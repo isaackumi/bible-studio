@@ -511,8 +511,7 @@
                 {@render icon(listening ? "mic-off" : "mic")}
                 {listening ? "Stop listening" : "Listen"}
               </button>
-              <button type="button" class="go" onclick={() 
-              => void findInScripture()}>{@render icon("wave")} Find</button>
+              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find</button>
             </footer>
           </section>
           <section class="pb-panel">
