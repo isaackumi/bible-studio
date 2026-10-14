@@ -25,6 +25,19 @@ describe("voice verse detection", () => {
     expect(spokenReference("john chapter 3 verse 16")?.chapter).toBe(3);
   });
 
+  it("reads the way speech writes a reference", () => {
+    expect(spokenReference("John 316")).toMatchObject({ bookOrd: 43, chapter: 3, startVerse: 16 });
+    expect(spokenReference("joshua one verse eight")).toMatchObject({ bookOrd: 6, chapter: 1, startVerse: 8 });
+    expect(spokenReference("john three sixteen")?.startVerse).toBe(16);
+  });
+
+  it("shows the latest reference in a noisy transcript", () => {
+    const hit = spokenReference(
+      "Efficient was 12 best off Don't resist John 316 John three Thank you Joshua one verse eight mosquito Joshua one verse eight I draw a line",
+    );
+    expect(hit).toMatchObject({ bookOrd: 6, chapter: 1, startVerse: 8 });
+  });
+
   it("does not invent a live take from a short fragment", () => {
     expect(detectVerse("and the", [{ verse: 1, text: "In the beginning God created the heaven and the earth." }], genesis, 1, "kjv")).toBeNull();
   });

@@ -17,19 +17,80 @@ function overlap(heard: string, verse: string): number {
   return hits / verseWords.length;
 }
 
-/** Turn spoken "john 3 16" into a parsed reference when a colon is missing. */
+const SMALL: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+};
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+
+function takeNumber(tokens: string[], index: number): { value: number; next: number } | null {
+  let value = 0;
+  let next = index;
+  if (TENS[tokens[next]] !== undefined) {
+    value = TENS[tokens[next]];
+    next += 1;
+    if (SMALL[tokens[next]] !== undefined && SMALL[tokens[next]] < 10) {
+      value += SMALL[tokens[next]];
+      next += 1;
+    }
+  } else if (SMALL[tokens[next]] !== undefined) {
+    value = SMALL[tokens[next]];
+    next += 1;
+  } else {
+    return null;
+  }
+  if (tokens[next] === "hundred") {
+    value *= 100;
+    next += 1;
+    const rest = takeNumber(tokens, next);
+    if (rest && rest.value < 100) {
+      value += rest.value;
+      next = rest.next;
+    }
+  }
+  return { value, next };
+}
+
+/** "one verse eight" and "three sixteen" become digits the reference parser can read. */
+function spellNumbers(text: string): string {
+  const tokens = text.split(" ").filter(Boolean);
+  const spoken: string[] = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const taken = takeNumber(tokens, index);
+    if (!taken) {
+      spoken.push(tokens[index]);
+      continue;
+    }
+    spoken.push(String(taken.value));
+    index = taken.next - 1;
+  }
+  return spoken.join(" ");
+}
+
+/** Speech often glues "3 16" into "316". Split only when one chapter/verse pair fits the book. */
+function splitGlued(chapters: number, digits: string): { chapter: number; verse: number } | null {
+  if (digits.length < 3) return null;
+  const options: Array<{ chapter: number; verse: number }> = [];
+  for (let cut = 1; cut < digits.length; cut += 1) {
+    const chapter = Number(digits.slice(0, cut));
+    const verse = Number(digits.slice(cut));
+    if (chapter >= 1 && chapter <= chapters && verse >= 1 && verse <= 176) options.push({ chapter, verse });
+  }
+  return options.length === 1 ? options[0] : null;
+}
+
+/** Turn spoken "john 3 16", "john 316", or "joshua one verse eight" into a reference. The latest one wins. */
 export function spokenReference(raw: string): ParsedReference | null {
-  const direct = parseReference(raw);
-  if (direct?.startVerse) return direct;
-  const prepared = raw
-    .toLowerCase()
-    .replace(/\bchapters?\b/g, " ")
-    .replace(/\bverses?\b/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const whole = parseReference(prepared.replace(/^([1-3]?\s*[a-z]+(?:\s+[a-z]+){0,3})\s+(\d+)\s+(\d+)$/i, "$1 $2:$3"));
-  if (whole?.startVerse) return whole;
+  const prepared = spellNumbers(
+    raw
+      .toLowerCase()
+      .replace(/\bchapters?\b/g, " ")
+      .replace(/\bverses?\b/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+  const found: Array<{ at: number; alias: string; hit: ParsedReference }> = [];
   const aliases = CANON.flatMap((book) => book.aliases.map((alias) => ({ alias, book })))
     .filter((entry) => entry.alias.length >= 3)
     .sort((a, b) => b.alias.length - a.alias.length);
@@ -42,16 +103,23 @@ export function spokenReference(raw: string): ParsedReference | null {
       const after = at + entry.alias.length;
       const ended = after === prepared.length || prepared[after] === " ";
       if (before && ended) {
-        const numbers = prepared.slice(after).match(/^\s+(\d+)\s+(\d+)\b/);
-        if (numbers) {
-          const hit = parseReference(`${entry.alias} ${numbers[1]}:${numbers[2]}`);
-          if (hit?.startVerse) return hit;
-        }
+        const tail = prepared.slice(after);
+        const pair = tail.match(/^\s+(\d+)\s+(\d+)\b/);
+        const glued = pair ? null : tail.match(/^\s+(\d{3,4})\b/);
+        const split = glued ? splitGlued(entry.book.chapters, glued[1]) : null;
+        const reference = pair
+          ? `${entry.alias} ${pair[1]}:${pair[2]}`
+          : split
+            ? `${entry.alias} ${split.chapter}:${split.verse}`
+            : null;
+        const hit = reference ? parseReference(reference) : null;
+        if (hit?.startVerse) found.push({ at, alias: entry.alias, hit });
       }
       from = at + Math.max(entry.alias.length, 1);
     }
   }
-  return null;
+  found.sort((a, b) => a.at - b.at || a.alias.length - b.alias.length);
+  return found.at(-1)?.hit ?? null;
 }
 
 export type QuoteVerse = {
