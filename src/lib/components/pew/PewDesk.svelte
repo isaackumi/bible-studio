@@ -7,7 +7,8 @@
   import type { BibleItem, PresentationItem, SearchHit, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
   import { onDestroy } from "svelte";
   import { canUse } from "../../platform/capabilities";
-  import { detectVerse } from "../../voice/detect";
+  import { bundledQuoteCatalog } from "../../bible/texts";
+  import { detectVerse, matchSpoken, type QuoteVerse } from "../../voice/detect";
   import { openPrivacySettings, prepareListening, speechAvailable, startListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -41,6 +42,7 @@
   let listenNote = $state("");
   let micLevel = $state(0);
   let stopListen: (() => void) | null = null;
+  let quotes: QuoteVerse[] = [];
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
@@ -61,6 +63,13 @@
   $effect(() => {
     const first = session.translations[0];
     if (first && !session.translations.some((entry) => entry.id === translationId)) translationId = first.id;
+  });
+
+  $effect(() => {
+    const id = translationId;
+    void bundledQuoteCatalog(id).then((rows) => {
+      if (id === translationId) quotes = rows;
+    });
   });
 
   $effect(() => {
@@ -328,22 +337,26 @@
         heard = text;
         if (!text) return;
         listenNote = "Hearing you. Matching stays on Preview.";
-        if (!final || !book) return;
-        const hit = detectVerse(text, verses, book, chapter, translationId);
-        if (!hit) return;
-        const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? book.name;
+        if (!final) return;
+        const quoted = matchSpoken(text, quotes, translationId);
+        const openChapter = quotes.length === 0 && book ? detectVerse(text, verses, book, chapter, translationId) : null;
+        const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
+        if (!match) return;
+        const hit = match.item;
+        const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
         if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
           bookOrd = hit.bookOrd;
           chapter = hit.chapter;
-          anchor = hit.startVerse;
         }
+        anchor = hit.startVerse;
+        listenNote = `${hit.reference} is on Preview. LIVE still sends Program.`;
         detections = [
           {
             bookOrd: hit.bookOrd,
             bookName: named,
             chapter: hit.chapter,
             verse: hit.startVerse,
-            text,
+            text: match.text,
           },
           ...detections,
         ].slice(0, 12);

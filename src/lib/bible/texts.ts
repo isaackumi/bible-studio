@@ -1,5 +1,6 @@
 import { CANON } from "./reference";
 import type { BookInfo, SearchHit, TranslationInfo, VerseText } from "../domain/types";
+import { normalizeSpeech, type QuoteVerse } from "../voice/detect";
 
 type SourceBook = { chapters: string[][] };
 
@@ -59,6 +60,29 @@ export async function bundledPassage(
 ): Promise<VerseText[]> {
   const rows = await bundledChapter(translationId, bookOrd, chapter);
   return rows.filter((verse) => verse.verse >= startVerse && verse.verse <= endVerse);
+}
+
+export async function bundledQuoteCatalog(translationId: string): Promise<QuoteVerse[]> {
+  const books = await load(translationId);
+  const rows: QuoteVerse[] = [];
+  books.forEach((book, index) => {
+    const meta = CANON[index];
+    if (!meta) return;
+    book.chapters.forEach((chapter, chapterIndex) => {
+      chapter.forEach((text, verseIndex) => {
+        rows.push({
+          bookOrd: meta.ord,
+          bookName: meta.name,
+          chaptersInBook: meta.chapters,
+          chapter: chapterIndex + 1,
+          verse: verseIndex + 1,
+          text,
+          normalized: normalizeSpeech(text),
+        });
+      });
+    });
+  });
+  return rows;
 }
 
 export async function bundledSearch(translationId: string, query: string, limit = 24): Promise<SearchHit[]> {
