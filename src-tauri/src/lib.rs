@@ -229,6 +229,7 @@ fn open_privacy_settings() -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    voice::relaunch_inside_bundle();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Output::default())

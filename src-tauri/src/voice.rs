@@ -20,9 +20,22 @@ pub fn open_privacy_settings() -> Result<(), String> {
     Err("Privacy settings are opened on macOS.".into())
 }
 
+/// `tauri dev` starts a bare binary whose privacy keys TCC ignores when Cursor is the parent.
+/// Relaunch from a real .app so Microphone and Speech Recognition prompts can appear.
+pub fn relaunch_inside_bundle() {
+    #[cfg(target_os = "macos")]
+    macos::relaunch_inside_bundle();
+}
+
 pub fn request_access() -> Result<ListenAccess, String> {
     #[cfg(target_os = "macos")]
     {
+        if !macos::inside_app_bundle() {
+            return Err(
+                "Church Studio is not running as an app yet. Quit it and start npm run tauri dev again."
+                    .into(),
+            );
+        }
         macos::request_access()
     }
     #[cfg(not(target_os = "macos"))]
@@ -37,6 +50,8 @@ pub fn request_access() -> Result<ListenAccess, String> {
 #[cfg(target_os = "macos")]
 mod macos {
     use super::ListenAccess;
+    use std::os::unix::process::CommandExt;
+    use std::path::Path;
     use std::sync::mpsc;
     use std::time::Duration;
 
@@ -44,6 +59,65 @@ mod macos {
     use objc2::runtime::Bool;
     use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio};
     use objc2_speech::{SFSpeechRecognizer, SFSpeechRecognizerAuthorizationStatus};
+
+    const BUNDLE_PLIST: &str = include_str!("../Info.plist");
+
+    pub fn inside_app_bundle() -> bool {
+        std::env::current_exe()
+            .ok()
+            .is_some_and(|path| path.to_string_lossy().contains(".app/Contents/MacOS/"))
+    }
+
+    pub fn relaunch_inside_bundle() {
+        if inside_app_bundle() {
+            return;
+        }
+        let Ok(exe) = std::env::current_exe() else {
+            return;
+        };
+        let Some(parent) = exe.parent() else {
+            return;
+        };
+        let app = parent.join("Church Studio.app");
+        let macos_dir = app.join("Contents/MacOS");
+        let bundled = macos_dir.join("church-studio");
+        if std::fs::create_dir_all(&macos_dir).is_err() {
+            return;
+        }
+        if std::fs::write(app.join("Contents/Info.plist"), BUNDLE_PLIST).is_err() {
+            return;
+        }
+        if refresh_binary(&exe, &bundled).is_err() {
+            return;
+        }
+        let _ = std::process::Command::new("codesign")
+            .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present"])
+            .arg(&app)
+            .status();
+        log::info!("relaunching inside {} so macOS can show the microphone prompt", app.display());
+        let err = std::process::Command::new(&bundled)
+            .args(std::env::args().skip(1))
+            .exec();
+        log::error!("could not relaunch inside the app bundle: {err}");
+    }
+
+    fn refresh_binary(source: &Path, bundled: &Path) -> Result<(), String> {
+        let src = std::fs::metadata(source).map_err(|e| e.to_string())?;
+        let same = std::fs::metadata(bundled)
+            .ok()
+            .is_some_and(|dst| dst.len() == src.len() && dst.modified().ok() == src.modified().ok());
+        if same {
+            return Ok(());
+        }
+        let _ = std::fs::remove_file(bundled);
+        std::fs::copy(source, bundled).map_err(|e| e.to_string())?;
+        std::fs::File::options()
+            .write(true)
+            .open(bundled)
+            .and_then(|file| file.set_modified(src.modified().unwrap_or(std::time::SystemTime::now())))
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 
     pub fn request_access() -> Result<ListenAccess, String> {
         Ok(ListenAccess {
