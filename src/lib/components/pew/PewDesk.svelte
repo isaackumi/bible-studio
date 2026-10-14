@@ -8,7 +8,7 @@
   import { onDestroy } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { detectVerse } from "../../voice/detect";
-  import { speechAvailable, startListening } from "../../voice/listen";
+  import { openPrivacySettings, prepareListening, speechAvailable, startListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
@@ -312,6 +312,13 @@
       listenNote = "Voice detection needs a microphone in this window. Type a reference if listening is unavailable.";
       return;
     }
+    listenNote = "macOS may ask for the microphone…";
+    const blocked = await prepareListening();
+    if (blocked) {
+      listenNote = blocked;
+      void openPrivacySettings();
+      return;
+    }
     listening = true;
     heard = "";
     micLevel = 0;
@@ -504,7 +511,8 @@
                 {@render icon(listening ? "mic-off" : "mic")}
                 {listening ? "Stop listening" : "Listen"}
               </button>
-              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find</button>
+              <button type="button" class="go" onclick={() 
+              => void findInScripture()}>{@render icon("wave")} Find</button>
             </footer>
           </section>
           <section class="pb-panel">

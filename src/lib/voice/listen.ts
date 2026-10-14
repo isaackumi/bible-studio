@@ -1,3 +1,33 @@
+import { invoke } from "@tauri-apps/api/core";
+import { isDesktop } from "../platform/runtime";
+
+export type ListenAccess = { microphone: string; speech: string };
+
+export function accessMessage(access: ListenAccess): string | null {
+  if (access.microphone === "denied") {
+    return "macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.";
+  }
+  if (access.speech === "denied") {
+    return "macOS blocked Speech Recognition. In System Settings → Privacy & Security → Speech Recognition, turn on Church Studio.";
+  }
+  return null;
+}
+
+export async function prepareListening(): Promise<string | null> {
+  if (!isDesktop()) return null;
+  try {
+    const access = await invoke<ListenAccess>("request_listen_access");
+    return accessMessage(access);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+export async function openPrivacySettings(): Promise<void> {
+  if (!isDesktop()) return;
+  await invoke("open_privacy_settings");
+}
+
 type SpeechRec = {
   lang: string;
   continuous: boolean;
@@ -103,7 +133,7 @@ export function startListening(handlers: {
         stopped = true;
         handlers.onError(
           event.error === "not-allowed" || event.error === "service-not-allowed"
-            ? "Microphone or speech access was refused. Allow Church Studio in System Settings → Privacy & Security, then listen again."
+            ? "macOS blocked the microphone or Speech Recognition. Turn Church Studio on in System Settings → Privacy & Security."
             : "Listening stopped.",
         );
         stopRec();
@@ -176,7 +206,7 @@ export function startListening(handlers: {
       .then((next) => begin(next))
       .catch(() => {
         if (stopped) return;
-        handlers.onError("Microphone access was refused. Allow it in System Settings → Privacy & Security, then listen again.");
+        handlers.onError("macOS blocked the microphone. Turn Church Studio on in System Settings → Privacy & Security → Microphone.");
         if (engine()) begin(null);
         else {
           stopped = true;

@@ -7,7 +7,17 @@
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { canUse } from "../../platform/capabilities";
   import { isDesktop } from "../../platform/runtime";
+  import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+
+  let audioNote = $state("");
+
+  async function allowMicrophone() {
+    audioNote = "macOS may ask for the microphone…";
+    const blocked = await prepareListening();
+    audioNote = blocked ?? "Microphone and Speech Recognition are allowed for Church Studio.";
+    if (blocked) void openPrivacySettings();
+  }
 
   const groups = [
     {
@@ -491,9 +501,16 @@
           <h3>{canUse("voice-detect") ? "Voice detection" : "Not in this release"}</h3>
           <p class="note">
             {canUse("voice-detect")
-              ? "Listen on Live transcript. A match is Preview only. LIVE still sends Program. Recognition stays on this computer. Cloud AI is off."
+              ? "Listen on Live transcript. A match is Preview only. LIVE still sends Program. Recognition stays on this computer. Cloud AI is off. If macOS already refused the mic, turn Church Studio on under Microphone and Speech Recognition."
               : "Audio recognition is not connected. Nothing here starts a microphone."}
           </p>
+          {#if canUse("voice-detect") && isDesktop()}
+            <div class="actions">
+              <button type="button" class="primary" onclick={() => void allowMicrophone()}>Allow microphone</button>
+              <button type="button" onclick={() => void openPrivacySettings()}>Open Privacy settings</button>
+            </div>
+            {#if audioNote}<p class="note">{audioNote}</p>{/if}
+          {/if}
         </section>
       {:else if section === "performance"}
         <section class="card">

@@ -23,8 +23,11 @@ log = "0.4"
 env_logger = "0.11"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
 objc2 = "0.6.5"
 objc2-app-kit = "0.3.2"
+objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
+objc2-speech = { version = "0.3.2", features = ["SFSpeechRecognizer", "block2"] }
 
 [profile.release]
 codegen-units = 1

@@ -1,6 +1,7 @@
 mod bible;
 mod db;
 mod displays;
+mod voice;
 
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -215,6 +216,16 @@ fn bible_search(db: State<Db>, translation_id: String, query: String) -> Result<
     with_db(&db, |conn| bible::search(conn, &translation_id, &query))
 }
 
+#[tauri::command]
+fn request_listen_access() -> Result<voice::ListenAccess, String> {
+    voice::request_access()
+}
+
+#[tauri::command]
+fn open_privacy_settings() -> Result<(), String> {
+    voice::open_privacy_settings()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -258,7 +269,9 @@ pub fn run() {
             bible_books,
             bible_verses,
             bible_passage,
-            bible_search
+            bible_search,
+            request_listen_access,
+            open_privacy_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running Church Studio");
