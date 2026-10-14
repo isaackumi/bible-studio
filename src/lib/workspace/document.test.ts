@@ -38,6 +38,16 @@ describe("workspace document", () => {
     expect(workspace.appearance.desk).toBe("pewbeam");
   });
 
+  it("keeps a named operator theme", () => {
+    const workspace = normalizeWorkspace({ appearance: { theme: "vespers", density: "comfortable", scale: 1, accent: "#fa4f00" } });
+    expect(workspace.appearance.theme).toBe("vespers");
+  });
+
+  it("drops an unknown operator theme", () => {
+    const workspace = normalizeWorkspace({ appearance: { theme: "neon", density: "comfortable", scale: 1, accent: "#fa4f00" } });
+    expect(workspace.appearance.theme).toBe("dark");
+  });
+
   it("keeps an OBS desk choice", () => {
     const workspace = normalizeWorkspace({ appearance: { theme: "dark", density: "comfortable", scale: 1, accent: "#fa4f00", desk: "obs" } });
     expect(workspace.appearance.desk).toBe("obs");

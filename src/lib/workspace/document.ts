@@ -1,4 +1,4 @@
-import type { AppearanceSettings, Cursor, DisplayProfile, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
+import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
@@ -14,9 +14,15 @@ export function clampScale(value: number | undefined): number {
   return Math.min(1.35, Math.max(0.85, value));
 }
 
+const OPERATOR_THEMES: OperatorTheme[] = ["dark", "vespers", "nave", "light"];
+
+function operatorTheme(value: string | undefined, base: OperatorTheme): OperatorTheme {
+  return OPERATOR_THEMES.includes(value as OperatorTheme) ? (value as OperatorTheme) : base;
+}
+
 function appearance(value: Partial<AppearanceSettings> | undefined, base: AppearanceSettings): AppearanceSettings {
   return {
-    theme: value?.theme === "light" ? "light" : base.theme,
+    theme: operatorTheme(value?.theme, base.theme),
     density: value?.density === "compact" ? "compact" : value?.density === "comfortable" ? "comfortable" : base.density,
     scale: value?.scale === undefined ? base.scale : clampScale(value.scale),
     accent: sanitizeAccent(value?.accent?.toLowerCase() === "#c6a15b" ? undefined : (value?.accent ?? base.accent)),

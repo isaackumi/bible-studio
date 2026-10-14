@@ -14,7 +14,7 @@
   --pigment-iron: #111010;
   --pigment-steel: #1e1c1c;
   --pigment-hairline: #312f2d;
-  --pigment-bone: #e4e4e4;
+  --pigment-bone: #f5f5f5;
   --pigment-parchment: #161414;
   --pigment-scripture: #e4e4e4;
   --pigment-filament: #fa4f00;
@@ -29,7 +29,7 @@
   --panel-2: var(--pigment-steel);
   --line: var(--pigment-hairline);
   --ink: var(--pigment-bone);
-  --muted: #9a9186;
+  --muted: #bdbdbd;
   --paper: var(--pigment-parchment);
   --paper-ink: var(--pigment-scripture);
   --brass: var(--pigment-filament);
@@ -544,67 +544,6 @@ button { cursor: pointer; }
 .mat { container-type: size; }
 .mat .ratio { width: min(100cqw, calc(100cqh * 16 / 9)); max-height: 100cqh; }
 
-.settings-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  background: rgba(0, 0, 0, 0.55);
-  display: grid;
-  place-items: center;
-}
-.settings {
-  width: min(860px, calc(100% - 32px));
-  height: min(640px, calc(100% - 32px));
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  font-family: var(--font-ui);
-}
-.settings-nav {
-  border-right: 1px solid var(--line);
-  overflow: auto;
-  padding: 10px 8px;
-  background: var(--desk);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.settings-nav p { margin: 4px 8px 8px; font-size: 13px; font-weight: 650; }
-.settings-nav button {
-  width: 100%;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  font: inherit;
-  font-size: 13px;
-}
-.settings-nav button.active { color: var(--ink); background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.settings svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.settings-body { min-width: 0; overflow: auto; padding: 16px 18px 24px; display: flex; flex-direction: column; gap: 12px; }
-.settings-body h2 { margin: 0; font-family: var(--font-ui); font-weight: 600; font-size: 18px; }
-.desk-row { display: flex; gap: 8px; }
-.desk-card {
-  min-width: 120px;
-  height: 72px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--field);
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.desk-card.active { border-color: var(--accent); color: var(--accent); }
 [data-tip] { position: relative; }
 [data-tip]:hover::after, [data-tip]:focus-visible::after {
   content: attr(data-tip);
@@ -627,32 +566,44 @@ button { cursor: pointer; }
   top: calc(100% + 8px);
   transform: translateX(-50%);
 }
-.settings-body label { display: flex; flex-direction: column; gap: 6px; }
-.settings-toolbar { display: flex; justify-content: flex-end; }
-.display-list, .shortcut-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.display-list li, .shortcut-list li {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
+:root[data-theme="vespers"] {
+  color-scheme: dark;
+  --booth: #0c0a09;
+  --panel: #161311;
+  --panel-2: #221e1a;
+  --desk: #100e0c;
+  --field: #1c1814;
+  --recess: #0c0a09;
+  --line: #3a332c;
+  --ink: #f6f1e7;
+  --muted: #c4b8a8;
+  --paper: #1c1612;
 }
-.shortcut-list li span:last-child { margin-left: auto; }
-.live-tag { color: var(--pigment-live-ink); letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
-.accent-row { display: flex; gap: 8px; align-items: center; }
-.swatch { width: 22px; height: 22px; border: 1px solid var(--line); padding: 0; }
-.swatch.active { outline: 2px solid var(--ink); outline-offset: 2px; }
+:root[data-theme="nave"] {
+  color-scheme: dark;
+  --booth: #070b12;
+  --panel: #101722;
+  --panel-2: #182232;
+  --desk: #0b1018;
+  --field: #121a26;
+  --recess: #070b12;
+  --line: #2c3b50;
+  --ink: #f4f7fb;
+  --muted: #a9b6c9;
+  --paper: #101820;
+}
 :root[data-theme="light"] {
   color-scheme: light;
-  --desk: #f4f1ea;
-  --booth: #f4f1ea;
+  --desk: #f7f5f3;
+  --booth: #f7f5f3;
   --panel: #ffffff;
-  --panel-2: #f7f4ee;
+  --panel-2: #f3f1ef;
   --field: #ffffff;
-  --line: #e4dfd6;
-  --ink: #1c1917;
-  --muted: #6b6560;
-  --paper: #ffffff;
+  --recess: #eeeae6;
+  --line: #c4c1be;
+  --ink: #050505;
+  --muted: #5c5956;
+  --paper: #fff4ef;
 }
 :root[data-theme="light"] .program-well .mat { background: var(--pigment-live-well); color: var(--pigment-live-ink); }
 :root[data-theme="light"] .panel-tabs button.active { color: var(--ink); }

@@ -192,8 +192,11 @@ export type DisplayProfile = {
 
 export type DeskStyle = "pewbeam" | "obs";
 
+/** Operator chrome. Scripture themes are a separate record. */
+export type OperatorTheme = "dark" | "vespers" | "nave" | "light";
+
 export type AppearanceSettings = {
-  theme: "dark" | "light";
+  theme: OperatorTheme;
   density: "compact" | "comfortable";
   scale: number;
   accent: string;

@@ -1,17 +1,13 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
+  import { audienceStatus } from "../display/status";
   import { isDesktop } from "../platform/runtime";
 
   const profile = $derived(
     session.workspace.displayProfiles.find((item) => item.id === session.workspace.activeDisplayProfileId) ??
       session.workspace.displayProfiles[0],
   );
-  const selected = $derived(session.output.displays.find((display) => display.key === profile?.assignments.audience));
-  const label = $derived(
-    isDesktop()
-      ? selected?.name || (profile?.assignments.audience ? "Saved display is disconnected" : "No external display")
-      : "Browser window",
-  );
+  const status = $derived(audienceStatus(session.output, isDesktop()));
 </script>
 
 <div class="output-controls">
@@ -27,8 +23,8 @@
     {profile?.outputMode === "fullscreen" ? "Window" : "Fullscreen"}
   </button>
   <button type="button" onclick={() => session.testOutput()}>Test</button>
-  <button type="button" onclick={() => session.openSettings("displays")}>Displays</button>
-  <p>{label} · {session.output.online ? "Connected" : "Not showing"} · {session.output.message}</p>
+  <button type="button" onclick={() => session.openSettings("audience")}>Output</button>
+  <p>{status.title}. {status.detail}</p>
 </div>
 
 <style>
@@ -50,7 +46,7 @@
   }
   p {
     margin: 0;
-    color: var(--muted, #9aa3b2);
+    color: var(--ink, #f5f5f5);
     font-size: 12px;
   }
 </style>
