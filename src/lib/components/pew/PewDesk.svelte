@@ -8,7 +8,7 @@
   import { onDestroy } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
-  import { detectVerse, matchSpoken, type QuoteVerse } from "../../voice/detect";
+  import { buildQuoteIndex, detectVerse, matchSpoken, type QuoteIndex } from "../../voice/detect";
   import { openPrivacySettings, prepareListening, speechAvailable, startListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -42,7 +42,8 @@
   let listenNote = $state("");
   let micLevel = $state(0);
   let stopListen: (() => void) | null = null;
-  let quotes: QuoteVerse[] = [];
+  let quoteIndex: QuoteIndex | null = null;
+  let lastSpokenRef = "";
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
@@ -68,7 +69,7 @@
   $effect(() => {
     const id = translationId;
     void bundledQuoteCatalog(id).then((rows) => {
-      if (id === translationId) quotes = rows;
+      if (id === translationId) quoteIndex = buildQuoteIndex(rows);
     });
   });
 
@@ -330,19 +331,23 @@
     }
     listening = true;
     heard = "";
+    lastSpokenRef = "";
     micLevel = 0;
     listenNote = "Listening. Speak a verse. A match appears on Preview. LIVE still sends Program.";
     stopListen = startListening({
-      onHeard: (text, final) => {
+      onHeard: (text) => {
         heard = text;
         if (!text) return;
-        listenNote = "Hearing you. Matching stays on Preview.";
-        if (!final) return;
-        const quoted = matchSpoken(text, quotes, translationId);
-        const openChapter = quotes.length === 0 && book ? detectVerse(text, verses, book, chapter, translationId) : null;
+        const quoted = quoteIndex ? matchSpoken(text, quoteIndex, translationId) : null;
+        const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
         const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
-        if (!match) return;
+        if (!match) {
+          if (!lastSpokenRef) listenNote = quoteIndex ? "Hearing you. Keep reading the verse." : "Loading the Bible so a verse can be found…";
+          return;
+        }
         const hit = match.item;
+        if (hit.reference === lastSpokenRef) return;
+        lastSpokenRef = hit.reference;
         const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
         if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
           bookOrd = hit.bookOrd;

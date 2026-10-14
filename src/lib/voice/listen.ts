@@ -120,10 +120,10 @@ export function startListening(handlers: {
     next.onresult = (event) => {
       let text = "";
       let final = false;
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      for (let index = 0; index < event.results.length; index += 1) {
         const result = event.results[index];
-        text += result[0].transcript;
-        final = result.isFinal;
+        text += `${result[0].transcript} `;
+        final = final || result.isFinal;
       }
       handlers.onHeard(text.trim(), final);
     };

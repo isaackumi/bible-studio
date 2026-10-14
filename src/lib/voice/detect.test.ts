@@ -77,8 +77,9 @@ describe("voice verse detection", () => {
 
   it("finds John 3:16 in the King James catalog", async () => {
     const catalog = await bundledQuoteCatalog("kjv");
-    const hit = matchSpoken("for god so loved the world that he gave his only begotten son", catalog, "kjv");
+    const hit = matchSpoken("for god so loved the world", catalog, "kjv");
     expect(hit?.item.reference).toBe("John 3:16");
+    expect(matchSpoken("god so loved the world he gave his son", catalog, "kjv")?.item.reference).toBe("John 3:16");
     expect(matchSpoken("please pass the microphone to the sound booth", catalog, "kjv")).toBeNull();
   });
 
