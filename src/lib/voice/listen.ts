@@ -33,7 +33,7 @@ type SpeechRec = {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives?: number;
-  onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean; length: number }> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -71,7 +71,7 @@ function rms(samples: Uint8Array): number {
 }
 
 export function startListening(handlers: {
-  onHeard: (text: string, final: boolean) => void;
+  onHeard: (text: string, final: boolean, alternatives: string[]) => void;
   onError: (message: string) => void;
   onEnd: () => void;
   onLevel?: (level: number) => void;
@@ -116,16 +116,17 @@ export function startListening(handlers: {
     next.lang = "en-US";
     next.continuous = true;
     next.interimResults = true;
-    next.maxAlternatives = 1;
+    next.maxAlternatives = 5;
     next.onresult = (event) => {
-      let text = "";
-      let final = false;
-      for (let index = 0; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        text += `${result[0].transcript} `;
-        final = final || result.isFinal;
+      const latest = event.results[event.results.length - 1];
+      if (!latest) return;
+      const alternatives: string[] = [];
+      for (let index = 0; index < latest.length; index += 1) {
+        const phrase = latest[index]?.transcript?.trim();
+        if (phrase) alternatives.push(phrase);
       }
-      handlers.onHeard(text.trim(), final);
+      if (alternatives.length === 0) return;
+      handlers.onHeard(alternatives[0], latest.isFinal, alternatives);
     };
     next.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bundledQuoteCatalog } from "../bible/texts";
-import { detectVerse, matchSpoken, spokenReference, type QuoteVerse } from "./detect";
+import { chooseHeard, detectVerse, matchSpoken, spokenReference, type QuoteVerse } from "./detect";
 
 const genesis = { ord: 1, name: "Genesis", chapters: 50 };
 
@@ -93,7 +93,12 @@ describe("voice verse detection", () => {
     const hit = matchSpoken("for god so loved the world", catalog, "kjv");
     expect(hit?.item.reference).toBe("John 3:16");
     expect(matchSpoken("god so loved the world he gave his son", catalog, "kjv")?.item.reference).toBe("John 3:16");
+    expect(matchSpoken("for god so loved the wrld that he gave his only begoten son", catalog, "kjv")?.item.reference).toBe("John 3:16");
+    expect(
+      matchSpoken("joshua one verse eight for god so loved the world that he gave his only begotten son", catalog, "kjv")?.item.reference,
+    ).toBe("John 3:16");
     expect(matchSpoken("please pass the microphone to the sound booth", catalog, "kjv")).toBeNull();
+    expect(chooseHeard(["efficient was twelve", "for god so loved the world"], catalog, "kjv")?.item.reference).toBe("John 3:16");
   });
 
   it("returns a preview passage, not a program action", () => {

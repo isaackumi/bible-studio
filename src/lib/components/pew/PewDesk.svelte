@@ -8,7 +8,7 @@
   import { onDestroy } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
-  import { buildQuoteIndex, detectVerse, matchSpoken, type QuoteIndex } from "../../voice/detect";
+  import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
   import { openPrivacySettings, prepareListening, speechAvailable, startListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -335,10 +335,10 @@
     micLevel = 0;
     listenNote = "Listening. Speak a verse. A match appears on Preview. LIVE still sends Program.";
     stopListen = startListening({
-      onHeard: (text) => {
+      onHeard: (text, _final, alternatives) => {
         heard = text;
         if (!text) return;
-        const quoted = quoteIndex ? matchSpoken(text, quoteIndex, translationId) : null;
+        const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
         const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
         const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
         if (!match) {
