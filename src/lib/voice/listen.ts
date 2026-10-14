@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "../platform/runtime";
 
 export type ListenAccess = { microphone: string; speech: string };
@@ -68,6 +69,85 @@ function rms(samples: Uint8Array): number {
     total += centered * centered;
   }
   return Math.min(1, Math.sqrt(total / samples.length) * 4);
+}
+
+type NativePhrase = { kind: string; text?: string; final?: boolean; alternatives?: string[]; value?: number; message?: string };
+
+const TRANSCRIPT_WORDS = 48;
+
+function recentWords(text: string): string {
+  return text.split(/\s+/).filter(Boolean).slice(-TRANSCRIPT_WORDS).join(" ");
+}
+
+/**
+ * SpeechTranscriber grows a volatile guess, then commits it as short final pieces.
+ * Keep the pieces and show the latest guess after them, so a fragment is never the whole phrase.
+ */
+export function stitchTranscript(
+  committed: string,
+  update: { text: string; final: boolean; alternatives: string[] },
+): { committed: string; text: string; alternatives: string[] } {
+  const piece = update.text.trim();
+  const options = [...new Set(update.alternatives.map((item) => item.trim()).filter(Boolean))];
+  if (update.final) {
+    const next = recentWords(`${committed} ${piece}`);
+    const alternatives = (options.length ? options : [piece]).map((option) => recentWords(`${committed} ${option}`));
+    return { committed: next, text: next, alternatives: [...new Set(alternatives)] };
+  }
+  const spoken = recentWords(`${committed} ${piece}`);
+  const alternatives = [...new Set([spoken, ...options.map((option) => recentWords(`${committed} ${option}`))])];
+  return { committed, text: spoken, alternatives };
+}
+
+/** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
+export function startNativeListening(handlers: {
+  onHeard: (text: string, final: boolean, alternatives: string[]) => void;
+  onError: (message: string) => void;
+  onEnd: () => void;
+  onLevel?: (level: number) => void;
+  onStatus?: (message: string) => void;
+}): () => void {
+  let detach = () => {};
+  let stopped = false;
+  let committed = "";
+  void listen<string>("listen-phrase", (event) => {
+    let message: NativePhrase;
+    try {
+      message = JSON.parse(event.payload) as NativePhrase;
+    } catch {
+      return;
+    }
+    if (message.kind === "phrase" && message.text) {
+      const stitched = stitchTranscript(committed, {
+        text: message.text,
+        final: Boolean(message.final),
+        alternatives: message.alternatives?.filter(Boolean) ?? [],
+      });
+      committed = stitched.committed;
+      handlers.onHeard(stitched.text, Boolean(message.final), stitched.alternatives);
+    } else if (message.kind === "level" && typeof message.value === "number") {
+      handlers.onLevel?.(message.value);
+    } else if (message.kind === "status" && message.message) {
+      handlers.onStatus?.(message.message);
+    } else if (message.kind === "error") {
+      handlers.onError(message.message || "Listening stopped.");
+      handlers.onEnd();
+    } else if (message.kind === "end") {
+      handlers.onEnd();
+    }
+  }).then((unlisten) => {
+    if (stopped) unlisten();
+    else detach = unlisten;
+  });
+  void invoke("start_sermon_listen").catch((error: unknown) => {
+    handlers.onError(error instanceof Error ? error.message : String(error));
+    handlers.onEnd();
+  });
+  return () => {
+    stopped = true;
+    detach();
+    void invoke("stop_sermon_listen");
+  };
 }
 
 export function startListening(handlers: {

@@ -7,9 +7,10 @@
   import type { BibleItem, PresentationItem, SearchHit, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
   import { onDestroy } from "svelte";
   import { canUse } from "../../platform/capabilities";
+  import { isDesktop } from "../../platform/runtime";
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
-  import { openPrivacySettings, prepareListening, speechAvailable, startListening } from "../../voice/listen";
+  import { openPrivacySettings, prepareListening, speechAvailable, startListening, startNativeListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
@@ -334,8 +335,8 @@
     lastSpokenRef = "";
     micLevel = 0;
     listenNote = "Listening. Speak a verse. A match appears on Preview. LIVE still sends Program.";
-    stopListen = startListening({
-      onHeard: (text, _final, alternatives) => {
+    const heardHandlers = {
+      onHeard: (text: string, _final: boolean, alternatives: string[]) => {
         heard = text;
         if (!text) return;
         const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
@@ -367,10 +368,10 @@
         ].slice(0, 12);
         void showPassage(hit.startVerse, hit.endVerse);
       },
-      onLevel: (level) => {
+      onLevel: (level: number) => {
         micLevel = level;
       },
-      onError: (message) => {
+      onError: (message: string) => {
         listenNote = message;
       },
       onEnd: () => {
@@ -378,7 +379,11 @@
         stopListen = null;
         micLevel = 0;
       },
-    });
+      onStatus: (message: string) => {
+        listenNote = message;
+      },
+    };
+    stopListen = isDesktop() ? startNativeListening(heardHandlers) : startListening(heardHandlers);
   }
 
   onDestroy(stopVoice);

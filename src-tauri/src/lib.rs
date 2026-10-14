@@ -226,6 +226,16 @@ fn open_privacy_settings() -> Result<(), String> {
     voice::open_privacy_settings()
 }
 
+#[tauri::command]
+fn start_sermon_listen(app: tauri::AppHandle) -> Result<(), String> {
+    voice::start_transcribe(app)
+}
+
+#[tauri::command]
+fn stop_sermon_listen() {
+    voice::stop_transcribe();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -272,7 +282,9 @@ pub fn run() {
             bible_passage,
             bible_search,
             request_listen_access,
-            open_privacy_settings
+            open_privacy_settings,
+            start_sermon_listen,
+            stop_sermon_listen
         ])
         .run(tauri::generate_context!())
         .expect("error while running Church Studio");

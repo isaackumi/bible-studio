@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>app.churchstudio.present.transcribe</string>
+  <key>CFBundleName</key>
+  <string>Church Studio Transcribe</string>
+  <key>CFBundleExecutable</key>
+  <string>church-studio-transcribe</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>0.1.0</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Church Studio listens so it can suggest the verse being read. The suggestion stays on Preview until you press LIVE.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Church Studio uses on-device speech recognition to detect scripture. It does not send Program by itself.</string>
+</dict>
+</plist>

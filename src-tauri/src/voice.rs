@@ -27,6 +27,23 @@ pub fn relaunch_inside_bundle() {
     macos::relaunch_inside_bundle();
 }
 
+pub fn start_transcribe(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::start_transcribe(app)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("On-device sermon transcription runs on macOS.".into())
+    }
+}
+
+pub fn stop_transcribe() {
+    #[cfg(target_os = "macos")]
+    macos::stop_transcribe();
+}
+
 pub fn request_access() -> Result<ListenAccess, String> {
     #[cfg(target_os = "macos")]
     {
@@ -107,6 +124,15 @@ mod macos {
         if refresh_binary(&exe, &bundled).is_err() {
             return;
         }
+        let helper_src = parent.join("church-studio-transcribe");
+        let helper_dst = macos_dir.join("church-studio-transcribe");
+        if helper_src.exists() {
+            let _ = refresh_binary(&helper_src, &helper_dst);
+            let _ = std::process::Command::new("codesign")
+                .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present.transcribe"])
+                .arg(&helper_dst)
+                .status();
+        }
         let _ = std::process::Command::new("codesign")
             .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present"])
             .arg(&app)
@@ -184,6 +210,54 @@ mod macos {
             .and_then(|file| file.set_modified(src.modified().unwrap_or(std::time::SystemTime::now())))
             .map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    struct TranscribeRun {
+        child: std::process::Child,
+        stdin: std::process::ChildStdin,
+    }
+
+    static TRANSCRIBE: std::sync::Mutex<Option<TranscribeRun>> = std::sync::Mutex::new(None);
+
+    pub fn start_transcribe(app: tauri::AppHandle) -> Result<(), String> {
+        stop_transcribe();
+        let path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-transcribe")))
+            .filter(|path| path.exists())
+            .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
+        let mut child = std::process::Command::new(&path)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("Could not start the on-device transcriber. {error}"))?;
+        let stdout = child.stdout.take().ok_or("The transcriber produced no transcript stream.")?;
+        let stdin = child.stdin.take().ok_or("The transcriber could not be stopped later.")?;
+        std::thread::spawn(move || {
+            use tauri::Emitter;
+            let reader = std::io::BufReader::new(stdout);
+            for line in std::io::BufRead::lines(reader) {
+                let Ok(line) = line else { break };
+                let _ = app.emit("listen-phrase", line);
+            }
+            let _ = app.emit("listen-phrase", r#"{"kind":"end"}"#);
+        });
+        let mut guard = TRANSCRIBE.lock().unwrap_or_else(|poison| poison.into_inner());
+        *guard = Some(TranscribeRun { child, stdin });
+        Ok(())
+    }
+
+    pub fn stop_transcribe() {
+        let mut guard = TRANSCRIBE.lock().unwrap_or_else(|poison| poison.into_inner());
+        let Some(mut run) = guard.take() else { return };
+        drop(guard);
+        let _ = std::io::Write::write_all(&mut run.stdin, b"stop\n");
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let _ = run.child.kill();
+            let _ = run.child.wait();
+        });
     }
 
     pub fn request_access() -> Result<ListenAccess, String> {
