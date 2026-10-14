@@ -31,6 +31,7 @@
   let wrapVerses = $state(false);
   let expanded = $state<"transcript" | "display" | "preview" | null>(null);
   let chapterToken = 0;
+  let takeAfterPreview = false;
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
@@ -93,9 +94,16 @@
     start = from;
     end = to;
     const item = passage();
-    if (!item) return;
+    if (!item) {
+      takeAfterPreview = false;
+      return;
+    }
     query = item.reference;
     await session.previewPassage(item);
+    if (takeAfterPreview) {
+      takeAfterPreview = false;
+      await session.take();
+    }
   }
 
   function pick(verse: number, shift = false) {
@@ -166,9 +174,10 @@
     query = `${book.name} ${next}`;
   }
 
-  function stepOutput(direction: 1 | -1) {
+  async function stepOutput(direction: 1 | -1) {
     if (mode === "songs") {
       session.stepSong(direction);
+      await session.take();
       return;
     }
     const current = mode === "scriptures" ? passage() : null;
@@ -176,13 +185,18 @@
       const next = stepVerse(current, direction, book, verses.length);
       if (next) {
         anchor = next.startVerse;
-        void showPassage(next.startVerse, next.endVerse);
+        await showPassage(next.startVerse, next.endVerse);
+        await session.take();
         return;
       }
+      const nextChapter = chapter + direction;
+      if (nextChapter < 1 || nextChapter > book.chapters) return;
+      takeAfterPreview = true;
       moveChapter(direction);
       return;
     }
-    session.step(direction);
+    await session.step(direction);
+    await session.take();
   }
 
   async function ensureService(sectionName: string) {
@@ -522,8 +536,8 @@
           <footer class="output-tools">
             <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
             <span class="steppers">
-              <button type="button" aria-label="Previous" onclick={() => stepOutput(-1)}>{@render icon("chevron-left")}</button>
-              <button type="button" aria-label="Next" onclick={() => stepOutput(1)}>{@render icon("chevron-right")}</button>
+              <button type="button" aria-label="Previous" onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
+              <button type="button" aria-label="Next" onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
             </span>
           </footer>
         </section>
@@ -633,7 +647,7 @@
     padding: 0;
   }
   .pb-tools button.on { color: var(--accent); }
-  .pb-tools :global(svg), .mini :global(svg), .lex :global(svg), .go :global(svg) {
+  .pb-tools :global(svg), .mini :global(svg), .lex :global(svg), .go :global(svg), .steppers :global(svg) {
     width: 18px;
     height: 18px;
     fill: none;
@@ -806,7 +820,7 @@
     letter-spacing: 0.12em;
     cursor: pointer;
   }
-  .output-tools { justify-content: space-between; padding-bottom: 10px; }
+  .output-tools { justify-content: space-between; padding-bottom: 10px; flex: none; position: relative; z-index: 1; }
   .lex, .steppers button {
     height: 32px;
     border-radius: 8px;
