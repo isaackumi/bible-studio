@@ -13,6 +13,7 @@ export type FeatureId =
   | "cloud-sync"
   | "remote-control"
   | "ai"
+  | "voice-detect"
   | "streaming"
   | "recording";
 
@@ -26,6 +27,7 @@ const CORE = new Set<FeatureId>([
   "media-images",
   "themes",
   "service",
+  "voice-detect",
 ]);
 
 /**

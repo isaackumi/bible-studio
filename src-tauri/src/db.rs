@@ -19,20 +19,22 @@ pub fn open(app: &AppHandle) -> Result<Db, String> {
     conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
         .map_err(|e| e.to_string())?;
     migrate(&conn)?;
-    bible::seed_kjv_if_needed(&conn, &kjv_path(app))?;
+    bible::seed_bundled_translations(&conn, &resource_dir(app))?;
     Ok(Db(Mutex::new(conn)))
 }
 
-fn kjv_path(app: &AppHandle) -> PathBuf {
+fn resource_dir(app: &AppHandle) -> PathBuf {
     if let Ok(path) = app
         .path()
         .resolve("resources/kjv.json", tauri::path::BaseDirectory::Resource)
     {
-        if path.exists() {
-            return path;
+        if let Some(dir) = path.parent() {
+            if dir.join("kjv.json").exists() {
+                return dir.to_path_buf();
+            }
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/kjv.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
 }
 
 fn migrate(conn: &Connection) -> Result<(), String> {

@@ -17,29 +17,56 @@ struct SourceBook {
     chapters: Vec<Vec<String>>,
 }
 
-pub fn seed_kjv_if_needed(conn: &Connection, path: &Path) -> Result<(), String> {
+struct BundledTranslation {
+    id: &'static str,
+    name: &'static str,
+    abbreviation: &'static str,
+    file: &'static str,
+}
+
+const BUNDLED: &[BundledTranslation] = &[
+    BundledTranslation { id: "kjv", name: "King James Version", abbreviation: "KJV", file: "kjv.json" },
+    BundledTranslation { id: "asv", name: "American Standard Version", abbreviation: "ASV", file: "asv.json" },
+    BundledTranslation { id: "web", name: "World English Bible", abbreviation: "WEB", file: "web.json" },
+    BundledTranslation { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", file: "bbe.json" },
+];
+
+pub fn seed_bundled_translations(conn: &Connection, resource_dir: &Path) -> Result<(), String> {
+    for translation in BUNDLED {
+        seed_translation_if_needed(conn, resource_dir, translation)?;
+    }
+    Ok(())
+}
+
+fn seed_translation_if_needed(
+    conn: &Connection,
+    resource_dir: &Path,
+    translation: &BundledTranslation,
+) -> Result<(), String> {
     let count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bible_translations WHERE id = 'kjv'",
-            [],
+            "SELECT COUNT(*) FROM bible_translations WHERE id = ?1",
+            params![translation.id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
     if count > 0 {
         return Ok(());
     }
+    let path = resource_dir.join(translation.file);
     if !path.exists() {
-        return Err(format!("KJV source is missing at {}", path.display()));
+        return Err(format!("{} source is missing at {}", translation.abbreviation, path.display()));
     }
-    log::info!("seeding KJV from {}", path.display());
-    let file = File::open(path).map_err(|e| e.to_string())?;
+    log::info!("seeding {} from {}", translation.abbreviation, path.display());
+    let file = File::open(&path).map_err(|e| e.to_string())?;
     let books: Vec<SourceBook> =
         serde_json::from_reader(BufReader::new(file)).map_err(|e| e.to_string())?;
     let canon: Vec<CanonBook> =
         serde_json::from_str(include_str!("../../src/lib/bible/canon.json")).map_err(|e| e.to_string())?;
     if books.len() != canon.len() {
         return Err(format!(
-            "KJV file has {} books; the canon lists {}",
+            "{} file has {} books; the canon lists {}",
+            translation.abbreviation,
             books.len(),
             canon.len()
         ));
@@ -48,39 +75,45 @@ pub fn seed_kjv_if_needed(conn: &Connection, path: &Path) -> Result<(), String> 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     tx.execute(
         "INSERT INTO bible_translations (id, name, abbreviation, license_note, source)
-         VALUES ('kjv', 'King James Version', 'KJV', 'Public domain', 'bundled')",
-        [],
+         VALUES (?1, ?2, ?3, 'Public domain', 'bundled')",
+        params![translation.id, translation.name, translation.abbreviation],
     )
     .map_err(|e| e.to_string())?;
 
     {
         let mut insert_book = tx
             .prepare(
-                "INSERT INTO bible_books (translation_id, ord, name, abbreviation) VALUES ('kjv', ?1, ?2, ?3)",
+                "INSERT INTO bible_books (translation_id, ord, name, abbreviation) VALUES (?1, ?2, ?3, ?4)",
             )
             .map_err(|e| e.to_string())?;
         let mut insert_verse = tx
             .prepare(
                 "INSERT INTO bible_verses (translation_id, book_ord, chapter, verse, text)
-                 VALUES ('kjv', ?1, ?2, ?3, ?4)",
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
             )
             .map_err(|e| e.to_string())?;
         for (book, meta) in books.iter().zip(canon.iter()) {
             insert_book
-                .execute(params![meta.ord, meta.name, meta.abbr])
+                .execute(params![translation.id, meta.ord, meta.name, meta.abbr])
                 .map_err(|e| e.to_string())?;
             for (chapter_index, chapter) in book.chapters.iter().enumerate() {
                 let chapter_no = (chapter_index + 1) as i32;
                 for (verse_index, text) in chapter.iter().enumerate() {
                     insert_verse
-                        .execute(params![meta.ord, chapter_no, (verse_index + 1) as i32, text])
+                        .execute(params![
+                            translation.id,
+                            meta.ord,
+                            chapter_no,
+                            (verse_index + 1) as i32,
+                            text
+                        ])
                         .map_err(|e| e.to_string())?;
                 }
             }
         }
     }
     tx.commit().map_err(|e| e.to_string())?;
-    log::info!("KJV seed complete");
+    log::info!("{} seed complete", translation.abbreviation);
     Ok(())
 }
 
@@ -216,13 +249,22 @@ pub fn search(conn: &Connection, translation_id: &str, query: &str) -> Result<Ve
 mod tests {
     use super::*;
 
+    fn john_3_16(file: &str) -> String {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join(file);
+        let books: Vec<SourceBook> =
+            serde_json::from_reader(BufReader::new(File::open(path).expect(file))).expect("json");
+        books[42].chapters[2][15].clone()
+    }
+
     #[test]
     fn bundled_kjv_contains_john_3_16() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/kjv.json");
-        let file = File::open(path).expect("kjv.json");
-        let books: Vec<SourceBook> = serde_json::from_reader(BufReader::new(file)).expect("json");
-        let john = &books[42];
-        let text = &john.chapters[2][15];
-        assert!(text.starts_with("For God so loved the world"));
+        assert!(john_3_16("kjv.json").starts_with("For God so loved the world"));
+    }
+
+    #[test]
+    fn bundled_asv_web_bbe_contain_john_3_16() {
+        assert!(john_3_16("asv.json").to_lowercase().contains("god so loved"));
+        assert!(john_3_16("web.json").to_lowercase().contains("god so loved"));
+        assert!(john_3_16("bbe.json").to_lowercase().contains("love for the world"));
     }
 }

@@ -2,7 +2,7 @@
   let { name, size = 18 }: { name: string; size?: number } = $props();
 </script>
 
-<svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   {#if name === "outputs" || name === "display"}
     <rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path>
   {:else if name === "themes" || name === "look"}
@@ -25,6 +25,12 @@
     <path d="M10 6l6 6-6 6"></path>
   {:else if name === "expand"}
     <path d="M9 4H4v5M15 4h5v5M20 15v5h-5M4 15v5h5"></path>
+  {:else if name === "columns"}
+    <rect x="4" y="5" width="7" height="14" rx="1.5"></rect><rect x="13" y="5" width="7" height="14" rx="1.5"></rect>
+  {:else if name === "mic"}
+    <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"></path>
+  {:else if name === "mic-off"}
+    <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6M5 5l14 14"></path>
   {:else if name === "wave" || name === "audio"}
     <path d="M3 12h2l2-5 3 10 2-5h2l2 3 2-3h3"></path>
   {:else if name === "note" || name === "lyrics"}

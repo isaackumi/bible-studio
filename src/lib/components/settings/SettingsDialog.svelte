@@ -467,8 +467,13 @@
         </section>
       {:else if section === "bible"}
         <section class="card">
-          <h3>King James Version</h3>
-          <p class="note">Public-domain scripture is on this computer. Search and the next verse stay on Preview until LIVE.</p>
+          <h3>On this computer</h3>
+          <p class="note">Public-domain scripture is stored locally. Search, Listen, and the next verse stay on Preview until LIVE.</p>
+          <ul class="plain">
+            {#each session.translations as translation (translation.id)}
+              <li>{translation.abbreviation} — {translation.name}. {translation.licenseNote ?? "Public domain"}.</li>
+            {/each}
+          </ul>
         </section>
       {:else if section === "lyrics"}
         <section class="card">
@@ -483,8 +488,12 @@
         </section>
       {:else if section === "audio"}
         <section class="card">
-          <h3>Not in this release</h3>
-          <p class="note">Audio recognition and playback are not connected. Nothing here starts a microphone.</p>
+          <h3>{canUse("voice-detect") ? "Voice detection" : "Not in this release"}</h3>
+          <p class="note">
+            {canUse("voice-detect")
+              ? "Listen on Live transcript. A match is Preview only. LIVE still sends Program. Recognition stays on this computer. Cloud AI is off."
+              : "Audio recognition is not connected. Nothing here starts a microphone."}
+          </p>
         </section>
       {:else if section === "performance"}
         <section class="card">
@@ -617,6 +626,13 @@
     line-height: 1.45;
   }
   .note.stand { margin-top: 0; }
+  .plain {
+    margin: 12px 0 0;
+    padding: 0 0 0 18px;
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.5;
+  }
   .icon-close, .text {
     border: 0;
     background: transparent;

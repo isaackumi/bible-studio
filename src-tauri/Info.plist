@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Church Studio listens so it can suggest the verse being read. The suggestion stays on Preview until you press LIVE.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Church Studio uses on-device speech recognition to detect scripture. It does not send Program by itself.</string>
+</dict>
+</plist>

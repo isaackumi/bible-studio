@@ -5,6 +5,10 @@
   import { api } from "../../db/api";
   import { moveSongSection, removeSongSection } from "../../domain/song";
   import type { BibleItem, PresentationItem, SearchHit, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
+  import { onDestroy } from "svelte";
+  import { canUse } from "../../platform/capabilities";
+  import { detectVerse } from "../../voice/detect";
+  import { speechAvailable, startListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
@@ -32,6 +36,10 @@
   let expanded = $state<"transcript" | "display" | "preview" | null>(null);
   let chapterToken = 0;
   let takeAfterPreview = false;
+  let listening = $state(false);
+  let heard = $state("");
+  let listenNote = $state("");
+  let stopListen: (() => void) | null = null;
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
@@ -285,6 +293,61 @@
     session.previewSongSection(song, song.sections[0]?.id ?? null);
   }
 
+  function stopVoice() {
+    stopListen?.();
+    stopListen = null;
+    listening = false;
+  }
+
+  async function toggleVoice() {
+    if (listening) {
+      stopVoice();
+      listenNote = "Listening stopped. Preview and Program were left as they were.";
+      return;
+    }
+    if (!canUse("voice-detect") || !speechAvailable()) {
+      listenNote = "Voice detection needs a microphone in this window. Type a reference if listening is unavailable.";
+      return;
+    }
+    listening = true;
+    heard = "";
+    listenNote = "Listening. A match appears on Preview. LIVE still sends it to Program.";
+    stopListen = startListening({
+      onHeard: (text, final) => {
+        heard = text;
+        if (!final || !book) return;
+        const hit = detectVerse(text, verses, book, chapter, translationId);
+        if (!hit) return;
+        const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? book.name;
+        if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
+          bookOrd = hit.bookOrd;
+          chapter = hit.chapter;
+          anchor = hit.startVerse;
+        }
+        detections = [
+          {
+            bookOrd: hit.bookOrd,
+            bookName: named,
+            chapter: hit.chapter,
+            verse: hit.startVerse,
+            text,
+          },
+          ...detections,
+        ].slice(0, 12);
+        void showPassage(hit.startVerse, hit.endVerse);
+      },
+      onError: (message) => {
+        listenNote = message;
+      },
+      onEnd: () => {
+        listening = false;
+        stopListen = null;
+      },
+    });
+  }
+
+  onDestroy(stopVoice);
+
   async function queueSong(song: Song, section: SongSection) {
     await ensureService("Songs");
     session.addLyric(song.id, section.id, `${song.title} — ${section.label}`);
@@ -300,7 +363,7 @@
       <button type="button" class:on={mode === "songs"} onclick={() => (mode = "songs")}>Songs</button>
     </nav>
     <div class="pb-actions">
-      <OutputControls />
+      <OutputControls compact />
       <p class="audience-owner">{session.audienceLabel()}</p>
       {#if !session.controlsAudience}
         <button type="button" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
@@ -411,8 +474,11 @@
           <section class="pb-panel">
             <header class="pb-head"><span>Live transcript</span>{@render expand("transcript")}</header>
             <div class="pb-body transcript">
+              {#if listening || heard}
+                <p class="heard">{heard || "Speak a verse."}</p>
+              {/if}
               {#if reading.length === 0}
-                <p>{note || "Search a reference or a phrase."}</p>
+                <p>{listenNote || note || "Search a reference, or listen for a verse."}</p>
               {:else}
                 {#each reading as verse (verse.verse)}
                   <p><sup>{verse.verse}</sup> {verse.text}</p>
@@ -420,8 +486,11 @@
               {/if}
             </div>
             <footer class="pb-foot">
-              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find in scripture</button>
-              <button type="button" class="round" aria-label="Matches" title="{detections.length} matches"></button>
+              <button type="button" class="go" class:on={listening} onclick={toggleVoice}>
+                {@render icon(listening ? "mic-off" : "mic")}
+                {listening ? "Stop listening" : "Listen"}
+              </button>
+              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find</button>
             </footer>
           </section>
           <section class="pb-panel">
@@ -568,6 +637,7 @@
         <p>Click a verse to put it on Preview. Shift-click a second verse to select a range.</p>
         <p>LIVE copies Preview onto Program. BLACK and CLEAR change Program only.</p>
         <p>Search a reference such as John 3:16, or a phrase such as “in the beginning”.</p>
+        <p>Listen matches spoken scripture on Preview. It never takes Program by itself.</p>
         <p>+ Add puts the current passage in the queue without changing Program.</p>
       {:else if sheet === "alerts"}
         <p>{note || "No alerts."}</p>
@@ -604,7 +674,8 @@
   .pb-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 10px 12px;
     padding: 10px 14px 12px;
     flex: none;
   }
@@ -619,9 +690,9 @@
     font-size: 14px;
   }
   .pb-modes button.on { background: var(--accent); color: white; }
-  .pb-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .audience-owner { margin: 0; color: var(--muted); font-size: 12px; }
-  .pb-actions button {
+  .pb-actions > button {
     border: 1px solid transparent;
     border-radius: 999px;
     min-width: 78px;
@@ -635,18 +706,19 @@
   .pip { width: 7px; height: 7px; border-radius: 50%; background: white; }
   .black { background: var(--line); color: var(--ink); }
   .clear { background: transparent; color: var(--accent); border-color: var(--accent); }
-  .pb-tools { display: flex; align-items: flex-start; gap: 6px; margin-left: 10px; }
+  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: none; }
   .pb-tools button {
     width: 36px;
     height: 36px;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--field);
+    color: var(--ink);
     display: grid;
     place-items: center;
     padding: 0;
   }
-  .pb-tools button.on { color: var(--accent); }
+  .pb-tools button.on { color: var(--accent); border-color: var(--accent); }
   .pb-tools :global(svg), .mini :global(svg), .lex :global(svg), .go :global(svg), .steppers :global(svg) {
     width: 18px;
     height: 18px;
@@ -656,8 +728,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .pb-tools :global(svg) { width: 16px; height: 16px; padding: 7px; box-sizing: content-box; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
-  .pb-tools button.on :global(svg) { border-color: var(--accent); color: var(--accent); }
   .pb-grid {
     flex: 1;
     min-height: 0;
@@ -705,6 +775,7 @@
     font-size: 12px;
   }
   .go { color: var(--presence); display: inline-flex; align-items: center; gap: 6px; font-weight: 560; }
+  .go.on { color: var(--accent); }
   .pb-foot { justify-content: space-between; border-top: 1px solid var(--line); }
   .round { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); }
   .mini {
@@ -728,7 +799,7 @@
     color: var(--ink);
     padding: 0 10px;
   }
-  select { width: 72px; }
+  select { width: 88px; }
   .script-bar input, .slide-bar input { flex: 1; min-width: 0; }
   .verse-list, .queue { overflow: auto; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
   .verse, .queue button, .card, .tile {
@@ -759,6 +830,7 @@
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
   .transcript, .reading, .detections { overflow: auto; padding: 8px 12px 12px; }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
+  .heard { color: var(--accent); font-style: italic; }
   .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }

@@ -3,6 +3,8 @@
   import { audienceStatus } from "../display/status";
   import { isDesktop } from "../platform/runtime";
 
+  let { compact = false }: { compact?: boolean } = $props();
+
   const profile = $derived(
     session.workspace.displayProfiles.find((item) => item.id === session.workspace.activeDisplayProfileId) ??
       session.workspace.displayProfiles[0],
@@ -22,9 +24,11 @@
   <button type="button" onclick={() => session.setOutputMode(profile?.outputMode === "fullscreen" ? "window" : "fullscreen")}>
     {profile?.outputMode === "fullscreen" ? "Window" : "Fullscreen"}
   </button>
-  <button type="button" onclick={() => session.testOutput()}>Test</button>
-  <button type="button" onclick={() => session.openSettings("audience")}>Output</button>
-  <p>{status.title}. {status.detail}</p>
+  {#if !compact}
+    <button type="button" onclick={() => session.testOutput()}>Test</button>
+    <button type="button" onclick={() => session.openSettings("audience")}>Output</button>
+  {/if}
+  <p>{compact ? status.title : `${status.title}. ${status.detail}`}</p>
 </div>
 
 <style>

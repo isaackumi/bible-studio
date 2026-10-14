@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { KJV, kjvBooks, kjvChapter, kjvPassage, kjvSearch } from "../bible/kjv";
+import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch } from "../bible/texts";
 import { browserLibrary } from "../platform/browser-store";
 import type { LibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
@@ -58,23 +58,19 @@ export const api = {
     desktop() ? invoke<void>("import_library", { snapshot }) : browserLibrary.importSnapshot(snapshot),
   mediaList: () => invoke<MediaAsset[]>("media_list"),
   importMedia: (path: string) => invoke<MediaAsset>("import_media", { path }),
-  translations: () => (desktop() ? invoke<TranslationInfo[]>("bible_translations") : Promise.resolve([KJV])),
+  translations: () => (desktop() ? invoke<TranslationInfo[]>("bible_translations") : Promise.resolve(BUNDLED_TRANSLATIONS)),
   books: (translationId: string) =>
-    desktop() ? invoke<BookInfo[]>("bible_books", { translationId }) : Promise.resolve(translationId === "kjv" ? kjvBooks() : []),
-  verses: (translationId: string, bookOrd: number, chapter: number) =>
     desktop()
-      ? invoke<VerseText[]>("bible_verses", { translationId, bookOrd, chapter })
-      : translationId === "kjv"
-        ? kjvChapter(bookOrd, chapter)
-        : Promise.resolve([]),
+      ? invoke<BookInfo[]>("bible_books", { translationId })
+      : Promise.resolve(BUNDLED_TRANSLATIONS.some((entry) => entry.id === translationId) ? bundledBooks() : []),
+  verses: (translationId: string, bookOrd: number, chapter: number) =>
+    desktop() ? invoke<VerseText[]>("bible_verses", { translationId, bookOrd, chapter }) : bundledChapter(translationId, bookOrd, chapter),
   passage: (translationId: string, bookOrd: number, chapter: number, startVerse: number, endVerse: number) =>
     desktop()
       ? invoke<VerseText[]>("bible_passage", { translationId, bookOrd, chapter, startVerse, endVerse })
-      : translationId === "kjv"
-        ? kjvPassage(bookOrd, chapter, startVerse, endVerse)
-        : Promise.resolve([]),
+      : bundledPassage(translationId, bookOrd, chapter, startVerse, endVerse),
   search: (translationId: string, query: string) =>
-    desktop() ? invoke<SearchHit[]>("bible_search", { translationId, query }) : translationId === "kjv" ? kjvSearch(query) : Promise.resolve([]),
+    desktop() ? invoke<SearchHit[]>("bible_search", { translationId, query }) : bundledSearch(translationId, query),
 };
 
 export function assetUrl(path: string | null | undefined): string | null {
