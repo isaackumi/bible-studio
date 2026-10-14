@@ -13,8 +13,18 @@ export function audienceStatus(output: OutputStatus, desktop: boolean): Audience
       : { title: "Audience is closed", detail: "Open output to use a separate browser window. A browser cannot move that window onto a monitor." };
   }
   const live = output.displays.find((display) => display.audience);
+  const external = output.displays.find((display) => !display.primary);
   if (!output.desired) {
-    return { title: "Audience is closed", detail: "Open output when you are ready to show Program." };
+    if (external) {
+      return {
+        title: external.name,
+        detail: `External display detected · ${external.width} × ${external.height}. Open output to show Program there.`,
+      };
+    }
+    if (output.displays.length > 0) {
+      return { title: "Audience is closed", detail: "No external display is connected. Connect one, or choose this screen." };
+    }
+    return { title: "Audience is closed", detail: "Looking for displays." };
   }
   if (output.online && live) {
     const place = live.primary ? "Built-in display" : "External display";

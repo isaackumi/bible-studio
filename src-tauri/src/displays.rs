@@ -175,14 +175,15 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         if let Some(window) = app.get_webview_window("audience") {
             window.destroy().map_err(|e| e.to_string())?;
         }
-        publish(
-            app,
-            &output,
-            false,
-            String::new(),
-            "Audience output is closed".into(),
-            &signature,
-        );
+        let message = match displays.iter().find(|display| !display.primary) {
+            Some(display) => format!(
+                "External display detected: {}. Open output to show Program there.",
+                display.name
+            ),
+            None if displays.is_empty() => "No displays were detected.".into(),
+            None => "No external display is connected.".into(),
+        };
+        publish(app, &output, false, String::new(), message, &signature);
         return Ok(());
     }
 
@@ -578,11 +579,57 @@ fn display_key(name: &str, width: u32, height: u32, scale: f64) -> String {
 
 fn display_key_of(monitor: &Monitor) -> String {
     let size = monitor.size();
-    display_key(&monitor_name(monitor), size.width, size.height, monitor.scale_factor())
+    display_key(&raw_monitor_name(monitor), size.width, size.height, monitor.scale_factor())
+}
+
+fn raw_monitor_name(monitor: &Monitor) -> String {
+    monitor.name().cloned().unwrap_or_else(|| "Display".into())
 }
 
 fn monitor_name(monitor: &Monitor) -> String {
-    monitor.name().cloned().unwrap_or_else(|| "Display".into())
+    friendly_name(monitor).unwrap_or_else(|| raw_monitor_name(monitor))
+}
+
+/// Tao's macOS name is "Monitor #model". NSScreen.localizedName is the name in System Settings.
+#[cfg(target_os = "macos")]
+fn friendly_name(monitor: &Monitor) -> Option<String> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+
+    let marker = MainThreadMarker::new()?;
+    // Horizontal origin matches AppKit. Vertical origin does not: CoreGraphics is top-left.
+    let (x, _, width, _) = logical_frame(monitor);
+    let mut best: Option<(f64, String)> = None;
+    for screen in NSScreen::screens(marker) {
+        let frame = screen.frame();
+        let dx = (frame.origin.x - x).abs();
+        if dx > 8.0 || !width_matches(width, frame.size.width) {
+            continue;
+        }
+        let name = screen.localizedName().to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let score = dx + (frame.size.width - width).abs().min((frame.size.width - width * 2.0).abs());
+        if best.as_ref().is_none_or(|(previous, _)| score < *previous) {
+            best = Some((score, name));
+        }
+    }
+    best.map(|(_, name)| name)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn friendly_name(_monitor: &Monitor) -> Option<String> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn width_matches(reported: f64, actual: f64) -> bool {
+    if actual <= 0.0 {
+        return false;
+    }
+    let ratio = reported / actual;
+    (reported - actual).abs() < 8.0 || (ratio - 0.5).abs() < 0.08 || (ratio - 2.0).abs() < 0.08
 }
 
 fn monitor_key(monitor: &Monitor) -> String {
@@ -633,6 +680,14 @@ mod tests {
     fn a_one_to_one_display_keeps_its_points() {
         let (x, _y, width, height) = logical_points(1512, 0, 1920, 1080, 1.0);
         assert_eq!((x, width, height), (1512.0, 1920.0, 1080.0));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_retina_width_still_matches_the_screen() {
+        assert!(width_matches(720.0, 1440.0));
+        assert!(width_matches(1920.0, 1920.0));
+        assert!(!width_matches(1920.0, 1440.0));
     }
 
     #[test]

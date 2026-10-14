@@ -46,10 +46,16 @@ describe("audience status", () => {
     expect(status.detail).toBe("External display · 1920 × 1200 · Window");
   });
 
-  it("stays closed until output is opened", () => {
-    expect(audienceStatus(output({}), true)).toEqual({
+  it("names a connected external display before output is opened", () => {
+    const status = audienceStatus(output({ displays: [display({ primary: false })] }), true);
+    expect(status.title).toBe("DELL U2415");
+    expect(status.detail).toContain("External display detected");
+  });
+
+  it("stays closed when only the built-in display is connected", () => {
+    expect(audienceStatus(output({ displays: [display({ primary: true, name: "Built-in" })] }), true)).toEqual({
       title: "Audience is closed",
-      detail: "Open output when you are ready to show Program.",
+      detail: "No external display is connected. Connect one, or choose this screen.",
     });
   });
 });

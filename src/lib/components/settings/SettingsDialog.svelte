@@ -282,7 +282,7 @@
         <section class="status-card" class:on={session.output.online}>
           <span class="lamp" class:on={session.output.online}></span>
           <div>
-            <p class="eyebrow">{session.output.online ? "Showing" : "Output"}</p>
+            <p class="eyebrow">{session.output.online ? "Showing" : status.detail.startsWith("External display detected") ? "Detected" : "Output"}</p>
             <h3>{status.title}</h3>
             <p>{status.detail}</p>
           </div>
