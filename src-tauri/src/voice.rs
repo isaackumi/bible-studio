@@ -50,14 +50,31 @@ pub fn request_access() -> Result<ListenAccess, String> {
 #[cfg(target_os = "macos")]
 mod macos {
     use super::ListenAccess;
-    use std::os::unix::process::CommandExt;
+    use std::ffi::{CString, c_char, c_void};
+    use std::os::unix::ffi::OsStringExt;
     use std::path::Path;
     use std::sync::mpsc;
     use std::time::Duration;
 
+    unsafe extern "C" {
+        fn posix_spawnattr_init(attr: *mut *mut c_void) -> i32;
+        fn posix_spawnattr_destroy(attr: *mut *mut c_void) -> i32;
+        fn posix_spawn(
+            pid: *mut i32,
+            path: *const c_char,
+            file_actions: *const c_void,
+            attrp: *const *mut c_void,
+            argv: *const *mut c_char,
+            envp: *const *mut c_char,
+        ) -> i32;
+        fn responsibility_spawnattrs_setdisclaim(attr: *mut *mut c_void, disclaim: u32) -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+    }
+
     use block2::RcBlock;
     use objc2::runtime::Bool;
     use objc2_av_foundation::{AVAuthorizationStatus, AVCaptureDevice, AVMediaTypeAudio};
+    use objc2_foundation::{NSDate, NSDefaultRunLoopMode, NSRunLoop};
     use objc2_speech::{SFSpeechRecognizer, SFSpeechRecognizerAuthorizationStatus};
 
     const BUNDLE_PLIST: &str = include_str!("../Info.plist");
@@ -94,35 +111,61 @@ mod macos {
             .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present"])
             .arg(&app)
             .status();
-        // `exec` keeps Cursor as the responsible process, and macOS then aborts speech requests.
-        // LaunchServices `open` makes Church Studio responsible for its own microphone prompt.
+        // `open` failed with LaunchServices -600 while this binary was already running.
+        // Start the bundle ourselves and disclaim Cursor, so the microphone dialog belongs to Church Studio.
         let _ = std::process::Command::new("pkill")
             .args(["-f", "Church Studio.app/Contents/MacOS/church-studio"])
             .status();
-        let mut launched = std::process::Command::new("open");
-        launched.arg(&app).process_group(0);
-        if launched.spawn().is_err() {
-            log::error!("could not open {}", app.display());
-            return;
-        }
-        log::info!("opened {} for the microphone prompt", app.display());
-        for _ in 0..50 {
-            if app_is_running() {
-                break;
+        match spawn_disclaimed(&bundled) {
+            Ok(pid) => {
+                log::info!("started {} ({pid}) for the microphone prompt", bundled.display());
+                let mut status = 0;
+                unsafe {
+                    waitpid(pid, &mut status, 0);
+                }
+                std::process::exit(0);
             }
-            std::thread::sleep(Duration::from_millis(100));
+            Err(message) => log::error!("could not start the app bundle: {message}"),
         }
-        while app_is_running() {
-            std::thread::sleep(Duration::from_millis(400));
-        }
-        std::process::exit(0);
     }
 
-    fn app_is_running() -> bool {
-        std::process::Command::new("pgrep")
-            .args(["-f", "Church Studio.app/Contents/MacOS/church-studio"])
-            .output()
-            .is_ok_and(|output| output.status.success())
+    fn spawn_disclaimed(exe: &Path) -> Result<i32, String> {
+        let path = CString::new(exe.as_os_str().as_encoded_bytes()).map_err(|e| e.to_string())?;
+        let mut args = Vec::new();
+        for arg in std::env::args_os() {
+            args.push(CString::new(arg.as_encoded_bytes()).map_err(|e| e.to_string())?);
+        }
+        if let Some(first) = args.first_mut() {
+            *first = CString::new(exe.as_os_str().as_encoded_bytes()).map_err(|e| e.to_string())?;
+        }
+        let mut argv: Vec<*mut c_char> = args.iter().map(|arg| arg.as_ptr() as *mut c_char).collect();
+        argv.push(std::ptr::null_mut());
+        let mut env_owned = Vec::new();
+        for (key, value) in std::env::vars_os() {
+            let mut pair = key.into_vec();
+            pair.push(b'=');
+            pair.extend(value.as_encoded_bytes());
+            env_owned.push(CString::new(pair).map_err(|e| e.to_string())?);
+        }
+        let mut envp: Vec<*mut c_char> = env_owned.iter().map(|item| item.as_ptr() as *mut c_char).collect();
+        envp.push(std::ptr::null_mut());
+        unsafe {
+            let mut attr: *mut c_void = std::ptr::null_mut();
+            if posix_spawnattr_init(&mut attr) != 0 {
+                return Err("Could not prepare the app launch.".into());
+            }
+            if responsibility_spawnattrs_setdisclaim(&mut attr, 1) != 0 {
+                posix_spawnattr_destroy(&mut attr);
+                return Err("Could not separate the app from Cursor.".into());
+            }
+            let mut pid = 0;
+            let result = posix_spawn(&mut pid, path.as_ptr(), std::ptr::null(), &attr, argv.as_ptr(), envp.as_ptr());
+            posix_spawnattr_destroy(&mut attr);
+            if result != 0 {
+                return Err(format!("Could not start Church Studio ({result})."));
+            }
+            Ok(pid)
+        }
     }
 
     fn refresh_binary(source: &Path, bundled: &Path) -> Result<(), String> {
@@ -165,9 +208,7 @@ mod macos {
         unsafe {
             AVCaptureDevice::requestAccessForMediaType_completionHandler(media, &block);
         }
-        rx.recv_timeout(Duration::from_secs(180))
-            .map(|granted| if granted { "granted".into() } else { "denied".into() })
-            .map_err(|_| "The microphone dialog was closed.".into())
+        wait_for_dialog(&rx).map(|granted| if granted { "granted".into() } else { "denied".into() })
     }
 
     fn request_speech() -> Result<String, String> {
@@ -186,10 +227,26 @@ mod macos {
         unsafe {
             SFSpeechRecognizer::requestAuthorization(&block);
         }
-        match rx.recv_timeout(Duration::from_secs(180)) {
+        match wait_for_dialog(&rx) {
             Ok(SFSpeechRecognizerAuthorizationStatus::Authorized) => Ok("granted".into()),
             Ok(_) => Ok("denied".into()),
-            Err(_) => Err("The speech dialog was closed.".into()),
+            Err(message) => Err(message),
+        }
+    }
+
+    /// The system permission dialog is delivered on the main thread. A blocking wait never lets it appear.
+    fn wait_for_dialog<T>(rx: &mpsc::Receiver<T>) -> Result<T, String> {
+        let run_loop = NSRunLoop::mainRunLoop();
+        let start = std::time::Instant::now();
+        loop {
+            if let Ok(value) = rx.try_recv() {
+                return Ok(value);
+            }
+            if start.elapsed() > Duration::from_secs(180) {
+                return Err("The permission dialog was closed.".into());
+            }
+            let until = NSDate::dateWithTimeIntervalSinceNow(0.05);
+            let _ = run_loop.runMode_beforeDate(unsafe { NSDefaultRunLoopMode }, &until);
         }
     }
 }
