@@ -1,11 +1,11 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { CANON, formatReference, withChapterCounts, type CanonBook } from "../bible/reference";
+import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, assetUrl } from "../db/api";
 import { claimOwner, controlsOutput, publishLocal, readOwner } from "../display/channel";
 import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
-import { applyProgramAction, createLiveState, frame, programPacket, setPreview } from "../domain/live";
+import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
 import { findItem, moveInList, stepCursor } from "../domain/service";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
@@ -433,6 +433,32 @@ class Session {
     const model = await this.modelFor(item);
     this.previewModel(model, null);
     this.remember(passage);
+  };
+
+  /** Keep Program on the same verse, in the newly chosen translation. Preview is updated separately. */
+  refreshProgramTranslation = async (translationId: string) => {
+    const current = this.live.program.model;
+    if (current.layout !== "scripture" || !current.reference) return;
+    const parsed = parseReference(current.reference);
+    if (!parsed?.startVerse) return;
+    const translation = this.translations.find((entry) => entry.id === translationId);
+    const model = await this.modelFor({
+      id: this.live.program.sourceId ?? "program",
+      kind: "bible",
+      title: current.reference,
+      bible: {
+        translationId,
+        bookOrd: parsed.bookOrd,
+        chapter: parsed.chapter,
+        startVerse: parsed.startVerse,
+        endVerse: parsed.endVerse ?? parsed.startVerse,
+        reference: current.reference,
+      },
+    });
+    if (model.lines.length === 0) return;
+    if (translation) model.attribution = this.theme().attribution.show ? translation.name : null;
+    this.live = replaceProgramModel(this.live, model);
+    await this.pushProgram();
   };
 
   addPassage = async (passage: BibleItem) => {

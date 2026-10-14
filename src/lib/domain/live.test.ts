@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyProgramAction, createLiveState, frame, sameProgram, setPreview } from "./live";
+import { applyProgramAction, createLiveState, frame, replaceProgramModel, sameProgram, setPreview } from "./live";
 import { defaultTheme } from "./theme";
 import type { PresentationModel } from "./types";
 import { PROGRAM_ACTIONS } from "./types";
@@ -70,5 +70,20 @@ describe("preview and program", () => {
     state = applyProgramAction(state, "clear", theme, { title: "Grace Chapel", imageUrl: null });
     expect(state.program.model.layout).toBe("empty");
     expect(state.preview.model.layout).toBe("scripture");
+  });
+
+  it("a new translation updates program scripture without taking a different preview", () => {
+    let state = createLiveState(theme);
+    state = setPreview(state, frame(verse("John 3:16", "For God so loved the world"), "item-a", "cut"));
+    state = applyProgramAction(state, "take", theme, { title: "Logo", imageUrl: null });
+    state = setPreview(state, frame(verse("John 3:17", "For God sent not his Son"), "item-b", "cut"));
+    state = replaceProgramModel(
+      state,
+      verse("John 3:16", "For God so loved the world, that he gave his only begotten Son."),
+    );
+    expect(state.program.model.attribution).toBe("KJV");
+    expect(state.program.model.lines[0]?.text).toContain("only begotten");
+    expect(state.program.model.reference).toBe("John 3:16");
+    expect(state.preview.model.reference).toBe("John 3:17");
   });
 });

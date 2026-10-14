@@ -39,6 +39,7 @@
   let listening = $state(false);
   let heard = $state("");
   let listenNote = $state("");
+  let micLevel = $state(0);
   let stopListen: (() => void) | null = null;
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
@@ -77,6 +78,7 @@
         const to = end ?? from;
         note = rows.length ? "" : "This chapter has no verses.";
         if (rows.some((row) => row.verse === from)) void showPassage(from, Math.max(from, to));
+        void session.refreshProgramTranslation(id);
       })
       .catch(() => {
         if (token !== chapterToken) return;
@@ -297,6 +299,7 @@
     stopListen?.();
     stopListen = null;
     listening = false;
+    micLevel = 0;
   }
 
   async function toggleVoice() {
@@ -311,10 +314,13 @@
     }
     listening = true;
     heard = "";
-    listenNote = "Listening. A match appears on Preview. LIVE still sends it to Program.";
+    micLevel = 0;
+    listenNote = "Listening. Speak a verse. A match appears on Preview. LIVE still sends Program.";
     stopListen = startListening({
       onHeard: (text, final) => {
         heard = text;
+        if (!text) return;
+        listenNote = "Hearing you. Matching stays on Preview.";
         if (!final || !book) return;
         const hit = detectVerse(text, verses, book, chapter, translationId);
         if (!hit) return;
@@ -336,12 +342,16 @@
         ].slice(0, 12);
         void showPassage(hit.startVerse, hit.endVerse);
       },
+      onLevel: (level) => {
+        micLevel = level;
+      },
       onError: (message) => {
         listenNote = message;
       },
       onEnd: () => {
         listening = false;
         stopListen = null;
+        micLevel = 0;
       },
     });
   }
@@ -476,9 +486,13 @@
             <div class="pb-body transcript">
               {#if listening || heard}
                 <p class="heard">{heard || "Speak a verse."}</p>
+                {#if listening}
+                  <div class="meter" aria-hidden="true"><span style="width: {Math.max(4, Math.round(micLevel * 100))}%"></span></div>
+                {/if}
               {/if}
+              {#if listenNote}<p class="listen-note">{listenNote}</p>{/if}
               {#if reading.length === 0}
-                <p>{listenNote || note || "Search a reference, or listen for a verse."}</p>
+                <p>{note || "Search a reference, or listen for a verse."}</p>
               {:else}
                 {#each reading as verse (verse.verse)}
                   <p><sup>{verse.verse}</sup> {verse.text}</p>
@@ -831,6 +845,20 @@
   .transcript, .reading, .detections { overflow: auto; padding: 8px 12px 12px; }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
   .heard { color: var(--accent); font-style: italic; }
+  .listen-note { color: var(--muted); font-size: 12px; }
+  .meter {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+    margin: 0 0 10px;
+  }
+  .meter span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 80ms linear;
+  }
   .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
