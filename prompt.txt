@@ -1,0 +1,935 @@
+# Project: Next-Generation Bible & Church Presentation Software
+
+You are a senior desktop application architect, UI/UX engineer, multimedia systems engineer, and product reverse-engineering specialist.
+
+I have the following applications installed locally:
+
+- PewBeam
+- FreeShow
+- OBS Studio
+
+I am building my own open-source church presentation and live-production application.
+
+The goal is NOT to copy proprietary source code, assets, branding, or implementation details from PewBeam or OBS.
+
+Instead, study how these applications behave from a user's perspective, identify their strongest concepts and workflows, and use those ideas to design a substantially better, original application.
+
+FreeShow is open source and should be studied deeply at the architectural/product level where its source is available.
+
+PewBeam should be treated as a black-box product. Analyze its visible UI, workflows, presentation behavior, configuration, shortcuts, outputs, and user experience without attempting to extract proprietary source code.
+
+OBS should be studied as the reference for professional live-production concepts such as scenes, sources, preview/program workflows, transitions, audio/video routing, multiview, hotkeys, recording, streaming, and extensibility.
+
+---
+
+# 1. FIRST: DO NOT START CODING
+
+Before modifying the project, perform a product and technical investigation.
+
+Create:
+
+docs/reverse-engineering/
+    pewbeam-analysis.md
+    freeshow-analysis.md
+    obs-analysis.md
+    competitive-analysis.md
+    product-requirements.md
+    architecture.md
+    ux-principles.md
+    roadmap.md
+
+Do not simply describe what each application looks like.
+
+Analyze:
+
+- navigation
+- information architecture
+- presentation workflow
+- content creation workflow
+- live operation workflow
+- media management
+- Bible workflow
+- lyrics workflow
+- announcements
+- slides
+- themes
+- layouts
+- backgrounds
+- overlays
+- transitions
+- stage/display outputs
+- audience outputs
+- operator workflow
+- keyboard shortcuts
+- drag-and-drop behavior
+- search
+- scheduling
+- playlists
+- scenes
+- sources
+- preview/program behavior
+- fullscreen presentation
+- multi-display behavior
+- settings
+- performance
+- recovery from errors
+- import/export
+- extensibility
+- automation
+
+For every important feature, identify:
+
+1. What problem does it solve?
+2. How does the application solve it?
+3. What is good about the solution?
+4. What is frustrating?
+5. What would a professional church media operator expect?
+6. What could we improve?
+7. How should our application implement the concept differently?
+
+---
+
+# 2. INSPECT MY LOCAL ENVIRONMENT
+
+First determine:
+
+- operating system
+- CPU
+- GPU
+- available displays
+- installed runtimes
+- installed development tools
+- project structure
+- existing source code
+- available dependencies
+
+Locate the installed applications where possible.
+
+Do not modify PewBeam, FreeShow, or OBS.
+
+Do not overwrite their configuration.
+
+Use them only as references.
+
+If screenshots are useful, create a structured visual analysis of their interfaces.
+
+---
+
+# 3. PRODUCT VISION
+
+The application should become:
+
+> A professional, modern, open-source church presentation and live-production platform combining the simplicity of FreeShow, the production power of OBS, and the Bible-focused workflow of PewBeam.
+
+It should eventually support:
+
+### Presentation
+
+- Bible verses
+- lyrics
+- sermon notes
+- announcements
+- title slides
+- scripture references
+- images
+- videos
+- audio
+- PDF content
+- PowerPoint/imported presentations
+- web content
+- custom slides
+- countdowns
+- timers
+- lower thirds
+- overlays
+- backgrounds
+- stage displays
+
+### Bible
+
+Provide a first-class Bible experience.
+
+Features should include:
+
+- Bible search
+- book/chapter/verse navigation
+- multiple translations
+- verse selection
+- verse ranges
+- verse comparison
+- parallel translations
+- verse display formatting
+- Bible reading plans
+- recent verses
+- favorites
+- custom scripture groups
+- presentation-ready formatting
+- configurable verse layouts
+
+Do not hard-code copyrighted Bible translations.
+
+Design the Bible system so users can legally import/install translations that they have rights to use.
+
+---
+
+# 4. CORE WORKSPACE
+
+Design the application around a professional operator workspace.
+
+Think deeply about the following layout:
+
+┌──────────────────────────────────────────────────────────┐
+│ Menu / Toolbar / Project / Live Status                   │
+├───────────────┬──────────────────────────┬───────────────┤
+│               │                          │               │
+│ Library       │ Preview / Canvas         │ Inspector     │
+│               │                          │               │
+│ Slides        │                          │ Properties     │
+│ Bible         │                          │ Layers         │
+│ Lyrics        │                          │ Effects        │
+│ Media         │                          │ Transitions    │
+│ Playlists     │                          │               │
+│               │                          │               │
+├───────────────┴──────────────────────────┴───────────────┤
+│ Timeline / Playlist / Scenes / Live Queue                │
+├──────────────────────────────────────────────────────────┤
+│ Preview │ Program │ Stage │ Recording │ Streaming        │
+└──────────────────────────────────────────────────────────┘
+
+Do not blindly copy this layout.
+
+Determine the best layout from the investigation.
+
+The UI must remain usable on smaller screens.
+
+---
+
+# 5. LEARN FROM FREESHOW
+
+Study FreeShow especially for:
+
+- church presentation workflows
+- slide creation
+- playlists
+- Bible presentation
+- lyrics
+- themes
+- media
+- outputs
+- operator workflow
+- simplicity
+- open-source architecture
+
+Identify where FreeShow is excellent.
+
+Preserve those strengths conceptually.
+
+Then identify where the experience can be improved.
+
+---
+
+# 6. LEARN FROM OBS
+
+Study OBS for professional production concepts.
+
+Especially:
+
+- Scenes
+- Sources
+- Preview
+- Program
+- Studio Mode
+- Transitions
+- Scene collections
+- Profiles
+- Filters
+- Audio mixer
+- Recording
+- Streaming
+- Virtual camera
+- Multiview
+- Hotkeys
+- Dockable interfaces
+- Source transformations
+- Layer ordering
+
+Do NOT simply turn the application into OBS.
+
+Instead ask:
+
+> Which OBS concepts make sense for church presentation software?
+
+For example:
+
+A church operator should be able to create:
+
+Scene:
+"Sunday Service"
+
+Sources:
+
+- Bible
+- Lyrics
+- Camera
+- Background
+- Logo
+- Lower third
+- Countdown
+- Announcement
+
+Then switch between scenes during a live service.
+
+---
+
+# 7. LEARN FROM PEWBEAM
+
+Treat PewBeam as a black-box reference.
+
+Study:
+
+- Bible workflow
+- presentation workflow
+- UI organization
+- scripture search
+- slide generation
+- live operation
+- shortcuts
+- display behavior
+- media handling
+- church-specific workflows
+- usability
+
+Do not copy:
+
+- source code
+- proprietary assets
+- logos
+- branding
+- exact UI implementation
+- proprietary algorithms
+- copyrighted assets
+
+Instead extract:
+
+- product ideas
+- workflow patterns
+- interaction principles
+- useful concepts
+
+Then redesign them.
+
+---
+
+# 8. CREATE A BETTER CONCEPT
+
+The product should not feel like:
+
+"FreeShow with a different skin."
+
+It should feel like a new generation of church production software.
+
+Working product concept:
+
+## "Church Production Studio"
+
+One application for:
+
+Presentation
++
+Bible
++
+Lyrics
++
+Media
++
+Live production
++
+Streaming
++
+Stage display
++
+Service planning
+
+---
+
+# 9. SERVICE-FIRST WORKFLOW
+
+A major improvement should be the concept of a Service.
+
+Users should be able to create:
+
+Sunday Service
+    |
+    ├── Opening
+    ├── Worship
+    ├── Scripture
+    ├── Sermon
+    ├── Offering
+    ├── Announcements
+    └── Closing
+
+Each section can contain:
+
+- slides
+- Bible passages
+- lyrics
+- media
+- scenes
+- cameras
+- overlays
+- timers
+
+The operator should be able to run the entire service from one workspace.
+
+---
+
+# 10. LIVE OPERATOR MODE
+
+Create a dedicated Live Mode.
+
+The operator should have extremely fast access to:
+
+- Next
+- Previous
+- Clear
+- Black
+- Logo
+- Bible
+- Lyrics
+- Camera
+- Video
+- Announcement
+- Lower third
+- Countdown
+- Emergency fallback
+
+Every critical action should have keyboard shortcuts.
+
+The interface must be usable without touching the mouse constantly.
+
+---
+
+# 11. PREVIEW / PROGRAM
+
+Implement a professional:
+
+PREVIEW → PROGRAM
+
+workflow.
+
+Preview:
+
+What is about to go live?
+
+Program:
+
+What is currently live?
+
+Allow:
+
+- transition
+- cut
+- fade
+- custom transitions
+
+Provide clear visual distinction between Preview and Program.
+
+---
+
+# 12. MULTI-DISPLAY ARCHITECTURE
+
+Design for:
+
+Display 1:
+Operator UI
+
+Display 2:
+Audience output
+
+Display 3:
+Stage display
+
+Display 4:
+Confidence monitor
+
+The application should detect connected displays.
+
+Allow users to configure:
+
+Audience
+Stage
+Operator
+Auxiliary
+
+Each output should be independently configurable.
+
+---
+
+# 13. STAGE DISPLAY
+
+Stage display should support:
+
+- current verse
+- next verse
+- lyrics
+- speaker notes
+- timer
+- clock
+- service progress
+- upcoming item
+- custom messages
+
+Example:
+
+CURRENT
+
+John 3:16
+
+"For God so loved..."
+
+NEXT
+
+John 3:17
+
+Timer: 42:17
+
+---
+
+# 14. THEMING ENGINE
+
+Build a serious rendering/theme system.
+
+A presentation theme should define:
+
+- fonts
+- colors
+- background
+- margins
+- verse layout
+- lyric layout
+- title layout
+- animations
+- transitions
+- lower thirds
+- overlays
+
+Themes should be reusable.
+
+Users should be able to create and export themes.
+
+---
+
+# 15. MEDIA ENGINE
+
+Design a reliable media subsystem.
+
+Support:
+
+- images
+- videos
+- audio
+- GIFs where practical
+- web content
+- transparent overlays
+
+Consider hardware acceleration.
+
+Do not introduce unnecessary dependencies.
+
+Prefer proven multimedia libraries.
+
+---
+
+# 16. PERFORMANCE
+
+This application may run for several hours during a live church service.
+
+Therefore:
+
+- avoid UI freezes
+- avoid memory leaks
+- preload media
+- cache thumbnails
+- cache Bible data
+- handle large media libraries
+- recover from media errors
+- avoid blocking the UI thread
+- use background workers where appropriate
+
+A presentation operator must never experience:
+
+"Application Not Responding"
+
+during a live service.
+
+---
+
+# 17. OFFLINE-FIRST
+
+The application must work without Internet access.
+
+Bible data:
+
+LOCAL
+
+Media:
+
+LOCAL
+
+Presentations:
+
+LOCAL
+
+Themes:
+
+LOCAL
+
+Service plans:
+
+LOCAL
+
+Internet should be optional.
+
+If cloud synchronization is eventually added, it should sit on top of the offline-first architecture.
+
+---
+
+# 18. DATA MODEL
+
+Design a clean domain model.
+
+Potential entities:
+
+Workspace
+Project
+Service
+ServiceItem
+Presentation
+Slide
+BibleTranslation
+BibleBook
+BibleChapter
+BibleVerse
+Lyrics
+MediaAsset
+Scene
+Source
+Theme
+Output
+Display
+Playlist
+Transition
+LowerThird
+Timer
+Schedule
+
+Do not blindly implement all of these.
+
+Determine the minimal architecture required first.
+
+---
+
+# 19. EXTENSIBILITY
+
+Design for plugins eventually.
+
+Potential plugin categories:
+
+Bible providers
+Lyrics providers
+Streaming providers
+Media sources
+Web sources
+Church management integrations
+Lighting systems
+NDI
+Spout
+Syphon
+MIDI
+OSC
+REST API
+WebSocket
+DMX
+
+Do not build all integrations now.
+
+Create an architecture that makes them possible later.
+
+---
+
+# 20. AUTOMATION API
+
+Eventually expose a local API.
+
+For example:
+
+GET /api/status
+
+POST /api/live/next
+
+POST /api/live/previous
+
+POST /api/live/clear
+
+POST /api/bible/display
+
+POST /api/scene/activate
+
+POST /api/service/start
+
+This could allow:
+
+- Stream Deck
+- mobile remote
+- external automation
+- church management systems
+- AI assistants
+- custom controllers
+
+---
+
+# 21. MOBILE REMOTE
+
+Eventually provide a browser-based remote.
+
+Example:
+
+Phone
+
+    ↓
+
+Local Network
+
+    ↓
+
+Church Presentation App
+
+The phone should be able to:
+
+- next
+- previous
+- select Bible verse
+- activate scene
+- clear screen
+- start timer
+- display announcement
+
+Do not implement this before the desktop core is stable.
+
+---
+
+# 22. AI SHOULD BE OPTIONAL
+
+Do not turn the product into an "AI app."
+
+However, design future extension points for:
+
+- sermon-to-slides
+- Bible passage suggestions
+- automatic lyric formatting
+- announcement generation
+- service planning
+- intelligent search
+- media recommendations
+
+AI should assist the operator.
+
+It should never be required for basic presentation.
+
+---
+
+# 23. UX PRINCIPLES
+
+The application must be:
+
+- fast
+- predictable
+- keyboard-friendly
+- offline-first
+- professional
+- visually clean
+- highly configurable
+- accessible
+- reliable
+- understandable by volunteers
+
+Avoid:
+
+- unnecessary animations
+- excessive rounded cards
+- excessive gradients
+- dashboard-for-everything design
+- unnecessary onboarding
+- hidden critical controls
+- excessive modal dialogs
+
+This is production software, not a marketing website.
+
+---
+
+# 24. COMPETITIVE FEATURE MATRIX
+
+Create a detailed matrix:
+
+Feature | PewBeam | FreeShow | OBS | Our App
+
+Compare:
+
+- Bible
+- lyrics
+- slides
+- playlists
+- scenes
+- sources
+- media
+- transitions
+- stage display
+- multiview
+- recording
+- streaming
+- audio
+- remote control
+- themes
+- automation
+- plugins
+- offline operation
+- service planning
+- keyboard workflow
+
+Mark:
+
+✓ Excellent
+~ Partial
+✗ Missing
+
+Then identify the opportunity gaps.
+
+---
+
+# 25. PRODUCT PRIORITY
+
+Do not attempt to build everything.
+
+Rank features:
+
+P0 = absolutely required
+
+P1 = important
+
+P2 = valuable later
+
+P3 = experimental
+
+The first release should focus on:
+
+1. Bible
+2. Slides
+3. Lyrics
+4. Media
+5. Service/playlist
+6. Themes
+7. Audience output
+8. Preview/Program
+9. Keyboard control
+10. Multi-display
+11. Reliable live operation
+
+Everything else comes later.
+
+---
+
+# 26. IMPLEMENTATION RULES
+
+Before coding:
+
+1. Inspect the existing repository.
+2. Understand the current architecture.
+3. Identify what can be reused.
+4. Identify technical debt.
+5. Create an implementation plan.
+6. Do not rewrite working systems unnecessarily.
+7. Make incremental changes.
+8. Keep the application runnable after every major change.
+9. Add tests for critical functionality.
+10. Document architectural decisions.
+
+Do not generate a huge amount of code immediately.
+
+First produce the analysis and implementation plan.
+
+Then implement Phase 1.
+
+---
+
+# 27. MOST IMPORTANT PRINCIPLE
+
+Do not build:
+
+"PewBeam clone."
+
+Do not build:
+
+"FreeShow clone."
+
+Do not build:
+
+"OBS clone."
+
+Build:
+
+> An original professional church presentation and live-production platform that learns from the best interaction patterns of PewBeam, FreeShow, and OBS.
+
+The goal is to take:
+
+PewBeam's Bible-first experience
+
++
+
+FreeShow's church presentation workflow
+
++
+
+OBS's professional production architecture
+
++
+
+A modern, fast, keyboard-first UX
+
++
+
+A powerful service planning system
+
++
+
+An extensible plugin/API architecture
+
+and turn them into one coherent product.
+
+---
+
+# FIRST TASK
+
+Before writing application code, inspect the existing project and produce:
+
+1. Current architecture analysis
+2. PewBeam analysis
+3. FreeShow analysis
+4. OBS analysis
+5. Feature comparison matrix
+6. UX problems to solve
+7. Proposed product architecture
+8. Proposed application layout
+9. Domain model
+10. Rendering architecture
+11. Multi-display architecture
+12. Live production architecture
+13. MVP scope
+14. Phase 2 scope
+15. Phase 3 scope
+16. Recommended technology choices
+17. Risks and technical challenges
+18. Implementation roadmap
+
+Do not start implementing until this analysis has been completed.
+
+After the analysis, wait for approval before making large architectural changes.

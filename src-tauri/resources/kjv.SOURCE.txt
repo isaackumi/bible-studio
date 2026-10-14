@@ -1,0 +1,4 @@
+King James Version verse text is public domain.
+This bundle is only en_kjv.json (English verse text). Book titles stored in that
+file are not used. No other translation from the upstream collection is included.
+Upstream JSON layout: https://github.com/thiagobodruk/bible (en_kjv.json only).
