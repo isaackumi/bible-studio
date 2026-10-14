@@ -94,11 +94,35 @@ mod macos {
             .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present"])
             .arg(&app)
             .status();
-        log::info!("relaunching inside {} so macOS can show the microphone prompt", app.display());
-        let err = std::process::Command::new(&bundled)
-            .args(std::env::args().skip(1))
-            .exec();
-        log::error!("could not relaunch inside the app bundle: {err}");
+        // `exec` keeps Cursor as the responsible process, and macOS then aborts speech requests.
+        // LaunchServices `open` makes Church Studio responsible for its own microphone prompt.
+        let _ = std::process::Command::new("pkill")
+            .args(["-f", "Church Studio.app/Contents/MacOS/church-studio"])
+            .status();
+        let mut launched = std::process::Command::new("open");
+        launched.arg(&app).process_group(0);
+        if launched.spawn().is_err() {
+            log::error!("could not open {}", app.display());
+            return;
+        }
+        log::info!("opened {} for the microphone prompt", app.display());
+        for _ in 0..50 {
+            if app_is_running() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        while app_is_running() {
+            std::thread::sleep(Duration::from_millis(400));
+        }
+        std::process::exit(0);
+    }
+
+    fn app_is_running() -> bool {
+        std::process::Command::new("pgrep")
+            .args(["-f", "Church Studio.app/Contents/MacOS/church-studio"])
+            .output()
+            .is_ok_and(|output| output.status.success())
     }
 
     fn refresh_binary(source: &Path, bundled: &Path) -> Result<(), String> {
