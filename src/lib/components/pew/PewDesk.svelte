@@ -49,6 +49,9 @@
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
+  const displayLive = $derived(
+    session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
+  );
   const queue = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
   const slides = $derived(queue.filter((item) => item.kind === "slide" || item.kind === "announcement"));
   const visibleSlides = $derived(
@@ -409,7 +412,7 @@
       {#if !session.controlsAudience}
         <button type="button" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
-      <button type="button" class="live" data-tip="Send preview to program" onclick={() => session.take()}><span class="pip"></span>LIVE</button>
+      <button type="button" class="live" class:on-air={displayLive} data-tip={displayLive ? "Audience display is live" : "Send preview to program"} onclick={() => session.take()}><span class="pip"></span>LIVE</button>
       <button type="button" class="black" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
       <button type="button" class="clear" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
@@ -503,7 +506,7 @@
             </span>
           </header>
           <div class="monitor"><Screen model={session.live.preview.model} /></div>
-          <header>Main Output</header>
+          <header>{#if displayLive}<span class="pip on"></span>{/if}Main Output</header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
       </div>
@@ -636,7 +639,7 @@
       <div class="pb-col right">
         <section class="pb-panel output">
           <header class="pb-head">
-            <span class="output-name">Main Output</span>
+            <span class="output-name">{#if displayLive}<span class="pip on"></span>{/if}Main Output</span>
             <button
               type="button"
               class="style-name"
@@ -750,7 +753,34 @@
     letter-spacing: 0.04em;
   }
   .live { background: var(--live); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
-  .pip { width: 7px; height: 7px; border-radius: 50%; background: white; }
+  .live.on-air { animation: live-glow 1.6s ease-in-out infinite; }
+  .pip { width: 7px; height: 7px; border-radius: 50%; background: white; position: relative; display: inline-block; flex: none; }
+  .pip.on::after, .live.on-air .pip::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    animation: live-ring 1.6s ease-out infinite;
+  }
+  .pip.on::after { animation-name: live-ring-red; }
+  .output-name .pip, .song-stage header .pip { background: var(--live); margin-right: 6px; vertical-align: 1px; }
+  @keyframes live-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  }
+  @keyframes live-ring-red {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 75%, transparent); }
+    70% { box-shadow: 0 0 0 8px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes live-glow {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 45%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live.on-air, .pip.on::after, .live.on-air .pip::after { animation: none; }
+  }
   .black { background: var(--line); color: var(--ink); }
   .clear { background: transparent; color: var(--accent); border-color: var(--accent); }
   .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: none; }
