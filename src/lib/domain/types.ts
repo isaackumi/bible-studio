@@ -2,7 +2,8 @@ export type TransitionKind = "cut" | "fade";
 
 export type ThemeBackground =
   | { type: "color"; color: string }
-  | { type: "image"; assetId: string };
+  | { type: "image"; assetId: string }
+  | { type: "wash"; washId: string };
 
 export type ThemeLayout = "frame" | "lower-third";
 

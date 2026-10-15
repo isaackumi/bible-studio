@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultTheme, sanitizeTheme, sanitizeTransition, transitionChanged } from "./theme";
+import { displayWash } from "./backgrounds";
+import { defaultTheme, factoryThemes, mergeFactoryThemes, sanitizeTheme, sanitizeTransition, transitionChanged } from "./theme";
 
 describe("theme transitions", () => {
   it("keeps a saved transition and repairs malformed values", () => {
@@ -16,6 +17,25 @@ describe("theme transitions", () => {
   it("keeps a lower-third layout and repairs an unknown one", () => {
     expect(sanitizeTheme({ ...defaultTheme(), layout: "lower-third" }).layout).toBe("lower-third");
     expect(sanitizeTheme({ ...defaultTheme(), layout: "slide" as "frame" }).layout).toBe("frame");
+  });
+
+  it("adds the built-in display themes without replacing a saved Signal", () => {
+    const names = factoryThemes().map((theme) => theme.name);
+    expect(names).toEqual(["Signal", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
+    expect(new Set(factoryThemes().map((theme) => theme.id)).size).toBe(names.length);
+    const custom = { ...defaultTheme(), color: "#ffffff", name: "House" };
+    const merged = mergeFactoryThemes([custom]);
+    expect(merged[0]).toMatchObject({ id: "theme-manuscript", name: "House", color: "#ffffff" });
+    expect(merged.map((theme) => theme.name)).toEqual(["House", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
+    expect(merged.find((theme) => theme.name === "Sea")?.background).toEqual({ type: "wash", washId: "sea" });
+  });
+
+  it("keeps a known display background and replaces an unknown one", () => {
+    expect(displayWash("sea")?.name).toBe("Sea");
+    const kept = sanitizeTheme({ ...defaultTheme(), background: { type: "wash", washId: "linen" } });
+    expect(kept.background).toEqual({ type: "wash", washId: "linen" });
+    const dropped = sanitizeTheme({ ...defaultTheme(), background: { type: "wash", washId: "missing" } });
+    expect(dropped.background).toEqual({ type: "color", color: "#050505" });
   });
 
   it("does not treat the stored transition as a new edit", () => {

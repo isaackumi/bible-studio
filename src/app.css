@@ -234,6 +234,12 @@ button { cursor: pointer; }
   object-fit: contain;
 }
 .frame.black { background: #000 !important; }
+.frame.wash .line, .frame.wash .ref, .frame.wash .attr { text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); }
+.frame.wash.light .line, .frame.wash.light .ref, .frame.wash.light .attr { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
+.frame.drift { background-size: 160% 160%; animation: wash-drift 22s ease-in-out infinite alternate; }
+.frame.glow { animation: wash-glow 9s ease-in-out infinite alternate; }
+@keyframes wash-drift { from { background-position: 0% 0%; } to { background-position: 80% 40%; } }
+@keyframes wash-glow { from { background-size: 100% 120%; } to { background-size: 140% 160%; } }
 .frame.lower .stack {
   position: absolute;
   left: 0;

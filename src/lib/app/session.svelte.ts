@@ -9,7 +9,7 @@ import { applyProgramAction, createLiveState, frame, programPacket, replaceProgr
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
 import { findItem, moveInList, stepCursor } from "../domain/service";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
-import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, sanitizeTheme } from "../domain/theme";
+import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import type {
   AppearanceSettings,
   BibleItem,
@@ -200,9 +200,12 @@ class Session {
   };
 
   private loadThemes = async () => {
-    const themes = (await api.themeList()).map(sanitizeTheme);
-    this.themes = themes.length > 0 ? themes : [defaultTheme()];
-    if (themes.length === 0) await api.themeSave(defaultTheme());
+    const stored = (await api.themeList()).map(sanitizeTheme);
+    const themes = mergeFactoryThemes(stored);
+    this.themes = themes;
+    await Promise.all(
+      themes.filter((theme) => !stored.some((entry) => entry.id === theme.id)).map((theme) => api.themeSave(theme)),
+    );
   };
 
   private loadWorkspace = async (): Promise<Workspace> => {
@@ -727,9 +730,21 @@ class Session {
       this.message = error instanceof Error ? error.message : String(error);
     });
     this.persistSoon();
+    this.showThemeOnPreview(next);
+  };
+
+  useTheme = (id: string) => {
+    const next = this.themes.find((theme) => theme.id === id);
+    if (!next || next.id === this.workspace.themeId) return;
+    this.workspace = { ...this.workspace, themeId: next.id };
+    this.persistSoon();
+    this.showThemeOnPreview(next);
+  };
+
+  private showThemeOnPreview(next: Theme) {
     if (this.cursor.itemId) void this.selectItem(this.cursor.itemId);
     else this.live = setPreview(this.live, frame({ ...this.live.preview.model, theme: next }, this.live.preview.sourceId, "cut"));
-  };
+  }
 
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {
     if (!this.desktop() && !this.controlsAudience) {

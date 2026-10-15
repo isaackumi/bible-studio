@@ -13,6 +13,7 @@
   import { openPrivacySettings, prepareListening, speechAvailable, startListening, startNativeListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
+  import OutputType from "../OutputType.svelte";
   import Screen from "../Screen.svelte";
 
   type Mode = "scriptures" | "slides" | "songs";
@@ -29,7 +30,7 @@
   let slideQuery = $state("");
   let detections = $state<SearchHit[]>([]);
   let note = $state("Loading scripture…");
-  let sheet = $state<"help" | "alerts" | "lexicon" | null>(null);
+  let sheet = $state<"help" | "alerts" | "lexicon" | "type" | null>(null);
   let songTitle = $state("");
   let songAuthor = $state("");
   let songSections = $state<SongSection[]>([{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }]);
@@ -639,8 +640,8 @@
             <button
               type="button"
               class="style-name"
-              data-tip="Frame or lower third. Preview only until you Take."
-              onclick={() => session.saveTheme({ ...session.theme(), layout: session.theme().layout === "lower-third" ? "frame" : "lower-third" })}
+              data-tip="Font, color, and layout. Preview only until you Take."
+              onclick={() => (sheet = sheet === "type" ? null : "type")}
             >
               {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
             </button>
@@ -674,7 +675,7 @@
   {#if sheet}
     <div class="sheet" role="dialog" aria-label={sheet}>
       <header>
-        <strong>{sheet === "help" ? "How this desk works" : sheet === "alerts" ? "Alerts" : "Lexicon"}</strong>
+        <strong>{sheet === "help" ? "How this desk works" : sheet === "alerts" ? "Alerts" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
         <button type="button" onclick={() => (sheet = null)}>Close</button>
       </header>
       {#if sheet === "help"}
@@ -686,6 +687,8 @@
       {:else if sheet === "alerts"}
         <p>{note || "No alerts."}</p>
         <p>{session.message}</p>
+      {:else if sheet === "type"}
+        <OutputType />
       {:else}
         {#each reading as verse (verse.verse)}
           <p><sup>{verse.verse}</sup> {verse.text}</p>
@@ -1046,7 +1049,9 @@
     position: absolute;
     right: 16px;
     top: 64px;
-    width: min(360px, calc(100% - 32px));
+    width: min(380px, calc(100% - 32px));
+    max-height: calc(100% - 80px);
+    overflow: auto;
     background: var(--panel);
     border: 1px solid var(--accent);
     border-radius: 12px;

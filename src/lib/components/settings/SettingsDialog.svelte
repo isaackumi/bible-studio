@@ -9,6 +9,7 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+  import OutputType from "../OutputType.svelte";
 
   let audioNote = $state("");
 
@@ -251,11 +252,7 @@
         </section>
         <section class="card">
           <h3>Verse on the screen</h3>
-          <div class="segment" role="group" aria-label="Verse layout">
-            <button type="button" class:active={session.theme().layout !== "lower-third"} onclick={() => session.saveTheme({ ...session.theme(), layout: "frame" })}>Full frame</button>
-            <button type="button" class:active={session.theme().layout === "lower-third"} onclick={() => session.saveTheme({ ...session.theme(), layout: "lower-third" })}>Lower third</button>
-          </div>
-          <p class="note">This changes Preview. LIVE sends it to the audience.</p>
+          <OutputType />
         </section>
       {:else if section === "workspace"}
         <section class="card">

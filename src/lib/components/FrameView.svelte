@@ -1,13 +1,17 @@
 <script lang="ts">
+  import { displayWash } from "../domain/backgrounds";
   import type { PresentationModel } from "../domain/types";
 
   let { model }: { model: PresentationModel } = $props();
+
+  const wash = $derived(model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null);
 
   const background = $derived.by(() => {
     if (model.layout === "black") return "#000000";
     if (model.backgroundImageUrl) {
       return `center / cover no-repeat url("${model.backgroundImageUrl}")`;
     }
+    if (wash) return wash.background;
     if (model.theme.background.type === "color") return model.theme.background.color;
     return "#050505";
   });
@@ -20,6 +24,10 @@
 <div
   class="frame"
   class:black={model.layout === "black"}
+  class:wash={!!wash && model.layout !== "black"}
+  class:light={!!wash?.light}
+  class:drift={wash?.motion === "drift" && model.layout !== "black"}
+  class:glow={wash?.motion === "glow" && model.layout !== "black"}
   class:lower={model.theme.layout === "lower-third" && model.layout !== "black" && model.layout !== "empty" && model.layout !== "image"}
   style:background={background}
   style:color={model.theme.color}
