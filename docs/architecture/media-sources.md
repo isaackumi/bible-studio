@@ -26,13 +26,13 @@ VideoSource
 
 Do not put capture code in `PewDesk.svelte`. Select a source → `setPreview`. LIVE copies to Program.
 
-## Camera (not shipped)
+## Camera (partial)
 
-Browser: `navigator.mediaDevices.getUserMedia`. Permission denied and missing devices are desk messages. `getUserMedia` is already used for Listen in `src/lib/voice/listen.ts`; that path must not Take.
+Browser and desktop webview: `navigator.mediaDevices.getUserMedia` with `{ audio: false, video }`. Settings → Media lists cameras. Select → Preview (`previewCameraLive` / `setPreview`). LIVE copies the compiled camera card onto Program. Operator Preview may show the live `MediaStream`. `AudienceOutput` does not receive the stream. Permission denied and missing devices are desk messages. Listen in `src/lib/voice/listen.ts` stays audio-only and must not Take.
 
-Desktop: start with the same web API inside the webview. Native AVFoundation / Windows capture is later if the webview is not enough.
+Capture lives in `session.previewCamera` and `MediaPane`, not in `PewDesk.svelte`.
 
-Not claimed until a real camera is tested.
+Not claimed shipped until a real camera is tested.
 
 ## Browser vs desktop persistence
 

@@ -2,7 +2,7 @@
   import type { PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
 
-  let { model }: { model: PresentationModel } = $props();
+  let { model, stream = null }: { model: PresentationModel; stream?: MediaStream | null } = $props();
   let box: HTMLDivElement | undefined = $state();
   let scale = $state(0.3);
 
@@ -21,6 +21,6 @@
 
 <div class="ratio" bind:this={box}>
   <div class="canvas" style:transform="scale({scale})">
-    <FrameView {model} />
+    <FrameView {model} {stream} />
   </div>
 </div>

@@ -803,7 +803,7 @@
             <p>{operatorNotes || "Notes for this section stay here. They are not on Preview or Program."}</p>
           </article>
           <header><span class="kicker">Preview</span></header>
-          <div class="monitor"><Screen model={session.live.preview.model} /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
@@ -873,7 +873,7 @@
               <button type="button" aria-label="Next section" onclick={() => session.stepSong(1)}>Next</button>
             </span>
           </header>
-          <div class="monitor"><Screen model={session.live.preview.model} /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
@@ -1030,7 +1030,7 @@
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
                 </section>
               </Pane>
             </PaneGroup>

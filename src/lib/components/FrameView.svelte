@@ -2,7 +2,17 @@
   import { displayWash } from "../domain/backgrounds";
   import type { PresentationModel } from "../domain/types";
 
-  let { model }: { model: PresentationModel } = $props();
+  let { model, stream = null }: { model: PresentationModel; stream?: MediaStream | null } = $props();
+  let video = $state<HTMLVideoElement | undefined>();
+
+  $effect(() => {
+    const node = video;
+    if (!node) return;
+    node.srcObject = stream ?? null;
+    return () => {
+      node.srcObject = null;
+    };
+  });
 
   const wash = $derived(model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null);
 
@@ -33,7 +43,9 @@
   style:color={model.theme.color}
   style:font-family={model.theme.fontFamily}
 >
-  {#if model.layout === "image" && model.imageUrl}
+  {#if stream}
+    <video bind:this={video} class="cover" autoplay muted playsinline></video>
+  {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}
     <img class="logo" src={model.imageUrl} alt="" />

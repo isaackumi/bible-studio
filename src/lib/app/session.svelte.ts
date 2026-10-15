@@ -7,6 +7,16 @@ import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
+import {
+  cameraSourceId,
+  cameraUnavailableMessage,
+  listVideoInputs,
+  openCamera,
+  presentCamera,
+  previewCameraLive,
+  stopCameraStream,
+  type CameraDevice,
+} from "../domain/camera";
 import { importDocument as parseImportedDocument } from "../domain/import-content";
 import { authorizeRemoteCommand, createPairing, pairRemote, type RemotePairing } from "../domain/remote";
 import { publishRemote, subscribeRemote } from "../remote/channel";
@@ -95,6 +105,9 @@ class Session {
   sermons = $state<Sermon[]>([]);
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   media = $state<MediaAsset[]>([]);
+  cameras = $state<CameraDevice[]>([]);
+  cameraStream = $state<MediaStream | null>(null);
+  cameraNote = $state("");
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
   cursor = $state<Cursor>({ sectionId: null, itemId: null });
@@ -268,6 +281,7 @@ class Session {
   destroy = () => {
     this.unlisten?.();
     this.unlistenRemote?.();
+    this.releaseCamera();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
 
@@ -895,6 +909,46 @@ class Session {
     if (!focus) return "";
     const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
     return sermon ? deskNotes(sermon, focus.sectionId) : "";
+  };
+
+  loadCameras = async () => {
+    const media = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+    if (!media?.enumerateDevices) {
+      this.cameras = [];
+      this.cameraNote = cameraUnavailableMessage();
+      return;
+    }
+    const devices = await media.enumerateDevices();
+    this.cameras = listVideoInputs(devices as Array<{ deviceId: string; kind: string; label: string }>);
+    if (!this.cameras.length) this.cameraNote = cameraUnavailableMessage();
+  };
+
+  previewCamera = async (deviceId: string) => {
+    const media = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+    if (!media?.getUserMedia) {
+      this.cameraNote = cameraUnavailableMessage();
+      this.message = this.cameraNote;
+      return;
+    }
+    this.releaseCamera();
+    try {
+      const stream = (await openCamera(media, deviceId)) as MediaStream;
+      this.cameraStream = stream;
+      await this.loadCameras();
+      const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
+      this.live = previewCameraLive(this.live, presentCamera({ theme: this.theme(), label }), cameraSourceId(deviceId));
+      this.cameraNote = "";
+      this.message = `${label} is on Preview. LIVE still sends Program.`;
+    } catch (error) {
+      this.cameraStream = null;
+      this.cameraNote = error instanceof Error ? error.message : cameraUnavailableMessage();
+      this.message = this.cameraNote;
+    }
+  };
+
+  private releaseCamera = () => {
+    stopCameraStream(this.cameraStream);
+    this.cameraStream = null;
   };
 
   importImage = async (source: string | File) => {

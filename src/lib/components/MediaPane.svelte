@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { session } from "../app/session.svelte";
   import { mediaUrl } from "../db/api";
@@ -6,6 +7,10 @@
   import { isDesktop } from "../platform/runtime";
 
   let picker: HTMLInputElement | null = $state(null);
+
+  onMount(() => {
+    void session.loadCameras();
+  });
 
   async function chooseDesktop() {
     const picked = await open({
@@ -52,4 +57,22 @@
       </div>
     </div>
   {/each}
+
+  <h4>Camera</h4>
+  <p class="camera-note">Select a camera for Preview. LIVE still sends Program. Permission denied stays on this desk.</p>
+  <button type="button" onclick={() => void session.loadCameras()}>List cameras</button>
+  {#if session.cameraNote}<p class="camera-note">{session.cameraNote}</p>{/if}
+  {#each session.cameras as camera (camera.deviceId)}
+    <div class="hit">
+      <strong>{camera.label}</strong>
+      <div class="actions">
+        <button type="button" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
+      </div>
+    </div>
+  {/each}
 </div>
+
+<style>
+  h4 { margin: 16px 0 6px; font-size: 13px; }
+  .camera-note { margin: 0 0 8px; font-size: 12px; color: var(--muted, #a3a3a3); }
+</style>

@@ -27,7 +27,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P1-002 | Content import | P1 | Shipped | B |
 | CS-P1-003 | Live song / lyric search | P1 | Shipped | B |
 | CS-P1-004 | Phone / tablet remote | P1 | Partial | C |
-| CS-P1-005 | Camera sources | P1 | Planned | D |
+| CS-P1-005 | Camera sources | P1 | Partial | D |
 | CS-P1-006 | Video file sources | P1 | Planned | D |
 | CS-P1-007 | NDI architecture | P1 | Designed | E |
 | CS-P1-008 | NDI desktop input / output | P1 | Planned | E |
@@ -230,7 +230,9 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Architectural impact.** Native/service boundary later. Not inside `PewDesk.svelte`. See [architecture/media-sources.md](architecture/media-sources.md).
 
-**Dependencies.** CS-P0-001, CS-P0-006, CS-P0-005. **Status.** Planned. **Phase.** D.
+**Dependencies.** CS-P0-001, CS-P0-006, CS-P0-005. **Status.** Partial. `getUserMedia` video on Preview. Take copies the camera card onto Program. Permission denied is a desk message. Listen stays audio. Not shipped until a real camera is tested.
+
+**Phase.** D.
 
 **Acceptance.** Deny/unavailable handled. Program changes only through production actions. Not claimed until a real camera is tested.
 

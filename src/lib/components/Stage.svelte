@@ -9,7 +9,7 @@
   {#if part === "preview"}
     <div class="well preview-well">
       <div class="well-label"><span>Preview</span><span>Preparing</span></div>
-      <div class="mat"><Screen model={session.live.preview.model} /></div>
+      <div class="mat"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
     </div>
   {:else}
     <div class="well program-well">

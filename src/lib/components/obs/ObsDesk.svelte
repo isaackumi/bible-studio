@@ -105,7 +105,7 @@
   <div class="studio">
     <section class="pane">
       <header>Preview: {sceneName}</header>
-      <div class="well"><Screen model={session.live.preview.model} /></div>
+      <div class="well"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
       <footer>
         <span>{previewLabel}</span>
         <span class="tools">
