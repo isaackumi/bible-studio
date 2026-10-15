@@ -33,3 +33,20 @@ export function audienceStatus(output: OutputStatus, desktop: boolean): Audience
   }
   return { title: "Audience is not showing", detail: output.message || "The assigned display is unavailable." };
 }
+
+/** Short second line for the operator desk. Settings keeps the longer `detail`. */
+export function audienceDeskLine(output: OutputStatus, desktop: boolean): { title: string; line: string } {
+  const status = audienceStatus(output, desktop);
+  const live = output.displays.find((display) => display.audience);
+  const external = output.displays.find((display) => !display.primary);
+  if (output.online && live) {
+    const mode = output.mode === "fullscreen" ? "Fullscreen" : "Window";
+    return { title: live.name, line: `${live.width}×${live.height} · ${mode}` };
+  }
+  if (!output.desired && external) {
+    return { title: external.name, line: `${external.width}×${external.height} · Closed` };
+  }
+  if (output.online) return { title: status.title, line: "Window" };
+  if (output.desired) return { title: status.title, line: "Not showing" };
+  return { title: status.title, line: "Closed" };
+}

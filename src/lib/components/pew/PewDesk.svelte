@@ -5,7 +5,7 @@
   import { api } from "../../db/api";
   import { moveSongSection, removeSongSection } from "../../domain/song";
   import type { BibleItem, PresentationItem, SearchHit, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { isDesktop } from "../../platform/runtime";
   import { bundledQuoteCatalog } from "../../bible/texts";
@@ -65,39 +65,35 @@
   let epoch = $state(0);
   let frozen = $state(session.workspace.pew);
   let applying = false;
-  let sizing = false;
-  let follow = false;
+  let chromeReady = false;
+  const chrome = $derived(
+    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${session.workspace.activeLayoutId}`,
+  );
 
   function retarget() {
     applying = true;
-    frozen = session.workspace.pew;
+    frozen = untrack(() => session.workspace.pew);
     epoch += 1;
-  }
-
-  function rememberSizes(patch: Parameters<typeof session.savePew>[0]) {
-    const before = session.workspace.pew;
-    session.savePew(patch);
-    if (session.workspace.pew !== before) sizing = true;
   }
 
   function onColumns(reported: number[]) {
     if (applying || focus) return;
-    rememberSizes({ columns: mergeColumns(session.workspace.pew.columns, reported, showLibrary) });
+    session.savePew({ columns: mergeColumns(session.workspace.pew.columns, reported, showLibrary) });
   }
 
   function onLibrarySplit(reported: number[]) {
     if (applying || focus) return;
-    rememberSizes({ librarySplit: mergeSplit(session.workspace.pew.librarySplit, reported) });
+    session.savePew({ librarySplit: mergeSplit(session.workspace.pew.librarySplit, reported) });
   }
 
   function onStageSplit(reported: number[]) {
     if (applying || focus) return;
-    rememberSizes({ stageSplit: mergeSplit(session.workspace.pew.stageSplit, reported) });
+    session.savePew({ stageSplit: mergeSplit(session.workspace.pew.stageSplit, reported) });
   }
 
   function onProgramSplit(reported: number[]) {
     if (applying || focus) return;
-    rememberSizes({ programSplit: mergeSplit(session.workspace.pew.programSplit, reported) });
+    session.savePew({ programSplit: mergeSplit(session.workspace.pew.programSplit, reported) });
   }
 
   function share(part: number, other: number): number {
@@ -106,17 +102,13 @@
   }
 
   $effect(() => {
-    const desk = session.workspace.pew;
-    const panels = `${libraryVisible}:${queueVisible}`;
-    if (!follow) {
-      follow = true;
+    chrome;
+    if (!chromeReady) {
+      chromeReady = true;
+      frozen = untrack(() => session.workspace.pew);
       return;
     }
-    if (sizing) {
-      sizing = false;
-      return;
-    }
-    if (desk && panels) retarget();
+    retarget();
   });
 
   $effect(() => {
@@ -481,7 +473,6 @@
     </nav>
     <div class="pb-actions">
       <OutputControls compact />
-      <p class="audience-owner">{session.audienceLabel()}</p>
       {#if !session.controlsAudience}
         <button type="button" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
@@ -490,13 +481,13 @@
       <button type="button" class="clear" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
-      <button type="button" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => { session.togglePanel(LIBRARY_PANEL); retarget(); }}>
+      <button type="button" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
         <Icon name="library" size={16} />
       </button>
-      <button type="button" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => { session.togglePanel(QUEUE_PANEL); retarget(); }}>
+      <button type="button" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => session.togglePanel(QUEUE_PANEL)}>
         <Icon name="queue" size={16} />
       </button>
-      <button type="button" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => { session.savePew({ focus: !focus }); retarget(); }}>
+      <button type="button" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => session.savePew({ focus: !focus })}>
         <Icon name="focus" size={16} />
       </button>
       <button type="button" data-tip="PewBeam" aria-label="PewBeam" class:on={session.workspace.appearance.desk === "pewbeam"} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
@@ -588,7 +579,7 @@
             </span>
           </header>
           <div class="monitor"><Screen model={session.live.preview.model} /></div>
-          <header><span class="kicker">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
+          <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
       </div>
@@ -732,7 +723,7 @@
                 <PaneResizer />
               {/if}
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
-                <section class="pb-panel">
+                <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
                   <div class="monitor"><Screen model={session.live.preview.model} /></div>
                 </section>
@@ -745,9 +736,9 @@
           <div class="fill">
             <PaneGroup direction="vertical" onLayoutChange={onProgramSplit}>
               <Pane defaultSize={showQueue ? frozen.programSplit : 100} minSize={showQueue ? 28 : 20} order={1}>
-                <section class="pb-panel output">
+                <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head">
-                    <span class="kicker">{#if displayLive}<span class="pip on"></span>{/if}Program</span>
+                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span>
                     <button
                       type="button"
                       class="style-name"
@@ -856,7 +847,7 @@
   .pb-modes button:hover:not(.on) { background: var(--field); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
   .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-  .audience-owner { margin: 0; color: var(--muted); font-size: 12px; }
+  .pb-actions :global(.output-controls) { min-width: 0; }
   .pb-actions > button {
     border: 1px solid transparent;
     border-radius: 999px;
@@ -1102,6 +1093,10 @@
     background: #050505;
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+  .kicker.program { color: var(--live); }
+  .pb-panel.preview { border-style: dashed; }
+  .pb-panel.output { border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
+  .pb-panel.output.on-air { border-color: var(--live); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 35%, transparent); }
   .style-name {
     margin-left: auto;
     border: 0;

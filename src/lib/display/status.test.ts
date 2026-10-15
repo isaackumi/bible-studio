@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DisplayInfo, OutputStatus } from "../domain/types";
-import { audienceStatus } from "./status";
+import { audienceDeskLine, audienceStatus } from "./status";
 
 function display(patch: Partial<DisplayInfo>): DisplayInfo {
   return {
@@ -56,6 +56,32 @@ describe("audience status", () => {
     expect(audienceStatus(output({ displays: [display({ primary: true, name: "Built-in" })] }), true)).toEqual({
       title: "Audience is closed",
       detail: "No external display is connected. Connect one, or choose this screen.",
+    });
+  });
+
+  it("puts name, size, and mode on the desk without the settings sentence", () => {
+    expect(
+      audienceDeskLine(
+        output({
+          desired: true,
+          online: true,
+          mode: "fullscreen",
+          displays: [display({ name: "DELL U2415", audience: true })],
+        }),
+        true,
+      ),
+    ).toEqual({ title: "DELL U2415", line: "1920×1200 · Fullscreen" });
+    expect(audienceDeskLine(output({ displays: [display({ primary: false })] }), true)).toEqual({
+      title: "DELL U2415",
+      line: "1920×1200 · Closed",
+    });
+    expect(audienceDeskLine(output({ desired: true, online: true }), false)).toEqual({
+      title: "Audience window is open",
+      line: "Window",
+    });
+    expect(audienceDeskLine(output({}), false)).toEqual({
+      title: "Audience is closed",
+      line: "Closed",
     });
   });
 });
