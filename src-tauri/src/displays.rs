@@ -45,6 +45,8 @@ pub struct Output {
     pub audience_key: Mutex<Option<String>>,
     pub operator_key: Mutex<Option<String>>,
     pub mode: Mutex<String>,
+    /// True after we ask AppKit to leave native fullscreen, until that bit is gone.
+    leaving_fullscreen: Mutex<bool>,
 }
 
 impl Default for Output {
@@ -65,6 +67,7 @@ impl Default for Output {
             audience_key: Mutex::new(None),
             operator_key: Mutex::new(None),
             mode: Mutex::new("window".into()),
+            leaving_fullscreen: Mutex::new(false),
         }
     }
 }
@@ -228,6 +231,10 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         || !window.is_visible().unwrap_or(false)
         || (!fullscreen && !frame_matches(&window, monitor));
     if needs_place {
+        if release_native_fullscreen(&window, &output) {
+            log::info!("AUDIENCE_LEAVE_FULLSCREEN");
+            return Ok(());
+        }
         place(&window, monitor, fullscreen)?;
         window.show().map_err(|e| e.to_string())?;
         if !fullscreen {
@@ -272,23 +279,18 @@ fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
             .map_err(|e| e.to_string())?
     };
     let fullscreen = lock(&output.mode).as_str() == "fullscreen";
+    if release_native_fullscreen(&window, output) {
+        log::info!("AUDIENCE_LEAVE_FULLSCREEN");
+        return Ok(true);
+    }
     window.set_decorations(false).map_err(|e| e.to_string())?;
+    window
+        .set_position(LogicalPosition::new(x as f64, y as f64))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(LogicalSize::new(width as f64, height as f64))
+        .map_err(|e| e.to_string())?;
     if fullscreen {
-        window
-            .set_position(LogicalPosition::new(x as f64 + 40.0, y as f64 + 40.0))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_fullscreen_on_monitor(PhysicalPosition::new(x as f64, y as f64))
-            .map_err(|e| e.to_string())?;
-    } else {
-        window.set_fullscreen(false).map_err(|e| e.to_string())?;
-        let _ = window.set_simple_fullscreen(false);
-        window
-            .set_position(LogicalPosition::new(x as f64, y as f64))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_size(LogicalSize::new(width as f64, height as f64))
-            .map_err(|e| e.to_string())?;
         join_active_space(&window)?;
     }
     window.show().map_err(|e| e.to_string())?;
@@ -453,34 +455,40 @@ fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<
     window
         .set_visible_on_all_workspaces(true)
         .map_err(|e| e.to_string())?;
-    if fullscreen {
-        window.set_fullscreen(false).map_err(|e| e.to_string())?;
-        #[cfg(target_os = "macos")]
-        {
-            let _ = window.set_simple_fullscreen(false);
-        }
-        window
-            .set_position(LogicalPosition::new(x + 40.0, y + 40.0))
-            .map_err(|e| e.to_string())?;
-        let position = monitor.position();
-        window
-            .set_fullscreen_on_monitor(PhysicalPosition::new(position.x as f64, position.y as f64))
-            .map_err(|e| e.to_string())?;
-    } else {
-        window.set_fullscreen(false).map_err(|e| e.to_string())?;
-        #[cfg(target_os = "macos")]
-        {
-            let _ = window.set_simple_fullscreen(false);
-        }
-        window
-            .set_position(LogicalPosition::new(x, y))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_size(LogicalSize::new(width, height))
-            .map_err(|e| e.to_string())?;
-    }
+    // Cover the display with a borderless window. AppKit aborts if the fullscreen
+    // style bit is cleared outside a fullscreen transition.
+    window
+        .set_position(LogicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(|e| e.to_string())?;
     log::info!("AUDIENCE_PLACE logical={x},{y} {width}x{height} fullscreen={fullscreen}");
     Ok(())
+}
+
+/// Ask AppKit to leave native fullscreen, once. Returns true while that transition is still running.
+#[cfg(target_os = "macos")]
+fn release_native_fullscreen(window: &WebviewWindow, output: &Output) -> bool {
+    use objc2_app_kit::{NSWindow, NSWindowStyleMask};
+    let Ok(pointer) = window.ns_window() else {
+        return false;
+    };
+    let ns_window = unsafe { &*(pointer as *const NSWindow) };
+    if !ns_window.styleMask().contains(NSWindowStyleMask::FullScreen) {
+        *lock(&output.leaving_fullscreen) = false;
+        return false;
+    }
+    if !*lock(&output.leaving_fullscreen) {
+        ns_window.toggleFullScreen(None);
+        *lock(&output.leaving_fullscreen) = true;
+    }
+    true
+}
+
+#[cfg(not(target_os = "macos"))]
+fn release_native_fullscreen(_window: &WebviewWindow, _output: &Output) -> bool {
+    false
 }
 
 /// Keep the output above other windows without moving it off the display.
