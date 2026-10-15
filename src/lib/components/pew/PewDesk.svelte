@@ -15,6 +15,8 @@
   import OutputControls from "../OutputControls.svelte";
   import OutputType from "../OutputType.svelte";
   import Screen from "../Screen.svelte";
+  import { Pane, PaneGroup, PaneResizer } from "paneforge";
+  import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
 
   type Mode = "scriptures" | "slides" | "songs";
 
@@ -36,7 +38,6 @@
   let songSections = $state<SongSection[]>([{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }]);
   let songQuery = $state("");
   let wrapVerses = $state(false);
-  let expanded = $state<"transcript" | "display" | "preview" | null>(null);
   let chapterToken = 0;
   let takeAfterPreview = false;
   let listening = $state(false);
@@ -52,6 +53,78 @@
   const displayLive = $derived(
     session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
   );
+  const activeLayout = $derived(
+    session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
+  );
+  const libraryVisible = $derived(panelOpen(activeLayout, LIBRARY_PANEL));
+  const queueVisible = $derived(panelOpen(activeLayout, QUEUE_PANEL));
+  const focus = $derived(session.workspace.pew.focus);
+  const showLibrary = $derived(libraryVisible && !focus);
+  const showReading = $derived(!focus);
+  const showQueue = $derived(queueVisible && !focus);
+  let epoch = $state(0);
+  let frozen = $state(session.workspace.pew);
+  let applying = false;
+  let sizing = false;
+  let follow = false;
+
+  function retarget() {
+    applying = true;
+    frozen = session.workspace.pew;
+    epoch += 1;
+  }
+
+  function rememberSizes(patch: Parameters<typeof session.savePew>[0]) {
+    const before = session.workspace.pew;
+    session.savePew(patch);
+    if (session.workspace.pew !== before) sizing = true;
+  }
+
+  function onColumns(reported: number[]) {
+    if (applying || focus) return;
+    rememberSizes({ columns: mergeColumns(session.workspace.pew.columns, reported, showLibrary) });
+  }
+
+  function onLibrarySplit(reported: number[]) {
+    if (applying || focus) return;
+    rememberSizes({ librarySplit: mergeSplit(session.workspace.pew.librarySplit, reported) });
+  }
+
+  function onStageSplit(reported: number[]) {
+    if (applying || focus) return;
+    rememberSizes({ stageSplit: mergeSplit(session.workspace.pew.stageSplit, reported) });
+  }
+
+  function onProgramSplit(reported: number[]) {
+    if (applying || focus) return;
+    rememberSizes({ programSplit: mergeSplit(session.workspace.pew.programSplit, reported) });
+  }
+
+  function share(part: number, other: number): number {
+    const sum = part + other;
+    return sum > 0 ? (part / sum) * 100 : 50;
+  }
+
+  $effect(() => {
+    const desk = session.workspace.pew;
+    const panels = `${libraryVisible}:${queueVisible}`;
+    if (!follow) {
+      follow = true;
+      return;
+    }
+    if (sizing) {
+      sizing = false;
+      return;
+    }
+    if (desk && panels) retarget();
+  });
+
+  $effect(() => {
+    epoch;
+    queueMicrotask(() => {
+      applying = false;
+    });
+  });
   const queue = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
   const slides = $derived(queue.filter((item) => item.kind === "slide" || item.kind === "announcement"));
   const visibleSlides = $derived(
@@ -399,7 +472,7 @@
   }
 </script>
 
-<div class="pb" class:expand-transcript={expanded === "transcript"} class:expand-display={expanded === "display"} class:expand-preview={expanded === "preview"}>
+<div class="pb" class:focus>
   <header class="pb-bar">
     <nav class="pb-modes" aria-label="Library">
       <button type="button" class:on={mode === "scriptures"} onclick={() => { mode = "scriptures"; const item = passage(); if (item) void session.previewPassage(item); }}>Scriptures</button>
@@ -417,6 +490,15 @@
       <button type="button" class="clear" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
+      <button type="button" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => { session.togglePanel(LIBRARY_PANEL); retarget(); }}>
+        <Icon name="library" size={16} />
+      </button>
+      <button type="button" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => { session.togglePanel(QUEUE_PANEL); retarget(); }}>
+        <Icon name="queue" size={16} />
+      </button>
+      <button type="button" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => { session.savePew({ focus: !focus }); retarget(); }}>
+        <Icon name="focus" size={16} />
+      </button>
       <button type="button" data-tip="PewBeam" aria-label="PewBeam" class:on={session.workspace.appearance.desk === "pewbeam"} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
         {@render icon("pew")}
       </button>
@@ -499,24 +581,30 @@
         </div>
         <aside class="song-stage">
           <header>
-            <span>Preview{session.songPlace() ? ` · ${session.songPlace()}` : ""}</span>
+            <span class="kicker">Preview{session.songPlace() ? ` · ${session.songPlace()}` : ""}</span>
             <span class="song-step">
               <button type="button" aria-label="Previous section" onclick={() => session.stepSong(-1)}>Previous</button>
               <button type="button" aria-label="Next section" onclick={() => session.stepSong(1)}>Next</button>
             </span>
           </header>
           <div class="monitor"><Screen model={session.live.preview.model} /></div>
-          <header>{#if displayLive}<span class="pip on"></span>{/if}Main Output</header>
+          <header><span class="kicker">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
       </div>
     </section>
   {:else}
+    {#key epoch}
     <div class="pb-grid">
-      <div class="pb-col left">
-        <div class="pb-split">
+      <PaneGroup direction="horizontal" onLayoutChange={onColumns}>
+        {#if showLibrary}
+          <Pane defaultSize={frozen.columns[0]} minSize={18} order={1}>
+            <div class="fill">
+              <PaneGroup direction="vertical" onLayoutChange={onLibrarySplit}>
+                <Pane defaultSize={frozen.librarySplit} minSize={20} order={1}>
+                  <div class="pb-split">
           <section class="pb-panel">
-            <header class="pb-head"><span>Live transcript</span>{@render expand("transcript")}</header>
+            <header class="pb-head"><span>Live transcript</span></header>
             <div class="pb-body transcript">
               {#if listening || heard}
                 <p class="heard">{heard || "Speak a verse."}</p>
@@ -544,7 +632,7 @@
           <section class="pb-panel">
             <header class="pb-head">
               <span>Recent detections</span>
-              <button type="button" class="quiet" onclick={() => (detections = [])}>× Clear all</button>
+              <button type="button" class="quiet" onclick={() => (detections = [])}><Icon name="close" size={14} /> Clear all</button>
             </header>
             <div class="pb-body detections">
               {#each detections as hit (`${hit.bookOrd}-${hit.chapter}-${hit.verse}`)}
@@ -556,7 +644,9 @@
             </div>
           </section>
         </div>
-
+                </Pane>
+                <PaneResizer />
+                <Pane defaultSize={100 - frozen.librarySplit} minSize={24} order={2}>
         {#if mode === "scriptures"}
           <section class="pb-panel scriptures">
             <form class="script-bar" onsubmit={lookup}>
@@ -593,7 +683,7 @@
         {:else}
           <section class="pb-panel slides">
             <div class="slide-bar">
-              <button type="button" class="create" onclick={() => void createSlide()}>+ Create new</button>
+              <button type="button" class="create" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Create new</button>
               <input placeholder="Search for slide title or content" aria-label="Search slides" bind:value={slideQuery} />
             </div>
             <div class="slide-row">
@@ -606,11 +696,19 @@
             </div>
           </section>
         {/if}
-      </div>
-
-      <div class="pb-col mid">
-        <section class="pb-panel">
-          <header class="pb-head"><span>Live display</span>{@render expand("display")}</header>
+                </Pane>
+              </PaneGroup>
+            </div>
+          </Pane>
+          <PaneResizer />
+        {/if}
+        <Pane defaultSize={showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
+          <div class="fill">
+            <PaneGroup direction="vertical" onLayoutChange={onStageSplit}>
+              {#if showReading}
+                <Pane defaultSize={frozen.stageSplit} minSize={20} order={1}>
+                  <section class="pb-panel">
+                    <header class="pb-head"><span class="kicker">Scripture reading</span></header>
           <div class="pb-body display">
             {#if mode === "scriptures"}
               <article class="reading">
@@ -630,63 +728,83 @@
             {/if}
           </div>
         </section>
-        <section class="pb-panel">
-          <header class="pb-head"><span>Preview</span>{@render expand("preview")}</header>
-          <div class="monitor"><Screen model={session.live.preview.model} /></div>
-        </section>
-      </div>
-
-      <div class="pb-col right">
-        <section class="pb-panel output">
-          <header class="pb-head">
-            <span class="output-name">{#if displayLive}<span class="pip on"></span>{/if}Main Output</span>
-            <button
-              type="button"
-              class="style-name"
-              data-tip="Font, color, and layout. Preview only until you Take."
-              onclick={() => (sheet = sheet === "type" ? null : "type")}
-            >
-              {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
-            </button>
-          </header>
-          <div class="monitor main"><Screen model={session.live.program.model} /></div>
-          <footer class="output-tools">
-            <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
-            <span class="steppers">
-              <button type="button" aria-label="Previous" onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
-              <button type="button" aria-label="Next" onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
-            </span>
-          </footer>
-        </section>
-        <section class="pb-panel">
-          <header class="pb-head">
-            <span>Queue</span>
-            <span class="queue-actions">
-              <button type="button" class="quiet" onclick={() => void queuePassage()}>+ Add</button>
-              <button type="button" class="quiet" onclick={() => session.clearQueue()}>× Clear all</button>
-            </span>
-          </header>
-          <div class="pb-body queue">
-            {#each queue as item (item.id)}
-              <button type="button" class:on={session.cursor.itemId === item.id} onclick={() => open(item)}>{item.title}</button>
-            {/each}
+                </Pane>
+                <PaneResizer />
+              {/if}
+              <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
+                <section class="pb-panel">
+                  <header class="pb-head"><span class="kicker">Preview</span></header>
+                  <div class="monitor"><Screen model={session.live.preview.model} /></div>
+                </section>
+              </Pane>
+            </PaneGroup>
           </div>
-        </section>
-      </div>
+        </Pane>
+        <PaneResizer />
+        <Pane defaultSize={showLibrary ? frozen.columns[2] : share(frozen.columns[2], frozen.columns[1])} minSize={showLibrary ? 22 : 32} order={3}>
+          <div class="fill">
+            <PaneGroup direction="vertical" onLayoutChange={onProgramSplit}>
+              <Pane defaultSize={showQueue ? frozen.programSplit : 100} minSize={showQueue ? 28 : 20} order={1}>
+                <section class="pb-panel output">
+                  <header class="pb-head">
+                    <span class="kicker">{#if displayLive}<span class="pip on"></span>{/if}Program</span>
+                    <button
+                      type="button"
+                      class="style-name"
+                      data-tip="Font, color, and layout. Preview only until you press LIVE."
+                      onclick={() => (sheet = sheet === "type" ? null : "type")}
+                    >
+                      {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
+                    </button>
+                  </header>
+                  <div class="monitor main"><Screen model={session.live.program.model} /></div>
+                  <footer class="output-tools">
+                    <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
+                    <span class="steppers">
+                      <button type="button" aria-label="Previous" onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
+                      <button type="button" aria-label="Next" onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
+                    </span>
+                  </footer>
+                </section>
+              </Pane>
+              {#if showQueue}
+                <PaneResizer />
+                <Pane defaultSize={100 - frozen.programSplit} minSize={18} order={2}>
+                  <section class="pb-panel">
+                    <header class="pb-head">
+                      <span>Queue</span>
+                      <span class="queue-actions">
+                        <button type="button" class="quiet" onclick={() => void queuePassage()}><Icon name="plus" size={14} /> Add</button>
+                        <button type="button" class="quiet" onclick={() => session.clearQueue()}><Icon name="close" size={14} /> Clear all</button>
+                      </span>
+                    </header>
+                    <div class="pb-body queue">
+                      {#each queue as item (item.id)}
+                        <button type="button" class:on={session.cursor.itemId === item.id} onclick={() => open(item)}>{item.title}</button>
+                      {/each}
+                    </div>
+                  </section>
+                </Pane>
+              {/if}
+            </PaneGroup>
+          </div>
+        </Pane>
+      </PaneGroup>
     </div>
+    {/key}
   {/if}
   {#if sheet}
     <div class="sheet" role="dialog" aria-label={sheet}>
       <header>
         <strong>{sheet === "help" ? "How this desk works" : sheet === "alerts" ? "Alerts" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
-        <button type="button" onclick={() => (sheet = null)}>Close</button>
+        <button type="button" aria-label="Close" onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
       </header>
       {#if sheet === "help"}
         <p>Click a verse to put it on Preview. Shift-click a second verse to select a range.</p>
         <p>LIVE copies Preview onto Program. BLACK and CLEAR change Program only.</p>
         <p>Search a reference such as John 3:16, or a phrase such as “in the beginning”.</p>
         <p>Listen matches spoken scripture on Preview. It never takes Program by itself.</p>
-        <p>+ Add puts the current passage in the queue without changing Program.</p>
+        <p>F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.</p>
       {:else if sheet === "alerts"}
         <p>{note || "No alerts."}</p>
         <p>{session.message}</p>
@@ -701,10 +819,6 @@
     </div>
   {/if}
 </div>
-
-{#snippet expand(panel: "transcript" | "display" | "preview")}
-  <button type="button" class="mini ghost" aria-label="Expand" onclick={() => (expanded = expanded === panel ? null : panel)}>{@render icon("expand")}</button>
-{/snippet}
 
 {#snippet icon(name: string)}
   <Icon {name} size={16} />
@@ -725,8 +839,8 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px 12px;
-    padding: 10px 14px 12px;
+    gap: 8px 10px;
+    padding: var(--panel-pad) calc(var(--panel-pad) + 2px);
     flex: none;
   }
   .pb-modes { display: flex; align-items: center; gap: 4px; }
@@ -739,6 +853,7 @@
     font-weight: 560;
     font-size: 14px;
   }
+  .pb-modes button:hover:not(.on) { background: var(--field); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
   .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .audience-owner { margin: 0; color: var(--muted); font-size: 12px; }
@@ -746,7 +861,7 @@
     border: 1px solid transparent;
     border-radius: 999px;
     min-width: 78px;
-    height: 34px;
+    height: var(--control-h);
     padding: 0 14px;
     font-weight: 650;
     font-size: 12px;
@@ -763,7 +878,7 @@
     animation: live-ring 1.6s ease-out infinite;
   }
   .pip.on::after { animation-name: live-ring-red; }
-  .output-name .pip, .song-stage header .pip { background: var(--live); margin-right: 6px; vertical-align: 1px; }
+  .kicker .pip, .song-stage header .pip { background: var(--live); margin-right: 6px; vertical-align: 1px; }
   @keyframes live-ring {
     0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
     70% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
@@ -785,8 +900,8 @@
   .clear { background: transparent; color: var(--accent); border-color: var(--accent); }
   .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: none; }
   .pb-tools button {
-    width: 36px;
-    height: 36px;
+    width: var(--tool-size);
+    height: var(--tool-size);
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--field);
@@ -795,36 +910,48 @@
     place-items: center;
     padding: 0;
   }
+  .pb-tools button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .pb-tools button.on { color: var(--accent); border-color: var(--accent); }
-  .pb-tools :global(svg), .mini :global(svg), .lex :global(svg), .go :global(svg), .steppers :global(svg) {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
+  .pb button:active { opacity: 0.84; }
   .pb-grid {
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.9fr) minmax(220px, 0.78fr);
-    gap: 10px;
-    padding: 0 12px 12px;
+    min-width: 0;
+    padding: 0 var(--panel-pad) var(--panel-pad);
   }
-  .pb-col { min-width: 0; min-height: 0; display: grid; gap: 10px; }
-  .left { grid-template-rows: minmax(120px, 0.82fr) minmax(180px, 1.15fr); }
-  .mid, .right { grid-template-rows: minmax(0, 0.85fr) minmax(160px, 1fr); }
-  .expand-preview .mid { grid-template-rows: minmax(0, 0.25fr) minmax(0, 1fr); }
-  .expand-display .mid { grid-template-rows: minmax(0, 1fr) minmax(120px, 0.35fr); }
-  .expand-transcript .left { grid-template-rows: minmax(180px, 1.1fr) minmax(140px, 0.7fr); }
-  @media (max-width: 1080px) {
-    .pb-grid { grid-template-columns: minmax(0, 1fr); overflow: auto; }
-    .pb-col { min-height: 280px; }
+  .fill { height: 100%; min-width: 0; min-height: 0; }
+  .pb-grid :global([data-pane-group]) { width: 100%; height: 100%; }
+  .pb-grid :global([data-pane]) { min-width: 0; min-height: 0; overflow: hidden; }
+  .pb-grid :global([data-pane-resizer]) {
+    flex: 0 0 8px;
+    position: relative;
+    background: transparent;
   }
-  .pb-split { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pb-grid :global([data-pane-resizer][data-direction="horizontal"]) { cursor: col-resize; }
+  .pb-grid :global([data-pane-resizer][data-direction="vertical"]) { cursor: row-resize; }
+  .pb-grid :global([data-pane-resizer]::after) {
+    content: "";
+    position: absolute;
+    background: var(--line);
+    border-radius: 2px;
+  }
+  .pb-grid :global([data-pane-resizer][data-direction="horizontal"]::after) {
+    top: 10px;
+    bottom: 10px;
+    left: 3px;
+    width: 2px;
+  }
+  .pb-grid :global([data-pane-resizer][data-direction="vertical"]::after) {
+    left: 10px;
+    right: 10px;
+    top: 3px;
+    height: 2px;
+  }
+  .pb-grid :global([data-pane-resizer]:hover::after),
+  .pb-grid :global([data-pane-resizer][data-active]::after) { background: var(--accent); }
+  .pb-split { height: 100%; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 4px; }
   .pb-panel {
+    height: 100%;
     min-width: 0;
     min-height: 0;
     display: flex;
@@ -838,23 +965,23 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 36px;
-    padding: 0 10px;
+    min-height: var(--control-h);
+    padding: 0 var(--panel-pad);
     color: var(--muted);
     font-size: 13px;
   }
   .pb-head { justify-content: space-between; }
   .pb-body { flex: 1; min-height: 0; }
-  .quiet, .mini, .round, .go, .lex, .create {
+  .quiet, .mini, .go, .lex, .create {
     border: 0;
     background: transparent;
     color: var(--muted);
     font-size: 12px;
   }
+  .quiet { display: inline-flex; align-items: center; gap: 4px; }
   .go { color: var(--presence); display: inline-flex; align-items: center; gap: 6px; font-weight: 560; }
   .go.on { color: var(--accent); }
   .pb-foot { justify-content: space-between; border-top: 1px solid var(--line); }
-  .round { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); }
   .mini {
     width: 28px;
     height: 28px;
@@ -866,6 +993,7 @@
     place-items: center;
     flex: none;
   }
+  .mini:hover, .lex:hover, .steppers button:hover, .create:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .mini.on { color: var(--accent); border-color: var(--accent); }
   .script-bar, .slide-bar { padding: 8px; }
   select, .script-bar input, .slide-bar input {
@@ -905,7 +1033,7 @@
     -webkit-box-orient: vertical;
   }
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
-  .transcript, .reading, .detections { overflow: auto; padding: 8px 12px 12px; }
+  .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
   .heard { color: var(--accent); font-style: italic; }
   .listen-note { color: var(--muted); font-size: 12px; }
@@ -938,6 +1066,7 @@
   }
   .detections span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .queue-actions { display: flex; gap: 8px; }
+  .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
   .display { padding: 12px; }
   .display-grid { height: 100%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
@@ -972,7 +1101,7 @@
     overflow: hidden;
     background: #050505;
   }
-  .output-name::after { content: " ▾"; font-size: 10px; }
+  .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
   .style-name {
     margin-left: auto;
     border: 0;
@@ -1010,6 +1139,8 @@
     background-size: 18px 18px;
     overflow: auto;
   }
+  .focus .song-editor, .focus .song-library { display: none; }
+  .focus .song-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: min(1100px, 100%); }
   .song-desk {
     width: min(920px, 100%);
     margin: 28px auto;
@@ -1036,7 +1167,7 @@
     border: 1.5px solid var(--accent);
     border-radius: 10px;
   }
-  .note-icon :global(svg) { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+  .note-icon :global(svg) { width: 20px; height: 20px; }
   .song-editor h1 { margin: 4px 0 0; font-size: 20px; font-weight: 650; }
   .song-editor p, .song-empty { margin: 0; color: var(--muted); line-height: 1.45; }
   .song-editor input, .song-editor textarea, .song-library input {

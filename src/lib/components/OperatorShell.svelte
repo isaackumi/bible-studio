@@ -47,9 +47,17 @@
       black: () => void session.run("black"),
       logo: () => void session.run("logo"),
       escape: () => session.run("escape"),
+      focus: () => session.run("focus"),
+      library: () => session.run("library"),
+      queue: () => session.run("queue"),
+      find: () => session.run("find"),
     }).onKeyDown({
       code: event.code,
-      target,
+      target: target
+        ? { tagName: target.tagName, isContentEditable: target.isContentEditable, role: target.getAttribute("role") }
+        : null,
+      modified: event.metaKey || event.ctrlKey || event.altKey,
+      defaultPrevented: event.defaultPrevented,
       preventDefault: () => event.preventDefault(),
     });
   }

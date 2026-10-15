@@ -9,15 +9,22 @@ export const defaultShortcuts: ShortcutMap = {
   black: ["KeyB"],
   logo: ["KeyL"],
   escape: ["Escape"],
+  focus: ["KeyF"],
+  library: ["BracketLeft"],
+  queue: ["BracketRight"],
+  find: ["Slash"],
 };
 
 export type KeyInput = {
   code: string;
-  target: { tagName?: string; isContentEditable?: boolean } | null;
+  target: { tagName?: string; isContentEditable?: boolean; role?: string | null } | null;
+  modified?: boolean;
+  defaultPrevented?: boolean;
   preventDefault: () => void;
 };
 
-const ORDER: ShortcutAction[] = ["escape", "take", "cut", "previous", "next", "clear", "black", "logo"];
+const ORDER: ShortcutAction[] = ["escape", "take", "cut", "previous", "next", "clear", "black", "logo", "focus", "library", "queue", "find"];
+const DESK_ACTIONS = new Set<ShortcutAction>(["focus", "library", "queue", "find"]);
 
 export function shortcutFor(map: ShortcutMap, code: string): ShortcutAction | null {
   for (const action of ORDER) {
@@ -32,17 +39,26 @@ export function isTypingTarget(target: KeyInput["target"]): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
 }
 
+function holdsNavigation(target: KeyInput["target"]): boolean {
+  if (!target) return false;
+  const tag = target.tagName?.toUpperCase();
+  return tag === "BUTTON" || tag === "A" || target.role === "button" || target.role === "separator";
+}
+
 export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record<ShortcutAction, () => void>>) {
   return {
     onKeyDown(event: KeyInput) {
+      if (event.defaultPrevented) return;
       const action = shortcutFor(map, event.code);
       if (!action) return;
+      if (DESK_ACTIONS.has(action) && event.modified) return;
       if (isTypingTarget(event.target)) {
         if (action !== "escape") return;
         handlers.escape?.();
         event.preventDefault();
         return;
       }
+      if ((action === "previous" || action === "next") && holdsNavigation(event.target)) return;
       handlers[action]?.();
       event.preventDefault();
     },
@@ -59,6 +75,9 @@ export function shortcutLabel(map: ShortcutMap, action: ShortcutAction): string 
     ArrowUp: "↑",
     ArrowDown: "↓",
     Escape: "Esc",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Slash: "/",
   };
   return labels[code] ?? code.replace(/^Key/, "");
 }

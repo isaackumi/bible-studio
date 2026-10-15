@@ -122,7 +122,7 @@ export type MediaAsset = {
 
 export type RecentPassage = BibleItem;
 
-export type ShortcutAction = ProgramAction | "previous" | "next" | "escape";
+export type ShortcutAction = ProgramAction | "previous" | "next" | "escape" | "focus" | "library" | "queue" | "find";
 
 export type ShortcutMap = Record<ShortcutAction, string[]>;
 
@@ -196,6 +196,15 @@ export type DeskStyle = "pewbeam" | "obs";
 /** Operator chrome. Scripture themes are a separate record. */
 export type OperatorTheme = "dark" | "vespers" | "nave" | "light";
 
+/** PewBeam column sizes. Panel visibility stays on the workspace layout. */
+export type PewDeskState = {
+  focus: boolean;
+  columns: [number, number, number];
+  librarySplit: number;
+  stageSplit: number;
+  programSplit: number;
+};
+
 export type AppearanceSettings = {
   theme: OperatorTheme;
   density: "compact" | "comfortable";
@@ -215,6 +224,7 @@ export type Workspace = {
   cursor: Cursor;
   shortcuts: ShortcutMap | null;
   appearance: AppearanceSettings;
+  pew: PewDeskState;
   activeLayoutId: string;
   layouts: WorkspaceLayout[];
   activeDisplayProfileId: string;

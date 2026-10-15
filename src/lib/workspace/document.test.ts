@@ -19,6 +19,7 @@ describe("workspace document", () => {
     expect(workspace.layouts.map((layout) => layout.id)).toEqual(["layout-bible", "layout-production", "layout-simple"]);
     expect(workspace.activeLayoutId).toBe("layout-bible");
     expect(workspace.schemaVersion).toBe(2);
+    expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
     expect(workspace).not.toHaveProperty("program");
   });
 
@@ -46,6 +47,24 @@ describe("workspace document", () => {
   it("drops an unknown operator theme", () => {
     const workspace = normalizeWorkspace({ appearance: { theme: "neon", density: "comfortable", scale: 1, accent: "#fa4f00" } });
     expect(workspace.appearance.theme).toBe("dark");
+  });
+
+  it("keeps a saved shortcut map and fills desk keys that older documents omit", () => {
+    const workspace = normalizeWorkspace({
+      shortcuts: {
+        take: ["KeyT"],
+        cut: ["KeyC"],
+        previous: ["ArrowLeft"],
+        next: ["ArrowRight"],
+        clear: ["Backspace"],
+        black: ["KeyB"],
+        logo: ["KeyL"],
+        escape: ["Escape"],
+      },
+    });
+    expect(workspace.shortcuts?.take).toEqual(["KeyT"]);
+    expect(workspace.shortcuts?.focus).toEqual(["KeyF"]);
+    expect(workspace.shortcuts?.find).toEqual(["Slash"]);
   });
 
   it("keeps an OBS desk choice", () => {

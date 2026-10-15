@@ -2,6 +2,7 @@ import { displayWash } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
 import { SCREEN_FONTS } from "./fonts";
 import { factoryLayouts } from "../workspace/layout";
+import { defaultPewDesk } from "../workspace/pew";
 import type { AppearanceSettings, PresentationModel, Theme, Workspace } from "./types";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
@@ -216,6 +217,7 @@ export function defaultWorkspace(): Workspace {
     cursor: emptyCursor(),
     shortcuts: null,
     appearance: defaultAppearance(),
+    pew: defaultPewDesk(),
     activeLayoutId: layouts[0].id,
     layouts,
     activeDisplayProfileId: displayProfiles[0].id,

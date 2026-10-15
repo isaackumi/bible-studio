@@ -10,8 +10,10 @@ import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } fro
 import { findItem, moveInList, stepCursor } from "../domain/service";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
+import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
 import type {
   AppearanceSettings,
+  PewDeskState,
   BibleItem,
   Cursor,
   DisplayAssignment,
@@ -1017,7 +1019,18 @@ class Session {
     const layout = this.activeLayout();
     if (!layout) return;
     this.commitLayout(resetLayout(layout));
-    this.message = `${layout.name} restored.`;
+    this.workspace = { ...this.workspace, pew: defaultPewDesk() };
+    this.persistSoon();
+    this.message = `${layout.name} restored. Program was not changed.`;
+  };
+
+  focusSearch = () => {
+    if (typeof document === "undefined") return;
+    const field = document.querySelector<HTMLInputElement>(
+      '[aria-label="Bible search"], [aria-label="Search slides"], [aria-label="Search songs"]',
+    );
+    field?.focus();
+    field?.select();
   };
 
   restoreBuiltinWorkspaces = () => {
@@ -1034,6 +1047,13 @@ class Session {
     clearTimeout(this.saveTimer);
     await this.persist();
     this.message = "Workspace saved.";
+  };
+
+  savePew = (patch: Partial<PewDeskState>) => {
+    const pew = normalizePew({ ...this.workspace.pew, ...patch });
+    if (samePew(pew, this.workspace.pew)) return;
+    this.workspace = { ...this.workspace, pew };
+    this.persistSoon();
   };
 
   setAppearance = (patch: Partial<AppearanceSettings>) => {
@@ -1127,6 +1147,18 @@ class Session {
         return this.step(1);
       case "escape":
         this.escape();
+        return;
+      case "focus":
+        this.savePew({ focus: !this.workspace.pew.focus });
+        return;
+      case "library":
+        this.togglePanel("bible");
+        return;
+      case "queue":
+        this.togglePanel("service");
+        return;
+      case "find":
+        this.focusSearch();
         return;
       case "open-settings":
         this.openSettings("appearance");

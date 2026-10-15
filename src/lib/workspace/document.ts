@@ -2,8 +2,10 @@ import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, Shortcu
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
+import { defaultShortcuts } from "../keyboard/manager";
+import { normalizePew } from "./pew";
 
-const SHORTCUTS = ["take", "cut", "previous", "next", "clear", "black", "logo", "escape"] as const;
+const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
 export function sanitizeAccent(value: string | undefined): string {
   return value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#fa4f00";
@@ -32,9 +34,12 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
 
 function shortcuts(value: unknown): ShortcutMap | null {
   if (!value || typeof value !== "object") return null;
-  const record = value as ShortcutMap;
-  if (!SHORTCUTS.every((action) => Array.isArray(record[action]))) return null;
-  return record;
+  const record = value as Partial<ShortcutMap>;
+  const known = SHORTCUTS.filter((action) => Array.isArray(record[action]));
+  if (known.length === 0) return null;
+  const merged = { ...defaultShortcuts };
+  for (const action of known) merged[action] = record[action] ?? defaultShortcuts[action];
+  return merged;
 }
 
 function cursor(value: unknown, base: Cursor): Cursor {
@@ -69,6 +74,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     cursor: cursor(value.cursor, base.cursor),
     shortcuts: shortcuts(value.shortcuts),
     appearance: appearance(value.appearance, base.appearance),
+    pew: normalizePew(value.pew),
     layouts: safeLayouts,
     activeLayoutId: safeLayouts.some((layout) => layout.id === value.activeLayoutId) ? value.activeLayoutId! : safeLayouts[0].id,
     displayProfiles: safeProfiles,

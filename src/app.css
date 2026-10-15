@@ -374,8 +374,8 @@ button { cursor: pointer; }
   font-family: var(--font-label);
 }
 
-:root { --chrome-h: 52px; --ui-scale: 1; --panel-pad: 12px; }
-:root[data-density="compact"] { --chrome-h: 44px; --panel-pad: 8px; }
+:root { --chrome-h: 52px; --ui-scale: 1; --panel-pad: 12px; --control-h: 34px; --tool-size: 36px; }
+:root[data-density="compact"] { --chrome-h: 44px; --panel-pad: 8px; --control-h: 30px; --tool-size: 32px; }
 :root[data-theme="light"] {
   color-scheme: light;
   --booth: #f7f5f3;

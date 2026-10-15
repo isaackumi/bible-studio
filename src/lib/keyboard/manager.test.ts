@@ -7,6 +7,8 @@ function press(code: string, tag?: string) {
     event: {
       code,
       target: tag ? { tagName: tag } : null,
+      modified: false,
+      defaultPrevented: false,
       preventDefault() {
         prevented = true;
       },
@@ -36,5 +38,42 @@ describe("keyboard manager", () => {
     const escape = press("Escape", "INPUT");
     manager.onKeyDown(escape.event);
     expect(seen).toEqual(["take", "escape"]);
+
+    const arrowOnButton = press("ArrowRight", "BUTTON");
+    manager.onKeyDown(arrowOnButton.event);
+    expect(seen).toEqual(["take", "escape"]);
+    expect(arrowOnButton.prevented()).toBe(false);
+
+    const spaceOnButton = press("Space", "BUTTON");
+    manager.onKeyDown(spaceOnButton.event);
+    expect(seen).toEqual(["take", "escape", "take"]);
+
+    const handled = press("ArrowRight");
+    handled.event.defaultPrevented = true;
+    manager.onKeyDown(handled.event);
+    expect(seen).toEqual(["take", "escape", "take"]);
+  });
+
+  it("keeps desk keys off program and out of text fields", () => {
+    const seen: string[] = [];
+    const manager = createKeyboardManager(defaultShortcuts, {
+      focus: () => seen.push("focus"),
+      find: () => seen.push("find"),
+      take: () => seen.push("take"),
+    });
+    const focus = press("KeyF");
+    manager.onKeyDown(focus.event);
+    expect(seen).toEqual(["focus"]);
+
+    const modified = press("KeyF");
+    modified.event.modified = true;
+    manager.onKeyDown(modified.event);
+    expect(seen).toEqual(["focus"]);
+    expect(modified.prevented()).toBe(false);
+
+    const slash = press("Slash", "INPUT");
+    manager.onKeyDown(slash.event);
+    expect(seen).toEqual(["focus"]);
+    expect(slash.prevented()).toBe(false);
   });
 });
