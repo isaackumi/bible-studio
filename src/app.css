@@ -45,8 +45,9 @@
   --live: #ff4458;
   --presence: #3dce7a;
   --mustard: #e2cc9d;
-  --font-ui: "Instrument Sans", sans-serif;
-  --font-label: "Instrument Sans", sans-serif;
+  /* SF Pro is the Mac system face. Instrument Sans remains the fallback off Apple platforms. */
+  --font-ui: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Instrument Sans", sans-serif;
+  --font-label: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Instrument Sans", sans-serif;
   --font-scripture: "Instrument Serif", serif;
   --font-screen: "Inter Variable", Inter, sans-serif;
   font-family: var(--font-ui);
