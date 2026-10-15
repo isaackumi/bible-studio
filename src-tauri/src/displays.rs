@@ -241,7 +241,7 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
             // Do not focus the operator. Focusing it can pull the audience window back.
             join_active_space(&window)?;
         }
-        let (x, y, width, height) = logical_frame(monitor);
+        let (x, y, width, height) = screen_frame(monitor);
         log::info!("AUDIENCE_PLACED name={name} mode={mode} logical={x},{y} {width}x{height}");
     }
     publish(
@@ -258,22 +258,13 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
 /// Tauri sometimes reports no monitors while CoreGraphics still has the Dell.
 #[cfg(target_os = "macos")]
 fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
-    let Some((x, y, width, height)) = external_display_points() else {
+    let Some((x, y, width, height)) = first_external_ns_frame().or_else(external_display_points) else {
         return Ok(false);
     };
     let window = if let Some(window) = app.get_webview_window("audience") {
         window
     } else {
-        WebviewWindowBuilder::new(app, "audience", WebviewUrl::default())
-            .title("Audience")
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .visible(false)
-            .focused(false)
-            .visible_on_all_workspaces(true)
-            .resizable(false)
-            .shadow(false)
+        audience_window(app)
             .inner_size(960.0, 540.0)
             .build()
             .map_err(|e| e.to_string())?
@@ -294,6 +285,7 @@ fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
         join_active_space(&window)?;
     }
     window.show().map_err(|e| e.to_string())?;
+    join_active_space(&window)?;
     log::info!("AUDIENCE_PLACE cg-points={x},{y} {width}x{height} fullscreen={fullscreen}");
     let fallback_key = display_key("External display", width, height, 1.0);
     {
@@ -428,12 +420,9 @@ fn logical_points(x: i32, y: i32, width: u32, height: u32, scale: f64) -> (f64, 
     )
 }
 
-fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, String> {
-    if let Some(window) = app.get_webview_window("audience") {
-        return Ok(window);
-    }
-    let (x, y, width, height) = logical_frame(monitor);
+fn audience_window(app: &AppHandle) -> WebviewWindowBuilder<'_, tauri::Wry, AppHandle> {
     WebviewWindowBuilder::new(app, "audience", WebviewUrl::default())
+        .initialization_script("window.__CHURCH_STUDIO_SURFACE__='audience';")
         .title("Audience")
         .decorations(false)
         .always_on_top(true)
@@ -443,6 +432,14 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
         .visible_on_all_workspaces(true)
         .resizable(false)
         .shadow(false)
+}
+
+fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, String> {
+    if let Some(window) = app.get_webview_window("audience") {
+        return Ok(window);
+    }
+    let (x, y, width, height) = screen_frame(monitor);
+    audience_window(app)
         .position(x, y)
         .inner_size(width, height)
         .build()
@@ -450,7 +447,7 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
 }
 
 fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<(), String> {
-    let (x, y, width, height) = logical_frame(monitor);
+    let (x, y, width, height) = screen_frame(monitor);
     window.set_decorations(false).map_err(|e| e.to_string())?;
     window
         .set_visible_on_all_workspaces(true)
@@ -465,6 +462,69 @@ fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<
         .map_err(|e| e.to_string())?;
     log::info!("AUDIENCE_PLACE logical={x},{y} {width}x{height} fullscreen={fullscreen}");
     Ok(())
+}
+
+/// AppKit window points. Tao's monitor frame is not always the same origin as NSScreen.
+fn screen_frame(monitor: &Monitor) -> (f64, f64, f64, f64) {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(frame) = ns_screen_frame(monitor) {
+            return frame;
+        }
+    }
+    logical_frame(monitor)
+}
+
+#[cfg(target_os = "macos")]
+fn first_external_ns_frame() -> Option<(i32, i32, u32, u32)> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+
+    let marker = MainThreadMarker::new()?;
+    let main = NSScreen::mainScreen(marker)?;
+    let main_frame = main.frame();
+    for screen in NSScreen::screens(marker) {
+        let frame = screen.frame();
+        let same_origin = (frame.origin.x - main_frame.origin.x).abs() < 1.0
+            && (frame.origin.y - main_frame.origin.y).abs() < 1.0;
+        if same_origin {
+            continue;
+        }
+        return Some((
+            frame.origin.x.round() as i32,
+            frame.origin.y.round() as i32,
+            frame.size.width.round() as u32,
+            frame.size.height.round() as u32,
+        ));
+    }
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn first_external_ns_frame() -> Option<(i32, i32, u32, u32)> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn ns_screen_frame(monitor: &Monitor) -> Option<(f64, f64, f64, f64)> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+
+    let marker = MainThreadMarker::new()?;
+    let (x, _, width, _) = logical_frame(monitor);
+    let mut best: Option<(f64, (f64, f64, f64, f64))> = None;
+    for screen in NSScreen::screens(marker) {
+        let frame = screen.frame();
+        let dx = (frame.origin.x - x).abs();
+        if dx > 48.0 || !width_matches(width, frame.size.width) {
+            continue;
+        }
+        let placed = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+        if best.as_ref().is_none_or(|(score, _)| dx < *score) {
+            best = Some((dx, placed));
+        }
+    }
+    best.map(|(_, frame)| frame)
 }
 
 /// Ask AppKit to leave native fullscreen, once. Returns true while that transition is still running.
@@ -522,7 +582,7 @@ fn frame_matches(window: &WebviewWindow, monitor: &Monitor) -> bool {
     let Ok(size) = window.outer_size() else {
         return false;
     };
-    let (x, y, width, height) = logical_frame(monitor);
+    let (x, y, width, height) = screen_frame(monitor);
     let scale = window.scale_factor().unwrap_or(1.0);
     let target_x = (x * scale).round() as i32;
     let target_y = (y * scale).round() as i32;

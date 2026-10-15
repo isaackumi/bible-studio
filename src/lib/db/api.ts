@@ -84,6 +84,16 @@ export const api = {
       : bundledPassage(translationId, bookOrd, chapter, startVerse, endVerse),
   search: (translationId: string, query: string) =>
     desktop() ? invoke<SearchHit[]>("bible_search", { translationId, query }) : bundledSearch(translationId, query),
+  startRemoteLan: () =>
+    desktop()
+      ? invoke<{ listening: boolean; url: string; port: number }>("start_remote_lan")
+      : Promise.resolve({ listening: false, url: "", port: 17891 }),
+  remoteLanStatus: () =>
+    desktop()
+      ? invoke<{ listening: boolean; url: string; port: number }>("remote_lan_status")
+      : Promise.resolve({ listening: false, url: "", port: 17891 }),
+  remoteReply: (id: string, envelope: unknown) =>
+    desktop() ? invoke<void>("remote_reply", { id, envelope }) : Promise.resolve(),
 };
 
 export function assetUrl(path: string | null | undefined): string | null {

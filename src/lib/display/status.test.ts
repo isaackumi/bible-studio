@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DisplayInfo, OutputStatus } from "../domain/types";
-import { audienceDeskLine, audienceStatus } from "./status";
+import { audienceChip, audienceDeskLine, audienceStatus } from "./status";
 
 function display(patch: Partial<DisplayInfo>): DisplayInfo {
   return {
@@ -83,5 +83,23 @@ describe("audience status", () => {
       title: "Audience is closed",
       line: "Closed",
     });
+  });
+
+  it("compacts the desk chip to Audience plus the screen name", () => {
+    expect(
+      audienceChip(
+        output({
+          desired: true,
+          online: true,
+          displays: [display({ name: "DELL U2415", audience: true })],
+        }),
+        true,
+      ),
+    ).toEqual({ on: true, label: "Audience · DELL U2415" });
+    expect(audienceChip(output({ displays: [display({ primary: false })] }), true)).toEqual({
+      on: false,
+      label: "Audience · DELL U2415",
+    });
+    expect(audienceChip(output({}), false)).toEqual({ on: false, label: "Audience · Closed" });
   });
 });

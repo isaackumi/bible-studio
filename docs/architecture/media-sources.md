@@ -26,11 +26,31 @@ VideoSource
 
 Do not put capture code in `PewDesk.svelte`. Select a source → `setPreview`. LIVE copies to Program.
 
+## Composition layers
+
+A camera, video file, or future NDI input is a **media source**, then a `SourceRef` on a composition layer. The composition engine does not open devices.
+
+```text
+Camera / Video / NDI
+        ↓
+Media Source API  (camera.ts today; NDI later, native only)
+        ↓
+SourceRef { type: "camera" | "video" | "ndi", ... }
+        ↓
+compileSource → PresentationModel
+        ↓
+Composition layer
+```
+
+`presentCamera` is the stand-in paint until a real capture is wired into a layer. Composition `FrameView` does not receive `MediaStream`. `AudienceOutput` never does. See [composition-engine.md](composition-engine.md).
+
 ## Camera (partial)
 
 Browser and desktop webview: `navigator.mediaDevices.getUserMedia` with `{ audio: false, video }`. Settings → Media lists cameras. Select → Preview (`previewCameraLive` / `setPreview`). LIVE copies the compiled camera card onto Program. Operator Preview may show the live `MediaStream`. `AudienceOutput` does not receive the stream. Permission denied and missing devices are desk messages. Listen in `src/lib/voice/listen.ts` stays audio-only and must not Take.
 
-Capture lives in `session.previewCamera` and `MediaPane`, not in `PewDesk.svelte`.
+Capture lives in `session.previewCamera` and Looks (`previewLook` opens a matching camera feed). Not in `PewDesk.svelte`.
+
+A composition camera layer uses the same feed: `cameraFeedForLayer(..., "preview")`. Operator Preview may show the `MediaStream` inside that region. Program monitors and `AudienceOutput` never receive the stream; they paint `presentCamera`. See [composition-engine.md](composition-engine.md).
 
 Not claimed shipped until a real camera is tested.
 

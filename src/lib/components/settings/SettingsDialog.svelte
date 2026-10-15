@@ -202,7 +202,7 @@
         <section class="card">
           <h3>Desk</h3>
           <div class="choice-row" role="group" aria-label="Desk">
-            {#each [{ id: "pewbeam", name: "PewBeam", icon: "pew", note: "Scripture desk" }, { id: "obs", name: "OBS", icon: "obs", note: "Preview and Program" }] as style (style.id)}
+            {#each [{ id: "pewbeam", name: "Presenter Desk", icon: "pew", note: "Scripture, songs and service presentation." }, { id: "obs", name: "Production Desk", icon: "obs", note: "Live production, cameras, compositions and output control." }] as style (style.id)}
               <button type="button" class="choice" class:active={session.workspace.appearance.desk === style.id} onclick={() => session.setAppearance({ desk: style.id as DeskStyle })}>
                 <Icon name={style.icon} size={18} />
                 <strong>{style.name}</strong>
@@ -467,7 +467,10 @@
       {:else if section === "remote"}
         <section class="card">
           <h3>Phone is a controller</h3>
-          <p class="note">Pair on this computer first. Unpaired pads cannot change Program. A LAN socket for a real phone is not claimed shipped yet.</p>
+          <p class="note">Pair on this computer first. Unpaired pads cannot change Program. A phone on this Wi-Fi opens the LAN address. Not shipped until that phone is tested.</p>
+          {#if session.remoteLanUrl}
+            <p class="note">On this network <strong>{session.remoteLanUrl}</strong></p>
+          {/if}
           {#if session.remotePairing}
             <p class="note">Code <strong>{session.remotePairing.code}</strong></p>
             <p class="note">{session.remoteTokens.length} paired. Open the remote pad and enter that code.</p>

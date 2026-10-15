@@ -1,9 +1,11 @@
 mod bible;
 mod db;
 mod displays;
+mod remote;
 mod voice;
 
 use serde_json::Value;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::Db;
@@ -251,6 +253,24 @@ fn stop_sermon_listen() {
     voice::stop_transcribe();
 }
 
+#[tauri::command]
+fn start_remote_lan(app: AppHandle, lan: State<Arc<remote::LanRemote>>) -> Value {
+    remote::start(app, Arc::clone(&lan));
+    remote_lan_status(lan)
+}
+
+#[tauri::command]
+fn remote_lan_status(lan: State<Arc<remote::LanRemote>>) -> Value {
+    let listening = *lan.listening.lock().unwrap_or_else(|poison| poison.into_inner());
+    let url = lan.url.lock().unwrap_or_else(|poison| poison.into_inner()).clone();
+    serde_json::json!({ "listening": listening, "url": url, "port": remote::PORT })
+}
+
+#[tauri::command]
+fn remote_reply(lan: State<Arc<remote::LanRemote>>, id: String, envelope: Value) {
+    remote::reply(&lan, id, envelope);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -264,6 +284,7 @@ pub fn run() {
             displays::place_operator(app.handle());
             displays::reconcile(app.handle()).map_err(|message| std::io::Error::other(message))?;
             displays::start(app.handle().clone());
+            app.manage(Arc::new(remote::LanRemote::default()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -302,7 +323,10 @@ pub fn run() {
             request_listen_access,
             open_privacy_settings,
             start_sermon_listen,
-            stop_sermon_listen
+            stop_sermon_listen,
+            start_remote_lan,
+            remote_lan_status,
+            remote_reply
         ])
         .run(tauri::generate_context!())
         .expect("error while running Church Studio");

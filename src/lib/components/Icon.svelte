@@ -23,8 +23,14 @@
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Mic from "@lucide/svelte/icons/mic";
   import MicOff from "@lucide/svelte/icons/mic-off";
+  import Minus from "@lucide/svelte/icons/minus";
   import Monitor from "@lucide/svelte/icons/monitor";
+  import Moon from "@lucide/svelte/icons/moon";
   import Music from "@lucide/svelte/icons/music";
+  import Play from "@lucide/svelte/icons/play";
+  import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+  import Scissors from "@lucide/svelte/icons/scissors";
+  import Square from "@lucide/svelte/icons/square";
   import Palette from "@lucide/svelte/icons/palette";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Plus from "@lucide/svelte/icons/plus";
@@ -65,6 +71,7 @@
     stage: Presentation,
     lyrics: Music,
     media: Image,
+    logo: Image,
     audio: AudioLines,
     files: Folder,
     speed: Gauge,
@@ -73,6 +80,12 @@
     key: KeyRound,
     close: X,
     plus: Plus,
+    minus: Minus,
+    play: Play,
+    scissors: Scissors,
+    square: Square,
+    moon: Moon,
+    reset: RotateCcw,
     studio: LayoutGrid,
     list: List,
     transition: ArrowLeftRight,

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1018" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Church Studio Remote</title>
+    <style>
+      :root {
+        --nave: #0b1018;
+        --pew: #141b26;
+        --gilt: #d4a056;
+        --ember: #e23d2e;
+        --linen: #f3ead8;
+        --mist: #9aa7b8;
+      }
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; margin: 0; }
+      body {
+        position: relative;
+        isolation: isolate;
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        padding: max(20px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        background:
+          radial-gradient(120% 70% at 50% 115%, rgba(226, 61, 46, 0.28), transparent 55%),
+          radial-gradient(80% 50% at 80% 0%, rgba(212, 160, 86, 0.12), transparent 50%),
+          var(--nave);
+        color: var(--linen);
+        font-family: "SF Pro Display", "Avenir Next", "Segoe UI Variable", system-ui, sans-serif;
+        overflow: hidden;
+      }
+      body::before {
+        content: "";
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        background-image: repeating-linear-gradient(-18deg, transparent 0 11px, rgba(255,255,255,0.015) 11px 12px);
+        mix-blend-mode: overlay;
+      }
+      header, form, .air, .clicker, .foot { position: relative; }
+      header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+      .mark {
+        margin: 0;
+        font-family: "New York", "Iowan Old Style", Palatino, "Palatino Linotype", "Times New Roman", serif;
+        font-style: italic;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+      }
+      .link, .kicker, .foot, label span, .note {
+        margin: 0;
+        color: var(--mist);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      form, .clicker { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+      label { display: flex; flex-direction: column; gap: 10px; }
+      input {
+        height: 88px;
+        border: 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--gilt) 55%, transparent);
+        border-radius: 0;
+        background: transparent;
+        color: var(--linen);
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 48px;
+        letter-spacing: 0.28em;
+        text-align: center;
+      }
+      button {
+        appearance: none;
+        border: 0;
+        color: inherit;
+        font: inherit;
+        touch-action: manipulation;
+      }
+      .pair, .prev, .next, .busk button {
+        min-height: 56px;
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--pew) 88%, #000);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.28);
+      }
+      .pair {
+        margin-top: auto;
+        background: var(--linen);
+        color: var(--nave);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .air { margin-top: 8px; }
+      .cue {
+        margin: 8px 0 10px;
+        font-family: "New York", "Iowan Old Style", Palatino, "Palatino Linotype", "Times New Roman", serif;
+        font-size: clamp(28px, 8vw, 44px);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+      }
+      .verse {
+        margin: 0 0 8px;
+        max-height: 22vh;
+        overflow: auto;
+        font-family: "New York", "Iowan Old Style", Palatino, "Palatino Linotype", "Times New Roman", serif;
+        font-size: 18px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+      .attr { margin: 0 0 8px; color: var(--gilt); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+      .note { letter-spacing: 0.04em; text-transform: none; line-height: 1.45; max-width: 28em; }
+      .arrows { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; min-height: 18vh; }
+      .prev, .next {
+        min-height: 18vh;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .next { background: color-mix(in srgb, var(--gilt) 18%, var(--pew)); }
+      .lamp {
+        align-self: center;
+        width: min(42vw, 168px);
+        height: min(42vw, 168px);
+        margin: 4px 0 8px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 42%, #ff6a55 0%, var(--ember) 42%, #7a1c16 78%);
+        box-shadow: 0 0 0 10px color-mix(in srgb, var(--gilt) 35%, transparent), 0 0 40px rgba(226,61,46,0.45), inset 0 -18px 24px rgba(0,0,0,0.35);
+        color: #fff7f2;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        animation: breathe 3.6s ease-in-out infinite;
+      }
+      .hot { outline: 2px solid var(--gilt); outline-offset: 3px; }
+      .busk { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: auto; }
+      .busk button {
+        min-height: 64px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 13px;
+        color: var(--mist);
+      }
+      .foot { margin-top: auto; line-height: 1.6; }
+      button:active { transform: translateY(1px) scale(0.985); }
+      .clicker[hidden], form[hidden] { display: none; }
+      @keyframes breathe {
+        0%, 100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--gilt) 28%, transparent), 0 0 34px rgba(226,61,46,0.32), inset 0 -18px 24px rgba(0,0,0,0.35); }
+        50% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gilt) 48%, transparent), 0 0 54px rgba(226,61,46,0.55), inset 0 -18px 24px rgba(0,0,0,0.35); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .lamp { animation: none; }
+        button:active { transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="mark">Church Studio</p>
+      <p class="link" id="link">Pair the desk</p>
+    </header>
+    <form id="pair">
+      <label>
+        <span>Desk code</span>
+        <input id="code" aria-label="Pairing code" inputmode="numeric" maxlength="6" placeholder="000000" />
+      </label>
+      <button type="submit" class="pair">Open the pad</button>
+    </form>
+    <p class="foot" id="gate">The desk is showing a six-digit code. This phone is a clicker, not a display.</p>
+    <section class="air" id="air" hidden>
+      <p class="kicker" id="kicker">Ready</p>
+      <p class="cue" id="cue">Waiting for the first cue</p>
+      <p class="verse" id="verse" hidden></p>
+      <p class="attr" id="attr" hidden></p>
+      <p class="note" id="note">This phone takes Program. Next and Previous send the following cue.</p>
+    </section>
+    <div class="clicker" id="pad" hidden>
+      <div class="arrows">
+        <button type="button" class="prev" data-id="previous">Previous</button>
+        <button type="button" class="next" data-id="next">Next</button>
+      </div>
+      <button type="button" class="lamp" data-id="take">LIVE</button>
+      <div class="busk">
+        <button type="button" data-id="clear">Clear</button>
+        <button type="button" data-id="black">Black</button>
+        <button type="button" data-id="logo">Logo</button>
+      </div>
+    </div>
+    <script>
+      let token = "";
+      const link = document.getElementById("link");
+      const gate = document.getElementById("gate");
+      const air = document.getElementById("air");
+      const pad = document.getElementById("pad");
+      const kicker = document.getElementById("kicker");
+      const cue = document.getElementById("cue");
+      const verse = document.getElementById("verse");
+      const attr = document.getElementById("attr");
+      const note = document.getElementById("note");
+      function mark(id) {
+        document.querySelectorAll("[data-id]").forEach((button) => button.classList.toggle("hot", button.getAttribute("data-id") === id));
+      }
+      function showCue(payload) {
+        if (!payload) return;
+        if (payload.cue) cue.textContent = payload.cue;
+        if (payload.layout === "scripture") kicker.textContent = "Scripture";
+        else if (payload.cue) kicker.textContent = "On air";
+        if (payload.body) {
+          verse.hidden = false;
+          verse.textContent = payload.body;
+        }
+        if (payload.attribution) {
+          attr.hidden = false;
+          attr.textContent = payload.attribution;
+        } else {
+          attr.hidden = true;
+        }
+      }
+      function showModel(model) {
+        if (!model) return;
+        const lines = Array.isArray(model.lines) ? model.lines : [];
+        showCue({
+          cue: model.reference || (lines[0] && lines[0].text) || "",
+          layout: model.layout || "",
+          body: lines.map((line) => ((line.marker ? line.marker + " " : "") + (line.text || "")).trim()).filter(Boolean).join("\n"),
+          attribution: model.attribution || "",
+        });
+      }
+      async function send(type, payload) {
+        let envelope;
+        try {
+          const res = await fetch("/v1/remote", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ v: 1, type, payload }),
+          });
+          envelope = await res.json();
+        } catch {
+          envelope = { type: "denied", payload: { reason: "The desk did not answer." } };
+        }
+        if (envelope.type === "welcome" && envelope.payload && envelope.payload.token) {
+          token = envelope.payload.token;
+          document.getElementById("pair").hidden = true;
+          gate.hidden = true;
+          air.hidden = false;
+          pad.hidden = false;
+          link.textContent = "Paired";
+          showCue(envelope.payload);
+        } else if (envelope.type === "denied") {
+          const reason = (envelope.payload && envelope.payload.reason) || "That remote is not paired.";
+          if (air.hidden) gate.textContent = reason;
+          else note.textContent = reason;
+          if (/not paired|did not answer/i.test(reason)) {
+            token = "";
+            document.getElementById("pair").hidden = false;
+            gate.hidden = false;
+            air.hidden = true;
+            pad.hidden = true;
+            link.textContent = "Pair the desk";
+          }
+        } else if (envelope.type === "ack") {
+          mark(envelope.payload && envelope.payload.id);
+          showCue(envelope.payload);
+        }
+      }
+      setInterval(() => {
+        if (!token) return;
+        fetch("/v1/program")
+          .then((res) => res.json())
+          .then((packet) => showModel(packet && packet.frame && packet.frame.model))
+          .catch(() => {});
+      }, 1000);
+      document.getElementById("pair").addEventListener("submit", (event) => {
+        event.preventDefault();
+        send("pair", { code: document.getElementById("code").value.trim() });
+      });
+      document.querySelectorAll("[data-id]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (!token) return;
+          mark(button.getAttribute("data-id"));
+          if (navigator.vibrate) navigator.vibrate(12);
+          send("command", { token, id: button.getAttribute("data-id") });
+        });
+      });
+    </script>
+  </body>
+</html>

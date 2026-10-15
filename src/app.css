@@ -8,7 +8,7 @@
 
 :root {
   color-scheme: dark;
-  /* PewBeam's public palette. Panels use the roles below. */
+  /* Operator chrome palette. Panels use the roles below. */
   --pigment-void: #030303;
   --pigment-night: #050505;
   --pigment-iron: #111010;
@@ -252,6 +252,51 @@ button { cursor: pointer; }
   padding: 28px 72px 40px;
   background: color-mix(in srgb, #050505 78%, transparent);
 }
+.frame.nested.lower .stack {
+  inset: 0;
+  height: 100%;
+  padding: 16px 22px;
+  justify-content: center;
+  gap: 6px;
+}
+.frame.nested {
+  width: 100%;
+  height: 100%;
+}
+.frame.composition { display: block; }
+.frame.timer .line.clock { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.frame.nested.timer {
+  background: color-mix(in srgb, #050505 78%, transparent);
+}
+.frame.nested.timer .stack {
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px !important;
+}
+.frame.nested.timer .ref {
+  font-size: 22px !important;
+}
+.frame.nested.timer .line {
+  font-size: 64px !important;
+}
+.frame.timer.warning .line { color: #ffb020; }
+.comp-layer {
+  position: absolute;
+  overflow: hidden;
+}
+.comp-layer.fit-cover :is(.frame img.cover, .frame video.cover) { object-fit: cover; }
+.comp-layer.fit-fill :is(.frame img.cover, .frame video.cover) { object-fit: fill; }
+.comp-layer.enter-fade { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-dissolve { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-slide-left { animation: cs-slide-left var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-slide-right { animation: cs-slide-right var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-slide-up { animation: cs-slide-up var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-slide-down { animation: cs-slide-down var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+@keyframes cs-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cs-slide-left { from { transform: translateX(-12%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes cs-slide-right { from { transform: translateX(12%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes cs-slide-up { from { transform: translateY(18%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes cs-slide-down { from { transform: translateY(-18%); opacity: 0.2; } to { transform: none; opacity: 1; } }
 
 .transport button {
   min-width: 88px;
@@ -374,8 +419,25 @@ button { cursor: pointer; }
   font-family: var(--font-label);
 }
 
-:root { --chrome-h: 52px; --ui-scale: 1; --panel-pad: 12px; --control-h: 34px; --tool-size: 36px; }
-:root[data-density="compact"] { --chrome-h: 44px; --panel-pad: 8px; --control-h: 30px; --tool-size: 32px; }
+:root {
+  --chrome-h: 52px;
+  --ui-scale: 1;
+  --panel-pad: 12px;
+  --control-h: 34px;
+  --tool-size: 36px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --gap: 8px;
+  --icon-size: 16px;
+  --desk-head-h: 28px;
+}
+:root[data-density="compact"] {
+  --chrome-h: 44px;
+  --panel-pad: 8px;
+  --control-h: 30px;
+  --tool-size: 32px;
+  --desk-head-h: 26px;
+}
 :root[data-theme="light"] {
   color-scheme: light;
   --booth: #f7f5f3;
@@ -568,10 +630,67 @@ button { cursor: pointer; }
   z-index: 40;
   pointer-events: none;
 }
-.pb-tools [data-tip]:hover::after, .pb-actions [data-tip]:hover::after, .obs-bar [data-tip]:hover::after {
+.pb-tools [data-tip]:hover::after, .pb-actions [data-tip]:hover::after, .obs-bar [data-tip]:hover::after, .prod-bar [data-tip]:hover::after, .desk-switch [data-tip]:hover::after, .bridge [data-tip]:hover::after {
   left: 50%;
   top: calc(100% + 8px);
   transform: translateX(-50%);
+}
+
+.desk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h);
+  min-height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.desk-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+.desk-btn:active:not(:disabled) { opacity: 0.88; }
+.desk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.desk-btn.primary { background: var(--live); border-color: var(--live); color: #fff; }
+.desk-btn.danger { background: var(--panel-2); color: var(--ink); }
+.desk-btn.ghost { background: transparent; color: var(--accent); border-color: var(--accent); }
+.desk-btn.icon {
+  width: var(--tool-size);
+  min-width: var(--tool-size);
+  padding: 0;
+}
+.desk-btn.on { color: var(--accent); border-color: var(--accent); }
+.desk-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.desk-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--tool-size);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.desk-switch button.on { color: var(--ink); border-color: var(--accent); }
+.desk-switch .label { white-space: nowrap; }
+@media (max-width: 1280px) {
+  .desk-switch .label { display: none; }
+  .desk-switch button { width: var(--tool-size); padding: 0; justify-content: center; }
 }
 :root[data-theme="vespers"] {
   color-scheme: dark;

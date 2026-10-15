@@ -21,6 +21,22 @@ describe("workspace document", () => {
     expect(workspace.schemaVersion).toBe(2);
     expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
     expect(workspace).not.toHaveProperty("program");
+    expect(workspace.compositions).toEqual([]);
+  });
+
+  it("restores saved compositions without inventing Program", () => {
+    const workspace = normalizeWorkspace({
+      compositions: [
+        {
+          id: "composition:sunday",
+          name: "Sunday Camera + Scripture",
+          layers: [{ name: "A", bounds: { x: 0, y: 0, w: 50, h: 100 } }],
+        },
+      ],
+    });
+    expect(workspace.compositions[0]?.name).toBe("Sunday Camera + Scripture");
+    expect(workspace.compositions[0]?.layers).toHaveLength(1);
+    expect(workspace).not.toHaveProperty("program");
   });
 
   it("replaces a corrupt layout list and an invalid accent", () => {
@@ -67,7 +83,7 @@ describe("workspace document", () => {
     expect(workspace.shortcuts?.find).toEqual(["Slash"]);
   });
 
-  it("keeps an OBS desk choice", () => {
+  it("keeps a Production Desk choice", () => {
     const workspace = normalizeWorkspace({ appearance: { theme: "dark", density: "comfortable", scale: 1, accent: "#fa4f00", desk: "obs" } });
     expect(workspace.appearance.desk).toBe("obs");
   });

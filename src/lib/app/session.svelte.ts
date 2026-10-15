@@ -1,10 +1,17 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
 import { claimOwner, controlsOutput, publishLocal, readOwner } from "../display/channel";
 import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
+import {
+  presentComposition,
+  previewComposition,
+  sanitizeComposition,
+  type Composition,
+} from "../domain/composition";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
 import {
@@ -18,7 +25,16 @@ import {
   type CameraDevice,
 } from "../domain/camera";
 import { importDocument as parseImportedDocument } from "../domain/import-content";
-import { authorizeRemoteCommand, createPairing, pairRemote, type RemotePairing } from "../domain/remote";
+import {
+  createPairing,
+  isRemoteClicker,
+  programPadPayload,
+  readRemoteEnvelope,
+  remoteEnvelope,
+  routeRemote,
+  type RemoteEnvelope,
+  type RemotePairing,
+} from "../domain/remote";
 import { publishRemote, subscribeRemote } from "../remote/channel";
 import { findItem, moveInList, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
@@ -107,7 +123,9 @@ class Session {
   media = $state<MediaAsset[]>([]);
   cameras = $state<CameraDevice[]>([]);
   cameraStream = $state<MediaStream | null>(null);
+  cameraFeedId = $state<string | null>(null);
   cameraNote = $state("");
+  previewBible = $state<BibleItem | null>(null);
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
   cursor = $state<Cursor>({ sectionId: null, itemId: null });
@@ -126,6 +144,7 @@ class Session {
   settingsSection = $state("appearance");
   remotePairing = $state<RemotePairing | null>(null);
   remoteTokens = $state<string[]>([]);
+  remoteLanUrl = $state("");
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
@@ -134,6 +153,7 @@ class Session {
   private browserWatch: ReturnType<typeof setInterval> | undefined;
   private unlisten: UnlistenFn | undefined;
   private unlistenRemote: (() => void) | undefined;
+  private unlistenLan: UnlistenFn | undefined;
 
   theme = (): Theme => this.themes.find((theme) => theme.id === this.workspace.themeId) ?? this.themes[0] ?? defaultTheme();
 
@@ -141,6 +161,7 @@ class Session {
 
   private desktop = () => isDesktop();
   private sessionId = "";
+  private outputHeldClosed = false;
   controlsAudience = $state(true);
   audienceGeneration = 0;
 
@@ -152,6 +173,9 @@ class Session {
         : "Another window has the audience.";
 
   init = async () => {
+    this.ready = true;
+    const keepLive = this.live.revision > 0;
+    const keepOutput = this.output.desired;
     try {
       if (this.desktop()) await this.loadLibraries();
       else {
@@ -163,6 +187,7 @@ class Session {
         this.services = await api.serviceList();
       }
       this.workspace = await this.loadWorkspace();
+      if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
           this.service = await api.serviceGet(this.workspace.lastServiceId);
@@ -182,31 +207,35 @@ class Session {
           console.error(error);
         }
       }
-      this.live = createLiveState(this.theme());
-      this.cursor = this.workspace.cursor;
+      if (!keepLive) {
+        this.live = createLiveState(this.theme());
+        this.cursor = this.workspace.cursor;
+      }
       this.adoptAudienceOwner();
       // A restart restores the operator workspace and the preview cursor.
       // The owning session publishes an empty Program so a stored frame is not shown again.
-      if (this.desktop() || this.controlsAudience) {
+      if (!keepLive && (this.desktop() || this.controlsAudience)) {
         try {
           await this.pushProgram();
         } catch (error) {
           console.error(error);
         }
       }
-      if (this.cursor.itemId && this.service) await this.selectItem(this.cursor.itemId);
       if (!this.desktop() && !this.browserWatch) {
         this.browserWatch = setInterval(() => this.noteBrowserAudience(), 1000);
       }
       this.ready = true;
       this.listenRemote();
+      if (this.desktop()) void this.attachLanRemote();
       if (this.message === "Opening workspace") {
         this.message = this.desktop() ? this.output.message : "Browser session. Audience output opens in its own window.";
       }
+      if (!keepLive && this.cursor.itemId && this.service) await this.selectItem(this.cursor.itemId);
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
       this.ready = true;
       this.listenRemote();
+      if (this.desktop()) void this.attachLanRemote();
       console.error(error);
     }
   };
@@ -275,12 +304,23 @@ class Session {
     const profile = this.currentProfile();
     await api.assignOperator(profile.assignments.operator);
     await api.assignAudience(profile.assignments.audience);
-    this.output = await api.setOutput(profile.outputEnabled, profile.outputMode);
+    const mode = profile.outputMode;
+    this.output = await api.setOutput(profile.outputEnabled || this.output.desired, mode);
+    const external = this.output.displays.some((display) => !display.primary);
+    if (!this.output.desired && external && !this.outputHeldClosed) {
+      this.rememberOutput({ outputEnabled: true });
+      this.output = await api.setOutput(true, mode);
+    }
+    if (this.output.desired && !this.output.online && external) {
+      await api.assignAudience(null);
+      this.output = await api.setOutput(true, mode);
+    }
   };
 
   destroy = () => {
     this.unlisten?.();
     this.unlistenRemote?.();
+    this.unlistenLan?.();
     this.releaseCamera();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
@@ -337,7 +377,11 @@ class Session {
       }
       return;
     }
-    await api.publishProgram(packet);
+    try {
+      await api.publishProgram(packet);
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : "The audience could not be updated.";
+    }
   };
 
   private persistSoon = () => {
@@ -412,6 +456,7 @@ class Session {
   };
 
   remotePageUrl = () => {
+    if (this.remoteLanUrl) return this.remoteLanUrl;
     if (typeof location === "undefined") return "/?remote=1";
     const url = new URL(location.href);
     url.search = "?remote=1";
@@ -421,7 +466,8 @@ class Session {
 
   openRemotePairing = () => {
     this.remotePairing = createPairing();
-    this.message = `Remote code ${this.remotePairing.code}. A phone is a controller, not a display.`;
+    this.message = `Remote code ${this.remotePairing.code}. Next on the phone takes the following cue.`;
+    if (this.desktop()) void this.attachLanRemote(true);
   };
 
   closeRemotePairing = () => {
@@ -433,30 +479,108 @@ class Session {
   private listenRemote = () => {
     this.unlistenRemote?.();
     if (!canUse("remote-control")) return;
-    this.unlistenRemote = subscribeRemote((envelope) => this.handleRemote(envelope));
+    this.unlistenRemote = subscribeRemote((envelope) => {
+      void this.dispatchRemote(envelope);
+    });
   };
 
-  private handleRemote = (envelope: { type: string; payload: Record<string, string> }) => {
-    if (envelope.type === "pair") {
-      const result = pairRemote(this.remotePairing, envelope.payload.code ?? "");
-      if (!result.ok) {
-        publishRemote("denied", { reason: result.reason });
-        this.message = result.reason;
+  private attachLanRemote = async (start = false) => {
+    this.unlistenLan?.();
+    try {
+      this.unlistenLan = await listen<{ id: string; envelope: unknown }>("remote-in", (event) => {
+        void (async () => {
+          const parsed = readRemoteEnvelope(event.payload.envelope);
+          const reply = parsed
+            ? await this.dispatchRemote(parsed)
+            : remoteEnvelope("denied", { reason: "That message was not a remote envelope." });
+          void api.remoteReply(event.payload.id, reply);
+        })();
+      });
+      if (start || this.remotePairing || this.remoteTokens.length || this.remoteLanUrl) {
+        let status = await api.startRemoteLan();
+        for (let i = 0; i < 8 && !status.listening; i += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          status = await api.remoteLanStatus();
+        }
+        this.remoteLanUrl = status.listening ? status.url : this.remoteLanUrl;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  private dispatchRemote = async (envelope: RemoteEnvelope): Promise<RemoteEnvelope> => {
+    const routed = routeRemote({ pairing: this.remotePairing, tokens: this.remoteTokens }, envelope);
+    this.remoteTokens = routed.session.tokens;
+    if (routed.reply.type === "denied") this.message = routed.reply.payload.reason || routed.reply.type;
+    else if (routed.reply.type === "welcome") this.message = "A remote is paired. Next and Previous take the following cue.";
+    if (routed.command) await this.runFromRemote(routed.command);
+    const pad = programPadPayload(this.live.program.model);
+    const reply =
+      routed.reply.type === "ack" || routed.reply.type === "welcome"
+        ? remoteEnvelope(routed.reply.type, { ...routed.reply.payload, ...pad })
+        : routed.reply;
+    publishRemote(reply.type, reply.payload);
+    return reply;
+  };
+
+  private runFromRemote = async (command: CommandId) => {
+    if (isRemoteClicker(command)) {
+      await this.advanceFromRemote(command === "next" ? 1 : -1);
+      return;
+    }
+    await this.run(command);
+  };
+
+  private advanceFromRemote = async (direction: 1 | -1) => {
+    if (this.songFocus) {
+      if (this.stepSong(direction)) {
+        await this.take();
         return;
       }
-      this.remoteTokens = [result.token, ...this.remoteTokens.filter((token) => token !== result.token)];
-      publishRemote("welcome", { token: result.token });
-      this.message = "A remote is paired. Take from the phone still uses LIVE commands only.";
-      return;
+      this.songFocus = null;
     }
-    if (envelope.type !== "command") return;
-    const command = authorizeRemoteCommand(this.remoteTokens, envelope.payload.token ?? "", envelope.payload.id ?? "");
-    if (!command) {
-      publishRemote("denied", { reason: "That remote is not paired." });
-      return;
+    if (this.sermonFocus) {
+      if (await this.stepSermon(direction)) {
+        await this.take();
+        return;
+      }
     }
-    void this.run(command);
-    publishRemote("ack", { id: command });
+    if (this.live.preview.model.layout === "scripture") {
+      const moved = await this.stepPreviewScripture(direction);
+      if (moved) {
+        await this.take();
+        return;
+      }
+    }
+    await this.step(direction);
+    await this.take();
+  };
+
+  private stepPreviewScripture = async (direction: 1 | -1): Promise<boolean> => {
+    const current = this.previewBible;
+    if (!current) return false;
+    const book = this.books.find((entry) => entry.ord === current.bookOrd);
+    if (!book) return false;
+    const verses = await api.verses(current.translationId, current.bookOrd, current.chapter);
+    const next = stepVerse(current, direction, book, verses.length);
+    if (next) {
+      await this.previewPassage(next);
+      return true;
+    }
+    const nextChapter = current.chapter + direction;
+    if (nextChapter < 1 || nextChapter > book.chapters) return false;
+    const chapterVerses = await api.verses(current.translationId, current.bookOrd, nextChapter);
+    const verse = direction > 0 ? 1 : chapterVerses.length;
+    if (verse < 1) return false;
+    await this.previewPassage({
+      ...current,
+      chapter: nextChapter,
+      startVerse: verse,
+      endVerse: verse,
+      reference: formatReference(book.name, nextChapter, verse, verse, book.chapters),
+    });
+    return true;
   };
 
   private mediaSrc = (id: string | null | undefined) => mediaUrl(this.media.find((asset) => asset.id === id) ?? null);
@@ -489,6 +613,11 @@ class Session {
     if (item.kind === "image" && item.image) {
       return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
     }
+    if (item.kind === "composition" && item.composition) {
+      const saved = this.workspace.compositions.find((entry) => entry.id === item.composition?.compositionId);
+      if (!saved) return emptyModel(theme);
+      return presentComposition(sanitizeComposition(saved), { theme, now: Date.now() });
+    }
     const heading = item.slide?.heading ?? item.announcement?.heading ?? item.title;
     const body = item.slide?.body ?? item.announcement?.body ?? "";
     const slideImage = this.mediaSrc(item.slide?.imageId);
@@ -509,6 +638,7 @@ class Session {
     this.songFocus = found.item.kind === "lyric" && found.item.lyric
       ? { songId: found.item.lyric.songId, sectionId: found.item.lyric.sectionId }
       : null;
+    this.previewBible = found.item.bible ?? null;
     this.cursor = { sectionId: found.section.id, itemId };
     this.library = found.item.kind === "lyric" ? "songs" : found.item.kind === "bible" ? "bible" : found.item.kind === "image" ? "media" : "slides";
     const model = await this.modelFor(found.item);
@@ -531,8 +661,54 @@ class Session {
     this.live = setPreview(this.live, frame(model, sourceId, "cut"));
   };
 
+  previewLook = (composition: Composition) => {
+    this.songFocus = null;
+    this.sermonFocus = null;
+    const clean = sanitizeComposition(composition);
+    const model = presentComposition(clean, { theme: this.theme(), now: Date.now() });
+    this.live = previewComposition(this.live, model, clean.id);
+    const camera = clean.layers.find((layer) => layer.visible && layer.source.type === "camera");
+    if (camera) void this.ensureCameraFeed(camera.source.id);
+    else this.releaseCamera();
+    this.message = `${clean.name} is on Preview. LIVE still sends Program.`;
+  };
+
+  saveLook = (composition: Composition) => {
+    const clean = sanitizeComposition(composition);
+    const existing = this.workspace.compositions;
+    const next = existing.some((entry) => entry.id === clean.id)
+      ? existing.map((entry) => (entry.id === clean.id ? clean : entry))
+      : [...existing, clean];
+    this.workspace = { ...this.workspace, compositions: next };
+    this.persistSoon();
+    this.message = `${clean.name} saved. LIVE still sends Program.`;
+  };
+
+  deleteLook = (id: string) => {
+    this.workspace = { ...this.workspace, compositions: this.workspace.compositions.filter((entry) => entry.id !== id) };
+    this.persistSoon();
+  };
+
+  addLookToService = (compositionId: string, title: string) => {
+    if (!this.service) {
+      this.message = "Create a service before adding a look.";
+      return;
+    }
+    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
+    if (!target) {
+      this.message = "Add a section first.";
+      return;
+    }
+    const item: PresentationItem = { id: uid(), kind: "composition", title, composition: { compositionId } };
+    this.insertItem(target, item);
+    void this.selectItem(item.id);
+    this.message = `${title} queued. Preview only until LIVE.`;
+  };
+
   previewPassage = async (passage: BibleItem) => {
     this.songFocus = null;
+    this.sermonFocus = null;
+    this.previewBible = passage;
     const item: PresentationItem = { id: "preview", kind: "bible", title: passage.reference, bible: passage };
     const model = await this.modelFor(item);
     this.previewModel(model, null);
@@ -786,6 +962,7 @@ class Session {
       return;
     }
     this.songFocus = { songId: clean.id, sectionId: section.id };
+    this.previewBible = null;
     this.recentSongs = rememberSongRecent(this.recentSongs, { songId: clean.id, sectionId: section.id });
     this.library = "songs";
     const theme = this.theme();
@@ -797,18 +974,20 @@ class Session {
     );
   };
 
-  stepSong = (direction: 1 | -1) => {
+  stepSong = (direction: 1 | -1): boolean => {
     const focus = this.songFocus;
-    if (!focus) return;
+    if (!focus) return false;
     const song = this.songs.find((entry) => entry.id === focus.songId);
     if (!song) {
       this.songFocus = null;
       this.message = "That song is no longer available.";
       this.previewModel(emptyModel(this.theme()), null);
-      return;
+      return false;
     }
     const next = stepSongSection(song, focus.sectionId, direction);
-    if (next) this.previewSongSection(song, next.id);
+    if (!next) return false;
+    this.previewSongSection(song, next.id);
+    return true;
   };
 
   songPlace = (): string => {
@@ -854,6 +1033,7 @@ class Session {
       return;
     }
     this.sermonFocus = { sermonId: clean.id, sectionId: section.id };
+    this.previewBible = null;
     this.library = "sermon";
     const item = sermonAudienceItem(section);
     const model = await this.modelFor(item);
@@ -863,18 +1043,20 @@ class Session {
       : "Preview the section, then LIVE.";
   };
 
-  stepSermon = (direction: 1 | -1) => {
+  stepSermon = async (direction: 1 | -1): Promise<boolean> => {
     const focus = this.sermonFocus;
-    if (!focus) return;
+    if (!focus) return false;
     const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
     if (!sermon) {
       this.sermonFocus = null;
       this.message = "That sermon is no longer available.";
       this.previewModel(emptyModel(this.theme()), null);
-      return;
+      return false;
     }
     const next = stepSermonSection(sermon, focus.sectionId, direction);
-    if (next) void this.previewSermonSection(sermon, next.id);
+    if (!next) return false;
+    await this.previewSermonSection(sermon, next.id);
+    return true;
   };
 
   saveSermon = async (sermon: Sermon): Promise<boolean> => {
@@ -924,31 +1106,49 @@ class Session {
   };
 
   previewCamera = async (deviceId: string) => {
+    const ok = await this.openCameraFeed(deviceId);
+    if (!ok) return;
+    const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
+    this.live = previewCameraLive(this.live, presentCamera({ theme: this.theme(), label }), cameraSourceId(deviceId));
+    this.message = `${label} is on Preview. LIVE still sends Program.`;
+  };
+
+  private ensureCameraFeed = async (deviceId: string) => {
+    const ok = await this.openCameraFeed(deviceId);
+    if (!ok) return;
+    const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
+    this.message = `${label} is on Preview. LIVE still sends Program.`;
+  };
+
+  private openCameraFeed = async (deviceId: string): Promise<boolean> => {
     const media = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
     if (!media?.getUserMedia) {
       this.cameraNote = cameraUnavailableMessage();
       this.message = this.cameraNote;
-      return;
+      return false;
     }
+    if (this.cameraFeedId === cameraSourceId(deviceId) && this.cameraStream) return true;
     this.releaseCamera();
     try {
       const stream = (await openCamera(media, deviceId)) as MediaStream;
       this.cameraStream = stream;
+      this.cameraFeedId = cameraSourceId(deviceId);
       await this.loadCameras();
-      const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
-      this.live = previewCameraLive(this.live, presentCamera({ theme: this.theme(), label }), cameraSourceId(deviceId));
       this.cameraNote = "";
-      this.message = `${label} is on Preview. LIVE still sends Program.`;
+      return true;
     } catch (error) {
       this.cameraStream = null;
+      this.cameraFeedId = null;
       this.cameraNote = error instanceof Error ? error.message : cameraUnavailableMessage();
       this.message = this.cameraNote;
+      return false;
     }
   };
 
   private releaseCamera = () => {
     stopCameraStream(this.cameraStream);
     this.cameraStream = null;
+    this.cameraFeedId = null;
   };
 
   importImage = async (source: string | File) => {
@@ -1106,7 +1306,9 @@ class Session {
   };
 
   openAudience = async () => {
+    this.outputHeldClosed = false;
     this.rememberOutput({ outputEnabled: true });
+    await this.persist();
     if (!this.desktop()) {
       await this.pushProgram();
       const opened = openBrowserAudience((url, name, features) => window.open(url, name, features));
@@ -1132,7 +1334,9 @@ class Session {
   };
 
   closeAudience = async () => {
+    this.outputHeldClosed = true;
     this.rememberOutput({ outputEnabled: false });
+    await this.persist();
     if (!this.desktop()) {
       this.audienceWindow?.close();
       this.audienceWindow = null;

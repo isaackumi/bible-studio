@@ -1,5 +1,6 @@
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
+import { sanitizeComposition } from "../domain/composition";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -81,5 +82,17 @@ export function normalizeWorkspace(input: unknown): Workspace {
     activeDisplayProfileId: safeProfiles.some((profile) => profile.id === value.activeDisplayProfileId)
       ? value.activeDisplayProfileId!
       : safeProfiles[0].id,
+    compositions: Array.isArray(value.compositions)
+      ? value.compositions.map((entry) => {
+          const clean = sanitizeComposition(entry);
+          return {
+            id: clean.id,
+            name: clean.name,
+            canvas: clean.canvas,
+            layers: clean.layers,
+            transition: clean.transition,
+          };
+        })
+      : [],
   };
 }

@@ -50,3 +50,15 @@ export function audienceDeskLine(output: OutputStatus, desktop: boolean): { titl
   if (output.desired) return { title: status.title, line: "Not showing" };
   return { title: status.title, line: "Closed" };
 }
+
+/** Compact operator chrome: “Audience · Dell U2415”. */
+export function audienceChip(output: OutputStatus, desktop: boolean): { on: boolean; label: string } {
+  const desk = audienceDeskLine(output, desktop);
+  const live = output.displays.find((display) => display.audience);
+  const external = output.displays.find((display) => !display.primary);
+  if (output.online && live) return { on: true, label: `Audience · ${live.name}` };
+  if (!output.desired && external) return { on: false, label: `Audience · ${external.name}` };
+  if (output.online) return { on: true, label: `Audience · ${desk.title}` };
+  if (desk.title === "Audience is closed") return { on: false, label: "Audience · Closed" };
+  return { on: false, label: `Audience · ${desk.title}` };
+}

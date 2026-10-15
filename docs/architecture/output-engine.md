@@ -12,6 +12,10 @@ Browser: `publishLocal` writes `church-studio.program` and `BroadcastChannel` `"
 
 `AudienceOutput.svelte` paints `packet.frame`. It does not search, edit, or call `applyProgramAction`. Do not restyle that component to invent new output types.
 
+A composition is a `PresentationModel` (`layout: "composition"`). Browser and Tauri sinks receive the same packet. Do not compile a second look per sink. `deliverProgram` swallows sink throws so a closed window cannot Take or corrupt Program.
+
+See [composition-engine.md](composition-engine.md).
+
 ## Sinks
 
 `src/lib/display/engine.ts`:

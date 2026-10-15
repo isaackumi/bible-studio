@@ -3,6 +3,7 @@
   import { sanitizeTransition, transitionChanged } from "../../domain/theme";
   import { formatReference, parseReference } from "../../bible/reference";
   import type { BibleItem } from "../../domain/types";
+  import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
@@ -39,6 +40,15 @@
   const sources = $derived(scene?.items ?? []);
   const sceneName = $derived(scene?.name ?? session.service?.name ?? "Untitled");
   const previewLabel = $derived(session.live.preview.model.reference || (session.live.preview.model.lines[0] ? sceneName : "No source selected"));
+  const displayLive = $derived(
+    session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
+  );
+  const focus = $derived(session.workspace.pew.focus);
+  const activeLayout = $derived(
+    session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
+  );
+  const scenesOpen = $derived(activeLayout?.panels.find((panel) => panel.panelId === "service")?.visible !== false);
+  const controlsOpen = $derived(activeLayout?.panels.find((panel) => panel.panelId === "controls")?.visible !== false);
 
   function rememberTransition() {
     duration = Number(duration) || 0;
@@ -101,177 +111,295 @@
   }
 </script>
 
-<div class="obs">
+<div class="prod" class:focus>
+  <header class="prod-bar">
+    <DeskSwitcher />
+    <p class="desk-title">Production Desk</p>
+    <div class="prod-actions">
+      <OutputControls compact />
+      {#if !session.controlsAudience}
+        <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
+      {/if}
+    </div>
+    <nav class="prod-tools" aria-label="Workspace">
+      <button type="button" class="desk-btn icon" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus Preview and Program"} data-tip={focus ? "Leave focus" : "Focus Preview and Program"} onclick={() => session.savePew({ focus: !focus })}>
+        <Icon name="focus" size={16} />
+      </button>
+      <button type="button" class="desk-btn icon" class:on={scenesOpen} aria-pressed={scenesOpen} aria-label={scenesOpen ? "Hide scenes" : "Show scenes"} data-tip={scenesOpen ? "Hide scenes" : "Show scenes"} onclick={() => session.togglePanel("service")}>
+        <Icon name="studio" size={16} />
+      </button>
+      <button type="button" class="desk-btn icon" class:on={controlsOpen} aria-pressed={controlsOpen} aria-label={controlsOpen ? "Hide controls" : "Show controls"} data-tip={controlsOpen ? "Hide controls" : "Show controls"} onclick={() => session.togglePanel("controls")}>
+        <Icon name="list" size={16} />
+      </button>
+      <button type="button" class="desk-btn icon" aria-label="Reset workspace" data-tip="Reset workspace" onclick={() => session.resetActiveLayout()}>
+        <Icon name="reset" size={16} />
+      </button>
+      <button type="button" class="desk-btn icon" aria-label="Settings" data-tip="Settings" onclick={() => session.openSettings("appearance")}>
+        <Icon name="settings" size={16} />
+      </button>
+    </nav>
+  </header>
+
   <div class="studio">
-    <section class="pane">
-      <header>Preview: {sceneName}</header>
-      <div class="well"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
+    <section class="pane preview">
+      <header>
+        <span class="kicker">Preview</span>
+        <span class="meta">{sceneName}</span>
+      </header>
+      <div class="well"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
       <footer>
         <span>{previewLabel}</span>
-        <span class="tools">
-          <button type="button" data-tip="Theme" onclick={() => (session.settingsOpen = true)}>Properties</button>
-        </span>
+        <button type="button" class="desk-btn" data-tip="Theme" onclick={() => (session.settingsOpen = true)}>Properties</button>
       </footer>
     </section>
 
-    <aside class="transitions">
-      <button type="button" class="ghost" data-tip="Copy preview to program" onclick={() => void transition()}>Transition</button>
-      <p>Quick Transitions</p>
-      <button type="button" class="ghost" data-tip="Cut to program" onclick={() => session.cut()}>Cut</button>
-      <button type="button" class="ghost" data-tip="Fade to program" onclick={() => void fade(duration)}>Fade ({duration}ms)</button>
-      <button type="button" class="ghost" data-tip="Fade program to black" onclick={() => session.black()}>Fade to Black</button>
+    <aside class="bridge" aria-label="Transition">
+      <p class="flow">Preview <Icon name="transition" size={16} /> Program</p>
+      <button type="button" class="desk-btn primary" data-tip="Send Preview to Program" onclick={() => void transition()}>
+        <Icon name="play" size={16} /> TAKE
+      </button>
+      <button type="button" class="desk-btn" data-tip="Cut Preview to Program" onclick={() => session.cut()}>
+        <Icon name="scissors" size={16} /> CUT
+      </button>
+      <button type="button" class="desk-btn" data-tip="Fade Preview to Program" onclick={() => void fade(duration)}>
+        AUTO
+      </button>
+      <div class="resets">
+        <button type="button" class="desk-btn ghost" data-tip="Clear Program" onclick={() => session.clear()}>
+          <Icon name="square" size={16} /> CLEAR
+        </button>
+        <button type="button" class="desk-btn danger" data-tip="Black Program" onclick={() => session.black()}>
+          <Icon name="moon" size={16} /> BLACK
+        </button>
+        <button type="button" class="desk-btn" data-tip="Logo on Program" onclick={() => session.logo()}>
+          <Icon name="logo" size={16} /> LOGO
+        </button>
+      </div>
+      {#if kind === "fade"}
+        <label class="duration">
+          Fade
+          <input
+            type="number"
+            min="0"
+            max="2000"
+            step="50"
+            bind:value={duration}
+            aria-label="Fade duration in milliseconds"
+            onchange={(event) => {
+              duration = Number(event.currentTarget.value) || 0;
+              rememberTransition();
+            }}
+          />
+          <span>ms</span>
+        </label>
+      {/if}
     </aside>
 
-    <section class="pane">
+    <section class="pane program" class:on-air={displayLive}>
       <header>
-        <span>Program: {sceneName}</span>
-        <span class="live-dot"></span>
+        <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}Program</span>
+        <span class="meta">{sceneName}</span>
       </header>
       <div class="well"><Screen model={session.live.program.model} /></div>
+      <footer>
+        <span>{session.live.program.model.reference || "Audience sees this frame."}</span>
+      </footer>
     </section>
   </div>
 
-  <div class="docks">
-    <section class="dock">
-      <header><Icon name="studio" size={14} /> Scenes</header>
-      <div class="list">
-        {#if sections.length === 0}
-          <button type="button" onclick={() => void ensureScene()}>New scene</button>
-        {/if}
-        {#each sections as section (section.id)}
-          <button type="button" class:on={scene?.id === section.id} onclick={() => void pickScene(section.id)}>{section.name}</button>
-        {/each}
-      </div>
-      <footer class="bar">
-        <button type="button" data-tip="Add scene" onclick={() => { void ensureScene(); session.addSection("Scene"); }}>+</button>
-        <button type="button" data-tip="Remove scene" onclick={() => scene && session.removeSection(scene.id)}>−</button>
-      </footer>
-    </section>
+  {#if !focus}
+    <div class="docks">
+      {#if scenesOpen}
+        <section class="dock">
+          <header><Icon name="studio" size={16} /> Scenes</header>
+          <div class="list">
+            {#if sections.length === 0}
+              <button type="button" onclick={() => void ensureScene()}>New scene</button>
+            {/if}
+            {#each sections as section (section.id)}
+              <button type="button" class:on={scene?.id === section.id} onclick={() => void pickScene(section.id)}>{section.name}</button>
+            {/each}
+          </div>
+          <footer class="bar">
+            <button type="button" class="desk-btn icon" data-tip="Add scene" aria-label="Add scene" onclick={() => { void ensureScene(); session.addSection("Scene"); }}>
+              <Icon name="plus" size={16} />
+            </button>
+            <button type="button" class="desk-btn icon" data-tip="Remove scene" aria-label="Remove scene" onclick={() => scene && session.removeSection(scene.id)}>
+              <Icon name="minus" size={16} />
+            </button>
+          </footer>
+        </section>
+      {/if}
 
-    <section class="dock">
-      <header><Icon name="list" size={14} /> Sources</header>
-      <div class="list">
-        {#each sources as item (item.id)}
-          <button type="button" class:on={session.cursor.itemId === item.id} onclick={() => session.selectItem(item.id)}>
-            <span>{item.title}</span>
+      <section class="dock">
+        <header><Icon name="list" size={16} /> Sources</header>
+        <div class="list">
+          {#each sources as item (item.id)}
+            <button type="button" class:on={session.cursor.itemId === item.id} onclick={() => session.selectItem(item.id)}>
+              <span>{item.title}</span>
+            </button>
+          {/each}
+        </div>
+        <form class="add" onsubmit={previewScripture}>
+          <input aria-label="Add scripture" placeholder="John 3:16" bind:value={query} data-tip="Enter previews. Add puts it in the scene." />
+          <button type="button" class="desk-btn" data-tip="Add the reference to this scene" onclick={() => void addScripture()}>Add</button>
+        </form>
+        <footer class="bar">
+          <button type="button" class="desk-btn icon" data-tip="Add slide" aria-label="Add slide" onclick={() => { void ensureScene(); session.addSlide("slide"); }}>
+            <Icon name="plus" size={16} />
           </button>
-        {/each}
-      </div>
-      <form class="add" onsubmit={previewScripture}>
-        <input aria-label="Add scripture" placeholder="John 3:16" bind:value={query} data-tip="Enter previews. Add puts it in the scene." />
-        <button type="button" data-tip="Add the reference to this scene" onclick={() => void addScripture()}>Add</button>
-      </form>
-      <footer class="bar">
-        <button type="button" data-tip="Add slide" onclick={() => { void ensureScene(); session.addSlide("slide"); }}>+</button>
-      </footer>
-    </section>
+        </footer>
+      </section>
 
-    <section class="dock">
-      <header><Icon name="audio" size={14} /> Audio Mixer</header>
-      <div class="mixer">
-        <div class="meter">
-          <span>Program</span>
-          <div class="scale"></div>
-          <div class="fader"></div>
+      <section class="dock dock-mixer">
+        <header><Icon name="audio" size={16} /> Audio Mixer</header>
+        <div class="mixer">
+          <div class="meter">
+            <span>Program</span>
+            <div class="scale"></div>
+            <div class="fader"></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="dock">
-      <header><Icon name="transition" size={14} /> Scene Transitions</header>
-      <label>
-        <select
-          bind:value={kind}
-          onchange={(event) => {
-            kind = event.currentTarget.value === "cut" ? "cut" : "fade";
-            rememberTransition();
-          }}
-        >
-          <option value="fade">Fade</option>
-          <option value="cut">Cut</option>
-        </select>
-      </label>
-      <label class="duration">
-        Duration
-        <input
-          type="number"
-          min="0"
-          max="2000"
-          step="50"
-          bind:value={duration}
-          onchange={(event) => {
-            duration = Number(event.currentTarget.value) || 0;
-            rememberTransition();
-          }}
-        />
-        <span>ms</span>
-      </label>
-    </section>
+      <section class="dock dock-fx">
+        <header><Icon name="transition" size={16} /> Scene Transitions</header>
+        <label>
+          <select
+            aria-label="Transition type"
+            bind:value={kind}
+            onchange={(event) => {
+              kind = event.currentTarget.value === "cut" ? "cut" : "fade";
+              rememberTransition();
+            }}
+          >
+            <option value="fade">Fade</option>
+            <option value="cut">Cut</option>
+          </select>
+        </label>
+        <label class="duration">
+          Duration
+          <input
+            type="number"
+            min="0"
+            max="2000"
+            step="50"
+            bind:value={duration}
+            onchange={(event) => {
+              duration = Number(event.currentTarget.value) || 0;
+              rememberTransition();
+            }}
+          />
+          <span>ms</span>
+        </label>
+      </section>
 
-    <section class="dock">
-      <header><Icon name="settings" size={14} /> Controls</header>
-      <div class="controls">
-        <OutputControls />
-        <p class="audience-owner">{session.audienceLabel()}</p>
-        {#if !session.controlsAudience}
-          <button type="button" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
-        {/if}
-        <button type="button" class="studio-mode" data-tip="Selecting a source stays on preview">Studio Mode</button>
-        <button type="button" data-tip="Settings" onclick={() => session.openSettings("appearance")}>Settings</button>
-        <div class="desk-switch">
-          <button type="button" data-tip="PewBeam desk" aria-label="PewBeam" onclick={() => session.setAppearance({ desk: "pewbeam" })}><Icon name="pew" size={14} /></button>
-          <button type="button" class="on" data-tip="OBS desk" aria-label="OBS" onclick={() => session.setAppearance({ desk: "obs" })}><Icon name="obs" size={14} /></button>
-        </div>
-      </div>
-    </section>
-  </div>
+      {#if controlsOpen}
+        <section class="dock">
+          <header><Icon name="settings" size={16} /> Controls</header>
+          <div class="controls">
+            <p class="studio-mode">Studio — select stays on Preview</p>
+            <button type="button" class="desk-btn" data-tip="Settings" onclick={() => session.openSettings("appearance")}>Settings</button>
+          </div>
+        </section>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
-  .obs {
+  .prod {
     height: 100%;
     min-height: 0;
+    min-width: 0;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) 228px;
-    background: #1b1e26;
-    color: #e8eaef;
+    grid-template-rows: auto minmax(0, 1fr) minmax(148px, 200px);
+    background: var(--desk);
+    color: var(--ink);
     font-family: var(--font-ui);
     font-size: 12px;
     overflow: hidden;
   }
+  .prod.focus { grid-template-rows: auto minmax(0, 1fr); }
+  .prod-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-height: var(--chrome-h);
+    padding: 6px var(--panel-pad);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .desk-title {
+    margin: 0;
+    flex: none;
+    font-family: var(--font-label);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .prod-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .prod-tools { display: flex; align-items: center; gap: 4px; flex: none; }
   .studio {
     min-height: 0;
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 168px minmax(0, 1.05fr);
-    gap: 8px;
-    padding: 8px 8px 0;
+    grid-template-columns: minmax(220px, 1fr) minmax(148px, 168px) minmax(240px, 1.05fr);
+    gap: var(--gap);
+    padding: var(--gap) var(--panel-pad) 0;
   }
   .pane, .dock {
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: #242833;
-    border: 1px solid #343a46;
-    border-radius: 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel);
     overflow: hidden;
   }
+  .pane.program { border-color: color-mix(in srgb, var(--onair) 45%, var(--line)); }
+  .pane.program.on-air { border-color: var(--onair); }
   header, footer {
     flex: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    min-height: 28px;
-    padding: 0 8px;
-    color: #c9ced8;
-    background: #2c313c;
+    min-height: var(--desk-head-h);
+    padding: 0 var(--panel-pad);
+    color: var(--muted);
+    background: var(--panel-2);
+  }
+  .kicker {
+    font-family: var(--font-label);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 11px;
+    color: var(--ink);
+  }
+  .kicker.program { color: var(--pigment-live-ink); display: inline-flex; align-items: center; gap: 6px; }
+  .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pip {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 8px var(--live);
   }
   .well {
     flex: 1;
     min-height: 0;
-    background: #000;
+    background: var(--glass);
     display: grid;
     place-items: center;
     container-type: size;
@@ -286,57 +414,69 @@
     overflow: hidden;
     background: #000;
   }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3dd68c; box-shadow: 0 0 0 2px rgba(61, 214, 140, 0.25); }
-  .transitions {
+  .bridge {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
+    min-height: 0;
+    overflow: auto;
     padding: 8px 4px;
   }
-  .transitions p { margin: 8px 0 0; text-align: center; color: #9aa3b2; }
-  .ghost, .controls button, .list button, .bar button, .desk-switch button {
-    border: 1px solid #4a5160;
-    background: #343a46;
-    color: #e8eaef;
-    border-radius: 4px;
-    min-height: 28px;
-    padding: 0 8px;
+  .flow {
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--muted);
+    font-family: var(--font-label);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 10px;
   }
-  .ghost { width: 100%; }
+  .bridge .desk-btn { width: 100%; }
+  .resets { display: flex; flex-direction: column; gap: 6px; }
   .docks {
     min-height: 0;
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 0.85fr) minmax(0, 0.9fr);
-    gap: 8px;
-    padding: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--gap);
+    padding: var(--gap) var(--panel-pad);
   }
-  .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; }
+  .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
   .list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding: 4px; gap: 2px; }
-  .list button { text-align: left; background: transparent; border-color: transparent; }
-  .list button.on { background: #2f6fbe; border-color: #2f6fbe; color: white; }
-  .bar { justify-content: flex-start; gap: 4px; background: #232833; }
-  .bar button { width: 26px; padding: 0; }
-  .add { padding: 0 6px 6px; }
+  .list button {
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    min-height: 28px;
+    padding: 0 8px;
+    color: inherit;
+  }
+  .list button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
+  .bar { justify-content: flex-start; gap: 4px; }
+  .add { display: flex; gap: 6px; padding: 0 6px 6px; }
   .add input, .dock select, .duration input {
     width: 100%;
-    height: 28px;
-    border-radius: 4px;
-    border: 1px solid #4a5160;
-    background: #1b1e26;
-    color: #e8eaef;
+    height: var(--control-h);
+    border-radius: var(--radius-control);
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--ink);
     padding: 0 8px;
   }
-  .mixer { flex: 1; display: flex; align-items: end; padding: 8px 12px 12px; }
+  .mixer { flex: 1; display: flex; align-items: end; padding: 8px 12px 12px; min-height: 0; overflow: auto; }
   .meter { width: 100%; display: flex; flex-direction: column; gap: 6px; }
   .scale {
     height: 10px;
-    border-radius: 99px;
-    background: linear-gradient(90deg, #3dd68c 0 55%, #e2cc4a 55% 75%, #e25b4a 75% 100%);
+    border-radius: var(--radius-control);
+    background: linear-gradient(90deg, var(--presence) 0 55%, var(--mustard) 55% 75%, var(--live) 75% 100%);
   }
-  .fader { height: 4px; border-radius: 99px; background: #6d7585; position: relative; }
+  .fader { height: 4px; border-radius: var(--radius-control); background: var(--line); position: relative; }
   .fader::after {
     content: "";
     position: absolute;
@@ -345,22 +485,23 @@
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    background: #d7dbe3;
+    background: var(--ink);
   }
-  .duration { display: flex; align-items: center; gap: 6px; padding: 8px; color: #c9ced8; }
-  .duration input { width: 72px; }
-  .controls { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
-  .audience-owner { margin: 0; color: #9aa3b2; font-size: 12px; }
-  .controls button { width: 100%; }
-  .studio-mode { background: #2f6fbe; border-color: #2f6fbe; color: white; font-weight: 650; }
-  .desk-switch { display: flex; gap: 6px; }
-  .desk-switch button { flex: 1; display: grid; place-items: center; }
-  .desk-switch button.on { border-color: #2f6fbe; color: white; }
-  .obs :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .duration { display: flex; align-items: center; gap: 6px; padding: 8px; color: var(--muted); }
+  .duration input { width: 72px; flex: none; }
+  .controls { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
+  .studio-mode { margin: 0; color: var(--muted); }
+  .prod :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  @media (max-width: 1440px) {
+    .desk-title { display: none; }
+    .dock-mixer, .dock-fx { display: none; }
+    .docks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 1280px) {
+    .prod-actions :global(.output-controls button:not(:first-child):not(:last-child)) { display: none; }
+  }
   @media (max-width: 1100px) {
-    .obs { grid-template-rows: auto minmax(220px, 1fr); overflow: auto; }
-    .studio { grid-template-columns: 1fr; }
-    .pane { min-height: 220px; }
-    .docks { grid-template-columns: repeat(5, minmax(180px, 1fr)); }
+    .studio { grid-template-columns: minmax(0, 1fr) minmax(132px, 148px) minmax(0, 1fr); }
+    .docks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 </style>

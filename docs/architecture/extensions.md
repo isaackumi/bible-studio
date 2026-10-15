@@ -11,6 +11,8 @@ There is no plugin host. `canUse()` and the command list are the reserved gates.
 | `FeatureId` / `canUse` | Entitlement and “not in this build” |
 | `Theme` | Appearance only. No JS in a theme package |
 | `ItemKind` / `ContentAdapter` | Content providers compile to `PresentationModel` |
+| `registerSourceCompiler` | Plugin sources compile to `PresentationModel`; they cannot Take |
+| Composition templates | Community looks are data (slots + sources), not Program |
 | Output sinks | Output plugins consume packets |
 
 ## Manifest (not finalized)
@@ -34,7 +36,7 @@ Content provider, song provider, scripture provider, media source, output, theme
 
 ## Phone remote
 
-The first remote is not a plugin. It is a paired local client that sends `CommandId`. Pairing: code on the operator desk. Envelope `{ v: 1, type, payload }` on `BroadcastChannel` `church-studio.remote` so a later LAN socket or cloud hop (CS-P2-006) can carry the same payload. Phone UI is `?remote=1`, a controller, not a display. Unpaired tokens never call `session.run`. Not shipped until a real phone on the LAN is tested.
+The first remote is not a plugin. It is a paired local client that sends `CommandId`. Pairing: code on the operator desk. Envelope `{ v: 1, type, payload }` on `BroadcastChannel` `church-studio.remote` and on desktop HTTP `POST /v1/remote` at port 17891. Phone UI is `?remote=1` or `http://<lan-ip>:17891/`, a controller, not a display. Unpaired tokens never call `session.run`. Not shipped until a real phone on the LAN is tested.
 
 ## Themes
 

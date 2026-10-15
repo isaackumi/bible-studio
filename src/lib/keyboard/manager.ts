@@ -58,7 +58,13 @@ export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record
         event.preventDefault();
         return;
       }
-      if ((action === "previous" || action === "next") && holdsNavigation(event.target)) return;
+      if (holdsNavigation(event.target)) {
+        if (action === "previous" || action === "next") {
+          event.preventDefault();
+          return;
+        }
+        if (action === "take") return;
+      }
       handlers[action]?.();
       event.preventDefault();
     },

@@ -23,6 +23,11 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P0-007 | Image content | P0 | Shipped | B |
 | CS-P0-008 | Media architecture (browser adapter) | P0 | Shipped | B |
 | CS-P0-009 | Sermon / presenter content | P0 | Shipped | B |
+| CS-P0-010 | Composition Engine | P0 | Partial | A |
+| CS-P0-011 | Unified composition representation | P0 | Partial | A |
+| CS-P0-012 | Layer model | P0 | Partial | A |
+| CS-P0-013 | Preview/Program composition safety | P0 | Partial | A |
+| CS-P0-014 | Output engine composition integration | P0 | Partial | A |
 | CS-P1-001 | Presenter notes workflow | P1 | Shipped | B |
 | CS-P1-002 | Content import | P1 | Shipped | B |
 | CS-P1-003 | Live song / lyric search | P1 | Shipped | B |
@@ -33,12 +38,26 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P1-008 | NDI desktop input / output | P1 | Planned | E |
 | CS-P1-009 | Extension API foundation | P1 | Designed | F |
 | CS-P1-010 | Community theme format | P1 | Partial | F |
+| CS-P1-011 | Camera + lower third | P1 | Partial | D |
+| CS-P1-012 | Scripture + camera split screen | P1 | Partial | D |
+| CS-P1-013 | Song + camera split screen | P1 | Partial | D |
+| CS-P1-014 | Timer / countdown source | P1 | Partial | D |
+| CS-P1-015 | Lower-third templates | P1 | Partial | D |
+| CS-P1-016 | Saved compositions | P1 | Partial | A |
+| CS-P1-017 | Composition templates | P1 | Partial | A |
+| CS-P1-018 | Basic composition editor | P1 | Partial | A |
 | CS-P2-001 | Community plugin ecosystem | P2 | Planned | G |
 | CS-P2-002 | Extension registry | P2 | Planned | G |
 | CS-P2-003 | External song providers | P2 | Planned | G |
 | CS-P2-004 | External scripture providers | P2 | Planned | G |
 | CS-P2-005 | Multi-operator collaboration | P2 | Planned | G |
 | CS-P2-006 | Cloud remote control | P2 | Planned | G |
+| CS-P2-007 | Advanced composition animations | P2 | Planned | G |
+| CS-P2-008 | Multiple camera layouts | P2 | Planned | D |
+| CS-P2-009 | NDI composition sources | P2 | Planned | E |
+| CS-P2-010 | Plugin composition sources | P2 | Planned | F |
+| CS-P2-011 | Community composition templates | P2 | Planned | G |
+| CS-P2-012 | Advanced graphics | P2 | Planned | G |
 | CS-P3-001 | Stage window | P3 | Partial | D |
 | CS-P3-002 | Recording and streaming | P3 | Planned | E |
 
@@ -172,6 +191,52 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Phase.** B.
 
+### CS-P0-010 Composition Engine
+
+**Description.** One composition model for layered looks (camera + lower third, split regions, timers). Compiles to `PresentationModel`. Does not decide Program.
+
+**Architectural impact.** `src/lib/domain/composition.ts`, `timer.ts`. PewDesk hosts Looks UI only. Do not rewrite Preview/Program or `AudienceOutput`.
+
+**Dependencies.** CS-P0-001, CS-P0-006.
+
+**Status.** Partial. Domain, templates, Preview compile, FrameView layers, Looks pane. Live camera pixels inside a region and NDI are not in this item.
+
+**Acceptance.** Scripture, camera card, lower third, and timer can share one composition on Preview. LIVE is required for Program. Tests cover SELECT ≠ LIVE.
+
+**Phase.** A.
+
+### CS-P0-011 Unified composition representation
+
+**Description.** `presentComposition` is the only look the sinks paint. No browser-specific or Tauri-specific composition JSON.
+
+**Status.** Partial. `layout: "composition"` with `layers`.
+
+**Phase.** A.
+
+### CS-P0-012 Layer model
+
+**Description.** Deterministic z-index, bounds in percent, hide/show, opacity, fit, animation metadata.
+
+**Status.** Partial. Domain + FrameView. Full visual drag editor is CS-P1-018.
+
+**Phase.** A.
+
+### CS-P0-013 Preview/Program composition safety
+
+**Description.** Editing a look, swapping a source, or changing a timer writes Preview. TAKE/CUT copy to Program. Audience receives Program only.
+
+**Status.** Partial. Tests in `composition.test.ts` and `timer.test.ts`.
+
+**Phase.** A.
+
+### CS-P0-014 Output engine composition integration
+
+**Description.** Composition packets use the existing publish path. `deliverProgram` must not Take on sink failure.
+
+**Status.** Partial. Same `ProgramPacket`. NDI sink still `available: false`.
+
+**Phase.** A.
+
 ---
 
 ## P1
@@ -218,7 +283,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Architectural impact.** New local WebSocket (or equivalent) service in Tauri. Browser operator can host the same commands. Pairing code / QR. See [architecture/extensions.md](architecture/extensions.md).
 
-**Dependencies.** CS-P0-002, CS-P0-006. **Status.** Partial. Same-origin remote pad at `?remote=1`. Pairing code. Existing `CommandId`s. Unpaired clients cannot Take. Not shipped until a real phone on the LAN talks to a local socket.
+**Dependencies.** CS-P0-002, CS-P0-006. **Status.** Partial. Same-origin pad at `?remote=1`. Desktop LAN HTTP on port 17891, same v1 envelope. Unpaired clients cannot Take. Not shipped until a real phone on the LAN is tested.
 
 **Phase.** C.
 
@@ -274,6 +339,70 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Phase.** F.
 
+### CS-P1-011 Camera + lower third
+
+**Description.** Full-frame camera card with a lower-third layer. Configure → Preview → LIVE.
+
+**Status.** Partial. Template and paint. Real camera pixels in the region wait on CS-P1-005.
+
+**Phase.** D.
+
+### CS-P1-012 Scripture + camera split screen
+
+**Description.** Two-region template. Sources assigned to slots, not a hardcoded left/right kind.
+
+**Status.** Partial. `lookScriptureCamera` fills the split (last Preview verse + first camera). Camera pixels Preview-only.
+
+**Phase.** D.
+
+### CS-P1-013 Song + camera split screen
+
+**Description.** Same regions as CS-P1-012 with a lyric source.
+
+**Status.** Partial. `lookLyricsCamera` fills the split (last Preview song section + first camera). Camera pixels Preview-only.
+
+**Phase.** D.
+
+### CS-P1-014 Timer / countdown source
+
+**Description.** Countdown, count-up, clock, target time. Domain state. Local ticks in FrameView. Program only via LIVE.
+
+**Status.** Partial. `timer.ts`, timer layout, Camera + Countdown look, full countdown with count-up and clock in Looks. Local ticks in FrameView. Target time later. Camera pixels Preview-only.
+
+**Phase.** D.
+
+### CS-P1-015 Lower-third templates
+
+**Description.** Speaker, scripture reference, announcement, song title, guest, event. Themeable later. Not auto-LIVE.
+
+**Status.** Partial. `LOWER_THIRD_TEMPLATES`.
+
+**Phase.** D.
+
+### CS-P1-016 Saved compositions
+
+**Description.** Persist looks on the workspace. Restore to Preview. Do not restore as Program.
+
+**Status.** Partial. `Workspace.compositions`.
+
+**Phase.** A.
+
+### CS-P1-017 Composition templates
+
+**Description.** Reusable slot layouts, including community data later.
+
+**Status.** Partial. Built-in templates. Filled looks: lower third, camera countdown, scripture, lyrics, image, two cameras, camera + presentation, full camera, full scripture, full lyrics, full countdown, announcement, two regions. Community packages are CS-P2-011.
+
+**Phase.** A.
+
+### CS-P1-018 Basic composition editor
+
+**Description.** Select, reorder, hide, numeric move/resize, source assign. Preview only. Not Premiere.
+
+**Status.** Partial. Looks pane. Text heading/body fields. Drag handles later.
+
+**Phase.** A.
+
 ---
 
 ## P2
@@ -286,6 +415,12 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P2-004 | External scripture providers | Public-domain local texts stay default. |
 | CS-P2-005 | Multi-operator collaboration | Builds on output owner (`sessionId` / `generation`). |
 | CS-P2-006 | Cloud remote control | Same command protocol as CS-P1-004 with an account hop. App still runs offline. |
+| CS-P2-007 | Advanced composition animations | Beyond fade/slide/dissolve. Must not corrupt Program. |
+| CS-P2-008 | Multiple camera layouts | Three-plus regions, camera switcher. Still Preview until LIVE. |
+| CS-P2-009 | NDI composition sources | Native media source → `SourceRef` → layer. See ndi.md. |
+| CS-P2-010 | Plugin composition sources | `registerSourceCompiler` only. No session. No Take. |
+| CS-P2-011 | Community composition templates | Data packages, not executable looks. |
+| CS-P2-012 | Advanced graphics | Lower-third motion, bugs, tickers. Still layers. |
 
 ---
 

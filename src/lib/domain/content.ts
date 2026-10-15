@@ -4,7 +4,7 @@ import type { ItemKind, PresentationItem, PresentationModel } from "./types";
  * Rundown kinds that already persist on a service. Future sources (sermon, camera, NDI)
  * become one of these items, or a new ItemKind added with a schema bump — not a second model.
  */
-export type ContentSourceKind = ItemKind | "sermon" | "video" | "camera" | "ndi" | "plugin";
+export type ContentSourceKind = ItemKind | "sermon" | "video" | "camera" | "ndi" | "plugin" | "timer" | "composition";
 
 export type ContentSource = {
   id: string;

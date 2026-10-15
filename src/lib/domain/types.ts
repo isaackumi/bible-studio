@@ -28,7 +28,46 @@ export type PresentationLine = {
   marker?: string;
 };
 
-export type PresentationLayout = "scripture" | "lyrics" | "title" | "image" | "empty" | "black" | "logo";
+export type PresentationLayout =
+  | "scripture"
+  | "lyrics"
+  | "title"
+  | "image"
+  | "empty"
+  | "black"
+  | "logo"
+  | "composition"
+  | "timer"
+  | "lower-third";
+
+export type LayerBounds = { x: number; y: number; w: number; h: number };
+
+export type PaintedLayer = {
+  id: string;
+  zIndex: number;
+  opacity: number;
+  bounds: LayerBounds;
+  fit: "contain" | "cover" | "fill";
+  sourceId: string;
+  model: PresentationModel;
+  animation?: {
+    entrance: string;
+    exit: string;
+    durationMs: number;
+    easing: string;
+  };
+};
+
+export type TimerPaint = {
+  mode: "countdown" | "countup" | "clock" | "target";
+  label: string;
+  durationMs: number;
+  elapsedMs: number;
+  startedAt: number | null;
+  running: boolean;
+  warningMs: number;
+  targetAt: number | null;
+};
 
 export type PresentationModel = {
   layout: PresentationLayout;
@@ -38,6 +77,8 @@ export type PresentationModel = {
   lines: PresentationLine[];
   imageUrl: string | null;
   backgroundImageUrl: string | null;
+  layers?: PaintedLayer[];
+  timer?: TimerPaint;
 };
 
 export type LiveFrame = {
@@ -76,6 +117,7 @@ export type PresentationItem = {
   slide?: { heading: string; body: string; imageId: string | null };
   image?: { assetId: string };
   announcement?: { heading: string; body: string };
+  composition?: { compositionId: string };
 };
 
 export type ServiceSection = {
@@ -212,7 +254,7 @@ export type DeskStyle = "pewbeam" | "obs";
 /** Operator chrome. Scripture themes are a separate record. */
 export type OperatorTheme = "dark" | "vespers" | "nave" | "light";
 
-/** PewBeam column sizes. Panel visibility stays on the workspace layout. */
+/** Presenter Desk column sizes. Panel visibility stays on the workspace layout. */
 export type PewDeskState = {
   focus: boolean;
   columns: [number, number, number];
@@ -245,6 +287,16 @@ export type Workspace = {
   layouts: WorkspaceLayout[];
   activeDisplayProfileId: string;
   displayProfiles: DisplayProfile[];
+  /** Saved looks. Preview only until LIVE. */
+  compositions: CompositionDocument[];
+};
+
+export type CompositionDocument = {
+  id: string;
+  name: string;
+  canvas: { width: number; height: number };
+  layers: unknown[];
+  transition: { type: TransitionKind; ms: number };
 };
 
 export type ProgramPacket = {

@@ -23,3 +23,13 @@ export function outputSinks(desktop = isDesktop(), caps: OutputCapabilities = de
 }
 
 export type ProgramPublish = (packet: ProgramPacket) => void | Promise<void>;
+
+/** Sinks consume Program. A throw must not roll back or Take. */
+export async function deliverProgram(packet: ProgramPacket, publish: ProgramPublish): Promise<boolean> {
+  try {
+    await publish(packet);
+    return true;
+  } catch {
+    return false;
+  }
+}

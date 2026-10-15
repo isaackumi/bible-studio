@@ -22,6 +22,7 @@ describe("keyboard manager", () => {
     const seen: string[] = [];
     const manager = createKeyboardManager(defaultShortcuts, {
       take: () => seen.push("take"),
+      cut: () => seen.push("cut"),
       clear: () => seen.push("clear"),
       escape: () => seen.push("escape"),
     });
@@ -42,16 +43,22 @@ describe("keyboard manager", () => {
     const arrowOnButton = press("ArrowRight", "BUTTON");
     manager.onKeyDown(arrowOnButton.event);
     expect(seen).toEqual(["take", "escape"]);
-    expect(arrowOnButton.prevented()).toBe(false);
+    expect(arrowOnButton.prevented()).toBe(true);
 
     const spaceOnButton = press("Space", "BUTTON");
     manager.onKeyDown(spaceOnButton.event);
-    expect(seen).toEqual(["take", "escape", "take"]);
+    expect(seen).toEqual(["take", "escape"]);
+    expect(spaceOnButton.prevented()).toBe(false);
+
+    const cutOnButton = press("KeyC", "BUTTON");
+    manager.onKeyDown(cutOnButton.event);
+    expect(seen).toEqual(["take", "escape", "cut"]);
+    expect(cutOnButton.prevented()).toBe(true);
 
     const handled = press("ArrowRight");
     handled.event.defaultPrevented = true;
     manager.onKeyDown(handled.event);
-    expect(seen).toEqual(["take", "escape", "take"]);
+    expect(seen).toEqual(["take", "escape", "cut"]);
   });
 
   it("keeps desk keys off program and out of text fields", () => {

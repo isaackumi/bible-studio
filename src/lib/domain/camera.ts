@@ -1,5 +1,5 @@
-import { frame, setPreview, type LiveState } from "./live";
-import type { PresentationModel, Theme } from "./types";
+import { frame, setPreview } from "./live";
+import type { LiveState, PresentationModel, Theme } from "./types";
 
 export type CameraDevice = {
   deviceId: string;
@@ -30,6 +30,26 @@ export function cameraSourceId(deviceId: string) {
 
 export function isCameraSource(sourceId: string | null | undefined) {
   return !!sourceId?.startsWith("camera:");
+}
+
+export type CameraSurface = "preview" | "program" | "audience";
+
+/** Operator Preview may show pixels. Program and audience paint the camera card. */
+export function previewShowsCamera(model: PresentationModel, sourceId: string | null | undefined): boolean {
+  if (isCameraSource(sourceId)) return true;
+  return (model.layers ?? []).some((layer) => isCameraSource(layer.sourceId));
+}
+
+export function cameraFeedForLayer(
+  sourceId: string | undefined,
+  feedId: string | null | undefined,
+  stream: unknown,
+  surface: CameraSurface,
+): unknown | null {
+  if (surface !== "preview") return null;
+  if (!stream || !sourceId || sourceId !== feedId) return null;
+  if (!isCameraSource(sourceId)) return null;
+  return stream;
 }
 
 export function listVideoInputs(devices: MediaDeviceInfoLike[]): CameraDevice[] {

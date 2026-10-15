@@ -12,14 +12,16 @@
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
   import { openPrivacySettings, prepareListening, speechAvailable, startListening, startNativeListening } from "../../voice/listen";
+  import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
   import OutputType from "../OutputType.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
+  import CompositionPane from "../CompositionPane.svelte";
 
-  type Mode = "scriptures" | "slides" | "songs" | "sermon";
+  type Mode = "scriptures" | "slides" | "songs" | "sermon" | "looks";
   type DraftSermonSection = {
     id: string;
     name: string;
@@ -59,6 +61,7 @@
   let sermonQuery = $state("");
   let wrapVerses = $state(false);
   let chapterToken = 0;
+  let seededChapterPreview = false;
   let takeAfterPreview = false;
   let listening = $state(false);
   let heard = $state("");
@@ -194,7 +197,12 @@
         const from = start ?? 1;
         const to = end ?? from;
         note = rows.length ? "" : "This chapter has no verses.";
-        if (rows.some((row) => row.verse === from)) void showPassage(from, Math.max(from, to));
+        if (rows.some((row) => row.verse === from)) {
+          const layout = session.live.preview.model.layout;
+          const skipSeed = !seededChapterPreview && layout !== "black" && layout !== "empty";
+          seededChapterPreview = true;
+          if (!skipSeed) void showPassage(from, Math.max(from, to));
+        }
         void session.refreshProgramTranslation(id);
       })
       .catch(() => {
@@ -308,7 +316,7 @@
       return;
     }
     if (mode === "sermon") {
-      session.stepSermon(direction);
+      await session.stepSermon(direction);
       await session.take();
       return;
     }
@@ -657,15 +665,16 @@
       {#if canUse("sermon")}
         <button type="button" class:on={mode === "sermon"} onclick={() => (mode = "sermon")}>Sermon</button>
       {/if}
+      <button type="button" class:on={mode === "looks"} onclick={() => (mode = "looks")}>Looks</button>
     </nav>
     <div class="pb-actions">
       <OutputControls compact />
       {#if !session.controlsAudience}
-        <button type="button" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
+        <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
-      <button type="button" class="live" class:on-air={displayLive} data-tip={displayLive ? "Audience display is live" : "Send preview to program"} onclick={() => session.take()}><span class="pip"></span>LIVE</button>
-      <button type="button" class="black" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
-      <button type="button" class="clear" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
+      <button type="button" class="desk-btn primary live" class:on-air={displayLive} data-tip={displayLive ? "Audience display is live" : "Send preview to program"} onclick={() => session.take()}><span class="pip"></span>LIVE</button>
+      <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
+      <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
       <button type="button" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
@@ -677,22 +686,20 @@
       <button type="button" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => session.savePew({ focus: !focus })}>
         <Icon name="focus" size={16} />
       </button>
-      <button type="button" data-tip="PewBeam" aria-label="PewBeam" class:on={session.workspace.appearance.desk === "pewbeam"} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
-        {@render icon("pew")}
+      <button type="button" aria-label="Reset workspace" data-tip="Reset workspace" onclick={() => session.resetActiveLayout()}>
+        <Icon name="reset" size={16} />
       </button>
-      <button type="button" data-tip="OBS" aria-label="OBS" class:on={session.workspace.appearance.desk === "obs"} onclick={() => session.setAppearance({ desk: "obs" })}>
-        {@render icon("obs")}
-      </button>
-      <button type="button" data-tip="Displays" aria-label="Displays" onclick={() => session.openSettings("displays")}>
+      <DeskSwitcher />
+      <button type="button" class="secondary" data-tip="Displays" aria-label="Displays" onclick={() => session.openSettings("displays")}>
         {@render icon("outputs")}
       </button>
-      <button type="button" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
+      <button type="button" class="secondary" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
         {@render icon("themes")}
       </button>
-      <button type="button" data-tip="Alerts" aria-label="Alerts" onclick={() => (sheet = sheet === "alerts" ? null : "alerts")}>
+      <button type="button" class="secondary" data-tip="Alerts" aria-label="Alerts" onclick={() => (sheet = sheet === "alerts" ? null : "alerts")}>
         {@render icon("alerts")}
       </button>
-      <button type="button" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
+      <button type="button" class="secondary" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
         {@render icon("help")}
       </button>
       <button type="button" data-tip="Settings" aria-label="Settings" onclick={() => session.openSettings("appearance")}>
@@ -701,7 +708,9 @@
     </nav>
   </header>
 
-  {#if mode === "sermon"}
+  {#if mode === "looks"}
+    <CompositionPane />
+  {:else if mode === "sermon"}
     <section class="pb-songs">
       <div class="song-desk">
         <form class="song-editor" onsubmit={saveSermonForm}>
@@ -803,7 +812,7 @@
             <p>{operatorNotes || "Notes for this section stay here. They are not on Preview or Program."}</p>
           </article>
           <header><span class="kicker">Preview</span></header>
-          <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
@@ -873,7 +882,7 @@
               <button type="button" aria-label="Next section" onclick={() => session.stepSong(1)}>Next</button>
             </span>
           </header>
-          <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
           <div class="monitor"><Screen model={session.live.program.model} /></div>
         </aside>
@@ -1030,7 +1039,7 @@
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} stream={session.live.preview.sourceId?.startsWith("camera:") ? session.cameraStream : null} /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
                 </section>
               </Pane>
             </PaneGroup>
@@ -1134,36 +1143,29 @@
   .pb-bar {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px 10px;
-    padding: var(--panel-pad) calc(var(--panel-pad) + 2px);
+    padding: 6px calc(var(--panel-pad) + 2px);
+    min-height: var(--chrome-h);
     flex: none;
+    overflow: hidden;
   }
-  .pb-modes { display: flex; align-items: center; gap: 4px; }
+  .pb-modes { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: auto; flex: 1 1 auto; }
   .pb-modes button {
     border: 0;
     background: transparent;
     color: var(--muted);
-    border-radius: 999px;
+    border-radius: var(--radius-control);
     padding: 7px 14px;
     font-weight: 560;
     font-size: 14px;
+    flex: none;
   }
   .pb-modes button:hover:not(.on) { background: var(--field); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
-  .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; flex: none; min-width: 0; }
   .pb-actions :global(.output-controls) { min-width: 0; }
-  .pb-actions > button {
-    border: 1px solid transparent;
-    border-radius: 999px;
-    min-width: 78px;
-    height: var(--control-h);
-    padding: 0 14px;
-    font-weight: 650;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-  }
-  .live { background: var(--live); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+  .live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 78px; }
   .live.on-air { animation: live-glow 1.6s ease-in-out infinite; }
   .pip { width: 7px; height: 7px; border-radius: 50%; background: white; position: relative; display: inline-block; flex: none; }
   .pip.on::after, .live.on-air .pip::after {
@@ -1192,22 +1194,24 @@
   @media (prefers-reduced-motion: reduce) {
     .live.on-air, .pip.on::after, .live.on-air .pip::after { animation: none; }
   }
-  .black { background: var(--line); color: var(--ink); }
-  .clear { background: transparent; color: var(--accent); border-color: var(--accent); }
   .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: none; }
-  .pb-tools button {
+  .pb-tools > button {
     width: var(--tool-size);
     height: var(--tool-size);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     background: var(--field);
     color: var(--ink);
     display: grid;
     place-items: center;
     padding: 0;
   }
-  .pb-tools button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
-  .pb-tools button.on { color: var(--accent); border-color: var(--accent); }
+  .pb-tools > button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+  .pb-tools > button.on { color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 1280px) {
+    .pb-actions :global(.output-controls .desk-btn) { display: none; }
+    .pb-tools > button.secondary { display: none; }
+  }
   .pb button:active { opacity: 0.84; }
   .pb-grid {
     flex: 1;
