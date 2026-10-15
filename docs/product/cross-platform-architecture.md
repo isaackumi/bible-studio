@@ -63,7 +63,7 @@ Browser only:
 - `BroadcastChannel` plus `church-studio.program` for the audience tab.
 - `window.open("/?display=1")` for the audience window. A blocked popup is reported. It is not treated as success.
 
-`platformCapabilities()` reports this honestly. The browser does not claim native windows, multiple physical displays, or native media devices. Both platforms report offline storage, because each has a local store. They are not the same engine.
+`platformCapabilities()` reports this honestly. `detectOutputCapabilities()` probes open, fullscreen, screens, camera, microphone, and WebRTC. The browser does not claim native windows, `canPlaceWindow`, or native media devices. `getScreenDetails` may exist in Chromium; this app still does not place the audience popup. Both platforms report offline storage, because each has a local store. They are not the same engine. See [browser capabilities](../architecture/browser-capabilities.md).
 
 ## Storage strategy
 

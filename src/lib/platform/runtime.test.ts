@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDesktop, platformCapabilities } from "./runtime";
+import { isDesktop, outputCapabilities, platformCapabilities } from "./runtime";
 
 describe("platform runtime", () => {
   it("treats this test process as the web target", () => {
@@ -22,5 +22,10 @@ describe("platform runtime", () => {
       supportsMultipleDisplays: true,
       audienceOutput: "native-window",
     });
+  });
+
+  it("does not treat this process as able to place an audience window", () => {
+    expect(outputCapabilities(false).canPlaceWindow).toBe(false);
+    expect(outputCapabilities(true).canPlaceWindow).toBe(true);
   });
 });

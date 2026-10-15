@@ -1,16 +1,18 @@
+import { sanitizeSermon } from "../domain/sermon";
 import { sanitizeTheme } from "../domain/theme";
-import type { Service, Song, Theme } from "../domain/types";
+import type { Sermon, Service, Song, Theme } from "../domain/types";
 import type { LibrarySnapshot } from "./library";
 
 export const BROWSER_DB_NAME = "church-studio";
-export const BROWSER_SCHEMA_VERSION = 1;
+export const BROWSER_SCHEMA_VERSION = 3;
+export const BROWSER_MEDIA_STORE = "media";
 
 const LEGACY_SONGS = "church-studio.songs";
 const LEGACY_SERVICES = "church-studio.services";
 export const MIGRATION_META = "local-lists-v1";
 const MIGRATION_COMPLETE = "complete";
 
-export type StoreName = "songs" | "services" | "themes";
+export type StoreName = "songs" | "services" | "themes" | "sermons";
 
 export type KeyValueStore = {
   getItem(key: string): string | null;
@@ -37,6 +39,9 @@ export type BrowserLibrary = {
   saveService(service: Service): Promise<void>;
   themes(): Promise<Theme[]>;
   saveTheme(theme: Theme): Promise<void>;
+  sermons(): Promise<Sermon[]>;
+  saveSermon(sermon: Sermon): Promise<void>;
+  deleteSermon(id: string): Promise<void>;
   importSnapshot(snapshot: LibrarySnapshot): Promise<void>;
 };
 
@@ -44,20 +49,26 @@ function ensureStore(db: IDBDatabase, name: string, options?: IDBObjectStorePara
   if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, options);
 }
 
-export function upgradeBrowserDatabase(db: IDBDatabase, oldVersion: number) {
-  if (oldVersion < 1) {
+export function upgradeBrowserDatabase(db: IDBDatabase, oldVersion: number, newVersion = BROWSER_SCHEMA_VERSION) {
+  if (oldVersion < 1 && newVersion >= 1) {
     ensureStore(db, "songs", { keyPath: "id" });
     ensureStore(db, "services", { keyPath: "id" });
     ensureStore(db, "themes", { keyPath: "id" });
     ensureStore(db, "meta", { keyPath: "key" });
   }
+  if (oldVersion < 2 && newVersion >= 2) {
+    ensureStore(db, BROWSER_MEDIA_STORE, { keyPath: "id" });
+  }
+  if (oldVersion < 3 && newVersion >= 3) {
+    ensureStore(db, "sermons", { keyPath: "id" });
+  }
 }
 
-export function openBrowserDatabase(factory: IDBFactory): Promise<IDBDatabase> {
+export function openBrowserDatabase(factory: IDBFactory, version = BROWSER_SCHEMA_VERSION): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = factory.open(BROWSER_DB_NAME, BROWSER_SCHEMA_VERSION);
+    const request = factory.open(BROWSER_DB_NAME, version);
     request.onupgradeneeded = (event) => {
-      upgradeBrowserDatabase(request.result, event.oldVersion);
+      upgradeBrowserDatabase(request.result, event.oldVersion, event.newVersion ?? version);
     };
     request.onerror = () => reject(request.error ?? new Error("Could not open the browser library."));
     request.onsuccess = () => resolve(request.result);
@@ -273,6 +284,13 @@ export function createLibrary(getStore: () => Promise<RecordStore>): BrowserLibr
       return byRecent(await (await records()).list<Theme>("themes")).map(sanitizeTheme);
     },
     saveTheme: (theme) => save("themes", sanitizeTheme(theme)),
+    async sermons() {
+      return byRecent(await (await records()).list<Sermon>("sermons")).map(sanitizeSermon);
+    },
+    saveSermon: (sermon) => save("sermons", sanitizeSermon(sermon)),
+    async deleteSermon(id) {
+      await (await records()).remove("sermons", id);
+    },
     async importSnapshot(snapshot) {
       await importLibraryRecords(await records(), snapshot);
     },
@@ -329,4 +347,8 @@ export const browserLibrary: BrowserLibrary = {
   saveService: (service) => ready().then((library) => library.saveService(service)),
   themes: () => ready().then((library) => library.themes()),
   saveTheme: (theme) => ready().then((library) => library.saveTheme(theme)),
+  sermons: () => ready().then((library) => library.sermons()),
+  saveSermon: (sermon) => ready().then((library) => library.saveSermon(sermon)),
+  deleteSermon: (id) => ready().then((library) => library.deleteSermon(id)),
+  importSnapshot: (snapshot) => ready().then((library) => library.importSnapshot(snapshot)),
 };

@@ -1,12 +1,12 @@
 # Browser media storage
 
-This is a design, not an implementation. Desktop media already works. Browser media does not.
+Browser images use the same `MediaAsset` id as desktop. Bytes live in IndexedDB `church-studio` schema version 2, store `media`. Import from Settings → Media. Preview and logo assignment do not change Program.
 
 ## What exists
 
-`MediaAsset` is `{ id, name, path, kind: "image", createdAt }`. Desktop import copies a PNG, JPEG, WebP, or GIF into the app data `media` directory and inserts a row in SQLite `media_assets`. Slides, service items, theme backgrounds, and the logo store that `id`, not the file path. `session.modelFor` resolves the id to a URL. A missing file becomes an empty frame through `presentImageOrEmpty`. It does not throw.
+`MediaAsset` is `{ id, name, path, kind: "image", createdAt }`. Desktop import copies a PNG, JPEG, WebP, or GIF into the app data `media` directory and inserts a row in SQLite `media_assets`. Browser import stores the same metadata with `path` empty and the blob in the `media` record. Slides, service items, theme backgrounds, and the logo store that `id`, not the file path. `session.modelFor` resolves the id to a URL. A missing file or blob becomes an empty frame through `presentImageOrEmpty`. It does not throw.
 
-The browser `api.mediaList` and `api.importMedia` still call Tauri. There is no browser media store. The backup file does not include media bytes.
+The backup file still does not include media bytes.
 
 ## Recommendation
 

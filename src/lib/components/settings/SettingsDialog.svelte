@@ -9,6 +9,7 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+  import MediaPane from "../MediaPane.svelte";
   import OutputType from "../OutputType.svelte";
 
   let audioNote = $state("");
@@ -36,6 +37,7 @@
         ["audience", "Output", "cast"],
         ["displays", "Displays", "screens"],
         ["stage", "Stage", "stage"],
+        ["remote", "Remote", "cast"],
       ],
     },
     {
@@ -86,6 +88,7 @@
   let logoText = $state("");
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileMessage = $state("");
+  const IMPORT_ACCEPT = ".json,.txt,.md,.markdown,.text,application/json,text/plain,text/markdown";
 
   async function downloadLibrary() {
     const snapshot = await session.exportLibrary();
@@ -105,10 +108,13 @@
     input.value = "";
     if (!file) return;
     try {
-      await session.importLibrary(JSON.parse(await file.text()) as unknown);
+      const name = file.name.toLowerCase();
+      const text = await file.text();
+      if (name.endsWith(".json")) await session.importLibrary(JSON.parse(text) as unknown);
+      else await session.importDocument(file.name, text);
       fileMessage = session.message;
     } catch (error) {
-      fileMessage = error instanceof Error ? error.message : String(error);
+      fileMessage = error instanceof Error ? error.message : "The file was not imported.";
     }
   }
 
@@ -165,10 +171,12 @@
       {#each groups as group (group.label)}
         <p class="group">{group.label}</p>
         {#each group.items as [id, title, icon] (id)}
-          <button type="button" class:active={section === id} onclick={() => (section = id)}>
-            <Icon name={icon} size={15} />
-            <span>{title}</span>
-          </button>
+          {#if id !== "remote" || canUse("remote-control")}
+            <button type="button" class:active={section === id} onclick={() => (section = id)}>
+              <Icon name={icon} size={15} />
+              <span>{title}</span>
+            </button>
+          {/if}
         {/each}
       {/each}
     </nav>
@@ -178,7 +186,7 @@
         <div>
           <h2>{page?.[1]}</h2>
           <p>
-            {#if section === "general"}The name on the logo slide.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
+            {#if section === "general"}The name on the logo slide.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
           </p>
         </div>
         <button type="button" class="icon-close" aria-label="Close" onclick={close}><Icon name="close" size={16} /></button>
@@ -456,6 +464,22 @@
           </section>
         {/each}
         <p class="note stand">These keys call the command list. Remapping will use the same commands.</p>
+      {:else if section === "remote"}
+        <section class="card">
+          <h3>Phone is a controller</h3>
+          <p class="note">Pair on this computer first. Unpaired pads cannot change Program. A LAN socket for a real phone is not claimed shipped yet.</p>
+          {#if session.remotePairing}
+            <p class="note">Code <strong>{session.remotePairing.code}</strong></p>
+            <p class="note">{session.remoteTokens.length} paired. Open the remote pad and enter that code.</p>
+          {:else}
+            <p class="note">No pairing code yet.</p>
+          {/if}
+          <div class="actions">
+            <button type="button" class="primary" onclick={() => session.openRemotePairing()}>Show pairing code</button>
+            <button type="button" onclick={() => window.open(session.remotePageUrl(), "_blank", "noopener")}>Open remote pad</button>
+            <button type="button" class="text" onclick={() => session.closeRemotePairing()}>Clear pairing</button>
+          </div>
+        </section>
       {:else if section === "stage"}
         <section class="card">
           <h3>{canUse("stage-display") ? "Stage is available" : "Not in this release"}</h3>
@@ -464,11 +488,11 @@
         </section>
       {:else if section === "storage"}
         <section class="card">
-          <p class="note">Songs, services, and themes stored on this device. Import replaces a record only when its id matches. Program is not included.</p>
+          <p class="note">Songs, services, and themes stored on this device. Import a Church Studio library, or a text or Markdown file as slides. Import replaces a library record only when its id matches. Program is not included. Images import from Media.</p>
           <div class="actions">
             <button type="button" class="primary" onclick={() => downloadLibrary()}>Export library</button>
-            <button type="button" onclick={() => fileInput?.click()}>Import library</button>
-            <input bind:this={fileInput} type="file" accept="application/json,.json" hidden onchange={importFile} />
+            <button type="button" onclick={() => fileInput?.click()}>Import</button>
+            <input bind:this={fileInput} type="file" accept={IMPORT_ACCEPT} hidden onchange={(event) => void importFile(event)} />
           </div>
           {#if fileMessage}<p class="note">{fileMessage}</p>{/if}
         </section>
@@ -491,7 +515,8 @@
       {:else if section === "media"}
         <section class="card">
           <h3>Pictures</h3>
-          <p class="note">Backgrounds and the logo image are chosen on the desk. A missing picture shows the empty frame instead of crashing.</p>
+          <p class="note">Import stays on this computer. Preview and Use as logo do not change Program. LIVE still sends it. A missing picture shows the empty frame instead of crashing.</p>
+          <MediaPane />
         </section>
       {:else if section === "audio"}
         <section class="card">

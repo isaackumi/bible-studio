@@ -38,19 +38,27 @@ fn resource_dir(app: &AppHandle) -> PathBuf {
 }
 
 fn migrate(conn: &Connection) -> Result<(), String> {
-    let sql = include_str!("../migrations/001_init.sql");
-    conn.execute_batch(sql).map_err(|e| e.to_string())?;
+    conn.execute_batch(include_str!("../migrations/001_init.sql"))
+        .map_err(|e| e.to_string())?;
+    mark_migration(conn, 1, "init")?;
+    conn.execute_batch(include_str!("../migrations/002_sermons.sql"))
+        .map_err(|e| e.to_string())?;
+    mark_migration(conn, 2, "sermons")?;
+    Ok(())
+}
+
+fn mark_migration(conn: &Connection, version: i64, description: &str) -> Result<(), String> {
     let applied: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = 1",
-            [],
+            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?1",
+            params![version],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
     if applied == 0 {
         conn.execute(
-            "INSERT INTO schema_migrations (version, description) VALUES (1, 'init')",
-            [],
+            "INSERT INTO schema_migrations (version, description) VALUES (?1, ?2)",
+            params![version, description],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -141,6 +149,39 @@ pub fn song_save(conn: &Connection, document: &Value) -> Result<(), String> {
 
 pub fn song_delete(conn: &Connection, id: &str) -> Result<(), String> {
     conn.execute("DELETE FROM songs WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn sermon_list(conn: &Connection) -> Result<Vec<Value>, String> {
+    list_documents(conn, "SELECT document FROM sermons ORDER BY title COLLATE NOCASE")
+}
+
+pub fn sermon_save(conn: &Connection, document: &Value) -> Result<(), String> {
+    let id = document
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or("Sermon is missing an id")?;
+    let title = document
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Untitled sermon");
+    let updated = document
+        .get("updatedAt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let text = serde_json::to_string(document).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO sermons (id, title, document, updated_at) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(id) DO UPDATE SET title = excluded.title, document = excluded.document, updated_at = excluded.updated_at",
+        params![id, title, text, updated],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn sermon_delete(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM sermons WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -410,6 +451,29 @@ mod tests {
             value["themes"] = serde_json::json!([{"id":"theme-new","name":"New"}]);
         }
         value
+    }
+
+    #[test]
+    fn sermons_roundtrip_keep_operator_notes_in_the_document() {
+        let conn = test_db();
+        sermon_save(
+            &conn,
+            &serde_json::json!({
+                "id": "sermon-1",
+                "title": "The Word",
+                "speaker": "Ada",
+                "notes": "OPERATOR-ONLY",
+                "sections": [{"id":"sec-1","name":"Opening","notes":"Cue","items":[]}],
+                "updatedAt": "2026-10-15T00:00:00.000Z"
+            }),
+        )
+        .unwrap();
+        let rows = sermon_list(&conn).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["notes"], "OPERATOR-ONLY");
+        assert_eq!(rows[0]["sections"][0]["notes"], "Cue");
+        sermon_delete(&conn, "sermon-1").unwrap();
+        assert_eq!(count(&conn, "sermons"), 0);
     }
 
     #[test]

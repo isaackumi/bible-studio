@@ -1,3 +1,7 @@
+import { detectOutputCapabilities, probeFromWindow, type OutputCapabilities } from "./output-capabilities";
+
+export type { OutputCapabilities };
+
 export type PlatformId = "desktop" | "web";
 
 export type AudienceOutputKind = "native-window" | "browser-window";
@@ -15,6 +19,11 @@ export type PlatformCapabilities = {
 /** True only inside the Tauri shell. The web build never has this global. */
 export function isDesktop(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+export function outputCapabilities(desktop = isDesktop()): OutputCapabilities {
+  const target = typeof window !== "undefined" ? window : undefined;
+  return detectOutputCapabilities(probeFromWindow(desktop, target));
 }
 
 export function platformCapabilities(desktop = isDesktop()): PlatformCapabilities {

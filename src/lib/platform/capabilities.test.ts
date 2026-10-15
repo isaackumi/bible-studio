@@ -7,6 +7,8 @@ describe("capabilities", () => {
     expect(canUse("audience-output")).toBe(true);
     expect(canUse("bible")).toBe(true);
     expect(canUse("voice-detect")).toBe(true);
+    expect(canUse("sermon")).toBe(true);
+    expect(canUse("remote-control")).toBe(true);
     expect(canUse("stage-display")).toBe(false);
     expect(canUse("ndi")).toBe(false);
     expect(canUse("cloud-sync")).toBe(false);

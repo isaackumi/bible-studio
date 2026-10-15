@@ -3,8 +3,9 @@
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
   import { api } from "../../db/api";
+  import { attachSermonItem, deskNotes, moveSermonSection, removeSermonSection, sanitizeSermon, searchSermonHits } from "../../domain/sermon";
   import { moveSongSection, removeSongSection } from "../../domain/song";
-  import type { BibleItem, PresentationItem, SearchHit, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
+  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
   import { onDestroy, untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { isDesktop } from "../../platform/runtime";
@@ -18,7 +19,17 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
 
-  type Mode = "scriptures" | "slides" | "songs";
+  type Mode = "scriptures" | "slides" | "songs" | "sermon";
+  type DraftSermonSection = {
+    id: string;
+    name: string;
+    notes: string;
+    heading: string;
+    body: string;
+    attached: PresentationItem | null;
+    scripture: string;
+    imageId: string;
+  };
 
   let mode = $state<Mode>("scriptures");
   let translationId = $state("kjv");
@@ -30,6 +41,7 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let slideQuery = $state("");
+  let slideImport = $state<HTMLInputElement | null>(null);
   let detections = $state<SearchHit[]>([]);
   let note = $state("Loading scripture…");
   let sheet = $state<"help" | "alerts" | "lexicon" | "type" | null>(null);
@@ -37,6 +49,14 @@
   let songAuthor = $state("");
   let songSections = $state<SongSection[]>([{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }]);
   let songQuery = $state("");
+  let sermonId = $state("");
+  let sermonTitle = $state("");
+  let sermonSpeaker = $state("");
+  let sermonNotes = $state("");
+  let sermonSections = $state<DraftSermonSection[]>([
+    { id: crypto.randomUUID(), name: "Opening", notes: "", heading: "", body: "", attached: null, scripture: "", imageId: "" },
+  ]);
+  let sermonQuery = $state("");
   let wrapVerses = $state(false);
   let chapterToken = 0;
   let takeAfterPreview = false;
@@ -129,6 +149,23 @@
     session.songs.filter((song) =>
       `${song.title} ${song.author}`.toLowerCase().includes(songQuery.trim().toLowerCase()),
     ),
+  );
+  const sermonHits = $derived(
+    sermonQuery.trim()
+      ? searchSermonHits(session.sermons, sermonQuery)
+      : session.sermons.flatMap((sermon) =>
+          sermon.sections.map((section) => ({
+            sermonId: sermon.id,
+            sectionId: section.id,
+            title: sermon.title || "Untitled sermon",
+            speaker: sermon.speaker,
+            label: section.name,
+            snippet: "",
+          })),
+        ),
+  );
+  const operatorNotes = $derived(
+    deskNotes(draftSermon(), session.sermonFocus?.sectionId) || session.sermonDeskNotes(),
   );
 
   $effect(() => {
@@ -270,6 +307,11 @@
       await session.take();
       return;
     }
+    if (mode === "sermon") {
+      session.stepSermon(direction);
+      await session.take();
+      return;
+    }
     const current = mode === "scriptures" ? passage() : null;
     if (current && book) {
       const next = stepVerse(current, direction, book, verses.length);
@@ -310,6 +352,20 @@
     await ensureService("Service");
     session.addSlide("slide");
     mode = "slides";
+  }
+
+  async function importSlides(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try {
+      await session.importDocument(file.name, await file.text());
+      note = session.message;
+      mode = "slides";
+    } catch (error) {
+      note = error instanceof Error ? error.message : "The file was not imported.";
+    }
   }
 
   function open(item: PresentationItem) {
@@ -462,6 +518,134 @@
     session.addLyric(song.id, section.id, `${song.title} — ${section.label}`);
     note = `${song.title} added to the queue.`;
   }
+
+  function emptyDraftSection(name = "Section"): DraftSermonSection {
+    return { id: crypto.randomUUID(), name, notes: "", heading: "", body: "", attached: null, scripture: "", imageId: "" };
+  }
+
+  function draftSermon(): Sermon {
+    return sanitizeSermon({
+      id: sermonId || crypto.randomUUID(),
+      title: sermonTitle,
+      speaker: sermonSpeaker,
+      notes: sermonNotes,
+      sections: sermonSections.map((section) => {
+        const heading = section.heading.trim() || section.name.trim() || "Sermon";
+        const slide: PresentationItem = {
+          id: `${section.id}-slide`,
+          kind: "slide",
+          title: heading,
+          slide: { heading, body: section.body, imageId: null },
+        };
+        return {
+          id: section.id,
+          name: section.name,
+          notes: section.notes,
+          items: section.attached ? [section.attached, slide] : [slide],
+        };
+      }),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  function hydrateSermon(doc: Sermon) {
+    sermonId = doc.id;
+    sermonTitle = doc.title;
+    sermonSpeaker = doc.speaker;
+    sermonNotes = doc.notes;
+    sermonSections = doc.sections.map((section) => {
+      const attached = section.items.find((item) => item.kind === "bible" || item.kind === "image") ?? null;
+      const slide = section.items.find((item) => item.kind === "slide");
+      return {
+        id: section.id,
+        name: section.name,
+        notes: section.notes,
+        heading: slide?.slide?.heading ?? "",
+        body: slide?.slide?.body ?? "",
+        attached,
+        scripture: attached?.bible?.reference ?? "",
+        imageId: attached?.image?.assetId ?? "",
+      };
+    });
+  }
+
+  function applySermonDraft(doc: Sermon, sectionId: string, message: string) {
+    hydrateSermon(doc);
+    previewSermonDraft(sectionId);
+    note = message;
+  }
+
+  function attachScripture(sectionId: string, raw: string) {
+    const parsed = parseReference(raw);
+    if (!parsed) {
+      note = "Could not read that reference.";
+      return;
+    }
+    const start = parsed.startVerse ?? 1;
+    const end = parsed.endVerse ?? start;
+    const chapters = session.books.find((entry) => entry.ord === parsed.bookOrd)?.chapters ?? 150;
+    const reference = formatReference(parsed.bookName, parsed.chapter, start, end, chapters);
+    const item: PresentationItem = {
+      id: crypto.randomUUID(),
+      kind: "bible",
+      title: reference,
+      bible: {
+        translationId,
+        bookOrd: parsed.bookOrd,
+        chapter: parsed.chapter,
+        startVerse: start,
+        endVerse: end,
+        reference,
+      },
+    };
+    applySermonDraft(attachSermonItem(draftSermon(), sectionId, item), sectionId, `${reference} on Preview. LIVE still sends Program.`);
+  }
+
+  function attachImage(sectionId: string, assetId: string) {
+    const asset = session.media.find((entry) => entry.id === assetId);
+    if (!asset) {
+      note = "Import an image in Settings first.";
+      return;
+    }
+    const item: PresentationItem = { id: crypto.randomUUID(), kind: "image", title: asset.name, image: { assetId: asset.id } };
+    applySermonDraft(attachSermonItem(draftSermon(), sectionId, item), sectionId, `${asset.name} on Preview. LIVE still sends Program.`);
+  }
+
+  function detachSection(sectionId: string) {
+    sermonSections = sermonSections.map((section) =>
+      section.id === sectionId ? { ...section, attached: null, scripture: "", imageId: "" } : section,
+    );
+    previewSermonDraft(sectionId);
+    note = "Attachment removed. Heading goes to Preview.";
+  }
+
+  async function saveSermonForm(event?: Event) {
+    event?.preventDefault();
+    try {
+      const doc = draftSermon();
+      sermonId = doc.id;
+      const saved = await session.saveSermon(doc);
+      if (!saved) {
+        note = session.message;
+        return;
+      }
+      note = `${doc.title} saved. Notes stay on this desk.`;
+    } catch (error) {
+      note = error instanceof Error ? error.message : "Could not save the sermon.";
+    }
+  }
+
+  function previewSermonDraft(sectionId: string) {
+    const doc = draftSermon();
+    sermonId = doc.id;
+    void session.previewSermonSection(doc, sectionId);
+  }
+
+  async function queueSermonSection(doc: Sermon, section: SermonSection) {
+    await ensureService("Sermon");
+    session.addSermonSection(section, `${doc.title} — ${section.name}`);
+    note = `${section.name} added to the queue. Notes were not queued.`;
+  }
 </script>
 
 <div class="pb" class:focus>
@@ -470,6 +654,9 @@
       <button type="button" class:on={mode === "scriptures"} onclick={() => { mode = "scriptures"; const item = passage(); if (item) void session.previewPassage(item); }}>Scriptures</button>
       <button type="button" class:on={mode === "slides"} onclick={() => (mode = "slides")}>Slides</button>
       <button type="button" class:on={mode === "songs"} onclick={() => (mode = "songs")}>Songs</button>
+      {#if canUse("sermon")}
+        <button type="button" class:on={mode === "sermon"} onclick={() => (mode = "sermon")}>Sermon</button>
+      {/if}
     </nav>
     <div class="pb-actions">
       <OutputControls compact />
@@ -514,7 +701,115 @@
     </nav>
   </header>
 
-  {#if mode === "songs"}
+  {#if mode === "sermon"}
+    <section class="pb-songs">
+      <div class="song-desk">
+        <form class="song-editor" onsubmit={saveSermonForm}>
+          <span class="note-icon">{@render icon("book")}</span>
+          <h1>Sermon</h1>
+          <p>Notes stay on this desk. Attach scripture or an image for Preview. LIVE still sends Program.</p>
+          {#if note}<p>{note}</p>{/if}
+          <input aria-label="Sermon title" placeholder="Sermon title" bind:value={sermonTitle} />
+          <input aria-label="Speaker" placeholder="Speaker" bind:value={sermonSpeaker} />
+          <textarea aria-label="Operator notes" rows="4" placeholder="Operator notes — not sent to the audience" bind:value={sermonNotes}></textarea>
+          {#each sermonSections as section (section.id)}
+            <input aria-label="Section name" placeholder="Section name" bind:value={section.name} />
+            <input aria-label="Audience heading" placeholder="Audience heading" bind:value={section.heading} />
+            <textarea
+              aria-label="Audience body"
+              rows="3"
+              placeholder="Audience body"
+              bind:value={section.body}
+            ></textarea>
+            <textarea
+              aria-label="Section notes"
+              rows="2"
+              placeholder="Section notes — desk only"
+              bind:value={section.notes}
+            ></textarea>
+            <input
+              aria-label="Attach scripture"
+              placeholder="John 1:1"
+              bind:value={section.scripture}
+            />
+            <div class="song-actions">
+              <button type="button" onclick={() => attachScripture(section.id, section.scripture)}>Attach scripture</button>
+              {#if session.media.length > 0}
+                <select aria-label="Attach image" bind:value={section.imageId}>
+                  <option value="">Image</option>
+                  {#each session.media as asset (asset.id)}
+                    <option value={asset.id}>{asset.name}</option>
+                  {/each}
+                </select>
+                <button type="button" onclick={() => attachImage(section.id, section.imageId)}>Attach image</button>
+              {/if}
+              {#if section.attached}
+                <button type="button" onclick={() => detachSection(section.id)}>Detach {section.attached.title}</button>
+              {/if}
+            </div>
+            <div class="song-actions">
+              <button type="button" onclick={() => previewSermonDraft(section.id)}>Preview</button>
+              <button type="button" onclick={() => hydrateSermon(moveSermonSection(draftSermon(), section.id, -1))}>Up</button>
+              <button type="button" onclick={() => hydrateSermon(moveSermonSection(draftSermon(), section.id, 1))}>Down</button>
+              <button type="button" onclick={() => hydrateSermon(removeSermonSection(draftSermon(), section.id))}>Remove</button>
+            </div>
+          {/each}
+          <div class="song-actions">
+            <button
+              type="button"
+              onclick={() => {
+                sermonSections = [...sermonSections, emptyDraftSection(`Section ${sermonSections.length + 1}`)];
+              }}
+            >Add section</button>
+            <button type="button" onclick={() => void saveSermonForm()}>Save sermon</button>
+          </div>
+        </form>
+        <div class="song-library">
+          <input aria-label="Search sermons" placeholder="Title, speaker, notes, or scripture" bind:value={sermonQuery} />
+          {#if sermonHits.length === 0}
+            <p class="song-empty">{sermonQuery.trim() ? "No sermons match." : "No sermons yet."}</p>
+          {/if}
+          <ul class="song-list">
+            {#each sermonHits as hit (`${hit.sermonId}:${hit.sectionId}`)}
+              <li>
+                <button type="button" onclick={() => {
+                  const doc = session.sermons.find((entry) => entry.id === hit.sermonId);
+                  if (!doc) return;
+                  hydrateSermon(doc);
+                  void session.previewSermonSection(doc, hit.sectionId);
+                }}>
+                  <strong>{hit.title}</strong>
+                  <span>{hit.label}{hit.speaker ? ` · ${hit.speaker}` : ""}</span>
+                  {#if hit.snippet}<span>{hit.snippet}</span>{/if}
+                </button>
+                <button type="button" onclick={() => {
+                  const doc = session.sermons.find((entry) => entry.id === hit.sermonId);
+                  const queued = doc?.sections.find((entry) => entry.id === hit.sectionId);
+                  if (doc && queued) void queueSermonSection(doc, queued);
+                }}>Queue</button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+        <aside class="song-stage">
+          <header>
+            <span class="kicker">Operator notes</span>
+            <span class="song-step">
+              <button type="button" aria-label="Previous section" onclick={() => session.stepSermon(-1)}>Previous</button>
+              <button type="button" aria-label="Next section" onclick={() => session.stepSermon(1)}>Next</button>
+            </span>
+          </header>
+          <article class="sermon-notes">
+            <p>{operatorNotes || "Notes for this section stay here. They are not on Preview or Program."}</p>
+          </article>
+          <header><span class="kicker">Preview</span></header>
+          <div class="monitor"><Screen model={session.live.preview.model} /></div>
+          <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
+          <div class="monitor"><Screen model={session.live.program.model} /></div>
+        </aside>
+      </div>
+    </section>
+  {:else if mode === "songs"}
     <section class="pb-songs">
       <div class="song-desk">
         <form class="song-editor" onsubmit={saveSong}>
@@ -675,8 +970,18 @@
           <section class="pb-panel slides">
             <div class="slide-bar">
               <button type="button" class="create" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Create new</button>
+              <button type="button" class="create" onclick={() => slideImport?.click()}>Import text</button>
+              <input
+                bind:this={slideImport}
+                type="file"
+                accept=".txt,.md,.markdown,.text,text/plain,text/markdown"
+                hidden
+                aria-label="Import text or Markdown"
+                onchange={(event) => void importSlides(event)}
+              />
               <input placeholder="Search for slide title or content" aria-label="Search slides" bind:value={slideQuery} />
             </div>
+            {#if note}<p class="script-note">{note}</p>{/if}
             <div class="slide-row">
               {#each visibleSlides as item, index (item.id)}
                 <button type="button" class="card" class:hot={index % 3 !== 2} class:cool={index % 3 === 2} onclick={() => open(item)}>
@@ -1174,10 +1479,26 @@
     padding: 8px 10px;
   }
   .song-stage { display: flex; flex-direction: column; gap: 8px; min-height: 420px; }
+  .sermon-notes {
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--field) 80%, transparent);
+    min-height: 72px;
+  }
+  .sermon-notes p { margin: 0; color: var(--muted); line-height: 1.45; white-space: pre-wrap; }
   .song-stage header { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
   .song-step { display: flex; gap: 6px; }
   .song-step button { width: auto; padding: 4px 8px; }
-  .song-actions { display: flex; gap: 8px; }
+  .song-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .song-actions select {
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--ink);
+    padding: 0 8px;
+  }
   .song-actions button, .song-list li button:last-child {
     height: 32px;
     border-radius: 8px;

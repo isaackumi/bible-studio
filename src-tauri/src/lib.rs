@@ -153,6 +153,21 @@ fn song_delete(db: State<Db>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn sermon_list(db: State<Db>) -> Result<Vec<Value>, String> {
+    with_db(&db, db::sermon_list)
+}
+
+#[tauri::command]
+fn sermon_save(db: State<Db>, document: Value) -> Result<(), String> {
+    with_db(&db, |conn| db::sermon_save(conn, &document))
+}
+
+#[tauri::command]
+fn sermon_delete(db: State<Db>, id: String) -> Result<(), String> {
+    with_db(&db, |conn| db::sermon_delete(conn, &id))
+}
+
+#[tauri::command]
 fn service_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::service_list)
 }
@@ -270,6 +285,9 @@ pub fn run() {
             song_search,
             song_save,
             song_delete,
+            sermon_list,
+            sermon_save,
+            sermon_delete,
             service_list,
             service_get,
             service_save,

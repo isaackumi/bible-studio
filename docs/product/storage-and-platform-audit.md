@@ -117,7 +117,7 @@ The browser import still validates first and restores rows it already wrote if a
 
 ## Browser media
 
-The design is in [browser media storage](browser-media-storage.md). It is not implemented. A missing image already becomes an empty frame.
+Browser images use the IndexedDB `media` store described in [browser media storage](browser-media-storage.md). Quota failure leaves the previous store. A missing image already becomes an empty frame.
 
 ## What was run
 

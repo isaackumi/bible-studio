@@ -14,6 +14,7 @@ export type FeatureId =
   | "remote-control"
   | "ai"
   | "voice-detect"
+  | "sermon"
   | "streaming"
   | "recording";
 
@@ -28,6 +29,8 @@ const CORE = new Set<FeatureId>([
   "themes",
   "service",
   "voice-detect",
+  "sermon",
+  "remote-control",
 ]);
 
 /**

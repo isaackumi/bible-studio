@@ -1,5 +1,7 @@
 # Roadmap
 
+The living capability list is [../product-backlog.md](../product-backlog.md). Architecture contracts are under [../architecture/](../architecture/).
+
 The commercial sequence is core production, then professional church production, then intelligent assistance, then a connected platform. Each phase should leave a service runnable.
 
 ## Now — workspace and displays

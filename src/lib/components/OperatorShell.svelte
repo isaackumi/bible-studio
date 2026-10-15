@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { session } from "../app/session.svelte";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
+  import FindOverlay from "./FindOverlay.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
   import PewDesk from "./pew/PewDesk.svelte";
   import SettingsDialog from "./settings/SettingsDialog.svelte";
@@ -74,6 +75,7 @@
     {:else}
       <PewDesk />
     {/if}
+    <FindOverlay />
     {#if session.settingsOpen}
       <SettingsDialog />
     {/if}

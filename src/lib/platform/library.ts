@@ -1,3 +1,4 @@
+import { preserveServiceItems } from "../domain/import-content";
 import { sanitizeTheme } from "../domain/theme";
 import type { Service, Song, Theme } from "../domain/types";
 
@@ -27,6 +28,16 @@ function isTheme(value: unknown): value is Theme {
   return typeof theme.id === "string" && typeof theme.name === "string" && typeof theme.fontFamily === "string" && typeof theme.background === "object";
 }
 
+function sanitizeImportedService(service: Service): Service {
+  return {
+    ...service,
+    sections: (service.sections ?? []).map((section) => ({
+      ...section,
+      items: Array.isArray(section.items) ? preserveServiceItems(section.items) : [],
+    })),
+  };
+}
+
 /** Rejects the file before any record is written. */
 export function parseLibrarySnapshot(value: unknown): LibrarySnapshot {
   if (!value || typeof value !== "object") throw new Error("Library file is not valid.");
@@ -42,7 +53,7 @@ export function parseLibrarySnapshot(value: unknown): LibrarySnapshot {
     schemaVersion: 1,
     exportedAt: typeof record.exportedAt === "string" ? record.exportedAt : new Date(0).toISOString(),
     songs: record.songs,
-    services: record.services,
+    services: record.services.map(sanitizeImportedService),
     themes: themes.map((theme) => sanitizeTheme(theme)),
   };
 }

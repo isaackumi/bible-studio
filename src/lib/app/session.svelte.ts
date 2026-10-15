@@ -1,14 +1,19 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
-import { api, assetUrl } from "../db/api";
+import { api, mediaUrl } from "../db/api";
 import { claimOwner, controlsOutput, publishLocal, readOwner } from "../display/channel";
 import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
+import { importDocument as parseImportedDocument } from "../domain/import-content";
+import { authorizeRemoteCommand, createPairing, pairRemote, type RemotePairing } from "../domain/remote";
+import { publishRemote, subscribeRemote } from "../remote/channel";
 import { findItem, moveInList, stepCursor } from "../domain/service";
+import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
+import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
 import type {
@@ -25,6 +30,7 @@ import type {
   PresentationItem,
   PresentationModel,
   RegionId,
+  Sermon,
   Service,
   Song,
   Theme,
@@ -32,6 +38,7 @@ import type {
   Workspace,
   WorkspaceLayout,
 } from "../domain/types";
+import { canUse } from "../platform/capabilities";
 import { parseLibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
@@ -76,11 +83,17 @@ class Session {
   ready = $state(false);
   message = $state("Opening workspace");
   liveMode = $state(false);
-  library: "bible" | "songs" | "slides" | "media" | "theme" = $state("bible");
+  library: "bible" | "songs" | "slides" | "media" | "theme" | "sermon" = $state("bible");
   workspace = $state<Workspace>(defaultWorkspace());
   themes = $state<Theme[]>([defaultTheme()]);
   songs = $state<Song[]>([]);
   songFocus = $state<{ songId: string; sectionId: string } | null>(null);
+  findOpen = $state(false);
+  findQuery = $state("");
+  findHits = $state<SongHit[]>([]);
+  recentSongs = $state<SongRecent[]>([]);
+  sermons = $state<Sermon[]>([]);
+  sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   media = $state<MediaAsset[]>([]);
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
@@ -98,6 +111,8 @@ class Session {
   });
   settingsOpen = $state(false);
   settingsSection = $state("appearance");
+  remotePairing = $state<RemotePairing | null>(null);
+  remoteTokens = $state<string[]>([]);
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
@@ -105,6 +120,7 @@ class Session {
   private audienceWindow: { closed: boolean; close(): void; postMessage(message: unknown, targetOrigin: string): void } | null = null;
   private browserWatch: ReturnType<typeof setInterval> | undefined;
   private unlisten: UnlistenFn | undefined;
+  private unlistenRemote: (() => void) | undefined;
 
   theme = (): Theme => this.themes.find((theme) => theme.id === this.workspace.themeId) ?? this.themes[0] ?? defaultTheme();
 
@@ -129,6 +145,8 @@ class Session {
         await this.loadBibleCatalog();
         await this.loadThemes();
         this.songs = await api.songList();
+        this.sermons = await api.sermonList();
+        this.media = await api.mediaList();
         this.services = await api.serviceList();
       }
       this.workspace = await this.loadWorkspace();
@@ -168,12 +186,14 @@ class Session {
         this.browserWatch = setInterval(() => this.noteBrowserAudience(), 1000);
       }
       this.ready = true;
+      this.listenRemote();
       if (this.message === "Opening workspace") {
         this.message = this.desktop() ? this.output.message : "Browser session. Audience output opens in its own window.";
       }
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
       this.ready = true;
+      this.listenRemote();
       console.error(error);
     }
   };
@@ -197,6 +217,7 @@ class Session {
     }
     await this.loadThemes();
     this.songs = await api.songList();
+    this.sermons = await api.sermonList();
     this.media = await api.mediaList();
     this.services = await api.serviceList();
   };
@@ -246,6 +267,7 @@ class Session {
 
   destroy = () => {
     this.unlisten?.();
+    this.unlistenRemote?.();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
 
@@ -356,15 +378,78 @@ class Session {
       const fresh = await api.serviceGet(this.service.id);
       if (fresh) this.service = fresh;
     }
-    this.message = `Imported ${snapshot.songs.length} songs, ${snapshot.services.length} services, and ${snapshot.themes.length} themes.`;
+    this.message = `Imported ${snapshot.songs.length} songs, ${snapshot.services.length} services, and ${snapshot.themes.length} themes. Program was not in the file.`;
   };
 
-  private assetPath = (id: string | null | undefined) => this.media.find((asset) => asset.id === id)?.path ?? null;
+  importDocument = async (filename: string, text: string) => {
+    const items = parseImportedDocument(filename, text);
+    if (!this.service) await this.createService("Sunday Service");
+    if (!this.service?.sections.length) this.addSection("Imported");
+    const target = this.cursor.sectionId ?? this.service?.sections[0]?.id;
+    if (!target || !this.service) {
+      this.message = "Add a section, then import.";
+      return;
+    }
+    for (const item of items) this.insertItem(target, item);
+    this.persistSoon();
+    const first = items[0];
+    if (first) await this.selectItem(first.id);
+    this.message = `Imported ${items.length} slide${items.length === 1 ? "" : "s"} to Preview. LIVE still sends Program.`;
+  };
+
+  remotePageUrl = () => {
+    if (typeof location === "undefined") return "/?remote=1";
+    const url = new URL(location.href);
+    url.search = "?remote=1";
+    url.hash = "";
+    return url.toString();
+  };
+
+  openRemotePairing = () => {
+    this.remotePairing = createPairing();
+    this.message = `Remote code ${this.remotePairing.code}. A phone is a controller, not a display.`;
+  };
+
+  closeRemotePairing = () => {
+    this.remotePairing = null;
+    this.remoteTokens = [];
+    this.message = "Remote pairing cleared. Unpaired clients cannot change Program.";
+  };
+
+  private listenRemote = () => {
+    this.unlistenRemote?.();
+    if (!canUse("remote-control")) return;
+    this.unlistenRemote = subscribeRemote((envelope) => this.handleRemote(envelope));
+  };
+
+  private handleRemote = (envelope: { type: string; payload: Record<string, string> }) => {
+    if (envelope.type === "pair") {
+      const result = pairRemote(this.remotePairing, envelope.payload.code ?? "");
+      if (!result.ok) {
+        publishRemote("denied", { reason: result.reason });
+        this.message = result.reason;
+        return;
+      }
+      this.remoteTokens = [result.token, ...this.remoteTokens.filter((token) => token !== result.token)];
+      publishRemote("welcome", { token: result.token });
+      this.message = "A remote is paired. Take from the phone still uses LIVE commands only.";
+      return;
+    }
+    if (envelope.type !== "command") return;
+    const command = authorizeRemoteCommand(this.remoteTokens, envelope.payload.token ?? "", envelope.payload.id ?? "");
+    if (!command) {
+      publishRemote("denied", { reason: "That remote is not paired." });
+      return;
+    }
+    void this.run(command);
+    publishRemote("ack", { id: command });
+  };
+
+  private mediaSrc = (id: string | null | undefined) => mediaUrl(this.media.find((asset) => asset.id === id) ?? null);
 
   private async modelFor(item: PresentationItem): Promise<PresentationModel> {
     const theme = this.theme();
-    const backgroundImageUrl =
-      theme.background.type === "image" ? assetUrl(this.assetPath(theme.background.assetId)) : null;
+    const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
     if (item.kind === "bible" && item.bible) {
       const verses = await api.passage(
         item.bible.translationId,
@@ -388,11 +473,11 @@ class Session {
       return presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines });
     }
     if (item.kind === "image" && item.image) {
-      return presentImageOrEmpty(theme, assetUrl(this.assetPath(item.image.assetId)));
+      return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
     }
     const heading = item.slide?.heading ?? item.announcement?.heading ?? item.title;
     const body = item.slide?.body ?? item.announcement?.body ?? "";
-    const slideImage = assetUrl(this.assetPath(item.slide?.imageId));
+    const slideImage = this.mediaSrc(item.slide?.imageId);
     return presentText({
       theme,
       layout: "title",
@@ -639,6 +724,46 @@ class Session {
     this.persistSoon();
   };
 
+  openFind = () => {
+    this.findOpen = true;
+    this.findQuery = "";
+    this.findHits = recentSongHits(this.songs, this.recentSongs);
+    this.message = "Search songs. A match is Preview only. LIVE still sends Program.";
+  };
+
+  closeFind = () => {
+    this.findOpen = false;
+    this.findQuery = "";
+  };
+
+  searchFind = async (query: string) => {
+    this.findQuery = query;
+    const needle = query.trim();
+    if (!needle) {
+      this.findHits = recentSongHits(this.songs, this.recentSongs);
+      return;
+    }
+    const songs = await api.songSearch(needle);
+    this.findHits = searchSongHits(songs, needle);
+  };
+
+  previewSongHit = (hit: SongHit) => {
+    const song = this.songs.find((entry) => entry.id === hit.songId);
+    if (!song) {
+      this.message = "That song is no longer available.";
+      return;
+    }
+    this.previewSongSection(song, hit.sectionId);
+    this.message = `${hit.title} on Preview. LIVE still sends Program.`;
+  };
+
+  queueSongHit = async (hit: SongHit) => {
+    if (!this.service) await this.createService("Sunday Service");
+    if (!this.service?.sections.length) this.addSection("Songs");
+    this.addLyric(hit.songId, hit.sectionId, `${hit.title} — ${hit.label}`);
+    this.message = `${hit.title} queued. Preview it, then LIVE.`;
+  };
+
   previewSongSection = (song: Song, sectionId: string | null) => {
     const clean = sanitizeSong(song);
     const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
@@ -647,9 +772,10 @@ class Session {
       return;
     }
     this.songFocus = { songId: clean.id, sectionId: section.id };
+    this.recentSongs = rememberSongRecent(this.recentSongs, { songId: clean.id, sectionId: section.id });
     this.library = "songs";
     const theme = this.theme();
-    const backgroundImageUrl = theme.background.type === "image" ? assetUrl(this.assetPath(theme.background.assetId)) : null;
+    const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
     const lyrics = lyricsFor(clean, section.id, clean.title);
     this.previewModel(
       presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines }),
@@ -706,10 +832,81 @@ class Session {
     this.songs = query.trim() ? await api.songSearch(query) : await api.songList();
   };
 
-  importImage = async (path: string) => {
-    const asset = await api.importMedia(path);
-    this.media = [asset, ...this.media];
-    return asset;
+  previewSermonSection = async (sermon: Sermon, sectionId: string | null) => {
+    const clean = sanitizeSermon(sermon);
+    const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
+    if (!section) {
+      this.message = "This sermon has no sections.";
+      return;
+    }
+    this.sermonFocus = { sermonId: clean.id, sectionId: section.id };
+    this.library = "sermon";
+    const item = sermonAudienceItem(section);
+    const model = await this.modelFor(item);
+    this.previewModel(model, `sermon:${clean.id}:${section.id}`);
+    this.message = deskNotes(clean, section.id)
+      ? "Notes are on the desk. LIVE still sends Program."
+      : "Preview the section, then LIVE.";
+  };
+
+  stepSermon = (direction: 1 | -1) => {
+    const focus = this.sermonFocus;
+    if (!focus) return;
+    const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
+    if (!sermon) {
+      this.sermonFocus = null;
+      this.message = "That sermon is no longer available.";
+      this.previewModel(emptyModel(this.theme()), null);
+      return;
+    }
+    const next = stepSermonSection(sermon, focus.sectionId, direction);
+    if (next) void this.previewSermonSection(sermon, next.id);
+  };
+
+  saveSermon = async (sermon: Sermon): Promise<boolean> => {
+    const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
+    const error = sermonError(clean);
+    if (error) {
+      this.message = error;
+      return false;
+    }
+    await api.sermonSave(clean);
+    this.sermons = await api.sermonList();
+    if (this.sermonFocus?.sermonId === clean.id) void this.previewSermonSection(clean, this.sermonFocus.sectionId);
+    this.message = `${clean.title} saved. Notes stay on the desk.`;
+    return true;
+  };
+
+  addSermonSection = (section: Sermon["sections"][number], title: string) => {
+    if (!this.service) return;
+    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
+    if (!target) {
+      this.message = "Add a section first.";
+      return;
+    }
+    const source = sermonAudienceItem(section);
+    const item: PresentationItem = { ...source, id: uid(), title };
+    this.insertItem(target, item);
+    void this.selectItem(item.id);
+  };
+
+  sermonDeskNotes = (): string => {
+    const focus = this.sermonFocus;
+    if (!focus) return "";
+    const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
+    return sermon ? deskNotes(sermon, focus.sectionId) : "";
+  };
+
+  importImage = async (source: string | File) => {
+    try {
+      const asset = await api.importMedia(source);
+      this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
+      this.message = `${asset.name} saved. Preview it, then LIVE.`;
+      return asset;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : "The image was not saved.";
+      return null;
+    }
   };
 
   setLogo = (assetId: string | null) => {
@@ -753,7 +950,7 @@ class Session {
       this.message = "This window is not sending to the audience.";
       return;
     }
-    const imageUrl = assetUrl(this.assetPath(this.workspace.logoAssetId));
+    const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
     this.live = applyProgramAction(this.live, action, this.theme(), { title: this.logoTitle(), imageUrl });
     await this.pushProgram();
     this.message =
@@ -1025,12 +1222,7 @@ class Session {
   };
 
   focusSearch = () => {
-    if (typeof document === "undefined") return;
-    const field = document.querySelector<HTMLInputElement>(
-      '[aria-label="Bible search"], [aria-label="Search slides"], [aria-label="Search songs"]',
-    );
-    field?.focus();
-    field?.select();
+    this.openFind();
   };
 
   restoreBuiltinWorkspaces = () => {
@@ -1174,6 +1366,10 @@ class Session {
   };
 
   escape = () => {
+    if (this.findOpen) {
+      this.closeFind();
+      return;
+    }
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   };
@@ -1182,7 +1378,7 @@ class Session {
 
   idleModel = (): PresentationModel => emptyModel(this.theme());
   blackPreview = (): PresentationModel => blackModel(this.theme());
-  logoPreview = (): PresentationModel => logoModel(this.theme(), this.logoTitle(), assetUrl(this.assetPath(this.workspace.logoAssetId)));
+  logoPreview = (): PresentationModel => logoModel(this.theme(), this.logoTitle(), this.mediaSrc(this.workspace.logoAssetId));
 }
 
 export const session = new Session();

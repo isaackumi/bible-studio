@@ -42,6 +42,22 @@ describe("browser library", () => {
     expect((await library.themes())[0]?.name).toBe("Signal");
   });
 
+  it("saves and reloads sermons without putting notes on a presentation item", async () => {
+    const library = createLibrary(async () => memoryRecordStore());
+    await library.saveSermon({
+      id: "sermon-1",
+      title: "The Word",
+      speaker: "Ada",
+      notes: "OPERATOR-ONLY",
+      sections: [{ id: "sec-1", name: "Opening", notes: "Cue band", items: [] }],
+      updatedAt: "2026-10-15T00:00:00.000Z",
+    });
+    const loaded = (await library.sermons())[0];
+    expect(loaded?.title).toBe("The Word");
+    expect(loaded?.notes).toBe("OPERATOR-ONLY");
+    expect(loaded?.sections[0]?.items).toEqual([]);
+  });
+
   it("reloads song sections in the saved order", async () => {
     const library = createLibrary(async () => memoryRecordStore());
     const withSections: Song = {
@@ -196,11 +212,11 @@ describe("browser library", () => {
 });
 
 describe("indexedDB schema", () => {
-  it("opens version 1 with the library stores and reloads records", async () => {
+  it("opens the current schema with library and media stores and reloads records", async () => {
     const factory = new IDBFactory();
     const opened = await openBrowserDatabase(factory);
     expect(opened.version).toBe(BROWSER_SCHEMA_VERSION);
-    expect(Array.from(opened.objectStoreNames).sort()).toEqual(["meta", "services", "songs", "themes"]);
+    expect(Array.from(opened.objectStoreNames).sort()).toEqual(["media", "meta", "sermons", "services", "songs", "themes"]);
     opened.close();
 
     const legacy = keys();
@@ -218,15 +234,49 @@ describe("indexedDB schema", () => {
     expect(await reloaded.songs()).toHaveLength(1);
   });
 
-  it("leaves an existing version 1 database unchanged", async () => {
+  it("adds the media store at version 2 and sermons at version 3", async () => {
+    const factory = new IDBFactory();
+    const v1 = await openBrowserDatabase(factory, 1);
+    expect(v1.version).toBe(1);
+    expect(Array.from(v1.objectStoreNames).sort()).toEqual(["meta", "services", "songs", "themes"]);
+    const write = v1.transaction("songs", "readwrite");
+    write.objectStore("songs").put({ ...song, ordinal: 1 });
+    await new Promise<void>((resolve, reject) => {
+      write.oncomplete = () => resolve();
+      write.onabort = () => reject(write.error ?? new Error("Could not seed version 1."));
+    });
+    v1.close();
+
+    const v2 = await openBrowserDatabase(factory, 2);
+    expect(v2.version).toBe(2);
+    expect(Array.from(v2.objectStoreNames).sort()).toEqual(["media", "meta", "services", "songs", "themes"]);
+    v2.close();
+
+    const v3 = await openBrowserDatabase(factory);
+    expect(v3.version).toBe(3);
+    expect(Array.from(v3.objectStoreNames).sort()).toEqual(["media", "meta", "sermons", "services", "songs", "themes"]);
+    const read = v3.transaction(["songs", "sermons"], "readonly");
+    const songs = await new Promise<Array<{ title: string }>>((resolve, reject) => {
+      const request = read.objectStore("songs").getAll();
+      request.onsuccess = () => resolve(request.result as Array<{ title: string }>);
+      request.onerror = () => reject(request.error ?? new Error("Could not read songs."));
+    });
+    const sermons = await new Promise<unknown[]>((resolve, reject) => {
+      const request = read.objectStore("sermons").getAll();
+      request.onsuccess = () => resolve(request.result as unknown[]);
+      request.onerror = () => reject(request.error ?? new Error("Could not read sermons."));
+    });
+    expect(songs[0]?.title).toBe("Grace");
+    expect(sermons).toEqual([]);
+    v3.close();
+  });
+
+  it("does not recreate stores on an already current database", async () => {
     const factory = new IDBFactory();
     const opened = await openBrowserDatabase(factory);
-    expect(() => upgradeBrowserDatabase(opened, 1)).not.toThrow();
-    expect(Array.from(opened.objectStoreNames).sort()).toEqual(["meta", "services", "songs", "themes"]);
+    expect(() => upgradeBrowserDatabase(opened, 3)).not.toThrow();
+    expect(Array.from(opened.objectStoreNames).sort()).toEqual(["media", "meta", "sermons", "services", "songs", "themes"]);
     opened.close();
-    const again = await openBrowserDatabase(factory);
-    expect(again.version).toBe(1);
-    again.close();
   });
 });
 
@@ -234,6 +284,34 @@ describe("library snapshot", () => {
   it("rejects a file before it can replace records", () => {
     expect(() => parseLibrarySnapshot({ schemaVersion: 1, songs: [{ id: 1 }], services: [] })).toThrow(/song/i);
     expect(() => parseLibrarySnapshot({ schemaVersion: 2, songs: [], services: [] })).toThrow(/newer version/);
+  });
+
+  it("keeps unknown service item kinds when importing a library file", () => {
+    const snapshot = parseLibrarySnapshot({
+      schemaVersion: 1,
+      songs: [],
+      services: [
+        {
+          id: "svc-cam",
+          name: "Sunday",
+          updatedAt: "2026-10-15T00:00:00.000Z",
+          sections: [
+            {
+              id: "open",
+              name: "Open",
+              items: [
+                { id: "cam-1", kind: "camera", title: "Cam 1", camera: { deviceId: "alpha" } },
+                { id: "welcome", kind: "slide", title: "Welcome", slide: { heading: "Welcome", body: "", imageId: null } },
+                { kind: "ndi" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const items = snapshot.services[0]?.sections[0]?.items ?? [];
+    expect(items.map((item) => item.kind)).toEqual(["camera", "slide"]);
+    expect(JSON.stringify(items[0])).toContain("alpha");
   });
 
   it("accepts a version 1 snapshot and keeps themes optional", () => {

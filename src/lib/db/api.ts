@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch } from "../bible/texts";
+import { browserMedia } from "../platform/browser-media";
 import { browserLibrary } from "../platform/browser-store";
 import type { LibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
@@ -10,6 +11,7 @@ import type {
   ProgramPacket,
   SearchHit,
   Service,
+  Sermon,
   Song,
   Theme,
   TranslationInfo,
@@ -47,6 +49,10 @@ export const api = {
   },
   songSave: (document: Song) => (desktop() ? invoke<void>("song_save", { document }) : browserLibrary.saveSong(document)),
   songDelete: (id: string) => (desktop() ? invoke<void>("song_delete", { id }) : browserLibrary.deleteSong(id)),
+  sermonList: () => (desktop() ? invoke<Sermon[]>("sermon_list") : browserLibrary.sermons()),
+  sermonSave: (document: Sermon) =>
+    desktop() ? invoke<void>("sermon_save", { document }) : browserLibrary.saveSermon(document),
+  sermonDelete: (id: string) => (desktop() ? invoke<void>("sermon_delete", { id }) : browserLibrary.deleteSermon(id)),
   serviceList: async () => {
     if (desktop()) return invoke<Array<{ id: string; name: string; updatedAt: string }>>("service_list");
     const services = await browserLibrary.services();
@@ -56,8 +62,15 @@ export const api = {
   serviceSave: (document: Service) => (desktop() ? invoke<void>("service_save", { document }) : browserLibrary.saveService(document)),
   importSnapshot: (snapshot: LibrarySnapshot) =>
     desktop() ? invoke<void>("import_library", { snapshot }) : browserLibrary.importSnapshot(snapshot),
-  mediaList: () => invoke<MediaAsset[]>("media_list"),
-  importMedia: (path: string) => invoke<MediaAsset>("import_media", { path }),
+  mediaList: () => (desktop() ? invoke<MediaAsset[]>("media_list") : browserMedia.list()),
+  importMedia: (source: string | File) => {
+    if (desktop()) {
+      if (typeof source !== "string") return Promise.reject(new Error("Use the file picker to import an image."));
+      return invoke<MediaAsset>("import_media", { path: source });
+    }
+    if (typeof source === "string") return Promise.reject(new Error("This browser import needs the image file, not a path."));
+    return browserMedia.importFile(source);
+  },
   translations: () => (desktop() ? invoke<TranslationInfo[]>("bible_translations") : Promise.resolve(BUNDLED_TRANSLATIONS)),
   books: (translationId: string) =>
     desktop()
@@ -76,4 +89,10 @@ export const api = {
 export function assetUrl(path: string | null | undefined): string | null {
   if (!path) return null;
   return convertFileSrc(path);
+}
+
+export function mediaUrl(asset: MediaAsset | null | undefined): string | null {
+  if (!asset) return null;
+  if (isDesktop()) return assetUrl(asset.path);
+  return browserMedia.url(asset.id);
 }

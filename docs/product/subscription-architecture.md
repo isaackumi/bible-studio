@@ -6,13 +6,13 @@ Core features return true and work offline:
 
 ```text
 operator, workspace, audience-output, bible, lyrics, slides,
-media-images, themes, service
+media-images, themes, service, voice-detect, sermon, remote-control
 ```
 
-These return false until a real entitlement source exists:
+Local pairing (`?remote=1`) is core. A later cloud hop (CS-P2-006) can stay behind an entitlement. These return false until a real entitlement source exists:
 
 ```text
-stage-display, ndi, cloud-sync, remote-control, ai, streaming, recording
+stage-display, ndi, cloud-sync, ai, streaming, recording
 ```
 
 A later license or subscription service can replace the set inside `canUse`. Callers stay the same. The live state machine does not ask. A locked feature must not be required to Take, to open a saved service, or to show the audience window.

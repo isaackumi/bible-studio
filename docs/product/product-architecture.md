@@ -2,6 +2,17 @@
 
 The shared core, browser adapters, and desktop adapters are described in [cross-platform architecture](cross-platform-architecture.md). This note covers the desktop path.
 
+Canonical follow-ons:
+
+- [Backlog](../product-backlog.md)
+- [Content model](../architecture/content-model.md)
+- [Output engine](../architecture/output-engine.md)
+- [Browser capabilities](../architecture/browser-capabilities.md)
+- [Media sources](../architecture/media-sources.md)
+- [NDI](../architecture/ndi.md)
+- [Extensions](../architecture/extensions.md)
+
+
 Church Studio’s operator UI is Svelte. Domain rules are TypeScript modules with no UI imports. On the desktop, SQLite holds the Bible, services, songs, themes, media records, and one workspace document. The audience window renders program frames. It does not search, edit, or own navigation.
 
 ## Boundaries

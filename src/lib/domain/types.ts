@@ -69,7 +69,7 @@ export type BibleItem = {
 
 export type PresentationItem = {
   id: string;
-  kind: ItemKind;
+  kind: ItemKind | string;
   title: string;
   bible?: BibleItem;
   lyric?: { songId: string; sectionId: string };
@@ -110,6 +110,22 @@ export type Song = {
   title: string;
   author: string;
   sections: SongSection[];
+};
+
+export type SermonSection = {
+  id: string;
+  name: string;
+  notes: string;
+  items: PresentationItem[];
+};
+
+export type Sermon = {
+  id: string;
+  title: string;
+  speaker: string;
+  notes: string;
+  sections: SermonSection[];
+  updatedAt: string;
 };
 
 export type MediaAsset = {
