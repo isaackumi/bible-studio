@@ -4,6 +4,21 @@ import { isDesktop } from "../platform/runtime";
 
 export type ListenAccess = { microphone: string; speech: string };
 
+/** Why listening could not run. The desk shows a different state for each. */
+export type ListenErrorKind = "denied" | "no-mic" | "unsupported" | "network" | "failed";
+
+export type ListenHandlers = {
+  /** `latest` is the newest phrase on its own (commands are parsed from it); `text` may carry earlier words. */
+  onHeard: (text: string, final: boolean, alternatives: string[], latest: string) => void;
+  onError: (message: string, kind: ListenErrorKind) => void;
+  onEnd: () => void;
+  onLevel?: (level: number) => void;
+  onStatus?: (message: string) => void;
+};
+
+/** Consecutive Web Speech "network" errors before listening gives up instead of looping silently. */
+export const NETWORK_RETRIES = 3;
+
 export function accessMessage(access: ListenAccess): string | null {
   if (access.microphone === "denied") {
     return "macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.";
@@ -100,20 +115,23 @@ export function stitchTranscript(
 }
 
 /** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
-export function startNativeListening(handlers: {
-  onHeard: (text: string, final: boolean, alternatives: string[]) => void;
-  onError: (message: string) => void;
-  onEnd: () => void;
-  onLevel?: (level: number) => void;
-  onStatus?: (message: string) => void;
-}): () => void {
+export function startNativeListening(handlers: ListenHandlers): () => void {
   let detach = () => {};
   let stopped = false;
+  let ended = false;
   let committed = "";
-  void listen<string>("listen-phrase", (event) => {
+  // Lines from an earlier run (its helper still sends a final "end") are ignored.
+  const run = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    handlers.onEnd();
+  };
+  const subscribed = listen<{ run: number; line: string }>("listen-phrase", (event) => {
+    if (event.payload?.run !== run) return;
     let message: NativePhrase;
     try {
-      message = JSON.parse(event.payload) as NativePhrase;
+      message = JSON.parse(event.payload.line) as NativePhrase;
     } catch {
       return;
     }
@@ -124,25 +142,31 @@ export function startNativeListening(handlers: {
         alternatives: message.alternatives?.filter(Boolean) ?? [],
       });
       committed = stitched.committed;
-      handlers.onHeard(stitched.text, Boolean(message.final), stitched.alternatives);
+      handlers.onHeard(stitched.text, Boolean(message.final), stitched.alternatives, message.text.trim());
     } else if (message.kind === "level" && typeof message.value === "number") {
       handlers.onLevel?.(message.value);
     } else if (message.kind === "status" && message.message) {
       handlers.onStatus?.(message.message);
     } else if (message.kind === "error") {
-      handlers.onError(message.message || "Listening stopped.");
-      handlers.onEnd();
+      const text = message.message || "Listening stopped.";
+      handlers.onError(text, /denied|not authori[sz]ed|privacy/i.test(text) ? "denied" : "failed");
+      end();
     } else if (message.kind === "end") {
-      handlers.onEnd();
+      end();
     }
-  }).then((unlisten) => {
-    if (stopped) unlisten();
-    else detach = unlisten;
   });
-  void invoke("start_sermon_listen").catch((error: unknown) => {
-    handlers.onError(error instanceof Error ? error.message : String(error));
-    handlers.onEnd();
-  });
+  // Subscribe before starting, so the first phrases are not lost.
+  void subscribed
+    .then((unlisten) => {
+      if (stopped) unlisten();
+      else detach = unlisten;
+      if (stopped) return;
+      return invoke("start_sermon_listen", { run });
+    })
+    .catch((error: unknown) => {
+      handlers.onError(error instanceof Error ? error.message : String(error), "unsupported");
+      end();
+    });
   return () => {
     stopped = true;
     detach();
@@ -150,13 +174,9 @@ export function startNativeListening(handlers: {
   };
 }
 
-export function startListening(handlers: {
-  onHeard: (text: string, final: boolean, alternatives: string[]) => void;
-  onError: (message: string) => void;
-  onEnd: () => void;
-  onLevel?: (level: number) => void;
-}): () => void {
+export function startListening(handlers: ListenHandlers): () => void {
   let stopped = false;
+  let networkErrors = 0;
   let rec: SpeechRec | null = null;
   let stream: MediaStream | null = null;
   let context: AudioContext | null = null;
@@ -206,20 +226,33 @@ export function startListening(handlers: {
         if (phrase) alternatives.push(phrase);
       }
       if (alternatives.length === 0) return;
-      handlers.onHeard(alternatives[0], latest.isFinal, alternatives);
+      networkErrors = 0;
+      handlers.onHeard(alternatives[0], latest.isFinal, alternatives, alternatives[0]);
     };
     next.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;
-      if (!shouldRestartListening("error", event.error)) {
+      const fail = (message: string, kind: ListenErrorKind) => {
         stopped = true;
-        handlers.onError(
-          event.error === "not-allowed" || event.error === "service-not-allowed"
-            ? "macOS blocked the microphone or Speech Recognition. Turn Church Studio on in System Settings → Privacy & Security."
-            : "Listening stopped.",
-        );
+        handlers.onError(message, kind);
         stopRec();
         stopTracks();
         handlers.onEnd();
+      };
+      if (event.error === "network") {
+        networkErrors += 1;
+        if (networkErrors >= NETWORK_RETRIES) {
+          fail("Speech recognition lost its connection. This browser sends audio to an online service; check the network, then listen again.", "network");
+        }
+        return;
+      }
+      if (!shouldRestartListening("error", event.error)) {
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          fail("The microphone or speech recognition is blocked for this site. Allow it in the browser's site settings (or System Settings → Privacy & Security), then listen again.", "denied");
+        } else if (event.error === "audio-capture") {
+          fail("No microphone is available. Connect one, then listen again.", "no-mic");
+        } else {
+          fail("Listening stopped.", "failed");
+        }
       }
     };
     next.onend = () => {
@@ -235,7 +268,7 @@ export function startListening(handlers: {
     try {
       next.start();
     } catch (error) {
-      handlers.onError(error instanceof Error ? error.message : "Listening could not start.");
+      handlers.onError(error instanceof Error ? error.message : "Listening could not start.", "failed");
       stopped = true;
       stopTracks();
       handlers.onEnd();
@@ -262,8 +295,12 @@ export function startListening(handlers: {
     tick();
   };
 
-  if (!micAvailable() && !engine()) {
-    handlers.onError("This window cannot open a microphone.");
+  // Without a recognizer, a level meter alone would look like listening. Say so and stop.
+  if (!engine()) {
+    handlers.onError(
+      "This browser cannot turn speech into words. Use Chrome or Edge, or the Church Studio desktop app.",
+      "unsupported",
+    );
     handlers.onEnd();
     return () => {};
   }
@@ -275,9 +312,6 @@ export function startListening(handlers: {
     }
     stream = next;
     if (stream) watchLevel();
-    if (!engine()) {
-      handlers.onError("The mic is open. This window cannot turn speech into words. Type a reference if no text appears.");
-    }
     startRec();
   };
 
@@ -285,14 +319,17 @@ export function startListening(handlers: {
     navigator.mediaDevices
       .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true } })
       .then((next) => begin(next))
-      .catch(() => {
+      .catch((error: unknown) => {
         if (stopped) return;
-        handlers.onError("macOS blocked the microphone. Turn Church Studio on in System Settings → Privacy & Security → Microphone.");
-        if (engine()) begin(null);
-        else {
-          stopped = true;
-          handlers.onEnd();
+        const name = error && typeof error === "object" && "name" in error ? String((error as { name: string }).name) : "";
+        stopped = true;
+        stopTracks();
+        if (name === "NotFoundError" || name === "OverconstrainedError") {
+          handlers.onError("No microphone is available. Connect one, then listen again.", "no-mic");
+        } else {
+          handlers.onError("The microphone is blocked for this window. Allow it in the browser's site settings (or System Settings → Privacy & Security → Microphone), then listen again.", "denied");
         }
+        handlers.onEnd();
       });
   } else {
     begin(null);

@@ -94,6 +94,14 @@ import type {
   WorkspaceLayout,
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
+import { parseVoiceCommand, voiceCommandLabel, type VoiceCommand } from "../voice/commands";
+import {
+  openPrivacySettings,
+  prepareListening,
+  startListening,
+  startNativeListening,
+  type ListenErrorKind,
+} from "../voice/listen";
 import { parseLibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
@@ -134,6 +142,38 @@ function browserSessionId(): string {
   }
 }
 
+export type VoiceStatus = "idle" | "starting" | "listening" | "error" | "stopped";
+
+export type VoiceState = {
+  status: VoiceStatus;
+  error: ListenErrorKind | null;
+  message: string;
+  /** Latest words heard (interim or final). */
+  heard: string;
+  /** True while the latest words are an interim guess. */
+  hearing: boolean;
+  level: number;
+  command: { label: string; phrase: string; outcome: "executed" | "blocked" | "failed"; at: number } | null;
+  /** Program-changing voice commands (take, cut, clear, black, logo). Off on every launch. */
+  allowLive: boolean;
+};
+
+/** A desk can take voice library/scripture requests so its own panes stay in sync. */
+export type VoiceDeskRequest =
+  | { kind: "library"; tab: "bible" | "songs" }
+  | { kind: "scripture"; query: string };
+
+const IDLE_VOICE: VoiceState = {
+  status: "idle",
+  error: null,
+  message: "",
+  heard: "",
+  hearing: false,
+  level: 0,
+  command: null,
+  allowLive: false,
+};
+
 class Session {
   ready = $state(false);
   message = $state("Opening workspace");
@@ -151,6 +191,12 @@ class Session {
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   media = $state<MediaAsset[]>([]);
   cameras = $state<CameraDevice[]>([]);
+  voice = $state<VoiceState>({ ...IDLE_VOICE });
+  private stopVoiceEngine: (() => void) | null = null;
+  private voiceListeners = new Set<(text: string, final: boolean, alternatives: string[]) => void>();
+  private voiceDesk: ((request: VoiceDeskRequest) => Promise<boolean> | boolean) | null = null;
+  private lastVoiceCommand = { phrase: "", at: 0 };
+
   /** Open feeds by camera source id: one per camera Preview or Program paints. */
   cameraFeeds = $state.raw<CameraFeeds<MediaStream>>({});
   private openingFeeds = new Map<string, Promise<boolean>>();
@@ -364,6 +410,7 @@ class Session {
     this.unlistenRemote?.();
     this.unlistenLan?.();
     this.releaseCameras();
+    this.stopVoiceEngine?.();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
 
@@ -715,6 +762,13 @@ class Session {
       this.stepSong(direction);
       return;
     }
+    // A verse searched or spoken onto Preview (not the selected service item) steps by verse.
+    const cursorItem = this.service && this.cursor.itemId ? findItem(this.service, this.cursor.itemId)?.item : null;
+    const freeVerse =
+      this.live.preview.model.layout === "scripture" &&
+      this.previewBible !== null &&
+      cursorItem?.bible?.reference !== this.previewBible.reference;
+    if (freeVerse && (await this.stepPreviewScripture(direction))) return;
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
     if (next.itemId && next.itemId !== this.cursor.itemId) await this.selectItem(next.itemId);
@@ -837,6 +891,168 @@ class Session {
     this.stageScene(removeLayer(scene, layerId));
     this.workspace = { ...this.workspace, sources: pruneSharedSources(this.sharedSources, this.workspace.compositions) };
     this.persistSoon();
+  };
+
+  /** Verse detection (Presenter Desk) subscribes here; commands are handled first. */
+  onVoiceHeard = (listener: (text: string, final: boolean, alternatives: string[]) => void) => {
+    this.voiceListeners.add(listener);
+    return () => this.voiceListeners.delete(listener);
+  };
+
+  attachVoiceDesk = (handler: (request: VoiceDeskRequest) => Promise<boolean> | boolean) => {
+    this.voiceDesk = handler;
+    return () => {
+      if (this.voiceDesk === handler) this.voiceDesk = null;
+    };
+  };
+
+  setVoiceAllowLive = (allow: boolean) => {
+    this.voice = { ...this.voice, allowLive: allow };
+  };
+
+  toggleVoice = async () => {
+    if (this.voice.status === "listening" || this.voice.status === "starting") {
+      this.stopVoice("Listening stopped. Preview and Program were left as they were.");
+      return;
+    }
+    await this.startVoice();
+  };
+
+  startVoice = async () => {
+    if (this.voice.status === "starting" || this.voice.status === "listening") return;
+    if (!canUse("voice-detect")) {
+      this.voice = { ...this.voice, status: "error", error: "unsupported", message: "Voice is not available in this build." };
+      return;
+    }
+    this.voice = { ...this.voice, status: "starting", error: null, heard: "", hearing: false, level: 0, message: "Starting the microphone…" };
+    const blocked = await prepareListening();
+    if (this.voice.status !== "starting") return;
+    if (blocked) {
+      this.voice = { ...this.voice, status: "error", error: "denied", message: blocked };
+      return;
+    }
+    const handlers = {
+      onHeard: (text: string, final: boolean, alternatives: string[], latest: string) =>
+        this.handleVoiceHeard(text, final, alternatives, latest),
+      onLevel: (level: number) => {
+        this.voice.level = level;
+      },
+      onError: (message: string, kind: ListenErrorKind) => {
+        this.voice = { ...this.voice, status: "error", error: kind, message, level: 0 };
+      },
+      onEnd: () => {
+        this.stopVoiceEngine = null;
+        if (this.voice.status === "error") return;
+        this.voice = { ...this.voice, status: "stopped", level: 0, hearing: false, message: this.voice.message || "Listening stopped." };
+      },
+      onStatus: (message: string) => {
+        this.voice.message = message;
+      },
+    };
+    this.voice = {
+      ...this.voice,
+      status: "listening",
+      message: "Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”.",
+    };
+    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers) : startListening(handlers);
+  };
+
+  stopVoice = (message = "Listening stopped.") => {
+    const stop = this.stopVoiceEngine;
+    this.stopVoiceEngine = null;
+    this.voice = { ...this.voice, status: "stopped", error: null, level: 0, hearing: false, message };
+    stop?.();
+  };
+
+  openVoicePrivacy = () => void openPrivacySettings();
+
+  private handleVoiceHeard = (text: string, final: boolean, alternatives: string[], latest: string) => {
+    if (this.voice.status !== "listening") return;
+    this.voice.heard = text;
+    this.voice.hearing = !final;
+    if (final) {
+      const command = parseVoiceCommand(latest) ?? alternatives.map((option) => parseVoiceCommand(option)).find(Boolean) ?? null;
+      if (command) {
+        void this.runVoiceCommand(command);
+        return;
+      }
+    }
+    for (const listener of this.voiceListeners) listener(text, final, alternatives);
+  };
+
+  /** Execute a parsed voice command. Program-changing commands need allowLive. */
+  runVoiceCommand = async (command: VoiceCommand) => {
+    const now = Date.now();
+    if (command.phrase === this.lastVoiceCommand.phrase && now - this.lastVoiceCommand.at < 2000) return;
+    this.lastVoiceCommand = { phrase: command.phrase, at: now };
+    const label = voiceCommandLabel(command);
+    const record = (outcome: "executed" | "blocked" | "failed", message: string) => {
+      this.voice = { ...this.voice, command: { label, phrase: command.phrase, outcome, at: Date.now() }, message };
+    };
+    if (command.live && !this.voice.allowLive) {
+      record("blocked", `Heard “${label}”. Live voice commands are off, so Program was not changed.`);
+      return;
+    }
+    try {
+      if (command.kind === "command") {
+        await this.run(command.id);
+        record("executed", command.live ? `${label} sent Program.` : `${label}. Preview only.`);
+        return;
+      }
+      if (command.kind === "library") {
+        const handled = (await this.voiceDesk?.({ kind: "library", tab: command.tab })) ?? false;
+        if (!handled && command.tab === "songs") this.openFind();
+        record("executed", `${label}.`);
+        return;
+      }
+      if (command.kind === "search" && command.scope === "songs") {
+        this.openFind();
+        await this.searchFind(command.query);
+        record("executed", `${this.findHits.length} song matches for “${command.query}”. Pick one for Preview.`);
+        return;
+      }
+      const query = command.query;
+      const handled = (await this.voiceDesk?.({ kind: "scripture", query })) ?? false;
+      if (handled || (await this.previewScriptureQuery(query))) {
+        record("executed", `${label}. Preview only.`);
+      } else {
+        record("failed", `No scripture found for “${query}”.`);
+      }
+    } catch (error) {
+      record("failed", error instanceof Error ? error.message : `${label} failed.`);
+    }
+  };
+
+  /** Reference or phrase → Preview. Used when no desk handles the request. Never Program. */
+  private previewScriptureQuery = async (query: string): Promise<boolean> => {
+    const translation = this.translations[0];
+    if (!translation) return false;
+    const parsed = parseReference(query, this.books);
+    if (parsed?.startVerse) {
+      const book = this.books.find((entry) => entry.ord === parsed.bookOrd);
+      const end = parsed.endVerse ?? parsed.startVerse;
+      await this.previewPassage({
+        translationId: translation.id,
+        bookOrd: parsed.bookOrd,
+        chapter: parsed.chapter,
+        startVerse: parsed.startVerse,
+        endVerse: end,
+        reference: formatReference(book?.name ?? "", parsed.chapter, parsed.startVerse, end, book?.chapters ?? 1),
+      });
+      return true;
+    }
+    const hit = (await api.search(translation.id, query))[0];
+    if (!hit) return false;
+    const book = this.books.find((entry) => entry.ord === hit.bookOrd);
+    await this.previewPassage({
+      translationId: translation.id,
+      bookOrd: hit.bookOrd,
+      chapter: hit.chapter,
+      startVerse: hit.verse,
+      endVerse: hit.verse,
+      reference: formatReference(hit.bookName, hit.chapter, hit.verse, hit.verse, book?.chapters ?? 1),
+    });
+    return true;
   };
 
   /** Resolve a typed reference to scripture fields (first translation). */

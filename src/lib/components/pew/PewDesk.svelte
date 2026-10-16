@@ -1,4 +1,5 @@
 <script lang="ts">
+  import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
@@ -6,12 +7,10 @@
   import { attachSermonItem, deskNotes, moveSermonSection, removeSermonSection, sanitizeSermon, searchSermonHits } from "../../domain/sermon";
   import { moveSongSection, removeSongSection } from "../../domain/song";
   import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
-  import { onDestroy, untrack } from "svelte";
+  import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
-  import { isDesktop } from "../../platform/runtime";
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
-  import { openPrivacySettings, prepareListening, speechAvailable, startListening, startNativeListening } from "../../voice/listen";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -63,11 +62,6 @@
   let chapterToken = 0;
   let seededChapterPreview = false;
   let takeAfterPreview = false;
-  let listening = $state(false);
-  let heard = $state("");
-  let listenNote = $state("");
-  let micLevel = $state(0);
-  let stopListen: (() => void) | null = null;
   let quoteIndex: QuoteIndex | null = null;
   let lastSpokenRef = "";
 
@@ -439,87 +433,60 @@
     session.previewSongSection(song, song.sections[0]?.id ?? null);
   }
 
-  function stopVoice() {
-    stopListen?.();
-    stopListen = null;
-    listening = false;
-    micLevel = 0;
+  // Voice runs in the session (both desks). This desk turns heard words into verses on Preview.
+  function detectSpokenVerse(text: string, _final: boolean, alternatives: string[]) {
+    if (!text) return;
+    const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
+    const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
+    const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
+    if (!match) {
+      if (!lastSpokenRef) session.voice.message = quoteIndex ? "Hearing you. Keep reading the verse." : "Loading the Bible so a verse can be found…";
+      return;
+    }
+    const hit = match.item;
+    if (hit.reference === lastSpokenRef) return;
+    lastSpokenRef = hit.reference;
+    const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
+    if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
+      bookOrd = hit.bookOrd;
+      chapter = hit.chapter;
+    }
+    anchor = hit.startVerse;
+    session.voice.message = `${hit.reference} is on Preview. LIVE still sends Program.`;
+    detections = [
+      { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text: match.text },
+      ...detections,
+    ].slice(0, 12);
+    // A pending arrow-key Take must never carry a spoken verse to Program.
+    takeAfterPreview = false;
+    void showPassage(hit.startVerse, hit.endVerse);
   }
 
-  async function toggleVoice() {
-    if (listening) {
-      stopVoice();
-      listenNote = "Listening stopped. Preview and Program were left as they were.";
-      return;
-    }
-    if (!canUse("voice-detect") || !speechAvailable()) {
-      listenNote = "Voice detection needs a microphone in this window. Type a reference if listening is unavailable.";
-      return;
-    }
-    listenNote = "macOS may ask for the microphone…";
-    const blocked = await prepareListening();
-    if (blocked) {
-      listenNote = blocked;
-      void openPrivacySettings();
-      return;
-    }
-    listening = true;
-    heard = "";
-    lastSpokenRef = "";
-    micLevel = 0;
-    listenNote = "Listening. Speak a verse. A match appears on Preview. LIVE still sends Program.";
-    const heardHandlers = {
-      onHeard: (text: string, _final: boolean, alternatives: string[]) => {
-        heard = text;
-        if (!text) return;
-        const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
-        const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
-        const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
-        if (!match) {
-          if (!lastSpokenRef) listenNote = quoteIndex ? "Hearing you. Keep reading the verse." : "Loading the Bible so a verse can be found…";
-          return;
-        }
-        const hit = match.item;
-        if (hit.reference === lastSpokenRef) return;
-        lastSpokenRef = hit.reference;
-        const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
-        if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
-          bookOrd = hit.bookOrd;
-          chapter = hit.chapter;
-        }
-        anchor = hit.startVerse;
-        listenNote = `${hit.reference} is on Preview. LIVE still sends Program.`;
-        detections = [
-          {
-            bookOrd: hit.bookOrd,
-            bookName: named,
-            chapter: hit.chapter,
-            verse: hit.startVerse,
-            text: match.text,
-          },
-          ...detections,
-        ].slice(0, 12);
-        void showPassage(hit.startVerse, hit.endVerse);
-      },
-      onLevel: (level: number) => {
-        micLevel = level;
-      },
-      onError: (message: string) => {
-        listenNote = message;
-      },
-      onEnd: () => {
-        listening = false;
-        stopListen = null;
-        micLevel = 0;
-      },
-      onStatus: (message: string) => {
-        listenNote = message;
-      },
+  const voiceActive = $derived(session.voice.status === "listening" || session.voice.status === "starting");
+
+  $effect(() => {
+    const stopHeard = session.onVoiceHeard(detectSpokenVerse);
+    const stopDesk = session.attachVoiceDesk(async (request) => {
+      if (request.kind === "library") {
+        mode = request.tab === "songs" ? "songs" : "scriptures";
+        return true;
+      }
+      mode = "scriptures";
+      query = request.query;
+      takeAfterPreview = false;
+      await findInScripture();
+      return true;
+    });
+    return () => {
+      stopHeard();
+      stopDesk();
     };
-    stopListen = isDesktop() ? startNativeListening(heardHandlers) : startListening(heardHandlers);
-  }
+  });
 
-  onDestroy(stopVoice);
+  function toggleVoice() {
+    if (!voiceActive) lastSpokenRef = "";
+    void session.toggleVoice();
+  }
 
   async function queueSong(song: Song, section: SongSection) {
     await ensureService("Songs");
@@ -901,13 +868,7 @@
           <section class="pb-panel">
             <header class="pb-head"><span>Live transcript</span></header>
             <div class="pb-body transcript">
-              {#if listening || heard}
-                <p class="heard">{heard || "Speak a verse."}</p>
-                {#if listening}
-                  <div class="meter" aria-hidden="true"><span style="width: {Math.max(4, Math.round(micLevel * 100))}%"></span></div>
-                {/if}
-              {/if}
-              {#if listenNote}<p class="listen-note">{listenNote}</p>{/if}
+              {#if session.voice.status !== "idle"}<VoiceStatus />{/if}
               {#if reading.length === 0}
                 <p>{note || "Search a reference, or listen for a verse."}</p>
               {:else}
@@ -917,9 +878,9 @@
               {/if}
             </div>
             <footer class="pb-foot">
-              <button type="button" class="go" class:on={listening} onclick={toggleVoice}>
-                {@render icon(listening ? "mic-off" : "mic")}
-                {listening ? "Stop listening" : "Listen"}
+              <button type="button" class="go" class:on={voiceActive} aria-pressed={voiceActive} onclick={toggleVoice}>
+                {@render icon(voiceActive ? "mic-off" : "mic")}
+                {session.voice.status === "starting" ? "Starting…" : voiceActive ? "Stop listening" : "Listen"}
               </button>
               <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find</button>
             </footer>
@@ -1351,21 +1312,6 @@
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
   .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .heard { color: var(--accent); font-style: italic; }
-  .listen-note { color: var(--muted); font-size: 12px; }
-  .meter {
-    height: 4px;
-    border-radius: 999px;
-    background: var(--line);
-    overflow: hidden;
-    margin: 0 0 10px;
-  }
-  .meter span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-    transition: width 80ms linear;
-  }
   .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }

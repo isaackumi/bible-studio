@@ -24,6 +24,7 @@
   import CompositionPane from "../CompositionPane.svelte";
   import AddSourceDialog from "../sources/AddSourceDialog.svelte";
   import SourceProperties from "../sources/SourceProperties.svelte";
+  import VoiceStatus from "../VoiceStatus.svelte";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -588,6 +589,20 @@
           <header><Icon name="settings" size={16} /> Controls</header>
           <div class="controls">
             <p class="studio-mode">Studio — select stays on Preview</p>
+            <div class="voice-row">
+              <button
+                type="button"
+                class="desk-btn"
+                class:on={session.voice.status === "listening" || session.voice.status === "starting"}
+                aria-pressed={session.voice.status === "listening" || session.voice.status === "starting"}
+                data-tip="Voice: say “Studio next”, “Studio take” (needs Live voice commands), “Studio show John 3 verse 16”."
+                onclick={() => void session.toggleVoice()}
+              >
+                <Icon name={session.voice.status === "listening" ? "mic-off" : "mic"} size={16} />
+                {session.voice.status === "starting" ? "Starting…" : session.voice.status === "listening" ? "Stop listening" : "Listen"}
+              </button>
+            </div>
+            {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}
             <label class="transition-select">
               Transition
               <select
@@ -904,6 +919,8 @@
   .duration input { width: 72px; flex: none; }
   .controls { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
   .studio-mode { margin: 0; color: var(--muted); }
+  .voice-row { display: flex; gap: 6px; }
+  .voice-row .desk-btn { flex: 1; }
   .transition-select { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px; color: var(--muted); }
   .control-actions { display: flex; flex-wrap: wrap; gap: 4px; }
   .control-actions .desk-btn { flex: 1 1 72px; }

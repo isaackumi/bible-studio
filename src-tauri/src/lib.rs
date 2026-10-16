@@ -244,8 +244,8 @@ fn open_privacy_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_sermon_listen(app: tauri::AppHandle) -> Result<(), String> {
-    voice::start_transcribe(app)
+fn start_sermon_listen(app: tauri::AppHandle, run: u64) -> Result<(), String> {
+    voice::start_transcribe(app, run)
 }
 
 #[tauri::command]

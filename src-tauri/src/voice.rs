@@ -27,14 +27,22 @@ pub fn relaunch_inside_bundle() {
     macos::relaunch_inside_bundle();
 }
 
-pub fn start_transcribe(app: tauri::AppHandle) -> Result<(), String> {
+/// One transcriber output line, tagged with the run that produced it. The frontend ignores
+/// lines from an earlier run (a stopped helper still sends its final "end").
+#[derive(Clone, Serialize)]
+pub struct ListenLine {
+    pub run: u64,
+    pub line: String,
+}
+
+pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        macos::start_transcribe(app)
+        macos::start_transcribe(app, run)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = app;
+        let _ = (app, run);
         Err("On-device sermon transcription runs on macOS.".into())
     }
 }
@@ -219,7 +227,7 @@ mod macos {
 
     static TRANSCRIBE: std::sync::Mutex<Option<TranscribeRun>> = std::sync::Mutex::new(None);
 
-    pub fn start_transcribe(app: tauri::AppHandle) -> Result<(), String> {
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
         stop_transcribe();
         let path = std::env::current_exe()
             .ok()
@@ -239,9 +247,10 @@ mod macos {
             let reader = std::io::BufReader::new(stdout);
             for line in std::io::BufRead::lines(reader) {
                 let Ok(line) = line else { break };
-                let _ = app.emit("listen-phrase", line);
+                let _ = app.emit("listen-phrase", super::ListenLine { run, line });
             }
-            let _ = app.emit("listen-phrase", r#"{"kind":"end"}"#);
+            let end = super::ListenLine { run, line: r#"{"kind":"end"}"#.into() };
+            let _ = app.emit("listen-phrase", end);
         });
         let mut guard = TRANSCRIBE.lock().unwrap_or_else(|poison| poison.into_inner());
         *guard = Some(TranscribeRun { child, stdin });
