@@ -11,14 +11,15 @@ export type OutputSink = {
 
 /**
  * Sinks consume a Program packet. They must not call applyProgramAction.
- * NDI and stage are listed so later work plugs in here instead of inventing a second Program.
+ * NDI is listed so later work plugs in here instead of inventing a second Program.
  */
 export function outputSinks(desktop = isDesktop(), caps: OutputCapabilities = detectOutputCapabilities({ desktop })): OutputSink[] {
   return [
     { kind: "tauri-window", available: desktop && caps.canOpenAudienceWindow },
     { kind: "browser-window", available: !desktop && caps.canOpenAudienceWindow },
     { kind: "ndi", available: false },
-    { kind: "stage", available: false },
+    // Stage reads Program + Preview from the desk (StageOutput); it opens wherever a window can.
+    { kind: "stage", available: desktop || caps.canOpenAudienceWindow },
   ];
 }
 

@@ -1,4 +1,4 @@
-import type { ProgramPacket } from "../domain/types";
+import type { PresentationModel, ProgramPacket } from "../domain/types";
 
 const KEY = "church-studio.program";
 const OWNER_KEY = "church-studio.output-owner";
@@ -137,4 +137,43 @@ export function subscribeStandbyLocal(onStandby: (ids: string[]) => void) {
     channel.close();
     window.removeEventListener("storage", onStorage);
   };
+}
+
+const STAGE_KEY = "church-studio.stage";
+
+/** What the stage (confidence) display shows: Program now, Preview as next. Never sent to the audience. */
+export type StageSnapshot = {
+  program: PresentationModel;
+  next: PresentationModel;
+  live: boolean;
+  desk: string;
+  at: number;
+};
+
+export function parseStage(raw: string | null): StageSnapshot | null {
+  try {
+    const value = raw ? (JSON.parse(raw) as Partial<StageSnapshot>) : null;
+    if (!value?.program?.layout || !value.next?.layout || typeof value.at !== "number") return null;
+    return { program: value.program, next: value.next, live: value.live === true, desk: String(value.desk ?? ""), at: value.at };
+  } catch {
+    return null;
+  }
+}
+
+export function publishStageLocal(snapshot: StageSnapshot) {
+  localStorage.setItem(STAGE_KEY, JSON.stringify(snapshot));
+}
+
+export function readStageLocal(): StageSnapshot | null {
+  return parseStage(localStorage.getItem(STAGE_KEY));
+}
+
+export function subscribeStageLocal(onStage: (snapshot: StageSnapshot) => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== STAGE_KEY) return;
+    const snapshot = parseStage(event.newValue);
+    if (snapshot) onStage(snapshot);
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
 }

@@ -3,7 +3,7 @@ import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
-import { claimOwner, controlsOutput, publishLocal, publishStandbyLocal, readOwner } from "../display/channel";
+import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageSnapshot } from "../display/channel";
 import { browserAudienceState, openBrowserAudience, pickAudienceScreen, placementFeatures, type ScreenLike } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
@@ -225,6 +225,7 @@ class Session {
     this.#live = next;
     void this.syncCameraFeeds();
     this.publishStandby();
+    this.publishStage();
   }
   output = $state<OutputStatus>({
     desired: false,
@@ -1659,6 +1660,54 @@ class Session {
   private releaseCameras = () => {
     for (const stream of Object.values(this.cameraFeeds)) stopCameraStream(stream);
     this.cameraFeeds = {};
+  };
+
+  /** Stage (confidence) display: Program now, Preview as next. Separate from the audience packet. */
+  private publishStage = () => {
+    if (typeof window === "undefined" || !this.stageOpen) return;
+    const snapshot: StageSnapshot = {
+      program: this.live.program.model,
+      next: this.live.preview.model,
+      live: this.output.online,
+      desk: this.workspace.churchName,
+      at: Date.now(),
+    };
+    try {
+      publishStageLocal(snapshot);
+    } catch {
+      // Storage full or blocked: the stage keeps its last frame.
+    }
+    if (isDesktop()) void emit("stage-frame", JSON.stringify(snapshot)).catch(() => {});
+  };
+
+  stageOpen = $state(false);
+
+  /** Open the stage display: a popup in the browser, a separate window on desktop. Never Program. */
+  openStage = async () => {
+    this.stageOpen = true;
+    this.publishStage();
+    if (isDesktop()) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const existing = await WebviewWindow.getByLabel("stage");
+        if (existing) {
+          await existing.setFocus();
+          return;
+        }
+        const stage = new WebviewWindow("stage", { url: "/?stage=1", title: "Stage display", width: 1280, height: 720 });
+        stage.once("tauri://error", (event) => {
+          this.message = `The stage display could not open: ${String(event.payload)}`;
+        });
+        this.message = "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
+      } catch (error) {
+        this.message = error instanceof Error ? error.message : "The stage display could not open.";
+      }
+      return;
+    }
+    const opened = window.open("/?stage=1", "church-studio-stage", "popup=yes,width=1280,height=720");
+    this.message = opened
+      ? "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next."
+      : "The browser blocked the stage window. Allow pop-ups for this site, then try again.";
   };
 
   /** Tell the audience window which Preview cameras to warm up. It never paints them before TAKE. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptProgramPacket, claimOwner, parseStandby, publishTo, readPacket, type OutputOwner, type PacketStore } from "./channel";
+import { acceptProgramPacket, claimOwner, parseStage, parseStandby, publishTo, readPacket, type OutputOwner, type PacketStore } from "./channel";
 import { createLiveState, frame, programPacket } from "../domain/live";
 import { defaultTheme, emptyModel } from "../domain/theme";
 import type { ProgramPacket } from "../domain/types";
@@ -71,5 +71,16 @@ describe("camera standby", () => {
     expect(parseStandby(null)).toEqual([]);
     expect(parseStandby("{nope")).toEqual([]);
     expect(parseStandby(JSON.stringify({ a: 1 }))).toEqual([]);
+  });
+});
+
+describe("stage snapshot", () => {
+  it("accepts a whole snapshot and rejects partial or broken ones", () => {
+    const model = emptyModel(defaultTheme());
+    const snapshot = { program: model, next: model, live: true, desk: "Grace", at: 1 };
+    expect(parseStage(JSON.stringify(snapshot))).toEqual(snapshot);
+    expect(parseStage(JSON.stringify({ program: model, at: 1 }))).toBeNull();
+    expect(parseStage("{oops")).toBeNull();
+    expect(parseStage(null)).toBeNull();
   });
 });

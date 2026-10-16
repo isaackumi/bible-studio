@@ -3,9 +3,10 @@
   import AudienceOutput from "$lib/components/AudienceOutput.svelte";
   import OperatorShell from "$lib/components/OperatorShell.svelte";
   import RemotePad from "$lib/components/RemotePad.svelte";
+  import StageOutput from "$lib/components/StageOutput.svelte";
   import { isDesktop } from "$lib/platform/runtime";
 
-  type Surface = "operator" | "audience" | "remote";
+  type Surface = "operator" | "audience" | "remote" | "stage";
 
   function markedAudience(): boolean {
     if (typeof window === "undefined") return false;
@@ -29,6 +30,7 @@
     if (typeof window === "undefined") return "operator";
     const params = new URLSearchParams(window.location.search);
     if (params.get("remote") === "1") return "remote";
+    if (params.get("stage") === "1" || tauriWindowLabel() === "stage") return "stage";
     if (params.get("display") === "1" || markedAudience()) return "audience";
     if (isDesktop() && tauriWindowLabel() === "audience") return "audience";
     return "operator";
@@ -37,7 +39,7 @@
   let surface = $state<Surface>(initialSurface());
 
   onMount(() => {
-    if (surface === "audience" || surface === "remote") return;
+    if (surface !== "operator") return;
     if (markedAudience() || tauriWindowLabel() === "audience") surface = "audience";
   });
 </script>
@@ -46,6 +48,8 @@
   <AudienceOutput />
 {:else if surface === "remote"}
   <RemotePad />
+{:else if surface === "stage"}
+  <StageOutput />
 {:else}
   <OperatorShell />
 {/if}

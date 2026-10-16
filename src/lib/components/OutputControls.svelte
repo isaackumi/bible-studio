@@ -25,6 +25,7 @@
   {#if session.output.desired && !session.output.online}
     <button type="button" class="desk-btn" onclick={() => session.openAudience()}>Reopen</button>
   {/if}
+  <button type="button" class="desk-btn" data-tip="Stage display: Program now and what is next, with a clock" onclick={() => void session.openStage()}>Stage</button>
   <button type="button" class="desk-btn" onclick={() => session.setOutputMode(profile?.outputMode === "fullscreen" ? "window" : "fullscreen")}>
     {profile?.outputMode === "fullscreen" ? "Window" : "Fullscreen"}
   </button>
