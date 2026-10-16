@@ -150,6 +150,7 @@ describe("shared sources", () => {
       { type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "Lead", style: {} },
       { type: "image", assetId: "a1", name: "Logo", imageUrl: "blob:x" },
       { type: "video", assetId: "v1", name: "Walk-in", videoUrl: "blob:v", loop: true, muted: false },
+      { type: "qr", data: "https://church.org/give", pattern: "dots", dark: "#111111", light: "#ffffff", caption: "Give" },
     ] as const;
     for (const fields of cases) expect(fieldsFromSource(buildSource(fields))).toEqual(fields);
     expect(fieldsFromSource(sourceRef("empty", "e", "Empty"))).toBeNull();

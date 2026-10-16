@@ -110,9 +110,11 @@ import type {
   Workspace,
   WorkspaceLayout,
   VoiceSettings,
+  ProgramAlert,
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
+import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
 import {
@@ -242,7 +244,9 @@ class Session {
   }
   /** Every Preview/Program write keeps camera feeds and the audience standby list in step. */
   set live(next: LiveState) {
-    this.#live = next;
+    // An active alert rides on every Program frame until it is cleared or expires.
+    const model = withAlert(next.program.model, this.alert);
+    this.#live = model === next.program.model ? next : { ...next, program: { ...next.program, model } };
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
@@ -1833,6 +1837,36 @@ class Session {
   };
 
   stageOpen = $state(false);
+
+  /** The alert on Program (nursery call, car lights…). Never on Preview. */
+  alert = $state<ProgramAlert | null>(null);
+  recentAlerts = $state<string[]>([]);
+  private alertTimer: ReturnType<typeof setTimeout> | undefined;
+
+  showAlert = async (input: { text: string; style: ProgramAlert["style"]; position: ProgramAlert["position"]; seconds: number | null }) => {
+    const now = Date.now();
+    const alert = sanitizeAlert({ text: input.text, style: input.style, position: input.position, until: input.seconds ? now + input.seconds * 1000 : null, id: `alert:${now}` }, now);
+    if (!alert) {
+      this.message = "Type the alert first.";
+      return;
+    }
+    this.alert = alert;
+    this.recentAlerts = [alert.text, ...this.recentAlerts.filter((text) => text !== alert.text)].slice(0, 6);
+    clearTimeout(this.alertTimer);
+    if (alert.until) this.alertTimer = setTimeout(() => void this.clearAlert(), alert.until - now);
+    this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
+    await this.pushProgram();
+    this.message = alert.until ? `Alert on Program for ${input.seconds} s.` : "Alert on Program until you clear it.";
+  };
+
+  clearAlert = async () => {
+    clearTimeout(this.alertTimer);
+    if (!this.alert) return;
+    this.alert = null;
+    this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
+    await this.pushProgram();
+    this.message = "Alert cleared.";
+  };
   /** Where the browser audience popup was placed, so the stage avoids it. */
   private audienceScreen: ScreenLike | null = null;
 

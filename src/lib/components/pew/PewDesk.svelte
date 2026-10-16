@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AlertsDialog from "../AlertsDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
   import MediaPane from "../MediaPane.svelte";
   import { findItem } from "../../domain/service";
@@ -49,7 +50,7 @@
   let slideImport = $state<HTMLInputElement | null>(null);
   let detections = $state<SearchHit[]>([]);
   let note = $state("Loading scripture…");
-  let sheet = $state<"help" | "alerts" | "lexicon" | "type" | null>(null);
+  let sheet = $state<"help" | "lexicon" | "type" | null>(null);
   let songTitle = $state("");
   let songAuthor = $state("");
   let songSections = $state<SongSection[]>([{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }]);
@@ -686,6 +687,7 @@
     session.addSermonSection(section, `${doc.title} — ${section.name}`);
     note = `${section.name} added to the queue. Notes were not queued.`;
   }
+  let alertsOpen = $state(false);
 </script>
 
 <div class="pb" class:focus>
@@ -729,7 +731,15 @@
       <button type="button" class="desk-btn icon secondary" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
         {@render icon("themes")}
       </button>
-      <button type="button" class="desk-btn icon secondary" data-tip="Alerts" aria-label="Alerts" onclick={() => (sheet = sheet === "alerts" ? null : "alerts")}>
+      <button
+        type="button"
+        class="desk-btn icon secondary alerts-btn"
+        class:on={!!session.alert}
+        aria-pressed={!!session.alert}
+        data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
+        aria-label="Alerts"
+        onclick={() => (alertsOpen = true)}
+      >
         {@render icon("alerts")}
       </button>
       <button type="button" class="desk-btn icon secondary" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
@@ -1169,7 +1179,7 @@
   {#if sheet}
     <div class="sheet" role="dialog" aria-label={sheet}>
       <header>
-        <strong>{sheet === "help" ? "How this desk works" : sheet === "alerts" ? "Alerts" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
+        <strong>{sheet === "help" ? "How this desk works" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
         <button type="button" aria-label="Close" onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
       </header>
       {#if sheet === "help"}
@@ -1178,9 +1188,6 @@
         <p>Search a reference such as John 3:16, or a phrase such as “in the beginning”.</p>
         <p>Listen matches spoken scripture on Preview. It never takes Program by itself.</p>
         <p>F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.</p>
-      {:else if sheet === "alerts"}
-        <p>{note || "No alerts."}</p>
-        <p>{session.message}</p>
       {:else if sheet === "type"}
         <OutputType />
       {:else}
@@ -1197,7 +1204,12 @@
   <Icon {name} size={16} />
 {/snippet}
 
+{#if alertsOpen}
+  <AlertsDialog onclose={() => (alertsOpen = false)} />
+{/if}
+
 <style>
+  .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
   .pb {
     height: 100%;
     min-height: 0;

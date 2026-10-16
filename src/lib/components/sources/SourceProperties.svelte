@@ -138,7 +138,8 @@
       (fields.type !== "scripture" || fields.body.length > 0) &&
       (fields.type !== "song" || fields.body.length > 0) &&
       (fields.type !== "image" || fields.imageUrl.length > 0) &&
-      (fields.type !== "video" || fields.videoUrl.length > 0),
+      (fields.type !== "video" || fields.videoUrl.length > 0) &&
+      (fields.type !== "qr" || (fields.data.trim().length > 0 && fields.data.trim() !== "https://")),
   );
 
   function save() {
@@ -321,6 +322,43 @@
         <span>Subtitle</span>
         <input class="field" aria-label="Subtitle" value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
       </label>
+    {:else if fields.type === "qr"}
+      <label class="row">
+        <span>Link</span>
+        <input
+          class="field"
+          aria-label="QR link"
+          placeholder="https://yourchurch.org/give"
+          value={fields.data}
+          oninput={(event) => fields.type === "qr" && (fields = { ...fields, data: event.currentTarget.value })}
+        />
+      </label>
+      <div class="row">
+        <span>Style</span>
+        <span class="inline" role="radiogroup" aria-label="QR style">
+          {#each ["rounded", "dots", "square"] as style (style)}
+            <button
+              type="button"
+              role="radio"
+              class="choice"
+              aria-checked={fields.pattern === style}
+              onclick={() => fields.type === "qr" && (fields = { ...fields, pattern: style as "square" | "rounded" | "dots" })}
+            >{style[0]!.toUpperCase() + style.slice(1)}</button>
+          {/each}
+        </span>
+      </div>
+      <div class="row">
+        <span>Colors</span>
+        <span class="inline">
+          <label class="swatch">Code <input type="color" aria-label="QR code color" value={fields.dark} oninput={(event) => fields.type === "qr" && (fields = { ...fields, dark: event.currentTarget.value })} /></label>
+          <label class="swatch">Background <input type="color" aria-label="QR background color" value={fields.light} oninput={(event) => fields.type === "qr" && (fields = { ...fields, light: event.currentTarget.value })} /></label>
+        </span>
+      </div>
+      <label class="row">
+        <span>Caption</span>
+        <input class="field" aria-label="QR caption" placeholder="Scan to give" maxlength="80" value={fields.caption} oninput={(event) => fields.type === "qr" && (fields = { ...fields, caption: event.currentTarget.value })} />
+      </label>
+      <p class="note">Keep strong contrast (dark code on a light background) so every phone can scan it.</p>
     {:else if fields.type === "video"}
       {#if !session.media.some((asset) => asset.kind === "video")}
         <p class="note">No videos yet. Import one in Media.</p>
@@ -395,6 +433,10 @@
   .inline { display: flex; gap: 6px; min-width: 0; }
   .inline .field { flex: 1; min-width: 0; }
   .unit { color: var(--muted); font-size: 12px; align-self: center; }
+  .choice { min-height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
+  .choice[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .swatch { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .swatch input { width: 34px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
   .field {
     height: var(--control-h);
     border-radius: var(--radius-control);

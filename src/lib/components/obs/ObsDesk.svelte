@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AlertsDialog from "../AlertsDialog.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import {
@@ -340,6 +341,7 @@
     selectedLayerId = session.createSourceInScene(ensureScene(), fields.reference, buildSource(fields)) ?? selectedLayerId;
     query = "";
   }
+  let alertsOpen = $state(false);
 </script>
 
 <div class="prod" class:focus class:looks={looksOpen}>
@@ -376,6 +378,14 @@
       <button type="button" class="desk-btn icon" aria-label="Reset workspace" data-tip="Reset workspace" onclick={resetWorkspace}>
         <Icon name="reset" size={16} />
       </button>
+      <button
+        type="button"
+        class="desk-btn alerts-btn"
+        class:on={!!session.alert}
+        aria-pressed={!!session.alert}
+        data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
+        onclick={() => (alertsOpen = true)}
+      >Alerts</button>
       <button type="button" class="desk-btn icon" aria-label="Settings" data-tip="Settings" onclick={() => session.openSettings("appearance")}>
         <Icon name="settings" size={16} />
       </button>
@@ -744,7 +754,12 @@
   />
 {/if}
 
+{#if alertsOpen}
+  <AlertsDialog onclose={() => (alertsOpen = false)} />
+{/if}
+
 <style>
+  .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
   .prod {
     height: 100%;
     min-height: 0;

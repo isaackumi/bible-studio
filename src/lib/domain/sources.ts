@@ -14,7 +14,7 @@ import type { CompositionDocument, TextStyle } from "./types";
 
 export type SharedSource = { id: string; name: string; source: SourceRef };
 
-export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video";
+export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video" | "qr";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "camera", label: "Camera" },
@@ -26,6 +26,7 @@ export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "lower-third", label: "Lower third" },
   { type: "image", label: "Image" },
   { type: "video", label: "Video" },
+  { type: "qr", label: "QR code" },
 ];
 
 export type SourceFields =
@@ -37,7 +38,8 @@ export type SourceFields =
   | { type: "clock"; label: string; style: TextStyle }
   | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle }
   | { type: "image"; assetId: string; name: string; imageUrl: string }
-  | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean };
+  | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean }
+  | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
 
 /** Payload entry for a style: omitted entirely when no style is set. */
 function stylePayload(style: TextStyle): Record<string, string> {
@@ -102,9 +104,11 @@ export function linkLayer(composition: Composition, layerId: string, shared: Sha
 export function addSharedLayer(composition: Composition, shared: SharedSource): Composition {
   if (composition.locked) return composition;
   const lower = shared.source.type === "lower-third";
+  // A QR code sits bottom-right as a square (26% × 44% of a 16:9 frame).
+  const qr = shared.source.type === "qr";
   let next = addLayer(composition, {
     name: shared.name,
-    bounds: lower ? { x: 6, y: 72, w: 55, h: 22 } : { x: 0, y: 0, w: 100, h: 100 },
+    bounds: lower ? { x: 6, y: 72, w: 55, h: 22 } : qr ? { x: 70, y: 50, w: 26, h: 44 } : { x: 0, y: 0, w: 100, h: 100 },
     fit: shared.source.type === "camera" ? "cover" : "contain",
     source: shared.source,
   });
@@ -246,6 +250,14 @@ export function buildSource(fields: SourceFields): SourceRef {
         assetId: fields.assetId,
         imageUrl: fields.imageUrl,
       });
+    case "qr":
+      return sourceRef("qr", "qr", fields.caption || "QR code", {
+        data: fields.data,
+        pattern: fields.pattern,
+        dark: fields.dark,
+        light: fields.light,
+        caption: fields.caption,
+      });
     case "video":
       return sourceRef("video", fields.assetId || "video", fields.name || "Video", {
         assetId: fields.assetId,
@@ -284,6 +296,15 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "", style: parseTextStyle(p.style) };
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
+    case "qr":
+      return {
+        type: "qr",
+        data: p.data ?? "",
+        pattern: p.pattern === "dots" || p.pattern === "rounded" ? p.pattern : "square",
+        dark: p.dark ?? "#000000",
+        light: p.light ?? "#ffffff",
+        caption: p.caption ?? "",
+      };
     case "video":
       // Old placeholder "video" layers (camera-card stand-ins) have no file and are not editable.
       if (!p.assetId && !p.videoUrl) return null;
@@ -315,6 +336,8 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
       return { type: "image", assetId: "", name: "", imageUrl: "" };
     case "video":
       return { type: "video", assetId: "", name: "", videoUrl: "", loop: false, muted: false };
+    case "qr":
+      return { type: "qr", data: "https://", pattern: "rounded", dark: "#000000", light: "#ffffff", caption: "" };
   }
 }
 

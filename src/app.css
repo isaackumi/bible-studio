@@ -748,3 +748,29 @@ button { cursor: pointer; }
 }
 :root[data-theme="light"] .program-well .mat { background: var(--pigment-live-well); color: var(--pigment-live-ink); }
 :root[data-theme="light"] .panel-tabs button.active { color: var(--ink); }
+
+/* Alerts ride on top of Program: a bold banner or a scrolling ticker. */
+.frame .alert-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #c8102e;
+  color: #ffffff;
+  font: 700 54px/1.25 "Inter Variable", Inter, system-ui, sans-serif;
+  padding: 22px 48px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-shadow: none;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+.frame .alert-bar.bottom { bottom: 0; }
+.frame .alert-bar.top { top: 0; }
+.frame .alert-bar.banner { text-align: center; white-space: normal; }
+.frame .alert-bar .ticker-track { display: inline-flex; gap: 240px; animation: alert-ticker 18s linear infinite; }
+@keyframes alert-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .app .frame .alert-bar .ticker-track { animation: none; }
+}

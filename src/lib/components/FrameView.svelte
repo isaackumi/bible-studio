@@ -7,6 +7,7 @@
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PaintedLayer, PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
+  import QrView from "./QrView.svelte";
 
   let {
     model,
@@ -152,6 +153,8 @@
       <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
       <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={!audio || model.video.muted}></video>
     {/key}
+  {:else if model.layout === "qr" && model.qr}
+    <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}
@@ -178,6 +181,15 @@
       {/each}
       {#if model.attribution}
         <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
+      {/if}
+    </div>
+  {/if}
+  {#if model.alert && !nested}
+    <div class="alert-bar {model.alert.style} {model.alert.position}" role="alert">
+      {#if model.alert.style === "ticker"}
+        <span class="ticker-track"><span>{model.alert.text}</span><span aria-hidden="true">{model.alert.text}</span></span>
+      {:else}
+        <span>{model.alert.text}</span>
       {/if}
     </div>
   {/if}

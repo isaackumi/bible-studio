@@ -58,7 +58,8 @@ export type PresentationLayout =
   | "composition"
   | "timer"
   | "lower-third"
-  | "video";
+  | "video"
+  | "qr";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -105,6 +106,19 @@ export type PresentationModel = {
   style?: TextStyle;
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
   video?: { url: string; loop: boolean; muted: boolean };
+  /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
+  qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
+  /** An alert riding on top of Program (never Preview), e.g. a nursery call. */
+  alert?: ProgramAlert;
+};
+
+export type ProgramAlert = {
+  id: string;
+  text: string;
+  style: "banner" | "ticker";
+  position: "top" | "bottom";
+  /** Epoch ms when it clears itself; null = until cleared. */
+  until: number | null;
 };
 
 export type LiveFrame = {

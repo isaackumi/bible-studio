@@ -3,6 +3,7 @@ import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText, presentVideo } from "./present";
 import { createTimer, DEFAULT_TIMER_WARNING_MS, presentTimer, type TimerMode } from "./timer";
 import { encodeTextStyle, parseTextStyle, styleModel } from "./text-style";
+import { presentQr } from "./overlays";
 import { emptyModel } from "./theme";
 import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, TextStyle, Theme } from "./types";
 
@@ -32,6 +33,7 @@ export type SourceType =
   | "lower-third"
   | "ndi"
   | "plugin"
+  | "qr"
   | "empty";
 
 export type SourceRef = {
@@ -1095,6 +1097,16 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
   }
   if (source.type === "image") {
     return payload.imageUrl ? presentImage({ theme: ctx.theme, imageUrl: payload.imageUrl }) : presentText({ theme: ctx.theme, layout: "title", heading: source.title, body: "" });
+  }
+  if (source.type === "qr") {
+    return presentQr({
+      theme: ctx.theme,
+      data: payload.data ?? "",
+      style: payload.pattern === "dots" || payload.pattern === "rounded" ? payload.pattern : "square",
+      dark: payload.dark,
+      light: payload.light,
+      caption: payload.caption,
+    });
   }
   if (source.type === "video" && payload.videoUrl) {
     return presentVideo({ theme: ctx.theme, videoUrl: payload.videoUrl, loop: payload.loop === "true", muted: payload.muted === "true" });

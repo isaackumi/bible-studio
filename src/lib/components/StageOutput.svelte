@@ -57,6 +57,9 @@
     <span class="desk">{snapshot?.desk || "Church Studio"}</span>
     <span class="clock">{clock}</span>
   </header>
+  {#if snapshot?.program.alert}
+    <p class="stage-alert" role="alert">Alert on screen: {snapshot.program.alert.text}</p>
+  {/if}
   <section class="now" aria-live="polite">
     <p class="cue">{cue(snapshot?.program) || (stale ? "Waiting for the desk" : "")}</p>
     {#each current as line, index (index)}
@@ -78,7 +81,7 @@
     color: #fff;
     font-family: "Inter Variable", system-ui, sans-serif;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     grid-template-columns: minmax(0, 1fr);
     gap: 2vh;
     padding: 2.5vh 3vw;
@@ -88,6 +91,7 @@
   .tag.live { background: #d92d20; border-color: #d92d20; color: #fff; }
   .desk { flex: 1; }
   .clock { font: 700 5vh/1 "Inter Variable", system-ui, sans-serif; color: #fff; font-variant-numeric: tabular-nums; }
+  .stage-alert { margin: 0; padding: 1vh 1.5vw; border-radius: 8px; background: #c8102e; color: #fff; font-size: 2.6vh; font-weight: 700; }
   .now { overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .cue { margin: 0 0 1.5vh; font-size: 3vh; color: #f5c451; font-weight: 700; letter-spacing: 0.04em; }
   .line { margin: 0 0 1vh; font-size: 6.4vh; line-height: 1.18; font-weight: 600; }
