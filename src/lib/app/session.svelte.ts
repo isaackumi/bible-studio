@@ -4,7 +4,7 @@ import { CANON, formatReference, parseReference, withChapterCounts, type CanonBo
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
 import { claimOwner, controlsOutput, publishLocal, publishStandbyLocal, readOwner } from "../display/channel";
-import { browserAudienceState, openBrowserAudience } from "../display/output";
+import { browserAudienceState, openBrowserAudience, pickAudienceScreen, placementFeatures, type ScreenLike } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
   createScene,
@@ -1538,13 +1538,32 @@ class Session {
     };
   };
 
+  /**
+   * Chromium Window Management: put the popup on a screen other than the operator's.
+   * The first call asks for permission. Any failure falls back to a plain popup the operator drags.
+   */
+  private audiencePlacement = async (): Promise<{ features: string; label: string } | null> => {
+    const page = window as Window & {
+      getScreenDetails?: () => Promise<{ screens: ScreenLike[]; currentScreen: ScreenLike }>;
+    };
+    if (typeof page.getScreenDetails !== "function") return null;
+    try {
+      const details = await page.getScreenDetails();
+      const target = pickAudienceScreen(details.screens, details.currentScreen);
+      return target ? { features: placementFeatures(target), label: target.label?.trim() || "the second screen" } : null;
+    } catch {
+      return null;
+    }
+  };
+
   openAudience = async () => {
     this.outputHeldClosed = false;
     this.rememberOutput({ outputEnabled: true });
     await this.persist();
     if (!this.desktop()) {
       await this.pushProgram();
-      const opened = openBrowserAudience((url, name, features) => window.open(url, name, features));
+      const placement = this.audienceWindow && !this.audienceWindow.closed ? null : await this.audiencePlacement();
+      const opened = openBrowserAudience((url, name, features) => window.open(url, name, features), placement);
       this.audienceWindow = opened.window;
       this.output = {
         ...this.output,

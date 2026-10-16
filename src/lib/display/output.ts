@@ -25,10 +25,46 @@ export function acceptAudienceFrame(current: ProgramPacket | null, next: Program
   return next.revision >= current.revision;
 }
 
+/** The subset of Window Management `ScreenDetailed` this module reads. */
+export type ScreenLike = {
+  label?: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  availLeft: number;
+  availTop: number;
+  availWidth: number;
+  availHeight: number;
+  isPrimary?: boolean;
+  isInternal?: boolean;
+};
+
+function sameScreen(left: ScreenLike, right: ScreenLike) {
+  return left.left === right.left && left.top === right.top && left.width === right.width && left.height === right.height;
+}
+
+/**
+ * A screen other than the operator's: external before internal, then the largest.
+ * Null when there is only one screen; the operator then drags the window as before.
+ */
+export function pickAudienceScreen(screens: ScreenLike[], current: ScreenLike | null): ScreenLike | null {
+  const others = screens.filter((screen) => !current || !sameScreen(screen, current));
+  if (!others.length) return null;
+  return [...others].sort(
+    (a, b) => Number(!!a.isInternal) - Number(!!b.isInternal) || b.width * b.height - a.width * a.height,
+  )[0]!;
+}
+
+export function placementFeatures(screen: ScreenLike): string {
+  return `popup=yes,left=${screen.availLeft},top=${screen.availTop},width=${screen.availWidth},height=${screen.availHeight}`;
+}
+
 export function openBrowserAudience(
   open: (url: string, name: string, features: string) => BrowserOutputWindow | null,
+  placement: { features: string; label: string } | null = null,
 ): { window: BrowserOutputWindow | null; state: BrowserOutputState } {
-  const opened = open(AUDIENCE_URL, AUDIENCE_NAME, AUDIENCE_FEATURES);
+  const opened = open(AUDIENCE_URL, AUDIENCE_NAME, placement?.features ?? AUDIENCE_FEATURES);
   if (!opened) {
     return {
       window: null,
@@ -44,7 +80,9 @@ export function openBrowserAudience(
     state: {
       desired: true,
       online: true,
-      message: "Audience window is open. Drag it onto the external display, then choose Fill this screen on that window. This browser cannot move it there.",
+      message: placement
+        ? `Audience window is on ${placement.label}. Choose Fill this screen on that window for full screen.`
+        : "Audience window is open. Drag it onto the external display, then choose Fill this screen on that window. This browser cannot move it there.",
     },
   };
 }

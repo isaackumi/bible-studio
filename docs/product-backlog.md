@@ -115,7 +115,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Dependencies.** CS-P0-005.
 
-**Status.** Partial. Works as a popup. No Window Management placement. Autoplay/fullscreen need a user gesture.
+**Status.** Partial. Works as a popup. Chromium opens it on the second screen via Window Management (`pickAudienceScreen` / `placementFeatures`); otherwise the operator drags it. Verified with stubbed screens, not a real second monitor. Autoplay/fullscreen need a user gesture.
 
 **Acceptance.** Popup blocked is reported. Closing the popup does not change Program. Fullscreen failure does not change Program.
 

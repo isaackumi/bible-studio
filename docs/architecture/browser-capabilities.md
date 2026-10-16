@@ -9,15 +9,15 @@
 | Operator desk | Supported | Supported | Supported |
 | Preview / Program | Supported | Supported | Supported |
 | Audience window | Partial (`window.open`) | Supported (native) | Supported (native) |
-| Multi-monitor placement | Browser dependent / untested | Supported | Supported |
+| Multi-monitor placement | Browser dependent (Chromium best-effort; drag fallback) | Supported | Supported |
 | Fullscreen audience | Requires permission + gesture | Supported | Supported |
-| Camera as source | Planned (`getUserMedia`) | Planned | Planned |
+| Camera as source | Partial (`getUserMedia`; Preview, Program, audience) | Partial (real-camera run pending) | Partial |
 | Microphone (Listen) | Partial (Web Speech) | Supported (helper on macOS) | Partial |
 | NDI | Unavailable (no native SDK) | Planned | Planned |
 | Phone controller | Partial (same-origin pad; no LAN socket) | Partial (same-origin pad; no LAN socket) | Partial (same-origin pad; no LAN socket) |
 | Offline library | Partial (IndexedDB + bundled Bible) | Supported (SQLite) | Supported (SQLite) |
 | File media | Designed, not shipped | Supported (images) | Supported (images) |
-| Window Management API | Chromium-only, untested | N/A (native displays) | N/A |
+| Window Management API | Chromium-only; used to place the audience popup | N/A (native displays) | N/A |
 
 Statuses: **Supported** is implemented and used. **Partial** works with limits. **Browser dependent** needs a specific engine. **Requires permission** may prompt. **Desktop only** / **Planned** / **Unavailable** as labeled.
 
@@ -32,7 +32,7 @@ Statuses: **Supported** is implemented and used. **Partial** works with limits. 
 | `canUseCamera` / `canUseMicrophone` | Desktop, or `navigator.mediaDevices.getUserMedia` exists |
 | `canUseWebRTC` | `RTCPeerConnection` is a function |
 
-`getScreenDetails` is experimental, secure-context, and missing in Firefox and Safari ([MDN Window Management API](https://developer.mozilla.org/en-US/docs/Web/API/Window_Management_API), [caniuse getScreenDetails](https://caniuse.com/mdn-api_window_getscreendetails)). This repo has not tested placing `/?display=1` onto a chosen `ScreenDetailed`. Do not claim multi-monitor browser output.
+`getScreenDetails` is experimental, secure-context, and missing in Firefox and Safari ([MDN Window Management API](https://developer.mozilla.org/en-US/docs/Web/API/Window_Management_API), [caniuse getScreenDetails](https://caniuse.com/mdn-api_window_getscreendetails)). Open output calls `getScreenDetails()` (one permission prompt), picks a screen other than the operator's with `pickAudienceScreen` (external before internal, then largest), and opens `/?display=1` over that screen's usable area (`placementFeatures`). No API, denied permission, or a single screen falls back to the plain popup the operator drags. Verified with stubbed screen details; not yet on a real second monitor. If the permission prompt outlasts the click's user activation, Chrome blocks the popup; the desk reports it and the next click opens it. Fullscreen still needs **Fill this screen** on the audience window. `canPlaceWindow` stays desktop-only because browser placement is best-effort.
 
 ## Autoplay and popups
 

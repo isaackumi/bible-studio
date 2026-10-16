@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createLiveState, frame, programPacket, setPreview } from "../domain/live";
 import { defaultTheme, emptyModel } from "../domain/theme";
 import { presentScripture } from "../domain/present";
-import { acceptAudienceFrame, browserAudienceState, openBrowserAudience, type BrowserOutputWindow } from "./output";
+import { acceptAudienceFrame, browserAudienceState, openBrowserAudience, pickAudienceScreen, placementFeatures, type BrowserOutputWindow, type ScreenLike } from "./output";
 import { factoryProfiles, normalizeProfile } from "./profiles";
 
 const theme = defaultTheme();
@@ -78,5 +78,33 @@ describe("saved display configuration", () => {
     expect(saved?.outputMode).toBe("window");
     expect(saved?.assignments.audience).toBe("gone|1x1|1.00");
     expect(factoryProfiles()[0].outputEnabled).toBe(false);
+  });
+});
+
+describe("browser audience placement", () => {
+  const laptop: ScreenLike = { label: "Built-in Retina Display", left: 0, top: 0, width: 1512, height: 982, availLeft: 0, availTop: 25, availWidth: 1512, availHeight: 957, isPrimary: true, isInternal: true };
+  const projector: ScreenLike = { label: "EPSON PJ", left: 1512, top: 0, width: 1920, height: 1080, availLeft: 1512, availTop: 0, availWidth: 1920, availHeight: 1080, isPrimary: false, isInternal: false };
+  const tv: ScreenLike = { label: "Lobby TV", left: -1280, top: 0, width: 1280, height: 720, availLeft: -1280, availTop: 0, availWidth: 1280, availHeight: 720, isPrimary: false, isInternal: false };
+
+  it("picks a screen other than the operator's, preferring the largest external one", () => {
+    expect(pickAudienceScreen([laptop, projector], laptop)).toBe(projector);
+    expect(pickAudienceScreen([laptop, tv, projector], laptop)).toBe(projector);
+    expect(pickAudienceScreen([laptop, projector], projector)).toBe(laptop);
+  });
+
+  it("returns null with a single screen, so the operator drags the window as before", () => {
+    expect(pickAudienceScreen([laptop], laptop)).toBeNull();
+    expect(pickAudienceScreen([], null)).toBeNull();
+  });
+
+  it("opens the popup over the chosen screen's usable area", () => {
+    expect(placementFeatures(projector)).toBe("popup=yes,left=1512,top=0,width=1920,height=1080");
+    expect(placementFeatures(tv)).toBe("popup=yes,left=-1280,top=0,width=1280,height=720");
+  });
+
+  it("names the screen in the open message when placed", () => {
+    const opened = openBrowserAudience(() => ({ closed: false, close() {}, focus() {}, postMessage() {} }), { features: placementFeatures(projector), label: "EPSON PJ" });
+    expect(opened.state.message).toContain("EPSON PJ");
+    expect(opened.state.online).toBe(true);
   });
 });
