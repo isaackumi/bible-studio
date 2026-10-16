@@ -40,25 +40,35 @@ describe("keyboard manager", () => {
     manager.onKeyDown(escape.event);
     expect(seen).toEqual(["take", "escape"]);
 
-    const arrowOnButton = press("ArrowRight", "BUTTON");
-    manager.onKeyDown(arrowOnButton.event);
-    expect(seen).toEqual(["take", "escape"]);
-    expect(arrowOnButton.prevented()).toBe(true);
-
+    // A focused button (even BLACK) never turns Space into its own click: Space is Take.
     const spaceOnButton = press("Space", "BUTTON");
     manager.onKeyDown(spaceOnButton.event);
-    expect(seen).toEqual(["take", "escape"]);
-    expect(spaceOnButton.prevented()).toBe(false);
+    expect(seen).toEqual(["take", "escape", "take"]);
+    expect(spaceOnButton.prevented()).toBe(true);
 
     const cutOnButton = press("KeyC", "BUTTON");
     manager.onKeyDown(cutOnButton.event);
-    expect(seen).toEqual(["take", "escape", "cut"]);
+    expect(seen).toEqual(["take", "escape", "take", "cut"]);
     expect(cutOnButton.prevented()).toBe(true);
 
     const handled = press("ArrowRight");
     handled.event.defaultPrevented = true;
     manager.onKeyDown(handled.event);
-    expect(seen).toEqual(["take", "escape", "cut"]);
+    expect(seen).toEqual(["take", "escape", "take", "cut"]);
+  });
+
+  it("steps with the arrows on a focused button but leaves them to pane resizers", () => {
+    const seen: string[] = [];
+    const manager = createKeyboardManager(defaultShortcuts, { next: () => seen.push("next") });
+    const onButton = press("ArrowRight", "BUTTON");
+    manager.onKeyDown(onButton.event);
+    expect(seen).toEqual(["next"]);
+    expect(onButton.prevented()).toBe(true);
+    const resizer = { ...press("ArrowRight").event, target: { tagName: "DIV", role: "separator" } };
+    let prevented = false;
+    manager.onKeyDown({ ...resizer, preventDefault: () => (prevented = true) });
+    expect(seen).toEqual(["next"]);
+    expect(prevented).toBe(false);
   });
 
   it("keeps desk keys off program and out of text fields", () => {

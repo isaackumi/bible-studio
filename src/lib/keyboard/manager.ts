@@ -39,10 +39,9 @@ export function isTypingTarget(target: KeyInput["target"]): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
 }
 
-function holdsNavigation(target: KeyInput["target"]): boolean {
-  if (!target) return false;
-  const tag = target.tagName?.toUpperCase();
-  return tag === "BUTTON" || tag === "A" || target.role === "button" || target.role === "separator";
+/** Pane resizers use the arrow keys themselves. */
+function ownsArrows(target: KeyInput["target"]): boolean {
+  return target?.role === "separator" || target?.role === "slider";
 }
 
 export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record<ShortcutAction, () => void>>) {
@@ -58,13 +57,9 @@ export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record
         event.preventDefault();
         return;
       }
-      if (holdsNavigation(event.target)) {
-        if (action === "previous" || action === "next") {
-          event.preventDefault();
-          return;
-        }
-        if (action === "take") return;
-      }
+      // Outside text fields Space is always Take and the arrows always step, even on a focused
+      // button (preventDefault stops the button's own Space activation). Enter still presses it.
+      if ((action === "previous" || action === "next") && ownsArrows(event.target)) return;
       handlers[action]?.();
       event.preventDefault();
     },
