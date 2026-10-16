@@ -1,7 +1,7 @@
 # Production Desk: Shared Sources and Live Camera
 
 Date: 2026-10-16  
-Status: Designed  
+Status: Part A shipped; Part B designed  
 Related: [2026-10-16-production-scenes-as-looks-design.md](2026-10-16-production-scenes-as-looks-design.md), [composition-engine.md](../../architecture/composition-engine.md), [media-sources.md](../../architecture/media-sources.md), CS-P1-005, CS-P1-011..014, CS-P1-016, CS-P1-018, CS-P0-006
 
 ## Problem

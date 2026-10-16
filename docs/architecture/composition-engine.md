@@ -48,6 +48,17 @@ Camera, video, and NDI compile through the same camera card today (`presentCamer
 
 Plugins call `registerSourceCompiler`. They return `PresentationModel`. They cannot call `applyProgramAction`.
 
+### Shared sources
+
+Sources are shared across scenes, OBS-style. `Workspace.sources` holds `{ id, name, source }`. A layer links to one by `sourceKey` and still keeps its own `SourceRef` copy, so compile, templates, rundown, and the Looks editor read the layer unchanged. Rules live in `src/lib/domain/sources.ts`:
+
+- `updateSharedSource` is the one way to edit a shared source. It rewrites name and source on every linked layer in every look. It refuses (returns the locked look names) if any linked look is locked.
+- `syncLinkedEdits` runs inside `session.saveLook`. A linked layer whose copy was edited (for example in the Looks editor) becomes the new shared value everywhere; if a locked look blocks that, only that layer unlinks.
+- `pruneSharedSources` drops a source once no layer references it (after layer removal or look deletion).
+- Older looks are not migrated. Their layers stay unlinked until Properties → OK links them.
+
+Edits never touch Program: Program is a compiled snapshot, so a source change reaches the audience on the next TAKE.
+
 ## Paint
 
 `presentComposition` returns `layout: "composition"` with `layers[]` of already compiled `PresentationModel`s.
@@ -68,7 +79,7 @@ A service item may reference `{ kind: "composition", composition: { compositionI
 
 ## Operator
 
-Presenter Desk → **Looks**. Production Desk → **Scenes** dock lists saved looks; **Sources** dock is that look’s layer stack (front on top). Scene lock freezes all edits until unlock. Layout tool still opens the richer Looks editor. Templates, layer list, add/rename/remove/duplicate, source assignment (including library images for image layers), numeric bounds, opacity, fit, entrance/exit (+ shared duration and easing), look transition (cut/fade), lock, Preview drag handles, save, duplicate look, queue. When Preview is a look, TAKE uses that look’s cut/fade (and fade ms); other sources still use the desk theme transition. CUT always cuts. Dragging a layer writes Preview only. A locked layer does not drag or accept numeric bounds. Scripture and lyrics layers have editable copy fields and can refill from the current desk verse/section. Adding, removing, duplicating, or changing entrance/exit/easing writes Preview only. FrameView plays entrance on paint with the layer easing; exit is stored for later leave transitions.
+Presenter Desk → **Looks**. Production Desk → **Scenes** dock lists saved looks; **Sources** dock is that look’s layer stack (front on top). Scene lock freezes all edits until unlock. Sources **+** → type → Create new (name) or Add existing → **Properties** (camera device + mirror + live thumbnail, scripture lookup, song + section, text, timer, lower third, image) → OK adds a linked layer on Preview. Double-click a source or ⚙ reopens Properties; a locked scene, or a shared source used by a locked scene, opens read-only. **−** removes the layer from the scene. The camera thumbnail is a private dialog stream and never touches Preview. Layout tool still opens the richer Looks editor. Templates, layer list, add/rename/remove/duplicate, source assignment (including library images for image layers), numeric bounds, opacity, fit, entrance/exit (+ shared duration and easing), look transition (cut/fade), lock, Preview drag handles, save, duplicate look, queue. When Preview is a look, TAKE uses that look’s cut/fade (and fade ms); other sources still use the desk theme transition. CUT always cuts. Dragging a layer writes Preview only. A locked layer does not drag or accept numeric bounds. Scripture and lyrics layers have editable copy fields and can refill from the current desk verse/section. Adding, removing, duplicating, or changing entrance/exit/easing writes Preview only. FrameView plays entrance on paint with the layer easing; exit is stored for later leave transitions.
 
 Looks lower-third buttons harvest scripture, song, and announcement copy from the desk; speaker, guest, and event keep the typed title and subtitle. LIVE still copies Program.
 

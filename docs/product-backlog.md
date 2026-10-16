@@ -383,7 +383,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Persist looks on the workspace. Restore to Preview. Do not restore as Program.
 
-**Status.** Partial. `Workspace.compositions`. Production Desk Scenes = looks; Sources = layers. Scene `locked` freezes edits. Queue persists the look first, then a `kind: "composition"` rundown item. Selecting that item restores Preview only. Missing look paints empty. Duplicate look saves a copy with a new id. Delete removes an unlocked look without Taking; open draft identity clears if it matched.
+**Status.** Partial. `Workspace.compositions`. Production Desk Scenes = looks; Sources = layers. Scene `locked` freezes edits. Shared sources: `Workspace.sources`; layers link by `sourceKey`; editing a shared source updates every linked layer, is refused while a linked scene is locked, and unreferenced sources prune. Queue persists the look first, then a `kind: "composition"` rundown item. Selecting that item restores Preview only. Missing look paints empty. Duplicate look saves a copy with a new id. Delete removes an unlocked look without Taking; open draft identity clears if it matched.
 
 **Phase.** A.
 
@@ -399,7 +399,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Select, reorder, hide, numeric move/resize, source assign. Preview only. Not Premiere.
 
-**Status.** Partial. Looks pane on Presenter Desk; Production Desk Scenes/Sources docks edit the same looks (Photoshop front-on-top layer list). Add/rename/remove/duplicate layers. Duplicate saved look. Scene lock freezes all edits. Look transition cut/fade; TAKE of a look uses that transition. Text heading/body fields. Scripture/lyrics have editable copy fields and can refill from the desk. Image layers can pick from the media library. Numeric opacity. Entrance/exit + shared duration and easing. Preview drag handles. Fit and lock (lock blocks drag and numeric bounds). Program has no handles. Exit is persisted; leave animation on hide is later.
+**Status.** Partial. Looks pane on Presenter Desk; Production Desk Scenes/Sources docks edit the same looks (Photoshop front-on-top layer list). Add/rename/remove/duplicate layers. Duplicate saved look. Scene lock freezes all edits. Production Desk Add source → Create new / Add existing → Properties (camera device + mirror, scripture lookup, song section, text, timer, lower third, image); double-click or ⚙ reopens Properties. Look transition cut/fade; TAKE of a look uses that transition. Text heading/body fields. Scripture/lyrics have editable copy fields and can refill from the desk. Image layers can pick from the media library. Numeric opacity. Entrance/exit + shared duration and easing. Preview drag handles. Fit and lock (lock blocks drag and numeric bounds). Program has no handles. Exit is persisted; leave animation on hide is later.
 
 **Phase.** A.
 
