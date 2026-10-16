@@ -29,7 +29,7 @@
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
-  import { mergeProductionDocks, mergeProductionStage } from "../../workspace/production";
+  import { mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
 
   let query = $state("");
   let kind = $state<"cut" | "fade">("fade");
@@ -115,6 +115,14 @@
     session.saveProductionLayout({
       ...session.workspace.production,
       stage: mergeProductionStage(session.workspace.production.stage, reported),
+    });
+  }
+
+  function onRowsLayout(reported: number[]) {
+    if (applying || focus) return;
+    session.saveProductionLayout({
+      ...session.workspace.production,
+      rows: mergeProductionRows(session.workspace.production.rows, reported),
     });
   }
 
@@ -358,6 +366,8 @@
     </div>
   {:else}
   {#key epoch}
+  <PaneGroup class="rows" direction="vertical" onLayoutChange={onRowsLayout}>
+  <Pane defaultSize={focus ? 100 : frozen.rows[0]} minSize={35} order={1}>
   <PaneGroup class="studio" direction="horizontal" onLayoutChange={onStageLayout}>
     <Pane defaultSize={frozen.stage[0]} minSize={20} order={1}>
     <section class="pane preview">
@@ -412,8 +422,11 @@
     </section>
     </Pane>
   </PaneGroup>
+  </Pane>
 
   {#if !focus}
+    <PaneResizer />
+    <Pane defaultSize={frozen.rows[1]} minSize={12} maxSize={60} order={2}>
     <PaneGroup class="docks" direction="horizontal" onLayoutChange={onDocksLayout}>
       {#if scenesOpen}
         <Pane defaultSize={dockSize(0)} minSize={15} order={1}>
@@ -622,7 +635,9 @@
         </Pane>
       {/if}
     </PaneGroup>
+    </Pane>
   {/if}
+  </PaneGroup>
   {/key}
   {/if}
 </div>
@@ -656,7 +671,7 @@
     min-height: 0;
     min-width: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) minmax(148px, 200px);
+    grid-template-rows: auto minmax(0, 1fr);
     background: var(--desk);
     color: var(--ink);
     font-family: var(--font-ui);
@@ -821,6 +836,14 @@
     width: 2px;
     border-radius: 2px;
     background: var(--line);
+  }
+  .prod :global([data-pane-resizer][data-direction="vertical"]::after) {
+    left: 10px;
+    right: 10px;
+    top: 3px;
+    bottom: auto;
+    width: auto;
+    height: 2px;
   }
   .prod :global([data-pane-resizer]:hover::after),
   .prod :global([data-pane-resizer][data-active]::after) { background: var(--accent); }

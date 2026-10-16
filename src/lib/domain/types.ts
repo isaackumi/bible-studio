@@ -268,6 +268,8 @@ export type PewDeskState = {
 export type ProductionLayout = {
   stage: [number, number, number];
   docks: [number, number, number];
+  /** Monitors row vs docks row, percent of the desk height. */
+  rows: [number, number];
 };
 
 export type AppearanceSettings = {
