@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
   import { session } from "../../app/session.svelte";
@@ -548,6 +549,7 @@
           <MediaPane />
         </section>
       {:else if section === "audio"}
+        <AudioSettings />
         <section class="card">
           <h3>{canUse("voice-detect") ? "Voice detection" : "Not in this release"}</h3>
           <p class="note">

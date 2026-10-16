@@ -22,6 +22,7 @@ describe("workspace document", () => {
     expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
     expect(workspace.production).toEqual({ stage: [42, 16, 42], docks: [28, 44, 28], rows: [74, 26] });
     expect(workspace.remoteDevices).toEqual([]);
+    expect(workspace.voice).toEqual({ commands: true, wake: true, custom: [] });
     expect(workspace).not.toHaveProperty("program");
     expect(workspace.compositions).toEqual([]);
   });

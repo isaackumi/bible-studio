@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseVoiceCommand } from "./commands";
+import { parseVoiceCommand, sanitizeVoiceSettings, type CustomVoiceCommand } from "./commands";
 
 describe("voice commands", () => {
   it("ignores speech without the wake word, so sermon words never act", () => {
@@ -46,5 +46,49 @@ describe("voice commands", () => {
     expect(parseVoiceCommand("studio make coffee")).toBeNull();
     expect(parseVoiceCommand("studio")).toBeNull();
     expect(parseVoiceCommand("studio search scripture")).toBeNull();
+  });
+});
+
+describe("voice settings storage", () => {
+  it("keeps valid custom phrases only", () => {
+    expect(
+      sanitizeVoiceSettings({ wake: false, custom: [{ phrase: " Lights Out ", action: "black" }, { phrase: "lights out", action: "next" }, { phrase: "x", action: "format" }, { phrase: "", action: "next" }] }),
+    ).toEqual({ commands: true, wake: false, custom: [{ phrase: "lights out", action: "black" }] });
+    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: true, custom: [] });
+  });
+});
+
+describe("voice settings: translations, custom phrases, wake word", () => {
+  const translations = [
+    { id: "kjv", abbreviation: "KJV", name: "King James Version" },
+    { id: "web", abbreviation: "WEB", name: "World English Bible" },
+    { id: "bbe", abbreviation: "BBE", name: "Bible in Basic English" },
+  ];
+
+  it("switches translation by abbreviation or name", () => {
+    expect(parseVoiceCommand("studio use King James", { translations })).toMatchObject({ kind: "translation", id: "kjv", live: false });
+    expect(parseVoiceCommand("studio give me WEB", { translations })).toMatchObject({ kind: "translation", id: "web" });
+    expect(parseVoiceCommand("studio switch to the basic english bible", { translations })).toMatchObject({ kind: "translation", id: "bbe" });
+    expect(parseVoiceCommand("studio switch to NIV", { translations })).toBeNull();
+  });
+
+  it("runs custom phrases, keeping live actions marked live", () => {
+    const custom: CustomVoiceCommand[] = [
+      { phrase: "next slide please", action: "next" },
+      { phrase: "lights out", action: "black" },
+      { phrase: "show the songs", action: "open-songs" },
+    ];
+    expect(parseVoiceCommand("Studio, next slide please", { custom })).toMatchObject({ kind: "command", id: "next", live: false });
+    expect(parseVoiceCommand("studio lights out", { custom })).toMatchObject({ kind: "command", id: "black", live: true });
+    expect(parseVoiceCommand("studio show the songs", { custom })).toMatchObject({ kind: "library", tab: "songs" });
+  });
+
+  it("can work without the wake word, but only for a whole command", () => {
+    expect(parseVoiceCommand("next", { wake: false })).toMatchObject({ kind: "command", id: "next" });
+    expect(parseVoiceCommand("next we read from john", { wake: false })).toBeNull();
+    expect(parseVoiceCommand("take this to heart", { wake: false })).toBeNull();
+    expect(parseVoiceCommand("studio next", { wake: false })).toMatchObject({ id: "next" });
+    expect(parseVoiceCommand("show me 3 things", { wake: false })).toBeNull();
+    expect(parseVoiceCommand("search song amazing grace", { wake: false })).toBeNull();
   });
 });

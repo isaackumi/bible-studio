@@ -3,6 +3,7 @@ import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
 import { sanitizeRemoteDevices } from "../domain/remote";
+import { sanitizeVoiceSettings } from "../voice/commands";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -103,5 +104,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
       ? value.sources.map(sanitizeSharedSource).filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       : [],
     remoteDevices: sanitizeRemoteDevices(value.remoteDevices),
+    voice: sanitizeVoiceSettings(value.voice),
   };
 }

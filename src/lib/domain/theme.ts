@@ -238,6 +238,7 @@ export function defaultWorkspace(): Workspace {
     compositions: [],
     sources: [],
     remoteDevices: [],
+    voice: { commands: true, wake: true, custom: [] },
   };
 }
 

@@ -528,6 +528,14 @@
         mode = request.tab === "songs" ? "songs" : "scriptures";
         return true;
       }
+      if (request.kind === "translation") {
+        if (!session.translations.some((entry) => entry.id === request.id)) return false;
+        translationId = request.id;
+        // Re-read the verse on Preview in the new translation; Program waits for LIVE.
+        const item = passage();
+        if (item) await session.previewPassage(item);
+        return true;
+      }
       mode = "scriptures";
       query = request.query;
       takeAfterPreview = false;

@@ -330,6 +330,16 @@ export type Workspace = {
   sources: SharedSourceDocument[];
   /** Phones approved for the LAN remote. Only token hashes are stored. */
   remoteDevices: RemoteDeviceDocument[];
+  voice: VoiceSettings;
+};
+
+/** Voice command preferences. Program-changing commands still need Live voice commands each launch. */
+export type VoiceSettings = {
+  /** Spoken commands on at all (verse detection always runs while listening). */
+  commands: boolean;
+  /** Require "Studio …" before a command. */
+  wake: boolean;
+  custom: Array<{ phrase: string; action: string }>;
 };
 
 export type RemoteDeviceDocument = {

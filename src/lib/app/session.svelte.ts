@@ -109,12 +109,19 @@ import type {
   TranslationInfo,
   Workspace,
   WorkspaceLayout,
+  VoiceSettings,
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
-import { parseVoiceCommand, voiceCommandLabel, type VoiceCommand } from "../voice/commands";
+import {
+  parseVoiceCommand,
+  sanitizeVoiceSettings,
+  voiceCommandLabel,
+  type CustomVoiceCommand,
+  type VoiceCommand,
+} from "../voice/commands";
 import {
   openPrivacySettings,
   prepareListening,
@@ -181,7 +188,8 @@ export type VoiceState = {
 /** A desk can take voice library/scripture requests so its own panes stay in sync. */
 export type VoiceDeskRequest =
   | { kind: "library"; tab: "bible" | "songs" }
-  | { kind: "scripture"; query: string };
+  | { kind: "scripture"; query: string }
+  | { kind: "translation"; id: string };
 
 const IDLE_VOICE: VoiceState = {
   status: "idle",
@@ -1163,8 +1171,10 @@ class Session {
     if (this.voice.status !== "listening") return;
     this.voice.heard = text;
     this.voice.hearing = !final;
-    if (final) {
-      const command = parseVoiceCommand(latest) ?? alternatives.map((option) => parseVoiceCommand(option)).find(Boolean) ?? null;
+    const settings = this.workspace.voice;
+    if (final && settings?.commands !== false) {
+      const options = { wake: settings?.wake !== false, custom: settings?.custom as CustomVoiceCommand[] | undefined, translations: this.translations };
+      const command = parseVoiceCommand(latest, options) ?? alternatives.map((option) => parseVoiceCommand(option, options)).find(Boolean) ?? null;
       if (command) {
         void this.runVoiceCommand(command);
         return;
@@ -1175,11 +1185,14 @@ class Session {
 
   /** Execute a parsed voice command. Program-changing commands need allowLive. */
   runVoiceCommand = async (command: VoiceCommand) => {
+    // One phrase can arrive twice (alternatives, a repeated final); run it once. Blocked or
+    // failed attempts do not count, so the operator can retry at once after allowing live commands.
     const now = Date.now();
     if (command.phrase === this.lastVoiceCommand.phrase && now - this.lastVoiceCommand.at < 2000) return;
     this.lastVoiceCommand = { phrase: command.phrase, at: now };
     const label = voiceCommandLabel(command);
     const record = (outcome: "executed" | "blocked" | "failed", message: string) => {
+      if (outcome !== "executed") this.lastVoiceCommand = { phrase: "", at: 0 };
       this.voice = { ...this.voice, command: { label, phrase: command.phrase, outcome, at: Date.now() }, message };
     };
     if (command.live && !this.voice.allowLive) {
@@ -1196,6 +1209,12 @@ class Session {
         const handled = (await this.voiceDesk?.({ kind: "library", tab: command.tab })) ?? false;
         if (!handled && command.tab === "songs") this.openFind();
         record("executed", `${label}.`);
+        return;
+      }
+      if (command.kind === "translation") {
+        this.voiceTranslationId = command.id;
+        await this.voiceDesk?.({ kind: "translation", id: command.id });
+        record("executed", `${label}. Scripture now reads from it.`);
         return;
       }
       if (command.kind === "search" && command.scope === "songs") {
@@ -1216,9 +1235,17 @@ class Session {
     }
   };
 
+  /** Translation chosen by voice; scripture previews from the session use it. */
+  voiceTranslationId = $state("");
+
+  saveVoiceSettings = (patch: Partial<VoiceSettings>) => {
+    this.workspace = { ...this.workspace, voice: sanitizeVoiceSettings({ ...this.workspace.voice, ...patch }) };
+    this.persistSoon();
+  };
+
   /** Reference or phrase → Preview. Used when no desk handles the request. Never Program. */
   private previewScriptureQuery = async (query: string): Promise<boolean> => {
-    const translation = this.translations[0];
+    const translation = this.translations.find((entry) => entry.id === this.voiceTranslationId) ?? this.translations[0];
     if (!translation) return false;
     const parsed = parseReference(query, this.books);
     if (parsed?.startVerse) {
