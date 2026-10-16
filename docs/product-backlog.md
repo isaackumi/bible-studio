@@ -18,7 +18,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P0-002 | Output engine / sinks | P0 | Partial | A |
 | CS-P0-003 | Browser operator | P0 | Shipped | C |
 | CS-P0-004 | Browser audience output | P0 | Partial | C |
-| CS-P0-005 | Browser/desktop capability detection | P0 | Partial | A |
+| CS-P0-005 | Browser/desktop capability detection | P0 | Shipped | A |
 | CS-P0-006 | Program/Preview safety for all sources | P0 | Partial | A |
 | CS-P0-007 | Image content | P0 | Shipped | B |
 | CS-P0-008 | Media architecture (browser adapter) | P0 | Shipped | B |
@@ -33,19 +33,19 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P1-003 | Live song / lyric search | P1 | Shipped | B |
 | CS-P1-004 | Phone / tablet remote | P1 | Partial | C |
 | CS-P1-005 | Camera sources | P1 | Partial | D |
-| CS-P1-006 | Video file sources | P1 | Planned | D |
+| CS-P1-006 | Video file sources | P1 | Partial | D |
 | CS-P1-007 | NDI architecture | P1 | Designed | E |
 | CS-P1-008 | NDI desktop input / output | P1 | Planned | E |
 | CS-P1-009 | Extension API foundation | P1 | Designed | F |
-| CS-P1-010 | Community theme format | P1 | Partial | F |
+| CS-P1-010 | Community theme format | P1 | Shipped | F |
 | CS-P1-011 | Camera + lower third | P1 | Partial | D |
 | CS-P1-012 | Scripture + camera split screen | P1 | Partial | D |
 | CS-P1-013 | Song + camera split screen | P1 | Partial | D |
-| CS-P1-014 | Timer / countdown source | P1 | Partial | D |
+| CS-P1-014 | Timer / countdown source | P1 | Shipped | D |
 | CS-P1-015 | Lower-third templates | P1 | Partial | D |
 | CS-P1-016 | Saved compositions | P1 | Partial | A |
 | CS-P1-017 | Composition templates | P1 | Partial | A |
-| CS-P1-018 | Basic composition editor | P1 | Partial | A |
+| CS-P1-018 | Basic composition editor | P1 | Shipped | A |
 | CS-P2-001 | Community plugin ecosystem | P2 | Planned | G |
 | CS-P2-002 | Extension registry | P2 | Planned | G |
 | CS-P2-003 | External song providers | P2 | Planned | G |
@@ -53,7 +53,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P2-005 | Multi-operator collaboration | P2 | Planned | G |
 | CS-P2-006 | Cloud remote control | P2 | Planned | G |
 | CS-P2-007 | Advanced composition animations | P2 | Planned | G |
-| CS-P2-008 | Multiple camera layouts | P2 | Planned | D |
+| CS-P2-008 | Multiple camera layouts | P2 | Partial | D |
 | CS-P2-009 | NDI composition sources | P2 | Planned | E |
 | CS-P2-010 | Plugin composition sources | P2 | Planned | F |
 | CS-P2-011 | Community composition templates | P2 | Planned | G |
@@ -445,3 +445,24 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 - Unrestricted plugins.
 - Scraping lyric sites.
 - Claiming browser multi-monitor, NDI, camera, or phone control without the tests in this document.
+
+## Status update — 2026-10-16
+
+Built and verified in the browser build (Chrome, fake camera/microphone where needed). Items that also need a desktop or real-hardware run stay **Partial** until that run passes.
+
+| ID | Now | Verified | Still needed |
+| --- | --- | --- | --- |
+| CS-P0-004 | Chromium opens the audience window on the second screen (Window Management); drag fallback | Stubbed screens | Real second monitor |
+| CS-P0-005 | Settings → This computer explains every capability and why it is unavailable | Browser | — |
+| CS-P1-004 | QR pairing with desk approval, hashed session tokens, per-phone revoke, Preview-only Next/Previous, timer controls | Same-origin pad | Real phone over Wi-Fi to the desktop app |
+| CS-P1-005 / 011–013 | Live camera pixels on Preview, Program and audience; one feed per camera | Fake camera | Real camera; two physical cameras |
+| CS-P1-006 | Video files (MP4/MOV/M4V/WebM): library, service items, scene sources; audience-only sound | Browser | Desktop playback through the asset protocol |
+| CS-P1-010 | Theme files (.cstheme.json) with background picture | Browser | — |
+| CS-P1-014 | Countdown/count-up/clock/target, position, red warning, pause/start/reset from desk, phone, voice | Browser | — |
+| CS-P1-018 | Shared sources with Properties, text styling, drag reorder, exit animations, two-click remove | Browser | — |
+| CS-P2-008 | Three- and four-camera templates | Browser | Camera switcher |
+| CS-P3-001 | Stage display (live, next, clock, timer); opens on a third screen when there is one | Browser | Desktop window placement |
+| — | Voice commands with wake word and Live voice commands switch | Fake recognizer | Desktop on-device recognizer with a real mic |
+| — | External display: AppKit frame placement for the audience window | Unit tests | Dell / Retina run |
+
+Not started (need outside services or SDKs): NDI (CS-P1-007/008, CS-P2-009), cloud remote and multi-operator (CS-P2-005/006), external song/scripture providers (CS-P2-003/004), plugin ecosystem and registry (CS-P1-009 runtime, CS-P2-001/002/010), recording and streaming (CS-P3-002).
