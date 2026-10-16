@@ -118,11 +118,16 @@
   .toggle.underline { text-decoration: underline; }
   .toggle.shadow { text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); }
   .position { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: #000; }
-  .grid button { width: 22px; height: 14px; border: 0; border-radius: 3px; background: color-mix(in srgb, #fff 10%, transparent); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  /* 28×20 targets 4px apart: every target's 24px circle stays clear of its neighbours (WCAG 2.5.8). */
+  .grid { display: grid; grid-template-columns: repeat(3, 28px); gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: #000; }
+  .grid button { width: 28px; height: 20px; border: 0; border-radius: 3px; background: color-mix(in srgb, #fff 10%, transparent); display: grid; place-items: center; cursor: pointer; padding: 0; }
   .grid button i { width: 8px; height: 4px; border-radius: 2px; background: color-mix(in srgb, #fff 35%, transparent); }
   .grid button[aria-checked="true"] { background: var(--accent); }
   .grid button[aria-checked="true"] i { background: #fff; }
   .link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; padding: 2px; }
   fieldset:disabled { opacity: 0.55; }
+  .toggle:focus-visible, .grid button:focus-visible, .link:focus-visible, select:focus-visible, .size:focus-visible, .color input:focus-visible {
+    outline: 2px solid var(--focus, var(--accent));
+    outline-offset: 2px;
+  }
 </style>

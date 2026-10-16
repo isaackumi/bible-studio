@@ -28,9 +28,10 @@
   } = $props();
 
   /** A layer that is hidden or leaves the scene plays its exit animation. */
-  function leave(_node: Element, animation: PaintedLayer["animation"]): TransitionConfig {
+  function leave(node: Element, animation: PaintedLayer["animation"]): TransitionConfig {
     const kind = animation?.exit ?? "none";
-    if (kind === "none") return { duration: 0 };
+    const reduced = node.closest(".app") !== null && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (kind === "none" || reduced) return { duration: 0 };
     const easing = animation?.easing === "linear" ? linear : animation?.easing === "ease-in" ? cubicIn : animation?.easing === "ease" ? cubicInOut : cubicOut;
     const shift: Record<string, string> = {
       "slide-left": "translateX(-12%)",

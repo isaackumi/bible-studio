@@ -40,6 +40,9 @@
       return;
     }
     const target = event.target instanceof HTMLElement ? event.target : null;
+    // Inside a modal dialog, keys belong to the dialog (Space presses its button, never Take).
+    // Escape still reaches the desk, which closes Find.
+    if (target?.closest('[aria-modal="true"]') && event.code !== "Escape") return;
     createKeyboardManager(session.workspace.shortcuts ?? defaultShortcuts, {
       take: () => void session.run("take"),
       cut: () => void session.run("cut"),

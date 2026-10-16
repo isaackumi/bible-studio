@@ -35,6 +35,20 @@
     };
   });
 
+  /** Two clicks: the first arms for three seconds, the second removes the phone. */
+  let armed = $state<string | null>(null);
+  let armTimer: ReturnType<typeof setTimeout> | undefined;
+  function removeDevice(id: string) {
+    clearTimeout(armTimer);
+    if (armed === id) {
+      armed = null;
+      session.revokeRemote(id);
+      return;
+    }
+    armed = id;
+    armTimer = setTimeout(() => (armed = null), 3000);
+  }
+
   function ago(at: number) {
     const minutes = Math.round((now - at) / 60000);
     if (minutes < 1) return "just now";
@@ -98,7 +112,13 @@
             <strong>{device.name}</strong>
             <small>Last seen {ago(device.lastSeen)} · signs out after 12 h idle</small>
           </span>
-          <button type="button" class="text" onclick={() => session.revokeRemote(device.id)}>Remove</button>
+          <button
+            type="button"
+            class="text"
+            class:armed={armed === device.id}
+            aria-label={armed === device.id ? `Confirm remove ${device.name}` : `Remove ${device.name}`}
+            onclick={() => removeDevice(device.id)}
+          >{armed === device.id ? "Remove? It must pair again" : "Remove"}</button>
         </li>
       {/each}
     </ul>
@@ -118,4 +138,5 @@
   .devices li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
   .devices span { display: flex; flex-direction: column; min-width: 0; }
   .devices small { color: var(--muted); }
+  .devices .armed { color: #ff8a8a; font-weight: 600; }
 </style>

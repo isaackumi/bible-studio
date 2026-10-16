@@ -6,27 +6,61 @@
     onclose,
     children,
     footer,
+    returnTo,
   }: {
     title: string;
     onclose: () => void;
     children: Snippet;
     footer?: Snippet;
+    /** Where focus goes on close when the control that opened the dialog is gone (a closed menu). */
+    returnTo?: () => HTMLElement | null | undefined;
   } = $props();
 
   const id = `desk-dialog-${Math.random().toString(36).slice(2, 8)}`;
+  let panel = $state<HTMLDivElement | undefined>();
+
+  const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  // Modal focus: move in on open (autofocus first), keep Tab inside, give focus back on close.
+  $effect(() => {
+    const node = panel;
+    if (!node) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const first = node.querySelector<HTMLElement>("[autofocus]") ?? node.querySelector<HTMLElement>(FOCUSABLE) ?? node;
+    first.focus();
+    return () => {
+      const usable = opener && opener !== document.body && opener.isConnected;
+      const target = usable ? opener : returnTo?.();
+      target?.focus();
+    };
+  });
 
   function onkeydown(event: KeyboardEvent) {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    onclose();
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onclose();
+      return;
+    }
+    if (event.key !== "Tab" || !panel) return;
+    const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((item) => item.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    if (event.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 </script>
 
 <svelte:window {onkeydown} />
 
 <div class="layer">
-  <button type="button" class="backdrop" aria-label="Close" onclick={onclose}></button>
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby={id}>
+  <button type="button" class="backdrop" aria-label="Close" tabindex="-1" onclick={onclose}></button>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
     <h2 {id}>{title}</h2>
     <div class="body">{@render children()}</div>
     {#if footer}
@@ -43,6 +77,7 @@
     display: grid;
     place-items: center;
   }
+  .panel:focus { outline: none; }
   .backdrop {
     position: absolute;
     inset: 0;

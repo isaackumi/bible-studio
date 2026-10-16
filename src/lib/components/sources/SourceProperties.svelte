@@ -17,6 +17,7 @@
     notice,
     onsave,
     onclose,
+    returnTo,
   }: {
     name: string;
     fields: SourceFields;
@@ -24,6 +25,7 @@
     notice: string | null;
     onsave: (name: string, fields: SourceFields) => void;
     onclose: () => void;
+    returnTo?: () => HTMLElement | null | undefined;
   } = $props();
 
   // Local drafts; the dialog is remounted per edit, so initial props are read once.
@@ -145,7 +147,7 @@
   }
 </script>
 
-<DeskDialog title={`Properties for “${initialName}”`} {onclose}>
+<DeskDialog title={`Properties for “${initialName}”`} {onclose} {returnTo}>
   {#if notice}
     <p class="notice" role="status">{notice}</p>
   {/if}

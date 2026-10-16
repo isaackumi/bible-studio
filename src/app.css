@@ -288,6 +288,8 @@ button { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .frame.timer.warning .line { animation: none; }
+  /* Operator monitors honor the setting; the audience projection is content, not desk motion. */
+  .app .comp-layer { animation: none !important; }
 }
 .comp-layer {
   position: absolute;

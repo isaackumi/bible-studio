@@ -49,10 +49,10 @@
   .timer-row { grid-template-columns: 1fr 1fr; }
   .flash { outline: 2px solid var(--gilt); }
   .tabs { display: flex; gap: 6px; }
-  .tabs button { flex: 1; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
+  .tabs button { flex: 1; min-height: 44px; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
   .tabs button[aria-selected="true"] { background: var(--pew-2); color: var(--linen); border-color: var(--gilt); }
   .list { display: flex; flex-direction: column; gap: 6px; max-height: 38dvh; overflow: auto; }
-  .list button { text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--pew); border: 1px solid var(--line); }
+  .list button { text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--pew); border: 1px solid var(--line); }
   .list button[aria-current="true"] { border-color: var(--gilt); }
   .list small { display: block; color: var(--mist); font-size: 12px; }
   .empty { color: var(--mist); margin: 6px 2px; }
@@ -65,7 +65,24 @@
   .msg { margin: 0; min-height: 1.4em; color: var(--warn); }
   .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--gilt); animation: spin 0.9s linear infinite; margin: 8px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .link { background: none; color: var(--mist); text-decoration: underline; padding: 6px; }
+  .pad-grid { display: flex; flex-direction: column; gap: 10px; }
+  .unpair { text-align: center; margin: 0; }
+  /* Short landscape screens: what is live on the left, controls on the right, TAKE without scrolling. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .pad-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-flow: row dense; column-gap: 12px; row-gap: 8px; align-items: start; }
+    .program, .preview, .tabs, #list, .unpair { grid-column: 1; }
+    .nav, .take, .row, #padMsg { grid-column: 2; }
+    .take { min-height: 64px; }
+    .body { max-height: 3.2em; }
+    #list { max-height: 30dvh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; border-top-color: var(--line); }
+    .btn:active { transform: none; }
+  }
+  .nav .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--gilt); outline-offset: 2px; }
+  .link { background: none; color: var(--mist); text-decoration: underline; padding: 6px 12px; min-height: 44px; }
 </style>
 </head>
 <body>
@@ -95,7 +112,7 @@
 </section>
 
 <main id="pad" hidden>
-  <div style="display:flex;flex-direction:column;gap:10px">
+  <div class="pad-grid">
     <section class="card program" aria-live="polite">
       <p class="kicker"><span>Program</span><b id="onair" hidden>ON AIR</b></p>
       <p class="cue" id="pCue">—</p>
@@ -107,8 +124,8 @@
       <p class="body" id="vBody"></p>
     </section>
     <div class="nav">
-      <button class="btn" data-cmd="previous" type="button">◀ Previous</button>
-      <button class="btn" data-cmd="next" type="button">Next ▶</button>
+      <button class="btn" data-cmd="previous" type="button"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Previous</button>
+      <button class="btn" data-cmd="next" type="button">Next <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
     <button class="take" data-cmd="take" type="button">TAKE</button>
     <div class="row">
@@ -127,7 +144,7 @@
       <button type="button" role="tab" id="tabScenes" aria-selected="false">Scenes</button>
     </div>
     <div class="list" id="list"></div>
-    <p style="text-align:center"><button class="link" id="unpair" type="button">Unpair this phone</button></p>
+    <p class="unpair"><button class="link" id="unpair" type="button">Unpair this phone</button></p>
   </div>
 </main>
 

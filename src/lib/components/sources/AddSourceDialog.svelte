@@ -9,12 +9,14 @@
     oncreate,
     onpick,
     onclose,
+    returnTo,
   }: {
     type: SourceKind;
     sources: SharedSource[];
     oncreate: (name: string) => void;
     onpick: (id: string) => void;
     onclose: () => void;
+    returnTo?: () => HTMLElement | null | undefined;
   } = $props();
 
   const existing = $derived(sourcesOfType(sources, type));
@@ -32,7 +34,7 @@
   }
 </script>
 
-<DeskDialog title={`Add ${sourceKindLabel(type)}`} {onclose}>
+<DeskDialog title={`Add ${sourceKindLabel(type)}`} {onclose} {returnTo}>
   <form class="add" onsubmit={submit}>
     <label class="choice">
       <input type="radio" name="add-mode" value="new" bind:group={mode} />

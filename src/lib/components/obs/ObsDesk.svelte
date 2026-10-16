@@ -42,6 +42,7 @@
   let selectedLayerId = $state<string | null>(null);
   let renameDraft = $state("");
   let typeMenu = $state(false);
+  let addSourceButton = $state<HTMLButtonElement | undefined>();
   /** Drag-to-reorder in the Sources list (front of the stack is the top row). */
   let dragId = $state<string | null>(null);
   let dropIndex = $state<number | null>(null);
@@ -222,8 +223,23 @@
     renameDraft = scene.name;
   }
 
+  /** Removing is two clicks: the first arms the button for three seconds, the second removes. */
+  let armed = $state<"scene" | "source" | null>(null);
+  let armTimer: ReturnType<typeof setTimeout> | undefined;
+  function arm(what: "scene" | "source"): boolean {
+    if (armed === what) {
+      armed = null;
+      clearTimeout(armTimer);
+      return true;
+    }
+    armed = what;
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => (armed = null), 3000);
+    return false;
+  }
+
   function removeActiveScene() {
-    if (!activeScene || activeScene.locked) return;
+    if (!activeScene || activeScene.locked || !arm("scene")) return;
     session.deleteLook(activeScene.id);
     selectedLayerId = null;
   }
@@ -308,7 +324,7 @@
   }
 
   function removeSelectedSource() {
-    if (!activeScene || sceneLocked || !selectedLayer) return;
+    if (!activeScene || sceneLocked || !selectedLayer || !arm("source")) return;
     session.removeSceneLayer(activeScene, selectedLayer.id);
     selectedLayerId = null;
   }
@@ -474,13 +490,15 @@
             >{sceneLocked ? "Unlock" : "Lock"}</button>
             <button
               type="button"
-              class="desk-btn icon"
-              data-tip="Remove scene"
-              aria-label="Remove scene"
+              class="desk-btn"
+              class:icon={armed !== "scene"}
+              class:armed={armed === "scene"}
+              data-tip="Remove scene (click twice)"
+              aria-label={armed === "scene" ? `Confirm remove ${activeScene?.name ?? "scene"}` : "Remove scene"}
               disabled={!activeScene || sceneLocked}
               onclick={removeActiveScene}
             >
-              <Icon name="minus" size={16} />
+              {#if armed === "scene"}Remove?{:else}<Icon name="minus" size={16} />{/if}
             </button>
           </footer>
         </section>
@@ -585,6 +603,7 @@
             class="desk-btn icon"
             class:on={typeMenu}
             aria-label="Add source"
+            bind:this={addSourceButton}
             aria-haspopup="menu"
             aria-expanded={typeMenu}
             data-tip="Add source"
@@ -595,13 +614,15 @@
           </button>
           <button
             type="button"
-            class="desk-btn icon"
-            aria-label="Remove source"
-            data-tip="Remove source from this scene"
+            class="desk-btn"
+            class:icon={armed !== "source"}
+            class:armed={armed === "source"}
+            aria-label={armed === "source" ? `Confirm remove ${selectedLayer?.name ?? "source"}` : "Remove source"}
+            data-tip="Remove source from this scene (click twice)"
             disabled={sceneLocked || !selectedLayer}
             onclick={removeSelectedSource}
           >
-            <Icon name="minus" size={16} />
+            {#if armed === "source"}Remove?{:else}<Icon name="minus" size={16} />{/if}
           </button>
           <button
             type="button"
@@ -702,7 +723,14 @@
 />
 
 {#if adding}
-  <AddSourceDialog type={adding} sources={session.sharedSources} oncreate={createNamed} onpick={pickExisting} onclose={() => (adding = null)} />
+  <AddSourceDialog
+    type={adding}
+    sources={session.sharedSources}
+    oncreate={createNamed}
+    onpick={pickExisting}
+    onclose={() => (adding = null)}
+    returnTo={() => addSourceButton}
+  />
 {/if}
 {#if editing}
   <SourceProperties
@@ -712,6 +740,7 @@
     notice={editing.notice}
     onsave={saveProperties}
     onclose={() => (editing = null)}
+    returnTo={() => addSourceButton}
   />
 {/if}
 
@@ -911,6 +940,7 @@
   .list button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
   .source-row { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; border-top: 2px solid transparent; }
   .source-row[draggable="true"] { cursor: grab; }
+  .desk-btn.armed { background: var(--live, #d92d20); border-color: var(--live, #d92d20); color: #fff; }
   .source-row.dragging { opacity: 0.45; }
   .source-row.drop-before { border-top-color: var(--accent); }
   .source-row > button:first-child { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
