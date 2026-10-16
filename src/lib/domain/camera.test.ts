@@ -8,6 +8,7 @@ import {
   camerasIn,
   camerasNeeded,
   cameraSourceId,
+  discoverCameras,
   listVideoInputs,
   openCamera,
   planFeeds,
@@ -138,5 +139,46 @@ describe("camera composition feeds", () => {
     const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
     expect(camerasIn(taken.program.model, taken.program.sourceId)).toEqual(["camera:cam-1", "camera:cam-2"]);
     expect(JSON.parse(JSON.stringify(taken.program.model))).toEqual(taken.program.model);
+  });
+});
+
+describe("discoverCameras", () => {
+  const iriun = { deviceId: "iriun", kind: "videoinput", label: "Iriun Webcam" };
+  const facetime = { deviceId: "ft", kind: "videoinput", label: "FaceTime HD Camera" };
+
+  it("asks for permission when cameras are hidden, then lists every camera", async () => {
+    let granted = false;
+    let stopped = 0;
+    const result = await discoverCameras({
+      enumerateDevices: async () => (granted ? [facetime, iriun] : [{ deviceId: "", kind: "videoinput", label: "" }]),
+      getUserMedia: async () => {
+        granted = true;
+        return { getTracks: () => [{ stop: () => stopped++ }] };
+      },
+    });
+    expect(result.cameras.map((camera) => camera.label)).toEqual(["FaceTime HD Camera", "Iriun Webcam"]);
+    expect(result.note).toBe("");
+    expect(stopped).toBe(1);
+  });
+
+  it("does not prompt again once cameras are visible", async () => {
+    let prompts = 0;
+    const result = await discoverCameras({
+      enumerateDevices: async () => [facetime, iriun],
+      getUserMedia: async () => (prompts++, {}),
+    });
+    expect(result.cameras).toHaveLength(2);
+    expect(prompts).toBe(0);
+  });
+
+  it("explains how to allow the camera when permission is denied", async () => {
+    const result = await discoverCameras({
+      enumerateDevices: async () => [{ deviceId: "", kind: "videoinput", label: "" }],
+      getUserMedia: async () => {
+        throw Object.assign(new Error("denied"), { name: "NotAllowedError" });
+      },
+    });
+    expect(result.cameras).toEqual([]);
+    expect(result.note).toMatch(/Privacy & Security/);
   });
 });

@@ -21,7 +21,7 @@ export function cameraDeniedMessage() {
 }
 
 export function cameraUnavailableMessage() {
-  return "No camera is available.";
+  return "No camera is available. Phone cameras (Iriun, Camo) must be running on the phone and computer before you press Refresh.";
 }
 
 export function cameraSourceId(deviceId: string) {
@@ -69,6 +69,36 @@ export function listVideoInputs(devices: MediaDeviceInfoLike[]): CameraDevice[] 
   return devices
     .filter((device) => device.kind === "videoinput" && device.deviceId)
     .map((device) => ({ deviceId: device.deviceId, label: device.label.trim() || "Camera" }));
+}
+
+export type CameraDiscoveryMedia = CameraMedia & {
+  enumerateDevices: () => Promise<MediaDeviceInfoLike[]>;
+};
+
+/**
+ * List cameras, asking for camera permission first when the browser hides them.
+ * Before permission, WebKit and Chromium report cameras with empty ids and labels,
+ * so phone and virtual cameras (Iriun, Camo, Continuity) look like nothing is attached.
+ */
+export async function discoverCameras(media: CameraDiscoveryMedia): Promise<{ cameras: CameraDevice[]; note: string }> {
+  const first = await media.enumerateDevices();
+  const hidden = first.some((device) => device.kind === "videoinput" && (!device.deviceId || !device.label));
+  const found = listVideoInputs(first);
+  if (!hidden && found.length) return { cameras: found, note: "" };
+  try {
+    stopCameraStream((await media.getUserMedia({ audio: false, video: true })) as Parameters<typeof stopCameraStream>[0]);
+  } catch (error) {
+    const name = error && typeof error === "object" && "name" in error ? String((error as { name: string }).name) : "";
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") return { cameras: found, note: cameraDeniedHelp() };
+    if (!found.length) return { cameras: [], note: cameraUnavailableMessage() };
+    return { cameras: found, note: "" };
+  }
+  const cameras = listVideoInputs(await media.enumerateDevices());
+  return { cameras, note: cameras.length ? "" : cameraUnavailableMessage() };
+}
+
+export function cameraDeniedHelp() {
+  return "Camera permission was denied. Allow Church Studio in System Settings › Privacy & Security › Camera, then press Refresh.";
 }
 
 export function presentCamera(input: { theme: Theme; label: string }): PresentationModel {

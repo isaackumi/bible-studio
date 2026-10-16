@@ -53,7 +53,8 @@ import {
   cameraUnavailableMessage,
   planFeeds,
   type CameraFeeds,
-  listVideoInputs,
+  discoverCameras,
+  type CameraDiscoveryMedia,
   openCamera,
   presentCamera,
   previewCameraLive,
@@ -1824,10 +1825,18 @@ class Session {
       this.cameraNote = cameraUnavailableMessage();
       return;
     }
-    const devices = await media.enumerateDevices();
-    this.cameras = listVideoInputs(devices as Array<{ deviceId: string; kind: string; label: string }>);
-    if (!this.cameras.length) this.cameraNote = cameraUnavailableMessage();
+    if (!this.watchingDevices && media.addEventListener) {
+      this.watchingDevices = true;
+      // Phone cameras (Iriun, Camo) often connect after the app opens.
+      media.addEventListener("devicechange", () => void this.loadCameras());
+    }
+    this.discovering ??= discoverCameras(media as unknown as CameraDiscoveryMedia).finally(() => (this.discovering = null));
+    const { cameras, note } = await this.discovering;
+    this.cameras = cameras;
+    this.cameraNote = note;
   };
+  private discovering: Promise<{ cameras: CameraDevice[]; note: string }> | null = null;
+  private watchingDevices = false;
 
   previewCamera = async (deviceId: string) => {
     const ok = await this.openFeed(cameraSourceId(deviceId));

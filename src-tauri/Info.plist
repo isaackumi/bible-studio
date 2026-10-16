@@ -20,6 +20,8 @@
   <string>0.1.0</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Church Studio listens so it can suggest the verse being read. The suggestion stays on Preview until you press LIVE.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Church Studio shows your cameras, including phone cameras like Iriun, on Preview and on Program when you take them.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Church Studio uses on-device speech recognition to detect scripture. It does not send Program by itself.</string>
 </dict>
