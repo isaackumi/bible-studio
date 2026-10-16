@@ -22,6 +22,9 @@ describe("voice commands", () => {
     expect(parseVoiceCommand("studio clear the screen")).toMatchObject({ kind: "command", id: "clear", live: true });
     expect(parseVoiceCommand("studio black screen")).toMatchObject({ kind: "command", id: "black", live: true });
     expect(parseVoiceCommand("studio show logo")).toMatchObject({ kind: "command", id: "logo", live: true });
+    expect(parseVoiceCommand("studio pause the timer")).toMatchObject({ kind: "command", id: "timer-pause", live: true });
+    expect(parseVoiceCommand("studio start timer")).toMatchObject({ kind: "command", id: "timer-resume", live: true });
+    expect(parseVoiceCommand("studio reset the countdown")).toMatchObject({ kind: "command", id: "timer-reset", live: true });
   });
 
   it("opens libraries and searches without touching Program", () => {

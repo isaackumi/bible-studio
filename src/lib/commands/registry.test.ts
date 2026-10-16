@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PROGRAM_ACTIONS } from "../domain/types";
-import { changesProgram, programCommandIds, programCommandsMatchActions } from "./registry";
+import { changesProgram, programCommandIds, programCommandsMatchActions, TIMER_COMMANDS } from "./registry";
 
 describe("commands", () => {
-  it("lets only take, cut, clear, black, and logo change program", () => {
+  it("lets only take, cut, clear, black, logo and timer controls change program", () => {
     expect(programCommandsMatchActions()).toBe(true);
-    expect(programCommandIds()).toEqual([...PROGRAM_ACTIONS]);
+    expect(programCommandIds()).toEqual([...PROGRAM_ACTIONS, ...TIMER_COMMANDS]);
     expect(changesProgram("next")).toBe(false);
     expect(changesProgram("focus")).toBe(false);
     expect(changesProgram("library")).toBe(false);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TimerControls from "../TimerControls.svelte";
   import MediaPane from "../MediaPane.svelte";
   import { findItem } from "../../domain/service";
   import TextStyleEditor from "../TextStyleEditor.svelte";
@@ -1121,6 +1122,7 @@
                     </button>
                   </header>
                   <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+                  <TimerControls compact />
                   <footer class="output-tools">
                     <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
                     <span class="steppers">

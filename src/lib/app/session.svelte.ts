@@ -104,6 +104,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
+import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
 import { parseVoiceCommand, voiceCommandLabel, type VoiceCommand } from "../voice/commands";
 import {
   openPrivacySettings,
@@ -774,6 +775,7 @@ class Session {
       items: JSON.stringify(items.slice(0, 200)),
       scenes: JSON.stringify(scenes.slice(0, 100)),
       live: REMOTE_LIVE_COMMANDS.join(","),
+      timer: this.programTimerState,
     };
   };
 
@@ -2312,8 +2314,33 @@ class Session {
       case "toggle-live":
         this.liveMode = !this.liveMode;
         return;
+      case "timer-pause":
+        return this.controlTimer("pause");
+      case "timer-resume":
+        return this.controlTimer("resume");
+      case "timer-reset":
+        return this.controlTimer("reset");
     }
   };
+
+  /** Pause, start or reset the timer(s) on Program, in place (no fade), and on the audience. */
+  controlTimer = async (action: TimerAction) => {
+    const model = controlTimers(this.live.program.model, action, Date.now());
+    if (!model) {
+      this.message = "There is no timer on Program.";
+      return;
+    }
+    this.live = replaceProgramModel(this.live, model, "cut");
+    await this.pushProgram();
+    this.message = action === "pause" ? "Timer paused." : action === "resume" ? "Timer running." : "Timer reset. Start it when ready.";
+  };
+
+  /** "running", "paused" or "" (no controllable timer on Program). */
+  get programTimerState(): "running" | "paused" | "" {
+    const timers = timersIn(this.live.program.model);
+    if (!timers.length) return "";
+    return timers.some((timer) => timer.running) ? "running" : "paused";
+  }
 
   escape = () => {
     if (this.findOpen) {

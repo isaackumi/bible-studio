@@ -6,7 +6,10 @@ export type CommandId =
   | "open-settings"
   | "toggle-audience"
   | "toggle-live"
-  | "save-workspace";
+  | "save-workspace"
+  | "timer-pause"
+  | "timer-resume"
+  | "timer-reset";
 
 export type CommandSpec = {
   id: CommandId;
@@ -22,6 +25,9 @@ export const COMMANDS: CommandSpec[] = [
   { id: "clear", title: "Clear", group: "Program", changesProgram: true, shortcut: "clear" },
   { id: "black", title: "Black", group: "Program", changesProgram: true, shortcut: "black" },
   { id: "logo", title: "Logo", group: "Program", changesProgram: true, shortcut: "logo" },
+  { id: "timer-pause", title: "Pause timer", group: "Program", changesProgram: true, shortcut: null },
+  { id: "timer-resume", title: "Start timer", group: "Program", changesProgram: true, shortcut: null },
+  { id: "timer-reset", title: "Reset timer", group: "Program", changesProgram: true, shortcut: null },
   { id: "previous", title: "Previous", group: "Service", changesProgram: false, shortcut: "previous" },
   { id: "next", title: "Next", group: "Service", changesProgram: false, shortcut: "next" },
   { id: "escape", title: "Leave text field", group: "Service", changesProgram: false, shortcut: "escape" },
@@ -43,7 +49,12 @@ export function changesProgram(id: CommandId): boolean {
   return COMMANDS.some((command) => command.id === id && command.changesProgram);
 }
 
+/** Change the timer already on Program (not which frame is on Program). */
+export const TIMER_COMMANDS: CommandId[] = ["timer-pause", "timer-resume", "timer-reset"];
+
+/** Program changes only through the frame actions (take, cut, clear, black, logo) and timer controls. */
 export function programCommandsMatchActions(): boolean {
   const ids = programCommandIds();
-  return ids.length === PROGRAM_ACTIONS.length && PROGRAM_ACTIONS.every((action, index) => action === ids[index]);
+  const expected: CommandId[] = [...PROGRAM_ACTIONS, ...TIMER_COMMANDS];
+  return ids.length === expected.length && expected.every((action, index) => action === ids[index]);
 }

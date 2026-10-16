@@ -46,6 +46,7 @@
   .take { min-height: 76px; border-radius: 20px; background: var(--ember); border: 0; font-size: 22px; letter-spacing: 0.08em; font-weight: 800; box-shadow: 0 14px 34px rgba(226, 61, 46, 0.35); }
   .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .row .btn { min-height: 48px; font-size: 14px; }
+  .timer-row { grid-template-columns: 1fr 1fr; }
   .flash { outline: 2px solid var(--gilt); }
   .tabs { display: flex; gap: 6px; }
   .tabs button { flex: 1; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
@@ -115,6 +116,10 @@
       <button class="btn" data-cmd="clear" type="button">Clear</button>
       <button class="btn" data-cmd="black" type="button">Black</button>
       <button class="btn" data-cmd="logo" type="button">Logo</button>
+    </div>
+    <div class="row timer-row" id="timerRow" hidden>
+      <button class="btn" id="timerToggle" data-timer="timer-pause" type="button">Pause timer</button>
+      <button class="btn" data-cmd="timer-reset" type="button">Reset timer</button>
     </div>
     <p class="msg" id="padMsg"></p>
     <div class="tabs" role="tablist">
@@ -194,7 +199,7 @@
     $("pad").hidden = !paired || next === "unauthorized";
     $("waiting").hidden = next !== "waiting";
     $("pair").hidden = paired && next !== "unauthorized" ? true : next === "waiting";
-    document.querySelectorAll("[data-cmd]").forEach((button) => { button.disabled = next !== "connected"; });
+    document.querySelectorAll("[data-cmd], [data-timer]").forEach((button) => { button.disabled = next !== "connected"; });
   }
 
   function guessName() {
@@ -278,6 +283,10 @@
     $("vCue").textContent = payload.previewCue || "—";
     $("vBody").textContent = payload.previewBody || "";
     $("onair").hidden = payload.output !== "on";
+    $("timerRow").hidden = !payload.timer;
+    const toggle = $("timerToggle");
+    toggle.dataset.timer = payload.timer === "running" ? "timer-pause" : "timer-resume";
+    toggle.textContent = payload.timer === "running" ? "Pause timer" : "Start timer";
     last = payload;
     renderList();
   }
@@ -358,6 +367,7 @@
   document.querySelectorAll("[data-cmd]").forEach((button) => {
     button.addEventListener("click", () => act("command", { id: button.dataset.cmd }, button));
   });
+  $("timerToggle").addEventListener("click", (event) => act("command", { id: event.currentTarget.dataset.timer }, event.currentTarget));
   $("tabItems").addEventListener("click", () => { view = "items"; $("tabItems").setAttribute("aria-selected", "true"); $("tabScenes").setAttribute("aria-selected", "false"); renderList(); });
   $("tabScenes").addEventListener("click", () => { view = "scenes"; $("tabScenes").setAttribute("aria-selected", "true"); $("tabItems").setAttribute("aria-selected", "false"); renderList(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(true); });

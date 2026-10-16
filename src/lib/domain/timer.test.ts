@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applyProgramAction, createLiveState } from "./live";
-import { defaultTheme } from "./theme";
+import { defaultTheme, emptyModel } from "./theme";
 import {
+  controlTimers,
   createTimer,
+  timersIn,
   formatClock,
   pauseTimer,
   presentTimer,
@@ -78,5 +80,29 @@ describe("timer source", () => {
     const snapshot = taken.program.model.layers?.[0]?.model.timer;
     expect(timerDisplay(timerFromPaint(snapshot!), 60_000).text).toBe("07:00");
     expect(taken.program.model.layers?.[0]?.model.timer?.elapsedMs).toBe(0);
+  });
+});
+
+describe("timer controls on a painted frame", () => {
+  const theme = defaultTheme();
+  const running = () => presentTimer(startTimer(createTimer({ name: "Service", mode: "countdown", durationMs: 600_000 }), 1_000), theme, 1_000);
+
+  it("pauses, resumes and resets a countdown without losing time", () => {
+    const paused = controlTimers(running(), "pause", 61_000)!;
+    expect(paused.timer).toMatchObject({ running: false, elapsedMs: 60_000, startedAt: null });
+    expect(timerDisplay(timerFromPaint(paused.timer!), 500_000).text).toBe("09:00");
+    const resumed = controlTimers(paused, "resume", 100_000)!;
+    expect(resumed.timer).toMatchObject({ running: true, startedAt: 100_000, elapsedMs: 60_000 });
+    expect(timerDisplay(timerFromPaint(resumed.timer!), 130_000).text).toBe("08:30");
+    expect(controlTimers(resumed, "reset", 200_000)!.timer).toMatchObject({ running: false, elapsedMs: 0, startedAt: null });
+  });
+
+  it("reaches timers inside scene layers and ignores clocks and frames without timers", () => {
+    const scene = { ...emptyModel(theme), layout: "composition" as const, layers: [{ id: "l", zIndex: 0, opacity: 1, bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "contain" as const, sourceId: "timer:t", model: running() }] };
+    expect(timersIn(scene)).toHaveLength(1);
+    expect(controlTimers(scene, "pause", 11_000)!.layers![0]!.model.timer).toMatchObject({ running: false, elapsedMs: 10_000 });
+    const clock = presentTimer(createTimer({ name: "Clock", mode: "clock" }), theme, 0);
+    expect(controlTimers(clock, "pause", 5)).toBeNull();
+    expect(controlTimers(emptyModel(theme), "reset", 5)).toBeNull();
   });
 });

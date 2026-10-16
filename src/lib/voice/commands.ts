@@ -21,6 +21,9 @@ const PHRASES: Array<[RegExp, CommandId]> = [
   [/^(?:clear|clear (?:the )?(?:screen|program|output))$/, "clear"],
   [/^(?:black|blackout|black ?out|black (?:the )?screen|go black|fade to black)$/, "black"],
   [/^(?:logo|show (?:the )?logo)$/, "logo"],
+  [/^(?:pause|stop|hold|freeze) (?:the )?(?:timer|countdown|clock)$/, "timer-pause"],
+  [/^(?:start|resume|continue|run) (?:the )?(?:timer|countdown)$/, "timer-resume"],
+  [/^(?:reset|restart) (?:the )?(?:timer|countdown)$/, "timer-reset"],
 ];
 
 function normalize(text: string): string {

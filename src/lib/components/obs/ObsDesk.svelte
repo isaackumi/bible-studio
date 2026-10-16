@@ -25,6 +25,7 @@
   import AddSourceDialog from "../sources/AddSourceDialog.svelte";
   import SourceProperties from "../sources/SourceProperties.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
+  import TimerControls from "../TimerControls.svelte";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -407,6 +408,7 @@
           <Icon name="logo" size={16} /> LOGO
         </button>
       </div>
+      <TimerControls />
     </aside>
     </Pane>
     <PaneResizer />

@@ -187,3 +187,30 @@ export function presentTimer(timer: TimerSpec, theme: Theme, now: number): Prese
     },
   };
 }
+
+export type TimerAction = "pause" | "resume" | "reset";
+
+/** Pause, resume or reset one painted timer. Clocks have nothing to control. */
+export function controlPaint(paint: TimerPaint, action: TimerAction, now: number): TimerPaint {
+  if (paint.mode === "clock") return paint;
+  const spec = timerFromPaint(paint);
+  const next = action === "pause" ? pauseTimer(spec, now) : action === "resume" ? resumeTimer(spec, now) : resetTimer(spec);
+  return { ...paint, running: next.running, startedAt: next.startedAt, elapsedMs: next.elapsedMs };
+}
+
+/** Controllable timers (not clocks) in a frame, including scene layers. */
+export function timersIn(model: PresentationModel): TimerPaint[] {
+  const own = model.timer && model.timer.mode !== "clock" ? [model.timer] : [];
+  return [...own, ...(model.layers ?? []).flatMap((layer) => timersIn(layer.model))];
+}
+
+/** Apply a timer action to every timer in a frame. Null when the frame has no timer. */
+export function controlTimers(model: PresentationModel, action: TimerAction, now: number): PresentationModel | null {
+  if (!timersIn(model).length) return null;
+  const apply = (frame: PresentationModel): PresentationModel => ({
+    ...frame,
+    ...(frame.timer ? { timer: controlPaint(frame.timer, action, now) } : {}),
+    ...(frame.layers ? { layers: frame.layers.map((layer) => ({ ...layer, model: apply(layer.model) })) } : {}),
+  });
+  return apply(model);
+}

@@ -18,10 +18,10 @@ export function setPreview(state: LiveState, next: LiveFrame): LiveState {
 }
 
 /** Replace Program scripture in place. Does not copy Preview. Used when the live translation changes. */
-export function replaceProgramModel(state: LiveState, model: PresentationModel): LiveState {
+export function replaceProgramModel(state: LiveState, model: PresentationModel, transition: "cut" | "fade" = "fade"): LiveState {
   return {
     preview: state.preview,
-    program: { ...state.program, model, transition: "fade" },
+    program: { ...state.program, model, transition },
     revision: state.revision + 1,
   };
 }
