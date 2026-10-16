@@ -681,6 +681,7 @@
   }
   :global(.studio [data-pane]) { padding: 0 4px; }
   .pane, .dock {
+    height: 100%;
     min-width: 0;
     min-height: 0;
     display: flex;
