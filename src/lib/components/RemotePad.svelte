@@ -198,7 +198,7 @@
     font-size: 22px;
     letter-spacing: -0.02em;
   }
-  .link, .kicker, .foot, label span, .note {
+  .link, .kicker, .foot, label span {
     margin: 0;
     color: var(--mist);
     font-size: 12px;
@@ -264,7 +264,6 @@
     white-space: pre-wrap;
   }
   .attr { margin: 0 0 8px; color: var(--gilt); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
-  .note { letter-spacing: 0.04em; text-transform: none; line-height: 1.45; max-width: 28em; }
   .arrows {
     display: grid;
     grid-template-columns: 1fr 1.4fr;

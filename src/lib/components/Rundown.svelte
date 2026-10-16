@@ -39,7 +39,7 @@
         </div>
         {#each section.items as item (item.id)}
           <div class="item-row" class:selected={session.cursor.itemId === item.id}>
-            <span class="on-air-mark" class:live={session.live.program.sourceId === item.id}></span>
+            <span class="on-air-mark" class:live={session.live.program.sourceId === item.id || (item.kind === "composition" && (session.live.program.sourceId === item.composition?.compositionId || session.live.program.sourceId === `composition:${item.composition?.compositionId}`))}></span>
             <button type="button" class="text-button" onclick={() => session.selectItem(item.id)}>
               <div>{item.title}</div>
               <div class="kind">{item.kind}</div>

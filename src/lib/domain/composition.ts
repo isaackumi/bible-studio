@@ -2,7 +2,8 @@ import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText } from "./present";
 import { createTimer, presentTimer, type TimerMode } from "./timer";
-import type { LiveState, PresentationModel, Theme } from "./types";
+import { emptyModel } from "./theme";
+import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, Theme } from "./types";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -55,6 +56,8 @@ export type CompositionLayer = {
 export type Composition = {
   id: string;
   name: string;
+  /** Full freeze: no rename, layer, or transition edits until unlock. */
+  locked: boolean;
   canvas: { width: number; height: number };
   layers: CompositionLayer[];
   transition: { type: "cut" | "fade"; ms: number };
@@ -198,16 +201,32 @@ export function createComposition(name: string): Composition {
   return {
     id: `composition:${Math.random().toString(36).slice(2, 10)}`,
     name: name.trim() || "Composition",
+    locked: false,
     canvas: { width: 1920, height: 1080 },
     layers: [],
     transition: { type: "fade", ms: 450 },
   };
 }
 
+/** Empty named scene: one full-frame empty layer. Production Desk “New scene”. */
+export function createScene(name = "Scene"): Composition {
+  return addLayer(createComposition(name), {
+    name: "Main",
+    bounds: { x: 0, y: 0, w: 100, h: 100 },
+    fit: "contain",
+    source: sourceRef("empty", "main", "Main"),
+  });
+}
+
+export function setCompositionLocked(composition: Composition, locked: boolean): Composition {
+  return { ...composition, locked: !!locked };
+}
+
 export function addLayer(
   composition: Composition,
   input: { name: string; bounds: LayerBounds; source?: SourceRef; fit?: LayerFit },
 ): Composition {
+  if (composition.locked) return composition;
   const layer: CompositionLayer = {
     id: uid(),
     name: input.name.trim() || `Layer ${composition.layers.length + 1}`,
@@ -227,7 +246,13 @@ export function layerOrder(composition: Composition): CompositionLayer[] {
   return [...composition.layers].sort((left, right) => left.zIndex - right.zIndex || left.name.localeCompare(right.name));
 }
 
+/** Photoshop-style stack: front (highest z-index) first. */
+export function layerStackFrontFirst(composition: Composition): CompositionLayer[] {
+  return layerOrder(composition).slice().reverse();
+}
+
 export function reorderLayers(composition: Composition, layerId: string, direction: 1 | -1): Composition {
+  if (composition.locked) return composition;
   const ordered = layerOrder(composition);
   const index = ordered.findIndex((layer) => layer.id === layerId);
   const target = index + direction;
@@ -242,7 +267,61 @@ export function reorderLayers(composition: Composition, layerId: string, directi
   };
 }
 
+export function renameLayer(composition: Composition, layerId: string, name: string): Composition {
+  if (composition.locked) return composition;
+  const next = name.trim();
+  if (!next) return composition;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, name: next } : layer)),
+  };
+}
+
+export function removeLayer(composition: Composition, layerId: string): Composition {
+  if (composition.locked) return composition;
+  if (!composition.layers.some((layer) => layer.id === layerId)) return composition;
+  const layers = layerOrder(composition)
+    .filter((layer) => layer.id !== layerId)
+    .map((layer, zIndex) => ({ ...layer, zIndex }));
+  return { ...composition, layers };
+}
+
+export function duplicateLayer(composition: Composition, layerId: string): Composition {
+  if (composition.locked) return composition;
+  const source = composition.layers.find((layer) => layer.id === layerId);
+  if (!source) return composition;
+  const copy: CompositionLayer = {
+    ...source,
+    id: uid(),
+    name: `${source.name} copy`,
+    zIndex: composition.layers.length,
+    source: sanitizeSource({ ...source.source, payload: { ...source.source.payload } }),
+    animation: sanitizeAnimation(source.animation),
+    bounds: sanitizeBounds(source.bounds),
+  };
+  return { ...composition, layers: [...composition.layers, copy] };
+}
+
+export function duplicateLook(composition: Composition): Composition {
+  const clean = sanitizeComposition(composition);
+  return {
+    ...clean,
+    id: `composition:${Math.random().toString(36).slice(2, 10)}`,
+    name: `${clean.name} copy`,
+    locked: false,
+    layers: clean.layers.map((layer, zIndex) => ({
+      ...layer,
+      id: uid(),
+      zIndex,
+      source: sanitizeSource({ ...layer.source, payload: { ...layer.source.payload } }),
+      animation: sanitizeAnimation(layer.animation),
+      bounds: sanitizeBounds(layer.bounds),
+    })),
+  };
+}
+
 export function hideLayer(composition: Composition, layerId: string): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, visible: false } : layer)),
@@ -250,6 +329,7 @@ export function hideLayer(composition: Composition, layerId: string): Compositio
 }
 
 export function showLayer(composition: Composition, layerId: string): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, visible: true } : layer)),
@@ -257,13 +337,118 @@ export function showLayer(composition: Composition, layerId: string): Compositio
 }
 
 export function resizeLayer(composition: Composition, layerId: string, bounds: LayerBounds): Composition {
+  if (composition.locked) return composition;
+  const target = composition.layers.find((layer) => layer.id === layerId);
+  if (!target || target.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, bounds: sanitizeBounds(bounds) } : layer)),
   };
 }
 
+export type LayerDragHandle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+function clampDragBounds(bounds: LayerBounds, handle: LayerDragHandle): LayerBounds {
+  let { x, y, w, h } = bounds;
+  w = Math.max(1, w);
+  h = Math.max(1, h);
+  if (handle === "move") {
+    x = Math.min(100 - w, Math.max(0, x));
+    y = Math.min(100 - h, Math.max(0, y));
+    return { x, y, w, h };
+  }
+  if (x < 0) {
+    w += x;
+    x = 0;
+  }
+  if (y < 0) {
+    h += y;
+    y = 0;
+  }
+  if (x + w > 100) w = 100 - x;
+  if (y + h > 100) h = 100 - y;
+  w = Math.min(100, Math.max(1, w));
+  h = Math.min(100, Math.max(1, h));
+  x = Math.min(100 - w, Math.max(0, x));
+  y = Math.min(100 - h, Math.max(0, y));
+  return { x, y, w, h };
+}
+
+export function applyLayerDrag(
+  composition: Composition,
+  layerId: string,
+  handle: LayerDragHandle,
+  delta: { dx: number; dy: number },
+): Composition {
+  if (composition.locked) return composition;
+  const layer = composition.layers.find((entry) => entry.id === layerId);
+  if (!layer || layer.locked) return composition;
+  let { x, y, w, h } = layer.bounds;
+  const dx = Number.isFinite(delta.dx) ? delta.dx : 0;
+  const dy = Number.isFinite(delta.dy) ? delta.dy : 0;
+  if (handle === "move") {
+    x += dx;
+    y += dy;
+  } else {
+    if (handle.includes("e")) w += dx;
+    if (handle.includes("s")) h += dy;
+    if (handle.includes("w")) {
+      x += dx;
+      w -= dx;
+    }
+    if (handle.includes("n")) {
+      y += dy;
+      h -= dy;
+    }
+  }
+  return resizeLayer(composition, layerId, clampDragBounds({ x, y, w, h }, handle));
+}
+
+export function setLayerOpacity(composition: Composition, layerId: string, opacity: number): Composition {
+  if (composition.locked) return composition;
+  const next = Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, opacity: next } : layer)),
+  };
+}
+
+function sanitizeFit(fit: LayerFit | string): LayerFit {
+  return fit === "cover" || fit === "fill" ? fit : "contain";
+}
+
+export function setLayerFit(composition: Composition, layerId: string, fit: LayerFit): Composition {
+  if (composition.locked) return composition;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, fit: sanitizeFit(fit) } : layer)),
+  };
+}
+
+export function setLayerLocked(composition: Composition, layerId: string, locked: boolean): Composition {
+  if (composition.locked) return composition;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, locked } : layer)),
+  };
+}
+
+export function setLayerAnimation(
+  composition: Composition,
+  layerId: string,
+  animation: Partial<LayerAnimation>,
+): Composition {
+  if (composition.locked) return composition;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) =>
+      layer.id === layerId ? { ...layer, animation: sanitizeAnimation({ ...layer.animation, ...animation }) } : layer,
+    ),
+  };
+}
+
 export function assignLayerSource(composition: Composition, layerId: string, source: SourceRef): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, source: sanitizeSource(source) } : layer)),
@@ -273,6 +458,30 @@ export function assignLayerSource(composition: Composition, layerId: string, sou
 export function assignText(composition: Composition, layerId: string, heading: string, body: string): Composition {
   const title = heading.trim() || "Announcement";
   return assignLayerSource(composition, layerId, sourceRef("text", "announcement", title, { heading: title, body }));
+}
+
+export function assignScripture(
+  composition: Composition,
+  layerId: string,
+  input: { reference: string; body: string; attribution?: string; verse?: number },
+): Composition {
+  const reference = input.reference.trim() || "Scripture";
+  const verse = Number.isFinite(input.verse) ? Math.max(1, Math.round(Number(input.verse))) : 1;
+  return assignLayerSource(
+    composition,
+    layerId,
+    sourceRef("scripture", reference, reference, {
+      reference,
+      body: input.body,
+      attribution: input.attribution?.trim() || "",
+      verse: String(verse),
+    }),
+  );
+}
+
+export function assignSong(composition: Composition, layerId: string, input: { label: string; body: string }): Composition {
+  const label = input.label.trim() || "Lyrics";
+  return assignLayerSource(composition, layerId, sourceRef("song", label, label, { label, body: input.body }));
 }
 
 export function instantiateTemplate(template: CompositionTemplate, name: string): Composition {
@@ -312,6 +521,7 @@ export function lookCameraLowerThird(input: {
 }
 
 export function clearLowerThird(composition: Composition): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) => (layer.source.type === "lower-third" ? { ...layer, visible: false } : layer)),
@@ -349,6 +559,7 @@ export function lookCameraCountdown(input: {
 }
 
 export function clearTimer(composition: Composition): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) =>
@@ -544,7 +755,7 @@ export function lookFullLyrics(input: { label: string; lines: string[] }): Compo
   return composition;
 }
 
-export function lookCountdown(input: { durationMs?: number; label?: string; mode?: TimerMode } = {}): Composition {
+export function lookCountdown(input: { durationMs?: number; label?: string; mode?: TimerMode; targetAt?: number } = {}): Composition {
   const full = COMPOSITION_TEMPLATES.find((entry) => entry.id === "countdown");
   let composition = instantiateTemplate(full!, "Countdown");
   const timer = composition.layers[0];
@@ -557,6 +768,7 @@ export function lookCountdown(input: { durationMs?: number; label?: string; mode
         mode,
         durationMs: String(input.durationMs ?? 10 * 60_000),
         label: input.label ?? "Service starts in",
+        ...(input.targetAt != null ? { targetAt: String(input.targetAt) } : {}),
       }),
     );
   }
@@ -590,6 +802,12 @@ export function lookTwoRegions(input: { left: SourceRef; right: SourceRef }): Co
   return composition;
 }
 
+function sanitizeTransition(value: Composition["transition"] | undefined): Composition["transition"] {
+  const type = value?.type === "cut" ? "cut" : "fade";
+  const raw = Number.isFinite(value?.ms) ? Number(value?.ms) : type === "cut" ? 0 : 450;
+  return { type, ms: Math.min(2000, Math.max(0, Math.round(raw))) };
+}
+
 export function sanitizeComposition(value: unknown): Composition {
   const record = value && typeof value === "object" ? (value as Partial<Composition>) : {};
   const base = createComposition(typeof record.name === "string" ? record.name : "Composition");
@@ -597,8 +815,9 @@ export function sanitizeComposition(value: unknown): Composition {
   return {
     ...base,
     id: typeof record.id === "string" && record.id ? record.id : base.id,
+    locked: record.locked === true,
     canvas: record.canvas?.width && record.canvas?.height ? record.canvas : base.canvas,
-    transition: record.transition?.type === "cut" ? { type: "cut", ms: record.transition.ms ?? 0 } : base.transition,
+    transition: sanitizeTransition(record.transition),
     layers: layers.map((layer, index) => ({
       id: layer.id || `layer:${index}`,
       name: layer.name || `Layer ${index + 1}`,
@@ -618,6 +837,118 @@ export function restoreComposition(value: unknown): Composition {
   return sanitizeComposition(value);
 }
 
+export function setCompositionTransition(
+  composition: Composition,
+  transition: { type: "cut" | "fade"; ms: number },
+): Composition {
+  if (composition.locked) return composition;
+  return { ...composition, transition: sanitizeTransition(transition) };
+}
+
+/** Canonical preview/program source id for a look. Ids already prefixed stay as-is. */
+export function compositionSourceId(compositionId: string): string {
+  return compositionId.startsWith("composition:") ? compositionId : `composition:${compositionId}`;
+}
+
+/**
+ * Resolve a composition id from a preview/program source id.
+ * Accepts `composition:{id}` and legacy double-prefixed `composition:composition:{id}`.
+ */
+export function compositionIdFromSource(sourceId: string | null): string | null {
+  if (!sourceId?.startsWith("composition:")) return null;
+  const rest = sourceId.slice("composition:".length);
+  return rest.startsWith("composition:") ? rest : sourceId;
+}
+
+export function takeTransitionForPreview(
+  sourceId: string | null,
+  looks: Array<{ id: string; transition: Composition["transition"] }>,
+  fallback: Composition["transition"],
+): Composition["transition"] {
+  const compositionId = compositionIdFromSource(sourceId);
+  if (!compositionId) return sanitizeTransition(fallback);
+  const look = looks.find((entry) => entry.id === compositionId);
+  return sanitizeTransition(look?.transition ?? fallback);
+}
+
+export function renameComposition(composition: Composition, name: string): Composition {
+  if (composition.locked) return composition;
+  const next = name.trim();
+  return next ? { ...composition, name: next } : composition;
+}
+
+export function persistLook(looks: CompositionDocument[], look: Composition): CompositionDocument[] {
+  const clean = sanitizeComposition(look);
+  return looks.some((entry) => entry.id === clean.id)
+    ? looks.map((entry) => (entry.id === clean.id ? clean : entry))
+    : [...looks, clean];
+}
+
+/** Drop a saved look by id. Does not touch Preview or Program. */
+export function removeLook(looks: CompositionDocument[], id: string): CompositionDocument[] {
+  return looks.filter((entry) => entry.id !== id);
+}
+
+export function compositionRundownItem(look: Composition): PresentationItem {
+  const clean = sanitizeComposition(look);
+  return {
+    id: `item:${Math.random().toString(36).slice(2, 10)}`,
+    kind: "composition",
+    title: clean.name,
+    composition: { compositionId: clean.id },
+  };
+}
+
+export function queueLook(
+  looks: CompositionDocument[],
+  look: Composition,
+): { looks: CompositionDocument[]; item: PresentationItem } {
+  const clean = sanitizeComposition(look);
+  return { looks: persistLook(looks, clean), item: compositionRundownItem(clean) };
+}
+
+export function presentSavedLook(
+  looks: CompositionDocument[],
+  compositionId: string,
+  ctx: CompileContext,
+): PresentationModel {
+  const saved = looks.find((entry) => entry.id === compositionId);
+  return saved ? presentComposition(sanitizeComposition(saved), ctx) : emptyModel(ctx.theme);
+}
+
+export type LowerThirdDesk = {
+  title?: string;
+  subtitle?: string;
+  scripture?: { reference: string; attribution?: string };
+  song?: { title: string; author?: string };
+  announcement?: { heading: string; body: string };
+};
+
+export function lowerThirdCopy(template: LowerThirdTemplate, desk: LowerThirdDesk = {}): { title: string; subtitle: string } {
+  if (template.id === "scripture-ref") {
+    return {
+      title: desk.scripture?.reference?.trim() || desk.title?.trim() || template.title,
+      subtitle: desk.scripture?.attribution?.trim() || desk.subtitle?.trim() || template.subtitle,
+    };
+  }
+  if (template.id === "song-title") {
+    return {
+      title: desk.song?.title?.trim() || desk.title?.trim() || template.title,
+      subtitle: desk.song?.author?.trim() || desk.subtitle?.trim() || template.subtitle,
+    };
+  }
+  if (template.id === "announcement") {
+    return {
+      title: desk.announcement?.heading?.trim() || desk.title?.trim() || template.title,
+      subtitle: desk.announcement?.body?.trim() || desk.subtitle?.trim() || template.subtitle,
+    };
+  }
+  return {
+    title: desk.title?.trim() || template.title,
+    subtitle: desk.subtitle?.trim() || template.subtitle,
+  };
+}
+
 export function applyLowerThirdTemplate(
   composition: Composition,
   layerId: string,
@@ -625,6 +956,7 @@ export function applyLowerThirdTemplate(
   title?: string,
   subtitle?: string,
 ): Composition {
+  if (composition.locked) return composition;
   return {
     ...composition,
     layers: composition.layers.map((layer) =>
@@ -753,5 +1085,5 @@ export function presentComposition(composition: Composition, ctx: CompileContext
 }
 
 export function previewComposition(live: LiveState, model: PresentationModel, compositionId: string): LiveState {
-  return setPreview(live, frame(model, `composition:${compositionId}`, "cut"));
+  return setPreview(live, frame(model, compositionSourceId(compositionId), "cut"));
 }

@@ -50,7 +50,7 @@ export function pairRemote(
   pairing: RemotePairing | null,
   code: string,
   now = Date.now(),
-  token = () => crypto.randomUUID(),
+  token: () => string = () => crypto.randomUUID(),
 ): { ok: true; token: string } | { ok: false; reason: string } {
   if (!pairing) return { ok: false, reason: "Pairing is not open." };
   if (now > pairing.expiresAt) return { ok: false, reason: "That code expired." };
@@ -104,7 +104,7 @@ export function routeRemote(
   session: RemoteGate,
   envelope: RemoteEnvelope,
   now = Date.now(),
-  token = () => crypto.randomUUID(),
+  token: () => string = () => crypto.randomUUID(),
 ): RemoteRoute {
   if (envelope.type === "pair") {
     const result = pairRemote(session.pairing, envelope.payload.code ?? "", now, token);

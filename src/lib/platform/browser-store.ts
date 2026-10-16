@@ -150,13 +150,13 @@ export function memoryRecordStore(): RecordStore {
   };
 }
 
-function withoutOrdinal<T extends { id: string }>(row: Stored<T>): T {
-  const copy = { ...row };
-  delete copy.ordinal;
+function withoutOrdinal<T extends { id: string }>(row: Stored<T>): Omit<T, "ordinal"> {
+  const { ordinal, ...copy } = row;
+  void ordinal;
   return copy;
 }
 
-function byRecent<T extends { id: string }>(rows: Array<Stored<T>>): T[] {
+function byRecent<T extends { id: string }>(rows: Array<Stored<T>>): Array<Omit<T, "ordinal">> {
   return [...rows].sort((a, b) => b.ordinal - a.ordinal).map(withoutOrdinal);
 }
 

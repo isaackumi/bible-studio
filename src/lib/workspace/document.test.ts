@@ -20,6 +20,7 @@ describe("workspace document", () => {
     expect(workspace.activeLayoutId).toBe("layout-bible");
     expect(workspace.schemaVersion).toBe(2);
     expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
+    expect(workspace.production).toEqual({ stage: [42, 16, 42], docks: [28, 44, 28] });
     expect(workspace).not.toHaveProperty("program");
     expect(workspace.compositions).toEqual([]);
   });
@@ -36,7 +37,15 @@ describe("workspace document", () => {
     });
     expect(workspace.compositions[0]?.name).toBe("Sunday Camera + Scripture");
     expect(workspace.compositions[0]?.layers).toHaveLength(1);
+    expect(workspace.compositions[0]?.locked).toBe(false);
     expect(workspace).not.toHaveProperty("program");
+  });
+
+  it("persists the scene lock with a saved composition", () => {
+    const workspace = normalizeWorkspace({
+      compositions: [{ id: "composition:locked", name: "Locked look", locked: true }],
+    });
+    expect(workspace.compositions[0]?.locked).toBe(true);
   });
 
   it("replaces a corrupt layout list and an invalid accent", () => {

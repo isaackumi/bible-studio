@@ -5,6 +5,7 @@ import { presentCamera } from "./camera";
 import {
   addLayer,
   applyLowerThirdTemplate,
+  lowerThirdCopy,
   assignLayerSource,
   COMPOSITION_TEMPLATES,
   createComposition,
@@ -24,6 +25,13 @@ import {
   lookAnnouncement,
   lookTwoRegions,
   assignText,
+  assignScripture,
+  assignSong,
+  setLayerOpacity,
+  setLayerFit,
+  setLayerLocked,
+  setLayerAnimation,
+  applyLayerDrag,
   layerOrder,
   LOWER_THIRD_TEMPLATES,
   clearTimer,
@@ -35,6 +43,22 @@ import {
   resizeLayer,
   restoreComposition,
   sanitizeComposition,
+  persistLook,
+  removeLook,
+  createScene,
+  setCompositionLocked,
+  layerStackFrontFirst,
+  renameComposition,
+  renameLayer,
+  removeLayer,
+  duplicateLayer,
+  duplicateLook,
+  setCompositionTransition,
+  takeTransitionForPreview,
+  compositionSourceId,
+  compositionRundownItem,
+  queueLook,
+  presentSavedLook,
   sourceRef,
 } from "./composition";
 import { applyProgramAction, createLiveState, programPacket, sameProgram } from "./live";
@@ -73,6 +97,145 @@ describe("composition model", () => {
     expect(restored.name).toBe("Sunday Camera + Scripture");
     expect(restored.layers[0]?.bounds.w).toBe(60);
     expect(restored.layers.some((layer) => !layer.visible)).toBe(true);
+  });
+
+  it("renames and removes layers, then reindexes z-order", () => {
+    let composition = createComposition("Layers");
+    composition = addLayer(composition, { name: "A", bounds: { x: 0, y: 0, w: 50, h: 100 }, source: scriptureSource() });
+    composition = addLayer(composition, { name: "B", bounds: { x: 50, y: 0, w: 50, h: 100 }, source: cameraSource() });
+    composition = renameLayer(composition, composition.layers[0]!.id, "Scripture");
+    expect(composition.layers[0]?.name).toBe("Scripture");
+    expect(renameLayer(composition, composition.layers[0]!.id, "   ").layers[0]?.name).toBe("Scripture");
+    const cameraId = composition.layers[1]!.id;
+    composition = removeLayer(composition, composition.layers[0]!.id);
+    expect(composition.layers).toHaveLength(1);
+    expect(composition.layers[0]?.id).toBe(cameraId);
+    expect(composition.layers[0]?.zIndex).toBe(0);
+    expect(removeLayer(composition, "missing").layers).toHaveLength(1);
+  });
+
+  it("duplicates a layer with a new id and name without Taking", () => {
+    let composition = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    const originalId = composition.layers[0]!.id;
+    composition = setLayerAnimation(composition, originalId, { entrance: "slide-up", durationMs: 800 });
+    composition = duplicateLayer(composition, originalId);
+    expect(composition.layers).toHaveLength(2);
+    expect(composition.layers[1]?.id).not.toBe(originalId);
+    expect(composition.layers[1]?.name).toBe("Main copy");
+    expect(composition.layers[1]?.source.type).toBe("scripture");
+    expect(composition.layers[1]?.animation.entrance).toBe("slide-up");
+    expect(composition.layers[1]?.animation.durationMs).toBe(800);
+    expect(composition.layers[1]?.zIndex).toBe(1);
+    expect(duplicateLayer(composition, "missing").layers).toHaveLength(2);
+
+    let live = previewComposition(createLiveState(theme), presentComposition(composition, { theme, now: 0 }), composition.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers).toHaveLength(2);
+    composition = removeLayer(composition, composition.layers[1]!.id);
+    live = previewComposition(taken, presentComposition(composition, { theme, now: 0 }), composition.id);
+    expect(live.preview.model.layers).toHaveLength(1);
+    expect(live.program.model.layers).toHaveLength(2);
+  });
+
+  it("sets look transition on Preview only; LIVE still uses the prior Program frame", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    expect(look.transition).toEqual({ type: "fade", ms: 450 });
+    look = setCompositionTransition(look, { type: "cut", ms: 0 });
+    expect(look.transition).toEqual({ type: "cut", ms: 0 });
+    look = setCompositionTransition(look, { type: "fade", ms: 900 });
+    expect(look.transition).toEqual({ type: "fade", ms: 900 });
+    expect(setCompositionTransition(look, { type: "fade", ms: -50 }).transition.ms).toBe(0);
+    expect(setCompositionTransition(look, { type: "fade", ms: 9999 }).transition.ms).toBe(2000);
+    const saved = sanitizeComposition(look);
+    expect(restoreComposition(JSON.parse(JSON.stringify(saved))).transition).toEqual({ type: "fade", ms: 900 });
+
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    look = setCompositionTransition(look, { type: "cut", ms: 0 });
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layout).toBe("composition");
+    expect(live.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+    expect(live.program.sourceId).toBe(look.id);
+  });
+
+  it("preview source id equals the look id without a double composition prefix", () => {
+    const look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    expect(look.id.startsWith("composition:")).toBe(true);
+    expect(compositionSourceId(look.id)).toBe(look.id);
+    expect(compositionSourceId("bare-id")).toBe("composition:bare-id");
+    const live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.sourceId).toBe(look.id);
+    expect(live.preview.sourceId).not.toMatch(/^composition:composition:/);
+  });
+
+  it("TAKE of a look uses that look's transition; other sources keep the theme fade", () => {
+    const themeFade = { type: "fade" as const, ms: 450 };
+    let look = setCompositionTransition(
+      lookFullScripture({
+        reference: "John 3:16",
+        body: "For God so loved the world.",
+        attribution: "KJV",
+        verse: 16,
+      }),
+      { type: "cut", ms: 0 },
+    );
+    expect(takeTransitionForPreview(look.id, [look], themeFade)).toEqual({ type: "cut", ms: 0 });
+    expect(takeTransitionForPreview(`composition:${look.id}`, [look], themeFade)).toEqual({ type: "cut", ms: 0 });
+    look = setCompositionTransition(look, { type: "fade", ms: 900 });
+    expect(takeTransitionForPreview(look.id, [look], themeFade)).toEqual({ type: "fade", ms: 900 });
+    expect(takeTransitionForPreview("item-a", [look], themeFade)).toEqual(themeFade);
+    expect(takeTransitionForPreview(look.id, [], themeFade)).toEqual(themeFade);
+
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    const cutLook = setCompositionTransition(look, { type: "cut", ms: 0 });
+    const resolved = takeTransitionForPreview(live.preview.sourceId, [cutLook], themeFade);
+    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null }, { transition: resolved.type });
+    expect(live.program.transition).toBe("cut");
+    expect(programPacket(live, resolved.ms).transitionMs).toBe(0);
+
+    live = previewComposition(live, presentComposition(look, { theme, now: 0 }), look.id);
+    const fadeResolved = takeTransitionForPreview(live.preview.sourceId, [look], themeFade);
+    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null }, { transition: fadeResolved.type });
+    expect(live.program.transition).toBe("fade");
+    expect(programPacket(live, fadeResolved.ms).transitionMs).toBe(900);
+  });
+
+  it("duplicates a saved look with a new id and layer ids; restore stays on Preview", () => {
+    const look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    const copy = duplicateLook(look);
+    expect(copy.id).not.toBe(look.id);
+    expect(copy.name).toBe("Full Scripture copy");
+    expect(copy.layers).toHaveLength(1);
+    expect(copy.layers[0]?.id).not.toBe(look.layers[0]?.id);
+    expect(copy.layers[0]?.source.payload.reference).toBe("John 3:16");
+    const saved = persistLook(persistLook([], look), copy);
+    expect(saved).toHaveLength(2);
+    let live = previewComposition(createLiveState(theme), presentComposition(copy, { theme, now: 0 }), copy.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
   });
 
   it("instantiates a split template as regions, not a hardcoded scripture-left layout", () => {
@@ -130,7 +293,7 @@ describe("composition Preview/Program safety", () => {
     expect(live.program).toEqual(program);
     const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
     expect(taken.program.model.layout).toBe("composition");
-    expect(taken.program.sourceId).toBe(`composition:${composition.id}`);
+    expect(taken.program.sourceId).toBe(composition.id);
     expect(taken.revision).toBeGreaterThan(live.revision);
   });
 
@@ -460,6 +623,28 @@ describe("composition Preview/Program safety", () => {
     expect(takenClock.program.model).not.toHaveProperty("stream");
   });
 
+  it("LIVE copies a target-time timer; filling stays off Program until LIVE", () => {
+    const look = lookCountdown({ label: "Go live", mode: "target", targetAt: 60_000 });
+    expect(look.layers[0]?.source.payload.mode).toBe("target");
+    expect(look.layers[0]?.source.payload.targetAt).toBe("60000");
+    const painted = presentComposition(look, { theme, now: 50_000 });
+    expect(painted.layers?.[0]?.model.timer?.mode).toBe("target");
+    expect(painted.layers?.[0]?.model.timer?.targetAt).toBe(60_000);
+    expect(painted.layers?.[0]?.model.lines[0]?.text).toBe("00:10");
+
+    let live = previewComposition(createLiveState(theme), painted, look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.timer?.mode).toBe("target");
+    expect(taken.program.model.layers?.[0]?.model.timer?.targetAt).toBe(60_000);
+    expect(taken.program.model).not.toHaveProperty("stream");
+
+    const later = lookCountdown({ label: "Go live", mode: "target", targetAt: 90_000 });
+    live = previewComposition(taken, presentComposition(later, { theme, now: 50_000 }), later.id);
+    expect(live.preview.model.layers?.[0]?.model.timer?.targetAt).toBe(90_000);
+    expect(live.program.model.layers?.[0]?.model.timer?.targetAt).toBe(60_000);
+  });
+
   it("LIVE copies a full-frame announcement; filling stays off Program until LIVE", () => {
     const look = lookAnnouncement({ heading: "Welcome", body: "Please join us after the service." });
     expect(look.layers).toHaveLength(1);
@@ -492,6 +677,67 @@ describe("composition Preview/Program safety", () => {
     expect(taken.program.model).not.toHaveProperty("stream");
   });
 
+  it("editing scripture copy writes Preview; LIVE copies the previous verse", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+    look = assignScripture(look, look.layers[0]!.id, {
+      reference: "Genesis 1:3",
+      body: "And God said, Let there be light.",
+      attribution: "KJV",
+      verse: 3,
+    });
+    expect(look.layers[0]?.source.payload.reference).toBe("Genesis 1:3");
+    expect(assignScripture(look, look.layers[0]!.id, { reference: "  ", body: "x" }).layers[0]?.source.payload.reference).toBe(
+      "Scripture",
+    );
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.model.reference).toBe("Genesis 1:3");
+    expect(live.preview.model.layers?.[0]?.model.lines[0]?.text).toContain("Let there be light");
+    expect(live.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+  });
+
+  it("editing lyrics copy writes Preview; LIVE copies the previous section", () => {
+    let look = lookFullLyrics({ label: "Verse 1", lines: ["Holy, holy, holy"] });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.lines[0]?.text).toBe("Holy, holy, holy");
+    look = assignSong(look, look.layers[0]!.id, { label: "Chorus", body: "Merciful and mighty\nGod in three persons" });
+    expect(look.layers[0]?.source.payload.label).toBe("Chorus");
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.model.reference).toBe("Chorus");
+    expect(live.preview.model.layers?.[0]?.model.lines.map((line) => line.text)).toEqual([
+      "Merciful and mighty",
+      "God in three persons",
+    ]);
+    expect(live.program.model.layers?.[0]?.model.lines[0]?.text).toBe("Holy, holy, holy");
+  });
+
+  it("changing layer opacity writes Preview; LIVE copies the faded layer", () => {
+    let look = lookAnnouncement({ heading: "Welcome", body: "Please join us after the service." });
+    expect(look.layers[0]?.opacity).toBe(1);
+    look = setLayerOpacity(look, look.layers[0]!.id, 0.4);
+    expect(look.layers[0]?.opacity).toBe(0.4);
+    expect(setLayerOpacity(look, look.layers[0]!.id, 2).layers[0]?.opacity).toBe(1);
+    expect(setLayerOpacity(look, look.layers[0]!.id, -0.2).layers[0]?.opacity).toBe(0);
+    const painted = presentComposition(look, { theme, now: 0 });
+    expect(painted.layers?.[0]?.opacity).toBe(0.4);
+
+    let live = previewComposition(createLiveState(theme), painted, look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.opacity).toBe(0.4);
+    expect(taken.program.model).not.toHaveProperty("stream");
+  });
+
   it("LIVE copies two regions; filling the split stays off Program until LIVE", () => {
     const look = lookTwoRegions({
       left: sourceRef("text", "announcement", "Welcome", {
@@ -521,6 +767,133 @@ describe("composition Preview/Program safety", () => {
     expect(taken.program.model).not.toHaveProperty("stream");
   });
 
+  it("dragging a layer writes Preview; LIVE copies the new bounds", () => {
+    let look = lookTwoRegions({
+      left: sourceRef("text", "announcement", "Welcome", {
+        heading: "Welcome",
+        body: "Please join us after the service.",
+      }),
+      right: sourceRef("camera", "cam-1", "FaceTime HD", { deviceId: "cam-1", label: "FaceTime HD" }),
+    });
+    const left = look.layers[0]!;
+    const right = look.layers[1]!;
+    look = applyLayerDrag(look, left.id, "e", { dx: 10, dy: 0 });
+    expect(look.layers[0]?.bounds).toEqual({ x: 0, y: 0, w: 60, h: 100 });
+    look = applyLayerDrag(look, right.id, "w", { dx: 10, dy: 0 });
+    expect(look.layers[1]?.bounds).toEqual({ x: 60, y: 0, w: 40, h: 100 });
+    look = applyLayerDrag(look, right.id, "move", { dx: -5, dy: 0 });
+    expect(look.layers[1]?.bounds).toEqual({ x: 55, y: 0, w: 40, h: 100 });
+    look = applyLayerDrag(look, right.id, "se", { dx: 50, dy: 0 });
+    expect(look.layers[1]?.bounds.x + look.layers[1]!.bounds.w).toBe(100);
+    expect(look.layers[1]?.bounds.w).toBe(45);
+
+    const locked = { ...look, layers: look.layers.map((layer) => (layer.id === left.id ? { ...layer, locked: true } : layer)) };
+    expect(applyLayerDrag(locked, left.id, "move", { dx: 8, dy: 8 }).layers[0]?.bounds).toEqual(locked.layers[0]?.bounds);
+
+    const painted = presentComposition(look, { theme, now: 0 });
+    expect(painted.layers?.[0]?.bounds).toEqual({ x: 0, y: 0, w: 60, h: 100 });
+    let live = previewComposition(createLiveState(theme), painted, look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.bounds).toEqual({ x: 0, y: 0, w: 60, h: 100 });
+    const after = applyLayerDrag(look, left.id, "move", { dx: 5, dy: 5 });
+    const later = previewComposition(taken, presentComposition(after, { theme, now: 0 }), after.id);
+    expect(later.program.model.layers?.[0]?.bounds).toEqual({ x: 0, y: 0, w: 60, h: 100 });
+    expect(later.preview.model.layers?.[0]?.bounds.x).toBe(5);
+  });
+
+  it("changing layer fit or lock writes Preview; LIVE copies fit; lock blocks drag", () => {
+    let look = lookTwoRegions({
+      left: sourceRef("text", "announcement", "Welcome", {
+        heading: "Welcome",
+        body: "Please join us after the service.",
+      }),
+      right: sourceRef("camera", "cam-1", "FaceTime HD", { deviceId: "cam-1", label: "FaceTime HD" }),
+    });
+    const left = look.layers[0]!;
+    expect(look.layers[0]?.fit).toBe("contain");
+    look = setLayerFit(look, left.id, "cover");
+    expect(look.layers[0]?.fit).toBe("cover");
+    look = setLayerFit(look, left.id, "stretch" as "fill");
+    expect(look.layers[0]?.fit).toBe("contain");
+    look = setLayerFit(look, left.id, "fill");
+    expect(look.layers[0]?.fit).toBe("fill");
+    look = setLayerLocked(look, left.id, true);
+    expect(look.layers[0]?.locked).toBe(true);
+    expect(applyLayerDrag(look, left.id, "move", { dx: 8, dy: 0 }).layers[0]?.bounds).toEqual(look.layers[0]?.bounds);
+    look = setLayerLocked(look, left.id, false);
+    look = applyLayerDrag(look, left.id, "move", { dx: 8, dy: 0 });
+    expect(look.layers[0]?.bounds.x).toBe(8);
+
+    const painted = presentComposition(look, { theme, now: 0 });
+    expect(painted.layers?.[0]?.fit).toBe("fill");
+    let live = previewComposition(createLiveState(theme), painted, look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.fit).toBe("fill");
+    const after = setLayerFit(look, left.id, "cover");
+    live = previewComposition(taken, presentComposition(after, { theme, now: 0 }), after.id);
+    expect(live.preview.model.layers?.[0]?.fit).toBe("cover");
+    expect(live.program.model.layers?.[0]?.fit).toBe("fill");
+  });
+
+  it("locked layer rejects numeric resize; LIVE still copies prior bounds", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    const layerId = look.layers[0]!.id;
+    const origin = look.layers[0]!.bounds;
+    look = setLayerLocked(look, layerId, true);
+    expect(resizeLayer(look, layerId, { x: 12, y: 8, w: 50, h: 40 }).layers[0]?.bounds).toEqual(origin);
+    look = setLayerLocked(look, layerId, false);
+    look = resizeLayer(look, layerId, { x: 12, y: 8, w: 50, h: 40 });
+    expect(look.layers[0]?.bounds).toEqual({ x: 12, y: 8, w: 50, h: 40 });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.bounds).toEqual({ x: 12, y: 8, w: 50, h: 40 });
+    look = setLayerLocked(look, layerId, true);
+    const blocked = resizeLayer(look, layerId, { x: 0, y: 0, w: 100, h: 100 });
+    live = previewComposition(taken, presentComposition(blocked, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.bounds).toEqual({ x: 12, y: 8, w: 50, h: 40 });
+    expect(live.program.model.layers?.[0]?.bounds).toEqual({ x: 12, y: 8, w: 50, h: 40 });
+  });
+
+  it("fills scripture, song, and announcement lower thirds from the desk; LIVE copies them", () => {
+    const scripture = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === "scripture-ref")!;
+    const song = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === "song-title")!;
+    const announcement = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === "announcement")!;
+    const speaker = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === "speaker")!;
+    const desk = {
+      title: "Pastor Isaac",
+      subtitle: "Senior Pastor",
+      scripture: { reference: "John 3:16", attribution: "KJV" },
+      song: { title: "Holy, holy, holy", author: "Heber" },
+      announcement: { heading: "Welcome", body: "Please join us after the service." },
+    };
+    expect(lowerThirdCopy(scripture, desk)).toEqual({ title: "John 3:16", subtitle: "KJV" });
+    expect(lowerThirdCopy(song, desk)).toEqual({ title: "Holy, holy, holy", subtitle: "Heber" });
+    expect(lowerThirdCopy(announcement, desk)).toEqual({ title: "Welcome", subtitle: "Please join us after the service." });
+    expect(lowerThirdCopy(speaker, desk)).toEqual({ title: "Pastor Isaac", subtitle: "Senior Pastor" });
+
+    let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "camera-lower-third")!, "LT");
+    const copy = lowerThirdCopy(scripture, desk);
+    composition = applyLowerThirdTemplate(composition, composition.layers[1]!.id, scripture, copy.title, copy.subtitle);
+    let live = previewComposition(createLiveState(theme), presentComposition(composition, { theme, now: 0 }), composition.id);
+    expect(live.preview.model.layers?.[1]?.model.lines[0]?.text).toBe("John 3:16");
+    expect(live.preview.model.layers?.[1]?.model.attribution).toBe("KJV");
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[1]?.model.lines[0]?.text).toBe("John 3:16");
+    const later = applyLowerThirdTemplate(composition, composition.layers[1]!.id, speaker, "Pastor Isaac", "Senior Pastor");
+    live = previewComposition(taken, presentComposition(later, { theme, now: 0 }), later.id);
+    expect(live.preview.model.layers?.[1]?.model.lines[0]?.text).toBe("Pastor Isaac");
+    expect(live.program.model.layers?.[1]?.model.lines[0]?.text).toBe("John 3:16");
+  });
+
   it("applies a lower-third template without Taking", () => {
     const speaker = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === "speaker");
     let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "camera-lower-third")!, "LT");
@@ -533,6 +906,92 @@ describe("composition Preview/Program safety", () => {
     expect(live.program).toEqual(program);
   });
 
+  it("changing layer entrance writes Preview; LIVE copies the previous animation", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    look = setLayerAnimation(look, look.layers[0]!.id, { entrance: "fade" });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.animation?.entrance).toBe("fade");
+    look = setLayerAnimation(look, look.layers[0]!.id, { entrance: "slide-up", durationMs: 800 });
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.animation?.entrance).toBe("slide-up");
+    expect(live.preview.model.layers?.[0]?.animation?.durationMs).toBe(800);
+    expect(live.program.model.layers?.[0]?.animation?.entrance).toBe("fade");
+    expect(setLayerAnimation(look, look.layers[0]!.id, { entrance: "stretch" as "fade" }).layers[0]?.animation.entrance).toBe("fade");
+  });
+
+  it("changing layer exit writes Preview; LIVE copies the previous exit", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    look = setLayerAnimation(look, look.layers[0]!.id, { exit: "fade" });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.animation?.exit).toBe("fade");
+    look = setLayerAnimation(look, look.layers[0]!.id, { exit: "slide-down", durationMs: 600 });
+    const saved = sanitizeComposition(look);
+    expect(restoreComposition(JSON.parse(JSON.stringify(saved))).layers[0]?.animation.exit).toBe("slide-down");
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.animation?.exit).toBe("slide-down");
+    expect(live.preview.model.layers?.[0]?.animation?.durationMs).toBe(600);
+    expect(live.program.model.layers?.[0]?.animation?.exit).toBe("fade");
+    expect(setLayerAnimation(look, look.layers[0]!.id, { exit: "stretch" as "fade" }).layers[0]?.animation.exit).toBe("fade");
+  });
+
+  it("changing layer easing writes Preview; LIVE copies the previous easing", () => {
+    let look = lookFullScripture({
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    look = setLayerAnimation(look, look.layers[0]!.id, { easing: "ease-out" });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.animation?.easing).toBe("ease-out");
+    look = setLayerAnimation(look, look.layers[0]!.id, { easing: "linear" });
+    const saved = sanitizeComposition(look);
+    expect(restoreComposition(JSON.parse(JSON.stringify(saved))).layers[0]?.animation.easing).toBe("linear");
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.animation?.easing).toBe("linear");
+    expect(live.program.model.layers?.[0]?.animation?.easing).toBe("ease-out");
+    expect(setLayerAnimation(look, look.layers[0]!.id, { easing: "bounce" as "linear" }).layers[0]?.animation.easing).toBe(
+      "ease-out",
+    );
+  });
+
+  it("adding or removing a layer writes Preview; LIVE copies the previous stack", () => {
+    let look = lookFullCamera({ camera: { id: "cam-1", label: "FaceTime HD" } });
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers).toHaveLength(1);
+    look = addLayer(look, {
+      name: "Lower third",
+      bounds: { x: 6, y: 72, w: 55, h: 22 },
+      source: sourceRef("lower-third", "speaker", "Speaker", { title: "Pastor Isaac", subtitle: "Senior Pastor", templateId: "speaker" }),
+    });
+    live = previewComposition(taken, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers).toHaveLength(2);
+    expect(live.program.model.layers).toHaveLength(1);
+    look = removeLayer(look, look.layers[1]!.id);
+    live = previewComposition(live, presentComposition(look, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers).toHaveLength(1);
+    expect(live.program.model.layers).toHaveLength(1);
+    expect(live.program.model.layers?.[0]?.model.lines[0]?.text).toBe("FaceTime HD");
+  });
+
   it("lets a plugin compiler paint a source without Taking", () => {
     registerSourceCompiler("plugin", (source, ctx) => presentText({ theme: ctx.theme, layout: "title", heading: source.title, body: "plugin-body" }));
     let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "full-frame")!, "Plugin");
@@ -542,6 +1001,130 @@ describe("composition Preview/Program safety", () => {
     live = previewComposition(live, presentComposition(composition, { theme, now: 0 }), composition.id);
     expect(live.preview.model.layers?.[0]?.model.lines.map((line) => line.text)).toEqual(["Plugin Cam", "plugin-body"]);
     expect(live.program).toEqual(program);
+  });
+});
+
+describe("saved compositions", () => {
+  const verse = {
+    reference: "John 3:16",
+    body: "For God so loved the world.",
+    attribution: "KJV",
+    verse: 16,
+  };
+
+  it("persists and renames a look without Taking", () => {
+    const look = lookFullScripture(verse);
+    const saved = persistLook([], look);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.id).toBe(look.id);
+    const again = persistLook(saved, renameComposition(look, "Sunday opener"));
+    expect(again).toHaveLength(1);
+    expect(again[0]?.name).toBe("Sunday opener");
+    let live = createLiveState(theme);
+    const program = live.program;
+    live = previewComposition(live, presentComposition(restoreComposition(again[0]!), { theme, now: 0 }), look.id);
+    expect(live.program).toEqual(program);
+  });
+
+  it("queues a rundown item that restores Preview from the saved look; LIVE copies Program", () => {
+    const look = lookFullScripture(verse);
+    const looks = persistLook([], look);
+    const item = compositionRundownItem(look);
+    expect(item.kind).toBe("composition");
+    expect(item.title).toBe("Full Scripture");
+    expect(item.composition?.compositionId).toBe(look.id);
+    const painted = presentSavedLook(looks, item.composition!.compositionId, { theme, now: 0 });
+    expect(painted.layout).toBe("composition");
+    expect(painted.layers?.[0]?.model.reference).toBe("John 3:16");
+    let live = previewComposition(createLiveState(theme), painted, look.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+    const later = persistLook(
+      looks,
+      assignLayerSource(
+        look,
+        look.layers[0]!.id,
+        sourceRef("scripture", "gen-13", "Genesis 1:3", {
+          reference: "Genesis 1:3",
+          body: "And God said, Let there be light.",
+          attribution: "KJV",
+        }),
+      ),
+    );
+    live = previewComposition(taken, presentSavedLook(later, item.composition!.compositionId, { theme, now: 0 }), look.id);
+    expect(live.preview.model.layers?.[0]?.model.reference).toBe("Genesis 1:3");
+    expect(live.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+  });
+
+  it("queueing an unsaved look persists it first", () => {
+    const look = lookFullScripture(verse);
+    const queued = queueLook([], look);
+    expect(queued.looks).toHaveLength(1);
+    expect(queued.item.composition?.compositionId).toBe(look.id);
+    expect(presentSavedLook(queued.looks, queued.item.composition!.compositionId, { theme, now: 0 }).layout).toBe("composition");
+  });
+
+  it("a missing saved look paints empty and does not Take", () => {
+    const item = compositionRundownItem(lookFullScripture(verse));
+    const painted = presentSavedLook([], item.composition!.compositionId, { theme, now: 0 });
+    expect(painted.layout).toBe("empty");
+    let live = createLiveState(theme);
+    const program = live.program;
+    live = previewComposition(live, painted, item.composition!.compositionId);
+    expect(live.program).toEqual(program);
+  });
+
+  it("removing a saved look leaves Program alone and restores empty for that id", () => {
+    const look = lookFullScripture(verse);
+    const other = lookAnnouncement({ heading: "Welcome", body: "Join us." });
+    const saved = persistLook(persistLook([], look), other);
+    expect(saved).toHaveLength(2);
+    let live = previewComposition(createLiveState(theme), presentComposition(look, { theme, now: 0 }), look.id);
+    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(live.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+    const onAir = live.program;
+    const remaining = removeLook(saved, look.id);
+    expect(remaining.map((entry) => entry.id)).toEqual([other.id]);
+    expect(removeLook(remaining, look.id)).toEqual(remaining);
+    expect(presentSavedLook(remaining, look.id, { theme, now: 0 }).layout).toBe("empty");
+    live = previewComposition(live, presentSavedLook(remaining, look.id, { theme, now: 0 }), look.id);
+    expect(live.program).toEqual(onAir);
+  });
+
+  it("scene lock freezes edits; unlock restores mutation; TAKE still works", () => {
+    let scene = createScene("Opener");
+    expect(scene.locked).toBe(false);
+    expect(scene.layers).toHaveLength(1);
+    expect(layerStackFrontFirst(scene)[0]?.id).toBe(scene.layers[0]?.id);
+    scene = assignScripture(scene, scene.layers[0]!.id, {
+      reference: "John 3:16",
+      body: "For God so loved the world.",
+      attribution: "KJV",
+      verse: 16,
+    });
+    scene = setCompositionLocked(scene, true);
+    const frozen = scene;
+    expect(renameComposition(scene, "Later")).toBe(scene);
+    expect(addLayer(scene, { name: "Extra", bounds: { x: 0, y: 0, w: 50, h: 50 } })).toBe(scene);
+    expect(resizeLayer(scene, scene.layers[0]!.id, { x: 10, y: 10, w: 40, h: 40 })).toBe(scene);
+    expect(setCompositionTransition(scene, { type: "cut", ms: 0 })).toBe(scene);
+    expect(assignScripture(scene, scene.layers[0]!.id, { reference: "Genesis 1:1", body: "In the beginning." })).toBe(scene);
+    const saved = sanitizeComposition(scene);
+    expect(restoreComposition(JSON.parse(JSON.stringify(saved))).locked).toBe(true);
+    expect(duplicateLook(scene).locked).toBe(false);
+
+    let live = previewComposition(createLiveState(theme), presentComposition(scene, { theme, now: 0 }), scene.id);
+    expect(live.program.model.layout).not.toBe("composition");
+    const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    expect(taken.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
+
+    scene = setCompositionLocked(frozen, false);
+    scene = renameComposition(scene, "Sunday opener");
+    expect(scene.name).toBe("Sunday opener");
+    live = previewComposition(taken, presentComposition(scene, { theme, now: 0 }), scene.id);
+    expect(live.preview.model.layers?.[0]?.model.reference).toBe("John 3:16");
+    expect(live.program.model.layers?.[0]?.model.reference).toBe("John 3:16");
   });
 });
 

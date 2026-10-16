@@ -32,7 +32,7 @@
     const paint = model.timer;
     if (model.layout !== "timer" || !paint) return;
     now = Date.now();
-    if (!paint.running && paint.mode !== "clock") return;
+    if (!paint.running && paint.mode !== "clock" && paint.mode !== "target") return;
     const id = setInterval(() => {
       now = Date.now();
     }, 250);
@@ -89,6 +89,7 @@
         style:width="{layer.bounds.w}%"
         style:height="{layer.bounds.h}%"
         style:opacity={layer.opacity}
+        style:--layer-opacity={layer.opacity}
         style:z-index={layer.zIndex}
         style:--layer-dur="{layer.animation?.durationMs ?? 400}ms"
         style:--layer-ease={layer.animation?.easing ?? "ease-out"}

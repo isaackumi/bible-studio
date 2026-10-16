@@ -54,7 +54,7 @@ function splitMarkdown(text: string): Array<{ heading: string; body: string }> {
   return blocks;
 }
 
-export function importDocument(filename: string, text: string, uid = () => crypto.randomUUID()): PresentationItem[] {
+export function importDocument(filename: string, text: string, uid: () => string = () => crypto.randomUUID()): PresentationItem[] {
   const ext = extension(filename);
   if (ext === "pdf" || ext === "ppt" || ext === "pptx" || ext === "key") {
     throw new Error("Church Studio cannot import that format yet.");

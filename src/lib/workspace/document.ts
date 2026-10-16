@@ -5,6 +5,7 @@ import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
 import { normalizePew } from "./pew";
+import { normalizeProductionLayout } from "./production";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -76,6 +77,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     shortcuts: shortcuts(value.shortcuts),
     appearance: appearance(value.appearance, base.appearance),
     pew: normalizePew(value.pew),
+    production: normalizeProductionLayout(value.production),
     layouts: safeLayouts,
     activeLayoutId: safeLayouts.some((layout) => layout.id === value.activeLayoutId) ? value.activeLayoutId! : safeLayouts[0].id,
     displayProfiles: safeProfiles,
@@ -88,6 +90,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
           return {
             id: clean.id,
             name: clean.name,
+            locked: clean.locked,
             canvas: clean.canvas,
             layers: clean.layers,
             transition: clean.transition,

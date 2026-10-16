@@ -41,12 +41,14 @@
 </script>
 
 {#if session.findOpen}
-  <div class="scrim" role="presentation" onclick={() => session.closeFind()}>
+  <div class="scrim">
+    <button type="button" class="backdrop" aria-label="Close song search" onclick={() => session.closeFind()}></button>
     <div
       class="finder"
       role="dialog"
       aria-label="Search songs"
-      onclick={(event) => event.stopPropagation()}
+      aria-modal="true"
+      tabindex="-1"
     >
       <input
         bind:this={field}
@@ -82,12 +84,18 @@
     position: fixed;
     inset: 0;
     z-index: 8;
-    background: color-mix(in srgb, #050505 45%, transparent);
     display: flex;
     justify-content: center;
     padding: 12vh 16px 16px;
   }
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: color-mix(in srgb, #050505 45%, transparent);
+  }
   .finder {
+    position: relative;
     width: min(560px, 100%);
     max-height: min(70vh, 640px);
     overflow: auto;

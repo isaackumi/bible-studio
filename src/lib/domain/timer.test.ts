@@ -9,6 +9,7 @@ import {
   resetTimer,
   resumeTimer,
   startTimer,
+  targetAtFromClock,
   timerDisplay,
   timerFromPaint,
 } from "./timer";
@@ -43,7 +44,11 @@ describe("timer source", () => {
       0,
     );
     expect(timerDisplay(target, 50_000).warning).toBe(true);
+    expect(timerDisplay(target, 50_000).text).toBe("00:10");
     expect(timerDisplay(target, 60_000).complete).toBe(true);
+    const morning = new Date("2026-10-16T09:00:00").getTime();
+    expect(targetAtFromClock("10:30", morning) - morning).toBe(90 * 60_000);
+    expect(targetAtFromClock("08:00", morning) - morning).toBe(23 * 60 * 60_000);
   });
 
   it("paints as a composition layer and reaches Program only through LIVE", () => {

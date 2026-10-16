@@ -31,13 +31,16 @@ export function applyProgramAction(
   action: ProgramAction,
   theme: Theme,
   logo: { title: string; imageUrl: string | null },
+  options?: { transition?: LiveFrame["transition"] },
 ): LiveState {
   if (action === "take" || action === "cut") {
+    const transition =
+      action === "cut" ? "cut" : options?.transition === "cut" || options?.transition === "fade" ? options.transition : "fade";
     return {
       preview: state.preview,
       program: {
         ...state.preview,
-        transition: action === "take" ? "fade" : "cut",
+        transition,
       },
       revision: state.revision + 1,
     };

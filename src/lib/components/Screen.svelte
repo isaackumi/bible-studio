@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { previewShowsCamera, type CameraSurface } from "../domain/camera";
   import type { PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
@@ -9,12 +10,14 @@
     sourceId = null,
     cameraFeedId = null,
     surface = "audience",
+    overlay,
   }: {
     model: PresentationModel;
     stream?: MediaStream | null;
     sourceId?: string | null;
     cameraFeedId?: string | null;
     surface?: CameraSurface;
+    overlay?: Snippet;
   } = $props();
   let box: HTMLDivElement | undefined = $state();
   let scale = $state(0.3);
@@ -38,4 +41,5 @@
   <div class="canvas" style:transform="scale({scale})">
     <FrameView {model} stream={feed} cameraFeedId={surface === "preview" ? cameraFeedId : null} />
   </div>
+  {@render overlay?.()}
 </div>

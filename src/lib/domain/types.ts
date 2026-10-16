@@ -97,7 +97,7 @@ export type ProgramAction = "take" | "cut" | "clear" | "black" | "logo";
 
 export const PROGRAM_ACTIONS: ProgramAction[] = ["take", "cut", "clear", "black", "logo"];
 
-export type ItemKind = "bible" | "lyric" | "slide" | "image" | "announcement";
+export type ItemKind = "bible" | "lyric" | "slide" | "image" | "announcement" | "composition";
 
 export type BibleItem = {
   translationId: string;
@@ -263,6 +263,11 @@ export type PewDeskState = {
   programSplit: number;
 };
 
+export type ProductionLayout = {
+  stage: [number, number, number];
+  docks: [number, number, number];
+};
+
 export type AppearanceSettings = {
   theme: OperatorTheme;
   density: "compact" | "comfortable";
@@ -283,6 +288,7 @@ export type Workspace = {
   shortcuts: ShortcutMap | null;
   appearance: AppearanceSettings;
   pew: PewDeskState;
+  production: ProductionLayout;
   activeLayoutId: string;
   layouts: WorkspaceLayout[];
   activeDisplayProfileId: string;
@@ -294,6 +300,7 @@ export type Workspace = {
 export type CompositionDocument = {
   id: string;
   name: string;
+  locked?: boolean;
   canvas: { width: number; height: number };
   layers: unknown[];
   transition: { type: TransitionKind; ms: number };

@@ -4,6 +4,11 @@ export function flatten(service: Service): Array<{ sectionId: string; item: Pres
   return service.sections.flatMap((section) => section.items.map((item) => ({ sectionId: section.id, item })));
 }
 
+export function sectionIdForInsert(service: Service, cursor: Cursor): string | null {
+  if (cursor.sectionId && service.sections.some((section) => section.id === cursor.sectionId)) return cursor.sectionId;
+  return service.sections[0]?.id ?? null;
+}
+
 export function findItem(service: Service, itemId: string): { section: ServiceSection; item: PresentationItem } | null {
   for (const section of service.sections) {
     const item = section.items.find((entry) => entry.id === itemId);

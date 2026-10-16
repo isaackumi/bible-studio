@@ -20,11 +20,11 @@ ProgramPacket
 Output sinks
 ```
 
-`ItemKind` today: `"bible" | "lyric" | "slide" | "image" | "announcement"`.
+`ItemKind` today: `"bible" | "lyric" | "slide" | "image" | "announcement" | "composition"`.
 
 `PresentationLayout` today: `"scripture" | "lyrics" | "title" | "image" | "empty" | "black" | "logo" | "composition" | "timer" | "lower-third"`.
 
-A composition compiles sources into one `PresentationModel` with `layers`. It is not a second content engine. See [composition-engine.md](composition-engine.md). `ItemKind` on the rundown is unchanged for existing items. A service may also store `{ kind: "composition", composition: { compositionId } }`. That kind is not `isRundownKind`; unknown older items still compile to a title slide.
+A composition compiles sources into one `PresentationModel` with `layers`. It is not a second content engine. See [composition-engine.md](composition-engine.md). `Composition.locked` (persisted on `CompositionDocument`) freezes structural and content edits until unlock; TAKE/CUT still work. Existing bible/lyric/slide/image/announcement items are unchanged. A queued look stores `{ kind: "composition", composition: { compositionId } }` and is `isRundownKind`. Selecting it compiles the saved look to Preview. Missing look id paints empty. Unknown older items still compile to a title slide.
 
 `session.selectItem` and `session.previewPassage` call `setPreview`. They do not call `applyProgramAction`. Text and Markdown import compile to slides through the same path. A failed import does not call `applyProgramAction`. Unknown service item kinds are kept on library JSON.
 

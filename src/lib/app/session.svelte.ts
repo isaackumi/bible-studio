@@ -7,9 +7,17 @@ import { claimOwner, controlsOutput, publishLocal, readOwner } from "../display/
 import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
+  createScene,
+  persistLook,
   presentComposition,
+  presentSavedLook,
   previewComposition,
+  queueLook,
+  removeLook,
+  restoreComposition,
   sanitizeComposition,
+  setCompositionLocked,
+  takeTransitionForPreview,
   type Composition,
 } from "../domain/composition";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
@@ -36,15 +44,17 @@ import {
   type RemotePairing,
 } from "../domain/remote";
 import { publishRemote, subscribeRemote } from "../remote/channel";
-import { findItem, moveInList, stepCursor } from "../domain/service";
+import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
+import { defaultProductionLayout, normalizeProductionLayout, sameProductionLayout } from "../workspace/production";
 import type {
   AppearanceSettings,
   PewDeskState,
+  ProductionLayout,
   BibleItem,
   Cursor,
   DisplayAssignment,
@@ -125,6 +135,8 @@ class Session {
   cameraStream = $state<MediaStream | null>(null);
   cameraFeedId = $state<string | null>(null);
   cameraNote = $state("");
+  /** Last look put on Preview (saved or draft). Used so TAKE can read its transition before Save. */
+  lookOnPreview = $state<Composition | null>(null);
   previewBible = $state<BibleItem | null>(null);
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
@@ -149,7 +161,7 @@ class Session {
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
-  private audienceWindow: { closed: boolean; close(): void; postMessage(message: unknown, targetOrigin: string): void } | null = null;
+  private audienceWindow: { closed: boolean; close(): void; focus(): void; postMessage(message: unknown, targetOrigin: string): void } | null = null;
   private browserWatch: ReturnType<typeof setInterval> | undefined;
   private unlisten: UnlistenFn | undefined;
   private unlistenRemote: (() => void) | undefined;
@@ -359,9 +371,21 @@ class Session {
     }
   };
 
+  private looksForTake = () => {
+    const draft = this.lookOnPreview;
+    if (!draft) return this.workspace.compositions;
+    return [draft, ...this.workspace.compositions.filter((entry) => entry.id !== draft.id)];
+  };
+
   private pushProgram = async () => {
+    const themeTransition = this.theme().transition;
+    const lookTransition = takeTransitionForPreview(
+      this.live.program.sourceId,
+      this.looksForTake(),
+      themeTransition,
+    );
     const packet = {
-      ...programPacket(this.live, this.theme().transition.ms),
+      ...programPacket(this.live, lookTransition.ms),
       sessionId: this.sessionId,
       generation: this.audienceGeneration,
     };
@@ -614,9 +638,7 @@ class Session {
       return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
     }
     if (item.kind === "composition" && item.composition) {
-      const saved = this.workspace.compositions.find((entry) => entry.id === item.composition?.compositionId);
-      if (!saved) return emptyModel(theme);
-      return presentComposition(sanitizeComposition(saved), { theme, now: Date.now() });
+      return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
     }
     const heading = item.slide?.heading ?? item.announcement?.heading ?? item.title;
     const body = item.slide?.body ?? item.announcement?.body ?? "";
@@ -641,8 +663,19 @@ class Session {
     this.previewBible = found.item.bible ?? null;
     this.cursor = { sectionId: found.section.id, itemId };
     this.library = found.item.kind === "lyric" ? "songs" : found.item.kind === "bible" ? "bible" : found.item.kind === "image" ? "media" : "slides";
+    if (found.item.kind === "composition") {
+      const saved = this.workspace.compositions.find((entry) => entry.id === found.item.composition?.compositionId);
+      if (saved) this.previewLook(restoreComposition(saved));
+      else {
+        this.lookOnPreview = null;
+        this.previewModel(emptyModel(this.theme()), itemId);
+      }
+      this.persistSoon();
+      return;
+    }
     const model = await this.modelFor(found.item);
     if (token !== this.selectToken) return;
+    this.lookOnPreview = null;
     this.live = setPreview(this.live, frame(model, itemId, "cut"));
     this.persistSoon();
   };
@@ -658,6 +691,7 @@ class Session {
   };
 
   previewModel = (model: PresentationModel, sourceId: string | null) => {
+    this.lookOnPreview = null;
     this.live = setPreview(this.live, frame(model, sourceId, "cut"));
   };
 
@@ -665,6 +699,7 @@ class Session {
     this.songFocus = null;
     this.sermonFocus = null;
     const clean = sanitizeComposition(composition);
+    this.lookOnPreview = clean;
     const model = presentComposition(clean, { theme: this.theme(), now: Date.now() });
     this.live = previewComposition(this.live, model, clean.id);
     const camera = clean.layers.find((layer) => layer.visible && layer.source.type === "camera");
@@ -675,34 +710,68 @@ class Session {
 
   saveLook = (composition: Composition) => {
     const clean = sanitizeComposition(composition);
-    const existing = this.workspace.compositions;
-    const next = existing.some((entry) => entry.id === clean.id)
-      ? existing.map((entry) => (entry.id === clean.id ? clean : entry))
-      : [...existing, clean];
-    this.workspace = { ...this.workspace, compositions: next };
+    this.workspace = { ...this.workspace, compositions: persistLook(this.workspace.compositions, clean) };
+    if (this.lookOnPreview?.id === clean.id) this.lookOnPreview = clean;
     this.persistSoon();
     this.message = `${clean.name} saved. LIVE still sends Program.`;
   };
 
-  deleteLook = (id: string) => {
-    this.workspace = { ...this.workspace, compositions: this.workspace.compositions.filter((entry) => entry.id !== id) };
-    this.persistSoon();
+  /** Create an empty scene (look), persist it, and stage Preview only. */
+  createSceneLook = (name = "Scene") => {
+    const scene = createScene(name);
+    this.saveLook(scene);
+    this.previewLook(scene);
+    this.message = `${scene.name} is on Preview. LIVE still sends Program.`;
+    return scene;
   };
 
-  addLookToService = (compositionId: string, title: string) => {
-    if (!this.service) {
-      this.message = "Create a service before adding a look.";
+  /** Apply a look mutation, persist, and refresh Preview. No-ops when scene-locked. */
+  editSceneLook = (next: Composition) => {
+    const clean = sanitizeComposition(next);
+    const prior = this.workspace.compositions.find((entry) => entry.id === clean.id);
+    if (prior?.locked && clean.locked) {
+      this.message = `${clean.name} is locked.`;
       return;
     }
-    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
-    if (!target) {
-      this.message = "Add a section first.";
+    this.saveLook(clean);
+    this.previewLook(clean);
+  };
+
+  setSceneLocked = (id: string, locked: boolean) => {
+    const saved = this.workspace.compositions.find((entry) => entry.id === id);
+    if (!saved) return;
+    const next = setCompositionLocked(restoreComposition(saved), locked);
+    this.saveLook(next);
+    if (this.lookOnPreview?.id === id) this.previewLook(next);
+    this.message = locked ? `${next.name} locked.` : `${next.name} unlocked.`;
+  };
+
+  deleteLook = (id: string) => {
+    const saved = this.workspace.compositions.find((entry) => entry.id === id);
+    if (saved?.locked) {
+      this.message = `${saved.name} is locked. Unlock to remove.`;
       return;
     }
-    const item: PresentationItem = { id: uid(), kind: "composition", title, composition: { compositionId } };
-    this.insertItem(target, item);
-    void this.selectItem(item.id);
-    this.message = `${title} queued. Preview only until LIVE.`;
+    this.workspace = { ...this.workspace, compositions: removeLook(this.workspace.compositions, id) };
+    if (this.lookOnPreview?.id === id) this.lookOnPreview = null;
+    this.persistSoon();
+    this.message = "Look removed. Program was not changed.";
+  };
+
+  addLookToService = async (composition: Composition) => {
+    const queued = queueLook(this.workspace.compositions, composition);
+    this.workspace = { ...this.workspace, compositions: queued.looks };
+    this.persistSoon();
+    if (!this.service) await this.createService("Sunday Service");
+    if (!this.service?.sections.length) this.addSection("Looks");
+    const target = this.service ? sectionIdForInsert(this.service, this.cursor) : null;
+    if (!this.service || !target) {
+      this.message = `${queued.item.title} saved. Add a section first.`;
+      return;
+    }
+    this.insertItem(target, queued.item);
+    await this.selectItem(queued.item.id);
+    this.message = `${queued.item.title} queued. Preview only until LIVE.`;
   };
 
   previewPassage = async (passage: BibleItem) => {
@@ -1205,11 +1274,24 @@ class Session {
       return;
     }
     const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
-    this.live = applyProgramAction(this.live, action, this.theme(), { title: this.logoTitle(), imageUrl });
+    const themeTransition = this.theme().transition;
+    const takeTransition =
+      action === "take"
+        ? takeTransitionForPreview(this.live.preview.sourceId, this.looksForTake(), themeTransition)
+        : null;
+    this.live = applyProgramAction(
+      this.live,
+      action,
+      this.theme(),
+      { title: this.logoTitle(), imageUrl },
+      takeTransition ? { transition: takeTransition.type } : undefined,
+    );
     await this.pushProgram();
     this.message =
       action === "take"
-        ? "Taken to program."
+        ? takeTransition?.type === "cut"
+          ? "Cut to program."
+          : "Taken to program."
         : action === "cut"
           ? "Cut to program."
           : action === "black"
@@ -1474,7 +1556,11 @@ class Session {
     const layout = this.activeLayout();
     if (!layout) return;
     this.commitLayout(resetLayout(layout));
-    this.workspace = { ...this.workspace, pew: defaultPewDesk() };
+    this.workspace = {
+      ...this.workspace,
+      pew: defaultPewDesk(),
+      production: defaultProductionLayout(),
+    };
     this.persistSoon();
     this.message = `${layout.name} restored. Program was not changed.`;
   };
@@ -1503,6 +1589,13 @@ class Session {
     const pew = normalizePew({ ...this.workspace.pew, ...patch });
     if (samePew(pew, this.workspace.pew)) return;
     this.workspace = { ...this.workspace, pew };
+    this.persistSoon();
+  };
+
+  saveProductionLayout = (production: ProductionLayout) => {
+    const next = normalizeProductionLayout(production);
+    if (sameProductionLayout(next, this.workspace.production)) return;
+    this.workspace = { ...this.workspace, production: next };
     this.persistSoon();
   };
 

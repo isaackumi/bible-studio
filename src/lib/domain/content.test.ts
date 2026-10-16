@@ -25,7 +25,7 @@ describe("content contract", () => {
     expect(isRundownKind("camera")).toBe(false);
     expect(isRundownKind("ndi")).toBe(false);
     expect(isRundownKind("sermon")).toBe(false);
-    expect(isRundownKind("composition")).toBe(false);
+    expect(isRundownKind("composition")).toBe(true);
     expect(isRundownKind("timer")).toBe(false);
   });
 

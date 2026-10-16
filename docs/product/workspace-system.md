@@ -48,6 +48,8 @@ Live mode hides Bible, lyrics, slides, media, and theme for that paint. Their sa
 
 Restart loads `activeLayoutId` and the panel list, then paints it.
 
+The Production Desk uses PaneForge split groups for its Preview / transition / Program stage and its Scenes / Sources / Controls docks. Their proportions are stored separately in the workspace document, so resizing production panes does not change Presenter Desk sizing. Reset workspace restores the factory production proportions; temporary Focus mode does not save its expanded view over them.
+
 ## Commands
 
 Keyboard shortcuts go through `src/lib/keyboard/manager.ts` into `session.run`. Program commands are take, cut, clear, black, and logo. Next and previous change the preview cursor. Settings consumes Escape and the shortcut keys so a settings field cannot Take.

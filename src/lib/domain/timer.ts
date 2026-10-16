@@ -47,6 +47,16 @@ export function formatDuration(ms: number) {
   return `${pad(minutes)}:${pad(seconds)}`;
 }
 
+export function targetAtFromClock(clock: string, now: number): number {
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(clock.trim());
+  if (!match) return now;
+  const date = new Date(now);
+  date.setHours(Number(match[1]), Number(match[2]), Number(match[3] ?? 0), 0);
+  let at = date.getTime();
+  if (at <= now) at += 24 * 60 * 60 * 1000;
+  return at;
+}
+
 export function formatClock(at: number, utc = false) {
   const date = new Date(at);
   const hours = utc ? date.getUTCHours() : date.getHours();

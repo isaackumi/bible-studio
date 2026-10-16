@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stepCursor } from "./service";
+import { sectionIdForInsert, stepCursor } from "./service";
 import type { Service } from "./types";
 
 const service: Service = {
@@ -33,5 +33,11 @@ describe("service cursor", () => {
     expect(next).toEqual({ sectionId: "word", itemId: "john" });
     const back = stepCursor(service, next, -1);
     expect(back.itemId).toBe("welcome");
+  });
+
+  it("queues into the current section, or the first section if the cursor is stale", () => {
+    expect(sectionIdForInsert(service, { sectionId: "word", itemId: "john" })).toBe("word");
+    expect(sectionIdForInsert(service, { sectionId: "gone", itemId: null })).toBe("open");
+    expect(sectionIdForInsert({ ...service, sections: [] }, { sectionId: "open", itemId: null })).toBeNull();
   });
 });

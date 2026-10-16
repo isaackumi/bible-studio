@@ -93,7 +93,7 @@ describe("camera composition feeds", () => {
     composition = assignLayerSource(composition, composition.layers[0]!.id, sourceRef("camera", "cam-1", "Camera 1"));
     const painted = presentComposition(composition, { theme, now: 0 });
     expect(painted.layers?.[0]?.sourceId).toBe("camera:cam-1");
-    expect(previewShowsCamera(painted, `composition:${composition.id}`)).toBe(true);
+    expect(previewShowsCamera(painted, composition.id)).toBe(true);
     expect(previewShowsCamera(presentCamera({ theme, label: "Cam" }), "composition:x")).toBe(false);
   });
 

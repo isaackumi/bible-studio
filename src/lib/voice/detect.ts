@@ -253,7 +253,15 @@ export function matchQuote(heard: string, source: QuoteVerse[] | QuoteIndex, tra
   return { item: passageFor(best.verse, translationId), text: best.verse.text, hits: best.hits };
 }
 
-function citationMatch(heard: string, spoken: ParsedReference, translationId: string): SpokenMatch {
+function hasStartVerse(spoken: ParsedReference | null): spoken is ParsedReference & { startVerse: number } {
+  return spoken !== null && typeof spoken.startVerse === "number" && spoken.startVerse > 0;
+}
+
+function citationMatch(
+  heard: string,
+  spoken: ParsedReference & { startVerse: number },
+  translationId: string,
+): SpokenMatch {
   const book = CANON.find((entry) => entry.ord === spoken.bookOrd);
   const end = spoken.endVerse ?? spoken.startVerse;
   const short = wordsOf(heard).length <= 10;
@@ -274,7 +282,7 @@ function citationMatch(heard: string, spoken: ParsedReference, translationId: st
 /** A citation or a quoted phrase. A later quote beats an older reference in the same phrase. */
 export function matchSpoken(heard: string, source: QuoteVerse[] | QuoteIndex, translationId: string): SpokenMatch | null {
   const spoken = spokenReference(heard);
-  const citation = spoken?.startVerse ? citationMatch(heard, spoken, translationId) : null;
+  const citation = hasStartVerse(spoken) ? citationMatch(heard, spoken, translationId) : null;
   if (citation && citation.hits >= 12) return citation;
   const quote = matchQuote(heard, source, translationId);
   if (quote && (!citation || quote.hits >= 4)) return quote;

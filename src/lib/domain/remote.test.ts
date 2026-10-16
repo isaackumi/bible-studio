@@ -45,6 +45,7 @@ describe("phone remote pairing", () => {
 
     const allowed = authorizeRemoteCommand([paired.token], paired.token, "take");
     expect(allowed).toBe("take");
+    if (allowed !== "take") throw new Error("The authorized remote action should be TAKE.");
     live = applyProgramAction(live, allowed, theme, { title: "Logo", imageUrl: null });
     expect(live.program.model.lines[0]?.text).toBe("Welcome");
     expect(live.program).not.toEqual(program);

@@ -677,32 +677,32 @@
       <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
-      <button type="button" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
+      <button type="button" class="desk-btn icon" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
         <Icon name="library" size={16} />
       </button>
-      <button type="button" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => session.togglePanel(QUEUE_PANEL)}>
+      <button type="button" class="desk-btn icon" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => session.togglePanel(QUEUE_PANEL)}>
         <Icon name="queue" size={16} />
       </button>
-      <button type="button" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => session.savePew({ focus: !focus })}>
+      <button type="button" class="desk-btn icon" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => session.savePew({ focus: !focus })}>
         <Icon name="focus" size={16} />
       </button>
-      <button type="button" aria-label="Reset workspace" data-tip="Reset workspace" onclick={() => session.resetActiveLayout()}>
+      <button type="button" class="desk-btn icon" aria-label="Reset workspace" data-tip="Reset workspace" onclick={() => session.resetActiveLayout()}>
         <Icon name="reset" size={16} />
       </button>
       <DeskSwitcher />
-      <button type="button" class="secondary" data-tip="Displays" aria-label="Displays" onclick={() => session.openSettings("displays")}>
+      <button type="button" class="desk-btn icon secondary" data-tip="Displays" aria-label="Displays" onclick={() => session.openSettings("displays")}>
         {@render icon("outputs")}
       </button>
-      <button type="button" class="secondary" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
+      <button type="button" class="desk-btn icon secondary" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
         {@render icon("themes")}
       </button>
-      <button type="button" class="secondary" data-tip="Alerts" aria-label="Alerts" onclick={() => (sheet = sheet === "alerts" ? null : "alerts")}>
+      <button type="button" class="desk-btn icon secondary" data-tip="Alerts" aria-label="Alerts" onclick={() => (sheet = sheet === "alerts" ? null : "alerts")}>
         {@render icon("alerts")}
       </button>
-      <button type="button" class="secondary" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
+      <button type="button" class="desk-btn icon secondary" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
         {@render icon("help")}
       </button>
-      <button type="button" data-tip="Settings" aria-label="Settings" onclick={() => session.openSettings("appearance")}>
+      <button type="button" class="desk-btn icon" data-tip="Settings" aria-label="Settings" onclick={() => session.openSettings("appearance")}>
         {@render icon("settings")}
       </button>
     </nav>
@@ -1133,8 +1133,10 @@
   .pb {
     height: 100%;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     background: var(--desk);
     color: var(--ink);
     font-family: var(--font-ui);
@@ -1150,7 +1152,7 @@
     flex: none;
     overflow: hidden;
   }
-  .pb-modes { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: auto; flex: 1 1 auto; }
+  .pb-modes { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: auto; flex: 1 1 0; }
   .pb-modes button {
     border: 0;
     background: transparent;
@@ -1163,7 +1165,18 @@
   }
   .pb-modes button:hover:not(.on) { background: var(--field); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
-  .pb-actions { margin-left: auto; display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; flex: none; min-width: 0; }
+  .pb-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    flex: none;
+    min-width: 0;
+    position: relative;
+    z-index: 2;
+    background: var(--desk);
+  }
   .pb-actions :global(.output-controls) { min-width: 0; }
   .live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 78px; }
   .live.on-air { animation: live-glow 1.6s ease-in-out infinite; }
@@ -1208,9 +1221,11 @@
   }
   .pb-tools > button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .pb-tools > button.on { color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 1440px) {
+    .pb-tools > button.secondary { display: none; }
+  }
   @media (max-width: 1280px) {
     .pb-actions :global(.output-controls .desk-btn) { display: none; }
-    .pb-tools > button.secondary { display: none; }
   }
   .pb button:active { opacity: 0.84; }
   .pb-grid {
@@ -1258,7 +1273,7 @@
     flex-direction: column;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius-panel);
     overflow: hidden;
   }
   .pb-head, .pb-foot, .script-bar, .slide-bar, .output-tools {
@@ -1330,6 +1345,7 @@
     white-space: normal;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
   }
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }

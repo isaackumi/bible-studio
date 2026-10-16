@@ -12,6 +12,27 @@
   import MediaPane from "../MediaPane.svelte";
   import OutputType from "../OutputType.svelte";
 
+  type SettingsSectionId =
+    | "general"
+    | "appearance"
+    | "workspace"
+    | "keyboard"
+    | "audience"
+    | "displays"
+    | "stage"
+    | "remote"
+    | "bible"
+    | "lyrics"
+    | "media"
+    | "audio"
+    | "storage"
+    | "performance"
+    | "updates"
+    | "account"
+    | "license";
+  type SettingsEntry = readonly [SettingsSectionId, string, string];
+  type SettingsGroup = { label: string; items: SettingsEntry[] };
+
   let audioNote = $state("");
 
   async function allowMicrophone() {
@@ -21,7 +42,7 @@
     if (blocked) void openPrivacySettings();
   }
 
-  const groups = [
+  const groups: SettingsGroup[] = [
     {
       label: "Studio",
       items: [
@@ -59,9 +80,9 @@
         ["license", "License", "key"],
       ],
     },
-  ] as const;
+  ];
 
-  const sections = groups.flatMap((group) => group.items);
+  const sections: SettingsEntry[] = groups.flatMap((group) => group.items);
   const themes: { id: OperatorTheme; name: string; note: string; ground: string; ink: string }[] = [
     { id: "dark", name: "Night", note: "Black desk, white type", ground: "#050505", ink: "#f5f5f5" },
     { id: "vespers", name: "Vespers", note: "Warm black, bone type", ground: "#0c0a09", ink: "#f6f1e7" },
@@ -75,8 +96,12 @@
     { name: "Crimson", value: "#be2119" },
   ];
 
-  let section = $state<(typeof sections)[number][0]>(
-    sections.some((item) => item[0] === session.settingsSection) ? (session.settingsSection as (typeof sections)[number][0]) : "appearance",
+  function isSettingsSection(value: string): value is SettingsSectionId {
+    return sections.some(([id]) => id === value);
+  }
+
+  let section = $state<SettingsSectionId>(
+    isSettingsSection(session.settingsSection) ? session.settingsSection : "appearance",
   );
   let layoutName = $state("");
   let layoutSeen = $state("");

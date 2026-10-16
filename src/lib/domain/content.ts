@@ -3,6 +3,7 @@ import type { ItemKind, PresentationItem, PresentationModel } from "./types";
 /**
  * Rundown kinds that already persist on a service. Future sources (sermon, camera, NDI)
  * become one of these items, or a new ItemKind added with a schema bump — not a second model.
+ * Composition items reference a saved look by id; they are not a second live state.
  */
 export type ContentSourceKind = ItemKind | "sermon" | "video" | "camera" | "ndi" | "plugin" | "timer" | "composition";
 
@@ -21,5 +22,5 @@ export type ContentAdapter = {
 };
 
 export function isRundownKind(kind: string): kind is ItemKind {
-  return kind === "bible" || kind === "lyric" || kind === "slide" || kind === "image" || kind === "announcement";
+  return kind === "bible" || kind === "lyric" || kind === "slide" || kind === "image" || kind === "announcement" || kind === "composition";
 }
