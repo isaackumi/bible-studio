@@ -243,14 +243,15 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         let (x, y, width, height) = screen_frame(monitor);
         log::info!("AUDIENCE_PLACED name={name} mode={mode} logical={x},{y} {width}x{height}");
     }
-    publish(
-        app,
-        &output,
-        true,
-        name.clone(),
-        format!("Audience on {name}"),
-        &signature,
-    );
+    // Read the real window frame back and say plainly if it does not cover the display.
+    let message = match coverage(&window, monitor) {
+        Some(report) if !report.covers => {
+            log::warn!("AUDIENCE_COVERAGE {}", report.detail);
+            format!("Audience on {name}, but the window does not cover the whole screen ({}).", report.detail)
+        }
+        _ => format!("Audience on {name}"),
+    };
+    publish(app, &output, true, name.clone(), message, &signature);
     Ok(())
 }
 
@@ -601,6 +602,33 @@ fn join_active_space(_window: &WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+
+struct Coverage {
+    covers: bool,
+    detail: String,
+}
+
+/// Compare the audience window's actual AppKit frame with the display it should cover.
+#[cfg(target_os = "macos")]
+fn coverage(window: &WebviewWindow, monitor: &Monitor) -> Option<Coverage> {
+    let target = ns_screen_frame(monitor)?;
+    let pointer = window.ns_window().ok()?;
+    let ns_window = unsafe { &*(pointer as *const objc2_app_kit::NSWindow) };
+    let frame = ns_window.frame();
+    let actual = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+    Some(Coverage {
+        covers: frames_close(actual, target),
+        detail: format!(
+            "window {:.0}x{:.0} at {:.0},{:.0}; screen {:.0}x{:.0} at {:.0},{:.0}",
+            actual.2, actual.3, actual.0, actual.1, target.2, target.3, target.0, target.1
+        ),
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn coverage(_window: &WebviewWindow, _monitor: &Monitor) -> Option<Coverage> {
+    None
+}
 
 fn frame_matches(window: &WebviewWindow, monitor: &Monitor) -> bool {
     #[cfg(target_os = "macos")]
