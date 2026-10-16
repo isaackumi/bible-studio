@@ -2,6 +2,9 @@ import type { PresentationModel, Theme } from "./types";
 
 export type TimerMode = "countdown" | "countup" | "clock" | "target";
 
+/** Countdowns turn red this long before zero unless the source sets another warning time. */
+export const DEFAULT_TIMER_WARNING_MS = 60_000;
+
 export type TimerSpec = {
   id: string;
   name: string;
@@ -165,7 +168,8 @@ export function presentTimer(timer: TimerSpec, theme: Theme, now: number): Prese
   const view = timerDisplay(timer, now);
   return {
     layout: "timer",
-    theme,
+    // Timers read across a room: at least 96px unless a style sets the size.
+    theme: { ...theme, fontSize: Math.max(theme.fontSize, 96) },
     reference: timer.label,
     attribution: null,
     lines: [{ text: view.text }],

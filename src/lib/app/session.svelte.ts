@@ -102,6 +102,7 @@ import type {
   WorkspaceLayout,
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
+import { styleModel } from "../domain/text-style";
 import { parseVoiceCommand, voiceCommandLabel, type VoiceCommand } from "../voice/commands";
 import {
   openPrivacySettings,
@@ -814,7 +815,13 @@ class Session {
 
   private mediaSrc = (id: string | null | undefined) => mediaUrl(this.media.find((asset) => asset.id === id) ?? null);
 
+  /** An item's own text style (slides, announcements) applies on top of the theme. */
   private async modelFor(item: PresentationItem): Promise<PresentationModel> {
+    const model = await this.baseModelFor(item);
+    return item.style ? styleModel(model, item.style) : model;
+  }
+
+  private async baseModelFor(item: PresentationItem): Promise<PresentationModel> {
     const theme = this.theme();
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
     if (item.kind === "bible" && item.bible) {
@@ -1198,6 +1205,7 @@ class Session {
       body: verses.map((verse) => verse.text).join(" "),
       attribution: translation.abbreviation || translation.name,
       verse: parsed.startVerse,
+      style: {},
     };
   };
 

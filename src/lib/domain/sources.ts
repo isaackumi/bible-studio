@@ -8,12 +8,13 @@ import {
   type SourceRef,
   type SourceType,
 } from "./composition";
-import type { TimerMode } from "./timer";
-import type { CompositionDocument } from "./types";
+import { encodeTextStyle, parseTextStyle } from "./text-style";
+import { DEFAULT_TIMER_WARNING_MS, type TimerMode } from "./timer";
+import type { CompositionDocument, TextStyle } from "./types";
 
 export type SharedSource = { id: string; name: string; source: SourceRef };
 
-export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "lower-third" | "image";
+export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "camera", label: "Camera" },
@@ -21,18 +22,26 @@ export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "song", label: "Lyrics" },
   { type: "text", label: "Text" },
   { type: "timer", label: "Timer" },
+  { type: "clock", label: "Clock" },
   { type: "lower-third", label: "Lower third" },
   { type: "image", label: "Image" },
 ];
 
 export type SourceFields =
   | { type: "camera"; deviceId: string; label: string; mirror: boolean }
-  | { type: "scripture"; reference: string; body: string; attribution: string; verse: number }
-  | { type: "song"; songId: string; sectionId: string; label: string; body: string }
-  | { type: "text"; heading: string; body: string }
-  | { type: "timer"; mode: TimerMode; durationMs: number; targetAt: number | null; label: string }
-  | { type: "lower-third"; templateId: string; title: string; subtitle: string }
+  | { type: "scripture"; reference: string; body: string; attribution: string; verse: number; style: TextStyle }
+  | { type: "song"; songId: string; sectionId: string; label: string; body: string; style: TextStyle }
+  | { type: "text"; heading: string; body: string; style: TextStyle }
+  | { type: "timer"; mode: TimerMode; durationMs: number; targetAt: number | null; label: string; warningMs: number; style: TextStyle }
+  | { type: "clock"; label: string; style: TextStyle }
+  | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle }
   | { type: "image"; assetId: string; name: string; imageUrl: string };
+
+/** Payload entry for a style: omitted entirely when no style is set. */
+function stylePayload(style: TextStyle): Record<string, string> {
+  const encoded = encodeTextStyle(style);
+  return encoded ? { style: encoded } : {};
+}
 
 const KINDS = new Set<string>(SOURCE_KINDS.map((kind) => kind.type));
 const TIMER_MODES: TimerMode[] = ["countdown", "countup", "clock", "target"];
@@ -200,6 +209,7 @@ export function buildSource(fields: SourceFields): SourceRef {
         body: fields.body,
         attribution: fields.attribution,
         verse: String(fields.verse),
+        ...stylePayload(fields.style),
       });
     case "song":
       return sourceRef("song", fields.songId || fields.label, fields.label, {
@@ -207,21 +217,27 @@ export function buildSource(fields: SourceFields): SourceRef {
         sectionId: fields.sectionId,
         label: fields.label,
         body: fields.body,
+        ...stylePayload(fields.style),
       });
     case "text":
-      return sourceRef("text", "text", fields.heading || "Text", { heading: fields.heading, body: fields.body });
+      return sourceRef("text", "text", fields.heading || "Text", { heading: fields.heading, body: fields.body, ...stylePayload(fields.style) });
     case "timer":
       return sourceRef("timer", "timer", fields.label || "Timer", {
         mode: fields.mode,
         durationMs: String(fields.durationMs),
         ...(fields.targetAt !== null ? { targetAt: String(fields.targetAt) } : {}),
         label: fields.label,
+        warningMs: String(fields.warningMs),
+        ...stylePayload(fields.style),
       });
+    case "clock":
+      return sourceRef("clock", "clock", fields.label || "Clock", { mode: "clock", label: fields.label, ...stylePayload(fields.style) });
     case "lower-third":
       return sourceRef("lower-third", fields.templateId, fields.title || "Lower third", {
         templateId: fields.templateId,
         title: fields.title,
         subtitle: fields.subtitle,
+        ...stylePayload(fields.style),
       });
     case "image":
       return sourceRef("image", fields.assetId || "image", fields.name || "Image", {
@@ -237,21 +253,26 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
     case "camera":
       return { type: "camera", deviceId: p.deviceId ?? source.id, label: p.label ?? source.title, mirror: p.mirror === "true" };
     case "scripture":
-      return { type: "scripture", reference: p.reference ?? source.title, body: p.body ?? "", attribution: p.attribution ?? "", verse: Number(p.verse) || 1 };
+      return { type: "scripture", reference: p.reference ?? source.title, body: p.body ?? "", attribution: p.attribution ?? "", verse: Number(p.verse) || 1, style: parseTextStyle(p.style) };
     case "song":
-      return { type: "song", songId: p.songId ?? "", sectionId: p.sectionId ?? "", label: p.label ?? source.title, body: p.body ?? "" };
+      return { type: "song", songId: p.songId ?? "", sectionId: p.sectionId ?? "", label: p.label ?? source.title, body: p.body ?? "", style: parseTextStyle(p.style) };
     case "text":
-      return { type: "text", heading: p.heading ?? source.title, body: p.body ?? "" };
+      return { type: "text", heading: p.heading ?? source.title, body: p.body ?? "", style: parseTextStyle(p.style) };
     case "timer":
+      if (p.mode === "clock") return { type: "clock", label: p.label ?? "", style: parseTextStyle(p.style) };
       return {
         type: "timer",
         mode: TIMER_MODES.includes(p.mode as TimerMode) ? (p.mode as TimerMode) : "countdown",
         durationMs: Number(p.durationMs) || 0,
         targetAt: p.targetAt ? Number(p.targetAt) : null,
         label: p.label ?? source.title,
+        warningMs: p.warningMs ? Number(p.warningMs) : DEFAULT_TIMER_WARNING_MS,
+        style: parseTextStyle(p.style),
       };
+    case "clock":
+      return { type: "clock", label: p.label ?? "", style: parseTextStyle(p.style) };
     case "lower-third":
-      return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "" };
+      return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "", style: parseTextStyle(p.style) };
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
     default:
@@ -266,15 +287,17 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
       return { type: "camera", deviceId: camera?.deviceId ?? "", label: camera?.label ?? "Camera", mirror: false };
     }
     case "scripture":
-      return { type: "scripture", reference: "", body: "", attribution: "", verse: 1 };
+      return { type: "scripture", reference: "", body: "", attribution: "", verse: 1, style: {} };
     case "song":
-      return { type: "song", songId: "", sectionId: "", label: "", body: "" };
+      return { type: "song", songId: "", sectionId: "", label: "", body: "", style: {} };
     case "text":
-      return { type: "text", heading: "", body: "" };
+      return { type: "text", heading: "", body: "", style: {} };
     case "timer":
-      return { type: "timer", mode: "countdown", durationMs: 10 * 60_000, targetAt: null, label: "Service starts in" };
+      return { type: "timer", mode: "countdown", durationMs: 10 * 60_000, targetAt: null, label: "Service starts in", warningMs: DEFAULT_TIMER_WARNING_MS, style: {} };
+    case "clock":
+      return { type: "clock", label: "", style: {} };
     case "lower-third":
-      return { type: "lower-third", templateId: "speaker", title: "", subtitle: "" };
+      return { type: "lower-third", templateId: "speaker", title: "", subtitle: "", style: {} };
     case "image":
       return { type: "image", assetId: "", name: "", imageUrl: "" };
   }

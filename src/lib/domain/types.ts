@@ -21,6 +21,25 @@ export type Theme = {
   reference: { show: boolean; size: number; color: string };
   attribution: { show: boolean; size: number; color: string };
   transition: { type: TransitionKind; ms: number };
+  /** Bold, italic, underline, uppercase and shadow for every frame using this theme. */
+  effects?: TextStyle;
+};
+
+/**
+ * Per-item text styling on top of the theme. Every field is optional; absent fields keep the
+ * theme's value. align + vertical together are the 9-point position (timers and clocks use it).
+ */
+export type TextStyle = {
+  fontFamily?: string;
+  size?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  uppercase?: boolean;
+  shadow?: boolean;
+  align?: "left" | "center" | "right";
+  vertical?: "top" | "middle" | "bottom";
 };
 
 export type PresentationLine = {
@@ -81,6 +100,8 @@ export type PresentationModel = {
   backgroundImageUrl: string | null;
   layers?: PaintedLayer[];
   timer?: TimerPaint;
+  /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */
+  style?: TextStyle;
 };
 
 export type LiveFrame = {
@@ -119,6 +140,8 @@ export type PresentationItem = {
   slide?: { heading: string; body: string; imageId: string | null };
   image?: { assetId: string };
   announcement?: { heading: string; body: string };
+  /** Text styling for slide and announcement items. */
+  style?: TextStyle;
   composition?: { compositionId: string };
 };
 

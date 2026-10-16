@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { findItem } from "../../domain/service";
+  import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
   import { stepVerse } from "../../bible/passage";
@@ -6,7 +8,7 @@
   import { api } from "../../db/api";
   import { attachSermonItem, deskNotes, moveSermonSection, removeSermonSection, sanitizeSermon, searchSermonHits } from "../../domain/sermon";
   import { moveSongSection, parseLyrics, removeSongSection } from "../../domain/song";
-  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
+  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, TextStyle, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
@@ -136,6 +138,30 @@
   });
   const queue = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
   const slides = $derived(queue.filter((item) => item.kind === "slide" || item.kind === "announcement"));
+  const editingSlide = $derived.by(() => {
+    const id = session.cursor.itemId;
+    if (!session.service || !id) return null;
+    const item = findItem(session.service, id)?.item;
+    return item && (item.kind === "slide" || item.kind === "announcement") ? item : null;
+  });
+
+  /** Edit the selected slide's text or style. Preview refreshes; Program waits for LIVE. */
+  function patchSlide(patch: { heading?: string; body?: string; style?: TextStyle }) {
+    const item = editingSlide;
+    if (!item) return;
+    const text = item.slide ?? item.announcement ?? { heading: "", body: "" };
+    const heading = patch.heading ?? text.heading;
+    const body = patch.body ?? text.body;
+    const style = patch.style ?? item.style;
+    const next: PresentationItem = {
+      ...item,
+      title: heading.trim() || item.title,
+      ...(item.kind === "slide" ? { slide: { heading, body, imageId: item.slide?.imageId ?? null } } : { announcement: { heading, body } }),
+      ...(style && Object.keys(style).length ? { style } : { style: undefined }),
+    };
+    session.updateItem(next);
+  }
+
   const visibleSlides = $derived(
     slides.filter((item) => item.title.toLowerCase().includes(slideQuery.trim().toLowerCase())),
   );
@@ -1005,6 +1031,26 @@
                 </button>
               {/each}
             </div>
+            {#if editingSlide}
+              {@const slideText = editingSlide.slide ?? editingSlide.announcement ?? { heading: "", body: "" }}
+              <div class="slide-editor">
+                <input
+                  aria-label="Slide heading"
+                  placeholder="Heading"
+                  value={slideText.heading}
+                  oninput={(event) => patchSlide({ heading: event.currentTarget.value })}
+                />
+                <textarea
+                  aria-label="Slide body"
+                  rows="4"
+                  placeholder="Body text"
+                  value={slideText.body}
+                  oninput={(event) => patchSlide({ body: event.currentTarget.value })}
+                ></textarea>
+                <TextStyleEditor style={editingSlide.style ?? {}} onchange={(style) => patchSlide({ style })} />
+                <p class="script-note">Edits show on Preview. LIVE sends Program.</p>
+              </div>
+            {/if}
           </section>
         {/if}
                 </Pane>
@@ -1389,6 +1435,15 @@
   .hot { background: linear-gradient(160deg, #ff8a3d, #ff5a1f); border-color: transparent; }
   .cool { background: linear-gradient(160deg, #1aa8a0, #0e6e74); border-color: transparent; }
   .slide-row { display: flex; gap: 10px; overflow: auto; padding: 4px 10px 12px; }
+  .slide-editor { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; }
+  .slide-editor input, .slide-editor textarea {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: var(--field);
+    color: var(--ink);
+    padding: 8px 10px;
+    font: inherit;
+  }
   .card { width: 180px; flex: none; min-height: 108px; }
   .card span, .tile { font-weight: 500; }
   .card span { font-size: 12px; opacity: 0.85; }

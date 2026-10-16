@@ -1,7 +1,8 @@
 import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText } from "./present";
-import { createTimer, presentTimer, type TimerMode } from "./timer";
+import { createTimer, DEFAULT_TIMER_WARNING_MS, presentTimer, type TimerMode } from "./timer";
+import { parseTextStyle, styleModel } from "./text-style";
 import { emptyModel } from "./theme";
 import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, Theme } from "./types";
 
@@ -990,7 +991,13 @@ export function registeredSourceTypes(): string[] {
   return [...extraCompilers.keys()];
 }
 
+/** Compile a source, then apply its text style (payload.style) on top of the theme. */
 export function compileSource(source: SourceRef, ctx: CompileContext): PresentationModel {
+  const model = compileSourceBase(source, ctx);
+  return source.payload.style ? styleModel(model, parseTextStyle(source.payload.style)) : model;
+}
+
+function compileSourceBase(source: SourceRef, ctx: CompileContext): PresentationModel {
   const extra = extraCompilers.get(source.type);
   const payload = source.payload;
   if (source.type === "scripture") {
@@ -1017,7 +1024,7 @@ export function compileSource(source: SourceRef, ctx: CompileContext): Presentat
   }
   if (source.type === "timer" || source.type === "countdown" || source.type === "clock") {
     const mode = source.type === "clock" ? "clock" : payload.mode === "countup" || payload.mode === "target" || payload.mode === "clock" ? payload.mode : "countdown";
-    return presentTimer(
+    const painted = presentTimer(
       startIfNeeded(
         createTimer({
           id: source.id,
@@ -1026,12 +1033,15 @@ export function compileSource(source: SourceRef, ctx: CompileContext): Presentat
           durationMs: Number(payload.durationMs) || 0,
           targetAt: payload.targetAt ? Number(payload.targetAt) : null,
           label: payload.label || source.title,
+          warningMs: payload.warningMs ? Number(payload.warningMs) : DEFAULT_TIMER_WARNING_MS,
         }),
         ctx.now,
       ),
       ctx.theme,
       ctx.now,
     );
+    // A clock shows only the time unless the operator gave it a label.
+    return mode === "clock" && !payload.label?.trim() ? { ...painted, reference: null } : painted;
   }
   if (source.type === "lower-third") {
     return presentLowerThird(ctx.theme, payload.title || source.title, payload.subtitle || "");

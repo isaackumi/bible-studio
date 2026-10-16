@@ -279,7 +279,16 @@ button { cursor: pointer; }
 .frame.nested.timer .line {
   font-size: 64px !important;
 }
-.frame.timer.warning .line { color: #ffb020; }
+/* Last stretch of a countdown: beaming red. At zero it holds solid red. */
+.frame.timer.warning .line { color: #ff2b2b !important; animation: timer-beam 1s ease-in-out infinite; }
+.frame.timer.done .line { color: #ff2b2b !important; text-shadow: 0 0 28px rgba(255, 43, 43, 0.6); }
+@keyframes timer-beam {
+  0%, 100% { opacity: 1; text-shadow: 0 0 34px rgba(255, 43, 43, 0.85); }
+  50% { opacity: 0.55; text-shadow: 0 0 6px rgba(255, 43, 43, 0.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame.timer.warning .line { animation: none; }
+}
 .comp-layer {
   position: absolute;
   overflow: hidden;

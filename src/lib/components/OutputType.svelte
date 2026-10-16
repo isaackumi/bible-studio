@@ -3,6 +3,8 @@
   import { DISPLAY_WASHES, backgroundFill, displayWash } from "../domain/backgrounds";
   import { SCREEN_FONTS, screenFont } from "../domain/fonts";
   import type { Theme } from "../domain/types";
+  import { sanitizeTextStyle } from "../domain/text-style";
+  import TextStyleEditor from "./TextStyleEditor.svelte";
 
   const theme = $derived(session.theme());
   const fill = $derived(backgroundFill(theme.background));
@@ -54,6 +56,16 @@
     Size {theme.fontSize}
     <input class="field" type="range" min="28" max="120" value={theme.fontSize} aria-label="Font size" oninput={(event) => save({ ...theme, fontSize: Number(event.currentTarget.value) })} />
   </label>
+
+  <TextStyleEditor
+    label="Effects and position"
+    effectsOnly
+    style={{ ...(theme.effects ?? {}), align: theme.align, vertical: theme.vertical }}
+    onchange={(style) => {
+      const { align, vertical, ...effects } = style;
+      save({ ...theme, effects: sanitizeTextStyle(effects), align: align ?? theme.align, vertical: vertical ?? theme.vertical });
+    }}
+  />
 
   <div class="colors">
     <label>

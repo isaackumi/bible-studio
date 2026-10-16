@@ -7,6 +7,8 @@
   import type { SourceFields } from "../../domain/sources";
   import type { TimerMode } from "../../domain/timer";
   import DeskDialog from "./DeskDialog.svelte";
+  import TextStyleEditor from "../TextStyleEditor.svelte";
+  import type { TextStyle } from "../../domain/types";
 
   let {
     name: initialName,
@@ -96,7 +98,8 @@
       error = "Reference not found.";
       return;
     }
-    fields = found;
+    // Keep the style the operator already chose.
+    fields = found.type === "scripture" && fields.type === "scripture" ? { ...found, style: fields.style } : found;
     if (!name.trim() || name === initialName) name = found.type === "scripture" ? found.reference : name;
   }
 
@@ -276,6 +279,28 @@
         <span>Label</span>
         <input class="field" aria-label="Label" value={fields.label} oninput={(event) => fields.type === "timer" && (fields = { ...fields, label: event.currentTarget.value })} />
       </label>
+      {#if fields.mode !== "clock"}
+        <label class="row">
+          <span>Red at</span>
+          <span class="inline">
+            <input
+              class="field"
+              type="number"
+              min="0"
+              max="3600"
+              aria-label="Warning seconds"
+              value={Math.round(fields.warningMs / 1000)}
+              oninput={(event) => fields.type === "timer" && (fields = { ...fields, warningMs: Math.max(0, Number(event.currentTarget.value) || 0) * 1000 })}
+            />
+            <span class="unit">seconds left (turns red and pulses)</span>
+          </span>
+        </label>
+      {/if}
+    {:else if fields.type === "clock"}
+      <label class="row">
+        <span>Label</span>
+        <input class="field" aria-label="Label" placeholder="Optional, e.g. Local time" value={fields.label} oninput={(event) => fields.type === "clock" && (fields = { ...fields, label: event.currentTarget.value })} />
+      </label>
     {:else if fields.type === "lower-third"}
       <label class="row">
         <span>Template</span>
@@ -312,6 +337,15 @@
         </div>
       {/if}
     {/if}
+    {#if "style" in fields}
+      <TextStyleEditor
+        style={fields.style}
+        label={fields.type === "timer" || fields.type === "clock" ? "Look and position" : "Text style"}
+        onchange={(style: TextStyle) => {
+          if ("style" in fields) fields = { ...fields, style } as SourceFields;
+        }}
+      />
+    {/if}
   </fieldset>
   {#if error}
     <p class="error" role="alert">{error}</p>
@@ -331,6 +365,7 @@
   .row > span:first-child { color: var(--muted); }
   .inline { display: flex; gap: 6px; min-width: 0; }
   .inline .field { flex: 1; min-width: 0; }
+  .unit { color: var(--muted); font-size: 12px; align-self: center; }
   .field {
     height: var(--control-h);
     border-radius: var(--radius-control);

@@ -43,7 +43,7 @@ describe("shared sources", () => {
 
   it("filters sources by type", () => {
     const camera = cam();
-    const text = createSharedSource("Welcome", buildSource({ type: "text", heading: "Welcome", body: "" }));
+    const text = createSharedSource("Welcome", buildSource({ type: "text", heading: "Welcome", body: "", style: {} }));
     expect(sourcesOfType([camera, text], "camera")).toEqual([camera]);
   });
 
@@ -58,7 +58,7 @@ describe("shared sources", () => {
   });
 
   it("places a lower third in the lower-third region", () => {
-    const shared = createSharedSource("Speaker", buildSource({ type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "" }));
+    const shared = createSharedSource("Speaker", buildSource({ type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "", style: {} }));
     const look = addSharedLayer(createScene("Main"), shared);
     expect(look.layers[look.layers.length - 1]!.bounds).toEqual({ x: 6, y: 72, w: 55, h: 22 });
   });
@@ -141,11 +141,12 @@ describe("shared sources", () => {
   it("round-trips fields through SourceRef for every kind", () => {
     const cases = [
       { type: "camera", deviceId: "d", label: "Cam", mirror: true },
-      { type: "scripture", reference: "John 3:16", body: "For God so loved", attribution: "KJV", verse: 16 },
-      { type: "song", songId: "s1", sectionId: "v1", label: "Amazing Grace — Verse 1", body: "Amazing grace\nHow sweet" },
-      { type: "text", heading: "Welcome", body: "Coffee after" },
-      { type: "timer", mode: "countdown", durationMs: 600000, targetAt: null, label: "Starts in" },
-      { type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "Lead" },
+      { type: "scripture", reference: "John 3:16", body: "For God so loved", attribution: "KJV", verse: 16, style: {} },
+      { type: "song", songId: "s1", sectionId: "v1", label: "Amazing Grace — Verse 1", body: "Amazing grace\nHow sweet", style: { italic: true } },
+      { type: "text", heading: "Welcome", body: "Coffee after", style: { bold: true, color: "#ffcc00", size: 80 } },
+      { type: "timer", mode: "countdown", durationMs: 600000, targetAt: null, label: "Starts in", warningMs: 30000, style: { align: "right", vertical: "top" } },
+      { type: "clock", label: "", style: { align: "left", vertical: "bottom" } },
+      { type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "Lead", style: {} },
       { type: "image", assetId: "a1", name: "Logo", imageUrl: "blob:x" },
     ] as const;
     for (const fields of cases) expect(fieldsFromSource(buildSource(fields))).toEqual(fields);
@@ -173,5 +174,23 @@ describe("shared sources", () => {
     expect(look.layers[look.layers.length - 1]!.sourceKey).toBe(shared.id);
     const model = presentComposition(look, { theme: defaultTheme(), now: 0 });
     expect(model.layers?.find((layer) => layer.sourceId === "camera:d")?.mirror).toBe(true);
+  });
+
+  it("styles a compiled text source and places a clock", () => {
+    const text = presentComposition(
+      sceneWith("A", createSharedSource("W", buildSource({ type: "text", heading: "Welcome", body: "", style: { color: "#ff0000", italic: true } }))),
+      { theme: defaultTheme(), now: 0 },
+    );
+    const painted = text.layers?.find((layer) => layer.sourceId === "text:text");
+    expect(painted?.model.theme.color).toBe("#ff0000");
+    expect(painted?.model.style).toEqual({ italic: true });
+    const clock = presentComposition(
+      sceneWith("B", createSharedSource("Clock", buildSource({ type: "clock", label: "", style: { align: "right", vertical: "top" } }))),
+      { theme: defaultTheme(), now: 0 },
+    ).layers?.find((layer) => layer.sourceId === "clock:clock");
+    expect(clock?.model.layout).toBe("timer");
+    expect(clock?.model.timer?.mode).toBe("clock");
+    expect(clock?.model.theme).toMatchObject({ align: "right", vertical: "top" });
+    expect(clock?.model.reference).toBeNull();
   });
 });

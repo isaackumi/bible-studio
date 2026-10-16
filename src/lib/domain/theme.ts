@@ -24,12 +24,23 @@ function sanitizeBackground(background: Theme["background"]): Theme["background"
   return { type: "color", color: "#050505" };
 }
 
+/** Theme effects are booleans only; font, size, color and position live on the theme itself. */
+function sanitizeEffects(value: Theme["effects"]): Theme["effects"] {
+  if (!value || typeof value !== "object") return undefined;
+  const effects: NonNullable<Theme["effects"]> = {};
+  for (const flag of ["bold", "italic", "underline", "uppercase", "shadow"] as const) {
+    if (typeof value[flag] === "boolean") effects[flag] = value[flag];
+  }
+  return Object.keys(effects).length ? effects : undefined;
+}
+
 export function sanitizeTheme(theme: Theme): Theme {
   return {
     ...theme,
     background: sanitizeBackground(theme.background),
     layout: theme.layout === "lower-third" ? "lower-third" : "frame",
     transition: sanitizeTransition(theme.transition),
+    effects: sanitizeEffects(theme.effects),
   };
 }
 

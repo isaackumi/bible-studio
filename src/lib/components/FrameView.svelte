@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
   import { displayWash, frameBackground } from "../domain/backgrounds";
+  import { effectsCss } from "../domain/text-style";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
@@ -51,6 +52,7 @@
   );
 
   const background = $derived(frameBackground(model, nested));
+  const effects = $derived(effectsCss(model.style, model.theme));
 
   const justify = $derived(
     model.theme.vertical === "top" ? "flex-start" : model.theme.vertical === "bottom" ? "flex-end" : "center",
@@ -71,6 +73,7 @@
   class:composition={model.layout === "composition"}
   class:timer={model.layout === "timer"}
   class:warning={!!timerView?.warning}
+  class:done={!!timerView?.complete && model.timer?.mode !== "clock"}
   style:background={background}
   style:color={model.theme.color}
   style:font-family={model.theme.fontFamily}
@@ -104,12 +107,22 @@
   {:else if model.layout === "logo" && model.imageUrl}
     <img class="logo" src={model.imageUrl} alt="" />
   {:else if model.layout !== "empty" && model.layout !== "black"}
-    <div class="stack" style:text-align={model.theme.align} style:justify-content={justify} style:padding="{nested ? 16 : model.theme.margin}px">
+    <div
+      class="stack"
+      style:text-align={model.theme.align}
+      style:justify-content={justify}
+      style:padding="{nested ? 16 : model.theme.margin}px"
+      style:font-weight={effects["font-weight"]}
+      style:font-style={effects["font-style"]}
+      style:text-decoration={effects["text-decoration"]}
+      style:text-transform={effects["text-transform"]}
+      style:text-shadow={effects["text-shadow"]}
+    >
       {#if model.reference && model.theme.reference.show}
         <p class="ref" style:font-size="{model.theme.reference.size}px" style:color={model.theme.reference.color}>{model.reference}</p>
       {/if}
       {#each displayLines as line}
-        <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.layout === 'timer' ? Math.max(model.theme.fontSize, 96) : model.theme.fontSize}px">
+        <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
           {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
         </p>
       {/each}
