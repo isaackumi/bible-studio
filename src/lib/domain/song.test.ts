@@ -3,7 +3,7 @@ import { applyProgramAction, createLiveState, frame, sameProgram, setPreview } f
 import { presentLyrics, presentScripture } from "./present";
 import { defaultTheme, sanitizeTheme } from "./theme";
 import type { Song } from "./types";
-import { lyricsFor, moveSongSection, sanitizeSong, sectionPlace, songError, stepSongSection } from "./song";
+import { lyricsFor, moveSongSection, parseLyrics, sanitizeSong, sectionPlace, songError, stepSongSection } from "./song";
 
 const theme = defaultTheme();
 
@@ -86,5 +86,57 @@ describe("song sections", () => {
       lines: ["This section is missing."],
     });
     expect(lyricsFor(hymn, "gone", "Morning light").lines).toEqual(["This section is missing."]);
+  });
+});
+
+describe("paste-to-song lyric import", () => {
+  let n = 0;
+  const id = () => `s${++n}`;
+
+  it("splits plain lyrics on blank lines and reads section headers", () => {
+    const parsed = parseLyrics(
+      "Amazing Grace\n\nVerse 1\nAmazing grace how sweet the sound\nThat saved a wretch like me\n\n[Chorus]\nMy chains are gone\nI've been set free\n\nBridge:\nThe earth shall soon dissolve like snow\n\nAmazing grace how sweet the sound\nThat saved a wretch like me",
+      id,
+    );
+    expect(parsed.title).toBe("Amazing Grace");
+    expect(parsed.sections.map((section) => [section.kind, section.label, section.lines.length])).toEqual([
+      ["verse", "Verse 1", 2],
+      ["chorus", "Chorus", 2],
+      ["bridge", "Bridge", 1],
+      ["verse", "Verse 2", 2],
+    ]);
+  });
+
+  it("numbers unlabeled blocks as verses and keeps a repeated chorus label", () => {
+    const parsed = parseLyrics("Line one\nLine two\n\nChorus\nSing\n\nLine three\n\nChorus\nSing", id);
+    expect(parsed.title).toBeUndefined();
+    expect(parsed.sections.map((section) => section.label)).toEqual(["Verse 1", "Chorus", "Verse 2", "Chorus"]);
+  });
+
+  it("maps pre-chorus, intro, outro and ending to sensible kinds", () => {
+    const parsed = parseLyrics("Pre-Chorus\nRise\n\nOutro\nAmen\n\nIntro\nHum", id);
+    expect(parsed.sections.map((section) => [section.kind, section.label])).toEqual([
+      ["chorus", "Pre-Chorus"],
+      ["tag", "Outro"],
+      ["tag", "Intro"],
+    ]);
+  });
+
+  it("reads ChordPro directives and strips chords", () => {
+    const parsed = parseLyrics(
+      "{title: How Great Is Our God}\n{artist: Chris Tomlin}\n{comment: Verse 1}\n[C]The splendor of a [Am]King\nClothed in [F]majesty\n\n{start_of_chorus}\n[C]How great is our [Am]God\n{end_of_chorus}\n\n{c: Verse 2}\nAnd age to age He stands",
+      id,
+    );
+    expect(parsed.title).toBe("How Great Is Our God");
+    expect(parsed.author).toBe("Chris Tomlin");
+    expect(parsed.sections.map((section) => [section.kind, section.label, section.lines])).toEqual([
+      ["verse", "Verse 1", ["The splendor of a King", "Clothed in majesty"]],
+      ["chorus", "Chorus", ["How great is our God"]],
+      ["verse", "Verse 2", ["And age to age He stands"]],
+    ]);
+  });
+
+  it("returns nothing for empty input", () => {
+    expect(parseLyrics("   \n\n ", id).sections).toEqual([]);
   });
 });

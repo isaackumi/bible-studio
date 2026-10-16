@@ -5,7 +5,7 @@
   import { formatReference, parseReference } from "../../bible/reference";
   import { api } from "../../db/api";
   import { attachSermonItem, deskNotes, moveSermonSection, removeSermonSection, sanitizeSermon, searchSermonHits } from "../../domain/sermon";
-  import { moveSongSection, removeSongSection } from "../../domain/song";
+  import { moveSongSection, parseLyrics, removeSongSection } from "../../domain/song";
   import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
@@ -391,6 +391,34 @@
     mode = "songs";
   }
 
+  let pasteText = $state("");
+
+  /** Replace the draft with sections parsed from pasted text or a ChordPro/text file. */
+  function applyLyrics(text: string) {
+    const parsed = parseLyrics(text);
+    if (!parsed.sections.length) {
+      note = "No lyrics found. Paste lines of a song, with a blank line between sections.";
+      return;
+    }
+    songSections = parsed.sections;
+    if (!songTitle.trim() && parsed.title) songTitle = parsed.title;
+    if (!songAuthor.trim() && parsed.author) songAuthor = parsed.author;
+    pasteText = "";
+    note = `${parsed.sections.length} section${parsed.sections.length === 1 ? "" : "s"} ready. Check the labels, then Save song.`;
+  }
+
+  async function importLyricFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      note = `${file.name} is too large for a lyric file.`;
+      return;
+    }
+    applyLyrics(await file.text());
+  }
+
   function addSongSection(kind: SongSectionKind) {
     const count = songSections.filter((section) => section.kind === kind).length + 1;
     const label = kind === "verse" ? `Verse ${count}` : kind === "chorus" ? "Chorus" : kind === "bridge" ? "Bridge" : "Tag";
@@ -409,7 +437,7 @@
     const title = (form.querySelector<HTMLInputElement>("[aria-label='Song title']")?.value ?? songTitle).trim();
     const author = (form.querySelector<HTMLInputElement>("[aria-label='Song author']")?.value ?? songAuthor).trim();
     const labels = [...form.querySelectorAll<HTMLInputElement>("[aria-label='Section label']")];
-    const areas = [...form.querySelectorAll<HTMLTextAreaElement>("textarea")];
+    const areas = [...form.querySelectorAll<HTMLTextAreaElement>("textarea:not([aria-label='Paste lyrics'])")];
     const sections = songSections.map((section, index) => ({
       ...section,
       label: labels[index]?.value.trim() || section.label,
@@ -795,6 +823,22 @@
           {#if note}<p>{note}</p>{/if}
           <input aria-label="Song title" placeholder="Song title" bind:value={songTitle} />
           <input aria-label="Song author" placeholder="Author" bind:value={songAuthor} />
+          <details class="paste-lyrics">
+            <summary>Paste lyrics or import a file</summary>
+            <textarea
+              aria-label="Paste lyrics"
+              rows="6"
+              placeholder="Paste a whole song. Blank lines split sections; “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro works too."
+              bind:value={pasteText}
+            ></textarea>
+            <div class="song-actions">
+              <button type="button" onclick={() => applyLyrics(pasteText)}>Split into sections</button>
+              <label class="file-pick">
+                Import .txt / ChordPro
+                <input type="file" accept=".txt,.cho,.chordpro,.chopro,.crd,text/plain" onchange={importLyricFile} />
+              </label>
+            </div>
+          </details>
           {#each songSections as section, index (section.id)}
             <input aria-label="Section label" bind:value={section.label} />
             <textarea
@@ -1457,6 +1501,12 @@
   .song-step { display: flex; gap: 6px; }
   .song-step button { width: auto; padding: 4px 8px; }
   .song-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .paste-lyrics { border: 1px solid var(--line); border-radius: var(--radius-control); padding: 6px 10px; }
+  .paste-lyrics summary { cursor: pointer; color: var(--muted); }
+  .paste-lyrics[open] { display: flex; flex-direction: column; gap: 8px; }
+  .paste-lyrics textarea { width: 100%; }
+  .file-pick { position: relative; cursor: pointer; color: var(--accent); }
+  .file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .song-actions select {
     height: 32px;
     border-radius: 8px;

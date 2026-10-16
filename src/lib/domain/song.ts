@@ -65,3 +65,101 @@ export function lyricsFor(song: Song | undefined, sectionId: string, fallbackTit
   const lines = section.lines.filter((line) => line.trim());
   return { label: section.label, lines: lines.length > 0 ? lines : ["This section is empty."] };
 }
+
+const HEADERS: Array<[RegExp, SongSectionKind, string | null]> = [
+  [/^pre[- ]?chorus(?:\s+\d+)?$/i, "chorus", "Pre-Chorus"],
+  [/^chorus(?:\s+\d+)?$/i, "chorus", null],
+  [/^refrain$/i, "chorus", "Chorus"],
+  [/^verse(?:\s+\d+)?$/i, "verse", null],
+  [/^bridge(?:\s+\d+)?$/i, "bridge", null],
+  [/^(?:tag|outro|ending|intro|coda|interlude)(?:\s+\d+)?$/i, "tag", null],
+];
+
+/** "[Verse 1]" / "Chorus:" / "(Bridge)" → a known section header, else null. */
+function readHeader(line: string): { kind: SongSectionKind; label: string } | null {
+  const bare = line.trim().replace(/^[[(]\s*|\s*[\])]$/g, "").replace(/:$/, "").trim();
+  if (!bare || bare.length > 24) return null;
+  for (const [pattern, kind, label] of HEADERS) {
+    if (pattern.test(bare)) return { kind, label: label ?? bare.replace(/\b\w/g, (letter) => letter.toUpperCase()) };
+  }
+  return null;
+}
+
+const stripChords = (line: string) => line.replace(/\[[^\]]*\]/g, "").replace(/\s{2,}/g, " ").trim();
+
+/**
+ * Turn pasted lyrics or a ChordPro file into song sections. Blank lines separate sections;
+ * headers like "Verse 1", "[Chorus]" or "Bridge:" name them; unlabeled blocks become numbered
+ * verses. A lone first line followed by a blank line is taken as the title.
+ */
+export function parseLyrics(
+  text: string,
+  newId: () => string = () => crypto.randomUUID(),
+): { title?: string; author?: string; sections: SongSection[] } {
+  let title: string | undefined;
+  let author: string | undefined;
+  const blocks: Array<{ header: { kind: SongSectionKind; label: string } | null; lines: string[] }> = [];
+  let current: (typeof blocks)[number] | null = null;
+  const close = () => {
+    if (current && current.lines.length) blocks.push(current);
+    current = null;
+  };
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    const directive = /^\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}$/i.exec(line);
+    if (directive) {
+      const name = directive[1]!.toLowerCase();
+      const value = (directive[2] ?? "").trim();
+      if (name === "title" || name === "t") title = value || title;
+      else if (name === "artist" || name === "subtitle" || name === "st" || name === "composer") author = author || value || undefined;
+      else if (name === "start_of_chorus" || name === "soc") {
+        close();
+        current = { header: { kind: "chorus", label: "Chorus" }, lines: [] };
+      } else if (name === "start_of_bridge" || name === "sob") {
+        close();
+        current = { header: { kind: "bridge", label: "Bridge" }, lines: [] };
+      } else if (name === "start_of_verse" || name === "sov") {
+        close();
+        current = { header: null, lines: [] };
+      } else if (name.startsWith("end_of_") || name === "eoc" || name === "eob" || name === "eov") close();
+      else if (name === "comment" || name === "c" || name === "comment_italic" || name === "ci") {
+        const header = readHeader(value);
+        if (header) {
+          close();
+          current = { header, lines: [] };
+        }
+      }
+      continue;
+    }
+    if (!line) {
+      close();
+      continue;
+    }
+    const header = readHeader(line);
+    if (header) {
+      close();
+      current = { header, lines: [] };
+      continue;
+    }
+    current ??= { header: null, lines: [] };
+    const lyric = stripChords(line);
+    if (lyric) current.lines.push(lyric);
+  }
+  close();
+
+  // A single unlabeled one-line block at the top is the title, when no {title} was given.
+  if (!title && blocks.length > 1 && !blocks[0]!.header && blocks[0]!.lines.length === 1) {
+    title = blocks.shift()!.lines[0];
+  }
+
+  const sections: SongSection[] = [];
+  for (const block of blocks) {
+    const kind = block.header?.kind ?? "verse";
+    const label = block.header?.label && !(kind === "verse" && /^verse$/i.test(block.header.label))
+      ? block.header.label
+      : defaultLabel(kind, sections);
+    sections.push({ id: newId(), kind, label, lines: block.lines });
+  }
+  return { ...(title ? { title } : {}), ...(author ? { author } : {}), sections };
+}
