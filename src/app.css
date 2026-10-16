@@ -286,6 +286,7 @@ button { cursor: pointer; }
 }
 .comp-layer.fit-cover :is(.frame img.cover, .frame video.cover) { object-fit: cover; }
 .comp-layer.fit-fill :is(.frame img.cover, .frame video.cover) { object-fit: fill; }
+.frame video.cover.mirror { transform: scaleX(-1); }
 .comp-layer.enter-fade { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
 .comp-layer.enter-dissolve { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
 .comp-layer.enter-slide-left { animation: cs-slide-left var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }

@@ -13,13 +13,27 @@ import {
   presentSavedLook,
   previewComposition,
   queueLook,
+  removeLayer,
   removeLook,
   restoreComposition,
   sanitizeComposition,
   setCompositionLocked,
   takeTransitionForPreview,
   type Composition,
+  type SourceRef,
 } from "../domain/composition";
+import {
+  addSharedLayer,
+  createSharedSource,
+  linkLayer,
+  lockedLooksUsing,
+  pruneSharedSources,
+  sanitizeSharedSource,
+  syncLinkedEdits,
+  updateSharedSource,
+  type SharedSource,
+  type SourceFields,
+} from "../domain/sources";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
 import {
@@ -710,10 +724,17 @@ class Session {
 
   saveLook = (composition: Composition) => {
     const clean = sanitizeComposition(composition);
-    this.workspace = { ...this.workspace, compositions: persistLook(this.workspace.compositions, clean) };
-    if (this.lookOnPreview?.id === clean.id) this.lookOnPreview = clean;
+    const synced = syncLinkedEdits(this.sharedSources, this.workspace.compositions, clean);
+    this.workspace = {
+      ...this.workspace,
+      sources: synced.sources,
+      compositions: persistLook(synced.looks, synced.look),
+    };
+    if (this.lookOnPreview?.id === clean.id) this.lookOnPreview = synced.look;
     this.persistSoon();
-    this.message = `${clean.name} saved. LIVE still sends Program.`;
+    this.message = synced.unlinked.length
+      ? `${synced.unlinked.join(", ")} unlinked: a locked scene uses the shared source. LIVE still sends Program.`
+      : `${clean.name} saved. LIVE still sends Program.`;
   };
 
   /** Create an empty scene (look), persist it, and stage Preview only. */
@@ -746,13 +767,91 @@ class Session {
     this.message = locked ? `${next.name} locked.` : `${next.name} unlocked.`;
   };
 
+  get sharedSources(): SharedSource[] {
+    return (this.workspace.sources ?? []).map(sanitizeSharedSource).filter((entry): entry is SharedSource => entry !== null);
+  }
+
+  lockedScenesUsing = (id: string) => lockedLooksUsing(this.workspace.compositions, id);
+
+  private stageScene = (next: Composition) => {
+    this.saveLook(next);
+    this.previewLook(next);
+  };
+
+  /** Create a shared source and add it as a new layer on the scene. Preview only. */
+  createSourceInScene = (scene: Composition, name: string, source: SourceRef): string | null => {
+    if (scene.locked) return null;
+    const shared = createSharedSource(name, source);
+    this.workspace = { ...this.workspace, sources: [...this.sharedSources, shared] };
+    const next = addSharedLayer(scene, shared);
+    this.stageScene(next);
+    return next.layers[next.layers.length - 1]?.id ?? null;
+  };
+
+  addExistingSourceToScene = (scene: Composition, id: string): string | null => {
+    const shared = this.sharedSources.find((entry) => entry.id === id);
+    if (!shared || scene.locked) return null;
+    const next = addSharedLayer(scene, shared);
+    this.stageScene(next);
+    return next.layers[next.layers.length - 1]?.id ?? null;
+  };
+
+  /** Edit a shared source everywhere. Returns locked scene names when refused. Never Program. */
+  saveSharedSource = (id: string, name: string, source: SourceRef): string[] => {
+    const result = updateSharedSource(this.sharedSources, this.workspace.compositions, id, { name, source });
+    if (!result.ok) {
+      this.message = `Used in locked scene "${result.blocked[0]}". Unlock to edit.`;
+      return result.blocked;
+    }
+    this.workspace = { ...this.workspace, sources: result.sources, compositions: result.looks };
+    this.persistSoon();
+    const open = this.lookOnPreview && result.looks.find((entry) => entry.id === this.lookOnPreview?.id);
+    if (open) this.previewLook(restoreComposition(open));
+    this.message = `${name} saved. Program updates on TAKE.`;
+    return [];
+  };
+
+  /** Turn an unlinked layer into a new shared source. Preview only. */
+  linkLayerToNewSource = (scene: Composition, layerId: string, name: string, source: SourceRef) => {
+    if (scene.locked) return;
+    const shared = createSharedSource(name, source);
+    this.workspace = { ...this.workspace, sources: [...this.sharedSources, shared] };
+    this.stageScene(linkLayer(scene, layerId, shared));
+  };
+
+  removeSceneLayer = (scene: Composition, layerId: string) => {
+    if (scene.locked) return;
+    this.stageScene(removeLayer(scene, layerId));
+    this.workspace = { ...this.workspace, sources: pruneSharedSources(this.sharedSources, this.workspace.compositions) };
+    this.persistSoon();
+  };
+
+  /** Resolve a typed reference to scripture fields (first translation). */
+  scriptureFields = async (reference: string): Promise<SourceFields | null> => {
+    const parsed = parseReference(reference, this.books);
+    const translation = this.translations[0];
+    if (!parsed?.startVerse || !translation) return null;
+    const book = this.books.find((entry) => entry.ord === parsed.bookOrd);
+    const end = parsed.endVerse ?? parsed.startVerse;
+    const verses = await api.passage(translation.id, parsed.bookOrd, parsed.chapter, parsed.startVerse, end);
+    if (!verses.length) return null;
+    return {
+      type: "scripture",
+      reference: formatReference(book?.name ?? "", parsed.chapter, parsed.startVerse, end, book?.chapters ?? 1),
+      body: verses.map((verse) => verse.text).join(" "),
+      attribution: translation.abbreviation || translation.name,
+      verse: parsed.startVerse,
+    };
+  };
+
   deleteLook = (id: string) => {
     const saved = this.workspace.compositions.find((entry) => entry.id === id);
     if (saved?.locked) {
       this.message = `${saved.name} is locked. Unlock to remove.`;
       return;
     }
-    this.workspace = { ...this.workspace, compositions: removeLook(this.workspace.compositions, id) };
+    const compositions = removeLook(this.workspace.compositions, id);
+    this.workspace = { ...this.workspace, compositions, sources: pruneSharedSources(this.sharedSources, compositions) };
     if (this.lookOnPreview?.id === id) this.lookOnPreview = null;
     this.persistSoon();
     this.message = "Look removed. Program was not changed.";

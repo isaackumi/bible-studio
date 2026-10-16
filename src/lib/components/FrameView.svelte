@@ -10,11 +10,13 @@
     stream = null,
     nested = false,
     cameraFeedId = null,
+    mirror = false,
   }: {
     model: PresentationModel;
     stream?: MediaStream | null;
     nested?: boolean;
     cameraFeedId?: string | null;
+    mirror?: boolean;
   } = $props();
   let video = $state<HTMLVideoElement | undefined>();
   let now = $state(0);
@@ -97,13 +99,14 @@
         <FrameView
           model={layer.model}
           nested
+          mirror={layer.mirror ?? false}
           cameraFeedId={cameraFeedId}
           stream={cameraFeedForLayer(layer.sourceId, cameraFeedId, stream, "preview") as MediaStream | null}
         />
       </div>
     {/each}
   {:else if stream}
-    <video bind:this={video} class="cover" autoplay muted playsinline></video>
+    <video bind:this={video} class="cover" class:mirror autoplay muted playsinline></video>
   {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}
