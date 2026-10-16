@@ -568,6 +568,42 @@ class Session {
     this.message = `Imported ${items.length} slide${items.length === 1 ? "" : "s"} to Preview. LIVE still sends Program.`;
   };
 
+  /** Each PDF page becomes an image slide in the service. Preview only; Program is untouched. */
+  importPdf = async (file: File, onProgress?: (done: number, total: number) => void) => {
+    const { renderPdfPages } = await import("../import/pdf");
+    if (!this.service) await this.createService("Sunday Service");
+    if (!this.service?.sections.length) this.addSection("Slides");
+    const target = this.cursor.sectionId ?? this.service?.sections[0]?.id;
+    if (!target || !this.service) {
+      this.message = "Add a section, then import.";
+      return 0;
+    }
+    const items: PresentationItem[] = [];
+    let total = 0;
+    try {
+      for await (const page of renderPdfPages(file)) {
+        total = page.count;
+        this.message = `Importing ${file.name}: page ${page.index + 1} of ${page.count}…`;
+        onProgress?.(page.index, page.count);
+        const asset = await api.importMediaBytes(page.name, page.blob);
+        this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
+        const title = page.count === 1 ? file.name.replace(/\.pdf$/i, "") : `${file.name.replace(/\.pdf$/i, "")} · ${page.index + 1}`;
+        const item: PresentationItem = { id: uid(), kind: "image", title, image: { assetId: asset.id } };
+        this.insertItem(target, item);
+        items.push(item);
+      }
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : `${file.name} could not be imported.`;
+      if (!items.length) return 0;
+    }
+    this.persistSoon();
+    const first = items[0];
+    if (first) await this.selectItem(first.id);
+    const capped = total > items.length ? ` (first ${items.length} pages)` : "";
+    this.message = `Imported ${items.length} slide${items.length === 1 ? "" : "s"} from ${file.name}${capped}. Preview only; LIVE sends Program.`;
+    return items.length;
+  };
+
   remotePageUrl = () => {
     if (this.remoteLanUrl) return this.remoteLanUrl;
     if (typeof location === "undefined") return "/?remote=1";

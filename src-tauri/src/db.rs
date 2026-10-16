@@ -291,6 +291,53 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
     if !allowed.contains(&ext.as_str()) {
         return Err("Use a PNG, JPEG, WebP, or GIF image.".into());
     }
+    let name = source
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("image")
+        .to_string();
+    store_media(conn, app, &name, &ext, |dest| fs::copy(source, dest).map(|_| ()).map_err(|e| e.to_string()))
+}
+
+/// Largest in-memory image accepted (a rendered PDF page is a few MB at most).
+pub const MAX_MEDIA_BYTES: usize = 25 * 1024 * 1024;
+
+/// Image bytes from the webview (for example a rendered PDF page). The type comes from the
+/// file signature, not the name.
+pub fn import_media_bytes(conn: &Connection, app: &AppHandle, name: &str, bytes: &[u8]) -> Result<Value, String> {
+    if bytes.is_empty() {
+        return Err("The image was empty.".into());
+    }
+    if bytes.len() > MAX_MEDIA_BYTES {
+        return Err("That image is too large.".into());
+    }
+    let ext = image_extension(bytes).ok_or("Use a PNG, JPEG, WebP, or GIF image.")?;
+    let name = name.trim();
+    let name = if name.is_empty() { "image" } else { name };
+    store_media(conn, app, name, ext, |dest| fs::write(dest, bytes).map_err(|e| e.to_string()))
+}
+
+pub fn image_extension(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
+        Some("png")
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("jpg")
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("webp")
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("gif")
+    } else {
+        None
+    }
+}
+
+fn store_media(
+    conn: &Connection,
+    app: &AppHandle,
+    name: &str,
+    ext: &str,
+    write: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<Value, String> {
     let id = Uuid::new_v4().to_string();
     let dir = app
         .path()
@@ -299,19 +346,16 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
         .join("media");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dest = dir.join(format!("{id}.{ext}"));
-    fs::copy(source, &dest).map_err(|e| e.to_string())?;
-    let name = source
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("image")
-        .to_string();
+    write(&dest)?;
     let created = chrono_now();
     let path = dest.to_string_lossy().to_string();
-    conn.execute(
+    if let Err(error) = conn.execute(
         "INSERT INTO media_assets (id, name, path, kind, created_at) VALUES (?1, ?2, ?3, 'image', ?4)",
         params![id, name, path, created],
-    )
-    .map_err(|e| e.to_string())?;
+    ) {
+        let _ = fs::remove_file(&dest);
+        return Err(error.to_string());
+    }
     Ok(serde_json::json!({
         "id": id,
         "name": name,
@@ -422,6 +466,15 @@ fn chrono_now() -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reads_image_signatures() {
+        assert_eq!(super::image_extension(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0]), Some("png"));
+        assert_eq!(super::image_extension(&[0xff, 0xd8, 0xff, 0xe0]), Some("jpg"));
+        assert_eq!(super::image_extension(b"RIFF\0\0\0\0WEBPVP8 "), Some("webp"));
+        assert_eq!(super::image_extension(b"GIF89a..."), Some("gif"));
+        assert_eq!(super::image_extension(b"%PDF-1.7"), None);
+    }
+
     use super::*;
 
     fn test_db() -> Connection {

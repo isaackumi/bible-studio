@@ -56,8 +56,11 @@ function splitMarkdown(text: string): Array<{ heading: string; body: string }> {
 
 export function importDocument(filename: string, text: string, uid: () => string = () => crypto.randomUUID()): PresentationItem[] {
   const ext = extension(filename);
-  if (ext === "pdf" || ext === "ppt" || ext === "pptx" || ext === "key") {
-    throw new Error("Church Studio cannot import that format yet.");
+  if (ext === "ppt" || ext === "pptx" || ext === "key") {
+    throw new Error("Save the presentation as PDF (File → Export → PDF), then import the PDF.");
+  }
+  if (ext === "pdf") {
+    throw new Error("Import PDF files with the PDF slide importer.");
   }
   if (ext === "json") {
     throw new Error("Use Import library for Church Studio JSON files.");

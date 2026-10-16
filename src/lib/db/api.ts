@@ -63,6 +63,14 @@ export const api = {
   importSnapshot: (snapshot: LibrarySnapshot) =>
     desktop() ? invoke<void>("import_library", { snapshot }) : browserLibrary.importSnapshot(snapshot),
   mediaList: () => (desktop() ? invoke<MediaAsset[]>("media_list") : browserMedia.list()),
+  /** In-memory image (for example a rendered PDF page). Desktop sends raw bytes to Rust. */
+  importMediaBytes: async (name: string, blob: Blob): Promise<MediaAsset> => {
+    if (desktop()) {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      return invoke<MediaAsset>("import_media_bytes", bytes, { headers: { "x-media-name": encodeURIComponent(name) } });
+    }
+    return api.importMedia(new File([blob], name, { type: blob.type || "image/png" }));
+  },
   importMedia: (source: string | File) => {
     if (desktop()) {
       if (typeof source !== "string") return Promise.reject(new Error("Use the file picker to import an image."));

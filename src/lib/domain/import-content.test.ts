@@ -42,8 +42,8 @@ describe("content import", () => {
     const live = createLiveState(theme);
     const program = live.program;
     expect(() => importDocument("notes.txt", "   ", uid)).toThrow(/no content/i);
-    expect(() => importDocument("talk.pdf", "%PDF-1.4", uid)).toThrow(/cannot import that format/i);
-    expect(() => importDocument("deck.pptx", "pk", uid)).toThrow(/cannot import that format/i);
+    expect(() => importDocument("talk.pdf", "%PDF-1.4", uid)).toThrow(/PDF slide importer/i);
+    expect(() => importDocument("deck.pptx", "pk", uid)).toThrow(/Save the presentation as PDF/i);
     expect(live.program).toEqual(program);
     expect(JSON.stringify(live.program)).not.toMatch(/%PDF/);
   });

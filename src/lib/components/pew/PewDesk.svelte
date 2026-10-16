@@ -362,7 +362,8 @@
     input.value = "";
     if (!file) return;
     try {
-      await session.importDocument(file.name, await file.text());
+      if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") await session.importPdf(file);
+      else await session.importDocument(file.name, await file.text());
       note = session.message;
       mode = "slides";
     } catch (error) {
@@ -988,7 +989,7 @@
               <input
                 bind:this={slideImport}
                 type="file"
-                accept=".txt,.md,.markdown,.text,text/plain,text/markdown"
+                accept=".txt,.md,.markdown,.text,.pdf,text/plain,text/markdown,application/pdf"
                 hidden
                 aria-label="Import text or Markdown"
                 onchange={(event) => void importSlides(event)}

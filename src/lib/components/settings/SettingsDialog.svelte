@@ -114,7 +114,7 @@
   let logoText = $state("");
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileMessage = $state("");
-  const IMPORT_ACCEPT = ".json,.txt,.md,.markdown,.text,application/json,text/plain,text/markdown";
+  const IMPORT_ACCEPT = ".json,.txt,.md,.markdown,.text,.pdf,application/json,text/plain,text/markdown,application/pdf";
 
   async function downloadLibrary() {
     const snapshot = await session.exportLibrary();
@@ -135,9 +135,12 @@
     if (!file) return;
     try {
       const name = file.name.toLowerCase();
-      const text = await file.text();
-      if (name.endsWith(".json")) await session.importLibrary(JSON.parse(text) as unknown);
-      else await session.importDocument(file.name, text);
+      if (name.endsWith(".pdf")) await session.importPdf(file);
+      else {
+        const text = await file.text();
+        if (name.endsWith(".json")) await session.importLibrary(JSON.parse(text) as unknown);
+        else await session.importDocument(file.name, text);
+      }
       fileMessage = session.message;
     } catch (error) {
       fileMessage = error instanceof Error ? error.message : "The file was not imported.";

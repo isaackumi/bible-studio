@@ -199,6 +199,40 @@ fn import_media(app: AppHandle, db: State<Db>, path: String) -> Result<Value, St
     with_db(&db, |conn| db::import_media(conn, &app, std::path::Path::new(&path)))
 }
 
+/// Raw image bytes in the request body; the name is URL-encoded in `x-media-name`.
+#[tauri::command]
+fn import_media_bytes(app: AppHandle, db: State<Db>, request: tauri::ipc::Request<'_>) -> Result<Value, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Send the image as raw bytes.".into());
+    };
+    let name = request
+        .headers()
+        .get("x-media-name")
+        .and_then(|value| value.to_str().ok())
+        .map(percent_decode)
+        .unwrap_or_else(|| "image".into());
+    with_db(&db, |conn| db::import_media_bytes(conn, &app, &name, bytes))
+}
+
+/// Decode `encodeURIComponent` output; invalid sequences are kept as typed.
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let Ok(value) = u8::from_str_radix(&input[index + 1..index + 3], 16) {
+                out.push(value);
+                index += 3;
+                continue;
+            }
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[tauri::command]
 fn bible_translations(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, bible::translations)
@@ -321,6 +355,7 @@ pub fn run() {
             import_library,
             media_list,
             import_media,
+            import_media_bytes,
             bible_translations,
             bible_books,
             bible_verses,
@@ -337,4 +372,16 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Church Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::percent_decode;
+
+    #[test]
+    fn decodes_uri_component_names() {
+        assert_eq!(percent_decode("Sermon%20notes%20%E2%80%94%20page%201.png"), "Sermon notes — page 1.png");
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%zz"), "%zz");
+    }
 }
