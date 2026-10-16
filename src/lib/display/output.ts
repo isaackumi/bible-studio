@@ -98,3 +98,18 @@ export function browserAudienceState(desired: boolean, audience: BrowserOutputWi
     message: "Audience window is open. If it is on this screen, drag it to the external display. This browser cannot list or place monitors.",
   };
 }
+
+/** The stage display goes on a screen that is neither the operator's nor the audience's. */
+export function pickStageScreen(screens: ScreenLike[], current: ScreenLike | null, audience: ScreenLike | null): ScreenLike | null {
+  return pickAudienceScreen(
+    screens.filter((screen) => !audience || !sameScreen(screen, audience)),
+    current,
+  );
+}
+
+export type StageDisplay = { key: string; name: string; x: number; y: number; width: number; height: number; primary: boolean; audience: boolean };
+
+/** Desktop: first display that is not the operator's (primary) and not the audience's. */
+export function pickStageDisplay<T extends StageDisplay>(displays: T[]): T | null {
+  return displays.find((display) => !display.primary && !display.audience) ?? null;
+}

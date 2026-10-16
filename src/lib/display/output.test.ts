@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createLiveState, frame, programPacket, setPreview } from "../domain/live";
 import { defaultTheme, emptyModel } from "../domain/theme";
 import { presentScripture } from "../domain/present";
-import { acceptAudienceFrame, browserAudienceState, openBrowserAudience, pickAudienceScreen, placementFeatures, type BrowserOutputWindow, type ScreenLike } from "./output";
+import { acceptAudienceFrame, browserAudienceState, openBrowserAudience, pickAudienceScreen, pickStageDisplay, pickStageScreen, placementFeatures, type BrowserOutputWindow, type ScreenLike } from "./output";
 import { factoryProfiles, normalizeProfile } from "./profiles";
 
 const theme = defaultTheme();
@@ -106,5 +106,17 @@ describe("browser audience placement", () => {
     const opened = openBrowserAudience(() => ({ closed: false, close() {}, focus() {}, postMessage() {} }), { features: placementFeatures(projector), label: "EPSON PJ" });
     expect(opened.state.message).toContain("EPSON PJ");
     expect(opened.state.online).toBe(true);
+  });
+
+  it("puts the stage on a third screen, never over the audience or the desk", () => {
+    expect(pickStageScreen([laptop, projector, tv], laptop, projector)).toBe(tv);
+    expect(pickStageScreen([laptop, projector], laptop, projector)).toBeNull();
+    expect(pickStageScreen([laptop, projector], laptop, null)).toBe(projector);
+  });
+
+  it("picks a desktop stage display that is neither primary nor audience", () => {
+    const d = (key: string, primary: boolean, audience: boolean) => ({ key, name: key, x: 0, y: 0, width: 1920, height: 1080, primary, audience });
+    expect(pickStageDisplay([d("mac", true, false), d("dell", false, true), d("tv", false, false)])?.key).toBe("tv");
+    expect(pickStageDisplay([d("mac", true, false), d("dell", false, true)])).toBeNull();
   });
 });

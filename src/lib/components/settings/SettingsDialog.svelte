@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
   import { session } from "../../app/session.svelte";
   import { COMMANDS } from "../../commands/registry";
@@ -15,6 +16,7 @@
 
   type SettingsSectionId =
     | "general"
+    | "system"
     | "appearance"
     | "workspace"
     | "keyboard"
@@ -48,6 +50,7 @@
       label: "Studio",
       items: [
         ["general", "Church", "church"],
+        ["system", "This computer", "screens"],
         ["appearance", "Look", "look"],
         ["workspace", "Layouts", "layout"],
         ["keyboard", "Keys", "keys"],
@@ -215,7 +218,7 @@
         <div>
           <h2>{page?.[1]}</h2>
           <p>
-            {#if section === "general"}The name on the logo slide.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
+            {#if section === "general"}The name on the logo slide.{:else if section === "system"}What works in this window, and why some things do not.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
           </p>
         </div>
         <button type="button" class="icon-close" aria-label="Close" onclick={close}><Icon name="close" size={16} /></button>
@@ -226,6 +229,11 @@
           <label>Church name <input class="field" bind:value={churchName} onchange={() => session.setChurchName(churchName)} /></label>
           <label>Logo text <input class="field" bind:value={logoText} onchange={() => session.setLogoText(logoText)} /></label>
           <p class="note">The logo picture is chosen in Media. The Logo button sends this name to Program.</p>
+        </section>
+      {:else if section === "system"}
+        <section class="card">
+          <h3>On this computer</h3>
+          <CapabilityList />
         </section>
       {:else if section === "appearance"}
         <section class="card">
@@ -497,9 +505,15 @@
         <RemotePanel />
       {:else if section === "stage"}
         <section class="card">
-          <h3>{canUse("stage-display") ? "Stage is available" : "Not in this release"}</h3>
-          <p class="note">A profile can remember a stage screen. The window stays closed, and Program is unchanged. Choose that screen under Displays.</p>
-          <button type="button" class="text" onclick={() => (section = "displays")}>Choose a stage screen</button>
+          <h3>Stage display</h3>
+          <p class="note">
+            A confidence screen for the platform: what is live now, what is next (Preview), the time, and any timer. It never
+            sends anything to the audience. With three screens it opens on the one that is neither this desk nor the audience;
+            otherwise drag it to the platform screen.
+          </p>
+          <div class="actions">
+            <button type="button" class="primary" onclick={() => void session.openStage()}>Open stage display</button>
+          </div>
         </section>
       {:else if section === "storage"}
         <section class="card">

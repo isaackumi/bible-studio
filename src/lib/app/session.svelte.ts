@@ -4,7 +4,15 @@ import { CANON, formatReference, parseReference, withChapterCounts, type CanonBo
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
 import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageSnapshot } from "../display/channel";
-import { browserAudienceState, openBrowserAudience, pickAudienceScreen, placementFeatures, type ScreenLike } from "../display/output";
+import {
+  browserAudienceState,
+  openBrowserAudience,
+  pickAudienceScreen,
+  pickStageDisplay,
+  pickStageScreen,
+  placementFeatures,
+  type ScreenLike,
+} from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
   createScene,
@@ -1756,6 +1764,8 @@ class Session {
   };
 
   stageOpen = $state(false);
+  /** Where the browser audience popup was placed, so the stage avoids it. */
+  private audienceScreen: ScreenLike | null = null;
 
   /** Open the stage display: a popup in the browser, a separate window on desktop. Never Program. */
   openStage = async () => {
@@ -1769,20 +1779,45 @@ class Session {
           await existing.setFocus();
           return;
         }
-        const stage = new WebviewWindow("stage", { url: "/?stage=1", title: "Stage display", width: 1280, height: 720 });
+        // A third display if there is one; otherwise a window the operator drags.
+        const target = pickStageDisplay(this.output.displays);
+        const stage = new WebviewWindow(
+          "stage",
+          target
+            ? { url: "/?stage=1", title: "Stage display", x: target.x, y: target.y, width: target.width, height: target.height, decorations: false }
+            : { url: "/?stage=1", title: "Stage display", width: 1280, height: 720 },
+        );
         stage.once("tauri://error", (event) => {
           this.message = `The stage display could not open: ${String(event.payload)}`;
         });
-        this.message = "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
+        this.message = target
+          ? `Stage display is on ${target.name}. It shows Program and what is on Preview next.`
+          : "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
       } catch (error) {
         this.message = error instanceof Error ? error.message : "The stage display could not open.";
       }
       return;
     }
-    const opened = window.open("/?stage=1", "church-studio-stage", "popup=yes,width=1280,height=720");
-    this.message = opened
-      ? "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next."
-      : "The browser blocked the stage window. Allow pop-ups for this site, then try again.";
+    const placed = await this.stagePlacement();
+    const opened = window.open("/?stage=1", "church-studio-stage", placed?.features ?? "popup=yes,width=1280,height=720");
+    this.message = !opened
+      ? "The browser blocked the stage window. Allow pop-ups for this site, then try again."
+      : placed
+        ? `Stage display is on ${placed.label}. It shows Program and what is on Preview next.`
+        : "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
+  };
+
+  /** Chromium: a screen that is neither the desk's nor the audience's. Null = plain popup. */
+  private stagePlacement = async (): Promise<{ features: string; label: string } | null> => {
+    const page = window as Window & { getScreenDetails?: () => Promise<{ screens: ScreenLike[]; currentScreen: ScreenLike }> };
+    if (typeof page.getScreenDetails !== "function") return null;
+    try {
+      const details = await page.getScreenDetails();
+      const target = pickStageScreen(details.screens, details.currentScreen, this.audienceScreen);
+      return target ? { features: placementFeatures(target), label: target.label?.trim() || "the stage screen" } : null;
+    } catch {
+      return null;
+    }
   };
 
   /** Tell the audience window which Preview cameras to warm up. It never paints them before TAKE. */
@@ -1981,6 +2016,7 @@ class Session {
     try {
       const details = await page.getScreenDetails();
       const target = pickAudienceScreen(details.screens, details.currentScreen);
+      this.audienceScreen = target;
       return target ? { features: placementFeatures(target), label: target.label?.trim() || "the second screen" } : null;
     } catch {
       return null;
