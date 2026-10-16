@@ -14,7 +14,7 @@ import type { CompositionDocument, TextStyle } from "./types";
 
 export type SharedSource = { id: string; name: string; source: SourceRef };
 
-export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image";
+export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "camera", label: "Camera" },
@@ -25,6 +25,7 @@ export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "clock", label: "Clock" },
   { type: "lower-third", label: "Lower third" },
   { type: "image", label: "Image" },
+  { type: "video", label: "Video" },
 ];
 
 export type SourceFields =
@@ -35,7 +36,8 @@ export type SourceFields =
   | { type: "timer"; mode: TimerMode; durationMs: number; targetAt: number | null; label: string; warningMs: number; style: TextStyle }
   | { type: "clock"; label: string; style: TextStyle }
   | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle }
-  | { type: "image"; assetId: string; name: string; imageUrl: string };
+  | { type: "image"; assetId: string; name: string; imageUrl: string }
+  | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean };
 
 /** Payload entry for a style: omitted entirely when no style is set. */
 function stylePayload(style: TextStyle): Record<string, string> {
@@ -244,6 +246,13 @@ export function buildSource(fields: SourceFields): SourceRef {
         assetId: fields.assetId,
         imageUrl: fields.imageUrl,
       });
+    case "video":
+      return sourceRef("video", fields.assetId || "video", fields.name || "Video", {
+        assetId: fields.assetId,
+        videoUrl: fields.videoUrl,
+        loop: fields.loop ? "true" : "false",
+        muted: fields.muted ? "true" : "false",
+      });
   }
 }
 
@@ -275,6 +284,10 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "", style: parseTextStyle(p.style) };
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
+    case "video":
+      // Old placeholder "video" layers (camera-card stand-ins) have no file and are not editable.
+      if (!p.assetId && !p.videoUrl) return null;
+      return { type: "video", assetId: p.assetId ?? "", name: source.title, videoUrl: p.videoUrl ?? "", loop: p.loop === "true", muted: p.muted === "true" };
     default:
       return null;
   }
@@ -300,5 +313,25 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
       return { type: "lower-third", templateId: "speaker", title: "", subtitle: "", style: {} };
     case "image":
       return { type: "image", assetId: "", name: "", imageUrl: "" };
+    case "video":
+      return { type: "video", assetId: "", name: "", videoUrl: "", loop: false, muted: false };
   }
+}
+
+/**
+ * Media layers keep their asset id; the playable URL can go stale (browser blob URLs live
+ * for one session). Refresh image/video URLs from the media library before painting.
+ */
+export function withMediaUrls(composition: Composition, resolve: (assetId: string) => string | null): Composition {
+  let changed = false;
+  const layers = composition.layers.map((layer) => {
+    const { type, payload } = layer.source;
+    if ((type !== "image" && type !== "video") || !payload.assetId) return layer;
+    const url = resolve(payload.assetId);
+    const key = type === "image" ? "imageUrl" : "videoUrl";
+    if (!url || payload[key] === url) return layer;
+    changed = true;
+    return { ...layer, source: { ...layer.source, payload: { ...payload, [key]: url } } };
+  });
+  return changed ? { ...composition, layers } : composition;
 }

@@ -3,7 +3,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { session } from "../app/session.svelte";
   import { mediaUrl } from "../db/api";
-  import { presentImage } from "../domain/present";
+  import { presentImage, presentVideo } from "../domain/present";
   import { isDesktop } from "../platform/runtime";
 
   let picker: HTMLInputElement | null = $state(null);
@@ -15,7 +15,9 @@
   async function chooseDesktop() {
     const picked = await open({
       multiple: false,
-      filters: [{ name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      filters: [
+        { name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] },
+      ],
     });
     if (typeof picked === "string") await session.importImage(picked);
   }
@@ -27,33 +29,52 @@
     if (file) await session.importImage(file);
   }
 
+  let loop = $state(false);
+
   function preview(assetId: string) {
-    const url = mediaUrl(session.media.find((entry) => entry.id === assetId) ?? null);
-    if (!url) return;
-    session.previewModel(presentImage({ theme: session.theme(), imageUrl: url }), null);
+    const asset = session.media.find((entry) => entry.id === assetId) ?? null;
+    const url = mediaUrl(asset);
+    if (!url || !asset) return;
+    session.previewModel(
+      asset.kind === "video"
+        ? presentVideo({ theme: session.theme(), videoUrl: url, loop })
+        : presentImage({ theme: session.theme(), imageUrl: url }),
+      null,
+    );
+  }
+
+  function add(assetId: string, name: string, kind: "image" | "video") {
+    if (kind === "video") session.addVideo(assetId, name, { loop });
+    else session.addImage(assetId, name);
   }
 </script>
 
 <div class="pane">
   {#if isDesktop()}
-    <button type="button" class="primary" onclick={() => void chooseDesktop()}>Import image</button>
+    <button type="button" class="primary" onclick={() => void chooseDesktop()}>Import image or video</button>
   {:else}
-    <button type="button" class="primary" onclick={() => picker?.click()}>Import image</button>
+    <button type="button" class="primary" onclick={() => picker?.click()}>Import image or video</button>
     <input
       bind:this={picker}
       type="file"
-      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v"
       hidden
       onchange={(event) => void chooseBrowser(event)}
     />
   {/if}
-  {#each session.media as asset}
+  {#if session.media.some((asset) => asset.kind === "video")}
+    <label class="loop"><input type="checkbox" bind:checked={loop} /> Loop videos (backgrounds, walk-in loops)</label>
+  {/if}
+  {#each session.media as asset (asset.id)}
     <div class="hit">
       <strong>{asset.name}</strong>
+      <span class="kind">{asset.kind === "video" ? "Video" : "Image"}</span>
       <div class="actions">
         <button type="button" onclick={() => preview(asset.id)}>Preview</button>
-        <button type="button" onclick={() => session.addImage(asset.id, asset.name)}>Add to section</button>
-        <button type="button" onclick={() => session.setLogo(asset.id)}>Use as logo</button>
+        <button type="button" onclick={() => add(asset.id, asset.name, asset.kind)}>Add to section</button>
+        {#if asset.kind === "image"}
+          <button type="button" onclick={() => session.setLogo(asset.id)}>Use as logo</button>
+        {/if}
       </div>
     </div>
   {/each}
@@ -74,5 +95,7 @@
 
 <style>
   h4 { margin: 16px 0 6px; font-size: 13px; }
+  .kind { font-size: 11px; color: var(--muted, #a3a3a3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .loop { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted, #a3a3a3); margin: 8px 0; }
   .camera-note { margin: 0 0 8px; font-size: 12px; color: var(--muted, #a3a3a3); }
 </style>

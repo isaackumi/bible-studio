@@ -57,7 +57,8 @@ export type PresentationLayout =
   | "logo"
   | "composition"
   | "timer"
-  | "lower-third";
+  | "lower-third"
+  | "video";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -102,6 +103,8 @@ export type PresentationModel = {
   timer?: TimerPaint;
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */
   style?: TextStyle;
+  /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
+  video?: { url: string; loop: boolean; muted: boolean };
 };
 
 export type LiveFrame = {
@@ -120,7 +123,7 @@ export type ProgramAction = "take" | "cut" | "clear" | "black" | "logo";
 
 export const PROGRAM_ACTIONS: ProgramAction[] = ["take", "cut", "clear", "black", "logo"];
 
-export type ItemKind = "bible" | "lyric" | "slide" | "image" | "announcement" | "composition";
+export type ItemKind = "bible" | "lyric" | "slide" | "image" | "video" | "announcement" | "composition";
 
 export type BibleItem = {
   translationId: string;
@@ -139,6 +142,7 @@ export type PresentationItem = {
   lyric?: { songId: string; sectionId: string };
   slide?: { heading: string; body: string; imageId: string | null };
   image?: { assetId: string };
+  video?: { assetId: string; loop: boolean; muted: boolean };
   announcement?: { heading: string; body: string };
   /** Text styling for slide and announcement items. */
   style?: TextStyle;
@@ -199,7 +203,7 @@ export type MediaAsset = {
   id: string;
   name: string;
   path: string;
-  kind: "image";
+  kind: "image" | "video";
   createdAt: string;
 };
 

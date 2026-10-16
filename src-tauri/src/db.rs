@@ -287,16 +287,22 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
         .and_then(|e| e.to_str())
         .unwrap_or("img")
         .to_ascii_lowercase();
-    let allowed = ["png", "jpg", "jpeg", "webp", "gif"];
-    if !allowed.contains(&ext.as_str()) {
-        return Err("Use a PNG, JPEG, WebP, or GIF image.".into());
-    }
+    let kind = media_kind(&ext).ok_or("Use a PNG, JPEG, WebP or GIF image, or an MP4, MOV, M4V or WebM video.")?;
     let name = source
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("image")
         .to_string();
-    store_media(conn, app, &name, &ext, |dest| fs::copy(source, dest).map(|_| ()).map_err(|e| e.to_string()))
+    store_media(conn, app, &name, &ext, kind, |dest| fs::copy(source, dest).map(|_| ()).map_err(|e| e.to_string()))
+}
+
+/// Image or video, by extension. Anything else is refused.
+pub fn media_kind(ext: &str) -> Option<&'static str> {
+    match ext {
+        "png" | "jpg" | "jpeg" | "webp" | "gif" => Some("image"),
+        "mp4" | "m4v" | "mov" | "webm" => Some("video"),
+        _ => None,
+    }
 }
 
 /// Largest in-memory image accepted (a rendered PDF page is a few MB at most).
@@ -314,7 +320,7 @@ pub fn import_media_bytes(conn: &Connection, app: &AppHandle, name: &str, bytes:
     let ext = image_extension(bytes).ok_or("Use a PNG, JPEG, WebP, or GIF image.")?;
     let name = name.trim();
     let name = if name.is_empty() { "image" } else { name };
-    store_media(conn, app, name, ext, |dest| fs::write(dest, bytes).map_err(|e| e.to_string()))
+    store_media(conn, app, name, ext, "image", |dest| fs::write(dest, bytes).map_err(|e| e.to_string()))
 }
 
 pub fn image_extension(bytes: &[u8]) -> Option<&'static str> {
@@ -336,6 +342,7 @@ fn store_media(
     app: &AppHandle,
     name: &str,
     ext: &str,
+    kind: &str,
     write: impl FnOnce(&Path) -> Result<(), String>,
 ) -> Result<Value, String> {
     let id = Uuid::new_v4().to_string();
@@ -350,8 +357,8 @@ fn store_media(
     let created = chrono_now();
     let path = dest.to_string_lossy().to_string();
     if let Err(error) = conn.execute(
-        "INSERT INTO media_assets (id, name, path, kind, created_at) VALUES (?1, ?2, ?3, 'image', ?4)",
-        params![id, name, path, created],
+        "INSERT INTO media_assets (id, name, path, kind, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, name, path, kind, created],
     ) {
         let _ = fs::remove_file(&dest);
         return Err(error.to_string());
@@ -360,7 +367,7 @@ fn store_media(
         "id": id,
         "name": name,
         "path": path,
-        "kind": "image",
+        "kind": kind,
         "createdAt": created,
     }))
 }
@@ -473,6 +480,9 @@ mod tests {
         assert_eq!(super::image_extension(b"RIFF\0\0\0\0WEBPVP8 "), Some("webp"));
         assert_eq!(super::image_extension(b"GIF89a..."), Some("gif"));
         assert_eq!(super::image_extension(b"%PDF-1.7"), None);
+        assert_eq!(super::media_kind("mov"), Some("video"));
+        assert_eq!(super::media_kind("png"), Some("image"));
+        assert_eq!(super::media_kind("exe"), None);
     }
 
     use super::*;

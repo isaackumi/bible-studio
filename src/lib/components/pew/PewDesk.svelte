@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MediaPane from "../MediaPane.svelte";
   import { findItem } from "../../domain/service";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
@@ -22,7 +23,7 @@
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
   import CompositionPane from "../CompositionPane.svelte";
 
-  type Mode = "scriptures" | "slides" | "songs" | "sermon" | "looks";
+  type Mode = "scriptures" | "slides" | "songs" | "media" | "sermon" | "looks";
   type DraftSermonSection = {
     id: string;
     name: string;
@@ -684,6 +685,7 @@
       <button type="button" class:on={mode === "scriptures"} onclick={() => { mode = "scriptures"; const item = passage(); if (item) void session.previewPassage(item); }}>Scriptures</button>
       <button type="button" class:on={mode === "slides"} onclick={() => (mode = "slides")}>Slides</button>
       <button type="button" class:on={mode === "songs"} onclick={() => (mode = "songs")}>Songs</button>
+      <button type="button" class:on={mode === "media"} onclick={() => (mode = "media")}>Media</button>
       {#if canUse("sermon")}
         <button type="button" class:on={mode === "sermon"} onclick={() => (mode = "sermon")}>Sermon</button>
       {/if}
@@ -732,6 +734,10 @@
 
   {#if mode === "looks"}
     <CompositionPane />
+  {:else if mode === "media"}
+    <section class="pb-songs pb-media">
+      <MediaPane />
+    </section>
   {:else if mode === "sermon"}
     <section class="pb-songs">
       <div class="song-desk">
@@ -765,10 +771,10 @@
             />
             <div class="song-actions">
               <button type="button" onclick={() => attachScripture(section.id, section.scripture)}>Attach scripture</button>
-              {#if session.media.length > 0}
+              {#if session.media.some((asset) => asset.kind === "image")}
                 <select aria-label="Attach image" bind:value={section.imageId}>
                   <option value="">Image</option>
-                  {#each session.media as asset (asset.id)}
+                  {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
                     <option value={asset.id}>{asset.name}</option>
                   {/each}
                 </select>
@@ -1494,6 +1500,7 @@
   .steppers button { width: 32px; padding: 0; justify-content: center; }
   .queue button { padding: 8px 10px; }
   .queue button.on { border-color: var(--accent); }
+  .pb-media { overflow: auto; padding: 16px 20px; }
   .pb-songs {
     flex: 1;
     min-height: 0;

@@ -12,6 +12,7 @@
     feeds = {},
     nested = false,
     mirror = false,
+    audio = false,
   }: {
     model: PresentationModel;
     /** Live pixels for this frame's own camera source. */
@@ -20,7 +21,27 @@
     feeds?: CameraFeeds<MediaStream>;
     nested?: boolean;
     mirror?: boolean;
+    /** Only the audience screen plays sound; operator monitors stay silent. */
+    audio?: boolean;
   } = $props();
+
+  /** Start playback; if sound is not allowed without a click, keep playing muted. */
+  function playClip(node: HTMLVideoElement, muted: boolean) {
+    node.muted = muted;
+    const start = () => {
+      void node.play().catch(() => {
+        node.muted = true;
+        void node.play().catch(() => {});
+      });
+    };
+    start();
+    return {
+      update(next: boolean) {
+        node.muted = next;
+        if (node.paused) start();
+      },
+    };
+  }
   let video = $state<HTMLVideoElement | undefined>();
   let playing = $state(false);
   let now = $state(0);
@@ -98,10 +119,16 @@
           model={layer.model}
           nested
           mirror={layer.mirror ?? false}
+          {audio}
           stream={cameraFeedForLayer(layer.sourceId, feeds)}
         />
       </div>
     {/each}
+  {:else if model.layout === "video" && model.video}
+    {#key model.video.url}
+      <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
+      <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={!audio || model.video.muted}></video>
+    {/key}
   {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}

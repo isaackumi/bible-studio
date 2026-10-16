@@ -1,6 +1,6 @@
 import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
-import { presentImage, presentLyrics, presentScripture, presentText } from "./present";
+import { presentImage, presentLyrics, presentScripture, presentText, presentVideo } from "./present";
 import { createTimer, DEFAULT_TIMER_WARNING_MS, presentTimer, type TimerMode } from "./timer";
 import { parseTextStyle, styleModel } from "./text-style";
 import { emptyModel } from "./theme";
@@ -1018,6 +1018,9 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
   }
   if (source.type === "image") {
     return payload.imageUrl ? presentImage({ theme: ctx.theme, imageUrl: payload.imageUrl }) : presentText({ theme: ctx.theme, layout: "title", heading: source.title, body: "" });
+  }
+  if (source.type === "video" && payload.videoUrl) {
+    return presentVideo({ theme: ctx.theme, videoUrl: payload.videoUrl, loop: payload.loop === "true", muted: payload.muted === "true" });
   }
   if (source.type === "camera" || source.type === "video" || source.type === "ndi") {
     return presentCamera({ theme: ctx.theme, label: payload.label || source.title });

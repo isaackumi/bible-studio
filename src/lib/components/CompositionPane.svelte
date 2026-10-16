@@ -789,10 +789,10 @@
           {/if}
           {#if selected.source.type === "image"}
             <p class="camera-note">Pick a library image for Preview. LIVE still sends Program.</p>
-            {#if session.media.length === 0}
+            {#if !session.media.some((asset) => asset.kind === "image")}
               <p class="camera-note">No media in the library yet.</p>
             {/if}
-            {#each session.media as asset (asset.id)}
+            {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
               <button
                 type="button"
                 onclick={() => {

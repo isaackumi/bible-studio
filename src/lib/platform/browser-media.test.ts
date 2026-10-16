@@ -2,6 +2,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it } from "vitest";
 import {
   MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
   createMediaAdapter,
   idbMediaStore,
   imageTypeOf,
@@ -44,12 +45,21 @@ describe("browser media adapter", () => {
     expect(media.url("missing")).toBeNull();
   });
 
-  it("rejects a file that is not an allowed image", async () => {
+  it("rejects a file that is not an image or video", async () => {
     const media = createMediaAdapter(async () => memoryMediaStore());
-    await expect(media.importFile(new File([new Uint8Array(8)], "clip.mp4", { type: "video/mp4" }))).rejects.toThrow(
-      "Use a PNG, JPEG, WebP, or GIF image.",
+    await expect(media.importFile(new File([new Uint8Array(8)], "notes.docx", { type: "application/msword" }))).rejects.toThrow(
+      /PNG, JPEG, WebP or GIF image, or an MP4/,
     );
     expect(await media.list()).toEqual([]);
+  });
+
+  it("imports a video as kind video and caps videos at 1 GB", async () => {
+    const media = createMediaAdapter(async () => memoryMediaStore(), { id: () => "vid-1", now: () => "2026-10-16T00:00:00.000Z" });
+    const asset = await media.importFile(new File([new Uint8Array(8)], "intro.mov", { type: "" }));
+    expect(asset).toMatchObject({ id: "vid-1", kind: "video", name: "intro.mov" });
+    const huge = new File([new Uint8Array(8)], "big.mp4", { type: "video/mp4" });
+    Object.defineProperty(huge, "size", { value: MAX_VIDEO_BYTES + 1 });
+    await expect(media.importFile(huge)).rejects.toThrow("That video is larger than 1 GB. It was not saved.");
   });
 
   it("rejects a file over 25 MB before writing", async () => {

@@ -31,11 +31,12 @@ import {
   sanitizeSharedSource,
   syncLinkedEdits,
   updateSharedSource,
+  withMediaUrls,
   type SharedSource,
   type SourceFields,
 } from "../domain/sources";
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
-import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
+import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo } from "../domain/present";
 import {
   cameraDeviceId,
   camerasIn,
@@ -849,8 +850,13 @@ class Session {
     if (item.kind === "image" && item.image) {
       return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
     }
+    if (item.kind === "video" && item.video) {
+      return presentVideo({ theme, videoUrl: this.mediaSrc(item.video.assetId), loop: item.video.loop, muted: item.video.muted });
+    }
     if (item.kind === "composition" && item.composition) {
-      return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
+      const saved = this.workspace.compositions.find((entry) => entry.id === item.composition?.compositionId);
+      if (!saved) return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
+      return presentComposition(withMediaUrls(restoreComposition(saved), this.mediaSrc), { theme, now: Date.now() });
     }
     const heading = item.slide?.heading ?? item.announcement?.heading ?? item.title;
     const body = item.slide?.body ?? item.announcement?.body ?? "";
@@ -919,7 +925,7 @@ class Session {
     this.sermonFocus = null;
     const clean = sanitizeComposition(composition);
     this.lookOnPreview = clean;
-    const model = presentComposition(clean, { theme: this.theme(), now: Date.now() });
+    const model = presentComposition(withMediaUrls(clean, this.mediaSrc), { theme: this.theme(), now: Date.now() });
     this.live = previewComposition(this.live, model, clean.id);
     this.message = `${clean.name} is on Preview. LIVE still sends Program.`;
   };
@@ -1386,9 +1392,32 @@ class Session {
     void this.selectItem(item.id);
   };
 
-  addImage = (assetId: string, title: string) => {
-    if (!this.service) return;
-    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
+  /** Add a video to the current section. Preview plays it muted; LIVE plays it on the audience. */
+  addVideo = async (assetId: string, title: string, options: { loop?: boolean; muted?: boolean } = {}) => {
+    const target = await this.sectionForMedia();
+    if (!target) {
+      this.message = "Add a section first.";
+      return;
+    }
+    const item: PresentationItem = {
+      id: uid(),
+      kind: "video",
+      title,
+      video: { assetId, loop: options.loop ?? false, muted: options.muted ?? false },
+    };
+    this.insertItem(target, item);
+    void this.selectItem(item.id);
+  };
+
+  /** The section media is added to; opens a service and a section when there is none yet. */
+  private sectionForMedia = async (): Promise<string | null> => {
+    if (!this.service) await this.createService("Sunday Service");
+    if (!this.service?.sections.length) this.addSection("Media");
+    return this.cursor.sectionId ?? this.service?.sections[0]?.id ?? null;
+  };
+
+  addImage = async (assetId: string, title: string) => {
+    const target = await this.sectionForMedia();
     if (!target) {
       this.message = "Add a section first.";
       return;

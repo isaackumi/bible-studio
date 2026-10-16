@@ -146,7 +146,7 @@
 
 <div class="audience" style:background={frameBackground(current)}>
   <div class:fade-in={fading} style:--fade="{fadeMs}ms">
-    <Screen model={current} sourceId={currentSource} {feeds} />
+    <Screen model={current} sourceId={currentSource} {feeds} audio />
   </div>
   {#if testing}
     <p class="test-card">Test. Program was not changed.</p>

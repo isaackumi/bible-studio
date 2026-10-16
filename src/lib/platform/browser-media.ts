@@ -2,8 +2,11 @@ import type { MediaAsset } from "../domain/types";
 import { BROWSER_MEDIA_STORE, openBrowserDatabase } from "./browser-store";
 
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+/** Browsers keep media in IndexedDB; a service video is rarely larger than this. */
+export const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
 
 const EXT_TYPES: Record<string, string> = {
   png: "image/png",
@@ -11,6 +14,10 @@ const EXT_TYPES: Record<string, string> = {
   jpeg: "image/jpeg",
   webp: "image/webp",
   gif: "image/gif",
+  mp4: "video/mp4",
+  m4v: "video/x-m4v",
+  mov: "video/quicktime",
+  webm: "video/webm",
 };
 
 export type StoredMedia = MediaAsset & {
@@ -31,8 +38,14 @@ export type BrowserMedia = {
 };
 
 export function imageTypeOf(file: { name: string; type: string }): string | null {
+  const type = mediaTypeOf(file);
+  return type?.startsWith("image/") ? type : null;
+}
+
+/** Image or video MIME type from the file type, then the extension. */
+export function mediaTypeOf(file: { name: string; type: string }): string | null {
   const type = file.type.trim().toLowerCase();
-  if (ALLOWED_IMAGE_TYPES.has(type)) return type;
+  if (ALLOWED_IMAGE_TYPES.has(type) || ALLOWED_VIDEO_TYPES.has(type)) return type;
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   return EXT_TYPES[ext] ?? null;
 }
@@ -44,7 +57,7 @@ export function isQuotaExceeded(error: unknown): boolean {
 }
 
 function asAsset(row: StoredMedia): MediaAsset {
-  return { id: row.id, name: row.name, path: "", kind: "image", createdAt: row.createdAt };
+  return { id: row.id, name: row.name, path: "", kind: row.kind === "video" ? "video" : "image", createdAt: row.createdAt };
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -128,14 +141,16 @@ export function createMediaAdapter(
         .map(asAsset);
     },
     async importFile(file) {
-      const type = imageTypeOf(file);
-      if (!type) throw new Error("Use a PNG, JPEG, WebP, or GIF image.");
-      if (file.size > MAX_IMAGE_BYTES) throw new Error("That image is larger than 25 MB. It was not saved.");
+      const type = mediaTypeOf(file);
+      if (!type) throw new Error("Use a PNG, JPEG, WebP or GIF image, or an MP4, MOV, M4V or WebM video.");
+      const kind = type.startsWith("video/") ? "video" : "image";
+      if (kind === "image" && file.size > MAX_IMAGE_BYTES) throw new Error("That image is larger than 25 MB. It was not saved.");
+      if (kind === "video" && file.size > MAX_VIDEO_BYTES) throw new Error("That video is larger than 1 GB. It was not saved.");
       const record: StoredMedia = {
         id: nextId(),
-        name: file.name || "image",
+        name: file.name || kind,
         path: "",
-        kind: "image",
+        kind,
         createdAt: now(),
         type,
         blob: file,
@@ -143,8 +158,8 @@ export function createMediaAdapter(
       try {
         await (await store()).put(record);
       } catch (error) {
-        if (isQuotaExceeded(error)) throw new Error("The image was not saved. This browser is out of space.");
-        throw error instanceof Error ? error : new Error("The image was not saved.");
+        if (isQuotaExceeded(error)) throw new Error(`The ${kind} was not saved. This browser is out of space.`);
+        throw error instanceof Error ? error : new Error(`The ${kind} was not saved.`);
       }
       remember(record.id, file);
       return asAsset(record);

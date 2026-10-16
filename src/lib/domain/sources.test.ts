@@ -15,6 +15,7 @@ import {
   defaultFields,
   fieldsFromSource,
   linkLayer,
+  withMediaUrls,
   lockedLooksUsing,
   nextSourceName,
   pruneSharedSources,
@@ -148,6 +149,7 @@ describe("shared sources", () => {
       { type: "clock", label: "", style: { align: "left", vertical: "bottom" } },
       { type: "lower-third", templateId: "speaker", title: "Pastor", subtitle: "Lead", style: {} },
       { type: "image", assetId: "a1", name: "Logo", imageUrl: "blob:x" },
+      { type: "video", assetId: "v1", name: "Walk-in", videoUrl: "blob:v", loop: true, muted: false },
     ] as const;
     for (const fields of cases) expect(fieldsFromSource(buildSource(fields))).toEqual(fields);
     expect(fieldsFromSource(sourceRef("empty", "e", "Empty"))).toBeNull();
@@ -192,5 +194,16 @@ describe("shared sources", () => {
     expect(clock?.model.timer?.mode).toBe("clock");
     expect(clock?.model.theme).toMatchObject({ align: "right", vertical: "top" });
     expect(clock?.model.reference).toBeNull();
+  });
+
+  it("refreshes stale media URLs from the asset id and plays video sources", () => {
+    const video = createSharedSource("Loop", buildSource({ type: "video", assetId: "v1", name: "Loop", videoUrl: "blob:old", loop: true, muted: true }));
+    const look = sceneWith("A", video);
+    const fresh = withMediaUrls(look, (id) => (id === "v1" ? "blob:new" : null));
+    const layer = fresh.layers.find((entry) => entry.source.type === "video")!;
+    expect(layer.source.payload.videoUrl).toBe("blob:new");
+    expect(withMediaUrls(fresh, () => "blob:new")).toBe(fresh);
+    const painted = presentComposition(fresh, { theme: defaultTheme(), now: 0 }).layers?.find((entry) => entry.sourceId === "video:v1");
+    expect(painted?.model).toMatchObject({ layout: "video", video: { url: "blob:new", loop: true, muted: true } });
   });
 });

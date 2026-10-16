@@ -135,7 +135,8 @@
       (fields.type !== "camera" || fields.deviceId.length > 0) &&
       (fields.type !== "scripture" || fields.body.length > 0) &&
       (fields.type !== "song" || fields.body.length > 0) &&
-      (fields.type !== "image" || fields.imageUrl.length > 0),
+      (fields.type !== "image" || fields.imageUrl.length > 0) &&
+      (fields.type !== "video" || fields.videoUrl.length > 0),
   );
 
   function save() {
@@ -318,12 +319,38 @@
         <span>Subtitle</span>
         <input class="field" aria-label="Subtitle" value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
       </label>
+    {:else if fields.type === "video"}
+      {#if !session.media.some((asset) => asset.kind === "video")}
+        <p class="note">No videos yet. Import one in Media.</p>
+      {:else}
+        <div class="media" role="listbox" aria-label="Videos">
+          {#each session.media.filter((asset) => asset.kind === "video") as asset (asset.id)}
+            <button
+              type="button"
+              role="option"
+              aria-selected={fields.assetId === asset.id}
+              class:on={fields.assetId === asset.id}
+              onclick={() => {
+                if (fields.type === "video") fields = { ...fields, assetId: asset.id, name: asset.name, videoUrl: mediaUrl(asset) ?? "" };
+              }}
+            >{asset.name}</button>
+          {/each}
+        </div>
+      {/if}
+      <label class="check">
+        <input type="checkbox" checked={fields.loop} onchange={(event) => fields.type === "video" && (fields = { ...fields, loop: event.currentTarget.checked })} />
+        Loop
+      </label>
+      <label class="check">
+        <input type="checkbox" checked={fields.muted} onchange={(event) => fields.type === "video" && (fields = { ...fields, muted: event.currentTarget.checked })} />
+        No sound on the audience screen
+      </label>
     {:else if fields.type === "image"}
-      {#if session.media.length === 0}
+      {#if !session.media.some((asset) => asset.kind === "image")}
         <p class="note">No images yet. Import images in Settings → Media.</p>
       {:else}
         <div class="media" role="listbox" aria-label="Images">
-          {#each session.media as asset (asset.id)}
+          {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
             <button
               type="button"
               role="option"
