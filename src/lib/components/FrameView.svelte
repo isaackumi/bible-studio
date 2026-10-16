@@ -2,8 +2,10 @@
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
   import { displayWash, frameBackground } from "../domain/backgrounds";
   import { effectsCss } from "../domain/text-style";
+  import { cubicIn, cubicInOut, cubicOut, linear } from "svelte/easing";
+  import type { TransitionConfig } from "svelte/transition";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
-  import type { PresentationModel } from "../domain/types";
+  import type { PaintedLayer, PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
 
   let {
@@ -24,6 +26,25 @@
     /** Only the audience screen plays sound; operator monitors stay silent. */
     audio?: boolean;
   } = $props();
+
+  /** A layer that is hidden or leaves the scene plays its exit animation. */
+  function leave(_node: Element, animation: PaintedLayer["animation"]): TransitionConfig {
+    const kind = animation?.exit ?? "none";
+    if (kind === "none") return { duration: 0 };
+    const easing = animation?.easing === "linear" ? linear : animation?.easing === "ease-in" ? cubicIn : animation?.easing === "ease" ? cubicInOut : cubicOut;
+    const shift: Record<string, string> = {
+      "slide-left": "translateX(-12%)",
+      "slide-right": "translateX(12%)",
+      "slide-up": "translateY(-18%)",
+      "slide-down": "translateY(18%)",
+    };
+    const away = shift[kind];
+    return {
+      duration: Math.max(0, animation?.durationMs ?? 400),
+      easing,
+      css: (t) => (away ? `opacity: ${t}; transform: ${away.replace(/(-?\d+)%/, (_, n) => `${Number(n) * (1 - t)}%`)};` : `opacity: ${t};`),
+    };
+  }
 
   /** Start playback; if sound is not allowed without a click, keep playing muted. */
   function playClip(node: HTMLVideoElement, muted: boolean) {
@@ -102,6 +123,7 @@
   {#if model.layout === "composition"}
     {#each model.layers ?? [] as layer (layer.id)}
       <div
+        out:leave={layer.animation}
         class="comp-layer enter-{layer.animation?.entrance ?? "none"}"
         class:fit-cover={layer.fit === "cover"}
         class:fit-fill={layer.fit === "fill"}

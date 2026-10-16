@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextStyleEditor from "./TextStyleEditor.svelte";
+  import { parseTextStyle } from "../domain/text-style";
   import { onMount } from "svelte";
   import { session } from "../app/session.svelte";
   import {
@@ -8,6 +10,8 @@
     assignLayerSource,
     clearLowerThird,
     COMPOSITION_TEMPLATES,
+    lookMultiCamera,
+    setLayerStyle,
     hideLayer,
     instantiateTemplate,
     lookCameraLowerThird,
@@ -168,6 +172,16 @@
         camera: { id: camera.deviceId, label: camera.label },
         ...imageFromDesk(),
       });
+      selectedId = draft.layers[0]?.id ?? null;
+      session.previewLook(draft);
+      return;
+    }
+    if (id === "three-cameras" || id === "four-cameras") {
+      await session.loadCameras();
+      draft = lookMultiCamera(
+        session.cameras.map((camera) => ({ id: camera.deviceId, label: camera.label })),
+        id === "three-cameras" ? 3 : 4,
+      );
       selectedId = draft.layers[0]?.id ?? null;
       session.previewLook(draft);
       return;
@@ -870,6 +884,14 @@
             {#if timerMode === "target"}
               <label>At <input type="time" aria-label="Target time" bind:value={timerClock} onchange={() => assign("timer")} /></label>
             {/if}
+          {/if}
+          {#if ["scripture", "song", "text", "lower-third", "timer", "clock"].includes(selected.source.type)}
+            <TextStyleEditor
+              style={parseTextStyle(selected.source.payload.style)}
+              onchange={(style) => {
+                if (draft && selected) touch(setLayerStyle(draft, selected.id, style));
+              }}
+            />
           {/if}
           <div class="song-actions">
             <button type="button" onclick={() => draft && session.previewLook(draft)}>Preview</button>

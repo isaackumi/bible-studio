@@ -4,6 +4,7 @@
   import {
     hideLayer,
     layerStackFrontFirst,
+    moveLayerTo,
     renameComposition,
     reorderLayers,
     restoreComposition,
@@ -41,6 +42,9 @@
   let selectedLayerId = $state<string | null>(null);
   let renameDraft = $state("");
   let typeMenu = $state(false);
+  /** Drag-to-reorder in the Sources list (front of the stack is the top row). */
+  let dragId = $state<string | null>(null);
+  let dropIndex = $state<number | null>(null);
   let adding = $state<SourceKind | null>(null);
   let editing = $state<{
     layerId: string | null;
@@ -488,8 +492,37 @@
       <section class="dock">
         <header><Icon name="list" size={16} /> Sources</header>
         <div class="list">
-          {#each sourceLayers as layer (layer.id)}
-            <div class="source-row">
+          {#each sourceLayers as layer, index (layer.id)}
+            <div
+              class="source-row"
+              class:dragging={dragId === layer.id}
+              class:drop-before={dropIndex === index && dragId !== layer.id}
+              role="listitem"
+              draggable={!sceneLocked}
+              ondragstart={(event) => {
+                dragId = layer.id;
+                event.dataTransfer?.setData("text/plain", layer.id);
+                if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+              }}
+              ondragover={(event) => {
+                if (!dragId) return;
+                event.preventDefault();
+                dropIndex = index;
+              }}
+              ondragleave={() => {
+                if (dropIndex === index) dropIndex = null;
+              }}
+              ondrop={(event) => {
+                event.preventDefault();
+                if (activeScene && dragId) mutate(moveLayerTo(activeScene, dragId, index));
+                dragId = null;
+                dropIndex = null;
+              }}
+              ondragend={() => {
+                dragId = null;
+                dropIndex = null;
+              }}
+            >
               <button
                 type="button"
                 class:on={selectedLayer?.id === layer.id}
@@ -876,7 +909,10 @@
     color: inherit;
   }
   .list button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
-  .source-row { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+  .source-row { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; border-top: 2px solid transparent; }
+  .source-row[draggable="true"] { cursor: grab; }
+  .source-row.dragging { opacity: 0.45; }
+  .source-row.drop-before { border-top-color: var(--accent); }
   .source-row > button:first-child { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
   .source-row .kind { font-size: 11px; color: var(--muted); }
   .scene-name { display: flex; flex-direction: column; gap: 4px; padding: 6px; font-size: 11px; color: var(--muted); }

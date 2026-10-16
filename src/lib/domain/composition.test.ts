@@ -3,6 +3,9 @@ import { defaultTheme } from "./theme";
 import { presentScripture, presentText } from "./present";
 import { presentCamera } from "./camera";
 import {
+  setLayerStyle,
+  lookMultiCamera,
+  moveLayerTo,
   addLayer,
   applyLowerThirdTemplate,
   lowerThirdCopy,
@@ -1148,5 +1151,42 @@ describe("composition output", () => {
     })).toBe(false);
     expect(live.program).toEqual(onAir);
     expect(live.revision).toBeGreaterThan(0);
+  });
+});
+
+describe("scene editor helpers", () => {
+  it("drags a layer to any place in the front-first stack", () => {
+    let scene = createComposition("S");
+    for (const name of ["Back", "Middle", "Front"]) scene = addLayer(scene, { name, bounds: { x: 0, y: 0, w: 100, h: 100 } });
+    const names = (look: typeof scene) => layerStackFrontFirst(look).map((layer) => layer.name);
+    expect(names(scene)).toEqual(["Front", "Middle", "Back"]);
+    const back = scene.layers.find((layer) => layer.name === "Back")!;
+    expect(names(moveLayerTo(scene, back.id, 0))).toEqual(["Back", "Front", "Middle"]);
+    expect(names(moveLayerTo(scene, back.id, 1))).toEqual(["Front", "Back", "Middle"]);
+    expect(moveLayerTo(scene, back.id, 2)).toBe(scene);
+    expect(moveLayerTo(setCompositionLocked(scene, true), back.id, 0).layers).toEqual(scene.layers);
+  });
+
+  it("fills three- and four-camera layouts, repeating cameras when there are fewer", () => {
+    const three = lookMultiCamera([{ id: "a", label: "A" }, { id: "b", label: "B" }], 3);
+    expect(three.layers.map((layer) => layer.source.id)).toEqual(["a", "b", "a"]);
+    expect(three.layers[0]!.bounds.w).toBeGreaterThan(60);
+    const four = lookMultiCamera([{ id: "a", label: "A" }], 4);
+    expect(four.layers).toHaveLength(4);
+    expect(four.layers.every((layer) => layer.source.type === "camera")).toBe(true);
+  });
+});
+
+describe("layer text style", () => {
+  it("sets a style, keeps it when the same kind of content is refilled, and clears it", () => {
+    let scene = addLayer(createComposition("S"), { name: "Text", bounds: { x: 0, y: 0, w: 100, h: 100 } });
+    const id = scene.layers[0]!.id;
+    scene = assignText(scene, id, "Welcome", "");
+    scene = setLayerStyle(scene, id, { bold: true, color: "#ff0000" });
+    expect(JSON.parse(scene.layers[0]!.source.payload.style!)).toEqual({ bold: true, color: "#ff0000" });
+    scene = assignText(scene, id, "Welcome back", "");
+    expect(scene.layers[0]!.source.payload.style).toBeDefined();
+    scene = setLayerStyle(scene, id, {});
+    expect(scene.layers[0]!.source.payload.style).toBeUndefined();
   });
 });

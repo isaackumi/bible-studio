@@ -2,9 +2,9 @@ import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText, presentVideo } from "./present";
 import { createTimer, DEFAULT_TIMER_WARNING_MS, presentTimer, type TimerMode } from "./timer";
-import { parseTextStyle, styleModel } from "./text-style";
+import { encodeTextStyle, parseTextStyle, styleModel } from "./text-style";
 import { emptyModel } from "./theme";
-import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, Theme } from "./types";
+import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, TextStyle, Theme } from "./types";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -120,6 +120,25 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
   { id: "image-camera", name: "Image + Camera", slots: SPLIT },
   { id: "two-cameras", name: "Two Cameras", slots: SPLIT },
   { id: "camera-presentation", name: "Camera + Presentation", slots: SPLIT },
+  {
+    id: "three-cameras",
+    name: "Three Cameras",
+    slots: [
+      { id: "main", name: "Main camera", bounds: { x: 0, y: 0, w: 66.6667, h: 100 }, fit: "cover" },
+      { id: "top", name: "Camera 2", bounds: { x: 66.6667, y: 0, w: 33.3333, h: 50 }, fit: "cover" },
+      { id: "bottom", name: "Camera 3", bounds: { x: 66.6667, y: 50, w: 33.3333, h: 50 }, fit: "cover" },
+    ],
+  },
+  {
+    id: "four-cameras",
+    name: "Four Cameras",
+    slots: [
+      { id: "a", name: "Camera 1", bounds: { x: 0, y: 0, w: 50, h: 50 }, fit: "cover" },
+      { id: "b", name: "Camera 2", bounds: { x: 50, y: 0, w: 50, h: 50 }, fit: "cover" },
+      { id: "c", name: "Camera 3", bounds: { x: 0, y: 50, w: 50, h: 50 }, fit: "cover" },
+      { id: "d", name: "Camera 4", bounds: { x: 50, y: 50, w: 50, h: 50 }, fit: "cover" },
+    ],
+  },
   {
     id: "camera-lower-third",
     name: "Camera + Lower Third",
@@ -454,7 +473,28 @@ export function assignLayerSource(composition: Composition, layerId: string, sou
   if (composition.locked) return composition;
   return {
     ...composition,
-    layers: composition.layers.map((layer) => (layer.id === layerId ? { ...layer, source: sanitizeSource(source) } : layer)),
+    layers: composition.layers.map((layer) => {
+      if (layer.id !== layerId) return layer;
+      // Re-filling a layer with the same kind of content keeps its text style.
+      const kept = layer.source.type === source.type && layer.source.payload.style && !source.payload.style
+        ? { ...source, payload: { ...source.payload, style: layer.source.payload.style } }
+        : source;
+      return { ...layer, source: sanitizeSource(kept) };
+    }),
+  };
+}
+
+/** Set a layer's text style (stored on its source payload). Scene lock wins. */
+export function setLayerStyle(composition: Composition, layerId: string, style: TextStyle): Composition {
+  if (composition.locked) return composition;
+  const encoded = encodeTextStyle(style);
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => {
+      if (layer.id !== layerId) return layer;
+      const { style: _old, ...payload } = layer.source.payload;
+      return { ...layer, source: { ...layer.source, payload: encoded ? { ...payload, style: encoded } : payload } };
+    }),
   };
 }
 
@@ -682,6 +722,43 @@ export function lookTwoCameras(input: {
     );
   }
   return composition;
+}
+
+/**
+ * Three- or four-camera look. Cameras fill the slots in order; with fewer devices than slots
+ * the list repeats, so every region shows a real feed instead of a blank.
+ */
+export function lookMultiCamera(cameras: Array<{ id: string; label: string }>, count: 3 | 4): Composition {
+  const template = COMPOSITION_TEMPLATES.find((entry) => entry.id === (count === 3 ? "three-cameras" : "four-cameras"))!;
+  let composition = instantiateTemplate(template, template.name);
+  const list = cameras.length ? cameras : [{ id: "cam-1", label: "Camera 1" }];
+  composition.layers.forEach((layer, index) => {
+    const camera = list[index % list.length]!;
+    composition = assignLayerSource(
+      composition,
+      layer.id,
+      sourceRef("camera", camera.id, camera.label, { deviceId: camera.id, label: camera.label }),
+    );
+  });
+  return composition;
+}
+
+/**
+ * Move a layer to a position in the front-first stack (0 = front), as a drag in the Sources
+ * list does. Scene lock and unknown ids leave the scene unchanged.
+ */
+export function moveLayerTo(composition: Composition, layerId: string, frontIndex: number): Composition {
+  if (composition.locked) return composition;
+  const front = layerOrder(composition).slice().reverse();
+  const from = front.findIndex((layer) => layer.id === layerId);
+  if (from < 0) return composition;
+  const target = Math.max(0, Math.min(front.length - 1, Math.round(frontIndex)));
+  if (target === from) return composition;
+  const next = front.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(target, 0, moved!);
+  const count = next.length;
+  return { ...composition, layers: next.map((layer, index) => ({ ...layer, zIndex: count - 1 - index })) };
 }
 
 export function lookCameraPresentation(input: {
