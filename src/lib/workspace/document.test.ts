@@ -20,7 +20,7 @@ describe("workspace document", () => {
     expect(workspace.activeLayoutId).toBe("layout-bible");
     expect(workspace.schemaVersion).toBe(2);
     expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
-    expect(workspace.production).toEqual({ stage: [42, 16, 42], docks: [28, 44, 28] });
+    expect(workspace.production).toEqual({ stage: [42, 16, 42], docks: [28, 44, 28], rows: [74, 26] });
     expect(workspace).not.toHaveProperty("program");
     expect(workspace.compositions).toEqual([]);
   });
