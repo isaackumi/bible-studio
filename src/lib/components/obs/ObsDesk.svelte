@@ -2,10 +2,6 @@
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import {
-    addLayer,
-    assignLayerSource,
-    assignScripture,
-    assignText,
     hideLayer,
     layerStackFrontFirst,
     renameComposition,
@@ -13,14 +9,21 @@
     restoreComposition,
     setLayerLocked,
     showLayer,
-    sourceRef,
     type Composition,
-    type SourceType,
+    type CompositionLayer,
   } from "../../domain/composition";
+  import {
+    buildSource,
+    defaultFields,
+    fieldsFromSource,
+    SOURCE_KINDS,
+    type SourceFields,
+    type SourceKind,
+  } from "../../domain/sources";
   import { sanitizeTransition, transitionChanged } from "../../domain/theme";
-  import { formatReference, parseReference } from "../../bible/reference";
-  import type { BibleItem } from "../../domain/types";
   import CompositionPane from "../CompositionPane.svelte";
+  import AddSourceDialog from "../sources/AddSourceDialog.svelte";
+  import SourceProperties from "../sources/SourceProperties.svelte";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import OutputControls from "../OutputControls.svelte";
@@ -35,6 +38,16 @@
   let looksOpen = $state(false);
   let selectedLayerId = $state<string | null>(null);
   let renameDraft = $state("");
+  let typeMenu = $state(false);
+  let adding = $state<SourceKind | null>(null);
+  let editing = $state<{
+    layerId: string | null;
+    sourceKey: string | null;
+    name: string;
+    fields: SourceFields;
+    readonly: boolean;
+    notice: string | null;
+  } | null>(null);
   let epoch = $state(0);
   let frozen = $state(session.workspace.production);
   let applying = false;
@@ -218,132 +231,84 @@
     session.editSceneLook(next);
   }
 
-  function scriptureFromQuery(): BibleItem | null {
-    const parsed = parseReference(query, session.books);
-    if (!parsed?.startVerse) return null;
-    const book = session.books.find((entry) => entry.ord === parsed.bookOrd);
-    return {
-      translationId: "kjv",
-      bookOrd: parsed.bookOrd,
-      chapter: parsed.chapter,
-      startVerse: parsed.startVerse,
-      endVerse: parsed.endVerse ?? parsed.startVerse,
-      reference: formatReference(book?.name ?? "John", parsed.chapter, parsed.startVerse, parsed.endVerse ?? parsed.startVerse, book?.chapters ?? 1),
+  function ensureScene(): Composition {
+    return activeScene ?? session.createSceneLook(`Scene ${scenes.length + 1}`);
+  }
+
+  function pickType(type: SourceKind) {
+    typeMenu = false;
+    adding = type;
+    if (type === "camera") void session.loadCameras();
+  }
+
+  function createNamed(name: string) {
+    if (!adding) return;
+    editing = {
+      layerId: null,
+      sourceKey: null,
+      name,
+      fields: defaultFields(adding, { cameras: session.cameras }),
+      readonly: false,
+      notice: null,
     };
+    adding = null;
+  }
+
+  function pickExisting(id: string) {
+    const scene = ensureScene();
+    selectedLayerId = session.addExistingSourceToScene(scene, id) ?? selectedLayerId;
+    adding = null;
+  }
+
+  function openProperties(layer: CompositionLayer) {
+    const fields = fieldsFromSource(layer.source);
+    if (!fields) return;
+    if (fields.type === "camera") void session.loadCameras();
+    const blocked = layer.sourceKey ? session.lockedScenesUsing(layer.sourceKey) : [];
+    selectedLayerId = layer.id;
+    editing = {
+      layerId: layer.id,
+      sourceKey: layer.sourceKey ?? null,
+      name: layer.name,
+      fields,
+      readonly: sceneLocked || blocked.length > 0,
+      notice: sceneLocked
+        ? "This scene is locked. Unlock it to edit sources."
+        : blocked.length
+          ? `Used in locked scene “${blocked[0]}” — unlock to edit.`
+          : null,
+    };
+  }
+
+  function saveProperties(name: string, fields: SourceFields) {
+    if (!editing) return;
+    const source = buildSource(fields);
+    if (editing.layerId === null) {
+      selectedLayerId = session.createSourceInScene(ensureScene(), name, source) ?? selectedLayerId;
+    } else if (editing.sourceKey) {
+      if (session.saveSharedSource(editing.sourceKey, name, source).length) return;
+    } else if (activeScene) {
+      session.linkLayerToNewSource(activeScene, editing.layerId, name, source);
+    }
+    editing = null;
+  }
+
+  function removeSelectedSource() {
+    if (!activeScene || sceneLocked || !selectedLayer) return;
+    session.removeSceneLayer(activeScene, selectedLayer.id);
+    selectedLayerId = null;
   }
 
   async function addScriptureLayer(event?: Event) {
     event?.preventDefault();
-    const item = scriptureFromQuery();
-    if (item) await session.previewPassage(item);
-    let scene = activeScene ?? session.lookOnPreview;
-    if (!scene) scene = session.createSceneLook(`Scene ${scenes.length + 1}`);
-    else scene = restoreComposition(scene);
-    if (scene.locked) return;
-    const preview = session.live.preview.model;
-    const reference =
-      item?.reference ||
-      (preview.layout === "scripture" ? preview.reference : null) ||
-      "John 3:16";
-    const body =
-      preview.layout === "scripture" && preview.lines[0]?.text
-        ? preview.lines.map((line) => line.text).join(" ")
-        : "For God so loved the world.";
-    const attribution = preview.layout === "scripture" ? preview.attribution || "KJV" : "KJV";
-    const verse = item?.startVerse ?? 16;
-    let next = addLayer(scene, {
-      name: reference,
-      bounds: { x: 0, y: 0, w: 100, h: 100 },
-      fit: "contain",
-      source: sourceRef("empty", "scripture", reference),
-    });
-    const layer = next.layers[next.layers.length - 1]!;
-    next = assignScripture(next, layer.id, { reference, body, attribution, verse });
-    selectedLayerId = layer.id;
-    session.editSceneLook(next);
+    if (sceneLocked || !query.trim()) return;
+    const fields = await session.scriptureFields(query);
+    if (!fields || fields.type !== "scripture") {
+      session.message = "Reference not found.";
+      return;
+    }
+    selectedLayerId = session.createSourceInScene(ensureScene(), fields.reference, buildSource(fields)) ?? selectedLayerId;
     query = "";
-  }
-
-  function addSource(type: SourceType) {
-    let scene = activeScene;
-    if (!scene) {
-      scene = session.createSceneLook(`Scene ${scenes.length + 1}`);
-    }
-    if (scene.locked) return;
-    const name =
-      type === "scripture"
-        ? "Scripture"
-        : type === "song"
-          ? "Lyrics"
-          : type === "camera"
-            ? "Camera"
-            : type === "timer"
-              ? "Timer"
-              : type === "lower-third"
-                ? "Lower third"
-                : type === "image"
-                  ? "Image"
-                  : type === "text"
-                    ? "Text"
-                    : "Layer";
-    let next = addLayer(scene, {
-      name,
-      bounds: type === "lower-third" ? { x: 6, y: 72, w: 55, h: 22 } : { x: 0, y: 0, w: 100, h: 100 },
-      fit: "contain",
-      source: sourceRef("empty", type, name),
-    });
-    const layer = next.layers[next.layers.length - 1]!;
-    if (type === "scripture") {
-      next = assignScripture(next, layer.id, {
-        reference: "John 3:16",
-        body: "For God so loved the world.",
-        attribution: "KJV",
-        verse: 16,
-      });
-    } else if (type === "text") {
-      next = assignText(next, layer.id, "Welcome", "Please join us after the service.");
-    } else if (type === "camera") {
-      const camera = session.cameras[0];
-      next = assignLayerSource(
-        next,
-        layer.id,
-        sourceRef("camera", camera?.deviceId ?? "cam-1", camera?.label ?? "Camera 1", {
-          deviceId: camera?.deviceId ?? "cam-1",
-          label: camera?.label ?? "Camera 1",
-        }),
-      );
-      void session.loadCameras();
-    } else if (type === "timer") {
-      next = assignLayerSource(
-        next,
-        layer.id,
-        sourceRef("timer", "service", "Service starts in", {
-          mode: "countdown",
-          durationMs: String(10 * 60_000),
-          label: "Service starts in",
-        }),
-      );
-    } else if (type === "lower-third") {
-      next = assignLayerSource(
-        next,
-        layer.id,
-        sourceRef("lower-third", "speaker", "Speaker", {
-          title: "Speaker",
-          subtitle: "",
-          templateId: "speaker",
-        }),
-      );
-    } else if (type === "song") {
-      next = assignLayerSource(
-        next,
-        layer.id,
-        sourceRef("song", "lyrics", "Verse 1", { label: "Verse 1", body: "Holy, holy, holy" }),
-      );
-    } else if (type === "image") {
-      next = assignLayerSource(next, layer.id, sourceRef("image", "image", "Image", { imageUrl: "" }));
-    }
-    selectedLayerId = layer.id;
-    session.editSceneLook(next);
   }
 </script>
 
@@ -509,10 +474,21 @@
         <div class="list">
           {#each sourceLayers as layer (layer.id)}
             <div class="source-row">
-              <button type="button" class:on={selectedLayer?.id === layer.id} onclick={() => (selectedLayerId = layer.id)}>
+              <button
+                type="button"
+                class:on={selectedLayer?.id === layer.id}
+                data-tip="Double-click for properties"
+                onclick={() => (selectedLayerId = layer.id)}
+                ondblclick={() => openProperties(layer)}
+              >
                 <span>{layer.name}</span>
-                <span class="kind">{layer.source.type}{layer.visible ? "" : " · hidden"}{layer.locked ? " · locked" : ""}</span>
+                <span class="kind">{layer.source.type}{layer.sourceKey ? " · shared" : ""}{layer.visible ? "" : " · hidden"}{layer.locked ? " · locked" : ""}</span>
               </button>
+              {#if fieldsFromSource(layer.source)}
+                <button type="button" class="desk-btn ghost icon" aria-label="Source properties" data-tip="Properties" onclick={() => openProperties(layer)}>
+                  <Icon name="settings" size={14} />
+                </button>
+              {/if}
               {#if activeScene && !sceneLocked}
                 <button type="button" class="desk-btn ghost" aria-label="Move source up" onclick={() => mutate(reorderLayers(activeScene, layer.id, 1))}>↑</button>
                 <button type="button" class="desk-btn ghost" aria-label="Move source down" onclick={() => mutate(reorderLayers(activeScene, layer.id, -1))}>↓</button>
@@ -548,13 +524,46 @@
           <button type="button" class="desk-btn" disabled={sceneLocked} data-tip="Add scripture layer" onclick={() => void addScriptureLayer()}>Add</button>
         </form>
         <footer class="bar source-add">
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("scripture")}>Scripture</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("camera")}>Camera</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("text")}>Text</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("song")}>Lyrics</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("timer")}>Timer</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("lower-third")}>Lower third</button>
-          <button type="button" class="desk-btn" disabled={sceneLocked} onclick={() => addSource("image")}>Image</button>
+          {#if typeMenu}
+            <div class="type-menu" role="menu" aria-label="Source type">
+              {#each SOURCE_KINDS as kind (kind.type)}
+                <button type="button" role="menuitem" onclick={() => pickType(kind.type)}>{kind.label}</button>
+              {/each}
+            </div>
+          {/if}
+          <button
+            type="button"
+            class="desk-btn icon"
+            class:on={typeMenu}
+            aria-label="Add source"
+            aria-haspopup="menu"
+            aria-expanded={typeMenu}
+            data-tip="Add source"
+            disabled={sceneLocked}
+            onclick={() => (typeMenu = !typeMenu)}
+          >
+            <Icon name="plus" size={16} />
+          </button>
+          <button
+            type="button"
+            class="desk-btn icon"
+            aria-label="Remove source"
+            data-tip="Remove source from this scene"
+            disabled={sceneLocked || !selectedLayer}
+            onclick={removeSelectedSource}
+          >
+            <Icon name="minus" size={16} />
+          </button>
+          <button
+            type="button"
+            class="desk-btn icon"
+            aria-label="Properties of selected source"
+            data-tip="Properties"
+            disabled={!selectedLayer || !fieldsFromSource(selectedLayer.source)}
+            onclick={() => selectedLayer && openProperties(selectedLayer)}
+          >
+            <Icon name="settings" size={16} />
+          </button>
         </footer>
       </section>
       </Pane>
@@ -617,6 +626,29 @@
   {/key}
   {/if}
 </div>
+
+<svelte:window
+  onpointerdown={(event) => {
+    if (typeMenu && !(event.target as Element | null)?.closest?.(".source-add")) typeMenu = false;
+  }}
+  onkeydown={(event) => {
+    if (typeMenu && event.key === "Escape") typeMenu = false;
+  }}
+/>
+
+{#if adding}
+  <AddSourceDialog type={adding} sources={session.sharedSources} oncreate={createNamed} onpick={pickExisting} onclose={() => (adding = null)} />
+{/if}
+{#if editing}
+  <SourceProperties
+    name={editing.name}
+    fields={editing.fields}
+    readonly={editing.readonly}
+    notice={editing.notice}
+    onsave={saveProperties}
+    onclose={() => (editing = null)}
+  />
+{/if}
 
 <style>
   .prod {
@@ -810,7 +842,30 @@
   .scene-name { display: flex; flex-direction: column; gap: 4px; padding: 6px; font-size: 11px; color: var(--muted); }
   .scene-name input { height: var(--control-h); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 0 8px; }
   .empty { margin: 8px; color: var(--muted); font-size: 12px; }
-  .source-add { flex-wrap: wrap; }
+  .source-add { flex-wrap: wrap; position: relative; }
+  .type-menu {
+    position: absolute;
+    left: 6px;
+    bottom: calc(100% + 4px);
+    z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
+    gap: 2px;
+    padding: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  .type-menu button {
+    text-align: left;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--ink);
+    padding: 6px 8px;
+  }
+  .type-menu button:hover, .type-menu button:focus-visible { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   .bar { justify-content: flex-start; gap: 4px; }
   .add { display: flex; gap: 6px; padding: 0 6px 6px; }
   .add input, .dock select, .duration input {
