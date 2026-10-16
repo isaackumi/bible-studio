@@ -338,3 +338,29 @@ describe("library snapshot", () => {
     expect(repaired.themes[1]?.transition).toEqual({ type: "cut", ms: 0 });
   });
 });
+describe("browser store records", () => {
+  it("saves a service held in reactive state (proxied) the way IndexedDB clones it", async () => {
+    const rows: unknown[] = [];
+    const cloning: RecordStore = {
+      ...memoryRecordStore(),
+      async put(_store, row) {
+        rows.push(structuredClone(row)); // IndexedDB uses structured clone; proxies throw here.
+      },
+    };
+    const service: Service = {
+      id: "s1",
+      name: "Sunday",
+      updatedAt: "2026-10-16T00:00:00.000Z",
+      sections: [{ id: "a", name: "Word", items: [{ id: "i", kind: "bible", title: "Romans 8:28" }] }],
+    } as Service;
+    const proxied = new Proxy(service, {
+      get(target, key, receiver) {
+        const value = Reflect.get(target, key, receiver);
+        return value && typeof value === "object" ? new Proxy(value, {}) : value;
+      },
+    });
+    await createLibrary(async () => cloning).saveService(proxied);
+    expect(rows).toHaveLength(1);
+    expect((rows[0] as Service).sections[0]?.items[0]?.title).toBe("Romans 8:28");
+  });
+});

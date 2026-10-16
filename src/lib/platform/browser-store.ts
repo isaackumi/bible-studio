@@ -262,7 +262,10 @@ export function createLibrary(getStore: () => Promise<RecordStore>): BrowserLibr
   const save = async <T extends { id: string }>(store: StoreName, value: T) => {
     const database = await records();
     const rows = await database.list<T>(store);
-    await database.put(store, { ...value, ordinal: nextOrdinal(rows) });
+    // Records are JSON documents (SQLite stores the same JSON on desktop). A deep plain copy
+    // also strips Svelte state proxies, which IndexedDB's structured clone rejects.
+    const plain = JSON.parse(JSON.stringify(value)) as T;
+    await database.put(store, { ...plain, ordinal: nextOrdinal(rows) });
   };
   return {
     async songs() {

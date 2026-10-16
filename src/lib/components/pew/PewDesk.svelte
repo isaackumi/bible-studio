@@ -998,7 +998,7 @@
             {#if note}<p class="script-note">{note}</p>{/if}
             <div class="slide-row">
               {#each visibleSlides as item, index (item.id)}
-                <button type="button" class="card" class:hot={index % 3 !== 2} class:cool={index % 3 === 2} onclick={() => open(item)}>
+                <button type="button" class="card" class:hot={index % 3 !== 2} class:cool={index % 3 === 2} onclick={(event) => { event.currentTarget.blur(); open(item); }}>
                   <strong>{item.title}</strong>
                   <span>{item.kind === "announcement" ? "Announcement" : "Slide"}</span>
                 </button>
@@ -1030,7 +1030,7 @@
             {:else if visibleSlides.length > 0}
               <div class="display-grid">
                 {#each visibleSlides.slice(0, 4) as item, index (item.id)}
-                  <button type="button" class="tile" class:cool={index % 2 === 0} class:hot={index % 2 === 1} onclick={() => open(item)}>
+                  <button type="button" class="tile" class:cool={index % 2 === 0} class:hot={index % 2 === 1} onclick={(event) => { event.currentTarget.blur(); open(item); }}>
                     {item.title}
                   </button>
                 {/each}
@@ -1090,7 +1090,7 @@
                     </header>
                     <div class="pb-body queue">
                       {#each queue as item (item.id)}
-                        <button type="button" class:on={session.cursor.itemId === item.id} onclick={() => open(item)}>{item.title}</button>
+                        <button type="button" class:on={session.cursor.itemId === item.id} onclick={(event) => { event.currentTarget.blur(); open(item); }}>{item.title}</button>
                       {/each}
                     </div>
                   </section>
