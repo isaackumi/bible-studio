@@ -812,9 +812,9 @@
             <p>{operatorNotes || "Notes for this section stay here. They are not on Preview or Program."}</p>
           </article>
           <header><span class="kicker">Preview</span></header>
-          <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
-          <div class="monitor"><Screen model={session.live.program.model} /></div>
+          <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
         </aside>
       </div>
     </section>
@@ -882,9 +882,9 @@
               <button type="button" aria-label="Next section" onclick={() => session.stepSong(1)}>Next</button>
             </span>
           </header>
-          <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
+          <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
           <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
-          <div class="monitor"><Screen model={session.live.program.model} /></div>
+          <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
         </aside>
       </div>
     </section>
@@ -1039,7 +1039,7 @@
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
                 </section>
               </Pane>
             </PaneGroup>
@@ -1062,7 +1062,7 @@
                       {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
                     </button>
                   </header>
-                  <div class="monitor main"><Screen model={session.live.program.model} /></div>
+                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
                   <footer class="output-tools">
                     <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
                     <span class="steppers">

@@ -938,7 +938,7 @@
         onpointerup={endDrag}
         onpointercancel={endDrag}
       >
-        <Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview">
+        <Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds}>
           {#snippet overlay()}
             {#if draft && session.live.preview.model.layout === "composition"}
               {#each draft.layers.filter((layer) => layer.visible) as layer (layer.id)}
@@ -987,7 +987,7 @@
         </Screen>
       </div>
       <header><span class="kicker program">{#if session.output.online}<span class="pip on"></span>{/if}Program</span></header>
-      <div class="monitor"><Screen model={session.live.program.model} /></div>
+      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
     </aside>
   </div>
 </section>

@@ -365,7 +365,7 @@
         <span class="kicker">Preview</span>
         <span class="meta">{sceneName}</span>
       </header>
-      <div class="well"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
+      <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
       <footer>
         <span>{previewLabel}</span>
         <button type="button" class="desk-btn" data-tip="Theme" onclick={() => (session.settingsOpen = true)}>Properties</button>
@@ -405,7 +405,7 @@
         <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}Program</span>
         <span class="meta">{programLabel}</span>
       </header>
-      <div class="well"><Screen model={session.live.program.model} /></div>
+      <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
       <footer>
         <span>{session.live.program.model.reference || "Audience sees this frame."}</span>
       </footer>

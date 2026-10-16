@@ -3,13 +3,16 @@ import { applyProgramAction, createLiveState } from "./live";
 import { defaultTheme } from "./theme";
 import {
   cameraDeniedMessage,
+  cameraDeviceId,
   cameraFeedForLayer,
+  camerasIn,
+  camerasNeeded,
   cameraSourceId,
   listVideoInputs,
   openCamera,
+  planFeeds,
   presentCamera,
   previewCameraLive,
-  previewShowsCamera,
 } from "./camera";
 import {
   assignLayerSource,
@@ -83,43 +86,57 @@ describe("camera sources", () => {
 });
 
 describe("camera composition feeds", () => {
-  const stream = { id: "preview-stream" };
+  const stream = { id: "stream-1" };
 
-  it("shows a live feed on Preview for a camera source or a camera composition layer", () => {
-    const card = presentCamera({ theme, label: "Cam 1" });
-    expect(previewShowsCamera(card, "camera:1")).toBe(true);
-    expect(previewShowsCamera(card, null)).toBe(false);
-    let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "camera-lower-third")!, "Look");
+  function twoCameraLook() {
+    let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "two-cameras")!, "Look");
     composition = assignLayerSource(composition, composition.layers[0]!.id, sourceRef("camera", "cam-1", "Camera 1"));
-    const painted = presentComposition(composition, { theme, now: 0 });
-    expect(painted.layers?.[0]?.sourceId).toBe("camera:cam-1");
-    expect(previewShowsCamera(painted, composition.id)).toBe(true);
-    expect(previewShowsCamera(presentCamera({ theme, label: "Cam" }), "composition:x")).toBe(false);
+    composition = assignLayerSource(composition, composition.layers[1]!.id, sourceRef("camera", "cam-2", "Camera 2"));
+    return composition;
+  }
+
+  it("lists the cameras a frame uses: its own camera source and every camera layer, once each", () => {
+    const card = presentCamera({ theme, label: "Cam 1" });
+    expect(camerasIn(card, "camera:1")).toEqual(["camera:1"]);
+    expect(camerasIn(card, null)).toEqual([]);
+    const painted = presentComposition(twoCameraLook(), { theme, now: 0 });
+    expect(camerasIn(painted, "composition:x")).toEqual(["camera:cam-1", "camera:cam-2"]);
+    expect(camerasIn(presentCamera({ theme, label: "Cam" }), "composition:x")).toEqual([]);
   });
 
-  it("attaches the MediaStream only on the Preview surface", () => {
-    expect(cameraFeedForLayer("camera:cam-1", "camera:cam-1", stream, "preview")).toEqual(stream);
-    expect(cameraFeedForLayer("camera:cam-1", "camera:cam-1", stream, "program")).toBeNull();
-    expect(cameraFeedForLayer("camera:cam-1", "camera:cam-1", stream, "audience")).toBeNull();
-    expect(cameraFeedForLayer("camera:other", "camera:cam-1", stream, "preview")).toBeNull();
-    expect(cameraFeedForLayer("scripture:john", "camera:cam-1", stream, "preview")).toBeNull();
+  it("needs the union of Preview and Program cameras", () => {
+    let live = createLiveState(theme);
+    live = previewCameraLive(live, presentCamera({ theme, label: "A" }), "camera:a");
+    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
+    live = previewCameraLive(live, presentCamera({ theme, label: "B" }), "camera:b");
+    expect(camerasNeeded(live).sort()).toEqual(["camera:a", "camera:b"]);
   });
 
-  it("opening a camera onto a composition writes Preview and never puts a stream on Program", () => {
-    let composition = instantiateTemplate(COMPOSITION_TEMPLATES.find((entry) => entry.id === "camera-lower-third")!, "Look");
-    composition = assignLayerSource(
-      composition,
-      composition.layers[0]!.id,
-      sourceRef("camera", "cam-1", "Camera 1", { deviceId: "cam-1", label: "Camera 1" }),
-    );
+  it("plans which feeds to open and which to close", () => {
+    expect(planFeeds(["camera:a", "camera:b"], ["camera:b", "camera:c"])).toEqual({ open: ["camera:c"], close: ["camera:a"] });
+    expect(planFeeds(["camera:a"], ["camera:a"])).toEqual({ open: [], close: [] });
+  });
+
+  it("finds a layer's feed in the feed map on any surface", () => {
+    const feeds = { "camera:cam-1": stream };
+    expect(cameraFeedForLayer("camera:cam-1", feeds)).toEqual(stream);
+    expect(cameraFeedForLayer("camera:other", feeds)).toBeNull();
+    expect(cameraFeedForLayer("scripture:john", feeds)).toBeNull();
+    expect(cameraFeedForLayer(undefined, feeds)).toBeNull();
+  });
+
+  it("reads the device id back out of a camera source id", () => {
+    expect(cameraDeviceId(cameraSourceId("abc:123"))).toBe("abc:123");
+  });
+
+  it("TAKE copies a camera look to Program as data; the packet never carries a stream", () => {
+    const composition = twoCameraLook();
     let live = createLiveState(theme);
     const program = live.program;
     live = previewComposition(live, presentComposition(composition, { theme, now: 0 }), composition.id);
-    expect(live.preview.model.layers?.[0]?.sourceId).toBe(cameraSourceId("cam-1"));
     expect(live.program).toEqual(program);
     const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
-    expect(taken.program.model.layers?.[0]?.model.attribution).toBe("Camera");
-    expect(taken.program.model).not.toHaveProperty("stream");
-    expect(cameraFeedForLayer(taken.program.model.layers?.[0]?.sourceId, cameraSourceId("cam-1"), stream, "audience")).toBeNull();
+    expect(camerasIn(taken.program.model, taken.program.sourceId)).toEqual(["camera:cam-1", "camera:cam-2"]);
+    expect(JSON.parse(JSON.stringify(taken.program.model))).toEqual(taken.program.model);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptProgramPacket, claimOwner, publishTo, readPacket, type OutputOwner, type PacketStore } from "./channel";
+import { acceptProgramPacket, claimOwner, parseStandby, publishTo, readPacket, type OutputOwner, type PacketStore } from "./channel";
 import { createLiveState, frame, programPacket } from "../domain/live";
 import { defaultTheme, emptyModel } from "../domain/theme";
 import type { ProgramPacket } from "../domain/types";
@@ -62,5 +62,14 @@ describe("program ownership", () => {
     };
     expect(() => publishTo(failing, packet("operator-a", 1, 3))).toThrow("disk full");
     expect(readPacket(store)?.revision).toBe(2);
+  });
+});
+
+describe("camera standby", () => {
+  it("keeps only camera source ids and survives bad input", () => {
+    expect(parseStandby(JSON.stringify(["camera:a", "scripture:x", 3, "camera:b"]))).toEqual(["camera:a", "camera:b"]);
+    expect(parseStandby(null)).toEqual([]);
+    expect(parseStandby("{nope")).toEqual([]);
+    expect(parseStandby(JSON.stringify({ a: 1 }))).toEqual([]);
   });
 });

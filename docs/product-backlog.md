@@ -295,7 +295,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Architectural impact.** Native/service boundary later. Not inside `PewDesk.svelte`. See [architecture/media-sources.md](architecture/media-sources.md).
 
-**Dependencies.** CS-P0-001, CS-P0-006, CS-P0-005. **Status.** Partial. `getUserMedia` video on Preview. Take copies the camera card onto Program. Permission denied is a desk message. Listen stays audio. Not shipped until a real camera is tested.
+**Dependencies.** CS-P0-001, CS-P0-006, CS-P0-005. **Status.** Partial. `getUserMedia` video on Preview, Program monitors, and the audience window (one feed per camera in use; audience opens its own feeds and warms Preview cameras on standby). Browser verified with a fake device. Permission denied is a desk message. Listen stays audio. Not shipped until a real camera is tested.
 
 **Phase.** D.
 
@@ -343,7 +343,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Full-frame camera card with a lower-third layer. Configure → Preview → LIVE.
 
-**Status.** Partial. Template and paint. Real camera pixels in the region wait on CS-P1-005.
+**Status.** Partial. Template and paint. Live camera pixels in the region on Preview, Program, and the audience window; desktop real-camera run pending.
 
 **Phase.** D.
 
@@ -351,7 +351,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Two-region template. Sources assigned to slots, not a hardcoded left/right kind.
 
-**Status.** Partial. `lookScriptureCamera` fills the split (last Preview verse + first camera). Camera pixels Preview-only.
+**Status.** Partial. `lookScriptureCamera` fills the split (last Preview verse + first camera). Live camera pixels on Preview, Program, and the audience window; desktop real-camera run pending.
 
 **Phase.** D.
 
@@ -359,7 +359,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Same regions as CS-P1-012 with a lyric source.
 
-**Status.** Partial. `lookLyricsCamera` fills the split (last Preview song section + first camera). Camera pixels Preview-only.
+**Status.** Partial. `lookLyricsCamera` fills the split (last Preview song section + first camera). Live camera pixels on Preview, Program, and the audience window; desktop real-camera run pending.
 
 **Phase.** D.
 
@@ -367,7 +367,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 **Description.** Countdown, count-up, clock, target time. Domain state. Local ticks in FrameView. Program only via LIVE.
 
-**Status.** Partial. `timer.ts`, timer layout, Camera + Countdown look, full countdown with count-up, clock, and target time in Looks. Local ticks in FrameView. Camera pixels Preview-only.
+**Status.** Partial. `timer.ts`, timer layout, Camera + Countdown look, full countdown with count-up, clock, and target time in Looks. Local ticks in FrameView. Live camera pixels on Preview, Program, and the audience window; desktop real-camera run pending.
 
 **Phase.** D.
 

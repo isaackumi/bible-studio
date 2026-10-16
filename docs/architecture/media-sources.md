@@ -42,17 +42,19 @@ compileSource → PresentationModel
 Composition layer
 ```
 
-`presentCamera` is the stand-in paint until a real capture is wired into a layer. Composition `FrameView` does not receive `MediaStream`. `AudienceOutput` never does. See [composition-engine.md](composition-engine.md).
+`presentCamera` is the card painted under every camera region. Live video fades in over it once frames arrive, so a slow or failed camera shows the card, not black. Packets never carry a `MediaStream`; each window opens its own feeds. See [composition-engine.md](composition-engine.md).
 
 ## Camera (partial)
 
-Browser and desktop webview: `navigator.mediaDevices.getUserMedia` with `{ audio: false, video }`. Settings → Media lists cameras. Select → Preview (`previewCameraLive` / `setPreview`). LIVE copies the compiled camera card onto Program. Operator Preview may show the live `MediaStream`. `AudienceOutput` does not receive the stream. Permission denied and missing devices are desk messages. Listen in `src/lib/voice/listen.ts` stays audio-only and must not Take.
+Browser and desktop webview: `navigator.mediaDevices.getUserMedia` with `{ audio: false, video }`. Settings → Media lists cameras. Select → Preview (`previewCameraLive` / `setPreview`). LIVE copies the compiled frame onto Program. Permission denied and missing devices are desk messages. Listen in `src/lib/voice/listen.ts` stays audio-only and must not Take.
 
 Production Desk camera sources are named shared sources with a device and a mirror setting (Properties dialog). Mirror flips the `<video>` only. The Properties thumbnail opens its own short-lived stream and stops it on close.
 
-Capture lives in `session.previewCamera` and Looks (`previewLook` opens a matching camera feed). Not in `PewDesk.svelte`.
+The operator keeps one feed per camera that Preview or Program paints (`session.cameraFeeds`, reconciled by `camerasNeeded` + `planFeeds` on every live write) and stops feeds nobody paints. Preview and Program monitors both show pixels. Not in `PewDesk.svelte`.
 
-A composition camera layer uses the same feed: `cameraFeedForLayer(..., "preview")`. Operator Preview may show the `MediaStream` inside that region. Program monitors and `AudienceOutput` never receive the stream; they paint `presentCamera`. See [composition-engine.md](composition-engine.md).
+A composition camera layer looks its feed up by source id: `cameraFeedForLayer(sourceId, feeds)`.
+
+Audience window: `AudienceOutput` opens its own feed (same `deviceId`) for every camera the Program packet paints. The operator also publishes a **standby** list — the cameras on Preview — through `church-studio.camera-standby` (browser: localStorage + `storage` event) or the `camera-standby` Tauri event (desktop). The audience opens standby cameras early but paints them only once Program uses them, so TAKE does not wait for a cold camera. Desktop audience webviews may ask for camera permission once.
 
 Not claimed shipped until a real camera is tested.
 

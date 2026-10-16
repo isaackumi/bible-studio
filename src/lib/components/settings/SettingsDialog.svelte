@@ -543,7 +543,7 @@
       {:else if section === "media"}
         <section class="card">
           <h3>Pictures</h3>
-          <p class="note">Import stays on this computer. Preview and Use as logo do not change Program. A camera is Preview only until LIVE. Permission denied is a desk message. A missing picture shows the empty frame instead of crashing. Audience Program is the camera card until a video sink exists.</p>
+          <p class="note">Import stays on this computer. Preview and Use as logo do not change Program. A camera reaches Program and the audience only on LIVE. Permission denied is a desk message. A missing picture shows the empty frame instead of crashing. If the audience window cannot open a camera, it shows the camera card.</p>
           <MediaPane />
         </section>
       {:else if section === "audio"}

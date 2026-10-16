@@ -82,10 +82,59 @@ export function readLocal(): ProgramPacket | null {
   return readPacket(localStorage);
 }
 
+/**
+ * BroadcastChannel can drop a message posted just before the sender closes it, so the
+ * `storage` event on the same key is the reliable path. Duplicates are fine: revisions gate them.
+ */
 export function subscribeLocal(onFrame: (packet: ProgramPacket) => void) {
   const channel = new BroadcastChannel(NAME);
   channel.onmessage = (event) => {
     if (event.data?.frame) onFrame(event.data as ProgramPacket);
   };
-  return () => channel.close();
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== KEY) return;
+    const packet = readPacket(localStorage);
+    if (packet) onFrame(packet);
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    channel.close();
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+const STANDBY_KEY = "church-studio.camera-standby";
+
+/** Camera source ids the audience may open ahead of TAKE. Never rendered until Program uses them. */
+export function parseStandby(raw: string | null): string[] {
+  try {
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string" && id.startsWith("camera:")) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function publishStandbyLocal(ids: string[]) {
+  localStorage.setItem(STANDBY_KEY, JSON.stringify(ids));
+  const channel = new BroadcastChannel(STANDBY_KEY);
+  channel.postMessage(ids);
+  channel.close();
+}
+
+export function readStandbyLocal(): string[] {
+  return parseStandby(localStorage.getItem(STANDBY_KEY));
+}
+
+export function subscribeStandbyLocal(onStandby: (ids: string[]) => void) {
+  const channel = new BroadcastChannel(STANDBY_KEY);
+  channel.onmessage = (event) => onStandby(parseStandby(JSON.stringify(event.data)));
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === STANDBY_KEY) onStandby(parseStandby(event.newValue));
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    channel.close();
+    window.removeEventListener("storage", onStorage);
+  };
 }

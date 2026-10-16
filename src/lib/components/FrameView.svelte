@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cameraFeedForLayer } from "../domain/camera";
+  import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
   import { displayWash } from "../domain/backgrounds";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PresentationModel } from "../domain/types";
@@ -8,22 +8,26 @@
   let {
     model,
     stream = null,
+    feeds = {},
     nested = false,
-    cameraFeedId = null,
     mirror = false,
   }: {
     model: PresentationModel;
+    /** Live pixels for this frame's own camera source. */
     stream?: MediaStream | null;
+    /** Open camera feeds by camera source id, resolved per composition layer. */
+    feeds?: CameraFeeds<MediaStream>;
     nested?: boolean;
-    cameraFeedId?: string | null;
     mirror?: boolean;
   } = $props();
   let video = $state<HTMLVideoElement | undefined>();
+  let playing = $state(false);
   let now = $state(0);
 
   $effect(() => {
     const node = video;
     if (!node) return;
+    playing = false;
     node.srcObject = stream ?? null;
     return () => {
       node.srcObject = null;
@@ -100,13 +104,10 @@
           model={layer.model}
           nested
           mirror={layer.mirror ?? false}
-          cameraFeedId={cameraFeedId}
-          stream={cameraFeedForLayer(layer.sourceId, cameraFeedId, stream, "preview") as MediaStream | null}
+          stream={cameraFeedForLayer(layer.sourceId, feeds)}
         />
       </div>
     {/each}
-  {:else if stream}
-    <video bind:this={video} class="cover" class:mirror autoplay muted playsinline></video>
   {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}
@@ -125,5 +126,9 @@
         <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
       {/if}
     </div>
+  {/if}
+  {#if stream && model.layout !== "composition"}
+    <!-- The camera card stays underneath until real frames arrive, so a slow or failed camera never shows black. -->
+    <video bind:this={video} class="cover live" class:ready={playing} class:mirror autoplay muted playsinline onplaying={() => (playing = true)}></video>
   {/if}
 </div>

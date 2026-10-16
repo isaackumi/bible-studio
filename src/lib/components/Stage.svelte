@@ -9,12 +9,12 @@
   {#if part === "preview"}
     <div class="well preview-well">
       <div class="well-label"><span>Preview</span><span>Preparing</span></div>
-      <div class="mat"><Screen model={session.live.preview.model} stream={session.cameraStream} sourceId={session.live.preview.sourceId} cameraFeedId={session.cameraFeedId} surface="preview" /></div>
+      <div class="mat"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
     </div>
   {:else}
     <div class="well program-well">
       <div class="well-label"><span>Program</span><span class="lamp" aria-hidden="true"></span></div>
-      <div class="mat"><Screen model={session.live.program.model} /></div>
+      <div class="mat"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
     </div>
   {/if}
 </section>

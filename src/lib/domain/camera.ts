@@ -32,24 +32,37 @@ export function isCameraSource(sourceId: string | null | undefined) {
   return !!sourceId?.startsWith("camera:");
 }
 
-export type CameraSurface = "preview" | "program" | "audience";
-
-/** Operator Preview may show pixels. Program and audience paint the camera card. */
-export function previewShowsCamera(model: PresentationModel, sourceId: string | null | undefined): boolean {
-  if (isCameraSource(sourceId)) return true;
-  return (model.layers ?? []).some((layer) => isCameraSource(layer.sourceId));
+export function cameraDeviceId(sourceId: string) {
+  return sourceId.startsWith("camera:") ? sourceId.slice("camera:".length) : sourceId;
 }
 
-export function cameraFeedForLayer(
-  sourceId: string | undefined,
-  feedId: string | null | undefined,
-  stream: unknown,
-  surface: CameraSurface,
-): unknown | null {
-  if (surface !== "preview") return null;
-  if (!stream || !sourceId || sourceId !== feedId) return null;
-  if (!isCameraSource(sourceId)) return null;
-  return stream;
+/** Open camera feeds keyed by camera source id (`camera:{deviceId}`). */
+export type CameraFeeds<T = unknown> = Record<string, T>;
+
+/** Camera source ids a frame paints: its own camera source plus every visible camera layer. */
+export function camerasIn(model: PresentationModel, sourceId: string | null | undefined): string[] {
+  const ids = new Set<string>();
+  if (isCameraSource(sourceId)) ids.add(sourceId!);
+  for (const layer of model.layers ?? []) if (isCameraSource(layer.sourceId)) ids.add(layer.sourceId);
+  return [...ids];
+}
+
+/** Cameras the operator must keep open: whatever Preview or Program paints. */
+export function camerasNeeded(live: LiveState): string[] {
+  return [...new Set([...camerasIn(live.preview.model, live.preview.sourceId), ...camerasIn(live.program.model, live.program.sourceId)])];
+}
+
+export function planFeeds(open: string[], needed: string[]): { open: string[]; close: string[] } {
+  return {
+    open: needed.filter((id) => !open.includes(id)),
+    close: open.filter((id) => !needed.includes(id)),
+  };
+}
+
+/** Any surface given a feed map may show pixels; a missing feed paints the camera card. */
+export function cameraFeedForLayer<T>(sourceId: string | null | undefined, feeds: CameraFeeds<T>): T | null {
+  if (!sourceId || !isCameraSource(sourceId)) return null;
+  return feeds[sourceId] ?? null;
 }
 
 export function listVideoInputs(devices: MediaDeviceInfoLike[]): CameraDevice[] {

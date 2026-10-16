@@ -1,9 +1,9 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
-import { claimOwner, controlsOutput, publishLocal, readOwner } from "../display/channel";
+import { claimOwner, controlsOutput, publishLocal, publishStandbyLocal, readOwner } from "../display/channel";
 import { browserAudienceState, openBrowserAudience } from "../display/output";
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
@@ -37,8 +37,13 @@ import {
 import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText } from "../domain/present";
 import {
+  cameraDeviceId,
+  camerasIn,
+  camerasNeeded,
   cameraSourceId,
   cameraUnavailableMessage,
+  planFeeds,
+  type CameraFeeds,
   listVideoInputs,
   openCamera,
   presentCamera,
@@ -146,8 +151,10 @@ class Session {
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   media = $state<MediaAsset[]>([]);
   cameras = $state<CameraDevice[]>([]);
-  cameraStream = $state<MediaStream | null>(null);
-  cameraFeedId = $state<string | null>(null);
+  /** Open feeds by camera source id: one per camera Preview or Program paints. */
+  cameraFeeds = $state.raw<CameraFeeds<MediaStream>>({});
+  private openingFeeds = new Map<string, Promise<boolean>>();
+  private standbySent = "";
   cameraNote = $state("");
   /** Last look put on Preview (saved or draft). Used so TAKE can read its transition before Save. */
   lookOnPreview = $state<Composition | null>(null);
@@ -155,7 +162,16 @@ class Session {
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
   cursor = $state<Cursor>({ sectionId: null, itemId: null });
-  live = $state<LiveState>(createLiveState(defaultTheme()));
+  #live = $state<LiveState>(createLiveState(defaultTheme()));
+  get live(): LiveState {
+    return this.#live;
+  }
+  /** Every Preview/Program write keeps camera feeds and the audience standby list in step. */
+  set live(next: LiveState) {
+    this.#live = next;
+    void this.syncCameraFeeds();
+    this.publishStandby();
+  }
   output = $state<OutputStatus>({
     desired: false,
     online: false,
@@ -347,7 +363,7 @@ class Session {
     this.unlisten?.();
     this.unlistenRemote?.();
     this.unlistenLan?.();
-    this.releaseCamera();
+    this.releaseCameras();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
 
@@ -716,9 +732,6 @@ class Session {
     this.lookOnPreview = clean;
     const model = presentComposition(clean, { theme: this.theme(), now: Date.now() });
     this.live = previewComposition(this.live, model, clean.id);
-    const camera = clean.layers.find((layer) => layer.visible && layer.source.type === "camera");
-    if (camera) void this.ensureCameraFeed(camera.source.id);
-    else this.releaseCamera();
     this.message = `${clean.name} is on Preview. LIVE still sends Program.`;
   };
 
@@ -1274,49 +1287,88 @@ class Session {
   };
 
   previewCamera = async (deviceId: string) => {
-    const ok = await this.openCameraFeed(deviceId);
+    const ok = await this.openFeed(cameraSourceId(deviceId));
     if (!ok) return;
     const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
     this.live = previewCameraLive(this.live, presentCamera({ theme: this.theme(), label }), cameraSourceId(deviceId));
     this.message = `${label} is on Preview. LIVE still sends Program.`;
   };
 
-  private ensureCameraFeed = async (deviceId: string) => {
-    const ok = await this.openCameraFeed(deviceId);
-    if (!ok) return;
-    const label = this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "Camera";
-    this.message = `${label} is on Preview. LIVE still sends Program.`;
-  };
-
-  private openCameraFeed = async (deviceId: string): Promise<boolean> => {
+  /** Open a feed for a camera source id. Errors become the desk camera note; Program is never touched. */
+  private openFeed = (id: string): Promise<boolean> => {
+    if (this.cameraFeeds[id]) return Promise.resolve(true);
+    const pending = this.openingFeeds.get(id);
+    if (pending) return pending;
     const media = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
     if (!media?.getUserMedia) {
       this.cameraNote = cameraUnavailableMessage();
       this.message = this.cameraNote;
-      return false;
+      return Promise.resolve(false);
     }
-    if (this.cameraFeedId === cameraSourceId(deviceId) && this.cameraStream) return true;
-    this.releaseCamera();
-    try {
-      const stream = (await openCamera(media, deviceId)) as MediaStream;
-      this.cameraStream = stream;
-      this.cameraFeedId = cameraSourceId(deviceId);
-      await this.loadCameras();
-      this.cameraNote = "";
-      return true;
-    } catch (error) {
-      this.cameraStream = null;
-      this.cameraFeedId = null;
-      this.cameraNote = error instanceof Error ? error.message : cameraUnavailableMessage();
-      this.message = this.cameraNote;
-      return false;
+    const opening = (async () => {
+      try {
+        const stream = (await openCamera(media, cameraDeviceId(id))) as MediaStream;
+        this.cameraFeeds = { ...this.cameraFeeds, [id]: stream };
+        this.cameraNote = "";
+        if (!this.cameras.length) await this.loadCameras();
+        return true;
+      } catch (error) {
+        this.cameraNote = error instanceof Error ? error.message : cameraUnavailableMessage();
+        this.message = this.cameraNote;
+        return false;
+      } finally {
+        this.openingFeeds.delete(id);
+      }
+    })();
+    this.openingFeeds.set(id, opening);
+    return opening;
+  };
+
+  /** Keep exactly the feeds Preview or Program paint. Closing a feed stops its tracks. */
+  private syncCameraFeeds = async () => {
+    const needed = camerasNeeded(this.live);
+    const plan = planFeeds(Object.keys(this.cameraFeeds), needed);
+    if (plan.close.length) {
+      const next = { ...this.cameraFeeds };
+      for (const id of plan.close) {
+        stopCameraStream(next[id]);
+        delete next[id];
+      }
+      this.cameraFeeds = next;
+    }
+    await Promise.all(plan.open.map((id) => this.openFeed(id)));
+    // A feed that finished opening after its frame left Preview and Program is closed again.
+    const stale = Object.keys(this.cameraFeeds).filter((id) => !camerasNeeded(this.live).includes(id));
+    if (stale.length) {
+      const next = { ...this.cameraFeeds };
+      for (const id of stale) {
+        stopCameraStream(next[id]);
+        delete next[id];
+      }
+      this.cameraFeeds = next;
     }
   };
 
-  private releaseCamera = () => {
-    stopCameraStream(this.cameraStream);
-    this.cameraStream = null;
-    this.cameraFeedId = null;
+  private releaseCameras = () => {
+    for (const stream of Object.values(this.cameraFeeds)) stopCameraStream(stream);
+    this.cameraFeeds = {};
+  };
+
+  /** Tell the audience window which Preview cameras to warm up. It never paints them before TAKE. */
+  private publishStandby = () => {
+    if (typeof window === "undefined") return;
+    const ids = camerasIn(this.live.preview.model, this.live.preview.sourceId);
+    const key = JSON.stringify(ids);
+    if (key === this.standbySent) return;
+    this.standbySent = key;
+    if (isDesktop()) void emit("camera-standby", ids).catch(() => {});
+    else {
+      try {
+        publishStandbyLocal(ids);
+      } catch {
+        // Storage can be unavailable (private mode); standby is only a warm-up.
+      }
+    }
   };
 
   importImage = async (source: string | File) => {
