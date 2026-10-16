@@ -229,7 +229,7 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
     let previous = lock(&output.signature).clone();
     let needs_place = previous != signature
         || !window.is_visible().unwrap_or(false)
-        || (!fullscreen && !frame_matches(&window, monitor));
+        || !frame_matches(&window, monitor);
     if needs_place {
         if release_native_fullscreen(&window, &output) {
             log::info!("AUDIENCE_LEAVE_FULLSCREEN");
@@ -237,10 +237,9 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         }
         place(&window, monitor, fullscreen)?;
         window.show().map_err(|e| e.to_string())?;
-        if !fullscreen {
-            // Do not focus the operator. Focusing it can pull the audience window back.
-            join_active_space(&window)?;
-        }
+        // Both modes are a dedicated output: above the menu bar and Dock of that display.
+        // Do not focus the operator. Focusing it can pull the audience window back.
+        join_active_space(&window)?;
         let (x, y, width, height) = screen_frame(monitor);
         log::info!("AUDIENCE_PLACED name={name} mode={mode} logical={x},{y} {width}x{height}");
     }
@@ -275,15 +274,7 @@ fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
         return Ok(true);
     }
     window.set_decorations(false).map_err(|e| e.to_string())?;
-    window
-        .set_position(LogicalPosition::new(x as f64, y as f64))
-        .map_err(|e| e.to_string())?;
-    window
-        .set_size(LogicalSize::new(width as f64, height as f64))
-        .map_err(|e| e.to_string())?;
-    if fullscreen {
-        join_active_space(&window)?;
-    }
+    cover_cocoa_frame(&window, (x as f64, y as f64, width as f64, height as f64))?;
     window.show().map_err(|e| e.to_string())?;
     join_active_space(&window)?;
     log::info!("AUDIENCE_PLACE cg-points={x},{y} {width}x{height} fullscreen={fullscreen}");
@@ -346,8 +337,10 @@ fn external_display_points() -> Option<(i32, i32, u32, u32)> {
         fn CGGetOnlineDisplayList(max_displays: u32, displays: *mut u32, count: *mut u32) -> i32;
         fn CGDisplayBounds(display: u32) -> CgRect;
         fn CGDisplayIsMain(display: u32) -> u32;
+        fn CGMainDisplayID() -> u32;
     }
     unsafe {
+        let main_height = CGDisplayBounds(CGMainDisplayID()).size.height;
         let mut ids = [0u32; 8];
         let mut count = 0u32;
         if CGGetOnlineDisplayList(8, ids.as_mut_ptr(), &mut count) != 0 || count < 2 {
@@ -358,9 +351,11 @@ fn external_display_points() -> Option<(i32, i32, u32, u32)> {
                 continue;
             }
             let bounds = CGDisplayBounds(id);
+            // CoreGraphics is top-left; AppKit window frames are bottom-left.
+            let cocoa_y = top_left_to_cocoa_y(bounds.origin.y, bounds.size.height, main_height);
             return Some((
                 bounds.origin.x.round() as i32,
-                bounds.origin.y.round() as i32,
+                cocoa_y.round() as i32,
                 bounds.size.width.round() as u32,
                 bounds.size.height.round() as u32,
             ));
@@ -438,7 +433,8 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
     if let Some(window) = app.get_webview_window("audience") {
         return Ok(window);
     }
-    let (x, y, width, height) = screen_frame(monitor);
+    // The builder takes top-left coordinates; place() then sets the exact AppKit frame.
+    let (x, y, width, height) = logical_frame(monitor);
     audience_window(app)
         .position(x, y)
         .inner_size(width, height)
@@ -447,21 +443,50 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
 }
 
 fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<(), String> {
-    let (x, y, width, height) = screen_frame(monitor);
     window.set_decorations(false).map_err(|e| e.to_string())?;
     window
         .set_visible_on_all_workspaces(true)
         .map_err(|e| e.to_string())?;
     // Cover the display with a borderless window. AppKit aborts if the fullscreen
     // style bit is cleared outside a fullscreen transition.
-    window
-        .set_position(LogicalPosition::new(x, y))
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(frame) = ns_screen_frame(monitor) {
+            cover_cocoa_frame(window, frame)?;
+            let (x, y, width, height) = frame;
+            log::info!("AUDIENCE_PLACE cocoa={x},{y} {width}x{height} fullscreen={fullscreen}");
+            return Ok(());
+        }
+    }
+    let (x, y, width, height) = logical_frame(monitor);
     window
         .set_size(LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
+    window
+        .set_position(LogicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
     log::info!("AUDIENCE_PLACE logical={x},{y} {width}x{height} fullscreen={fullscreen}");
     Ok(())
+}
+
+/// Set the window to an AppKit frame (points, bottom-left origin) in one call.
+/// Using NSScreen.frame end to end avoids two bugs of the tao path: its top-left Y
+/// misplaced displays that are not top-aligned with the main screen, and resizing
+/// after moving kept the bottom-left fixed, shifting the top edge.
+#[cfg(target_os = "macos")]
+fn cover_cocoa_frame(window: &WebviewWindow, frame: (f64, f64, f64, f64)) -> Result<(), String> {
+    use objc2_app_kit::NSWindow;
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+    let pointer = window.ns_window().map_err(|e| e.to_string())?;
+    let ns_window = unsafe { &*(pointer as *const NSWindow) };
+    let (x, y, width, height) = frame;
+    ns_window.setFrame_display(NSRect::new(NSPoint::new(x, y), NSSize::new(width.max(1.0), height.max(1.0))), true);
+    Ok(())
+}
+
+/// Convert a top-left-origin Y (CoreGraphics, tao) to AppKit's bottom-left origin.
+fn top_left_to_cocoa_y(top_left_y: f64, height: f64, main_height: f64) -> f64 {
+    main_height - (top_left_y + height)
 }
 
 /// AppKit window points. Tao's monitor frame is not always the same origin as NSScreen.
@@ -511,17 +536,19 @@ fn ns_screen_frame(monitor: &Monitor) -> Option<(f64, f64, f64, f64)> {
     use objc2_app_kit::NSScreen;
 
     let marker = MainThreadMarker::new()?;
-    let (x, _, width, _) = logical_frame(monitor);
+    let (x, y, width, _) = logical_frame(monitor);
+    let screens = NSScreen::screens(marker);
+    // The first screen holds the menu bar and defines the Cocoa origin.
+    let main_height = screens.iter().next().map(|screen| screen.frame().size.height)?;
     let mut best: Option<(f64, (f64, f64, f64, f64))> = None;
-    for screen in NSScreen::screens(marker) {
+    for screen in screens {
         let frame = screen.frame();
-        let dx = (frame.origin.x - x).abs();
-        if dx > 48.0 || !width_matches(width, frame.size.width) {
+        let frame = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+        let Some(score) = screen_match_score((x, y, width), frame, main_height) else {
             continue;
-        }
-        let placed = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
-        if best.as_ref().is_none_or(|(score, _)| dx < *score) {
-            best = Some((dx, placed));
+        };
+        if best.as_ref().is_none_or(|(best_score, _)| score < *best_score) {
+            best = Some((score, frame));
         }
     }
     best.map(|(_, frame)| frame)
@@ -576,6 +603,15 @@ fn join_active_space(_window: &WebviewWindow) -> Result<(), String> {
 
 
 fn frame_matches(window: &WebviewWindow, monitor: &Monitor) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        if let (Some(target), Ok(pointer)) = (ns_screen_frame(monitor), window.ns_window()) {
+            let ns_window = unsafe { &*(pointer as *const objc2_app_kit::NSWindow) };
+            let frame = ns_window.frame();
+            let actual = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+            return frames_close(actual, target);
+        }
+    }
     let Ok(position) = window.outer_position() else {
         return false;
     };
@@ -691,7 +727,32 @@ fn friendly_name(_monitor: &Monitor) -> Option<String> {
     None
 }
 
-#[cfg(target_os = "macos")]
+/// How well an NSScreen frame (Cocoa) matches a tao monitor (top-left points). Lower is better.
+/// X alone is ambiguous for displays stacked above or below each other.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn screen_match_score(monitor: (f64, f64, f64), screen: (f64, f64, f64, f64), main_height: f64) -> Option<f64> {
+    let (x, y, width) = monitor;
+    let (sx, sy, sw, sh) = screen;
+    if !width_matches(width, sw) {
+        return None;
+    }
+    let dx = (sx - x).abs();
+    let dy = (top_left_to_cocoa_y(y, sh, main_height) - sy).abs();
+    if dx > 48.0 {
+        return None;
+    }
+    Some(dx + dy)
+}
+
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn frames_close(actual: (f64, f64, f64, f64), target: (f64, f64, f64, f64)) -> bool {
+    (actual.0 - target.0).abs() <= 2.0
+        && (actual.1 - target.1).abs() <= 2.0
+        && (actual.2 - target.2).abs() <= 2.0
+        && (actual.3 - target.3).abs() <= 2.0
+}
+
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn width_matches(reported: f64, actual: f64) -> bool {
     if actual <= 0.0 {
         return false;
@@ -790,6 +851,38 @@ mod tests {
         ];
         assert_eq!(choose_index(&displays, Some("gone|1x1|1.00")), None);
         assert!(!fallback_allowed(Some("gone|1x1|1.00")));
+    }
+
+    // Built-in Retina 1512x982 pt at the origin; Dell 1920x1200 pt to the right, top-aligned.
+    // NSScreen reports the Dell at y = 982 - 1200 = -218 (bottom-left origin).
+    #[test]
+    fn converts_top_left_y_to_cocoa_for_a_taller_dell() {
+        assert_eq!(top_left_to_cocoa_y(0.0, 1200.0, 982.0), -218.0);
+        assert_eq!(top_left_to_cocoa_y(0.0, 982.0, 982.0), 0.0);
+        // Dell placed above the laptop: top-left y = -1200 -> Cocoa y = 982.
+        assert_eq!(top_left_to_cocoa_y(-1200.0, 1200.0, 982.0), 982.0);
+    }
+
+    #[test]
+    fn matches_the_dell_screen_not_the_laptop() {
+        let laptop = (0.0, 0.0, 1512.0, 982.0);
+        let dell_right = (1512.0, -218.0, 1920.0, 1200.0);
+        let dell_left = (-1920.0, -218.0, 1920.0, 1200.0);
+        let dell_above = (0.0, 982.0, 1920.0, 1200.0);
+        let main = 982.0;
+        assert_eq!(screen_match_score((1512.0, 0.0, 1920.0), dell_right, main), Some(0.0));
+        assert_eq!(screen_match_score((1512.0, 0.0, 1920.0), laptop, main), None);
+        assert_eq!(screen_match_score((-1920.0, 0.0, 1920.0), dell_left, main), Some(0.0));
+        // Stacked above with the same x as the laptop: y decides.
+        let above = screen_match_score((0.0, -1200.0, 1920.0), dell_above, main);
+        assert_eq!(above, Some(0.0));
+        assert!(screen_match_score((0.0, 0.0, 1512.0), laptop, main) == Some(0.0));
+    }
+
+    #[test]
+    fn frame_check_tolerates_rounding_only() {
+        assert!(frames_close((1512.0, -218.0, 1920.0, 1200.0), (1512.5, -217.0, 1920.0, 1199.0)));
+        assert!(!frames_close((1512.0, 0.0, 1920.0, 1080.0), (1512.0, -218.0, 1920.0, 1200.0)));
     }
 
     #[test]

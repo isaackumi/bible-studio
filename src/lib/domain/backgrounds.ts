@@ -1,4 +1,4 @@
-import type { ThemeBackground } from "./types";
+import type { PresentationModel, ThemeBackground } from "./types";
 
 export type DisplayWash = {
   id: string;
@@ -29,4 +29,18 @@ export function backgroundFill(background: ThemeBackground): string {
   if (background.type === "color") return background.color;
   if (background.type === "wash") return displayWash(background.washId)?.background ?? "#050505";
   return "#050505";
+}
+
+/**
+ * CSS background for a painted frame. The audience page also paints it behind the 16:9 frame,
+ * so a 16:10 or 4:3 display shows the theme in the margins instead of black bars.
+ */
+export function frameBackground(model: PresentationModel, nested = false): string {
+  if (model.layout === "black") return "#000000";
+  if (nested && (model.layout === "lower-third" || model.layout === "timer" || model.layout === "empty")) return "transparent";
+  if (model.backgroundImageUrl) return `center / cover no-repeat url("${model.backgroundImageUrl}")`;
+  const wash = model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null;
+  if (wash) return wash.background;
+  if (model.theme.background.type === "color") return model.theme.background.color;
+  return nested ? "transparent" : "#050505";
 }

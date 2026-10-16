@@ -2,6 +2,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import { acceptProgramPacket, readLocal, readOwner, readStandbyLocal, subscribeLocal, subscribeStandbyLocal } from "../display/channel";
+  import { frameBackground } from "../domain/backgrounds";
   import { cameraDeviceId, camerasIn, openCamera, planFeeds, stopCameraStream, type CameraFeeds } from "../domain/camera";
   import { acceptAudienceFrame } from "../display/output";
   import { api } from "../db/api";
@@ -143,7 +144,7 @@
   }
 </script>
 
-<div class="audience">
+<div class="audience" style:background={frameBackground(current)}>
   <div class:fade-in={fading} style:--fade="{fadeMs}ms">
     <Screen model={current} sourceId={currentSource} {feeds} />
   </div>

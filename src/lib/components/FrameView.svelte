@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
-  import { displayWash } from "../domain/backgrounds";
+  import { displayWash, frameBackground } from "../domain/backgrounds";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
@@ -50,16 +50,7 @@
     model.layout === "timer" && model.timer ? timerDisplay(timerFromPaint(model.timer), now || Date.now()) : null,
   );
 
-  const background = $derived.by(() => {
-    if (model.layout === "black") return "#000000";
-    if (nested && (model.layout === "lower-third" || model.layout === "timer" || model.layout === "empty")) return "transparent";
-    if (model.backgroundImageUrl) {
-      return `center / cover no-repeat url("${model.backgroundImageUrl}")`;
-    }
-    if (wash) return wash.background;
-    if (model.theme.background.type === "color") return model.theme.background.color;
-    return nested ? "transparent" : "#050505";
-  });
+  const background = $derived(frameBackground(model, nested));
 
   const justify = $derived(
     model.theme.vertical === "top" ? "flex-start" : model.theme.vertical === "bottom" ? "flex-end" : "center",
