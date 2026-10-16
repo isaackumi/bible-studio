@@ -51,6 +51,8 @@ export type CompositionLayer = {
   fit: LayerFit;
   source: SourceRef;
   animation: LayerAnimation;
+  /** Link to Workspace.sources; absent = unlinked copy. */
+  sourceKey?: string;
 };
 
 export type Composition = {
@@ -829,6 +831,7 @@ export function sanitizeComposition(value: unknown): Composition {
       fit: layer.fit === "cover" || layer.fit === "fill" ? layer.fit : "contain",
       source: sanitizeSource(layer.source),
       animation: sanitizeAnimation(layer.animation),
+      ...(typeof layer.sourceKey === "string" && layer.sourceKey ? { sourceKey: layer.sourceKey } : {}),
     })),
   };
 }
@@ -1070,6 +1073,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,
       model: compileSource(layer.source, ctx),
+      mirror: layer.source.type === "camera" && layer.source.payload.mirror === "true",
       animation: layer.animation,
     }));
   return {

@@ -225,6 +225,7 @@ export function defaultWorkspace(): Workspace {
     activeDisplayProfileId: displayProfiles[0].id,
     displayProfiles,
     compositions: [],
+    sources: [],
   };
 }
 

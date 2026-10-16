@@ -50,6 +50,8 @@ export type PaintedLayer = {
   fit: "contain" | "cover" | "fill";
   sourceId: string;
   model: PresentationModel;
+  /** Camera layers only: flip the video horizontally. */
+  mirror?: boolean;
   animation?: {
     entrance: string;
     exit: string;
@@ -295,6 +297,15 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** Shared sources. Scenes link to these by layer sourceKey. */
+  sources: SharedSourceDocument[];
+};
+
+/** Workspace-level source shared by scenes (OBS-style). `source` is a SourceRef. */
+export type SharedSourceDocument = {
+  id: string;
+  name: string;
+  source: { type: string; id: string; title: string; payload: Record<string, string> };
 };
 
 export type CompositionDocument = {

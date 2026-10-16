@@ -1,6 +1,7 @@
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition } from "../domain/composition";
+import { sanitizeSharedSource } from "../domain/sources";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -96,6 +97,9 @@ export function normalizeWorkspace(input: unknown): Workspace {
             transition: clean.transition,
           };
         })
+      : [],
+    sources: Array.isArray(value.sources)
+      ? value.sources.map(sanitizeSharedSource).filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       : [],
   };
 }

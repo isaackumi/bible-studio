@@ -96,4 +96,19 @@ describe("workspace document", () => {
     const workspace = normalizeWorkspace({ appearance: { theme: "dark", density: "comfortable", scale: 1, accent: "#fa4f00", desk: "obs" } });
     expect(workspace.appearance.desk).toBe("obs");
   });
+
+  it("keeps shared sources and layer source keys, defaulting to none", () => {
+    expect(normalizeWorkspace({}).sources).toEqual([]);
+    const shared = { id: "src:a", name: "Pulpit Cam", source: { type: "camera", id: "d", title: "Cam", payload: { deviceId: "d" } } };
+    const look = {
+      id: "composition:x",
+      name: "A",
+      canvas: { width: 1920, height: 1080 },
+      transition: { type: "fade", ms: 450 },
+      layers: [{ id: "l1", name: "Pulpit Cam", sourceKey: "src:a", bounds: { x: 0, y: 0, w: 100, h: 100 }, source: shared.source }],
+    };
+    const clean = normalizeWorkspace({ sources: [shared, { bad: true }], compositions: [look] } as never);
+    expect(clean.sources).toEqual([shared]);
+    expect((clean.compositions[0]!.layers[0] as { sourceKey?: string }).sourceKey).toBe("src:a");
+  });
 });
