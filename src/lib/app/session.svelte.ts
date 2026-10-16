@@ -112,6 +112,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
+import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
 import { parseVoiceCommand, voiceCommandLabel, type VoiceCommand } from "../voice/commands";
 import {
@@ -531,6 +532,47 @@ class Session {
         this.message = error instanceof Error ? error.message : String(error);
       }
     }
+  };
+
+  /** One theme as a shareable file (with its background picture when it has one). */
+  exportTheme = async (): Promise<{ fileName: string; json: string }> => {
+    const theme = this.theme();
+    let background: { name: string; dataUrl: string } | null = null;
+    if (theme.background.type === "image") {
+      const assetId = theme.background.assetId;
+      const asset = this.media.find((entry) => entry.id === assetId);
+      const url = mediaUrl(asset ?? null);
+      if (asset && url) {
+        const blob = await (await fetch(url)).blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error ?? new Error("The background picture could not be read."));
+          reader.readAsDataURL(blob);
+        });
+        background = { name: asset.name, dataUrl };
+      }
+    }
+    return { fileName: themePackageFileName(theme), json: JSON.stringify(exportThemePackage(theme, background), null, 2) };
+  };
+
+  /** Import a theme file as a new theme (never overwrites) and use it. */
+  importTheme = async (text: string) => {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      throw new Error("That file is not a Church Studio theme.");
+    }
+    const { theme, background } = readThemePackage(raw);
+    let next = theme;
+    if (background) {
+      const asset = await api.importMediaBytes(background.name, dataUrlToBlob(background.dataUrl));
+      this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
+      next = { ...theme, background: { type: "image", assetId: asset.id } };
+    }
+    this.saveTheme(next);
+    this.message = `${next.name} imported and in use. Program updates on the next LIVE.`;
   };
 
   exportLibrary = async () => {

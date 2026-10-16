@@ -13,6 +13,38 @@
   function save(next: Theme) {
     session.saveTheme(next);
   }
+
+  let themeFile = $state<HTMLInputElement | undefined>();
+  let themeNote = $state("");
+
+  async function exportTheme() {
+    try {
+      const { fileName, json } = await session.exportTheme();
+      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      themeNote = `${fileName} saved.`;
+    } catch (error) {
+      themeNote = error instanceof Error ? error.message : "The theme was not exported.";
+    }
+  }
+
+  async function importTheme(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 25 * 1024 * 1024) throw new Error("That theme file is too large.");
+      await session.importTheme(await file.text());
+      themeNote = session.message;
+    } catch (error) {
+      themeNote = error instanceof Error ? error.message : "The theme was not imported.";
+    }
+  }
 </script>
 
 <div class="type">
@@ -36,6 +68,13 @@
   <p class="sample" style:font-family={theme.fontFamily} style:color={theme.color} style:background={fill} style:text-align={theme.align}>
     In the beginning
   </p>
+
+  <div class="theme-files">
+    <button type="button" onclick={() => void exportTheme()}>Export theme</button>
+    <button type="button" onclick={() => themeFile?.click()}>Import theme</button>
+    <input bind:this={themeFile} type="file" accept=".json,application/json" hidden onchange={(event) => void importTheme(event)} />
+    {#if themeNote}<span class="theme-note" role="status">{themeNote}</span>{/if}
+  </div>
 
   <label>
     Theme name
@@ -196,4 +235,7 @@
   .segment button { height: 32px; padding: 0 10px; text-transform: capitalize; }
   .check { flex-direction: row; align-items: center; color: var(--ink); }
   .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .theme-files { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .theme-files button { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
+  .theme-note { color: var(--muted); font-size: 12px; }
 </style>
