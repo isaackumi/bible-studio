@@ -99,8 +99,8 @@ describe("voice verse detection", () => {
     ).toBe("John 3:16");
     expect(matchSpoken("please pass the microphone to the sound booth", catalog, "kjv")).toBeNull();
     expect(chooseHeard(["efficient was twelve", "for god so loved the world"], catalog, "kjv")?.item.reference).toBe("John 3:16");
-    // Builds the whole KJV quote catalog (~3.5s alone); the default 5s flakes when the suite runs in parallel.
-  }, 20_000);
+    // Builds the whole KJV quote catalog (~4s alone, 20s+ when the machine is busy with the full suite).
+  }, 60_000);
 
   it("returns a preview passage, not a program action", () => {
     const hit = detectVerse(
