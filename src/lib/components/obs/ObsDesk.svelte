@@ -824,7 +824,7 @@
   }
   .duration { display: flex; align-items: center; gap: 6px; padding: 8px; color: var(--muted); }
   .duration input { width: 72px; flex: none; }
-  .controls { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
+  .controls { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
   .studio-mode { margin: 0; color: var(--muted); }
   .transition-select { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px; color: var(--muted); }
   .control-actions { display: flex; flex-wrap: wrap; gap: 4px; }
