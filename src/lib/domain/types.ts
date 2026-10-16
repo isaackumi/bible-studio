@@ -301,6 +301,17 @@ export type Workspace = {
   compositions: CompositionDocument[];
   /** Shared sources. Scenes link to these by layer sourceKey. */
   sources: SharedSourceDocument[];
+  /** Phones approved for the LAN remote. Only token hashes are stored. */
+  remoteDevices: RemoteDeviceDocument[];
+};
+
+export type RemoteDeviceDocument = {
+  id: string;
+  name: string;
+  tokenHash: string;
+  pairedAt: number;
+  lastSeen: number;
+  expiresAt: number;
 };
 
 /** Workspace-level source shared by scenes (OBS-style). `source` is a SourceRef. */

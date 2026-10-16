@@ -2,6 +2,7 @@ import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, Shortcu
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
+import { sanitizeRemoteDevices } from "../domain/remote";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -101,5 +102,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     sources: Array.isArray(value.sources)
       ? value.sources.map(sanitizeSharedSource).filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       : [],
+    remoteDevices: sanitizeRemoteDevices(value.remoteDevices),
   };
 }

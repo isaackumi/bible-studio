@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RemoteApproval from "./RemoteApproval.svelte";
   import { onMount } from "svelte";
   import { session } from "../app/session.svelte";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
@@ -79,5 +80,6 @@
     {#if session.settingsOpen}
       <SettingsDialog />
     {/if}
+    <RemoteApproval />
   </div>
 {/if}

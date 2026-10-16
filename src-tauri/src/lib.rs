@@ -263,7 +263,13 @@ fn start_remote_lan(app: AppHandle, lan: State<Arc<remote::LanRemote>>) -> Value
 fn remote_lan_status(lan: State<Arc<remote::LanRemote>>) -> Value {
     let listening = *lan.listening.lock().unwrap_or_else(|poison| poison.into_inner());
     let url = lan.url.lock().unwrap_or_else(|poison| poison.into_inner()).clone();
-    serde_json::json!({ "listening": listening, "url": url, "port": remote::PORT })
+    let error = lan.error.lock().unwrap_or_else(|poison| poison.into_inner()).clone();
+    serde_json::json!({ "listening": listening, "url": url, "port": remote::PORT, "error": error })
+}
+
+#[tauri::command]
+fn stop_remote_lan(lan: State<Arc<remote::LanRemote>>) {
+    remote::stop(&lan);
 }
 
 #[tauri::command]
@@ -326,6 +332,7 @@ pub fn run() {
             stop_sermon_listen,
             start_remote_lan,
             remote_lan_status,
+            stop_remote_lan,
             remote_reply
         ])
         .run(tauri::generate_context!())

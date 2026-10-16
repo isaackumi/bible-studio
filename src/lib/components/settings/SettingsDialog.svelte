@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RemotePanel from "../RemotePanel.svelte";
   import { session } from "../../app/session.svelte";
   import { COMMANDS } from "../../commands/registry";
   import { audienceStatus } from "../../display/status";
@@ -490,24 +491,7 @@
         {/each}
         <p class="note stand">These keys call the command list. Remapping will use the same commands.</p>
       {:else if section === "remote"}
-        <section class="card">
-          <h3>Phone is a controller</h3>
-          <p class="note">Pair on this computer first. Unpaired pads cannot change Program. A phone on this Wi-Fi opens the LAN address. Not shipped until that phone is tested.</p>
-          {#if session.remoteLanUrl}
-            <p class="note">On this network <strong>{session.remoteLanUrl}</strong></p>
-          {/if}
-          {#if session.remotePairing}
-            <p class="note">Code <strong>{session.remotePairing.code}</strong></p>
-            <p class="note">{session.remoteTokens.length} paired. Open the remote pad and enter that code.</p>
-          {:else}
-            <p class="note">No pairing code yet.</p>
-          {/if}
-          <div class="actions">
-            <button type="button" class="primary" onclick={() => session.openRemotePairing()}>Show pairing code</button>
-            <button type="button" onclick={() => window.open(session.remotePageUrl(), "_blank", "noopener")}>Open remote pad</button>
-            <button type="button" class="text" onclick={() => session.closeRemotePairing()}>Clear pairing</button>
-          </div>
-        </section>
+        <RemotePanel />
       {:else if section === "stage"}
         <section class="card">
           <h3>{canUse("stage-display") ? "Stage is available" : "Not in this release"}</h3>

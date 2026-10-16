@@ -86,12 +86,13 @@ export const api = {
     desktop() ? invoke<SearchHit[]>("bible_search", { translationId, query }) : bundledSearch(translationId, query),
   startRemoteLan: () =>
     desktop()
-      ? invoke<{ listening: boolean; url: string; port: number }>("start_remote_lan")
-      : Promise.resolve({ listening: false, url: "", port: 17891 }),
+      ? invoke<RemoteLanStatus>("start_remote_lan")
+      : Promise.resolve<RemoteLanStatus>({ listening: false, url: "", port: 17891, error: "" }),
   remoteLanStatus: () =>
     desktop()
-      ? invoke<{ listening: boolean; url: string; port: number }>("remote_lan_status")
-      : Promise.resolve({ listening: false, url: "", port: 17891 }),
+      ? invoke<RemoteLanStatus>("remote_lan_status")
+      : Promise.resolve<RemoteLanStatus>({ listening: false, url: "", port: 17891, error: "" }),
+  stopRemoteLan: () => (desktop() ? invoke<void>("stop_remote_lan") : Promise.resolve()),
   remoteReply: (id: string, envelope: unknown) =>
     desktop() ? invoke<void>("remote_reply", { id, envelope }) : Promise.resolve(),
 };
@@ -106,3 +107,5 @@ export function mediaUrl(asset: MediaAsset | null | undefined): string | null {
   if (isDesktop()) return assetUrl(asset.path);
   return browserMedia.url(asset.id);
 }
+
+export type RemoteLanStatus = { listening: boolean; url: string; port: number; error?: string };

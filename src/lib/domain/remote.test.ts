@@ -1,114 +1,140 @@
 import { describe, expect, it } from "vitest";
-import { applyProgramAction, createLiveState, frame, setPreview } from "./live";
-import { presentText } from "./present";
 import {
-  authorizeRemoteCommand,
+  approvePending,
   createPairing,
-  isLanRemoteOrigin,
-  isRemoteClicker,
-  lanRemoteUrl,
-  pairRemote,
-  programCue,
-  programPadPayload,
-  REMOTE_COMMANDS,
-  REMOTE_LAN_PORT,
+  declinePending,
+  emptyRemoteGate,
+  framePayload,
+  pairingUrl,
+  readRemoteEnvelope,
+  REMOTE_CODE_ATTEMPTS,
+  REMOTE_PAIR_MS,
+  REMOTE_SESSION_MS,
   remoteEnvelope,
+  revokeDevice,
   routeRemote,
+  sanitizeRemoteDevices,
+  type RemoteContext,
+  type RemoteGate,
 } from "./remote";
-import { blackModel, defaultTheme } from "./theme";
 
-const theme = defaultTheme();
+const HASH = "a".repeat(64);
+let counter = 0;
+const ctx = (now: number, tokenHash: string | null = null): RemoteContext => ({
+  now,
+  tokenHash,
+  newId: () => `req-${++counter}`,
+  newSecret: () => `secret-${counter}`,
+});
 
-function previewLive() {
-  const model = presentText({ theme, layout: "title", heading: "Welcome", body: "Come in." });
-  return setPreview(createLiveState(theme), frame(model, "slide-1", "cut"));
+function opened(now = 1_000): RemoteGate {
+  return { ...emptyRemoteGate(), pairing: createPairing(now, "123456", "qr-token") };
 }
 
 describe("phone remote pairing", () => {
-  it("lets a paired token Take and keeps an unpaired token off Program", () => {
-    const pairing = createPairing(1_000, () => "482193");
-    expect(pairing.code).toBe("482193");
-    expect(pairRemote(pairing, "000000", 1_001).ok).toBe(false);
-    const paired = pairRemote(pairing, "482193", 1_001);
-    expect(paired.ok).toBe(true);
-    if (!paired.ok) return;
+  it("needs operator approval before a QR scan gets a session token", () => {
+    let gate = opened();
+    const asked = routeRemote(gate, remoteEnvelope("pair", { pair: "qr-token", name: "Ama's iPhone" }), ctx(2_000));
+    expect(asked.reply.type).toBe("pending");
+    gate = asked.gate;
+    const { request, secret } = asked.reply.payload;
+    expect(gate.pending[0]).toMatchObject({ name: "Ama's iPhone", status: "waiting" });
 
-    expect(authorizeRemoteCommand([], paired.token, "take")).toBeNull();
-    expect(authorizeRemoteCommand([paired.token], "other", "take")).toBeNull();
-    expect(authorizeRemoteCommand([paired.token], paired.token, "open-settings")).toBeNull();
-    expect(authorizeRemoteCommand([paired.token], paired.token, "take")).toBe("take");
+    const waiting = routeRemote(gate, remoteEnvelope("pair-status", { request: request!, secret: secret! }), ctx(3_000));
+    expect(waiting.reply.type).toBe("pending");
 
-    let live = previewLive();
-    const program = live.program;
-    expect(authorizeRemoteCommand([], "nope", "take")).toBeNull();
-    expect(live.program).toEqual(program);
-
-    const allowed = authorizeRemoteCommand([paired.token], paired.token, "take");
-    expect(allowed).toBe("take");
-    if (allowed !== "take") throw new Error("The authorized remote action should be TAKE.");
-    live = applyProgramAction(live, allowed, theme, { title: "Logo", imageUrl: null });
-    expect(live.program.model.lines[0]?.text).toBe("Welcome");
-    expect(live.program).not.toEqual(program);
+    gate = approvePending(gate, request!, "session-token", HASH, 4_000);
+    const welcome = routeRemote(gate, remoteEnvelope("pair-status", { request: request!, secret: secret! }), ctx(5_000));
+    expect(welcome.reply).toEqual(remoteEnvelope("welcome", { token: "session-token" }));
+    expect(welcome.gate.pending).toEqual([]);
+    expect(welcome.gate.devices[0]).toMatchObject({ name: "Ama's iPhone", tokenHash: HASH });
+    // The token is handed out once.
+    expect(routeRemote(welcome.gate, remoteEnvelope("pair-status", { request: request!, secret: secret! }), ctx(6_000)).reply.type).toBe("expired");
   });
 
-  it("rejects an expired code and keeps next/previous off Program", () => {
-    const pairing = createPairing(1_000, () => "111111");
-    expect(pairRemote(pairing, "111111", pairing.expiresAt + 1).ok).toBe(false);
-    const live = previewLive();
-    const program = live.program;
-    expect(authorizeRemoteCommand(["tok"], "tok", "next")).toBe("next");
-    expect(authorizeRemoteCommand(["tok"], "tok", "previous")).toBe("previous");
-    expect(live.program).toEqual(program);
-    expect(REMOTE_COMMANDS).toEqual(["take", "next", "previous", "clear", "black", "logo"]);
-    const envelope = remoteEnvelope("command", { token: "tok", id: "take" });
-    expect(envelope.v).toBe(1);
-    expect(envelope.type).toBe("command");
+  it("uses the QR token once and rejects a wrong request secret", () => {
+    const first = routeRemote(opened(), remoteEnvelope("pair", { pair: "qr-token" }), ctx(2_000));
+    const again = routeRemote(first.gate, remoteEnvelope("pair", { pair: "qr-token" }), ctx(2_100));
+    expect(again.reply.type).toBe("denied");
+    const stolen = routeRemote(first.gate, remoteEnvelope("pair-status", { request: first.reply.payload.request!, secret: "guess" }), ctx(2_200));
+    expect(stolen.reply.type).toBe("expired");
+  });
+
+  it("expires pairing and closes it after too many wrong codes", () => {
+    expect(routeRemote(opened(0), remoteEnvelope("pair", { pair: "qr-token" }), ctx(REMOTE_PAIR_MS + 1)).reply.type).toBe("expired");
+    let gate = opened(0);
+    for (let attempt = 1; attempt < REMOTE_CODE_ATTEMPTS; attempt += 1) {
+      const wrong = routeRemote(gate, remoteEnvelope("pair", { code: "000000" }), ctx(10));
+      expect(wrong.reply.type).toBe("denied");
+      gate = wrong.gate;
+    }
+    const last = routeRemote(gate, remoteEnvelope("pair", { code: "000000" }), ctx(10));
+    expect(last.reply.type).toBe("expired");
+    expect(last.gate.pairing).toBeNull();
+    expect(routeRemote(last.gate, remoteEnvelope("pair", { code: "123456" }), ctx(11)).reply.type).toBe("expired");
+  });
+
+  it("tells a declined phone it is unauthorized", () => {
+    const asked = routeRemote(opened(), remoteEnvelope("pair", { code: "123456" }), ctx(2_000));
+    const gate = declinePending(asked.gate, asked.reply.payload.request!);
+    const status = routeRemote(gate, remoteEnvelope("pair-status", asked.reply.payload), ctx(3_000));
+    expect(status.reply.type).toBe("unauthorized");
   });
 });
 
-describe("LAN remote envelope", () => {
-  it("names a reachable pad URL on the desk's port", () => {
-    expect(REMOTE_LAN_PORT).toBe(17891);
-    expect(lanRemoteUrl("192.168.1.20")).toBe("http://192.168.1.20:17891/");
-    expect(isLanRemoteOrigin("http://192.168.1.20:17891/")).toBe(true);
-    expect(isLanRemoteOrigin("http://127.0.0.1:1420/?remote=1")).toBe(false);
+describe("paired phone messages", () => {
+  function paired(now = 0): RemoteGate {
+    const asked = routeRemote(opened(now), remoteEnvelope("pair", { code: "123456", name: "Phone" }), ctx(now));
+    return approvePending(asked.gate, asked.reply.payload.request!, "t", HASH, now);
+  }
+
+  it("authorizes state and commands only for a known token hash", () => {
+    const gate = paired();
+    expect(routeRemote(gate, remoteEnvelope("state", {}), ctx(10, HASH)).action).toEqual({ kind: "state" });
+    expect(routeRemote(gate, remoteEnvelope("command", { id: "take" }), ctx(10, HASH)).action).toEqual({ kind: "command", id: "take" });
+    expect(routeRemote(gate, remoteEnvelope("command", { id: "take" }), ctx(10, "b".repeat(64))).reply.type).toBe("unauthorized");
+    expect(routeRemote(gate, remoteEnvelope("state", {}), ctx(10, null)).reply.type).toBe("unauthorized");
+    expect(routeRemote(gate, remoteEnvelope("command", { id: "format-disk" }), ctx(10, HASH)).reply.type).toBe("denied");
   });
 
-  it("replies over the same v1 envelope so a LAN socket can carry pair and Take", () => {
-    const pairing = createPairing(1_000, () => "482193");
-    const unpaired = routeRemote({ pairing, tokens: [] }, remoteEnvelope("command", { token: "", id: "take" }), 1_001);
-    expect(unpaired.command).toBeNull();
-    expect(unpaired.reply.type).toBe("denied");
-    expect(unpaired.session.tokens).toEqual([]);
+  it("keeps a used session alive and expires an idle one", () => {
+    const gate = paired(0);
+    const used = routeRemote(gate, remoteEnvelope("state", {}), ctx(REMOTE_SESSION_MS - 10, HASH));
+    expect(used.reply.type).toBe("state");
+    expect(routeRemote(used.gate, remoteEnvelope("state", {}), ctx(REMOTE_SESSION_MS * 2 - 20, HASH)).reply.type).toBe("state");
+    expect(routeRemote(gate, remoteEnvelope("state", {}), ctx(REMOTE_SESSION_MS + 1, HASH)).reply.type).toBe("unauthorized");
+  });
 
-    const wrong = routeRemote({ pairing, tokens: [] }, remoteEnvelope("pair", { code: "000000" }), 1_001);
-    expect(wrong.reply.payload.reason).toMatch(/does not match/i);
+  it("revokes one phone", () => {
+    const before = paired();
+    const gate = revokeDevice(before, before.devices[0]!.id);
+    expect(routeRemote(gate, remoteEnvelope("state", {}), ctx(10, HASH)).reply.type).toBe("unauthorized");
+  });
 
-    const welcome = routeRemote({ pairing, tokens: [] }, remoteEnvelope("pair", { code: "482193" }), 1_001, () => "tok");
-    expect(welcome.reply).toEqual(remoteEnvelope("welcome", { token: "tok" }));
-    expect(welcome.session.tokens).toEqual(["tok"]);
-    expect(welcome.command).toBeNull();
+  it("routes Preview-only picks", () => {
+    const gate = paired();
+    expect(routeRemote(gate, remoteEnvelope("preview-item", { itemId: "i1" }), ctx(1, HASH)).action).toEqual({ kind: "preview-item", itemId: "i1" });
+    expect(routeRemote(gate, remoteEnvelope("preview-scene", { sceneId: "s1" }), ctx(1, HASH)).action).toEqual({ kind: "preview-scene", sceneId: "s1" });
+  });
+});
 
-    const take = routeRemote(welcome.session, remoteEnvelope("command", { token: "tok", id: "take" }), 1_002);
-    expect(take.command).toBe("take");
-    expect(take.reply).toEqual(remoteEnvelope("ack", { id: "take" }));
+describe("remote wire format", () => {
+  it("puts only the one-time pairing token in the QR URL", () => {
+    expect(pairingUrl("192.168.1.20", "abc/+=")).toBe("http://192.168.1.20:17891/?pair=abc%2F%2B%3D");
+  });
 
-    const next = routeRemote(welcome.session, remoteEnvelope("command", { token: "tok", id: "next" }), 1_003);
-    expect(next.command).toBe("next");
-    expect(isRemoteClicker("next")).toBe(true);
-    expect(isRemoteClicker("previous")).toBe(true);
-    expect(isRemoteClicker("take")).toBe(false);
+  it("reads only current-protocol envelopes with string payloads", () => {
+    expect(readRemoteEnvelope({ v: 2, type: "state", payload: { token: "x", n: 3 } })).toEqual(remoteEnvelope("state", { token: "x" }));
+    expect(readRemoteEnvelope({ v: 1, type: "pair", payload: {} })).toBeNull();
+  });
 
-    let live = previewLive();
-    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
-    const onAir = live.program;
-    const following = presentText({ theme, layout: "title", heading: "Go in peace", body: "" });
-    live = setPreview(live, frame(following, "slide-2", "cut"));
-    expect(live.program).toEqual(onAir);
-    live = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
-    expect(live.program.model.lines[0]?.text).toBe("Go in peace");
-    expect(programCue(live.program.model)).toBe("Go in peace");
-    expect(programCue(blackModel(theme))).toBe("Black");
-    expect(programPadPayload(live.program.model)).toMatchObject({ cue: "Go in peace", layout: "title", body: "Go in peace" });
+  it("keeps only well-formed stored devices", () => {
+    expect(sanitizeRemoteDevices([{ id: "d", name: " Pad ", tokenHash: HASH, pairedAt: 1, lastSeen: 2, expiresAt: 3 }, { id: "x", tokenHash: "short" }])).toEqual([
+      { id: "d", name: "Pad", tokenHash: HASH, pairedAt: 1, lastSeen: 2, expiresAt: 3 },
+    ]);
+  });
+
+  it("summarises a frame for the phone", () => {
+    expect(framePayload("program", { layout: "black", reference: null, attribution: null, lines: [] })).toMatchObject({ programCue: "Black", programLayout: "black" });
   });
 });

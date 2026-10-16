@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1018" />
+<title>Church Studio Remote</title>
+<style>
+  :root {
+    --nave: #0b1018; --pew: #151c27; --pew-2: #1c2533; --line: #2a3546;
+    --linen: #f3ead8; --mist: #9aa7b8; --gilt: #d4a056; --ember: #e23d2e;
+    --ok: #3ccf6e; --warn: #e0b341; --bad: #ff5a5a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--nave); color: var(--linen); }
+  body {
+    min-height: 100dvh;
+    font: 15px/1.4 "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 12px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .mark { margin: 0; font: italic 600 19px/1.1 "New York", "Iowan Old Style", Palatino, serif; }
+  .desk { margin: 2px 0 0; color: var(--mist); font-size: 12px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--mist); }
+  .pill[data-tone="ok"] i { background: var(--ok); }
+  .pill[data-tone="warn"] i { background: var(--warn); }
+  .pill[data-tone="bad"] { border-color: var(--bad); color: #ff9a9a; }
+  .pill[data-tone="bad"] i { background: var(--bad); }
+  [hidden] { display: none !important; }
+  .card { background: var(--pew); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .kicker { margin: 0 0 4px; color: var(--mist); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; display: flex; justify-content: space-between; }
+  .kicker b { color: var(--ember); letter-spacing: 0.1em; }
+  .cue { margin: 0; font-size: 19px; font-weight: 650; }
+  .body { margin: 6px 0 0; color: #d9d2c4; white-space: pre-line; max-height: 6.2em; overflow: hidden; }
+  .preview .cue { font-size: 16px; }
+  .preview .body { max-height: 2.9em; }
+  button { appearance: none; border: 0; font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; }
+  button:disabled { opacity: 0.4; }
+  .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn { min-height: 58px; border-radius: 16px; background: var(--pew-2); border: 1px solid var(--line); font-weight: 650; font-size: 17px; }
+  .btn:active { transform: scale(0.98); }
+  .take { min-height: 76px; border-radius: 20px; background: var(--ember); border: 0; font-size: 22px; letter-spacing: 0.08em; font-weight: 800; box-shadow: 0 14px 34px rgba(226, 61, 46, 0.35); }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .row .btn { min-height: 48px; font-size: 14px; }
+  .flash { outline: 2px solid var(--gilt); }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button { flex: 1; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
+  .tabs button[aria-selected="true"] { background: var(--pew-2); color: var(--linen); border-color: var(--gilt); }
+  .list { display: flex; flex-direction: column; gap: 6px; max-height: 38dvh; overflow: auto; }
+  .list button { text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--pew); border: 1px solid var(--line); }
+  .list button[aria-current="true"] { border-color: var(--gilt); }
+  .list small { display: block; color: var(--mist); font-size: 12px; }
+  .empty { color: var(--mist); margin: 6px 2px; }
+  form { display: flex; flex-direction: column; gap: 12px; }
+  label { display: flex; flex-direction: column; gap: 6px; color: var(--mist); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+  input { height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--pew); color: var(--linen); font-size: 18px; padding: 0 14px; }
+  input.code { height: 72px; font: 600 34px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.3em; text-align: center; }
+  .primary { min-height: 56px; border-radius: 16px; background: var(--gilt); color: #1a1206; font-weight: 750; font-size: 17px; }
+  .note { margin: 0; color: var(--mist); }
+  .msg { margin: 0; min-height: 1.4em; color: var(--warn); }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--gilt); animation: spin 0.9s linear infinite; margin: 8px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .link { background: none; color: var(--mist); text-decoration: underline; padding: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <p class="mark">Church Studio</p>
+    <p class="desk" id="desk">Phone remote</p>
+  </div>
+  <span class="pill" id="pill" data-tone="warn"><i></i><span id="status">Connecting</span></span>
+</header>
+
+<section id="pair" hidden>
+  <form id="pairForm">
+    <p class="note" id="pairLead">On the desk, open Settings → Remote → Pair a phone. Scan its QR code, or type the code here.</p>
+    <label>Your name for this phone <input id="name" maxlength="40" autocomplete="off" /></label>
+    <label>Desk code <input id="code" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></label>
+    <button class="primary" type="submit">Pair</button>
+    <p class="msg" id="pairMsg"></p>
+  </form>
+</section>
+
+<section id="waiting" class="card" hidden>
+  <div class="spinner" aria-hidden="true"></div>
+  <p class="cue" style="text-align:center">Approve this phone on the desk</p>
+  <p class="note" style="text-align:center">The operator taps Allow on the Church Studio screen.</p>
+  <p style="text-align:center"><button class="link" id="cancelPair" type="button">Cancel</button></p>
+</section>
+
+<main id="pad" hidden>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <section class="card program" aria-live="polite">
+      <p class="kicker"><span>Program</span><b id="onair" hidden>ON AIR</b></p>
+      <p class="cue" id="pCue">—</p>
+      <p class="body" id="pBody"></p>
+    </section>
+    <section class="card preview">
+      <p class="kicker"><span>Preview</span></p>
+      <p class="cue" id="vCue">—</p>
+      <p class="body" id="vBody"></p>
+    </section>
+    <div class="nav">
+      <button class="btn" data-cmd="previous" type="button">◀ Previous</button>
+      <button class="btn" data-cmd="next" type="button">Next ▶</button>
+    </div>
+    <button class="take" data-cmd="take" type="button">TAKE</button>
+    <div class="row">
+      <button class="btn" data-cmd="cut" type="button">Cut</button>
+      <button class="btn" data-cmd="clear" type="button">Clear</button>
+      <button class="btn" data-cmd="black" type="button">Black</button>
+      <button class="btn" data-cmd="logo" type="button">Logo</button>
+    </div>
+    <p class="msg" id="padMsg"></p>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabItems" aria-selected="true">Service</button>
+      <button type="button" role="tab" id="tabScenes" aria-selected="false">Scenes</button>
+    </div>
+    <div class="list" id="list"></div>
+    <p style="text-align:center"><button class="link" id="unpair" type="button">Unpair this phone</button></p>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const V = 2;
+  const TOKEN_KEY = "church-studio.remote.token";
+  const PENDING_KEY = "church-studio.remote.pending";
+  const NAME_KEY = "church-studio.remote.name";
+  const lan = location.port === "17891";
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
+    set(key, value) { try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch {} },
+  };
+
+  // Transport: HTTP to the desk's LAN server, or BroadcastChannel to a desk window in this browser.
+  async function send(type, payload) {
+    const envelope = { v: V, type, payload };
+    if (lan) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      try {
+        const response = await fetch("/v1/remote", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(envelope),
+          signal: controller.signal,
+        });
+        if (!response.ok) return null;
+        return await response.json();
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (typeof BroadcastChannel === "undefined") return null;
+    return new Promise((resolve) => {
+      const rid = Math.random().toString(36).slice(2) + Date.now();
+      const replies = new BroadcastChannel("church-studio.remote.reply");
+      const requests = new BroadcastChannel("church-studio.remote");
+      const done = (value) => { clearTimeout(timer); replies.close(); requests.close(); resolve(value); };
+      const timer = setTimeout(() => done(null), 3000);
+      replies.onmessage = (event) => { if (event.data && event.data.rid === rid) done(event.data.envelope); };
+      requests.postMessage({ rid, envelope });
+    });
+  }
+
+  // Connection state shown in the pill.
+  const STATES = {
+    connecting: ["Connecting", "warn"],
+    pairing: ["Pairing", "warn"],
+    waiting: ["Waiting for approval", "warn"],
+    connected: ["Connected", "ok"],
+    reconnecting: ["Reconnecting", "warn"],
+    unavailable: ["Desk unavailable", "bad"],
+    expired: ["Pairing expired", "bad"],
+    unauthorized: ["Not authorized", "bad"],
+  };
+  let state = "connecting";
+  function setState(next) {
+    state = next;
+    const [label, tone] = STATES[next];
+    $("status").textContent = label;
+    $("pill").dataset.tone = tone;
+    const paired = !!store.get(TOKEN_KEY);
+    $("pad").hidden = !paired || next === "unauthorized";
+    $("waiting").hidden = next !== "waiting";
+    $("pair").hidden = paired && next !== "unauthorized" ? true : next === "waiting";
+    document.querySelectorAll("[data-cmd]").forEach((button) => { button.disabled = next !== "connected"; });
+  }
+
+  function guessName() {
+    const ua = navigator.userAgent;
+    if (/iPhone/.test(ua)) return "iPhone";
+    if (/iPad/.test(ua)) return "iPad";
+    if (/Android/.test(ua)) return "Android phone";
+    return "Phone";
+  }
+  $("name").value = store.get(NAME_KEY) || guessName();
+
+  // ---- Pairing ----
+  async function pair(payload) {
+    setState("pairing");
+    $("pairMsg").textContent = "";
+    const name = $("name").value.trim() || guessName();
+    store.set(NAME_KEY, name);
+    const reply = await send("pair", Object.assign({ name }, payload));
+    if (!reply) { setState("unavailable"); $("pairMsg").textContent = "The desk did not answer. Check that the phone is on the same Wi-Fi."; showPairForm(); return; }
+    if (reply.type === "pending") {
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify(reply.payload));
+      setState("waiting");
+      pollApproval();
+      return;
+    }
+    setState(reply.type === "expired" ? "expired" : "pairing");
+    if (payload.pair) {
+      // A used or expired QR code: fall back to the typed code.
+      pairToken = null;
+      $("code").closest("label").hidden = false;
+    }
+    showPairForm(reply.payload.reason || "Pairing failed.");
+  }
+
+  function showPairForm(message) {
+    $("pair").hidden = false;
+    $("waiting").hidden = true;
+    if (message) $("pairMsg").textContent = message;
+  }
+
+  let approvalTimer = 0;
+  async function pollApproval() {
+    clearTimeout(approvalTimer);
+    let pending;
+    try { pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); } catch { pending = null; }
+    if (!pending) return;
+    const reply = await send("pair-status", { request: pending.request, secret: pending.secret });
+    if (!reply) { $("status").textContent = "Reconnecting"; approvalTimer = setTimeout(pollApproval, 2000); return; }
+    if (reply.type === "pending") { approvalTimer = setTimeout(pollApproval, 1000); return; }
+    sessionStorage.removeItem(PENDING_KEY);
+    if (reply.type === "welcome" && reply.payload.token) {
+      store.set(TOKEN_KEY, reply.payload.token);
+      setState("connected");
+      poll(true);
+      return;
+    }
+    setState(reply.type === "unauthorized" ? "unauthorized" : "expired");
+    showPairForm(reply.payload.reason || "Pairing was not approved.");
+  }
+
+  $("pairForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (pairToken) { pair({ pair: pairToken }); return; }
+    const code = $("code").value.replace(/\D/g, "");
+    if (code.length !== 6) { $("pairMsg").textContent = "Type the six-digit code shown on the desk."; return; }
+    pair({ code });
+  });
+  $("cancelPair").addEventListener("click", () => { sessionStorage.removeItem(PENDING_KEY); clearTimeout(approvalTimer); setState("pairing"); showPairForm(); });
+  $("unpair").addEventListener("click", () => { store.set(TOKEN_KEY, ""); clearTimeout(pollTimer); setState("pairing"); showPairForm("This phone was unpaired. Pair again to control the desk."); });
+
+  // ---- Paired: poll state, send commands ----
+  let failures = 0;
+  let pollTimer = 0;
+  let view = "items";
+  let last = null;
+
+  function render(payload) {
+    $("desk").textContent = payload.desk || "Church Studio";
+    $("pCue").textContent = payload.programCue || (payload.programLayout === "empty" ? "Clear" : "—");
+    $("pBody").textContent = payload.programBody || "";
+    $("vCue").textContent = payload.previewCue || "—";
+    $("vBody").textContent = payload.previewBody || "";
+    $("onair").hidden = payload.output !== "on";
+    last = payload;
+    renderList();
+  }
+
+  function renderList() {
+    const list = $("list");
+    list.textContent = "";
+    if (!last) return;
+    let entries = [];
+    try { entries = JSON.parse(view === "items" ? last.items || "[]" : last.scenes || "[]"); } catch { entries = []; }
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = view === "items" ? "No service is open on the desk." : "No scenes yet.";
+      list.append(empty);
+      return;
+    }
+    for (const entry of entries) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = view === "items" ? entry.title : entry.name;
+      if (view === "items" && entry.section) {
+        const small = document.createElement("small");
+        small.textContent = entry.section;
+        button.append(small);
+      }
+      const current = view === "items" ? last.cursor === entry.id : last.scene === entry.id;
+      button.setAttribute("aria-current", current ? "true" : "false");
+      button.addEventListener("click", () => act(view === "items" ? "preview-item" : "preview-scene", view === "items" ? { itemId: entry.id } : { sceneId: entry.id }, button));
+      list.append(button);
+    }
+  }
+
+  function handle(reply) {
+    if (!reply) {
+      failures += 1;
+      setState(failures >= 3 ? "unavailable" : "reconnecting");
+      return false;
+    }
+    failures = 0;
+    if (reply.type === "unauthorized") {
+      store.set(TOKEN_KEY, "");
+      setState("unauthorized");
+      showPairForm(reply.payload.reason || "The desk no longer accepts this phone. Pair again.");
+      return false;
+    }
+    if (reply.type === "state" || reply.type === "ack") {
+      if (state !== "connected") setState("connected");
+      render(reply.payload);
+      return true;
+    }
+    $("padMsg").textContent = reply.payload.reason || "";
+    return true;
+  }
+
+  async function poll(now) {
+    clearTimeout(pollTimer);
+    const token = store.get(TOKEN_KEY);
+    if (!token) return;
+    if (!now && document.hidden) { pollTimer = setTimeout(poll, 3000); return; }
+    const ok = handle(await send("state", { token }));
+    if (!store.get(TOKEN_KEY)) return;
+    // Back off while the desk is away: 1s, 2s, 4s, max 8s.
+    const delay = ok ? 1000 : Math.min(8000, 1000 * 2 ** Math.min(failures, 3));
+    pollTimer = setTimeout(poll, delay);
+  }
+
+  async function act(type, payload, button) {
+    const token = store.get(TOKEN_KEY);
+    if (!token) return;
+    if (navigator.vibrate) navigator.vibrate(10);
+    button && button.classList.add("flash");
+    $("padMsg").textContent = "";
+    handle(await send(type, Object.assign({ token }, payload)));
+    setTimeout(() => button && button.classList.remove("flash"), 250);
+  }
+
+  document.querySelectorAll("[data-cmd]").forEach((button) => {
+    button.addEventListener("click", () => act("command", { id: button.dataset.cmd }, button));
+  });
+  $("tabItems").addEventListener("click", () => { view = "items"; $("tabItems").setAttribute("aria-selected", "true"); $("tabScenes").setAttribute("aria-selected", "false"); renderList(); });
+  $("tabScenes").addEventListener("click", () => { view = "scenes"; $("tabScenes").setAttribute("aria-selected", "true"); $("tabItems").setAttribute("aria-selected", "false"); renderList(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(true); });
+
+  // ---- Start ----
+  const params = new URLSearchParams(location.search);
+  let pairToken = params.get("pair");
+  if (pairToken) history.replaceState(null, "", location.pathname);
+  if (store.get(TOKEN_KEY) && !pairToken) {
+    setState("connecting");
+    poll(true);
+  } else if (sessionStorage.getItem(PENDING_KEY)) {
+    setState("waiting");
+    pollApproval();
+  } else if (pairToken) {
+    store.set(TOKEN_KEY, "");
+    $("pairLead").textContent = "Scanned. Confirm this phone's name, then tap Pair.";
+    setState("pairing");
+    showPairForm();
+    $("code").closest("label").hidden = true;
+  } else {
+    setState("pairing");
+    showPairForm();
+  }
+})();
+</script>
+</body>
+</html>

@@ -53,16 +53,24 @@ import {
 } from "../domain/camera";
 import { importDocument as parseImportedDocument } from "../domain/import-content";
 import {
+  approvePending,
   createPairing,
-  isRemoteClicker,
-  programPadPayload,
+  declinePending,
+  framePayload,
+  pairingUrl,
   readRemoteEnvelope,
+  REMOTE_LIVE_COMMANDS,
   remoteEnvelope,
+  revokeDevice,
   routeRemote,
+  type RemoteDevice,
   type RemoteEnvelope,
+  type RemoteGate,
   type RemotePairing,
+  type RemotePending,
 } from "../domain/remote";
-import { publishRemote, subscribeRemote } from "../remote/channel";
+import { serveRemote } from "../remote/channel";
+import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
@@ -231,8 +239,11 @@ class Session {
   settingsOpen = $state(false);
   settingsSection = $state("appearance");
   remotePairing = $state<RemotePairing | null>(null);
-  remoteTokens = $state<string[]>([]);
+  /** Phones waiting for the operator to allow or decline them. */
+  remotePending = $state<RemotePending[]>([]);
   remoteLanUrl = $state("");
+  remoteLanError = $state("");
+  private remoteDevicesSaved = 0;
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
@@ -565,24 +576,86 @@ class Session {
     return url.toString();
   };
 
-  openRemotePairing = () => {
-    this.remotePairing = createPairing();
-    this.message = `Remote code ${this.remotePairing.code}. Next on the phone takes the following cue.`;
-    if (this.desktop()) void this.attachLanRemote(true);
+  get remoteDevices(): RemoteDevice[] {
+    return this.workspace.remoteDevices ?? [];
+  }
+
+  /** The QR payload: LAN page + one-time pairing token. Empty until the LAN server is up. */
+  remotePairingUrl = () => {
+    const pairing = this.remotePairing;
+    if (!pairing?.token || !this.remoteLanUrl) return "";
+    const host = new URL(this.remoteLanUrl).hostname;
+    return pairingUrl(host, pairing.token);
+  };
+
+  openRemotePairing = async () => {
+    this.remotePairing = createPairing(Date.now(), randomCode(), randomToken(24));
+    this.message = `Scan the QR code on the phone, or type code ${this.remotePairing.code}. You approve each phone here.`;
+    if (this.desktop()) await this.attachLanRemote(true);
   };
 
   closeRemotePairing = () => {
     this.remotePairing = null;
-    this.remoteTokens = [];
-    this.message = "Remote pairing cleared. Unpaired clients cannot change Program.";
+    this.remotePending = [];
+    this.message = "Pairing closed. Paired phones still work until you remove them.";
+  };
+
+  approveRemote = async (requestId: string) => {
+    const token = randomToken();
+    const gate = approvePending(this.remoteGate(), requestId, token, await sha256Hex(token), Date.now());
+    this.applyRemoteGate(gate, true);
+    const device = gate.devices.find((entry) => entry.id === requestId);
+    this.message = `${device?.name ?? "Phone"} can control this desk. Take on the phone changes Program.`;
+  };
+
+  declineRemote = (requestId: string) => {
+    this.applyRemoteGate(declinePending(this.remoteGate(), requestId), false);
+    this.message = "Phone declined. It cannot control this desk.";
+  };
+
+  revokeRemote = (deviceId: string) => {
+    const name = this.remoteDevices.find((device) => device.id === deviceId)?.name ?? "Phone";
+    this.applyRemoteGate(revokeDevice(this.remoteGate(), deviceId), true);
+    this.message = `${name} removed. It can no longer control this desk.`;
+  };
+
+  stopRemoteLan = async () => {
+    this.closeRemotePairing();
+    try {
+      await api.stopRemoteLan();
+    } catch (error) {
+      console.error(error);
+    }
+    this.remoteLanUrl = "";
+    this.message = "Phone remote server stopped.";
+  };
+
+  private remoteGate = (): RemoteGate => ({
+    pairing: this.remotePairing,
+    pending: this.remotePending,
+    devices: this.remoteDevices,
+  });
+
+  /** Persist device changes; lastSeen alone is saved at most every five minutes. */
+  private applyRemoteGate = (gate: RemoteGate, devicesChanged: boolean) => {
+    this.remotePairing = gate.pairing;
+    this.remotePending = gate.pending;
+    const now = Date.now();
+    const membership = (devices: RemoteDevice[]) => devices.map((device) => device.id + device.tokenHash).join("|");
+    const changed = devicesChanged || membership(gate.devices) !== membership(this.remoteDevices);
+    if (!changed && now - this.remoteDevicesSaved < 5 * 60 * 1000) {
+      this.workspace.remoteDevices = gate.devices;
+      return;
+    }
+    this.remoteDevicesSaved = now;
+    this.workspace = { ...this.workspace, remoteDevices: gate.devices };
+    this.persistSoon();
   };
 
   private listenRemote = () => {
     this.unlistenRemote?.();
     if (!canUse("remote-control")) return;
-    this.unlistenRemote = subscribeRemote((envelope) => {
-      void this.dispatchRemote(envelope);
-    });
+    this.unlistenRemote = serveRemote((envelope) => this.dispatchRemote(envelope));
   };
 
   private attachLanRemote = async (start = false) => {
@@ -593,69 +666,87 @@ class Session {
           const parsed = readRemoteEnvelope(event.payload.envelope);
           const reply = parsed
             ? await this.dispatchRemote(parsed)
-            : remoteEnvelope("denied", { reason: "That message was not a remote envelope." });
+            : remoteEnvelope("denied", { reason: "This page is out of date. Reload it." });
           void api.remoteReply(event.payload.id, reply);
         })();
       });
-      if (start || this.remotePairing || this.remoteTokens.length || this.remoteLanUrl) {
+      // Paired phones must reach the desk again after a restart.
+      if (start || this.remotePairing || this.remoteDevices.length || this.remoteLanUrl) {
         let status = await api.startRemoteLan();
         for (let i = 0; i < 8 && !status.listening; i += 1) {
           await new Promise((resolve) => setTimeout(resolve, 50));
           status = await api.remoteLanStatus();
         }
-        this.remoteLanUrl = status.listening ? status.url : this.remoteLanUrl;
+        this.remoteLanUrl = status.listening ? status.url : "";
+        this.remoteLanError = status.listening ? "" : status.error || "The phone remote server could not start.";
       }
     } catch (error) {
       console.error(error);
+      this.remoteLanError = error instanceof Error ? error.message : String(error);
     }
   };
 
   private dispatchRemote = async (envelope: RemoteEnvelope): Promise<RemoteEnvelope> => {
-    const routed = routeRemote({ pairing: this.remotePairing, tokens: this.remoteTokens }, envelope);
-    this.remoteTokens = routed.session.tokens;
-    if (routed.reply.type === "denied") this.message = routed.reply.payload.reason || routed.reply.type;
-    else if (routed.reply.type === "welcome") this.message = "A remote is paired. Next and Previous take the following cue.";
-    if (routed.command) await this.runFromRemote(routed.command);
-    const pad = programPadPayload(this.live.program.model);
-    const reply =
-      routed.reply.type === "ack" || routed.reply.type === "welcome"
-        ? remoteEnvelope(routed.reply.type, { ...routed.reply.payload, ...pad })
-        : routed.reply;
-    publishRemote(reply.type, reply.payload);
-    return reply;
+    const token = envelope.payload.token;
+    const routed = routeRemote(this.remoteGate(), envelope, {
+      now: Date.now(),
+      tokenHash: token ? await sha256Hex(token) : null,
+      newId: () => crypto.randomUUID(),
+      newSecret: () => randomToken(18),
+    });
+    const before = this.remoteDevices;
+    this.applyRemoteGate(routed.gate, routed.gate.devices.length !== before.length);
+    if (routed.reply.type === "pending" && envelope.type === "pair") {
+      const request = routed.gate.pending.find((entry) => entry.id === routed.reply.payload.request);
+      this.message = `${request?.name ?? "A phone"} wants to control this desk. Allow or decline it.`;
+    }
+    const action = routed.action;
+    if (!action) return routed.reply;
+    try {
+      if (action.kind === "command") await this.runFromRemote(action.id);
+      else if (action.kind === "preview-item") await this.selectItem(action.itemId);
+      else if (action.kind === "preview-scene") {
+        const saved = this.workspace.compositions.find((entry) => entry.id === action.sceneId);
+        if (saved) this.previewLook(restoreComposition(saved));
+      }
+    } catch (error) {
+      return remoteEnvelope("denied", { reason: error instanceof Error ? error.message : "The desk could not do that." });
+    }
+    return remoteEnvelope(action.kind === "command" ? "ack" : "state", this.remoteState(action.kind === "command" ? action.id : ""));
   };
 
+  /** What a paired phone sees. Lists are JSON strings because envelope payloads are strings. */
+  private remoteState = (done: string): Record<string, string> => {
+    const service = this.service;
+    const items = service
+      ? service.sections.flatMap((section) =>
+          section.items.map((item) => ({ id: item.id, title: item.title, kind: item.kind, section: section.name })),
+        )
+      : [];
+    const scenes = this.workspace.compositions.map((entry) => ({ id: entry.id, name: entry.name }));
+    return {
+      ...framePayload("program", this.live.program.model),
+      ...framePayload("preview", this.live.preview.model),
+      done,
+      desk: this.workspace.churchName || "Church Studio",
+      output: this.output.online ? "on" : "off",
+      cursor: this.cursor.itemId ?? "",
+      scene: this.lookOnPreview?.id ?? "",
+      items: JSON.stringify(items.slice(0, 200)),
+      scenes: JSON.stringify(scenes.slice(0, 100)),
+      live: REMOTE_LIVE_COMMANDS.join(","),
+    };
+  };
+
+  /** Next/Previous move Preview only (songs, sermon sections, verses, then the rundown). */
   private runFromRemote = async (command: CommandId) => {
-    if (isRemoteClicker(command)) {
-      await this.advanceFromRemote(command === "next" ? 1 : -1);
+    if (command === "next" || command === "previous") {
+      const direction = command === "next" ? 1 : -1;
+      if (this.sermonFocus && (await this.stepSermon(direction))) return;
+      await this.step(direction);
       return;
     }
     await this.run(command);
-  };
-
-  private advanceFromRemote = async (direction: 1 | -1) => {
-    if (this.songFocus) {
-      if (this.stepSong(direction)) {
-        await this.take();
-        return;
-      }
-      this.songFocus = null;
-    }
-    if (this.sermonFocus) {
-      if (await this.stepSermon(direction)) {
-        await this.take();
-        return;
-      }
-    }
-    if (this.live.preview.model.layout === "scripture") {
-      const moved = await this.stepPreviewScripture(direction);
-      if (moved) {
-        await this.take();
-        return;
-      }
-    }
-    await this.step(direction);
-    await this.take();
   };
 
   private stepPreviewScripture = async (direction: 1 | -1): Promise<boolean> => {

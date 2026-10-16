@@ -226,6 +226,7 @@ export function defaultWorkspace(): Workspace {
     displayProfiles,
     compositions: [],
     sources: [],
+    remoteDevices: [],
   };
 }
 

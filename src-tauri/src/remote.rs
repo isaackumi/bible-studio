@@ -1,23 +1,29 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
-use crate::displays::Output;
-
 pub const PORT: u16 = 17891;
-const PAD: &str = include_str!("../resources/remote.html");
+/// The same phone page the browser build serves; one UI for every transport.
+const PAD: &str = include_str!("../../static/remote.html");
+/// Concurrent connections; a phone polls once a second, so this is generous.
+const MAX_CONNECTIONS: usize = 32;
+const MAX_REQUEST: usize = 64 * 1024;
 
 pub struct LanRemote {
     pub listening: Mutex<bool>,
     pub url: Mutex<String>,
+    pub error: Mutex<String>,
     started: Mutex<bool>,
+    stopping: AtomicBool,
+    connections: AtomicUsize,
     pending: Mutex<HashMap<String, mpsc::Sender<Value>>>,
 }
 
@@ -26,52 +32,103 @@ impl Default for LanRemote {
         Self {
             listening: Mutex::new(false),
             url: Mutex::new(String::new()),
+            error: Mutex::new(String::new()),
             started: Mutex::new(false),
+            stopping: AtomicBool::new(false),
+            connections: AtomicUsize::new(0),
             pending: Mutex::new(HashMap::new()),
         }
     }
 }
 
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// The address a phone on this network can reach. A UDP "connect" sends nothing; it only asks
+/// the OS which interface routes there. Private targets keep this working on a LAN without internet.
 pub fn lan_host() -> Option<String> {
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("1.1.1.1:80").ok()?;
-    Some(socket.local_addr().ok()?.ip().to_string())
+    const TARGETS: [&str; 4] = ["1.1.1.1:80", "192.168.1.1:80", "10.0.0.1:80", "172.16.0.1:80"];
+    TARGETS.iter().find_map(|target| {
+        let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+        socket.connect(target).ok()?;
+        let ip = socket.local_addr().ok()?.ip();
+        usable_lan_ip(ip).then(|| ip.to_string())
+    })
+}
+
+fn usable_lan_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => !v4.is_loopback() && !v4.is_unspecified() && !v4.is_link_local(),
+        std::net::IpAddr::V6(_) => false,
+    }
 }
 
 pub fn start(app: AppHandle, lan: Arc<LanRemote>) {
     {
-        let mut started = lan.started.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut started = lock(&lan.started);
         if *started {
             return;
         }
         *started = true;
     }
+    lan.stopping.store(false, Ordering::SeqCst);
     thread::spawn(move || {
-        let Ok(listener) = TcpListener::bind(("0.0.0.0", PORT)) else {
-            if let Ok(mut started) = lan.started.lock() {
-                *started = false;
+        let listener = match TcpListener::bind((Ipv4Addr::UNSPECIFIED, PORT)) {
+            Ok(listener) => listener,
+            Err(error) => {
+                log::error!("remote: bind {PORT}: {error}");
+                *lock(&lan.error) = format!("The phone remote could not use port {PORT}: {error}. Another copy of Church Studio may be running.");
+                *lock(&lan.started) = false;
+                return;
             }
+        };
+        let Some(host) = lan_host() else {
+            log::warn!("remote: no LAN address");
+            *lock(&lan.error) = "This computer is not on a network a phone can reach. Join the same Wi-Fi as the phone.".into();
+            *lock(&lan.started) = false;
             return;
         };
-        let host = lan_host().unwrap_or_else(|| "127.0.0.1".into());
-        if let Ok(mut url) = lan.url.lock() {
-            *url = format!("http://{host}:{PORT}/");
-        }
-        if let Ok(mut listening) = lan.listening.lock() {
-            *listening = true;
-        }
+        *lock(&lan.url) = format!("http://{host}:{PORT}/");
+        lock(&lan.error).clear();
+        *lock(&lan.listening) = true;
+        log::info!("remote: listening on {host}:{PORT}");
         for stream in listener.incoming() {
-            if let Ok(stream) = stream {
-                let app = app.clone();
-                let lan = lan.clone();
-                thread::spawn(move || serve(stream, &app, &lan));
+            if lan.stopping.load(Ordering::SeqCst) {
+                break;
             }
+            let Ok(stream) = stream else { continue };
+            if lan.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                lan.connections.fetch_sub(1, Ordering::SeqCst);
+                drop(stream);
+                continue;
+            }
+            let app = app.clone();
+            let lan = lan.clone();
+            thread::spawn(move || {
+                serve(stream, &app, &lan);
+                lan.connections.fetch_sub(1, Ordering::SeqCst);
+            });
         }
+        *lock(&lan.listening) = false;
+        lock(&lan.url).clear();
+        *lock(&lan.started) = false;
+        log::info!("remote: stopped");
     });
 }
 
+/// Stop accepting phones. The accept loop wakes on a local connection and exits.
+pub fn stop(lan: &LanRemote) {
+    if !*lock(&lan.started) {
+        return;
+    }
+    lan.stopping.store(true, Ordering::SeqCst);
+    let _ = TcpStream::connect_timeout(&(Ipv4Addr::LOCALHOST, PORT).into(), Duration::from_millis(300));
+    lock(&lan.pending).clear();
+}
+
 pub fn reply(lan: &LanRemote, id: String, envelope: Value) {
-    if let Some(tx) = lan.pending.lock().unwrap_or_else(|poison| poison.into_inner()).remove(&id) {
+    if let Some(tx) = lock(&lan.pending).remove(&id) {
         let _ = tx.send(envelope);
     }
 }
@@ -85,14 +142,22 @@ fn serve(mut stream: TcpStream, app: &AppHandle, lan: &LanRemote) {
             Ok(0) => break,
             Ok(n) => {
                 buf.extend_from_slice(&chunk[..n]);
-                if let Some(req) = parse_http(&buf) {
-                    respond(&mut stream, app, lan, req);
-                    return;
+                match parse_http(&buf) {
+                    Parsed::Complete(req) => {
+                        respond(&mut stream, app, lan, req);
+                        return;
+                    }
+                    Parsed::Invalid => {
+                        write_http(&mut stream, 400, "text/plain", b"Bad request");
+                        return;
+                    }
+                    Parsed::Partial => {}
                 }
             }
             Err(_) => break,
         }
-        if buf.len() > 64 * 1024 {
+        if buf.len() > MAX_REQUEST {
+            write_http(&mut stream, 413, "text/plain", b"Too large");
             break;
         }
     }
@@ -104,66 +169,74 @@ struct HttpRequest {
     body: Vec<u8>,
 }
 
-fn parse_http(buf: &[u8]) -> Option<HttpRequest> {
-    let text = std::str::from_utf8(buf).ok()?;
-    let (head, rest) = text.split_once("\r\n\r\n")?;
+enum Parsed {
+    Complete(HttpRequest),
+    Partial,
+    Invalid,
+}
+
+fn parse_http(buf: &[u8]) -> Parsed {
+    let Some(split) = buf.windows(4).position(|window| window == b"\r\n\r\n") else {
+        return Parsed::Partial;
+    };
+    let Ok(head) = std::str::from_utf8(&buf[..split]) else {
+        return Parsed::Invalid;
+    };
+    let rest = &buf[split + 4..];
     let mut lines = head.split("\r\n");
-    let start = lines.next()?;
-    let mut parts = start.split_whitespace();
-    let method = parts.next()?.to_string();
-    let path = parts.next()?.to_string();
+    let mut parts = lines.next().unwrap_or_default().split_whitespace();
+    let (Some(method), Some(target)) = (parts.next(), parts.next()) else {
+        return Parsed::Invalid;
+    };
     let mut length = 0usize;
     for line in lines {
         if let Some((name, value)) = line.split_once(':') {
             if name.eq_ignore_ascii_case("content-length") {
-                length = value.trim().parse().ok()?;
+                match value.trim().parse::<usize>() {
+                    Ok(parsed) if parsed <= MAX_REQUEST => length = parsed,
+                    _ => return Parsed::Invalid,
+                }
             }
         }
     }
-    let body = rest.as_bytes();
-    if body.len() < length {
-        return None;
+    if rest.len() < length {
+        return Parsed::Partial;
     }
-    Some(HttpRequest {
-        method,
+    // Route on the path only; the QR pairing token travels in the query.
+    let path = target.split('?').next().unwrap_or("/").to_string();
+    Parsed::Complete(HttpRequest {
+        method: method.to_string(),
         path,
-        body: body[..length].to_vec(),
+        body: rest[..length].to_vec(),
     })
 }
 
 fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRequest) {
-    if req.method == "OPTIONS" {
-        write_http(stream, 204, "text/plain", b"");
-        return;
-    }
-    if req.method == "GET" && (req.path == "/" || req.path.starts_with("/index")) {
+    if req.method == "GET" && (req.path == "/" || req.path == "/remote.html" || req.path == "/index.html") {
         write_http(stream, 200, "text/html; charset=utf-8", PAD.as_bytes());
         return;
     }
-    if req.method == "GET" && req.path.starts_with("/v1/program") {
-        let program = app
-            .try_state::<Output>()
-            .map(|output| output.program.lock().unwrap_or_else(|poison| poison.into_inner()).clone())
-            .unwrap_or_else(|| json!({}));
-        write_json(stream, program);
-        return;
-    }
-    if req.method == "POST" && req.path.starts_with("/v1/remote") {
+    // Every remote message, including reading Program, is checked by the desk (token hash).
+    if req.method == "POST" && req.path == "/v1/remote" {
         let Ok(body) = serde_json::from_slice::<Value>(&req.body) else {
-            write_json(stream, json!({ "v": 1, "type": "denied", "payload": { "reason": "That message was not a remote envelope." } }));
+            write_http(stream, 400, "text/plain", b"Bad request");
             return;
         };
         let id = Uuid::new_v4().to_string();
         let (tx, rx) = mpsc::channel();
-        lan.pending.lock().unwrap_or_else(|poison| poison.into_inner()).insert(id.clone(), tx);
+        lock(&lan.pending).insert(id.clone(), tx);
         if app.emit("remote-in", json!({ "id": id, "envelope": body })).is_err() {
-            write_json(stream, json!({ "v": 1, "type": "denied", "payload": { "reason": "The desk did not answer." } }));
+            lock(&lan.pending).remove(&id);
+            write_http(stream, 503, "text/plain", b"Desk unavailable");
             return;
         }
-        let reply = rx.recv_timeout(Duration::from_secs(3)).unwrap_or_else(|_| {
-            json!({ "v": 1, "type": "denied", "payload": { "reason": "The desk did not answer." } })
-        });
-        write_json(stream, reply);
+        match rx.recv_timeout(Duration::from_secs(3)) {
+            Ok(reply) => write_json(stream, reply),
+            Err(_) => {
+                lock(&lan.pending).remove(&id);
+                write_http(stream, 503, "text/plain", b"Desk unavailable");
+            }
+        }
         return;
     }
     write_http(stream, 404, "text/plain", b"Not found");
@@ -177,11 +250,15 @@ fn write_json(stream: &mut TcpStream, value: Value) {
 fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u8]) {
     let reason = match status {
         200 => "OK",
-        204 => "No Content",
+        400 => "Bad Request",
+        404 => "Not Found",
+        413 => "Payload Too Large",
+        503 => "Service Unavailable",
         _ => "Error",
     };
+    // Same-origin only: no CORS headers. No referrer, so the QR token never leaves the page.
     let head = format!(
-        "HTTP/1.1 {status} {reason}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: content-type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
@@ -192,21 +269,42 @@ fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u
 mod tests {
     use super::*;
 
+    fn complete(raw: &[u8]) -> HttpRequest {
+        match parse_http(raw) {
+            Parsed::Complete(req) => req,
+            Parsed::Partial => panic!("partial"),
+            Parsed::Invalid => panic!("invalid"),
+        }
+    }
+
     #[test]
     fn parses_a_json_post() {
-        let raw = b"POST /v1/remote HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}";
-        let req = parse_http(raw).expect("request");
+        let req = complete(b"POST /v1/remote HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}");
         assert_eq!(req.method, "POST");
         assert_eq!(req.path, "/v1/remote");
         assert_eq!(req.body, b"{}");
     }
 
     #[test]
-    fn parses_the_pad_get() {
-        let raw = b"GET / HTTP/1.1\r\nHost: 192.168.1.20:17891\r\n\r\n";
-        let req = parse_http(raw).expect("request");
+    fn routes_the_qr_link_on_its_path() {
+        let req = complete(b"GET /?pair=abc123 HTTP/1.1\r\nHost: 192.168.1.20:17891\r\n\r\n");
         assert_eq!(req.method, "GET");
         assert_eq!(req.path, "/");
         assert!(req.body.is_empty());
+    }
+
+    #[test]
+    fn waits_for_a_whole_body_and_rejects_bad_lengths() {
+        assert!(matches!(parse_http(b"POST /v1/remote HTTP/1.1\r\nContent-Length: 10\r\n\r\n{}"), Parsed::Partial));
+        assert!(matches!(parse_http(b"POST /v1/remote HTTP/1.1\r\nContent-Length: nope\r\n\r\n{}"), Parsed::Invalid));
+        assert!(matches!(parse_http(b"POST /v1/remote HTTP/1.1\r\nContent-Length: 99999999\r\n\r\n"), Parsed::Invalid));
+        assert!(matches!(parse_http(b"GET / HTTP/1.1\r\nHost: x"), Parsed::Partial));
+    }
+
+    #[test]
+    fn never_offers_loopback_to_a_phone() {
+        assert!(!usable_lan_ip("127.0.0.1".parse().expect("ip")));
+        assert!(!usable_lan_ip("169.254.10.2".parse().expect("ip")));
+        assert!(usable_lan_ip("192.168.1.20".parse().expect("ip")));
     }
 }
