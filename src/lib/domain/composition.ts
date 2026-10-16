@@ -34,6 +34,7 @@ export type SourceType =
   | "ndi"
   | "plugin"
   | "qr"
+  | "shape"
   | "empty";
 
 export type SourceRef = {
@@ -58,9 +59,22 @@ export type CompositionLayer = {
   sourceKey?: string;
 };
 
+/** A page background for decks: color, two-color gradient, or a picture, with an optional tint. */
+export type PageBackground = {
+  type: "color" | "gradient" | "image";
+  color: string;
+  to: string;
+  angle: number;
+  assetId: string;
+  imageUrl: string;
+  overlay: string;
+  overlayOpacity: number;
+};
+
 export type Composition = {
   id: string;
   name: string;
+  background?: PageBackground;
   /** Full freeze: no rename, layer, or transition edits until unlock. */
   locked: boolean;
   canvas: { width: number; height: number };
@@ -890,12 +904,56 @@ function sanitizeTransition(value: Composition["transition"] | undefined): Compo
   return { type, ms: Math.min(2000, Math.max(0, Math.round(raw))) };
 }
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export function sanitizeBackground(value: unknown): PageBackground | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Partial<PageBackground>;
+  const color = (input: unknown, fallback: string) => (typeof input === "string" && HEX_COLOR.test(input) ? input.toLowerCase() : fallback);
+  const type = record.type === "gradient" || record.type === "image" ? record.type : "color";
+  return {
+    type,
+    color: color(record.color, "#1b1b1f"),
+    to: color(record.to, "#3a2a1a"),
+    angle: Number.isFinite(record.angle) ? Math.round(Number(record.angle)) % 360 : 135,
+    assetId: typeof record.assetId === "string" ? record.assetId : "",
+    imageUrl: typeof record.imageUrl === "string" ? record.imageUrl : "",
+    overlay: color(record.overlay, "#000000"),
+    overlayOpacity: Number.isFinite(record.overlayOpacity) ? Math.min(1, Math.max(0, Number(record.overlayOpacity))) : 0,
+  };
+}
+
+/** CSS for a page background (the tint is a translucent layer over color, gradient or picture). */
+export function backgroundCss(background: PageBackground): string {
+  const tint = (() => {
+    if (!(background.overlayOpacity > 0)) return "";
+    const value = Number.parseInt(background.overlay.slice(1), 16);
+    const rgba = `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${background.overlayOpacity})`;
+    return `linear-gradient(${rgba}, ${rgba}), `;
+  })();
+  if (background.type === "image" && background.imageUrl) return `${tint}center / cover no-repeat url("${background.imageUrl}")`;
+  if (background.type === "gradient") return `${tint}linear-gradient(${background.angle}deg, ${background.color}, ${background.to})`;
+  return tint ? `${tint}${background.color}` : background.color;
+}
+
+export function setCompositionBackground(composition: Composition, background: PageBackground | undefined): Composition {
+  if (composition.locked) return composition;
+  const clean = sanitizeBackground(background);
+  if (!clean) {
+    const { background: _gone, ...rest } = composition;
+    return rest;
+  }
+  return { ...composition, background: clean };
+}
+
 export function sanitizeComposition(value: unknown): Composition {
   const record = value && typeof value === "object" ? (value as Partial<Composition>) : {};
   const base = createComposition(typeof record.name === "string" ? record.name : "Composition");
   const layers = Array.isArray(record.layers) ? record.layers : [];
+  const background = sanitizeBackground(record.background);
   return {
     ...base,
+    ...(background ? { background } : {}),
     id: typeof record.id === "string" && record.id ? record.id : base.id,
     locked: record.locked === true,
     canvas: record.canvas?.width && record.canvas?.height ? record.canvas : base.canvas,
@@ -1098,6 +1156,22 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
   if (source.type === "image") {
     return payload.imageUrl ? presentImage({ theme: ctx.theme, imageUrl: payload.imageUrl }) : presentText({ theme: ctx.theme, layout: "title", heading: source.title, body: "" });
   }
+  if (source.type === "shape") {
+    return {
+      layout: "shape",
+      theme: ctx.theme,
+      reference: null,
+      attribution: null,
+      lines: [],
+      imageUrl: null,
+      backgroundImageUrl: null,
+      shape: {
+        kind: payload.kind === "ellipse" ? "ellipse" : "rect",
+        fill: payload.fill && HEX_COLOR.test(payload.fill) ? payload.fill : "#ffffff",
+        radius: Math.min(50, Math.max(0, Number(payload.radius) || 0)),
+      },
+    };
+  }
   if (source.type === "qr") {
     return presentQr({
       theme: ctx.theme,
@@ -1139,7 +1213,8 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
     return presentLowerThird(ctx.theme, payload.title || source.title, payload.subtitle || "");
   }
   if (source.type === "text") {
-    return presentText({ theme: ctx.theme, layout: "title", heading: payload.heading || source.title, body: payload.body || "" });
+    // An empty heading is deliberate (deck text elements); only a missing one falls back to the title.
+    return presentText({ theme: ctx.theme, layout: "title", heading: payload.heading ?? source.title, body: payload.body || "" });
   }
   if (extra) return extra(source, ctx);
   if (source.type === "plugin") {
@@ -1174,13 +1249,15 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       bounds: layer.bounds,
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,
-      model: compileSource(layer.source, ctx),
+      // On a deck page the page background shows through every element.
+      model: composition.background ? { ...compileSource(layer.source, ctx), fill: "transparent" } : compileSource(layer.source, ctx),
       mirror: layer.source.type === "camera" && layer.source.payload.mirror === "true",
       animation: layer.animation,
     }));
   return {
     layout: "composition",
     theme: ctx.theme,
+    ...(composition.background ? { fill: backgroundCss(composition.background) } : {}),
     reference: composition.name,
     attribution: null,
     lines: [],

@@ -239,6 +239,7 @@ export function defaultWorkspace(): Workspace {
     sources: [],
     remoteDevices: [],
     voice: { commands: true, wake: true, custom: [] },
+    decks: [],
   };
 }
 

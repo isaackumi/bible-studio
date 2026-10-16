@@ -356,5 +356,10 @@ export function withMediaUrls(composition: Composition, resolve: (assetId: strin
     changed = true;
     return { ...layer, source: { ...layer.source, payload: { ...payload, [key]: url } } };
   });
+  const background = composition.background;
+  if (background?.type === "image" && background.assetId) {
+    const url = resolve(background.assetId);
+    if (url && url !== background.imageUrl) return { ...composition, layers, background: { ...background, imageUrl: url } };
+  }
   return changed ? { ...composition, layers } : composition;
 }

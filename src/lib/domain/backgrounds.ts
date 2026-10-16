@@ -38,6 +38,7 @@ export function backgroundFill(background: ThemeBackground): string {
 export function frameBackground(model: PresentationModel, nested = false): string {
   if (model.layout === "black") return "#000000";
   if (nested && (model.layout === "lower-third" || model.layout === "timer" || model.layout === "empty")) return "transparent";
+  if (model.fill) return model.fill;
   if (model.backgroundImageUrl) return `center / cover no-repeat url("${model.backgroundImageUrl}")`;
   const wash = model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null;
   if (wash) return wash.background;

@@ -153,6 +153,12 @@
       <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
       <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={!audio || model.video.muted}></video>
     {/key}
+  {:else if model.layout === "shape" && model.shape}
+    <div
+      class="shape"
+      style:background={model.shape.fill}
+      style:border-radius={model.shape.kind === "ellipse" ? "50%" : `${model.shape.radius}%`}
+    ></div>
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}

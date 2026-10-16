@@ -59,7 +59,8 @@ export type PresentationLayout =
   | "timer"
   | "lower-third"
   | "video"
-  | "qr";
+  | "qr"
+  | "shape";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -110,6 +111,10 @@ export type PresentationModel = {
   qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
   /** An alert riding on top of Program (never Preview), e.g. a nursery call. */
   alert?: ProgramAlert;
+  /** CSS background for the whole frame (deck page gradients); wins over the theme. */
+  fill?: string;
+  /** layout "shape": a filled rectangle or ellipse. */
+  shape?: { kind: "rect" | "ellipse"; fill: string; radius: number };
 };
 
 export type ProgramAlert = {
@@ -137,7 +142,7 @@ export type ProgramAction = "take" | "cut" | "clear" | "black" | "logo";
 
 export const PROGRAM_ACTIONS: ProgramAction[] = ["take", "cut", "clear", "black", "logo"];
 
-export type ItemKind = "bible" | "lyric" | "slide" | "image" | "video" | "announcement" | "composition";
+export type ItemKind = "bible" | "lyric" | "slide" | "image" | "video" | "announcement" | "composition" | "deck";
 
 export type BibleItem = {
   translationId: string;
@@ -158,6 +163,7 @@ export type PresentationItem = {
   image?: { assetId: string };
   video?: { assetId: string; loop: boolean; muted: boolean };
   announcement?: { heading: string; body: string };
+  deck?: { deckId: string };
   /** Text styling for slide and announcement items. */
   style?: TextStyle;
   composition?: { compositionId: string };
@@ -344,6 +350,8 @@ export type Workspace = {
   sources: SharedSourceDocument[];
   /** Phones approved for the LAN remote. Only token hashes are stored. */
   remoteDevices: RemoteDeviceDocument[];
+  /** Slide decks: named, multi-page, each page a canvas of layers. */
+  decks: SlideDeckDocument[];
   voice: VoiceSettings;
 };
 
@@ -354,6 +362,13 @@ export type VoiceSettings = {
   /** Require "Studio …" before a command. */
   wake: boolean;
   custom: Array<{ phrase: string; action: string }>;
+};
+
+export type SlideDeckDocument = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  pages: unknown[];
 };
 
 export type RemoteDeviceDocument = {

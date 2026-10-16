@@ -1,4 +1,6 @@
 <script lang="ts">
+  import DeckLibrary from "../decks/DeckLibrary.svelte";
+  import DeckEditor from "../decks/DeckEditor.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
   import MediaPane from "../MediaPane.svelte";
@@ -688,6 +690,8 @@
     note = `${section.name} added to the queue. Notes were not queued.`;
   }
   let alertsOpen = $state(false);
+  let editingDeckId = $state<string | null>(null);
+  const editingDeck = $derived(session.decks.find((deck) => deck.id === editingDeckId) ?? null);
 </script>
 
 <div class="pb" class:focus>
@@ -1034,9 +1038,11 @@
           </section>
         {:else}
           <section class="pb-panel slides">
+            <DeckLibrary onedit={(id) => (editingDeckId = id)} />
             <div class="slide-bar">
-              <button type="button" class="create" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Create new</button>
-              <button type="button" class="create" onclick={() => slideImport?.click()}>Import text</button>
+              <span class="service-slides">Service slides</span>
+              <button type="button" class="new-slide" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Slide</button>
+              <button type="button" class="new-slide" onclick={() => slideImport?.click()}>Import text</button>
               <input
                 bind:this={slideImport}
                 type="file"
@@ -1208,6 +1214,12 @@
   <AlertsDialog onclose={() => (alertsOpen = false)} />
 {/if}
 
+{#if editingDeck}
+  {#key editingDeck.id}
+    <DeckEditor deck={editingDeck} onclose={() => (editingDeckId = null)} />
+  {/key}
+{/if}
+
 <style>
   .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
   .pb {
@@ -1367,7 +1379,7 @@
   }
   .pb-head { justify-content: space-between; }
   .pb-body { flex: 1; min-height: 0; }
-  .quiet, .mini, .go, .lex, .create {
+  .quiet, .mini, .go, .lex, .new-slide {
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -1388,7 +1400,7 @@
     place-items: center;
     flex: none;
   }
-  .mini:hover, .lex:hover, .steppers button:hover, .create:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+  .mini:hover, .lex:hover, .steppers button:hover, .new-slide:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .mini.on { color: var(--accent); border-color: var(--accent); }
   .script-bar, .slide-bar { padding: 8px; }
   select, .script-bar input, .slide-bar input {
@@ -1462,6 +1474,10 @@
   }
   .hot { background: linear-gradient(160deg, #ff8a3d, #ff5a1f); border-color: transparent; }
   .cool { background: linear-gradient(160deg, #1aa8a0, #0e6e74); border-color: transparent; }
+  .slides .slide-bar { flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 10px; }
+  .slides .slide-bar input { flex: 1 1 200px; }
+  .service-slides { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+  .pb-panel.slides { overflow: auto; }
   .slide-row { display: flex; gap: 10px; overflow: auto; padding: 4px 10px 12px; }
   .slide-editor { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; }
   .slide-editor input, .slide-editor textarea {
@@ -1475,7 +1491,7 @@
   .card { width: 180px; flex: none; min-height: 108px; }
   .card span, .tile { font-weight: 500; }
   .card span { font-size: 12px; opacity: 0.85; }
-  .create { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  .new-slide { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
   .monitor {
     flex: 1;
     min-height: 0;

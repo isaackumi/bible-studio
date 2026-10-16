@@ -114,6 +114,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
+import { deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
@@ -917,6 +918,12 @@ class Session {
     if (item.kind === "video" && item.video) {
       return presentVideo({ theme, videoUrl: this.mediaSrc(item.video.assetId), loop: item.video.loop, muted: item.video.muted });
     }
+    if (item.kind === "deck" && item.deck) {
+      const deck = this.decks.find((entry) => entry.id === item.deck?.deckId);
+      const page = deck?.pages[0];
+      if (!page) return emptyModel(theme);
+      return presentComposition(withMediaUrls(page, this.mediaSrc), { theme, now: Date.now() });
+    }
     if (item.kind === "composition" && item.composition) {
       const saved = this.workspace.compositions.find((entry) => entry.id === item.composition?.compositionId);
       if (!saved) return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
@@ -945,6 +952,13 @@ class Session {
     this.previewBible = found.item.bible ?? null;
     this.cursor = { sectionId: found.section.id, itemId };
     this.library = found.item.kind === "lyric" ? "songs" : found.item.kind === "bible" ? "bible" : found.item.kind === "image" ? "media" : "slides";
+    if (found.item.kind === "deck" && found.item.deck) {
+      const deckId = found.item.deck.deckId;
+      if (this.decks.some((entry) => entry.id === deckId)) this.previewDeckPage(deckId, 0);
+      else this.previewModel(emptyModel(this.theme()), itemId);
+      this.persistSoon();
+      return;
+    }
     if (found.item.kind === "composition") {
       const saved = this.workspace.compositions.find((entry) => entry.id === found.item.composition?.compositionId);
       if (saved) this.previewLook(restoreComposition(saved));
@@ -966,6 +980,16 @@ class Session {
     if (this.songFocus) {
       this.stepSong(direction);
       return;
+    }
+    // A deck on Preview steps by page, then on through the rundown at either end.
+    const focus = this.deckFocus;
+    if (focus && this.live.preview.sourceId === `deck:${focus.deckId}:${focus.index}`) {
+      const deck = this.decks.find((entry) => entry.id === focus.deckId);
+      const next = deck ? stepDeckPage(deck, focus.index, direction) : null;
+      if (deck && next !== null) {
+        this.previewDeckPage(deck.id, next);
+        return;
+      }
     }
     // A verse searched or spoken onto Preview (not the selected service item) steps by verse.
     const cursorItem = this.service && this.cursor.itemId ? findItem(this.service, this.cursor.itemId)?.item : null;
@@ -1473,6 +1497,61 @@ class Session {
     const item: PresentationItem = { id: uid(), kind: "lyric", title, lyric: { songId, sectionId } };
     this.insertItem(target, item);
     void this.selectItem(item.id);
+  };
+
+  /** Slide decks (Slides tab). */
+  get decks(): SlideDeck[] {
+    return (this.workspace.decks ?? []).map(sanitizeDeck).filter((deck): deck is SlideDeck => deck !== null);
+  }
+
+  /** Which deck page is on Preview, so Next/Previous step pages. */
+  deckFocus = $state<{ deckId: string; index: number } | null>(null);
+
+  saveDeck = (deck: SlideDeck) => {
+    const exists = this.decks.some((entry) => entry.id === deck.id);
+    const decks = exists ? this.decks.map((entry) => (entry.id === deck.id ? deck : entry)) : [deck, ...this.decks];
+    this.workspace = { ...this.workspace, decks };
+    this.persistSoon();
+    this.message = `${deck.name} saved.`;
+    // Keep Preview in step with an edited page that is showing.
+    const focus = this.deckFocus;
+    if (focus?.deckId === deck.id && this.live.preview.sourceId === `deck:${deck.id}:${focus.index}`) {
+      this.previewDeckPage(deck.id, Math.min(focus.index, deck.pages.length - 1));
+    }
+  };
+
+  deleteDeck = (id: string) => {
+    const deck = this.decks.find((entry) => entry.id === id);
+    this.workspace = { ...this.workspace, decks: this.decks.filter((entry) => entry.id !== id) };
+    this.persistSoon();
+    if (this.deckFocus?.deckId === id) this.deckFocus = null;
+    this.message = `${deck?.name ?? "Deck"} deleted. Program was not changed.`;
+  };
+
+  /** Put one deck page on Preview. Program waits for LIVE. */
+  previewDeckPage = (deckId: string, index: number) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    const page = deck?.pages[index];
+    if (!deck || !page) return;
+    this.songFocus = null;
+    this.sermonFocus = null;
+    this.lookOnPreview = null;
+    this.previewBible = null;
+    this.deckFocus = { deckId, index };
+    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    this.live = setPreview(this.live, frame(model, `deck:${deckId}:${index}`, page.transition.type === "cut" ? "cut" : "fade"));
+    this.message = `${deck.name}: page ${index + 1} of ${deck.pages.length} on Preview. LIVE sends Program.`;
+  };
+
+  addDeckToService = async (deckId: string) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    if (!deck) return;
+    const target = await this.sectionForMedia();
+    if (!target) return;
+    const item = deckItem(deck);
+    this.insertItem(target, item);
+    await this.selectItem(item.id);
+    this.message = `${deck.name} queued. Preview only until LIVE.`;
   };
 
   /** Add a video to the current section. Preview plays it muted; LIVE plays it on the audience. */
