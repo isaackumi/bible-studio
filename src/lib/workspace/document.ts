@@ -130,6 +130,10 @@ export function normalizeWorkspace(input: unknown): Workspace {
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
     songUses: sanitizeSongUses(value.songUses),
     stageLayout: sanitizeStageLayout(value.stageLayout),
+    backup: {
+      folder: typeof value.backup?.folder === "string" ? value.backup.folder.slice(0, 1000) : "",
+      lastAt: typeof value.backup?.lastAt === "string" ? value.backup.lastAt : "",
+    },
     pco: {
       appId: typeof value.pco?.appId === "string" ? value.pco.appId.trim().slice(0, 200) : "",
       secret: typeof value.pco?.secret === "string" ? value.pco.secret.trim().slice(0, 200) : "",

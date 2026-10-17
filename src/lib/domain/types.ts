@@ -405,6 +405,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** A folder (often a cloud drive) that automatic backups go to, and the last backup time. */
+  backup: { folder: string; lastAt: string };
   /** Planning Center Personal Access Token (kept on this computer). */
   pco: { appId: string; secret: string };
   /** What the stage (confidence) screen shows. */

@@ -1,4 +1,6 @@
 import { noteSongUse } from "../domain/song-usage";
+import { invoke } from "@tauri-apps/api/core";
+import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
@@ -655,6 +657,43 @@ class Session {
       services,
       themes: this.themes,
     };
+  };
+
+  /** Back up to the chosen folder now (desktop). Returns an error to show, or null. */
+  backupNow = async (): Promise<string | null> => {
+    const folder = this.workspace.backup.folder;
+    if (!folder || !this.desktop()) return "Choose a backup folder first.";
+    try {
+      const library = await this.exportLibrary();
+      const snapshot = { ...library, extras: extrasFrom(this.workspace, await api.sermonList()) };
+      await invoke("backup_write", { dir: folder, name: backupName(), contents: JSON.stringify(snapshot) });
+      this.workspace = { ...this.workspace, backup: { ...this.workspace.backup, lastAt: new Date().toISOString() } };
+      this.persistSoon();
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  setBackupFolder = (folder: string) => {
+    this.workspace = { ...this.workspace, backup: { ...this.workspace.backup, folder } };
+    this.persistSoon();
+  };
+
+  /** Bring in the newest backup from the folder: songs, services, sermons, decks, looks and layouts. */
+  restoreLatestBackup = async (): Promise<string> => {
+    const folder = this.workspace.backup.folder;
+    if (!folder || !this.desktop()) return "Choose the backup folder first.";
+    const latest = await invoke<[string, string] | null>("backup_latest", { dir: folder });
+    if (!latest) return "There is no Church Studio backup in that folder yet.";
+    const payload = JSON.parse(latest[1]) as { extras?: Partial<BackupExtras> };
+    await this.importLibrary(payload);
+    const extras = payload.extras ?? {};
+    for (const sermon of Array.isArray(extras.sermons) ? extras.sermons : []) await api.sermonSave(sermon);
+    this.sermons = await api.sermonList();
+    this.workspace = applyExtras(this.workspace, extras);
+    this.persistSoon();
+    return `Restored ${latest[0].replace(/\.json$/, "")}.`;
   };
 
   importLibrary = async (payload: unknown) => {

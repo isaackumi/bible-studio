@@ -327,6 +327,59 @@ fn remote_reply(lan: State<Arc<remote::LanRemote>>, id: String, envelope: Value)
     remote::reply(&lan, id, envelope);
 }
 
+fn backup_file_name(name: &str) -> Result<&str, String> {
+    if name.starts_with("Church Studio backup ") && name.ends_with(".json") && !name.contains(['/', '\\']) && !name.contains("..") {
+        Ok(name)
+    } else {
+        Err("That is not a Church Studio backup file name.".into())
+    }
+}
+
+/// Write a backup into the chosen folder, then keep only the newest twenty there.
+#[tauri::command]
+fn backup_write(dir: String, name: String, contents: String) -> Result<(), String> {
+    let folder = std::path::PathBuf::from(&dir);
+    if !folder.is_dir() {
+        return Err("The backup folder is not there any more. Choose it again.".into());
+    }
+    let name = backup_file_name(&name)?;
+    let temp = folder.join(format!("{name}.partial"));
+    std::fs::write(&temp, contents).map_err(|error| format!("The backup could not be written. {error}"))?;
+    std::fs::rename(&temp, folder.join(name)).map_err(|error| format!("The backup could not be saved. {error}"))?;
+    let mut backups: Vec<String> = std::fs::read_dir(&folder)
+        .map_err(|error| error.to_string())?
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|file| backup_file_name(file).is_ok())
+        .collect();
+    backups.sort();
+    let extra = backups.len().saturating_sub(20);
+    for old in &backups[..extra] {
+        let _ = std::fs::remove_file(folder.join(old));
+    }
+    Ok(())
+}
+
+/// The newest backup in a folder: its name and contents, or nothing.
+#[tauri::command]
+fn backup_latest(dir: String) -> Result<Option<(String, String)>, String> {
+    let folder = std::path::PathBuf::from(&dir);
+    if !folder.is_dir() {
+        return Err("The backup folder is not there any more. Choose it again.".into());
+    }
+    let latest = std::fs::read_dir(&folder)
+        .map_err(|error| error.to_string())?
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|file| backup_file_name(file).is_ok())
+        .max();
+    match latest {
+        Some(name) => {
+            let contents = std::fs::read_to_string(folder.join(&name)).map_err(|error| error.to_string())?;
+            Ok(Some((name, contents)))
+        }
+        None => Ok(None),
+    }
+}
+
 /// The desktop crash log (Rust panics), for a problem report. Empty when nothing crashed.
 #[tauri::command]
 fn crash_log(app: tauri::AppHandle) -> String {
@@ -408,6 +461,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pco_get,
             crash_log,
+            backup_write,
+            backup_latest,
             output_status,
             open_audience,
             close_audience,
