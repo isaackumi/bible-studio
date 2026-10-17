@@ -73,6 +73,8 @@ import {
   presentSavedLook,
   sourceRef,
   setCompositionEdges,
+  scriptureLayerOf,
+  withLiveScripture,
 } from "./composition";
 import { applyProgramAction, createLiveState, programPacket, sameProgram } from "./live";
 import { deliverProgram, outputSinks } from "../display/engine";
@@ -1333,5 +1335,17 @@ describe("side-by-side regions fill the screen and show their edges", () => {
     const chosen = restoreComposition(JSON.parse(JSON.stringify({ ...old, edges: "touch" })));
     expect(chosen.layers[0]!.fit).toBe("contain");
     expect(chosen.edges).toBe("touch");
+  });
+});
+
+describe("live scripture in a look", () => {
+  it("finds the scripture region and moves its verse even when the look is locked", () => {
+    const look = setCompositionLocked(lookScriptureCamera({ camera: { id: "c", label: "Cam" }, reference: "John 3:16", body: "For God so loved", attribution: "KJV", verse: 16 }), true);
+    const layer = scriptureLayerOf(look)!;
+    expect(layer.source.payload.reference).toBe("John 3:16");
+    const next = withLiveScripture(look, layer.id, { reference: "John 3:17", body: "For God sent not", attribution: "KJV", verse: 17, translationId: "kjv" });
+    const moved = scriptureLayerOf(next)!;
+    expect(moved.source.payload).toMatchObject({ reference: "John 3:17", translationId: "kjv", verse: "17" });
+    expect(next.locked).toBe(true);
   });
 });

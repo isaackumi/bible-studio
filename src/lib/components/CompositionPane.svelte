@@ -197,7 +197,7 @@
       scriptureAttr = fields.attribution;
       verseQuery = fields.reference;
       if (translationId) verseTranslation = translationId;
-      touch(assignScripture(draft, selected.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse }));
+      touch(assignScripture(draft, selected.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse, translationId }));
       return true;
     } catch (error) {
       verseNote = error instanceof Error ? error.message : "That verse could not be loaded.";

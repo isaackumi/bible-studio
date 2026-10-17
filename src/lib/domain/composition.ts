@@ -702,7 +702,7 @@ export function assignText(composition: Composition, layerId: string, heading: s
 export function assignScripture(
   composition: Composition,
   layerId: string,
-  input: { reference: string; body: string; attribution?: string; verse?: number },
+  input: { reference: string; body: string; attribution?: string; verse?: number; translationId?: string },
 ): Composition {
   const reference = input.reference.trim() || "Scripture";
   const verse = Number.isFinite(input.verse) ? Math.max(1, Math.round(Number(input.verse))) : 1;
@@ -714,8 +714,42 @@ export function assignScripture(
       body: input.body,
       attribution: input.attribution?.trim() || "",
       verse: String(verse),
+      ...(input.translationId ? { translationId: input.translationId } : {}),
     }),
   );
+}
+
+/** The first visible scripture region of a look, if it has one. */
+export function scriptureLayerOf(composition: Composition): CompositionLayer | undefined {
+  return layerOrder(composition).find((layer) => layer.visible && layer.source.type === "scripture");
+}
+
+/**
+ * Put a verse in a look's scripture region while the service runs. Unlike editing, this works on
+ * a locked look: a lock stops the layout changing, not the verse moving on.
+ */
+export function withLiveScripture(
+  composition: Composition,
+  layerId: string,
+  input: { reference: string; body: string; attribution: string; verse: number; translationId: string },
+): Composition {
+  const reference = input.reference.trim() || "Scripture";
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => {
+      if (layer.id !== layerId) return layer;
+      const style = layer.source.payload.style;
+      const source = sourceRef("scripture", reference, reference, {
+        reference,
+        body: input.body,
+        attribution: input.attribution,
+        verse: String(Math.max(1, Math.round(input.verse) || 1)),
+        translationId: input.translationId,
+        ...(style ? { style } : {}),
+      });
+      return { ...layer, source: sanitizeSource(source) };
+    }),
+  };
 }
 
 export function assignSong(composition: Composition, layerId: string, input: { label: string; body: string }): Composition {

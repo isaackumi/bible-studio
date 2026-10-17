@@ -6,7 +6,7 @@ import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { stepVerse } from "../bible/passage";
+import { shiftPassage, stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
@@ -28,6 +28,10 @@ import {
   persistLook,
   presentComposition,
   swapSides,
+  scriptureLayerOf,
+  compositionIdFromSource,
+  compositionSourceId,
+  withLiveScripture,
   layoutFromLook,
   presentSavedLook,
   previewComposition,
@@ -271,6 +275,8 @@ class Session {
   cameraNote = $state("");
   /** Last look put on Preview (saved or draft). Used so TAKE can read its transition before Save. */
   lookOnPreview = $state<Composition | null>(null);
+  /** The look on Program as it was taken (with any verse stepped since), so it can move on live. */
+  lookOnProgram = $state<Composition | null>(null);
   previewBible = $state<BibleItem | null>(null);
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
@@ -1192,6 +1198,8 @@ class Session {
       this.previewBible !== null &&
       cursorItem?.bible?.reference !== this.previewBible.reference;
     if (freeVerse && (await this.stepPreviewScripture(direction))) return;
+    // A look with a scripture region on Preview steps its verse.
+    if (this.lookVerse("preview") && (await this.stepLookVerse("preview", direction))) return;
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
     if (next.itemId && next.itemId !== this.cursor.itemId) await this.selectItem(next.itemId);
@@ -1210,6 +1218,102 @@ class Session {
     const model = presentComposition(withMediaUrls(clean, this.mediaSrc), { theme: this.theme(), now: Date.now() });
     this.live = previewComposition(this.live, model, clean.id);
     this.message = `${clean.name} is on Preview. LIVE still sends Program.`;
+  };
+
+  /**
+   * The look showing on Preview or Program. Program keeps the copy that was taken (and stepped);
+   * otherwise the saved look with that id.
+   */
+  lookAt = (target: "preview" | "program"): Composition | null => {
+    const frameNow = target === "preview" ? this.live.preview : this.live.program;
+    const id = compositionIdFromSource(frameNow.sourceId);
+    if (!id || frameNow.model.layout !== "composition") return null;
+    const held = target === "preview" ? this.lookOnPreview : this.lookOnProgram;
+    if (held?.id === id) return held;
+    if (target === "program" && this.lookOnPreview?.id === id) return this.lookOnPreview;
+    const saved = this.workspace.compositions.find((entry) => entry.id === id);
+    return saved ? restoreComposition(saved) : null;
+  };
+
+  /** The verse in the scripture region of the look on Preview or Program. */
+  lookVerse = (target: "preview" | "program"): { reference: string; translationId: string } | null => {
+    const look = this.lookAt(target);
+    const layer = look ? scriptureLayerOf(look) : undefined;
+    if (!layer) return null;
+    return { reference: layer.source.payload.reference ?? "", translationId: this.translationForLayer(layer.source.payload) };
+  };
+
+  /** The translation a region's verse came from: saved with it, or matched by its attribution. */
+  private translationForLayer = (payload: Record<string, string>): string => {
+    if (payload.translationId && this.translations.some((entry) => entry.id === payload.translationId)) return payload.translationId;
+    const named = this.translations.find((entry) => entry.abbreviation === payload.attribution || attributionFor(entry) === payload.attribution);
+    return named?.id ?? this.translations[0]?.id ?? "";
+  };
+
+  /**
+   * Put a verse in the look on Preview or Program. Program changes at once (that is the point of
+   * the Live row); Preview waits for GO LIVE as always.
+   */
+  setLookVerse = async (target: "preview" | "program", reference: string, translationId?: string): Promise<boolean> => {
+    const look = this.lookAt(target);
+    const layer = look ? scriptureLayerOf(look) : undefined;
+    if (!look || !layer) {
+      this.message = target === "program" ? "The look on Program has no scripture region." : "Put a look with a scripture region on Preview first.";
+      return false;
+    }
+    const translation = translationId ?? this.translationForLayer(layer.source.payload);
+    const fields = await this.scriptureFields(reference, translation);
+    if (!fields || fields.type !== "scripture") {
+      this.message = `Nothing found for “${reference.trim()}”. Try John 3:16 or Psalm 23:1-3.`;
+      return false;
+    }
+    const next = withLiveScripture(look, layer.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse, translationId: translation });
+    const model = presentComposition(withMediaUrls(next, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    if (target === "preview") {
+      this.lookOnPreview = next;
+      this.live = setPreview(this.live, frame(model, compositionSourceId(next.id), "cut"));
+      this.message = `${fields.reference} is on Preview. GO LIVE sends it.`;
+      return true;
+    }
+    if (!this.desktop() && !this.controlsAudience) {
+      this.message = "This window is not sending to the audience.";
+      return false;
+    }
+    this.lookOnProgram = next;
+    this.live = replaceProgramModel(this.live, model, "fade");
+    await this.pushProgram();
+    this.message = `${fields.reference} is live.`;
+    return true;
+  };
+
+  /** Next or previous verse in a look's scripture region (a range moves by its own length, on into the next chapter). */
+  stepLookVerse = async (target: "preview" | "program", direction: 1 | -1): Promise<boolean> => {
+    const current = this.lookVerse(target);
+    const parsed = current ? parseReference(current.reference, this.books) : null;
+    if (!current || !parsed?.startVerse) return false;
+    const book = this.books.find((entry) => entry.ord === parsed.bookOrd);
+    if (!book) return false;
+    const passage: BibleItem = {
+      translationId: current.translationId,
+      bookOrd: parsed.bookOrd,
+      chapter: parsed.chapter,
+      startVerse: parsed.startVerse,
+      endVerse: parsed.endVerse ?? parsed.startVerse,
+      reference: current.reference,
+    };
+    const verses = await api.verses(current.translationId, parsed.bookOrd, parsed.chapter);
+    let next = shiftPassage(passage, direction, book, verses.length);
+    if (!next) {
+      const chapter = parsed.chapter + direction;
+      if (chapter < 1 || chapter > book.chapters) {
+        this.message = direction > 0 ? `That is the end of ${book.name}.` : `That is the start of ${book.name}.`;
+        return false;
+      }
+      const count = direction > 0 ? 1 : (await api.verses(current.translationId, parsed.bookOrd, chapter)).length;
+      if (count < 1) return false;
+      next = { ...passage, chapter, startVerse: count, endVerse: count, reference: formatReference(book.name, chapter, count, count, book.chapters) };
+    }
+    return this.setLookVerse(target, next.reference, current.translationId);
   };
 
   /** Swap sides of the look on Preview (mirror left to right). Program is untouched. */
@@ -2904,6 +3008,8 @@ class Session {
         }
       }
     }
+    // Remember the look that went live, so its verse can step on Program.
+    this.lookOnProgram = action === "take" || action === "cut" ? this.lookAt("program") : null;
     await this.pushProgram();
     this.message =
       action === "take"

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createLiveState, frame, sameProgram, setPreview } from "../domain/live";
 import { defaultTheme } from "../domain/theme";
 import type { BibleItem, PresentationModel } from "../domain/types";
-import { stepVerse } from "./passage";
+import { shiftPassage, stepVerse } from "./passage";
 
 const john: BibleItem = {
   translationId: "kjv",
@@ -43,5 +43,22 @@ describe("verse stepping", () => {
     expect(sameProgram(before, state)).toBe(true);
     expect(state.preview.model.reference).toBe("John 3:17");
     expect(state.program.model.layout).toBe("empty");
+  });
+});
+
+describe("shiftPassage", () => {
+  const book = { name: "1 Corinthians", chapters: 16 };
+  const love: BibleItem = { translationId: "kjv", bookOrd: 46, chapter: 13, startVerse: 4, endVerse: 5, reference: "1 Corinthians 13:4-5" };
+
+  it("moves a range by its own length", () => {
+    expect(shiftPassage(love, 1, book, 13)?.reference).toBe("1 Corinthians 13:6-7");
+    expect(shiftPassage(love, -1, book, 13)?.reference).toBe("1 Corinthians 13:2-3");
+  });
+
+  it("shortens at the ends of the chapter and stops past them", () => {
+    expect(shiftPassage({ ...love, startVerse: 10, endVerse: 11 }, 1, book, 13)?.reference).toBe("1 Corinthians 13:12-13");
+    expect(shiftPassage({ ...love, startVerse: 12, endVerse: 13 }, 1, book, 13)).toBeNull();
+    expect(shiftPassage({ ...love, startVerse: 2, endVerse: 3 }, -1, book, 13)?.reference).toBe("1 Corinthians 13:1");
+    expect(shiftPassage({ ...love, startVerse: 1, endVerse: 2 }, -1, book, 13)).toBeNull();
   });
 });

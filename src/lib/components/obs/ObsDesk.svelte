@@ -1,5 +1,6 @@
 <script lang="ts">
   import VideoControls from "../VideoControls.svelte";
+  import LookScripture from "./LookScripture.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
@@ -484,6 +485,7 @@
           <Icon name="logo" size={16} /> LOGO
         </button>
       </div>
+      <LookScripture />
       <TimerControls />
       <VideoControls />
     </aside>
