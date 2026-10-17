@@ -86,7 +86,7 @@ import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
-import { lyricsFor, sanitizeSong, sectionPlace, songError, stepSongSection } from "../domain/song";
+import { cleanFolder, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
@@ -1782,6 +1782,69 @@ class Session {
     this.songs = await api.songList();
     if (this.songFocus?.songId === clean.id) this.previewSongSection(clean, this.songFocus.sectionId);
     return true;
+  };
+
+  /** Add an empty song folder. Returns the folder name, or null when the name is empty. */
+  createSongFolder = (name: string): string | null => {
+    const clean = cleanFolder(name);
+    if (!clean) return null;
+    const existing = this.workspace.songFolders.find((entry) => entry.toLowerCase() === clean.toLowerCase());
+    if (existing) return existing;
+    this.workspace = { ...this.workspace, songFolders: sanitizeFolderNames([...this.workspace.songFolders, clean]) };
+    this.persistSoon();
+    return clean;
+  };
+
+  /** Rename a folder and move its songs with it. */
+  renameSongFolder = async (from: string, to: string): Promise<string | null> => {
+    const clean = cleanFolder(to);
+    if (!clean) return null;
+    const same = (name: string | undefined) => cleanFolder(name).toLowerCase() === from.toLowerCase();
+    for (const song of this.songs.filter((entry) => same(entry.folder))) await api.songSave(sanitizeSong({ ...song, folder: clean }));
+    this.workspace = {
+      ...this.workspace,
+      songFolders: sanitizeFolderNames([...this.workspace.songFolders.filter((entry) => !same(entry)), clean]),
+    };
+    this.persistSoon();
+    this.songs = await api.songList();
+    return clean;
+  };
+
+  /** Remove a folder. Its songs stay in the library, unfiled. */
+  deleteSongFolder = async (name: string) => {
+    const same = (entry: string | undefined) => cleanFolder(entry).toLowerCase() === name.toLowerCase();
+    for (const song of this.songs.filter((entry) => same(entry.folder))) await api.songSave(sanitizeSong({ ...song, folder: "" }));
+    this.workspace = { ...this.workspace, songFolders: this.workspace.songFolders.filter((entry) => !same(entry)) };
+    this.persistSoon();
+    this.songs = await api.songList();
+  };
+
+  moveSongToFolder = async (song: Song, folder: string) => {
+    const clean = cleanFolder(folder);
+    if (clean) this.createSongFolder(clean);
+    await api.songSave(sanitizeSong({ ...song, folder: clean }));
+    this.songs = await api.songList();
+    this.message = clean ? `${song.title} moved to ${clean}.` : `${song.title} removed from its folder.`;
+  };
+
+  /** Import lyric / ChordPro files as songs in a folder. Files with no lyrics are skipped. */
+  importSongFiles = async (files: { name: string; text: string }[], folder: string): Promise<{ added: number; skipped: string[] }> => {
+    const clean = cleanFolder(folder);
+    if (clean) this.createSongFolder(clean);
+    let added = 0;
+    const skipped: string[] = [];
+    for (const file of files) {
+      const song = songFromFile(file.name, file.text, clean);
+      if (!song || songError(song)) {
+        skipped.push(file.name);
+        continue;
+      }
+      await api.songSave(song);
+      added += 1;
+    }
+    this.songs = await api.songList();
+    this.message = `${added} song${added === 1 ? "" : "s"} imported${clean ? ` to ${clean}` : ""}.${skipped.length ? ` ${skipped.length} file${skipped.length === 1 ? "" : "s"} had no lyrics.` : ""}`;
+    return { added, skipped };
   };
 
   deleteSong = async (id: string) => {

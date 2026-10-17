@@ -5,6 +5,7 @@ import { sanitizeSharedSource } from "../domain/sources";
 import { sanitizeRemoteDevices } from "../domain/remote";
 import { sanitizeVoiceSettings } from "../voice/commands";
 import { sanitizeDeck } from "../domain/decks";
+import { sanitizeFolderNames } from "../domain/song";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -111,5 +112,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],
+    songFolders: sanitizeFolderNames(value.songFolders),
   };
 }

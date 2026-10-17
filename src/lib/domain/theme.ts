@@ -220,6 +220,7 @@ export function defaultWorkspace(): Workspace {
   const displayProfiles = factoryProfiles();
   return {
     schemaVersion: 2,
+    songFolders: [],
     churchName: "",
     logoAssetId: null,
     logoText: "Church Studio",

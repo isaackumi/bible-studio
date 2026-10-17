@@ -19,12 +19,75 @@ export function sanitizeSong(song: Song): Song {
     const label = section.label?.trim() || defaultLabel(kind, sections);
     sections.push({ id: section.id, kind, label, lines });
   }
+  const folder = cleanFolder(song.folder);
   return {
     id: song.id,
     title: song.title.trim(),
     author: song.author.trim(),
     sections,
+    ...(folder ? { folder } : {}),
   };
+}
+
+/** A folder name: trimmed, single-spaced, at most 60 characters. Empty means no folder. */
+export function cleanFolder(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+}
+
+export function sanitizeFolderNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const entry of value) {
+    const name = cleanFolder(entry);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    names.push(name);
+  }
+  return names;
+}
+
+/** Every folder: the saved (possibly empty) ones plus any a song names, sorted, with counts. */
+export function songFolders(songs: Song[], saved: string[]): { name: string; count: number }[] {
+  const counts = new Map<string, { name: string; count: number }>();
+  for (const name of saved) counts.set(name.toLowerCase(), { name, count: 0 });
+  for (const song of songs) {
+    const name = cleanFolder(song.folder);
+    if (!name) continue;
+    const entry = counts.get(name.toLowerCase());
+    if (entry) entry.count += 1;
+    else counts.set(name.toLowerCase(), { name, count: 1 });
+  }
+  return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+/** Songs in a folder (null: all songs) matching a query in title, author or lyrics. Title matches first. */
+export function filterSongs(songs: Song[], folder: string | null, query: string): Song[] {
+  const needle = query.trim().toLowerCase();
+  const inFolder = folder === null ? songs : songs.filter((song) => cleanFolder(song.folder).toLowerCase() === folder.toLowerCase());
+  const byTitle = (a: Song, b: Song) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  if (!needle) return [...inFolder].sort(byTitle);
+  const head: Song[] = [];
+  const body: Song[] = [];
+  for (const song of inFolder) {
+    if (`${song.title} ${song.author}`.toLowerCase().includes(needle)) head.push(song);
+    else if (song.sections.some((section) => section.lines.join(" ").toLowerCase().includes(needle))) body.push(song);
+  }
+  return [...head.sort(byTitle), ...body.sort(byTitle)];
+}
+
+/** A song from a lyric or ChordPro file. The title falls back to the file name. Null when no lyrics. */
+export function songFromFile(filename: string, text: string, folder: string, newId: () => string = () => crypto.randomUUID()): Song | null {
+  const parsed = parseLyrics(text, newId);
+  if (parsed.sections.length === 0) return null;
+  const fallback = filename.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled song";
+  return sanitizeSong({
+    id: newId(),
+    title: parsed.title?.trim() || fallback,
+    author: parsed.author?.trim() ?? "",
+    sections: parsed.sections,
+    folder,
+  });
 }
 
 export function songError(song: Song): string | null {

@@ -3,7 +3,7 @@ import { applyProgramAction, createLiveState, frame, sameProgram, setPreview } f
 import { presentLyrics, presentScripture } from "./present";
 import { defaultTheme, sanitizeTheme } from "./theme";
 import type { Song } from "./types";
-import { lyricsFor, moveSongSection, parseLyrics, sanitizeSong, sectionPlace, songError, stepSongSection } from "./song";
+import { filterSongs, lyricsFor, moveSongSection, parseLyrics, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFolders, songFromFile, stepSongSection } from "./song";
 
 const theme = defaultTheme();
 
@@ -138,5 +138,45 @@ describe("paste-to-song lyric import", () => {
 
   it("returns nothing for empty input", () => {
     expect(parseLyrics("   \n\n ", id).sections).toEqual([]);
+  });
+});
+
+describe("song folders", () => {
+  const song = (id: string, title: string, folder?: string, line = "Line one"): Song => ({
+    id,
+    title,
+    author: "",
+    sections: [{ id: `${id}-s`, kind: "verse", label: "Verse 1", lines: [line] }],
+    ...(folder !== undefined ? { folder } : {}),
+  });
+
+  it("keeps a cleaned folder on a song and drops an empty one", () => {
+    expect(sanitizeSong(song("a", "A", "  Hymns   Old ")).folder).toBe("Hymns Old");
+    expect("folder" in sanitizeSong(song("a", "A", "   "))).toBe(false);
+  });
+
+  it("lists saved and used folders once each, with counts", () => {
+    const songs = [song("a", "A", "Hymns"), song("b", "B", "hymns"), song("c", "C", "Worship"), song("d", "D")];
+    expect(songFolders(songs, ["Christmas", "Hymns"])).toEqual([
+      { name: "Christmas", count: 0 },
+      { name: "Hymns", count: 2 },
+      { name: "Worship", count: 1 },
+    ]);
+    expect(sanitizeFolderNames(["Hymns", " hymns ", "", 4, "Kids"])).toEqual(["Hymns", "Kids"]);
+  });
+
+  it("filters by folder and query, title matches before lyric matches", () => {
+    const songs = [song("a", "Zion", "Hymns", "grace abounds"), song("b", "Grace Alone", "Hymns"), song("c", "Other", "Worship", "grace")];
+    expect(filterSongs(songs, "Hymns", "grace").map((entry) => entry.id)).toEqual(["b", "a"]);
+    expect(filterSongs(songs, null, "").map((entry) => entry.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("makes a song from a lyric file, titled by the file when the file has no title", () => {
+    let n = 0;
+    const id = () => `id${++n}`;
+    const made = songFromFile("blessed_assurance.txt", "Blessed assurance Jesus is mine\nOh what a foretaste\n\nThis is my story", "Hymns", id);
+    expect(made).toMatchObject({ title: "blessed assurance", folder: "Hymns" });
+    expect(made?.sections).toHaveLength(2);
+    expect(songFromFile("empty.txt", "   \n\n", "Hymns", id)).toBeNull();
   });
 });

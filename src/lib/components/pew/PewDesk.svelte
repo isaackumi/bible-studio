@@ -9,14 +9,14 @@
   import { formatReference, parseReference } from "../../bible/reference";
   import { api } from "../../db/api";
   import { attachSermonItem, deskNotes, moveSermonSection, removeSermonSection, sanitizeSermon, searchSermonHits } from "../../domain/sermon";
-  import { moveSongSection, parseLyrics, removeSongSection } from "../../domain/song";
-  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, Song, SongSection, SongSectionKind, TextStyle, VerseText } from "../../domain/types";
+  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, TextStyle, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
+  import SongDesk from "./SongDesk.svelte";
   import OutputMenu from "../OutputMenu.svelte";
   import ToolMenu from "../ToolMenu.svelte";
   import OutputType from "../OutputType.svelte";
@@ -48,10 +48,6 @@
   let detections = $state<SearchHit[]>([]);
   let note = $state("Loading scripture…");
   let sheet = $state<"help" | "lexicon" | "type" | null>(null);
-  let songTitle = $state("");
-  let songAuthor = $state("");
-  let songSections = $state<SongSection[]>([{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }]);
-  let songQuery = $state("");
   let sermonId = $state("");
   let sermonTitle = $state("");
   let sermonSpeaker = $state("");
@@ -140,11 +136,6 @@
   const queue = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
   const reading = $derived(
     verses.filter((verse) => start !== null && verse.verse >= start && verse.verse <= (end ?? start)),
-  );
-  const visibleSongs = $derived(
-    session.songs.filter((song) =>
-      `${song.title} ${song.author}`.toLowerCase().includes(songQuery.trim().toLowerCase()),
-    ),
   );
   const sermonHits = $derived(
     sermonQuery.trim()
@@ -376,96 +367,10 @@
     void session.selectItem(item.id);
   }
 
-  function previewLyrics(title: string, label: string, lines: string[]) {
-    session.songFocus = null;
-    void session.previewModel(
-      {
-        layout: "lyrics",
-        theme: session.theme(),
-        reference: label || title,
-        attribution: null,
-        lines: lines.filter((line) => line.trim()).map((text) => ({ text })),
-        imageUrl: null,
-        backgroundImageUrl: null,
-      },
-      null,
-    );
-    mode = "songs";
-  }
-
-  let pasteText = $state("");
-
-  /** Replace the draft with sections parsed from pasted text or a ChordPro/text file. */
-  function applyLyrics(text: string) {
-    const parsed = parseLyrics(text);
-    if (!parsed.sections.length) {
-      note = "No lyrics found. Paste lines of a song, with a blank line between sections.";
-      return;
-    }
-    songSections = parsed.sections;
-    if (!songTitle.trim() && parsed.title) songTitle = parsed.title;
-    if (!songAuthor.trim() && parsed.author) songAuthor = parsed.author;
-    pasteText = "";
-    note = `${parsed.sections.length} section${parsed.sections.length === 1 ? "" : "s"} ready. Check the labels, then Save song.`;
-  }
-
-  async function importLyricFile(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) return;
-    if (file.size > 512 * 1024) {
-      note = `${file.name} is too large for a lyric file.`;
-      return;
-    }
-    applyLyrics(await file.text());
-  }
-
-  function addSongSection(kind: SongSectionKind) {
-    const count = songSections.filter((section) => section.kind === kind).length + 1;
-    const label = kind === "verse" ? `Verse ${count}` : kind === "chorus" ? "Chorus" : kind === "bridge" ? "Bridge" : "Tag";
-    songSections = [...songSections, { id: crypto.randomUUID(), kind, label, lines: [""] }];
-  }
-
-  function previewDraft() {
-    const first = songSections[0];
-    if (!first) return;
-    previewLyrics(songTitle || "Untitled song", first.label, first.lines);
-  }
-
-  async function saveSong(event: Event) {
-    event.preventDefault();
-    const form = event.currentTarget as HTMLFormElement;
-    const title = (form.querySelector<HTMLInputElement>("[aria-label='Song title']")?.value ?? songTitle).trim();
-    const author = (form.querySelector<HTMLInputElement>("[aria-label='Song author']")?.value ?? songAuthor).trim();
-    const labels = [...form.querySelectorAll<HTMLInputElement>("[aria-label='Section label']")];
-    const areas = [...form.querySelectorAll<HTMLTextAreaElement>("textarea:not([aria-label='Paste lyrics'])")];
-    const sections = songSections.map((section, index) => ({
-      ...section,
-      label: labels[index]?.value.trim() || section.label,
-      lines: (areas[index]?.value ?? section.lines.join("\n")).split("\n"),
-    }));
-    const song: Song = {
-      id: crypto.randomUUID(),
-      title,
-      author,
-      sections,
-    };
-    const saved = await session.saveSong(song);
-    if (!saved) {
-      note = session.message;
-      return;
-    }
-    songTitle = "";
-    songAuthor = "";
-    songSections = [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }];
-    note = `${song.title} saved. Preview only until you press LIVE.`;
-    session.previewSongSection(song, song.sections[0]?.id ?? null);
-  }
-
   // Voice runs in the session (both desks). This desk turns heard words into verses on Preview.
   function detectSpokenVerse(text: string, _final: boolean, alternatives: string[]) {
-    if (!text) return;
+    // While songs are up, lyrics that quote scripture must not pull a verse onto Preview.
+    if (!text || mode === "songs") return;
     const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
     const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
     const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
@@ -524,12 +429,6 @@
   function toggleVoice() {
     if (!voiceActive) lastSpokenRef = "";
     void session.toggleVoice();
-  }
-
-  async function queueSong(song: Song, section: SongSection) {
-    await ensureService("Songs");
-    session.addLyric(song.id, section.id, `${song.title} — ${section.label}`);
-    note = `${song.title} added to the queue.`;
   }
 
   function emptyDraftSection(name = "Section"): DraftSermonSection {
@@ -842,91 +741,7 @@
       </div>
     </section>
   {:else if mode === "songs"}
-    <section class="pb-songs">
-      <div class="song-desk">
-        <form class="song-editor" onsubmit={saveSong}>
-          <span class="note-icon">{@render icon("note")}</span>
-          <h1>Songs</h1>
-          <p>Write a lyric, preview it, then add it to the queue. LIVE sends the preview to program.</p>
-          {#if note}<p>{note}</p>{/if}
-          <input aria-label="Song title" placeholder="Song title" bind:value={songTitle} />
-          <input aria-label="Song author" placeholder="Author" bind:value={songAuthor} />
-          <details class="paste-lyrics">
-            <summary>Paste lyrics or import a file</summary>
-            <textarea
-              aria-label="Paste lyrics"
-              rows="6"
-              placeholder="Paste a whole song. Blank lines split sections; “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro works too."
-              bind:value={pasteText}
-            ></textarea>
-            <div class="song-actions">
-              <button type="button" onclick={() => applyLyrics(pasteText)}>Split into sections</button>
-              <label class="file-pick">
-                Import .txt / ChordPro
-                <input type="file" accept=".txt,.cho,.chordpro,.chopro,.crd,text/plain" onchange={importLyricFile} />
-              </label>
-            </div>
-          </details>
-          {#each songSections as section, index (section.id)}
-            <input aria-label="Section label" bind:value={section.label} />
-            <textarea
-              aria-label="{section.label} lines"
-              rows="4"
-              placeholder="One lyric line per row"
-              value={section.lines.join("\n")}
-              oninput={(event) => {
-                songSections[index] = { ...section, lines: event.currentTarget.value.split("\n") };
-                songSections = songSections;
-              }}
-            ></textarea>
-            <div class="song-actions">
-              <button type="button" onclick={() => (songSections = moveSongSection({ id: "", title: "", author: "", sections: songSections }, section.id, -1).sections)}>Up</button>
-              <button type="button" onclick={() => (songSections = moveSongSection({ id: "", title: "", author: "", sections: songSections }, section.id, 1).sections)}>Down</button>
-              <button type="button" onclick={() => (songSections = removeSongSection({ id: "", title: "", author: "", sections: songSections }, section.id).sections)}>Remove</button>
-            </div>
-          {/each}
-          <div class="song-actions">
-            <button type="button" onclick={() => addSongSection("verse")}>Verse</button>
-            <button type="button" onclick={() => addSongSection("chorus")}>Chorus</button>
-            <button type="button" onclick={() => addSongSection("bridge")}>Bridge</button>
-            <button type="button" onclick={() => addSongSection("tag")}>Tag</button>
-            <button type="button" onclick={previewDraft}>Preview</button>
-            <button type="submit">Save song</button>
-          </div>
-        </form>
-        <div class="song-library">
-          <input aria-label="Search songs" placeholder="Search songs" bind:value={songQuery} />
-          {#if visibleSongs.length === 0}
-            <p class="song-empty">No songs yet.</p>
-          {/if}
-          <ul class="song-list">
-            {#each visibleSongs as song (song.id)}
-              {#each song.sections as section (section.id)}
-                <li>
-                  <button type="button" onclick={() => session.previewSongSection(song, section.id)}>
-                    <strong>{song.title || "Untitled song"}</strong>
-                    <span>{section.label}{song.author ? ` · ${song.author}` : ""}</span>
-                  </button>
-                  <button type="button" onclick={() => void queueSong(song, section)}>Queue</button>
-                </li>
-              {/each}
-            {/each}
-          </ul>
-        </div>
-        <aside class="song-stage">
-          <header>
-            <span class="kicker">Preview{session.songPlace() ? ` · ${session.songPlace()}` : ""}</span>
-            <span class="song-step">
-              <button type="button" aria-label="Previous section" onclick={() => session.stepSong(-1)}>Previous</button>
-              <button type="button" aria-label="Next section" onclick={() => session.stepSong(1)}>Next</button>
-            </span>
-          </header>
-          <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
-          <header><span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span></header>
-          <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
-        </aside>
-      </div>
-    </section>
+    <SongDesk />
   {:else}
     {#key epoch}
     <div class="pb-grid">
@@ -1489,12 +1304,6 @@
   .song-step { display: flex; gap: 6px; }
   .song-step button { width: auto; padding: 4px 8px; }
   .song-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .paste-lyrics { border: 1px solid var(--line); border-radius: var(--radius-control); padding: 6px 10px; }
-  .paste-lyrics summary { cursor: pointer; color: var(--muted); }
-  .paste-lyrics[open] { display: flex; flex-direction: column; gap: 8px; }
-  .paste-lyrics textarea { width: 100%; }
-  .file-pick { position: relative; cursor: pointer; color: var(--accent); }
-  .file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .song-actions select {
     height: 32px;
     border-radius: 8px;

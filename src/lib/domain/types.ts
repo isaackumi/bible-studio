@@ -201,6 +201,8 @@ export type Song = {
   title: string;
   author: string;
   sections: SongSection[];
+  /** Library folder (Hymns, Worship, Christmas…). Absent: no folder. */
+  folder?: string;
 };
 
 export type SermonSection = {
@@ -356,6 +358,8 @@ export type Workspace = {
   /** Slide decks: named, multi-page, each page a canvas of layers. */
   decks: SlideDeckDocument[];
   voice: VoiceSettings;
+  /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
+  songFolders: string[];
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */
