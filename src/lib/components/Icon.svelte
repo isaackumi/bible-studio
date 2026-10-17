@@ -41,6 +41,11 @@
   import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import User from "@lucide/svelte/icons/user";
   import X from "@lucide/svelte/icons/x";
+  import Eye from "@lucide/svelte/icons/eye";
+  import EyeOff from "@lucide/svelte/icons/eye-off";
+  import GripVertical from "@lucide/svelte/icons/grip-vertical";
+  import Lock from "@lucide/svelte/icons/lock";
+  import LockOpen from "@lucide/svelte/icons/lock-open";
   import type { Component } from "svelte";
 
   const ICONS: Record<string, Component<{ size?: number; strokeWidth?: number }>> = {
@@ -92,6 +97,11 @@
     library: PanelLeft,
     queue: List,
     focus: Focus,
+    eye: Eye,
+    "eye-off": EyeOff,
+    grip: GripVertical,
+    lock: Lock,
+    "lock-open": LockOpen,
   };
 
   let { name, size = 16 }: { name: string; size?: number } = $props();

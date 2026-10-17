@@ -551,9 +551,26 @@
                 dropIndex = null;
               }}
             >
+              {#if activeScene && !sceneLocked}
+                <button
+                  type="button"
+                  class="grip"
+                  aria-label={`Reorder ${layer.name}. Drag, or press arrow up or down`}
+                  data-tip="Drag to reorder"
+                  onkeydown={(event) => {
+                    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                    event.preventDefault();
+                    mutate(reorderLayers(activeScene, layer.id, event.key === "ArrowUp" ? 1 : -1));
+                    const target = event.currentTarget;
+                    requestAnimationFrame(() => target.focus());
+                  }}
+                ><Icon name="grip" size={16} /></button>
+              {/if}
               <button
                 type="button"
+                class="pick"
                 class:on={selectedLayer?.id === layer.id}
+                class:hidden-layer={!layer.visible}
                 data-tip="Double-click for properties"
                 onclick={() => (selectedLayerId = layer.id)}
                 ondblclick={() => openProperties(layer)}
@@ -567,20 +584,24 @@
                 </button>
               {/if}
               {#if activeScene && !sceneLocked}
-                <button type="button" class="desk-btn ghost" aria-label="Move source up" onclick={() => mutate(reorderLayers(activeScene, layer.id, 1))}>↑</button>
-                <button type="button" class="desk-btn ghost" aria-label="Move source down" onclick={() => mutate(reorderLayers(activeScene, layer.id, -1))}>↓</button>
-                <button
+<button
                   type="button"
-                  class="desk-btn ghost"
-                  aria-label={layer.visible ? "Hide source" : "Show source"}
+                  class="desk-btn ghost icon toggle"
+                  class:off={!layer.visible}
+                  aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                  aria-pressed={!layer.visible}
+                  data-tip={layer.visible ? "Hide" : "Show"}
                   onclick={() => mutate(layer.visible ? hideLayer(activeScene, layer.id) : showLayer(activeScene, layer.id))}
-                >{layer.visible ? "Hide" : "Show"}</button>
+                ><Icon name={layer.visible ? "eye" : "eye-off"} size={16} /></button>
                 <button
                   type="button"
-                  class="desk-btn ghost"
-                  aria-label={layer.locked ? "Unlock source" : "Lock source"}
+                  class="desk-btn ghost icon toggle"
+                  class:on={layer.locked}
+                  aria-label={layer.locked ? `Unlock ${layer.name}` : `Lock ${layer.name}`}
+                  aria-pressed={layer.locked}
+                  data-tip={layer.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
                   onclick={() => mutate(setLayerLocked(activeScene, layer.id, !layer.locked))}
-                >{layer.locked ? "Unlock" : "Lock"}</button>
+                ><Icon name={layer.locked ? "lock" : "lock-open"} size={16} /></button>
               {/if}
             </div>
           {/each}
@@ -954,11 +975,18 @@
   }
   .list button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border-color: var(--accent); }
   .source-row { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; border-top: 2px solid transparent; }
-  .source-row[draggable="true"] { cursor: grab; }
+  .source-row .grip { display: grid; place-items: center; width: 22px; min-height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: grab; flex: none; }
+  .source-row .grip:hover { color: var(--ink); background: var(--field); }
+  .source-row .grip:active { cursor: grabbing; }
+  .source-row .hidden-layer > span:first-child { opacity: 0.5; }
+  .source-row .toggle { color: var(--muted); }
+  .source-row .toggle:hover { color: var(--ink); }
+  .source-row .toggle.on { color: var(--accent); }
+  .source-row .toggle.off { color: color-mix(in srgb, var(--muted) 60%, transparent); }
   .desk-btn.armed { background: var(--live, #d92d20); border-color: var(--live, #d92d20); color: #fff; }
   .source-row.dragging { opacity: 0.45; }
   .source-row.drop-before { border-top-color: var(--accent); }
-  .source-row > button:first-child { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
+  .source-row > .pick { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
   .source-row .kind { font-size: 11px; color: var(--muted); }
   .scene-name { display: flex; flex-direction: column; gap: 4px; padding: 6px; font-size: 11px; color: var(--muted); }
   .scene-name input { height: var(--control-h); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 0 8px; }
