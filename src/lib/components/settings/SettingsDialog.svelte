@@ -111,6 +111,8 @@
   let search = $state("");
   let billing = $state<"monthly" | "yearly">("yearly");
 
+  let stageText = $state("");
+
   // CCLI usage report.
   let usagePeriod = $state<"month" | "quarter" | "half" | "year">("quarter");
   const usageTo = $derived(new Date().toISOString().slice(0, 10));
@@ -693,6 +695,40 @@
             <button type="button" class="btn" onclick={() => (section = "displays")}>Displays</button>
           </div>
         </section>
+        <p class="section-label">Message to the stage</p>
+        <section class="rows">
+          <form class="row" onsubmit={(event) => { event.preventDefault(); session.sendStageMessage(stageText); }}>
+            <div class="row-copy"><strong>{session.stageMessage ? `Showing “${session.stageMessage}”` : "Send a message"}</strong><span>A bright banner on the stage screen until you clear it. The audience never sees it.</span></div>
+            <div class="row-end">
+              <input class="field" aria-label="Stage message" placeholder="5 minutes" maxlength="140" bind:value={stageText} />
+              <button type="submit" class="btn primary" disabled={!stageText.trim()}>Send</button>
+              {#if session.stageMessage}<button type="button" class="btn" onclick={() => session.sendStageMessage("")}>Clear</button>{/if}
+            </div>
+          </form>
+          <div class="row">
+            <div class="row-copy"><strong>Quick messages</strong></div>
+            <div class="row-end wrap">
+              {#each ["5 minutes", "2 minutes", "Wrap up", "Slow down", "Speak up", "Look at the screen"] as quick (quick)}
+                <button type="button" class="btn" onclick={() => session.sendStageMessage(quick)}>{quick}</button>
+              {/each}
+            </div>
+          </div>
+        </section>
+        <p class="section-label">What the stage screen shows</p>
+        <section class="rows">
+          {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."]] as [key, title, detail] (key)}
+            <div class="row">
+              <div class="row-copy"><strong>{title}</strong><span>{detail}</span></div>
+              <input type="checkbox" class="switch" role="switch" aria-label={title} checked={session.workspace.stageLayout[key as "next" | "clock" | "notes"]} onchange={(event) => session.setStageLayout({ [key]: event.currentTarget.checked })} />
+            </div>
+          {/each}
+          <div class="row">
+            <div class="row-copy"><strong>Text size</strong><span>Larger for a stage screen far from the pulpit.</span></div>
+            <select class="field" aria-label="Stage text size" value={session.workspace.stageLayout.size} onchange={(event) => session.setStageLayout({ size: event.currentTarget.value as "s" | "m" | "l" })}>
+              <option value="s">Small</option><option value="m">Medium</option><option value="l">Large</option>
+            </select>
+          </div>
+        </section>
       {:else if section === "storage"}
         <section class="rows">
           <div class="row">
@@ -1205,6 +1241,7 @@
   .settings-body :global(.row-icon) { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--panel); color: var(--muted); }
   .settings-body :global(.row-lead) { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
   .settings-body :global(.row-end) { display: flex; align-items: center; gap: 8px; flex: none; }
+  .settings-body :global(.row-end.wrap) { flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
   .settings-body :global(.row .field), .settings-body :global(.row select.field) { width: min(300px, 45%); height: 34px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
   .settings-body :global(.row .field:focus) { border-color: var(--accent); outline: none; }
   .settings-body :global(.row .field.grow) { width: auto; flex: 1; }

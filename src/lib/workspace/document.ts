@@ -15,6 +15,7 @@ import { normalizeProductionLayout } from "./production";
 import { sanitizeTourProgress } from "../tour/steps";
 import { sanitizeOnlineBibles } from "../bible/online-bibles";
 import { sanitizeSongUses } from "../domain/song-usage";
+import { sanitizeStageLayout } from "../display/channel";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -128,6 +129,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     tours: sanitizeTourProgress(value.tours),
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
     songUses: sanitizeSongUses(value.songUses),
+    stageLayout: sanitizeStageLayout(value.stageLayout),
     parallelTranslationId: typeof value.parallelTranslationId === "string" && value.parallelTranslationId ? value.parallelTranslationId.slice(0, 120) : null,
   };
 }

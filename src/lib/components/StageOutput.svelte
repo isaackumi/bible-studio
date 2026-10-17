@@ -1,7 +1,7 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { readStageLocal, subscribeStageLocal, parseStage, type StageSnapshot } from "../display/channel";
+  import { defaultStageLayout, readStageLocal, subscribeStageLocal, parseStage, type StageSnapshot } from "../display/channel";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PresentationModel } from "../domain/types";
   import { isDesktop } from "../platform/runtime";
@@ -49,14 +49,18 @@
   const upcoming = $derived(lines(snapshot?.next));
   const clock = $derived(new Date(now).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
   const stale = $derived(!snapshot || now - snapshot.at > 6 * 60 * 60 * 1000);
+  const layout = $derived(snapshot?.layout ?? defaultStageLayout());
 </script>
 
-<div class="stage">
+<div class="stage size-{layout.size}">
   <header>
     <span class="tag" class:live={snapshot?.live}>{snapshot?.live ? "LIVE" : "Output off"}</span>
     <span class="desk">{snapshot?.desk || "Church Studio"}</span>
-    <span class="clock">{clock}</span>
+    {#if layout.clock}<span class="clock">{clock}</span>{/if}
   </header>
+  {#if snapshot?.message}
+    <p class="stage-message" role="alert">{snapshot.message}</p>
+  {/if}
   {#if snapshot?.program.alert}
     <p class="stage-alert" role="alert">Alert on screen: {snapshot.program.alert.text}</p>
   {/if}
@@ -66,11 +70,16 @@
       <p class="line">{line}</p>
     {/each}
   </section>
-  <section class="next">
-    <p class="label">Next</p>
-    <p class="next-cue">{cue(snapshot?.next) || "—"}</p>
-    {#if upcoming.length}<p class="next-line">{upcoming.slice(0, 2).join(" / ")}</p>{/if}
-  </section>
+  {#if layout.notes && snapshot?.notes}
+    <section class="notes"><p class="label">Notes</p><p>{snapshot.notes}</p></section>
+  {/if}
+  {#if layout.next}
+    <section class="next">
+      <p class="label">Next</p>
+      <p class="next-cue">{cue(snapshot?.next) || "—"}</p>
+      {#if upcoming.length}<p class="next-line">{upcoming.slice(0, 2).join(" / ")}</p>{/if}
+    </section>
+  {/if}
 </div>
 
 <style>
@@ -81,7 +90,7 @@
     color: #fff;
     font-family: "Inter Variable", system-ui, sans-serif;
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
     grid-template-columns: minmax(0, 1fr);
     gap: 2vh;
     padding: 2.5vh 3vw;
@@ -95,6 +104,13 @@
   .now { overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .cue { margin: 0 0 1.5vh; font-size: 3vh; color: #f5c451; font-weight: 700; letter-spacing: 0.04em; }
   .line { margin: 0 0 1vh; font-size: 6.4vh; line-height: 1.18; font-weight: 600; }
+  .stage-message { margin: 0; padding: 2vh 2vw; border-radius: 12px; background: #ffd60a; color: #000; font-size: 6vh; font-weight: 800; text-align: center; animation: call 1.2s ease-in-out infinite alternate; }
+  @keyframes call { from { box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.7); } to { box-shadow: 0 0 0 1.2vh rgba(255, 214, 10, 0); } }
+  .notes { padding: 1.5vh 1.5vw; border: 1px dashed #444; border-radius: 10px; color: #e8e8e8; }
+  .notes p:last-child { margin: 0.6vh 0 0; font-size: 3vh; line-height: 1.35; white-space: pre-wrap; max-height: 22vh; overflow: hidden; }
+  .size-s .line { font-size: 4.6vh; }
+  .size-l .line { font-size: 8.4vh; }
+  @media (prefers-reduced-motion: reduce) { .stage-message { animation: none; } }
   .next { border-top: 2px solid #333; padding-top: 1.5vh; color: #c9ced6; }
   .label { margin: 0; font-size: 2vh; letter-spacing: 0.2em; text-transform: uppercase; color: #7d8794; }
   .next-cue { margin: 0.4vh 0 0; font-size: 3.4vh; font-weight: 700; color: #fff; }

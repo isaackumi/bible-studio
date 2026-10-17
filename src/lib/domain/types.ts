@@ -405,6 +405,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** What the stage (confidence) screen shows. */
+  stageLayout: import("../display/channel").StageLayout;
   /** A second translation shown beside the first on scripture slides, or null. */
   parallelTranslationId: string | null;
   /** Songs shown live, once per day, for CCLI copy reporting. */

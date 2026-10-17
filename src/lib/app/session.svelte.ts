@@ -7,7 +7,7 @@ import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
-import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageSnapshot } from "../display/channel";
+import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageLayout, type StageSnapshot } from "../display/channel";
 import {
   browserAudienceState,
   openBrowserAudience,
@@ -2541,12 +2541,17 @@ class Session {
   /** Stage (confidence) display: Program now, Preview as next. Separate from the audience packet. */
   private publishStage = () => {
     if (typeof window === "undefined" || !this.stageOpen) return;
+    const sermon = this.sermonFocus && this.sermons.find((entry) => entry.id === this.sermonFocus?.sermonId);
+    const notes = sermon ? (sermon.sections.find((section) => section.id === this.sermonFocus?.sectionId)?.notes ?? "") : "";
     const snapshot: StageSnapshot = {
       program: this.live.program.model,
       next: this.live.preview.model,
       live: this.output.online,
       desk: this.workspace.churchName,
       at: Date.now(),
+      message: this.stageMessage,
+      notes,
+      layout: this.workspace.stageLayout,
     };
     try {
       publishStageLocal(snapshot);
@@ -2557,6 +2562,20 @@ class Session {
   };
 
   stageOpen = $state(false);
+  /** A message on the stage screen until cleared. Never reaches the audience. */
+  stageMessage = $state("");
+
+  sendStageMessage = (text: string) => {
+    this.stageMessage = text.trim().slice(0, 140);
+    this.publishStage();
+    this.message = this.stageMessage ? `Stage now reads “${this.stageMessage}”.` : "Stage message cleared.";
+  };
+
+  setStageLayout = (patch: Partial<StageLayout>) => {
+    this.workspace = { ...this.workspace, stageLayout: { ...this.workspace.stageLayout, ...patch } };
+    this.persistSoon();
+    this.publishStage();
+  };
 
   /** The alert on Program (nursery call, car lights…). Never on Preview. */
   alert = $state<ProgramAlert | null>(null);

@@ -552,6 +552,7 @@
         {#snippet children(close)}
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} Displays…</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} Themes…</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} Message to the stage…</button>
           <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} Tour this page</button>
           <button type="button" role="menuitem" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} All guided tours…</button>
           <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} Help</button>

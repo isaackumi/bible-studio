@@ -148,13 +148,38 @@ export type StageSnapshot = {
   live: boolean;
   desk: string;
   at: number;
+  /** A message from the desk to the people on stage ("5 minutes", "Wrap up"). */
+  message?: string;
+  /** Private notes for what is on Program (sermon desk notes). */
+  notes?: string;
+  layout?: StageLayout;
 };
+
+export type StageLayout = { next: boolean; clock: boolean; notes: boolean; size: "s" | "m" | "l" };
+
+export function defaultStageLayout(): StageLayout {
+  return { next: true, clock: true, notes: true, size: "m" };
+}
+
+export function sanitizeStageLayout(value: unknown): StageLayout {
+  const record = value && typeof value === "object" ? (value as Partial<StageLayout>) : {};
+  return { next: record.next !== false, clock: record.clock !== false, notes: record.notes !== false, size: record.size === "s" || record.size === "l" ? record.size : "m" };
+}
 
 export function parseStage(raw: string | null): StageSnapshot | null {
   try {
     const value = raw ? (JSON.parse(raw) as Partial<StageSnapshot>) : null;
     if (!value?.program?.layout || !value.next?.layout || typeof value.at !== "number") return null;
-    return { program: value.program, next: value.next, live: value.live === true, desk: String(value.desk ?? ""), at: value.at };
+    return {
+      program: value.program,
+      next: value.next,
+      live: value.live === true,
+      desk: String(value.desk ?? ""),
+      at: value.at,
+      message: typeof value.message === "string" ? value.message.slice(0, 140) : "",
+      notes: typeof value.notes === "string" ? value.notes.slice(0, 2000) : "",
+      layout: sanitizeStageLayout(value.layout),
+    };
   } catch {
     return null;
   }
