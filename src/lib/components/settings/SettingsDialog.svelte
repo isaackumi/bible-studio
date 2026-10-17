@@ -49,22 +49,20 @@
   // Each page: a colored icon tile (System Settings style), a one-line description and search words.
   const groups: SettingsGroup[] = [
     {
-      label: "Studio",
+      label: "General",
       items: [
         { id: "general", title: "Church", icon: "church", color: "#f08a24", about: "Your church's name, logo text and CCLI license.", keywords: "name logo ccli license copyright" },
-        { id: "system", title: "This computer", icon: "laptop", color: "#8e8e93", about: "What works in this window, and why some things do not.", keywords: "capabilities browser desktop features" },
-        { id: "appearance", title: "Appearance", icon: "look", color: "#a259e6", about: "Desk, theme, accent color and type size on this computer.", keywords: "theme dark light accent color size spacing desk verse font" },
+        { id: "appearance", title: "Appearance", icon: "look", color: "#a259e6", about: "Desk, theme, accent color and type size on this computer.", keywords: "theme dark light accent color size spacing desk verse font performance density" },
         { id: "workspace", title: "Layouts", icon: "layout", color: "#5b5bd6", about: "How the operator desk is arranged.", keywords: "workspace panels arrange reset" },
         { id: "keyboard", title: "Keyboard", icon: "keys", color: "#636366", about: "Keys that drive the desk.", keywords: "shortcuts keys hotkeys" },
       ],
     },
     {
-      label: "Output",
+      label: "Presenting",
       items: [
         { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test" },
         { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
         { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
-        { id: "remote", title: "Phone remote", icon: "phone", color: "#30a46c", about: "Pair a phone as a controller. It is never a display.", keywords: "phone tablet pair qr lan" },
       ],
     },
     {
@@ -73,20 +71,36 @@
         { id: "bible", title: "Bible", icon: "bible", color: "#a07a52", about: "Scripture translations on this computer.", keywords: "translation kjv scripture" },
         { id: "lyrics", title: "Songs", icon: "lyrics", color: "#e93d82", about: "Songs, folders, imports and copyright.", keywords: "lyrics hymns ccli songselect openlyrics" },
         { id: "media", title: "Media", icon: "media", color: "#12a5b8", about: "Pictures and videos for backgrounds and the logo.", keywords: "images video background logo camera" },
-        { id: "audio", title: "Sound & voice", icon: "audio", color: "#3e63dd", about: "Microphone, listening and voice commands.", keywords: "microphone voice speech listen detection" },
         { id: "storage", title: "Backup", icon: "files", color: "#2f80ed", about: "Export or import the whole library.", keywords: "export import backup files library" },
       ],
     },
     {
-      label: "System",
+      label: "Devices",
       items: [
-        { id: "performance", title: "Performance", icon: "speed", color: "#30a46c", about: "How much of the desk is on screen.", keywords: "speed density size" },
+        { id: "audio", title: "Sound & voice", icon: "audio", color: "#3e63dd", about: "Microphone, listening and voice commands.", keywords: "microphone voice speech listen detection" },
+        { id: "remote", title: "Phone remote", icon: "phone", color: "#30a46c", about: "Pair a phone as a controller. It is never a display.", keywords: "phone tablet pair qr lan" },
+      ],
+    },
+    {
+      label: "About",
+      items: [
+        { id: "system", title: "This computer", icon: "laptop", color: "#8e8e93", about: "What works in this window, and why some things do not.", keywords: "capabilities browser desktop features" },
         { id: "updates", title: "Updates", icon: "refresh", color: "#0a84ff", about: "Which version is running.", keywords: "version update release" },
-        { id: "account", title: "Plan & account", icon: "user", color: "#8e8e93", about: "Your plan, the Premium trial, and what each plan includes.", keywords: "sign in user cloud plan premium free church trial upgrade billing" },
-        { id: "license", title: "License", icon: "key", color: "#d4a017", about: "How this copy of Church Studio is entitled.", keywords: "license plan" },
       ],
     },
   ];
+
+  /** Opened from the account card at the top of the sidebar, like the profile in System Settings. */
+  const ACCOUNT: SettingsEntry = {
+    id: "account",
+    title: "Plan & account",
+    icon: "user",
+    color: "#8e8e93",
+    about: "Your plan, the Premium trial, and what each plan includes.",
+    keywords: "sign in user cloud plan premium free church trial upgrade billing license",
+  };
+  /** Older links: these pages were folded into others. */
+  const ALIASES: Partial<Record<string, SettingsSectionId>> = { license: "account", performance: "appearance" };
 
   let search = $state("");
   const visibleGroups = $derived.by(() => {
@@ -103,7 +117,7 @@
       .filter((group) => group.items.length > 0);
   });
 
-  const sections: SettingsEntry[] = groups.flatMap((group) => group.items);
+  const sections: SettingsEntry[] = [...groups.flatMap((group) => group.items), ACCOUNT];
   const themes: { id: OperatorTheme; name: string; note: string; ground: string; ink: string }[] = [
     { id: "dark", name: "Night", note: "Black desk, white type", ground: "#050505", ink: "#f5f5f5" },
     { id: "vespers", name: "Vespers", note: "Warm black, bone type", ground: "#0c0a09", ink: "#f6f1e7" },
@@ -121,9 +135,8 @@
     return sections.some((entry) => entry.id === value);
   }
 
-  let section = $state<SettingsSectionId>(
-    isSettingsSection(session.settingsSection) ? session.settingsSection : "appearance",
-  );
+  const requested = ALIASES[session.settingsSection] ?? session.settingsSection;
+  let section = $state<SettingsSectionId>(isSettingsSection(requested) ? requested : "appearance");
   let layoutName = $state("");
   let layoutSeen = $state("");
   let profileName = $state("");
@@ -239,13 +252,14 @@
   <button type="button" class="settings-backdrop" aria-label="Close settings" onclick={close}></button>
   <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="settings-title">
     <nav class="settings-nav" aria-label="Settings">
-      <div class="set-brand">
+      <button type="button" class="account-card" class:active={section === "account"} onclick={() => (section = "account")}>
         <span class="set-brand-mark" style:background={session.workspace.appearance.accent}><Icon name="church" size={18} /></span>
-        <div>
-          <p id="settings-title">Settings</p>
-          <span>{session.workspace.churchName || "Church Studio"}</span>
-        </div>
-      </div>
+        <span class="account-copy">
+          <strong id="settings-title">{session.workspace.churchName || "Church Studio"}</strong>
+          <span>{planById(session.plan).name}{session.trialDays > 0 ? ` trial · ${session.trialDays}d left` : ""} · Plan & account</span>
+        </span>
+        <Icon name="chevron-right" size={14} />
+      </button>
       <label class="nav-search">
         <Icon name="search" size={14} />
         <input type="search" placeholder="Search settings" aria-label="Search settings" bind:value={search} />
@@ -263,7 +277,6 @@
           <p class="nav-empty">No settings match “{search}”.</p>
         {/each}
       </div>
-      <p class="nav-foot">Church Studio 0.1.0 · offline</p>
     </nav>
 
     <div class="settings-body">
@@ -825,10 +838,28 @@
     border-right: 1px solid var(--line);
     background: color-mix(in srgb, var(--desk) 80%, var(--panel));
   }
-  .set-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 14px; }
-  .set-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: #fff; flex: none; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
-  .set-brand p { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
-  .set-brand div span { display: block; font-size: 11px; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--field);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    flex: none;
+  }
+  .account-card:hover { border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
+  .account-card.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
+  .account-card > :global(svg) { color: var(--muted); flex: none; }
+  .set-brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: #fff; flex: none; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
+  .account-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+  .account-copy strong { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account-copy span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nav-search {
     display: flex;
     align-items: center;
@@ -846,41 +877,44 @@
   .nav-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
   .nav-search input::-webkit-search-cancel-button { display: none; }
   .nav-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; padding: 0 2px; }
-  .nav-group { margin: 16px 10px 6px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  /* The list scrolls; rows keep their height instead of being squeezed. */
+  .nav-list > * { flex: none; }
+  .nav-group { margin: 12px 10px 3px; font-size: 11px; font-weight: 600; color: var(--muted); }
   .nav-group:first-child { margin-top: 4px; }
   .nav-item {
     display: flex;
     align-items: center;
     gap: 10px;
     width: 100%;
-    height: 31px;
-    padding: 0 8px;
+    height: 30px;
+    padding: 0 8px 0 6px;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: var(--ink);
     font: inherit;
     font-size: 13px;
+    font-weight: 500;
     text-align: left;
   }
   .nav-item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
-  .nav-item.active { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .nav-item.active { background: var(--accent); color: #fff; }
+  .nav-item.active .tile { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
   .nav-item.active .nav-title { font-weight: 600; }
   .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile {
     display: grid;
     place-items: center;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     flex: none;
-    border-radius: 7px;
+    border-radius: 6px;
     color: #fff;
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25);
   }
   .tile.big { width: 44px; height: 44px; border-radius: 12px; }
   .nav-empty { margin: 12px 10px; font-size: 12px; color: var(--muted); }
-  .nav-foot { margin: 8px 10px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
 
   /* Page */
   .settings-body { min-width: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 28px 32px; }
