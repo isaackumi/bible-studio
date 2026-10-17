@@ -40,6 +40,18 @@
   const onPreview = $derived(session.songFocus);
   const index = $derived(buildSongIndex(session.songs));
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
+  const programSource = $derived(session.live.program.sourceId ?? "");
+  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const listTitle = $derived(folder === null ? "All songs" : folder === "" ? "Unfiled" : folder);
+
+  // Messages fade after a few seconds so they never crowd the song.
+  let noteTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    if (!note) return;
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => (note = ""), 6000);
+    return () => clearTimeout(noteTimer);
+  });
 
   // Follow the song on Preview (picked here, from the queue or by voice).
   $effect(() => {
@@ -237,6 +249,7 @@
     </div>
     <input class="search" type="search" placeholder="Search title, author or lyrics" aria-label="Search songs" bind:value={query} />
 
+    <p class="group">Folders</p>
     <nav class="folders" aria-label="Song folders">
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
@@ -259,18 +272,18 @@
             onblur={(event) => void commitRename(entry.name, event.currentTarget.value)}
           />
         {:else}
-          <div class="folder-row">
+          <div class="folder-row" class:on={folder === entry.name}>
             <button type="button" class="folder" class:on={folder === entry.name} onclick={() => (folder = entry.name)} ondblclick={() => (renaming = entry.name)}>
               <Icon name={folder === entry.name ? "folder-open" : "folder"} size={16} /><span>{entry.name}</span><small>{entry.count}</small>
             </button>
             {#if folder === entry.name}
-              <button type="button" class="desk-btn ghost icon mini" aria-label={`Rename ${entry.name}`} data-tip="Rename" onclick={() => (renaming = entry.name)}><Icon name="pencil" size={14} /></button>
+              <button type="button" class="row-tool" aria-label={`Rename ${entry.name}`} title="Rename" onclick={() => (renaming = entry.name)}><Icon name="pencil" size={14} /></button>
               <button
                 type="button"
-                class="desk-btn ghost icon mini"
+                class="row-tool"
                 class:armed={armed === `folder:${entry.name}`}
                 aria-label={armed === `folder:${entry.name}` ? `Confirm remove ${entry.name}` : `Remove folder ${entry.name}`}
-                data-tip={armed === `folder:${entry.name}` ? "Click again — songs stay, unfiled" : "Remove folder"}
+                title={armed === `folder:${entry.name}` ? "Click again — songs stay, unfiled" : "Remove folder"}
                 onclick={() => void removeFolder(entry.name)}
               ><Icon name="close" size={14} /></button>
             {/if}
@@ -296,9 +309,12 @@
       {/if}
     </nav>
 
-    <div class="imports">
-      <button type="button" class="desk-btn" data-tip="Lyric or ChordPro files, into the open folder" onclick={() => fileInput?.click()}>Import files</button>
-      <button type="button" class="desk-btn" data-tip="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
+    <div class="list-head">
+      <p class="group">{listTitle} <span>{visible.length}</span></p>
+      <div class="imports">
+        <button type="button" class="import" title="Lyric or ChordPro files, into the open folder" onclick={() => fileInput?.click()}>Import files</button>
+        <button type="button" class="import" title="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
+      </div>
       <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
@@ -309,9 +325,13 @@
       {/if}
       {#each visible as song (song.id)}
         <li>
-          <button type="button" class="song" class:on={selectedId === song.id && !draft} class:live={onPreview?.songId === song.id} onclick={() => pick(song)}>
-            <strong>{song.title || "Untitled song"}</strong>
-            <span>{song.author || "—"} · {song.sections.length} section{song.sections.length === 1 ? "" : "s"}{folder === null && song.folder ? ` · ${song.folder}` : ""}</span>
+          <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
+            <strong>
+              {song.title || "Untitled song"}
+              {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">Live</em>
+              {:else if onPreview?.songId === song.id}<em class="badge">Preview</em>{/if}
+            </strong>
+            <span>{[song.author, `${song.sections.length} section${song.sections.length === 1 ? "" : "s"}`, folder === null ? song.folder : ""].filter(Boolean).join(" · ")}</span>
           </button>
         </li>
       {/each}
@@ -320,7 +340,9 @@
 
   <!-- Song -->
   <div class="sheet">
-    {#if note}<p class="note" role="status">{note}</p>{/if}
+    {#if note}
+      <p class="note" role="status"><span>{note}</span><button type="button" aria-label="Dismiss" onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
+    {/if}
     {#if draft}
       <form class="editor" onsubmit={(event) => { event.preventDefault(); void saveDraft(); }}>
         <div class="editor-head">
@@ -378,7 +400,11 @@
       <header class="song-head">
         <div>
           <h2>{selected.title}</h2>
-          <p class="muted">{selected.author || "Unknown author"}</p>
+          <p class="meta">
+            <span>{selected.author || "Unknown author"}</span>
+            <span>{selected.sections.length} section{selected.sections.length === 1 ? "" : "s"}</span>
+            {#if selected.folder}<span class="chip"><Icon name="folder" size={12} />{selected.folder}</span>{/if}
+          </p>
         </div>
         <div class="row-actions">
           <select
@@ -401,18 +427,27 @@
           ><Icon name="close" size={14} /></button>
         </div>
       </header>
-      <p class="hint">Click a section for Preview. Double-click sends it LIVE. Arrow keys step sections.</p>
+      <p class="hint">Click a section for <b>Preview</b> · double-click sends it <b>LIVE</b> · <kbd>←</kbd> <kbd>→</kbd> step sections</p>
       <div class="sections">
-        {#each selected.sections as section (section.id)}
+        {#each selected.sections as section, n (section.id)}
+          {@const isLive = programLive && programSource === `song:${selected.id}:${section.id}`}
           <button
             type="button"
             class="section {section.kind}"
+            class:live={isLive}
             class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
             class:heard={detected?.songId === selected.id && detected.sectionId === section.id}
             onclick={() => show(selected, section.id)}
             ondblclick={() => void showAndTake(selected, section.id)}
           >
-            <span class="label">{section.label}{#if detected?.songId === selected.id && detected.sectionId === section.id}<em>heard</em>{/if}</span>
+            <span class="label">
+              <i>{n + 1}</i>{section.label}
+              <span class="tags">
+                {#if detected?.songId === selected.id && detected.sectionId === section.id}<em class="badge heard">Heard</em>{/if}
+                {#if isLive}<em class="badge live">Live</em>{/if}
+                {#if onPreview?.songId === selected.id && onPreview.sectionId === section.id}<em class="badge">Preview</em>{/if}
+              </span>
+            </span>
             {#each section.lines.filter((line) => line.trim()) as line, l (l)}<span class="line">{line}</span>{/each}
           </button>
         {/each}
@@ -428,20 +463,28 @@
 
   <!-- Monitors and detection -->
   <aside class="stage">
-    <header>
-      <span class="kicker">Preview{session.songPlace() ? ` · ${session.songPlace()}` : ""}</span>
-      <span class="steps">
-        <button type="button" class="desk-btn ghost icon" aria-label="Previous section" onclick={() => session.stepSong(-1)}><Icon name="chevron-left" size={14} /></button>
-        <button type="button" class="desk-btn ghost icon" aria-label="Next section" onclick={() => session.stepSong(1)}><Icon name="chevron-right" size={14} /></button>
-      </span>
-    </header>
-    <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
-    <header><span class="kicker program">Program</span></header>
-    <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+    <figure class="screen preview">
+      <figcaption>
+        <span class="kicker">Preview</span>
+        <span class="place">{session.songPlace()}</span>
+        <span class="steps">
+          <button type="button" class="row-tool" aria-label="Previous section" title="Previous section" onclick={() => session.stepSong(-1)}><Icon name="chevron-left" size={14} /></button>
+          <button type="button" class="row-tool" aria-label="Next section" title="Next section" onclick={() => session.stepSong(1)}><Icon name="chevron-right" size={14} /></button>
+        </span>
+      </figcaption>
+      <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
+    </figure>
+    <figure class="screen program" class:on-air={programLive}>
+      <figcaption>
+        <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
+        <span class="place">{programLive ? "Audience sees this" : "Nothing live"}</span>
+      </figcaption>
+      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+    </figure>
 
     <section class="detect" aria-label="Song detection">
       <header>
-        <span class="kicker">Song detection</span>
+        <span class="kicker">{#if listening}<span class="dot listen"></span>{/if}Song detection</span>
         <button type="button" class="desk-btn" class:on={listening} aria-pressed={listening} onclick={() => void session.toggleVoice()}>
           <Icon name={listening ? "mic-off" : "mic"} size={14} />{listening ? "Stop" : "Listen"}
         </button>
@@ -458,7 +501,7 @@
       {:else}
         <p class="muted">{listening ? "Listening for a song you have saved…" : "Listen to match singing to your saved songs."}</p>
       {/if}
-      {#if heard}<p class="heard">“{heard}”</p>{/if}
+      {#if heard}<p class="heard-text">“{heard}”</p>{/if}
     </section>
   </aside>
 </section>
@@ -494,18 +537,31 @@
   textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
 
   /* Library */
-  .lib-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px; }
-  .search { margin: 0 12px 8px; }
-  .folders { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 8px; border-bottom: 1px solid var(--line); max-height: 40%; overflow: auto; flex: none; }
-  .folder-row { display: flex; align-items: center; gap: 2px; }
+  .lib-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px; }
+  .search { margin: 0 14px 12px; }
+  .group {
+    margin: 0;
+    padding: 0 16px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .group span { margin-left: 4px; font-weight: 600; opacity: 0.8; }
+  .folders { display: flex; flex-direction: column; gap: 4px; padding: 0 10px 14px; max-height: 42%; overflow: auto; flex: none; }
+  /* Rows keep their height; the list scrolls instead of squeezing them. */
+  .folders > :global(*), .songs > li { flex: none; }
+  .folder-row { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-control, 8px); }
+  .folder-row.on { background: color-mix(in srgb, var(--accent) 16%, var(--panel)); }
   .folder {
-    flex: 1;
+    flex: none;
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 32px;
-    padding: 0 8px;
+    gap: 10px;
+    height: 36px;
+    padding: 0 10px;
     border: 0;
     border-radius: var(--radius-control, 8px);
     background: none;
@@ -514,24 +570,60 @@
     font-size: 13px;
     text-align: left;
   }
+  .folder-row .folder { flex: 1; }
   .folder span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .folder small { color: var(--muted); font-size: 11px; }
+  .folder small {
+    min-width: 22px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--field);
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+  }
   .folder:hover { background: var(--field); }
-  .folder.on { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); color: var(--ink); }
+  .folder.on, .folder-row.on .folder:hover { background: none; }
   .folder.on :global(svg) { color: var(--accent); }
-  .folder.add { color: var(--muted); }
-  .folder-input { margin: 2px 0; }
-  .mini { width: 26px; min-width: 26px; height: 26px; min-height: 26px; }
-  .armed { color: var(--live) !important; border-color: var(--live) !important; }
-  .imports { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex: none; }
-  .imports .desk-btn { flex: 1; }
-  .songs { list-style: none; margin: 0; padding: 6px 8px 12px; overflow: auto; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+  .folder.on small { background: color-mix(in srgb, var(--accent) 30%, var(--panel)); color: var(--ink); }
+  .folder.add { color: var(--muted); border: 1px dashed var(--line); margin-top: 4px; }
+  .folder.add:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .folder-input { margin: 2px 0; height: 36px; }
+  .row-tool {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+  }
+  .row-tool:hover { background: var(--field); color: var(--ink); }
+  .folder-row .row-tool:last-child { margin-right: 4px; }
+  .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 15%, transparent) !important; }
+  .list-head { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 8px; border-top: 1px solid var(--line); flex: none; }
+  .list-head .group { padding-bottom: 0; }
+  .imports { display: flex; gap: 6px; padding: 0 14px; }
+  .import {
+    flex: 1;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control, 8px);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .import:hover { color: var(--ink); background: var(--field); }
+  .songs { list-style: none; margin: 0; padding: 4px 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .song {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 8px 10px;
+    gap: 3px;
+    padding: 10px 12px;
     border: 1px solid transparent;
     border-radius: var(--radius-control, 8px);
     background: none;
@@ -539,21 +631,41 @@
     text-align: left;
     font: inherit;
   }
-  .song strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
   .song span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .song:hover { background: var(--field); }
-  .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
-  .song.live strong::before { content: "● "; color: var(--accent); }
+  .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
+  .badge {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live); }
+  .badge.heard { background: color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); color: var(--presence, #3fb950); }
 
   /* Song sheet */
   .sheet { overflow: auto; padding: 14px 16px 18px; gap: 10px; }
-  .note { margin: 0; padding: 8px 10px; border-radius: var(--radius-control, 8px); background: var(--field); font-size: 12px; color: var(--muted); }
+  .note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 8px 8px 12px; border-radius: var(--radius-control, 8px); background: var(--field); font-size: 12px; color: var(--muted); }
+  .note span { flex: 1; }
+  .note button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
+  .note button:hover { color: var(--ink); background: var(--panel); }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--field); }
   .song-head, .editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .song-head h2 { font-size: 20px; }
   .row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .song-head select { width: auto; max-width: 180px; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); }
+  .hint b { color: var(--ink); font-weight: 600; }
+  kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }
   .sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .section {
     display: flex;
@@ -574,9 +686,11 @@
   .section.tag { border-left-color: #2fb8a6; }
   .section:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .section.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .section.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
   .section.heard { outline: 2px dashed color-mix(in srgb, var(--presence, #3fb950) 80%, transparent); outline-offset: 2px; }
-  .section .label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; display: flex; gap: 8px; }
-  .section .label em { font-style: normal; color: var(--presence, #3fb950); }
+  .section .label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .section .label i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--panel); color: var(--ink); letter-spacing: 0; }
+  .section .tags { margin-left: auto; display: flex; gap: 4px; }
   .section .line { font-size: 14px; line-height: 1.4; }
   .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
   .blank p { margin: 0; }
@@ -592,19 +706,35 @@
   .edit-section-head input { flex: 1; }
 
   /* Stage */
-  .stage { padding: 10px; gap: 8px; overflow: auto; }
-  .stage > header, .detect > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-  .kicker.program { color: var(--live); }
-  .steps { display: flex; gap: 4px; }
-  .monitor { container-type: inline-size; border-radius: var(--radius-control, 8px); overflow: hidden; flex: none; }
-  .detect { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
+  .stage { padding: 12px; gap: 12px; overflow: auto; }
+  .detect > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .screen {
+    margin: 0;
+    flex: none;
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, var(--line));
+    border-radius: var(--radius-control, 8px);
+    background: var(--field);
+    overflow: hidden;
+  }
+  .screen figcaption { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 6px 4px 10px; border-bottom: 1px solid var(--line); }
+  .screen .place { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .screen.preview { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .screen.preview .kicker { color: var(--accent); }
+  .screen.program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
+  .screen.program .kicker { color: var(--live); }
+  .screen.program.on-air { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 18px color-mix(in srgb, var(--live) 25%, transparent); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); box-shadow: 0 0 6px var(--live); }
+  .dot.listen { background: var(--presence, #3fb950); box-shadow: 0 0 6px var(--presence, #3fb950); }
+  .steps { display: flex; gap: 2px; }
+  .monitor { container-type: inline-size; background: #000; }
+  .detect { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
   .follow { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
   .follow input { height: auto; margin-top: 3px; }
   .follow small { display: block; color: var(--muted); font-size: 11px; }
   .match { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--presence, #3fb950); border-radius: var(--radius-control, 8px); background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
   .match small { font-size: 11px; color: var(--presence, #3fb950); text-transform: uppercase; letter-spacing: 0.08em; }
-  .heard { margin: 0; font-size: 12px; color: var(--muted); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+  .heard-text { margin: 0; font-size: 12px; color: var(--muted); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
 
   @media (max-width: 1280px) {
     .song-desk { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
