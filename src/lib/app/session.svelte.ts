@@ -2531,8 +2531,12 @@ class Session {
     this.message = `${layout.name} restored. Program was not changed.`;
   };
 
+  /** A window's own library search (Songs, Sermon) takes "/" while it is open; otherwise Find. */
+  localSearch: (() => void) | null = null;
+
   focusSearch = () => {
-    this.openFind();
+    if (this.localSearch) this.localSearch();
+    else this.openFind();
   };
 
   restoreBuiltinWorkspaces = () => {

@@ -5,6 +5,8 @@
   import type { PresentationItem, Sermon, SermonSection } from "../../domain/types";
   import Icon from "../Icon.svelte";
   import MonitorPair from "./MonitorPair.svelte";
+  import LibrarySidebar from "./LibrarySidebar.svelte";
+  import SearchField from "./SearchField.svelte";
 
   // Sermon window: a library of sermons, the outline as cards (what the audience sees, and the
   // notes that stay on this desk), and the speaker's notes beside Preview and Program.
@@ -25,6 +27,51 @@
 
   const sermons = $derived([...session.sermons].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
   const hits = $derived(query.trim() ? searchSermonHits(session.sermons, query) : []);
+  let hitIndex = $state(-1);
+  $effect(() => {
+    query;
+    hitIndex = -1;
+  });
+
+  /** Sermons by when they were last edited. */
+  const groups = $derived.by(() => {
+    const now = Date.now();
+    const day = 86_400_000;
+    const buckets: { label: string; items: Sermon[] }[] = [
+      { label: "This week", items: [] },
+      { label: "This month", items: [] },
+      { label: "Earlier", items: [] },
+    ];
+    for (const doc of sermons) {
+      const age = now - new Date(doc.updatedAt).getTime();
+      buckets[age < 7 * day ? 0 : age < 31 * day ? 1 : 2]!.items.push(doc);
+    }
+    return buckets.filter((bucket) => bucket.items.length > 0);
+  });
+
+  function navigate(key: "up" | "down" | "enter") {
+    if (query.trim()) {
+      if (hits.length === 0) return;
+      if (key === "enter") {
+        const hit = hits[Math.max(0, hitIndex)]!;
+        openHit(hit.sermonId, hit.sectionId);
+        return;
+      }
+      hitIndex = Math.min(hits.length - 1, Math.max(0, hitIndex + (key === "down" ? 1 : -1)));
+    } else {
+      const order = groups.flatMap((group) => group.items);
+      if (order.length === 0) return;
+      const at = order.findIndex((doc) => doc.id === selectedId);
+      if (key === "enter") {
+        const doc = at >= 0 ? order[at]! : order[0]!;
+        pick(doc.id);
+        if (doc.sections[0]) show(doc, doc.sections[0].id);
+        return;
+      }
+      pick(order[at < 0 ? 0 : Math.min(order.length - 1, Math.max(0, at + (key === "down" ? 1 : -1)))]!.id);
+    }
+    requestAnimationFrame(() => document.querySelector(".list .row.on")?.scrollIntoView({ block: "nearest" }));
+  }
   const selected = $derived(session.sermons.find((entry) => entry.id === selectedId) ?? null);
   const focus = $derived(session.sermonFocus);
   const programSource = $derived(session.live.program.sourceId ?? "");
@@ -235,45 +282,41 @@
 
 <section class="sermon-desk">
   <!-- Library -->
-  <aside class="library" aria-label="Sermon library">
-    <div class="lib-head">
-      <h2>Sermons</h2>
-      <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> New sermon</button>
-    </div>
-    <input class="search" type="search" placeholder="Search title, speaker, notes or scripture" aria-label="Search sermons" bind:value={query} />
-    {#if query.trim()}
-      <p class="group">Matches <span>{hits.length}</span></p>
-      <ul class="list">
-        {#if hits.length === 0}<li class="empty">No sermons match.</li>{/if}
-        {#each hits as hit (`${hit.sermonId}:${hit.sectionId}`)}
-          <li>
-            <button type="button" class="row" onclick={() => openHit(hit.sermonId, hit.sectionId)}>
-              <strong>{hit.title}</strong>
-              <span>{[hit.label, hit.speaker].filter(Boolean).join(" · ")}</span>
-              {#if hit.snippet && hit.snippet !== hit.label}<span class="snippet">{hit.snippet}</span>{/if}
-            </button>
-          </li>
+  <LibrarySidebar title="Sermons" icon="book" count={sermons.length} storageKey="sermons">
+    {#snippet actions()}
+      <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> New</button>
+    {/snippet}
+    <SearchField bind:value={query} label="Search sermons" placeholder="Title, speaker, notes or scripture" onnavigate={navigate} />
+    <div class="list">
+      {#if query.trim()}
+        <p class="group">Matches <span>{hits.length}</span></p>
+        {#if hits.length === 0}<p class="empty">No sermons match.</p>{/if}
+        {#each hits as hit, h (`${hit.sermonId}:${hit.sectionId}`)}
+          <button type="button" class="row" class:on={h === hitIndex} onclick={() => openHit(hit.sermonId, hit.sectionId)}>
+            <strong>{hit.title}</strong>
+            <span>{[hit.label, hit.speaker].filter(Boolean).join(" · ")}</span>
+            {#if hit.snippet && hit.snippet !== hit.label}<span class="snippet">{hit.snippet}</span>{/if}
+          </button>
         {/each}
-      </ul>
-    {:else}
-      <p class="group">All sermons <span>{sermons.length}</span></p>
-      <ul class="list">
-        {#if sermons.length === 0}<li class="empty">No sermons yet. Create one to plan the message and its notes.</li>{/if}
-        {#each sermons as doc (doc.id)}
-          <li>
+      {:else}
+        {#if sermons.length === 0}<p class="empty">No sermons yet. Create one to plan the message and its notes.</p>{/if}
+        {#each groups as group (group.label)}
+          <p class="group">{group.label} <span>{group.items.length}</span></p>
+          {#each group.items as doc (doc.id)}
             <button type="button" class="row" class:on={selectedId === doc.id && !draft} onclick={() => pick(doc.id)}>
               <strong>
                 {doc.title || "Untitled sermon"}
                 {#if programLive && programSource.startsWith(`sermon:${doc.id}:`)}<em class="badge live">Live</em>
                 {:else if focus?.sermonId === doc.id}<em class="badge">Preview</em>{/if}
               </strong>
+              {#if doc.sections[0]}<span class="snippet">{doc.sections.map((section) => section.name).join(" → ")}</span>{/if}
               <span>{[doc.speaker, `${doc.sections.length} section${doc.sections.length === 1 ? "" : "s"}`, when(doc.updatedAt)].filter(Boolean).join(" · ")}</span>
             </button>
-          </li>
+          {/each}
         {/each}
-      </ul>
-    {/if}
-  </aside>
+      {/if}
+    </div>
+  </LibrarySidebar>
 
   <!-- Outline -->
   <div class="sheet">
@@ -425,11 +468,11 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(280px, 380px);
+    grid-template-columns: auto minmax(0, 1fr) minmax(280px, 380px);
     gap: var(--gap, 10px);
     padding: var(--gap, 10px) var(--panel-pad, 12px) var(--panel-pad, 12px);
   }
-  .library, .sheet, .stage {
+  .sheet, .stage {
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -459,19 +502,18 @@
   .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live); }
 
   /* Library */
-  .lib-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px; }
-  .search { margin: 0 14px 12px; }
-  .group { margin: 0; padding: 0 16px 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 0; padding: 10px 6px 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
   .group span { margin-left: 4px; opacity: 0.8; }
-  .list { list-style: none; margin: 0; padding: 4px 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-  .list > li { flex: none; }
+  .list { margin: 0; padding: 0 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .list > :global(*) { flex: none; }
+  .list > .group:first-child { padding-top: 0; }
   .row { width: 100%; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); background: none; color: var(--ink); text-align: left; font: inherit; }
   .row strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
   .row span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .snippet { font-style: italic; }
   .row:hover { background: var(--field); }
   .row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
-  .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
+  .empty { margin: 0; padding: 12px 6px; color: var(--muted); font-size: 12px; }
 
   /* Outline */
   .sheet { overflow: auto; padding: 14px 16px 18px; gap: 12px; }
@@ -534,7 +576,7 @@
   .speaker p.empty-notes { font-size: 12px; color: var(--muted); }
 
   @media (max-width: 1280px) {
-    .sermon-desk { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
+    .sermon-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
     .card-main, .two { grid-template-columns: 1fr; }
     .notes { padding-left: 0; border-left: 0; }
   }

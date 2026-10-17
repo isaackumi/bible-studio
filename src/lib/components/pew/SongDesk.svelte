@@ -5,6 +5,8 @@
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
   import MonitorPair from "./MonitorPair.svelte";
+  import LibrarySidebar from "./LibrarySidebar.svelte";
+  import SearchField from "./SearchField.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
 
   // Songs window: library in folders, the song's sections one click from Preview, and detection
@@ -33,16 +35,50 @@
 
   const folders = $derived(songFolders(session.songs, session.workspace.songFolders));
   const unfiled = $derived(session.songs.filter((song) => !cleanFolder(song.folder)).length);
-  const visible = $derived(
-    folder === "" ? filterSongs(session.songs.filter((song) => !cleanFolder(song.folder)), null, query) : filterSongs(session.songs, folder, query),
+  /** The "Recent" view: songs put on Preview this session, newest first. */
+  const RECENT = "\u0000recent";
+  const recent = $derived(
+    [...new Set(session.recentSongs.map((entry) => entry.songId))]
+      .map((id) => session.songs.find((song) => song.id === id))
+      .filter((song): song is Song => !!song),
   );
+  const visible = $derived(
+    folder === RECENT
+      ? recent.filter((song) => filterSongs([song], null, query).length > 0)
+      : folder === ""
+        ? filterSongs(session.songs.filter((song) => !cleanFolder(song.folder)), null, query)
+        : filterSongs(session.songs, folder, query),
+  );
+  /** Where new songs and imports go: the open folder, or none. */
+  const targetFolder = $derived(folder && folder !== RECENT ? folder : "");
+
+  /** First lyric line, or the line that matches the search. */
+  function snippet(song: Song): string {
+    const needle = query.trim().toLowerCase();
+    const lines = song.sections.flatMap((section) => section.lines).map((line) => line.trim()).filter(Boolean);
+    return (needle ? lines.find((line) => line.toLowerCase().includes(needle)) : null) ?? lines[0] ?? "";
+  }
+
+  function navigate(key: "up" | "down" | "enter") {
+    if (visible.length === 0) return;
+    const at = visible.findIndex((song) => song.id === selectedId);
+    if (key === "enter") {
+      const song = at >= 0 ? visible[at]! : visible[0]!;
+      pick(song);
+      if (song.sections[0]) show(song, song.sections[0].id);
+      return;
+    }
+    const next = at < 0 ? 0 : Math.min(visible.length - 1, Math.max(0, at + (key === "down" ? 1 : -1)));
+    pick(visible[next]!);
+    requestAnimationFrame(() => document.querySelector(".songs .song.on")?.scrollIntoView({ block: "nearest" }));
+  }
   const selected = $derived(session.songs.find((song) => song.id === selectedId) ?? null);
   const onPreview = $derived(session.songFocus);
   const index = $derived(buildSongIndex(session.songs));
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
-  const listTitle = $derived(folder === null ? "All songs" : folder === "" ? "Unfiled" : folder);
+  const listTitle = $derived(folder === null ? "All songs" : folder === RECENT ? "Recent" : folder === "" ? "Unfiled" : folder);
 
   // Messages fade after a few seconds so they never crowd the song.
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -156,7 +192,7 @@
 
   async function onFiles(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    await importFiles(input.files, folder ?? "");
+    await importFiles(input.files, targetFolder);
     input.value = "";
   }
 
@@ -164,7 +200,7 @@
     const input = event.currentTarget as HTMLInputElement;
     const first = input.files?.[0] as (File & { webkitRelativePath?: string }) | undefined;
     const dirName = first?.webkitRelativePath?.split("/")[0] ?? "Imported";
-    await importFiles(input.files, folder || dirName);
+    await importFiles(input.files, targetFolder || dirName);
     input.value = "";
   }
 
@@ -175,7 +211,7 @@
       id: crypto.randomUUID(),
       title: "",
       author: "",
-      folder: folder ?? "",
+      folder: targetFolder,
       sections: [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }],
       isNew: true,
     };
@@ -242,18 +278,22 @@
 
 <section class="song-desk">
   <!-- Library -->
-  <aside class="library" aria-label="Song library">
-    <div class="lib-head">
-      <h2>Songs</h2>
-      <button type="button" class="desk-btn" onclick={newSong}><Icon name="plus" size={14} /> New song</button>
-    </div>
-    <input class="search" type="search" placeholder="Search title, author or lyrics" aria-label="Search songs" bind:value={query} />
+  <LibrarySidebar title="Songs" icon="note" count={session.songs.length} storageKey="songs">
+    {#snippet actions()}
+      <button type="button" class="desk-btn" onclick={newSong}><Icon name="plus" size={14} /> New</button>
+    {/snippet}
+    <SearchField bind:value={query} label="Search songs" placeholder="Title, author or lyrics" onnavigate={navigate} />
 
     <p class="group">Folders</p>
     <nav class="folders" aria-label="Song folders">
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
       </button>
+      {#if recent.length > 0}
+        <button type="button" class="folder" class:on={folder === RECENT} onclick={() => (folder = RECENT)}>
+          <Icon name="reset" size={16} /><span>Recent</span><small>{recent.length}</small>
+        </button>
+      {/if}
       {#if unfiled > 0 && folders.length > 0}
         <button type="button" class="folder" class:on={folder === ""} onclick={() => (folder = "")}>
           <Icon name="folder" size={16} /><span>Unfiled</span><small>{unfiled}</small>
@@ -331,12 +371,13 @@
               {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">Live</em>
               {:else if onPreview?.songId === song.id}<em class="badge">Preview</em>{/if}
             </strong>
+            {#if snippet(song)}<span class="first-line">{snippet(song)}</span>{/if}
             <span>{[song.author, `${song.sections.length} section${song.sections.length === 1 ? "" : "s"}`, folder === null ? song.folder : ""].filter(Boolean).join(" · ")}</span>
           </button>
         </li>
       {/each}
     </ul>
-  </aside>
+  </LibrarySidebar>
 
   <!-- Song -->
   <div class="sheet">
@@ -494,11 +535,11 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(280px, 380px);
+    grid-template-columns: auto minmax(0, 1fr) minmax(280px, 380px);
     gap: var(--gap, 10px);
     padding: var(--gap, 10px) var(--panel-pad, 12px) var(--panel-pad, 12px);
   }
-  .library, .sheet, .stage {
+  .sheet, .stage {
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -520,8 +561,6 @@
   textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
 
   /* Library */
-  .lib-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px; }
-  .search { margin: 0 14px 12px; }
   .group {
     margin: 0;
     padding: 0 16px 6px;
@@ -616,6 +655,7 @@
   }
   .song strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
   .song span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song .first-line { font-size: 12px; color: color-mix(in srgb, var(--ink) 70%, var(--muted)); font-style: italic; }
   .song:hover { background: var(--field); }
   .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
@@ -702,7 +742,7 @@
   .heard-text { margin: 0; font-size: 12px; color: var(--muted); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
 
   @media (max-width: 1280px) {
-    .song-desk { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(240px, 300px); }
+    .song-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
     .fields { grid-template-columns: 1fr 1fr; }
   }
 </style>

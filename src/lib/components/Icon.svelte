@@ -67,6 +67,7 @@
     mic: Mic,
     "mic-off": MicOff,
     wave: Search,
+    search: Search,
     book: BookOpen,
     bible: Book,
     columns: Columns2,
