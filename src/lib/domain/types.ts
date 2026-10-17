@@ -33,6 +33,21 @@ export type Theme = {
   dim?: number;
   /** A Premium library theme (animated, photo or video). */
   premium?: boolean;
+  /** A panel behind the words: a box, frosted glass, a full-width band, or a broadcast bar. */
+  panel?: ThemePanel;
+};
+
+export type ThemePanelStyle = "box" | "glass" | "band" | "bar";
+
+export type ThemePanel = {
+  style: ThemePanelStyle;
+  color: string;
+  /** 0–1. */
+  opacity: number;
+  /** Stripe or edge color (bar, box) and the reference tag. */
+  accent: string;
+  /** Show the reference as a colored tag, broadcast style. */
+  tag: boolean;
 };
 
 /**
@@ -84,6 +99,8 @@ export type PaintedLayer = {
   model: PresentationModel;
   /** Camera layers only: flip the video horizontally. */
   mirror?: boolean;
+  /** A backing behind the layer so text reads over a camera or picture (CSS color). */
+  backing?: string;
   animation?: {
     entrance: string;
     exit: string;
@@ -375,6 +392,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** Layouts the church saved from its own looks ("Start from a layout"). */
+  customLayouts: import("./composition").CompositionTemplate[];
   /** Shared sources. Scenes link to these by layer sourceKey. */
   sources: SharedSourceDocument[];
   /** Phones approved for the LAN remote. Only token hashes are stored. */

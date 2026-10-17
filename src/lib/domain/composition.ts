@@ -57,7 +57,11 @@ export type CompositionLayer = {
   animation: LayerAnimation;
   /** Link to Workspace.sources; absent = unlinked copy. */
   sourceKey?: string;
+  /** A panel behind the layer so words read over a camera or picture. */
+  backing?: LayerBacking;
 };
+
+export type LayerBacking = { color: string; opacity: number };
 
 /** A page background for decks: color, two-color gradient, or a picture, with an optional tint. */
 export type PageBackground = {
@@ -84,17 +88,24 @@ export type Composition = {
   transition: { type: "cut" | "fade"; ms: number };
 };
 
+/** What a layout slot is for, so a layout can be filled from what is on the desk. */
+export type SlotRole = "camera" | "scripture" | "lyrics" | "timer" | "clock" | "image" | "text" | "lower-third";
+
 export type CompositionSlot = {
   id: string;
   name: string;
   bounds: LayerBounds;
   fit: LayerFit;
+  role?: SlotRole;
+  backing?: LayerBacking;
 };
 
 export type CompositionTemplate = {
   id: string;
   name: string;
   slots: CompositionSlot[];
+  /** A layout the church saved from its own look. */
+  custom?: boolean;
 };
 
 export type PaintedLayer = {
@@ -171,6 +182,87 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
     slots: [
       { id: "fill", name: "Fill", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover" },
       { id: "timer", name: "Timer", bounds: { x: 68, y: 8, w: 28, h: 18 }, fit: "contain" },
+    ],
+  },
+  {
+    id: "pip",
+    name: "Picture in Picture",
+    slots: [
+      { id: "main", name: "Main camera", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "inset", name: "Inset camera", bounds: { x: 72, y: 70, w: 24, h: 24 }, fit: "cover", role: "camera" },
+    ],
+  },
+  {
+    id: "camera-scripture-lower",
+    name: "Camera + Scripture bar",
+    slots: [
+      { id: "fill", name: "Camera", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "verse", name: "Scripture", bounds: { x: 4, y: 66, w: 92, h: 28 }, fit: "contain", role: "scripture", backing: { color: "#050505", opacity: 0.72 } },
+    ],
+  },
+  {
+    id: "camera-lyrics-lower",
+    name: "Camera + Lyrics bar",
+    slots: [
+      { id: "fill", name: "Camera", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "lyrics", name: "Lyrics", bounds: { x: 4, y: 70, w: 92, h: 24 }, fit: "contain", role: "lyrics", backing: { color: "#050505", opacity: 0.72 } },
+    ],
+  },
+  {
+    id: "camera-sidebar",
+    name: "Camera + Scripture side",
+    slots: [
+      { id: "fill", name: "Camera", bounds: { x: 0, y: 0, w: 66.6667, h: 100 }, fit: "cover", role: "camera" },
+      { id: "verse", name: "Scripture", bounds: { x: 66.6667, y: 0, w: 33.3333, h: 100 }, fit: "contain", role: "scripture", backing: { color: "#050505", opacity: 0.92 } },
+    ],
+  },
+  {
+    id: "scripture-speaker",
+    name: "Scripture + Speaker inset",
+    slots: [
+      { id: "verse", name: "Scripture", bounds: { x: 3, y: 6, w: 63, h: 88 }, fit: "contain", role: "scripture" },
+      { id: "inset", name: "Speaker", bounds: { x: 68, y: 33, w: 29, h: 34 }, fit: "cover", role: "camera" },
+    ],
+  },
+  {
+    id: "image-scripture",
+    name: "Picture + Scripture",
+    slots: [
+      { id: "picture", name: "Picture", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "image" },
+      { id: "verse", name: "Scripture", bounds: { x: 10, y: 22, w: 80, h: 56 }, fit: "contain", role: "scripture", backing: { color: "#050505", opacity: 0.55 } },
+    ],
+  },
+  {
+    id: "lyrics-countdown",
+    name: "Lyrics + Countdown",
+    slots: [
+      { id: "lyrics", name: "Lyrics", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain", role: "lyrics" },
+      { id: "timer", name: "Countdown", bounds: { x: 70, y: 3, w: 27, h: 16 }, fit: "contain", role: "timer" },
+    ],
+  },
+  {
+    id: "welcome-countdown",
+    name: "Welcome + Countdown",
+    slots: [
+      { id: "welcome", name: "Welcome", bounds: { x: 0, y: 4, w: 100, h: 56 }, fit: "contain", role: "text" },
+      { id: "timer", name: "Countdown", bounds: { x: 30, y: 60, w: 40, h: 30 }, fit: "contain", role: "timer" },
+    ],
+  },
+  {
+    id: "camera-clock",
+    name: "Camera + Time",
+    slots: [
+      { id: "fill", name: "Camera", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "clock", name: "Time", bounds: { x: 76, y: 4, w: 21, h: 13 }, fit: "contain", role: "clock", backing: { color: "#050505", opacity: 0.72 } },
+    ],
+  },
+  {
+    id: "three-across",
+    name: "Three Across",
+    slots: [
+      { id: "a", name: "Camera 1", bounds: { x: 0, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
+      { id: "b", name: "Camera 2", bounds: { x: 33.3333, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
+      { id: "c", name: "Camera 3", bounds: { x: 66.6667, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
     ],
   },
   {
@@ -299,7 +391,7 @@ export function setCompositionLocked(composition: Composition, locked: boolean):
 
 export function addLayer(
   composition: Composition,
-  input: { name: string; bounds: LayerBounds; source?: SourceRef; fit?: LayerFit },
+  input: { name: string; bounds: LayerBounds; source?: SourceRef; fit?: LayerFit; backing?: LayerBacking },
 ): Composition {
   if (composition.locked) return composition;
   const layer: CompositionLayer = {
@@ -313,6 +405,7 @@ export function addLayer(
     fit: input.fit ?? "contain",
     source: sanitizeSource(input.source),
     animation: DEFAULT_ANIMATION,
+    ...(input.backing ? { backing: sanitizeBacking(input.backing)! } : {}),
   };
   return { ...composition, layers: [...composition.layers, layer] };
 }
@@ -582,7 +675,7 @@ export function assignSong(composition: Composition, layerId: string, input: { l
 
 export function instantiateTemplate(template: CompositionTemplate, name: string): Composition {
   return template.slots.reduce(
-    (composition, slot) => addLayer(composition, { name: slot.name, bounds: slot.bounds, fit: slot.fit, source: sourceRef("empty", slot.id, slot.name) }),
+    (composition, slot) => addLayer(composition, { name: slot.name, bounds: slot.bounds, fit: slot.fit, backing: slot.backing, source: sourceRef("empty", slot.id, slot.name) }),
     createComposition(name || template.name),
   );
 }
@@ -736,6 +829,93 @@ export function lookScriptureClock(input: ScriptureInput): Composition {
   if (verse) composition = assignLayerSource(composition, verse.id, scriptureSource(input));
   if (clock) composition = assignLayerSource(composition, clock.id, sourceRef("clock", "clock", "Time", { mode: "clock", label: "" }));
   return composition;
+}
+
+/** What the desk has right now, for filling a layout's slots by role. */
+export type DeskContent = {
+  scripture: ScriptureInput;
+  lyrics: { label: string; lines: string[] };
+  cameras: { id: string; label: string }[];
+  image: { imageUrl: string; title: string };
+  announcement: { heading: string; body: string };
+  timer: { durationMs: number; label: string };
+  lowerThird: { title: string; subtitle: string };
+};
+
+/** Fill each slot of a layout from the desk by its role. Slots without a role stay empty. */
+export function fillTemplate(template: CompositionTemplate, content: DeskContent): Composition {
+  let composition = instantiateTemplate(template, template.name);
+  let cameraIndex = 0;
+  template.slots.forEach((slot, index) => {
+    const layer = composition.layers[index];
+    if (!layer || !slot.role) return;
+    if (slot.role === "lower-third") {
+      composition = applyLowerThirdTemplate(composition, layer.id, LOWER_THIRD_TEMPLATES[0]!, content.lowerThird.title, content.lowerThird.subtitle);
+      return;
+    }
+    const camera = () => {
+      const pick = content.cameras[cameraIndex++ % Math.max(1, content.cameras.length)] ?? { id: "cam-1", label: "Camera 1" };
+      return sourceRef("camera", pick.id, pick.label, { deviceId: pick.id, label: pick.label });
+    };
+    const source: Record<Exclude<SlotRole, "lower-third">, () => SourceRef> = {
+      camera,
+      scripture: () => scriptureSource(content.scripture),
+      lyrics: () => sourceRef("song", content.lyrics.label, content.lyrics.label, { label: content.lyrics.label, body: content.lyrics.lines.join("\n") }),
+      timer: () => sourceRef("timer", "service", content.timer.label, { mode: "countdown", durationMs: String(content.timer.durationMs), label: content.timer.label }),
+      clock: () => sourceRef("clock", "clock", "Time", { mode: "clock", label: "" }),
+      image: () => sourceRef("image", content.image.title, content.image.title, { imageUrl: content.image.imageUrl }),
+      text: () => sourceRef("text", "announcement", content.announcement.heading, { heading: content.announcement.heading, body: content.announcement.body }),
+    };
+    composition = assignLayerSource(composition, layer.id, source[slot.role]());
+  });
+  return composition;
+}
+
+function roleOf(type: SourceType): SlotRole | undefined {
+  if (type === "camera" || type === "video" || type === "ndi") return "camera";
+  if (type === "scripture") return "scripture";
+  if (type === "song") return "lyrics";
+  if (type === "timer" || type === "countdown") return "timer";
+  if (type === "clock" || type === "image" || type === "text" || type === "lower-third") return type;
+  return undefined;
+}
+
+/** Save a look's arrangement (not its content) as a layout the church can start from again. */
+export function layoutFromLook(composition: Composition, name: string): CompositionTemplate {
+  return {
+    id: `custom-${uid()}`,
+    name: name.trim().slice(0, 60) || composition.name,
+    custom: true,
+    slots: layerOrder(composition)
+      .filter((layer) => layer.visible)
+      .map((layer) => ({
+        id: layer.id,
+        name: layer.name,
+        bounds: layer.bounds,
+        fit: layer.fit,
+        ...(roleOf(layer.source.type) ? { role: roleOf(layer.source.type)! } : {}),
+        ...(layer.backing ? { backing: layer.backing } : {}),
+      })),
+  };
+}
+
+const ROLES: SlotRole[] = ["camera", "scripture", "lyrics", "timer", "clock", "image", "text", "lower-third"];
+
+export function sanitizeLayouts(value: unknown): CompositionTemplate[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 60).flatMap((entry) => {
+    const record = entry && typeof entry === "object" ? (entry as Partial<CompositionTemplate>) : null;
+    if (!record || typeof record.id !== "string" || !Array.isArray(record.slots) || record.slots.length === 0) return [];
+    const slots = record.slots.slice(0, 12).map((slot, index) => ({
+      id: typeof slot.id === "string" && slot.id ? slot.id : `slot-${index}`,
+      name: typeof slot.name === "string" && slot.name ? slot.name.slice(0, 60) : `Region ${index + 1}`,
+      bounds: sanitizeBounds(slot.bounds ?? { x: 0, y: 0, w: 100, h: 100 }),
+      fit: slot.fit === "cover" || slot.fit === "fill" ? slot.fit : ("contain" as LayerFit),
+      ...(ROLES.includes(slot.role as SlotRole) ? { role: slot.role as SlotRole } : {}),
+      ...(sanitizeBacking(slot.backing) ? { backing: sanitizeBacking(slot.backing)! } : {}),
+    }));
+    return [{ id: record.id, name: typeof record.name === "string" && record.name ? record.name.slice(0, 60) : "My layout", custom: true, slots }];
+  });
 }
 
 /**
@@ -1064,8 +1244,16 @@ export function sanitizeComposition(value: unknown): Composition {
       source: sanitizeSource(layer.source),
       animation: sanitizeAnimation(layer.animation),
       ...(typeof layer.sourceKey === "string" && layer.sourceKey ? { sourceKey: layer.sourceKey } : {}),
+      ...(sanitizeBacking(layer.backing) ? { backing: sanitizeBacking(layer.backing)! } : {}),
     })),
   };
+}
+
+function sanitizeBacking(value: unknown): LayerBacking | null {
+  const record = value && typeof value === "object" ? (value as Partial<LayerBacking>) : null;
+  if (!record || typeof record.color !== "string" || !HEX_COLOR.test(record.color)) return null;
+  const opacity = Number(record.opacity);
+  return { color: record.color.toLowerCase(), opacity: Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 0.7 };
 }
 
 export function restoreComposition(value: unknown): Composition {
@@ -1346,6 +1534,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       // On a deck page the page background shows through every element.
       model: composition.background ? { ...compileSource(layer.source, ctx), fill: "transparent" } : compileSource(layer.source, ctx),
       mirror: layer.source.type === "camera" && layer.source.payload.mirror === "true",
+      ...(layer.backing ? { backing: `color-mix(in srgb, ${layer.backing.color} ${Math.round(layer.backing.opacity * 100)}%, transparent)` } : {}),
       animation: layer.animation,
     }));
   return {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { backgroundFill, frameBackground, MOTIONS } from "./backgrounds";
 import { planIncludes } from "./plans";
 import { presentScripture } from "./present";
-import { defaultTheme, factoryThemes, sanitizeTheme } from "./theme";
+import { defaultTheme, factoryThemes, sanitizePanel, sanitizeTheme } from "./theme";
 import type { Theme } from "./types";
 
 const theme = (patch: Partial<Theme>): Theme => sanitizeTheme({ ...defaultTheme(), ...patch } as Theme);
@@ -28,10 +28,18 @@ describe("theme library", () => {
     const all = factoryThemes();
     const premium = all.filter((entry) => entry.premium);
     expect(all.length).toBeGreaterThanOrEqual(23);
-    expect(premium.length).toBe(12);
-    expect(premium.filter((entry) => entry.background.type === "motion").length).toBe(7);
+    expect(premium.length).toBe(22);
+    expect(premium.filter((entry) => entry.background.type === "motion").length).toBe(9);
+    // Broadcast themes put the words on a panel.
+    expect(premium.filter((entry) => entry.panel).map((entry) => entry.panel!.style).sort()).toEqual(["band", "band", "bar", "bar", "bar", "box", "glass", "glass"]);
     expect(all.filter((entry) => !entry.premium).every((entry) => entry.background.type !== "motion")).toBe(true);
     expect(planIncludes("free", "theme-library")).toBe(false);
     expect(planIncludes("premium", "theme-library")).toBe(true);
+  });
+
+  it("keeps a valid panel and drops a broken one", () => {
+    expect(sanitizePanel({ style: "bar", color: "#0B1530", opacity: 3, accent: "nope", tag: true })).toEqual({ style: "bar", color: "#0b1530", opacity: 1, accent: "#fa4f00", tag: true });
+    expect(sanitizePanel({ style: "spotlight" })).toBeUndefined();
+    expect(sanitizePanel(null)).toBeUndefined();
   });
 });

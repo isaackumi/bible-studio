@@ -19,6 +19,7 @@ import {
   persistLook,
   presentComposition,
   swapSides,
+  layoutFromLook,
   presentSavedLook,
   previewComposition,
   queueLook,
@@ -1089,6 +1090,23 @@ class Session {
     this.message = synced.unlinked.length
       ? `${synced.unlinked.join(", ")} unlinked: a locked scene uses the shared source. LIVE still sends Program.`
       : `${clean.name} saved. LIVE still sends Program.`;
+  };
+
+  /** Save a look's arrangement as a layout to start from again (content is filled from the desk). */
+  saveLookLayout = (composition: Composition) => {
+    const layout = layoutFromLook(composition, composition.name);
+    if (layout.slots.length === 0) {
+      this.message = "Add a visible layer before saving a layout.";
+      return;
+    }
+    this.workspace = { ...this.workspace, customLayouts: [layout, ...this.workspace.customLayouts].slice(0, 60) };
+    this.persistSoon();
+    this.message = `${layout.name} saved under Your layouts.`;
+  };
+
+  deleteLookLayout = (id: string) => {
+    this.workspace = { ...this.workspace, customLayouts: this.workspace.customLayouts.filter((layout) => layout.id !== id) };
+    this.persistSoon();
   };
 
   /** Create an empty scene (look), persist it, and stage Preview only. */

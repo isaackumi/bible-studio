@@ -56,6 +56,22 @@ export function sanitizeTheme(theme: Theme): Theme {
     effects: sanitizeEffects(theme.effects),
     dim: typeof theme.dim === "number" && Number.isFinite(theme.dim) ? Math.min(0.8, Math.max(0, theme.dim)) : undefined,
     premium: theme.premium === true ? true : undefined,
+    panel: sanitizePanel(theme.panel),
+  };
+}
+
+const PANEL_STYLES = ["box", "glass", "band", "bar"] as const;
+
+export function sanitizePanel(value: unknown): Theme["panel"] {
+  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!record || !PANEL_STYLES.includes(record.style as (typeof PANEL_STYLES)[number])) return undefined;
+  const opacity = Number(record.opacity);
+  return {
+    style: record.style as (typeof PANEL_STYLES)[number],
+    color: hex(record.color, "#050505"),
+    opacity: Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 0.75,
+    accent: hex(record.accent, "#fa4f00"),
+    tag: record.tag === true,
   };
 }
 
@@ -223,6 +239,17 @@ export function factoryThemes(): Theme[] {
     displayTheme({ id: "theme-easter", name: "Easter", premium: true, background: { type: "gradient", from: "#fff6e5", to: "#f2d9a6", angle: 180 }, fontFamily: SERIF, fontSize: 62, color: "#3a2410", reference: { color: "#9a6420" }, attribution: { color: "#8a7258" } }),
     displayTheme({ id: "theme-pentecost", name: "Pentecost", premium: true, background: { type: "gradient", from: "#2a0606", to: "#c2410c", angle: 200 }, fontFamily: SANS, fontSize: 62, color: "#fff4ec", reference: { color: "#ffd2a8" }, attribution: { color: "#f0b998" } }),
     displayTheme({ id: "theme-royal", name: "Royal", premium: true, background: { type: "gradient", from: "#070b1f", to: "#1d2a5c", angle: 165 }, fontFamily: SERIF, fontSize: 62, color: "#f6f2e6", reference: { color: "#e6c879" }, attribution: { color: "#a9a48f" } }),
+    // Broadcast and stage themes (Premium): words on a panel, the way TV graphics and big-room screens do it.
+    displayTheme({ id: "theme-newsdesk", name: "Newsdesk", premium: true, layout: "lower-third", background: { type: "color", color: "#050505" }, fontFamily: INTER, fontSize: 46, color: "#ffffff", align: "left", vertical: "bottom", margin: 72, effects: { bold: true }, panel: { style: "bar", color: "#0b1530", opacity: 0.94, accent: "#e11d48", tag: true }, reference: { size: 22, color: "#ffffff" }, attribution: { color: "#a9b4d0" } }),
+    displayTheme({ id: "theme-headline", name: "Headline", premium: true, layout: "lower-third", background: { type: "color", color: "#050505" }, fontFamily: INTER, fontSize: 44, color: "#0b0b0f", align: "left", vertical: "bottom", margin: 72, panel: { style: "bar", color: "#ffffff", opacity: 0.96, accent: "#0a84ff", tag: true }, reference: { size: 22, color: "#ffffff" }, attribution: { color: "#5b6170" } }),
+    displayTheme({ id: "theme-caption-glass", name: "Glass caption", premium: true, layout: "lower-third", background: { type: "color", color: "#050505" }, fontFamily: SANS, fontSize: 46, color: "#ffffff", align: "center", vertical: "bottom", margin: 72, panel: { style: "glass", color: "#0a0a0a", opacity: 0.45, accent: "#ffffff", tag: false }, reference: { size: 22, color: "#ffe6b0" }, attribution: { color: "#d0d0d0" } }),
+    displayTheme({ id: "theme-key-green", name: "Key green", premium: true, layout: "lower-third", background: { type: "color", color: "#00b140" }, fontFamily: INTER, fontSize: 46, color: "#ffffff", align: "left", vertical: "bottom", margin: 72, effects: { bold: true }, panel: { style: "bar", color: "#101418", opacity: 1, accent: "#f5a524", tag: true }, reference: { size: 22, color: "#101418" }, attribution: { color: "#b8c0c8" } }),
+    displayTheme({ id: "theme-studio-box", name: "Studio box", premium: true, background: { type: "gradient", from: "#0d1117", to: "#1f2937", angle: 160 }, fontFamily: INTER, fontSize: 58, color: "#f8fafc", panel: { style: "box", color: "#000000", opacity: 0.55, accent: "#fa4f00", tag: true }, reference: { size: 24, color: "#ffffff" }, attribution: { color: "#94a3b8" } }),
+    displayTheme({ id: "theme-frosted", name: "Frosted", premium: true, background: { type: "motion", motionId: "aurora", tint: "#7aa2ff", base: "#050b1c" }, fontFamily: SANS, fontSize: 58, color: "#ffffff", panel: { style: "glass", color: "#0b1020", opacity: 0.35, accent: "#9cb8ff", tag: false }, reference: { color: "#cdd9ff" }, attribution: { color: "#a8b4d8" } }),
+    displayTheme({ id: "theme-band", name: "Band", premium: true, background: { type: "gradient", from: "#1a1206", to: "#3b2a10", angle: 180 }, fontFamily: SERIF, fontSize: 62, color: "#fff8e8", panel: { style: "band", color: "#000000", opacity: 0.45, accent: "#e2cc9d", tag: false }, reference: { color: "#e2cc9d" }, attribution: { color: "#bfae8c" } }),
+    displayTheme({ id: "theme-keynote", name: "Keynote", premium: true, background: { type: "color", color: "#000000" }, fontFamily: INTER, fontSize: 72, color: "#ffffff", align: "left", margin: 140, effects: { bold: true }, reference: { size: 26, color: "#fa4f00" }, attribution: { color: "#8e8e93" } }),
+    displayTheme({ id: "theme-daylight", name: "Daylight", premium: true, background: { type: "color", color: "#f7f8fa" }, fontFamily: INTER, fontSize: 64, color: "#0f172a", align: "left", margin: 140, effects: { bold: true }, reference: { color: "#2563eb" }, attribution: { color: "#64748b" } }),
+    displayTheme({ id: "theme-stage-wide", name: "Big room", premium: true, background: { type: "motion", motionId: "rays", tint: "#ffb35c", base: "#0a0603" }, fontFamily: FIGTREE, fontSize: 70, color: "#ffffff", dim: 0.25, effects: { bold: true, uppercase: true, shadow: true }, panel: { style: "band", color: "#000000", opacity: 0.35, accent: "#ffb35c", tag: false }, reference: { color: "#ffd59a" }, attribution: { color: "#e0c7a4" } }),
     displayTheme({ id: "theme-slate", name: "Slate", premium: true, background: { type: "gradient", from: "#111418", to: "#2c333d", angle: 180 }, fontFamily: INTER, fontSize: 60, color: "#eef2f6", reference: { color: "#9fb3c8" }, attribution: { color: "#7d8a98" } }),
   ];
 }
@@ -251,6 +278,7 @@ export function defaultWorkspace(): Workspace {
     songFolders: [],
     ccliLicense: "",
     installedPacks: [],
+    customLayouts: [],
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,

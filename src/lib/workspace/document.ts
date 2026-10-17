@@ -1,6 +1,6 @@
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
-import { sanitizeComposition } from "../domain/composition";
+import { sanitizeComposition, sanitizeLayouts } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
 import { sanitizeRemoteDevices } from "../domain/remote";
 import { sanitizeVoiceSettings } from "../voice/commands";
@@ -121,5 +121,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     // Saved before setup existed: an existing church, so do not show first-run setup.
     onboarded: value.onboarded !== false,
     installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
+    customLayouts: sanitizeLayouts(value.customLayouts),
   };
 }

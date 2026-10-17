@@ -10,6 +10,8 @@
     assignLayerSource,
     clearLowerThird,
     COMPOSITION_TEMPLATES,
+    fillTemplate,
+    type CompositionTemplate,
     lookMultiCamera,
     setLayerStyle,
     hideLayer,
@@ -93,6 +95,37 @@
   ];
 
   const saved = $derived(session.workspace.compositions.map((entry) => restoreComposition(entry)));
+
+  type LayoutGroup = "all" | "scripture" | "lyrics" | "camera" | "timer";
+  const LAYOUT_GROUPS: [LayoutGroup, string][] = [["all", "All"], ["scripture", "Scripture"], ["lyrics", "Lyrics"], ["camera", "Cameras"], ["timer", "Timers"]];
+  let layoutGroup = $state<LayoutGroup>("all");
+  /** Which filter chips a layout belongs to, from its slot roles or its name. */
+  function groupsOf(template: CompositionTemplate): Set<LayoutGroup> {
+    const words = template.name.toLowerCase();
+    const roles = new Set(template.slots.map((slot) => slot.role));
+    const groups = new Set<LayoutGroup>();
+    if (roles.has("scripture") || words.includes("scripture")) groups.add("scripture");
+    if (roles.has("lyrics") || words.includes("lyrics")) groups.add("lyrics");
+    if (roles.has("camera") || /camera|picture in|speaker|across/.test(words)) groups.add("camera");
+    if (roles.has("timer") || roles.has("clock") || /countdown|time\b/.test(words)) groups.add("timer");
+    return groups;
+  }
+  const layouts = $derived(COMPOSITION_TEMPLATES.filter((template) => layoutGroup === "all" || groupsOf(template).has(layoutGroup)));
+  const customLayouts = $derived(session.workspace.customLayouts);
+
+  /** Everything on the desk a layout's slots can be filled with. */
+  async function deskContent() {
+    await session.loadCameras();
+    return {
+      scripture: scriptureFromDesk(),
+      lyrics: lyricsFromDesk(),
+      cameras: session.cameras.map((camera) => ({ id: camera.deviceId, label: camera.label })),
+      image: imageFromDesk(),
+      announcement: announcementFromDesk(),
+      timer: { durationMs: Math.max(1, timerMinutes) * 60_000, label: timerLabel || "Service starts in" },
+      lowerThird: { title: lowerTitle, subtitle: lowerSubtitle },
+    };
+  }
   const selected = $derived(draft?.layers.find((layer) => layer.id === selectedId) ?? draft?.layers[0] ?? null);
 
   $effect(() => {
@@ -289,9 +322,9 @@
       session.previewLook(draft);
       return;
     }
-    const template = COMPOSITION_TEMPLATES.find((entry) => entry.id === id);
+    const template = [...COMPOSITION_TEMPLATES, ...session.workspace.customLayouts].find((entry) => entry.id === id);
     if (!template) return;
-    draft = instantiateTemplate(template, template.name);
+    draft = template.slots.some((slot) => slot.role) ? fillTemplate(template, await deskContent()) : instantiateTemplate(template, template.name);
     selectedId = draft.layers[0]?.id ?? null;
     session.previewLook(draft);
   }
@@ -592,9 +625,49 @@
   <!-- Library: templates and saved looks -->
   <LibrarySidebar title="Looks" icon="layout" count={saved.length} storageKey="looks">
     <div class="lib-scroll">
+      {#if customLayouts.length > 0}
+        <p class="group">Your layouts <span>{customLayouts.length}</span></p>
+        <div class="tiles">
+          {#each customLayouts as template (template.id)}
+            <div class="tile-wrap">
+              <button type="button" class="tile" title={template.name} onclick={() => void openTemplate(template.id)}>
+                <span class="schema" aria-hidden="true">
+                  {#each template.slots as slot, n (slot.id)}
+                    <i style:left="{slot.bounds.x}%" style:top="{slot.bounds.y}%" style:width="{slot.bounds.w}%" style:height="{slot.bounds.h}%" class:main={n === 0}></i>
+                  {/each}
+                </span>
+                <span class="tile-name">{template.name}</span>
+              </button>
+              <button
+                type="button"
+                class="tile-delete"
+                class:armed={armedDelete === template.id}
+                aria-label={armedDelete === template.id ? `Confirm delete ${template.name}` : `Delete ${template.name}`}
+                title={armedDelete === template.id ? "Click again to delete" : "Delete layout"}
+                onclick={() => {
+                  if (armedDelete !== template.id) {
+                    armedDelete = template.id;
+                    clearTimeout(armTimer);
+                    armTimer = setTimeout(() => (armedDelete = null), 3000);
+                    return;
+                  }
+                  armedDelete = null;
+                  session.deleteLookLayout(template.id);
+                }}
+              ><Icon name="close" size={12} /></button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
       <p class="group">Start from a layout</p>
+      <div class="layout-chips" role="radiogroup" aria-label="Show layouts">
+        {#each LAYOUT_GROUPS as [id, label] (id)}
+          <button type="button" role="radio" aria-checked={layoutGroup === id} class:on={layoutGroup === id} onclick={() => (layoutGroup = id)}>{label}</button>
+        {/each}
+      </div>
       <div class="tiles">
-        {#each COMPOSITION_TEMPLATES as template (template.id)}
+        {#each layouts as template (template.id)}
           <button
             type="button"
             class="tile"
@@ -671,6 +744,7 @@
         <div class="head-actions">
           <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> Preview</button>
           <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>Save look</button>
+          <button type="button" class="desk-btn" title="Save this arrangement as a layout to start from again" onclick={() => draft && session.saveLookLayout(draft)}>Save as layout</button>
           <button
             type="button"
             class="desk-btn ghost icon"
@@ -998,6 +1072,13 @@
   .schema i.main { background: color-mix(in srgb, var(--accent) 30%, transparent); }
   .tile:hover .schema i.main, .tile.on .schema i.main { background: color-mix(in srgb, var(--accent) 55%, transparent); }
   .tile-name { font-size: 11px; font-weight: 600; line-height: 1.25; }
+  .tile-wrap { position: relative; display: grid; }
+  .tile-delete { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: color-mix(in srgb, #000 55%, transparent); color: #fff; opacity: 0; cursor: pointer; }
+  .tile-wrap:hover .tile-delete, .tile-delete:focus-visible, .tile-delete.armed { opacity: 1; }
+  .tile-delete.armed { background: var(--live); }
+  .layout-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+  .layout-chips button { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
+  .layout-chips button.on { border-color: var(--accent); background: var(--accent); color: #fff; }
   .empty { margin: 0 4px; font-size: 12px; color: var(--muted); }
   .saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .saved li { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); }

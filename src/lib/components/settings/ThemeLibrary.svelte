@@ -5,14 +5,14 @@
   import { SCREEN_FONTS } from "../../domain/fonts";
   import { presentScripture } from "../../domain/present";
   import { factoryThemes } from "../../domain/theme";
-  import type { PresentationModel, Theme, ThemeBackground } from "../../domain/types";
+  import type { PresentationModel, Theme, ThemeBackground, ThemePanelStyle } from "../../domain/types";
   import { isDesktop } from "../../platform/runtime";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
 
   // Theme library: browse every look for the audience screen, preview it live, and (Premium)
   // edit or create one with color, gradient, animated, photo or video backgrounds.
-  type Filter = "all" | "still" | "animated" | "media" | "mine";
+  type Filter = "all" | "broadcast" | "still" | "animated" | "media" | "mine";
   type Tab = "background" | "text" | "details";
 
   let filter = $state<Filter>("all");
@@ -31,7 +31,7 @@
   const kind = (theme: Theme) =>
     theme.background.type === "motion" ? "animated" : theme.background.type === "image" || theme.background.type === "video" ? "media" : "still";
   const shown = $derived(
-    session.themes.filter((theme) => filter === "all" || (filter === "mine" ? isMine(theme) : kind(theme) === filter)),
+    session.themes.filter((theme) => filter === "all" || (filter === "mine" ? isMine(theme) : filter === "broadcast" ? !!theme.panel || theme.layout === "lower-third" : kind(theme) === filter)),
   );
   const images = $derived(session.media.filter((asset) => asset.kind === "image"));
   const videos = $derived(session.media.filter((asset) => asset.kind === "video"));
@@ -202,7 +202,7 @@
   <div class="gallery-head">
     <p class="section-label">Library <span>{shown.length}</span></p>
     <div class="filters" role="radiogroup" aria-label="Show">
-      {#each [["all", "All"], ["still", "Still"], ["animated", "Animated"], ["media", "Photo & video"], ["mine", "My themes"]] as [id, label] (id)}
+      {#each [["all", "All"], ["broadcast", "Broadcast"], ["still", "Still"], ["animated", "Animated"], ["media", "Photo & video"], ["mine", "My themes"]] as [id, label] (id)}
         <button type="button" role="radio" aria-checked={filter === id} class:on={filter === id} onclick={() => (filter = id as Filter)}>{label}</button>
       {/each}
     </div>
@@ -361,6 +361,41 @@
           <div class="row-copy"><strong>Capitals</strong><span>Show words in capitals.</span></div>
           <input type="checkbox" class="switch" role="switch" aria-label="Capitals" checked={!!selected.effects?.uppercase} onchange={(event) => patch({ effects: { ...selected.effects, uppercase: event.currentTarget.checked } })} />
         </div>
+      </section>
+      <p class="section-label">Text panel</p>
+      <section class="rows">
+        <div class="row">
+          <div class="row-copy"><strong>Panel</strong><span>A shape behind the words, like TV graphics. Bar suits lower thirds.</span></div>
+          <div class="seg small" role="radiogroup" aria-label="Text panel">
+            {#each [["none", "None"], ["box", "Box"], ["glass", "Glass"], ["band", "Band"], ["bar", "Bar"]] as [id, label] (id)}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={(selected.panel?.style ?? "none") === id}
+                class:on={(selected.panel?.style ?? "none") === id}
+                onclick={() => patch({ panel: id === "none" ? undefined : { color: "#050505", opacity: 0.7, accent: session.workspace.appearance.accent, tag: false, ...selected.panel, style: id as ThemePanelStyle } })}
+              >{label}</button>
+            {/each}
+          </div>
+        </div>
+        {#if selected.panel}
+          {@const panel = selected.panel}
+          <div class="row">
+            <div class="row-copy"><strong>Panel colors</strong><span>Fill, then the stripe and tag color.</span></div>
+            <div class="row-end">
+              <input type="color" class="swatch-input" aria-label="Panel color" value={panel.color} onchange={(event) => patch({ panel: { ...panel, color: event.currentTarget.value } })} />
+              <input type="color" class="swatch-input" aria-label="Panel accent" value={panel.accent} onchange={(event) => patch({ panel: { ...panel, accent: event.currentTarget.value } })} />
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Panel strength</strong><span>{Math.round(panel.opacity * 100)}%</span></div>
+            <input type="range" min="0" max="100" step="5" aria-label="Panel strength" value={Math.round(panel.opacity * 100)} onchange={(event) => patch({ panel: { ...panel, opacity: Number(event.currentTarget.value) / 100 } })} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Reference tag</strong><span>Show the reference on a colored tag.</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label="Reference tag" checked={panel.tag} onchange={(event) => patch({ panel: { ...panel, tag: event.currentTarget.checked } })} />
+          </div>
+        {/if}
       </section>
     {:else}
       <section class="rows">

@@ -103,6 +103,8 @@
   /** Text frames get the theme's animated, video and darkening layers behind the words. */
   const TEXT_LAYOUTS = new Set(["scripture", "lyrics", "title", "timer", "lower-third", "empty", "announcement", "slide"]);
   const backdrop = $derived(!nested && !model.fill && !model.backgroundImageUrl && TEXT_LAYOUTS.has(model.layout) ? model.theme.background : null);
+  /** The theme's text panel, for words only (not timers, logos or cameras). */
+  const panel = $derived(model.theme.panel && (model.layout === "scripture" || model.layout === "lyrics" || model.layout === "title" || model.layout === "lower-third") && !stream ? model.theme.panel : null);
   const dim = $derived(!nested && TEXT_LAYOUTS.has(model.layout) ? (model.theme.dim ?? 0) : 0);
   const effects = $derived(effectsCss(model.style, model.theme));
 
@@ -113,6 +115,21 @@
   const displayLines = $derived(timerView ? [{ text: timerView.text }] : model.lines);
 </script>
 
+{#snippet words()}
+  {#if model.reference && model.theme.reference.show}
+    <p class="ref" style:font-size="{model.theme.reference.size}px" style:color={model.theme.reference.color}>{model.reference}</p>
+  {/if}
+  {#each displayLines as line}
+    <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
+      {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
+    </p>
+  {/each}
+  {#if model.attribution}
+    <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
+  {/if}
+{/snippet}
+
+
 <div
   class="frame"
   class:black={model.layout === "black"}
@@ -120,6 +137,7 @@
   class:light={!!wash?.light}
   class:drift={wash?.motion === "drift" && model.layout !== "black" && !nested}
   class:glow={wash?.motion === "glow" && model.layout !== "black" && !nested}
+  class:paneled={!!panel}
   class:lower={(model.theme.layout === "lower-third" || model.layout === "lower-third") && model.layout !== "black" && model.layout !== "empty" && model.layout !== "image"}
   class:nested
   class:composition={model.layout === "composition"}
@@ -148,6 +166,7 @@
         style:width="{layer.bounds.w}%"
         style:height="{layer.bounds.h}%"
         style:opacity={layer.opacity}
+        style:background={layer.backing}
         style:--layer-opacity={layer.opacity}
         style:z-index={layer.zIndex}
         style:--layer-dur="{layer.animation?.durationMs ?? 400}ms"
@@ -192,16 +211,19 @@
       style:text-transform={effects["text-transform"]}
       style:text-shadow={effects["text-shadow"]}
     >
-      {#if model.reference && model.theme.reference.show}
-        <p class="ref" style:font-size="{model.theme.reference.size}px" style:color={model.theme.reference.color}>{model.reference}</p>
-      {/if}
-      {#each displayLines as line}
-        <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
-          {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
-        </p>
-      {/each}
-      {#if model.attribution}
-        <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
+      {#if panel}
+        <div
+          class="tpanel {panel.style}"
+          class:tag={panel.tag}
+          style:--panel-bg="color-mix(in srgb, {panel.color} {Math.round(panel.opacity * 100)}%, transparent)"
+          style:--panel-accent={panel.accent}
+          style:--panel-bleed="{nested ? 16 : model.theme.margin}px"
+          style:align-self={model.theme.align === "left" ? "flex-start" : model.theme.align === "right" ? "flex-end" : "center"}
+        >
+          {@render words()}
+        </div>
+      {:else}
+        {@render words()}
       {/if}
     </div>
   {/if}

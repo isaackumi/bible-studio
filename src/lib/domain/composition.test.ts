@@ -22,6 +22,10 @@ import {
   lookScriptureClock,
   lookScriptureCountdown,
   swapSides,
+  fillTemplate,
+  layoutFromLook,
+  sanitizeLayouts,
+  COMPOSITION_TEMPLATES as LAYOUTS,
   lookLyricsCamera,
   lookImageCamera,
   lookTwoCameras,
@@ -1247,5 +1251,41 @@ describe("scripture with a countdown or the time, and swapping sides", () => {
     const corner = swapSides(lookScriptureCountdown(verse));
     expect(corner.layers[1]!.bounds.x).toBe(3);
     expect(swapSides({ ...split, locked: true })).toEqual({ ...split, locked: true });
+  });
+});
+
+describe("layouts filled from the desk, and the church's own layouts", () => {
+  const desk = {
+    scripture: { reference: "John 3:16", body: "For God so loved the world.", attribution: "KJV", verse: 16 },
+    lyrics: { label: "Verse 1", lines: ["Holy, holy, holy"] },
+    cameras: [{ id: "cam-a", label: "Pulpit" }, { id: "cam-b", label: "Wide" }],
+    image: { imageUrl: "data:image/png;base64,AA", title: "Sunrise" },
+    announcement: { heading: "Welcome", body: "" },
+    timer: { durationMs: 300_000, label: "Service starts in" },
+    lowerThird: { title: "Pastor Ama", subtitle: "Grace Chapel" },
+  };
+  const layout = (id: string) => LAYOUTS.find((entry) => entry.id === id)!;
+
+  it("fills each slot by its role, cameras in order", () => {
+    const pip = fillTemplate(layout("pip"), desk);
+    expect(pip.layers.map((entry) => entry.source.payload.deviceId)).toEqual(["cam-a", "cam-b"]);
+    const bar = fillTemplate(layout("camera-scripture-lower"), desk);
+    expect(bar.layers.map((entry) => entry.source.type)).toEqual(["camera", "scripture"]);
+    expect(bar.layers[1]!.backing).toEqual({ color: "#050505", opacity: 0.72 });
+    const painted = presentComposition(bar, { theme: defaultTheme(), now: 0 });
+    expect(painted.layers?.[1]?.backing).toBe("color-mix(in srgb, #050505 72%, transparent)");
+    expect(fillTemplate(layout("welcome-countdown"), desk).layers.map((entry) => entry.source.type)).toEqual(["text", "timer"]);
+    // One camera on the desk fills every camera slot.
+    expect(fillTemplate(layout("three-across"), { ...desk, cameras: [desk.cameras[0]!] }).layers.every((entry) => entry.source.payload.deviceId === "cam-a")).toBe(true);
+  });
+
+  it("saves a look's arrangement as a layout and refills it later", () => {
+    const look = fillTemplate(layout("image-scripture"), desk);
+    const saved = layoutFromLook({ ...look, name: "Sunday verse" }, "Sunday verse");
+    expect(saved).toMatchObject({ name: "Sunday verse", custom: true });
+    expect(saved.slots.map((slot) => slot.role)).toEqual(["image", "scripture"]);
+    const again = fillTemplate(saved, { ...desk, scripture: { ...desk.scripture, reference: "Psalm 23:1" } });
+    expect(again.layers[1]!.source.payload.reference).toBe("Psalm 23:1");
+    expect(sanitizeLayouts([saved, { id: 4 }, { id: "x", slots: [] }, "junk"])).toEqual([saved]);
   });
 });
