@@ -121,13 +121,18 @@
       {#if session.cameras.length === 0 && !session.cameraNote}
         <p class="empty">No cameras found. Connect a camera, then Refresh.</p>
       {/if}
-      {#each session.cameras as camera (camera.deviceId)}
-        <div class="row">
-          <span class="name"><strong>{camera.label}</strong></span>
-          <button type="button" class="desk-btn ghost" data-tip="Show alone on Preview" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
-          <button type="button" class="desk-btn" disabled={locked} data-tip={locked ? lockedTip : "Add to the scene on Preview"} onclick={() => addCamera(camera.deviceId, camera.label)}>Add to scene</button>
-        </div>
-      {/each}
+      <div class="cam-grid">
+        {#each session.cameras as camera (camera.deviceId)}
+          <div class="cam-card">
+            <span class="cam-icon"><Icon name="camera" size={18} /></span>
+            <span class="cam-copy"><strong>{camera.label}</strong><em>{session.cameraFeeds[`camera:${camera.deviceId}`] ? "In use" : "Ready"}</em></span>
+            <span class="cam-actions">
+              <button type="button" class="desk-btn ghost" data-tip="Show alone on Preview" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
+              <button type="button" class="desk-btn primary-soft" disabled={locked} data-tip={locked ? lockedTip : "Add to the scene on Preview"} onclick={() => addCamera(camera.deviceId, camera.label)}><Icon name="plus" size={13} /> Scene</button>
+            </span>
+          </div>
+        {/each}
+      </div>
     </div>
   {:else}
     <SlidesPanel />
@@ -157,6 +162,14 @@
   .loop { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
   .empty { margin: 4px 2px; font-size: 12px; color: var(--muted); }
   .row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 8px; }
+  .cam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; padding: 2px 0; }
+  .cam-card { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 8px 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
+  .cam-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, #30a46c 18%, transparent); color: #30a46c; }
+  .cam-copy { display: grid; gap: 1px; min-width: 0; }
+  .cam-copy strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cam-copy em { font-style: normal; font-size: 11px; color: var(--muted); }
+  .cam-actions { grid-column: 1 / -1; display: flex; gap: 6px; }
+  .cam-actions :global(.desk-btn) { flex: 1; justify-content: center; }
   .row:hover { background: var(--field); }
   .name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
   .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }

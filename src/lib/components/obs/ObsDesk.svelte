@@ -804,63 +804,51 @@
         <section class="dock" data-tour="controls">
           <header><Icon name="settings" size={16} /> Controls</header>
           <div class="controls">
-            <p class="studio-mode">Studio — select stays on Preview</p>
-            <div class="voice-row">
+            <div class="ctl-card">
+              <span class="ctl-label">Transition for GO LIVE</span>
+              <div class="seg" role="radiogroup" aria-label="Transition type">
+                {#each [["fade", "Fade"], ["cut", "Cut"]] as [id, label] (id)}
+                  <button type="button" role="radio" aria-checked={kind === id} class:on={kind === id} onclick={() => { kind = id === "cut" ? "cut" : "fade"; rememberTransition(); }}>{label}</button>
+                {/each}
+              </div>
+              {#if kind === "fade"}
+                <div class="seg small" role="radiogroup" aria-label="Fade length">
+                  {#each [[250, "Quick"], [450, "Smooth"], [900, "Slow"]] as [ms, label] (ms)}
+                    <button type="button" role="radio" aria-checked={duration === ms} class:on={duration === ms} onclick={() => { duration = Number(ms); rememberTransition(); }}>{label}</button>
+                  {/each}
+                  <label class="ms">
+                    <input
+                      type="number"
+                      min="0"
+                      max="2000"
+                      step="50"
+                      bind:value={duration}
+                      aria-label="Transition duration in milliseconds"
+                      onchange={(event) => {
+                        duration = Number(event.currentTarget.value) || 0;
+                        rememberTransition();
+                      }}
+                    />ms
+                  </label>
+                </div>
+              {/if}
+            </div>
+            <div class="ctl-card">
+              <span class="ctl-label">Voice</span>
               <button
                 type="button"
-                class="desk-btn"
+                class="desk-btn listen"
                 class:on={session.voice.status === "listening" || session.voice.status === "starting"}
                 aria-pressed={session.voice.status === "listening" || session.voice.status === "starting"}
-                data-tip="Voice: say “Studio next”, “Studio take” (needs Live voice commands), “Studio show John 3 verse 16”."
+                data-tip="Say “next verse”, “go live” (with Live voice commands on), or a reference like “John three sixteen”."
                 onclick={() => void session.toggleVoice()}
               >
                 <Icon name={session.voice.status === "listening" ? "mic-off" : "mic"} size={16} />
                 {session.voice.status === "starting" ? "Starting…" : session.voice.status === "listening" ? "Stop listening" : "Listen"}
               </button>
+              {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}
             </div>
-            {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}
-            <label class="transition-select">
-              Transition
-              <select
-                aria-label="Transition type"
-                bind:value={kind}
-                onchange={(event) => {
-                  kind = event.currentTarget.value === "cut" ? "cut" : "fade";
-                  rememberTransition();
-                }}
-              >
-                <option value="fade">Fade</option>
-                <option value="cut">Cut</option>
-              </select>
-            </label>
-            <label class="duration">
-              Duration
-              <input
-                type="number"
-                min="0"
-                max="2000"
-                step="50"
-                bind:value={duration}
-                aria-label="Transition duration in milliseconds"
-                onchange={(event) => {
-                  duration = Number(event.currentTarget.value) || 0;
-                  rememberTransition();
-                }}
-              />
-              <span>ms</span>
-            </label>
-            <div class="control-actions">
-              <button type="button" class="desk-btn ghost" data-tip="Clear Program" onclick={() => session.clear()}>
-                <Icon name="square" size={16} /> CLEAR
-              </button>
-              <button type="button" class="desk-btn danger" data-tip="Black Program" onclick={() => session.black()}>
-                <Icon name="moon" size={16} /> BLACK
-              </button>
-              <button type="button" class="desk-btn" data-tip="Logo on Program" onclick={() => session.logo()}>
-                <Icon name="logo" size={16} /> LOGO
-              </button>
-            </div>
-            <button type="button" class="desk-btn" data-tip="Settings" onclick={() => session.openSettings("appearance")}>Settings</button>
+            <p class="ctl-hint">Click a scene to put it on Preview. GO LIVE shows it to the audience.</p>
           </div>
         </section>
         </Pane>
@@ -1173,23 +1161,16 @@
   .source-row > .pick { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
   .source-row .kind { font-size: 11px; color: var(--muted); }
   .empty { margin: 8px; color: var(--muted); font-size: 12px; }
-  .dock select, .duration input {
-    width: 100%;
-    height: var(--control-h);
-    border-radius: var(--radius-control);
-    border: 1px solid var(--line);
-    background: var(--field);
-    color: var(--ink);
-    padding: 0 8px;
-  }
-  .duration { display: flex; align-items: center; gap: 6px; padding: 8px; color: var(--muted); }
-  .duration input { width: 72px; flex: none; }
-  .controls { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: auto; }
-  .studio-mode { margin: 0; color: var(--muted); }
-  .voice-row { display: flex; gap: 6px; }
-  .voice-row .desk-btn { flex: 1; }
-  .transition-select { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px; color: var(--muted); }
-  .control-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-  .control-actions .desk-btn { flex: 1 1 72px; }
+  .controls { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow: auto; }
+  .ctl-card { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
+  .ctl-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .seg { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .seg button { flex: 1; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; letter-spacing: normal; text-transform: none; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .seg.small button { height: 24px; font-size: 11px; }
+  .ms { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px; font-size: 11px; color: var(--muted); }
+  .ms input { width: 56px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-size: 11px; }
+  .listen { justify-content: center; }
+  .ctl-hint { margin: 0; padding: 0 2px; font-size: 11px; color: var(--muted); line-height: 1.45; }
   .prod :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 </style>

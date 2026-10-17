@@ -16,6 +16,7 @@ export const SOURCE_META: Record<string, SourceMeta> = {
   image: { icon: "media", color: "#12a5b8", blurb: "A picture or logo", group: "Graphics" },
   qr: { icon: "qr", color: "#525252", blurb: "A code to scan: giving, sign-up, Wi-Fi", group: "Graphics" },
   shape: { icon: "square", color: "#525252", blurb: "A colored shape", group: "Graphics" },
+  empty: { icon: "layers", color: "#6b7280", blurb: "Empty: double-click to choose what it shows", group: "Graphics" },
 };
 
 export function sourceMeta(type: string): SourceMeta {
