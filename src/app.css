@@ -655,6 +655,8 @@ button { cursor: pointer; }
   top: calc(100% + 8px);
   transform: translateX(-50%);
 }
+/* The desk switch sits at the window's left edge: open its tips rightward. */
+.desk-switch [data-tip]:hover::after { left: 0; transform: none; }
 
 .desk-btn {
   display: inline-flex;

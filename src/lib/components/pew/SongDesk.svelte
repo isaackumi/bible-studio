@@ -467,7 +467,7 @@
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
       <div class="imports">
-        <button type="button" class="import" title="Lyrics, ChordPro, SongSelect (.usr/.txt) or OpenLyrics (.xml/.zip), into the open folder" onclick={() => fileInput?.click()}>Import files</button>
+        <button type="button" class="import" title="Lyrics, ChordPro, SongSelect (.usr/.txt) or OpenLyrics (.xml/.zip), into the open folder" onclick={() => fileInput?.click()}>Import</button>
         <button type="button" class="import" title="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
         <button type="button" class="import" disabled={visible.length === 0} title={`Save these ${visible.length} songs as OpenLyrics (.zip) — opens in OpenLP, FreeShow and others`} onclick={exportList}>Export</button>
       </div>
@@ -759,8 +759,10 @@
   .list-head .group { padding-bottom: 0; }
   .imports { display: flex; gap: 6px; padding: 0 14px; }
   .import {
-    flex: 1;
+    flex: 1 1 auto;
     height: 30px;
+    padding: 0 8px;
+    white-space: nowrap;
     border: 1px solid var(--line);
     border-radius: var(--radius-control, 8px);
     background: none;

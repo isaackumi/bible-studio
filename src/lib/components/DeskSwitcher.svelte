@@ -12,7 +12,7 @@
     class:on={session.workspace.appearance.desk === "pewbeam" || !session.entitled("production")}
     aria-label="Presenter Desk"
     aria-pressed={session.workspace.appearance.desk === "pewbeam" || !session.entitled("production")}
-    data-tip="Presenter Desk — Scripture, songs and service presentation."
+    data-tip="Presenter Desk: scripture, songs and sermons"
     onclick={() => session.setAppearance({ desk: "pewbeam" })}
   >
     <Icon name="pew" size={16} />
@@ -23,7 +23,7 @@
     class:on={session.workspace.appearance.desk === "obs" && session.entitled("production")}
     aria-label="Production Desk"
     aria-pressed={session.workspace.appearance.desk === "obs" && session.entitled("production")}
-    data-tip="Production Desk — Live production, cameras, compositions and output control."
+    data-tip="Production Desk: scenes, cameras and video"
     onclick={() => session.requireFeature("production") && session.setAppearance({ desk: "obs" })}
   >
     <Icon name="obs" size={16} />
