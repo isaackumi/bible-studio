@@ -114,5 +114,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
       : [],
     songFolders: sanitizeFolderNames(value.songFolders),
     ccliLicense: cleanCcli(value.ccliLicense),
+    installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
   };
 }

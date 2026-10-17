@@ -222,6 +222,7 @@ export function defaultWorkspace(): Workspace {
     schemaVersion: 2,
     songFolders: [],
     ccliLicense: "",
+    installedPacks: [],
     churchName: "",
     logoAssetId: null,
     logoText: "Church Studio",

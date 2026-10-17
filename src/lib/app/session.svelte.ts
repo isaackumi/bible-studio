@@ -86,6 +86,8 @@ import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
+import { readZip } from "../domain/zip";
+import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
@@ -1783,6 +1785,38 @@ class Session {
     this.songs = await api.songList();
     if (this.songFocus?.songId === clean.id) this.previewSongSection(clean, this.songFocus.sectionId);
     return true;
+  };
+
+  songPacks = $state<SongPack[]>([]);
+
+  /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
+  loadSongPacks = async () => {
+    try {
+      const response = await fetch("/song-packs/index.json", { cache: "no-store" });
+      this.songPacks = response.ok ? sanitizeSongPacks(await response.json()) : [];
+    } catch {
+      this.songPacks = [];
+    }
+  };
+
+  /** Install a pack into its folder. Its songs are copies the church can edit. */
+  installSongPack = async (pack: SongPack): Promise<boolean> => {
+    try {
+      const response = await fetch(`/song-packs/${pack.file}`);
+      if (!response.ok) throw new Error(`${pack.name} is not available.`);
+      const decoder = new TextDecoder();
+      const files = (await readZip(new Uint8Array(await response.arrayBuffer())))
+        .filter((entry) => /\.(xml|txt|cho|chordpro|usr)$/i.test(entry.name))
+        .map((entry) => ({ name: entry.name.split("/").pop() ?? entry.name, text: decoder.decode(entry.data) }));
+      const result = await this.importSongFiles(files, pack.folder);
+      this.workspace = { ...this.workspace, installedPacks: [...new Set([...this.workspace.installedPacks, pack.id])] };
+      this.persistSoon();
+      this.message = `${pack.name}: ${result.added} song${result.added === 1 ? "" : "s"} added to ${pack.folder}.`;
+      return true;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : `${pack.name} could not be installed.`;
+      return false;
+    }
   };
 
   /** Add an empty song folder. Returns the folder name, or null when the name is empty. */

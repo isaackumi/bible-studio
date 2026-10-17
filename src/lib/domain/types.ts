@@ -366,6 +366,8 @@ export type Workspace = {
   songFolders: string[];
   /** The church's CCLI Church Copyright License number, shown with song copyright. */
   ccliLicense: string;
+  /** Song pack ids already installed (static/song-packs), so they are not offered twice. */
+  installedPacks: string[];
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */

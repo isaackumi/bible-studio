@@ -36,6 +36,20 @@
   let detected = $state<SungMatch | null>(null);
 
   const folders = $derived(songFolders(session.songs, session.workspace.songFolders));
+  const packs = $derived(session.songPacks.filter((pack) => !session.workspace.installedPacks.includes(pack.id)));
+  let installing = $state<string | null>(null);
+
+  $effect(() => {
+    void session.loadSongPacks();
+  });
+
+  async function install(pack: (typeof packs)[number]) {
+    installing = pack.id;
+    const ok = await session.installSongPack(pack);
+    installing = null;
+    note = session.message;
+    if (ok) folder = pack.folder;
+  }
   const unfiled = $derived(session.songs.filter((song) => !cleanFolder(song.folder)).length);
   /** The "Recent" view: songs put on Preview this session, newest first. */
   const RECENT = "\u0000recent";
@@ -433,6 +447,22 @@
       {/if}
     </nav>
 
+    {#if packs.length > 0}
+      <div class="packs" aria-label="Song packs">
+        <p class="group">Song packs</p>
+        {#each packs as pack (pack.id)}
+          <div class="pack">
+            <div>
+              <strong>{pack.name}</strong>
+              {#if pack.description}<span>{pack.description}</span>{/if}
+              {#if pack.license}<small>{pack.license}</small>{/if}
+            </div>
+            <button type="button" class="import" disabled={installing !== null} onclick={() => void install(pack)}>{installing === pack.id ? "Adding…" : "Add"}</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
       <div class="imports">
@@ -717,6 +747,13 @@
   .row-tool:hover { background: var(--field); color: var(--ink); }
   .folder-row .row-tool:last-child { margin-right: 4px; }
   .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 15%, transparent) !important; }
+  .packs { display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 12px 10px; border-top: 1px solid var(--line); flex: none; }
+  .packs .group { padding: 0 6px 2px; }
+  .pack { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); }
+  .pack > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pack strong { font-size: 13px; }
+  .pack span, .pack small { font-size: 11px; color: var(--muted); }
+  .pack .import { flex: none; padding: 0 12px; }
   .list-head { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 8px; border-top: 1px solid var(--line); flex: none; }
   .list-head .group { padding-bottom: 0; }
   .imports { display: flex; gap: 6px; padding: 0 14px; }
