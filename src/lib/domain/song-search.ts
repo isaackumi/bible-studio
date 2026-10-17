@@ -1,3 +1,4 @@
+import { searchWords as words, wordMatches, wordsFound, wordsNeeded } from "./match-words";
 import type { Song } from "./types";
 
 export type SongHit = {
@@ -13,28 +14,6 @@ export type SongRecent = { songId: string; sectionId: string };
 
 function haystack(song: Song, section: Song["sections"][number]): string {
   return `${song.title} ${song.author} ${section.label} ${section.lines.join(" ")}`.toLowerCase();
-}
-
-function words(text: string): string[] {
-  return text.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
-}
-
-function editDistance(a: string, b: string): number {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
-    previous = current;
-  }
-  return previous[b.length]!;
-}
-
-/** A typed word matches a song word exactly, as its start ("amaz" → "amazing"), or with a slip. */
-function wordMatches(typed: string, word: string): boolean {
-  if (word === typed) return true;
-  if (typed.length >= 3 && word.startsWith(typed)) return true;
-  if (typed.length < 4 || Math.abs(word.length - typed.length) > 2) return false;
-  return editDistance(typed, word) <= (typed.length >= 7 ? 2 : 1);
 }
 
 function snippetFor(song: Song, section: Song["sections"][number], typed: string[]): string {
@@ -66,7 +45,7 @@ export function searchSongHits(songs: Song[], query: string, limit = 24): SongHi
   if (!needle) return [];
   const typed = words(needle);
   if (typed.length === 0) return [];
-  const need = typed.length <= 2 ? typed.length : typed.length - 1;
+  const need = wordsNeeded(typed);
   const scored: Array<{ hit: SongHit; score: number; order: number }> = [];
   let order = 0;
   for (const song of songs) {
@@ -75,7 +54,7 @@ export function searchSongHits(songs: Song[], query: string, limit = 24): SongHi
       order += 1;
       const text = haystack(song, section);
       const all = sectionWords(song, section, titleWords);
-      const found = typed.filter((word) => all.some((candidate) => wordMatches(word, candidate))).length;
+      const found = wordsFound(typed, all);
       const exact = text.includes(needle);
       if (!exact && found < need) continue;
       const inTitle = song.title.toLowerCase().includes(needle);

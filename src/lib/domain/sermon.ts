@@ -1,3 +1,4 @@
+import { searchWords, wordsFound, wordsNeeded } from "./match-words";
 import { isRundownKind } from "./content";
 import { moveInList } from "./service";
 import type { PresentationItem, PresentationModel, Sermon, SermonSection } from "./types";
@@ -154,34 +155,51 @@ function haystack(sermon: Sermon, section: SermonSection): string {
   return `${sermon.title} ${sermon.speaker} ${sermon.notes} ${section.name} ${section.notes} ${section.items.map(itemHaystack).join(" ")}`.toLowerCase();
 }
 
-function snippetFor(sermon: Sermon, section: SermonSection, needle: string): string {
+function snippetFor(sermon: Sermon, section: SermonSection, query: string | string[]): string {
+  const has = (text: string) =>
+    typeof query === "string" ? text.toLowerCase().includes(query) : wordsFound(query, searchWords(text)) > 0;
+  const needle = typeof query === "string" ? query : "";
   const notes = [section.notes, sermon.notes].flatMap((block) => block.split("\n"));
-  const note = notes.find((line) => line.toLowerCase().includes(needle));
+  const note = notes.find((line) => has(line));
   if (note?.trim()) return note.trim();
-  const item = section.items.find((entry) => itemHaystack(entry).toLowerCase().includes(needle));
+  const item = section.items.find((entry) => has(itemHaystack(entry)));
   if (item?.title.trim()) return item.title.trim();
   if (item?.bible?.reference) return item.bible.reference;
-  if (section.name.toLowerCase().includes(needle)) return section.name;
+  if (needle && section.name.toLowerCase().includes(needle)) return section.name;
   return section.name || sermon.title || "Sermon";
 }
 
+/** Sermons by title, speaker, notes or scripture: exact phrase first, then most of the words (slips allowed). */
 export function searchSermonHits(sermons: Sermon[], query: string, limit = 24): SermonHit[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
-  const hits: SermonHit[] = [];
+  const typed = searchWords(needle);
+  if (typed.length === 0) return [];
+  const need = wordsNeeded(typed);
+  const scored: Array<{ hit: SermonHit; score: number; order: number }> = [];
+  let order = 0;
   for (const sermon of sermons) {
     for (const section of sermon.sections) {
-      if (!haystack(sermon, section).includes(needle)) continue;
-      hits.push({
-        sermonId: sermon.id,
-        sectionId: section.id,
-        title: sermon.title || "Untitled sermon",
-        speaker: sermon.speaker,
-        label: section.name,
-        snippet: snippetFor(sermon, section, needle),
+      order += 1;
+      const text = haystack(sermon, section);
+      const exact = text.includes(needle);
+      const found = exact ? typed.length : wordsFound(typed, searchWords(text));
+      if (!exact && found < need) continue;
+      const inTitle = sermon.title.toLowerCase().includes(needle);
+      scored.push({
+        hit: {
+          sermonId: sermon.id,
+          sectionId: section.id,
+          title: sermon.title || "Untitled sermon",
+          speaker: sermon.speaker,
+          label: section.name,
+          snippet: snippetFor(sermon, section, exact ? needle : typed),
+        },
+        score: (exact ? 1000 : 0) + (inTitle ? 500 : 0) + found * 10,
+        order,
       });
-      if (hits.length >= limit) return hits;
     }
   }
-  return hits;
+  scored.sort((a, b) => b.score - a.score || a.order - b.order);
+  return scored.slice(0, limit).map((entry) => entry.hit);
 }

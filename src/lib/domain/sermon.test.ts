@@ -98,3 +98,24 @@ describe("sermon content", () => {
     expect(sermonError(sermon())).toBeNull();
   });
 });
+
+describe("forgiving sermon search", async () => {
+  const { searchSermonHits } = await import("./sermon");
+  const sermon = {
+    id: "s1",
+    title: "The fruit of the Spirit",
+    speaker: "Pastor Ama",
+    notes: "",
+    sections: [
+      { id: "a", name: "Love is patient", notes: "Galatians five, the first fruit", items: [] },
+      { id: "b", name: "Joy in trials", notes: "James one two", items: [] },
+    ],
+  } as unknown as Parameters<typeof searchSermonHits>[0][number];
+
+  it("finds sermons with slips and partial words", () => {
+    expect(searchSermonHits([sermon], "fruit of the spirt")[0]?.sermonId).toBe("s1");
+    expect(searchSermonHits([sermon], "pastr ama").length).toBeGreaterThan(0);
+    expect(searchSermonHits([sermon], "joy trails")[0]?.sectionId).toBe("b");
+    expect(searchSermonHits([sermon], "zebra crossing")).toEqual([]);
+  });
+});
