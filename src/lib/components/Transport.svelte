@@ -6,7 +6,7 @@
 </script>
 
 <div class="transport">
-  <button class="take" onclick={() => session.take()}>Take <kbd>{shortcutLabel(map, "take")}</kbd></button>
+  <button class="take" onclick={() => session.take()}>Go live <kbd>{shortcutLabel(map, "take")}</kbd></button>
   <button onclick={() => session.cut()}>Cut <kbd>{shortcutLabel(map, "cut")}</kbd></button>
   <button onclick={() => session.clear()}>Clear <kbd>{shortcutLabel(map, "clear")}</kbd></button>
   <button onclick={() => session.black()}>Black <kbd>{shortcutLabel(map, "black")}</kbd></button>

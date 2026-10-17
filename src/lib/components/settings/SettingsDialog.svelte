@@ -628,7 +628,7 @@
         {:else}
           <section class="rows">
             <div class="row">
-              <div class="row-copy"><strong>Phone remote is part of Premium</strong><span>Pair a phone to move through the service and Take from anywhere in the room.</span></div>
+              <div class="row-copy"><strong>Phone remote is part of Premium</strong><span>Pair a phone to move through the service and go live from anywhere in the room.</span></div>
               <button type="button" class="btn primary" onclick={() => session.requireFeature("phone-remote")}>Unlock</button>
             </div>
           </section>

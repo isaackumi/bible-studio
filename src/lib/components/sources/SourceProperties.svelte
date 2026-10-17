@@ -417,7 +417,7 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
-  <p class="note">Changes show on Preview. Program updates on TAKE.</p>
+  <p class="note">Changes show on Preview. Program updates when you go live.</p>
   {#snippet footer()}
     <button type="button" class="desk-btn" onclick={onclose}>{readonly ? "Close" : "Cancel"}</button>
     {#if !readonly}

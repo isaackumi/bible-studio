@@ -457,7 +457,7 @@
     </div>
     <div class="pb-actions">
       {#if !session.controlsAudience}
-        <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
+        <button type="button" class="desk-btn" data-tip="Send to the audience from this window" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
       <OutputMenu />
       <button

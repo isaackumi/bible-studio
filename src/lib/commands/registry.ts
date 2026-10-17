@@ -20,7 +20,7 @@ export type CommandSpec = {
 };
 
 export const COMMANDS: CommandSpec[] = [
-  { id: "take", title: "Take", group: "Program", changesProgram: true, shortcut: "take" },
+  { id: "take", title: "Go live", group: "Program", changesProgram: true, shortcut: "take" },
   { id: "cut", title: "Cut", group: "Program", changesProgram: true, shortcut: "cut" },
   { id: "clear", title: "Clear", group: "Program", changesProgram: true, shortcut: "clear" },
   { id: "black", title: "Black", group: "Program", changesProgram: true, shortcut: "black" },

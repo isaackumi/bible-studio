@@ -18,6 +18,7 @@ import {
   createScene,
   persistLook,
   presentComposition,
+  swapSides,
   presentSavedLook,
   previewComposition,
   queueLook,
@@ -515,7 +516,7 @@ class Session {
       this.sessionId = owner.sessionId;
       this.audienceGeneration = owner.generation;
       this.controlsAudience = true;
-      this.message = "This window can send to the audience. Take when you are ready.";
+      this.message = "This window can send to the audience. Go live when you are ready.";
     } catch (error) {
       this.controlsAudience = false;
       this.message = error instanceof Error ? error.message : "Audience control could not be saved. Nothing was sent.";
@@ -747,7 +748,7 @@ class Session {
     const gate = approvePending(this.remoteGate(), requestId, token, await sha256Hex(token), Date.now());
     this.applyRemoteGate(gate, true);
     const device = gate.devices.find((entry) => entry.id === requestId);
-    this.message = `${device?.name ?? "Phone"} can control this desk. Take on the phone changes Program.`;
+    this.message = `${device?.name ?? "Phone"} can control this desk. Go live on the phone changes what the audience sees.`;
   };
 
   declineRemote = (requestId: string) => {
@@ -1065,6 +1066,14 @@ class Session {
     this.message = `${clean.name} is on Preview. LIVE still sends Program.`;
   };
 
+  /** Swap sides of the look on Preview (mirror left to right). Program is untouched. */
+  canSwapPreview = () => !!this.lookOnPreview && !this.lookOnPreview.locked && this.live.preview.model.layout === "composition";
+  swapPreviewSides = () => {
+    if (!this.canSwapPreview()) return;
+    this.previewLook(swapSides(this.lookOnPreview!));
+    this.message = "Sides swapped on Preview.";
+  };
+
   saveLook = (composition: Composition) => {
     const clean = sanitizeComposition(composition);
     const synced = syncLinkedEdits(this.sharedSources, this.workspace.compositions, clean);
@@ -1168,7 +1177,7 @@ class Session {
     this.persistSoon();
     const open = this.lookOnPreview && result.looks.find((entry) => entry.id === this.lookOnPreview?.id);
     if (open) this.previewLook(restoreComposition(open));
-    this.message = `${name} saved. Program updates on TAKE.`;
+    this.message = `${name} saved. Program updates when you go live.`;
     return [];
   };
 
@@ -2417,7 +2426,7 @@ class Session {
       action === "take"
         ? takeTransition?.type === "cut"
           ? "Cut to program."
-          : "Taken to program."
+          : "Live."
         : action === "cut"
           ? "Cut to program."
           : action === "black"

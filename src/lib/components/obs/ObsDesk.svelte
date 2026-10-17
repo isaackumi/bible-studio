@@ -358,19 +358,19 @@
       <DeskSwitcher compact />
       <nav class="prod-modes" aria-label="Production view">
         <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip="Scenes, sources and media — select stays on Preview" onclick={() => (looksOpen = false)}>Studio</button>
-        <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip="Looks — compositions stay on Preview until TAKE" onclick={() => (looksOpen = true)}>Looks</button>
+        <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip="Looks: compositions wait on Preview until you go live" onclick={() => (looksOpen = true)}>Looks</button>
       </nav>
     </div>
     <div class="prod-actions">
       {#if !session.controlsAudience}
-        <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
+        <button type="button" class="desk-btn" data-tip="Send to the audience from this window" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
       <OutputMenu />
       {#if looksOpen}
-        <button type="button" class="desk-btn primary" data-tip="Send Preview to Program" onclick={() => void transition()}>
-          <Icon name="play" size={16} /> TAKE
+        <button type="button" class="desk-btn primary" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
+          <Icon name="play" size={16} /> GO LIVE
         </button>
-        <button type="button" class="desk-btn" data-tip="Cut Preview to Program" onclick={() => session.cut()}>
+        <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
           <Icon name="scissors" size={16} /> CUT
         </button>
       {/if}
@@ -426,6 +426,9 @@
       <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
       <footer>
         <span>{previewLabel}</span>
+        {#if session.canSwapPreview()}
+          <button type="button" class="desk-btn" data-tip="Mirror the layout left to right" onclick={() => session.swapPreviewSides()}><Icon name="transition" size={14} /> Swap sides</button>
+        {/if}
         <button type="button" class="desk-btn" data-tip="Theme" onclick={() => (session.settingsOpen = true)}>Properties</button>
       </footer>
     </section>
@@ -434,14 +437,14 @@
     <Pane defaultSize={frozen.stage[1]} minSize={12} maxSize={28} order={2}>
     <aside class="bridge" aria-label="Transition">
       <p class="flow">Preview <Icon name="transition" size={16} /> Program</p>
-      <button type="button" class="desk-btn primary" data-tip="Send Preview to Program" onclick={() => void transition()}>
-        <Icon name="play" size={16} /> TAKE
+      <button type="button" class="desk-btn primary" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
+        <Icon name="play" size={16} /> GO LIVE
       </button>
-      <button type="button" class="desk-btn" data-tip="Cut Preview to Program" onclick={() => session.cut()}>
+      <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
         <Icon name="scissors" size={16} /> CUT
       </button>
-      <button type="button" class="desk-btn" data-tip="Fade Preview to Program" onclick={() => void fade(duration)}>
-        AUTO
+      <button type="button" class="desk-btn" data-tip="Fade Preview in over the set duration" onclick={() => void fade(duration)}>
+        FADE
       </button>
       <div class="resets">
         <button type="button" class="desk-btn ghost" data-tip="Clear Program" onclick={() => session.clear()}>

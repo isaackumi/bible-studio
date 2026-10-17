@@ -9,7 +9,7 @@
   <p class="hint">Church name, used on the logo frame</p>
   <input class="field" value={session.workspace.churchName} aria-label="Church name" oninput={(event) => session.setChurchName(event.currentTarget.value)} />
   <OutputType />
-  <p class="hint">Take transition</p>
+  <p class="hint">Go live transition</p>
   <select
     class="field"
     value={theme.transition.type}
@@ -23,5 +23,5 @@
     <option value="fade">Fade</option>
     <option value="cut">Cut</option>
   </select>
-  <p class="hint">Cut still jumps. Take uses this transition.</p>
+  <p class="hint">Cut still switches instantly. Go live uses this transition.</p>
 </div>

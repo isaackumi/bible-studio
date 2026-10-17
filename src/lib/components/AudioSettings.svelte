@@ -129,7 +129,7 @@
     <input type="checkbox" class="switch" role="switch" aria-label="Require Studio wake word" disabled={!settings.commands} checked={settings.wake} onchange={(event) => session.saveVoiceSettings({ wake: event.currentTarget.checked, wakeChosen: true })} />
   </div>
   <div class="row" class:dim={!settings.commands}>
-    <div class="row-copy"><strong>Live voice commands</strong><span>Let voice change Program (Take, Cut, Clear, Black, Logo, timer). Off every time Church Studio starts.</span></div>
+    <div class="row-copy"><strong>Live voice commands</strong><span>Let voice change Program (go live, cut, clear, black, logo, timer). Off every time Church Studio starts.</span></div>
     <input type="checkbox" class="switch" role="switch" aria-label="Live voice commands" disabled={!settings.commands} checked={session.voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
   </div>
   <div class="row stack">

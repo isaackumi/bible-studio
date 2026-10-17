@@ -173,6 +173,22 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
       { id: "timer", name: "Timer", bounds: { x: 68, y: 8, w: 28, h: 18 }, fit: "contain" },
     ],
   },
+  {
+    id: "scripture-countdown",
+    name: "Scripture + Countdown",
+    slots: [
+      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain" },
+      { id: "timer", name: "Countdown", bounds: { x: 70, y: 3, w: 27, h: 16 }, fit: "contain" },
+    ],
+  },
+  {
+    id: "scripture-clock",
+    name: "Scripture + Time",
+    slots: [
+      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain" },
+      { id: "clock", name: "Time", bounds: { x: 76, y: 3, w: 21, h: 13 }, fit: "contain" },
+    ],
+  },
 ];
 
 export type LowerThirdTemplate = {
@@ -679,6 +695,62 @@ export function lookScriptureCamera(input: {
     );
   }
   return composition;
+}
+
+type ScriptureInput = { reference: string; body: string; attribution?: string; verse?: number };
+
+function scriptureSource(input: ScriptureInput): SourceRef {
+  return sourceRef("scripture", input.reference, input.reference, {
+    reference: input.reference,
+    body: input.body,
+    attribution: input.attribution ?? "KJV",
+    verse: String(input.verse ?? 1),
+  });
+}
+
+/** Scripture filling the screen with a countdown in the corner (sermon time, service start). */
+export function lookScriptureCountdown(input: ScriptureInput & { durationMs?: number; label?: string }): Composition {
+  const template = COMPOSITION_TEMPLATES.find((entry) => entry.id === "scripture-countdown")!;
+  let composition = instantiateTemplate(template, "Scripture + Countdown");
+  const [verse, timer] = composition.layers;
+  if (verse) composition = assignLayerSource(composition, verse.id, scriptureSource(input));
+  if (timer) {
+    composition = assignLayerSource(
+      composition,
+      timer.id,
+      sourceRef("timer", "service", input.label ?? "Time left", {
+        mode: "countdown",
+        durationMs: String(input.durationMs ?? 30 * 60_000),
+        label: input.label ?? "Time left",
+      }),
+    );
+  }
+  return composition;
+}
+
+/** Scripture filling the screen with the time of day in the corner. */
+export function lookScriptureClock(input: ScriptureInput): Composition {
+  const template = COMPOSITION_TEMPLATES.find((entry) => entry.id === "scripture-clock")!;
+  let composition = instantiateTemplate(template, "Scripture + Time");
+  const [verse, clock] = composition.layers;
+  if (verse) composition = assignLayerSource(composition, verse.id, scriptureSource(input));
+  if (clock) composition = assignLayerSource(composition, clock.id, sourceRef("clock", "clock", "Time", { mode: "clock", label: "" }));
+  return composition;
+}
+
+/**
+ * Swap sides: mirror every unlocked layer left to right, so a split trades places and a
+ * corner timer moves to the other corner. Doing it twice puts everything back.
+ */
+export function swapSides(composition: Composition): Composition {
+  if (composition.locked) return composition;
+  const round = (value: number) => Math.round(value * 10_000) / 10_000;
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) =>
+      layer.locked ? layer : { ...layer, bounds: { ...layer.bounds, x: round(100 - layer.bounds.x - layer.bounds.w) } },
+    ),
+  };
 }
 
 export function lookLyricsCamera(input: {

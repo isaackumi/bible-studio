@@ -17,6 +17,9 @@
     lookCameraLowerThird,
     lookCameraCountdown,
     lookScriptureCamera,
+    lookScriptureClock,
+    lookScriptureCountdown,
+    swapSides,
     lookLyricsCamera,
     lookImageCamera,
     lookTwoCameras,
@@ -161,6 +164,20 @@
         camera: { id: camera.deviceId, label: camera.label },
         ...scriptureFromDesk(),
       });
+      selectedId = draft.layers[0]?.id ?? null;
+      session.previewLook(draft);
+      return;
+    }
+    if (id === "scripture-countdown") {
+      timerMode = "countdown";
+      timerLabel = "Time left";
+      draft = lookScriptureCountdown({ ...scriptureFromDesk(), durationMs: Math.max(1, timerMinutes) * 60_000, label: timerLabel });
+      selectedId = draft.layers[1]?.id ?? null;
+      session.previewLook(draft);
+      return;
+    }
+    if (id === "scripture-clock") {
+      draft = lookScriptureClock(scriptureFromDesk());
       selectedId = draft.layers[0]?.id ?? null;
       session.previewLook(draft);
       return;
@@ -673,7 +690,7 @@
       </header>
     {:else}
       <header class="look-head empty-head">
-        <p>Pick a layout or a saved look. It goes to <b>Preview</b> to arrange; <b>TAKE</b> sends it to Program.</p>
+        <p>Pick a layout or a saved look. It goes to <b>Preview</b> to arrange; <b>Go live</b> shows it to the audience.</p>
       </header>
     {/if}
 
@@ -681,6 +698,9 @@
       <figcaption>
         <span class="kicker">Preview</span>
         <span class="hint">{draft ? "Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)" : "Nothing to arrange yet"}</span>
+        {#if draft && !draft.locked}
+          <button type="button" class="swap-sides" title="Mirror the layout left to right" onclick={() => touch(swapSides(draft!))}><Icon name="transition" size={14} /> Swap sides</button>
+        {/if}
       </figcaption>
       <div
         class="monitor preview-edit"
@@ -997,6 +1017,8 @@
   .empty-head p { margin: 0; font-size: 13px; color: var(--muted); }
   .empty-head b { color: var(--ink); }
   .edit-frame, .screen { margin: 0; flex: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: var(--radius-control, 8px); background: var(--field); overflow: hidden; }
+  .swap-sides { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .swap-sides:hover { border-color: var(--accent); }
   .edit-frame figcaption, .screen figcaption { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 10px; border-bottom: 1px solid var(--line); }
   .edit-frame .kicker { color: var(--accent); }
   .monitor { container-type: inline-size; background: #000; }

@@ -19,6 +19,9 @@ import {
   lookCameraLowerThird,
   lookCameraCountdown,
   lookScriptureCamera,
+  lookScriptureClock,
+  lookScriptureCountdown,
+  swapSides,
   lookLyricsCamera,
   lookImageCamera,
   lookTwoCameras,
@@ -1214,5 +1217,35 @@ describe("scene folders", () => {
     expect(ids(moveLook(list, "a", -1))).toBe("abcd");
     expect(ids(moveLook(list, "d", 99))).toBe("abcd");
     expect(moveLook(list, "zz", 0)).toBe(list);
+  });
+});
+
+describe("scripture with a countdown or the time, and swapping sides", () => {
+  const verse = { reference: "John 3:16", body: "For God so loved the world.", attribution: "KJV", verse: 16 };
+
+  it("puts scripture full width with a countdown in the corner", () => {
+    const look = lookScriptureCountdown({ ...verse, durationMs: 25 * 60_000 });
+    expect(look.layers.map((layer) => layer.source.type)).toEqual(["scripture", "timer"]);
+    expect(look.layers[1]!.source.payload).toMatchObject({ mode: "countdown", durationMs: String(25 * 60_000), label: "Time left" });
+    const painted = presentComposition(look, { theme: defaultTheme(), now: 0 });
+    expect(painted.layers?.map((layer) => layer.model.layout)).toEqual(["scripture", "timer"]);
+  });
+
+  it("puts the time of day in the corner without a label", () => {
+    const look = lookScriptureClock(verse);
+    const painted = presentComposition(look, { theme: defaultTheme(), now: Date.parse("2026-10-17T10:30:00") });
+    const clock = painted.layers?.find((layer) => layer.model.layout === "timer")?.model;
+    expect(clock?.timer?.mode).toBe("clock");
+    expect(clock?.reference ?? null).toBeNull();
+  });
+
+  it("swaps sides of a split and a corner overlay, and back again", () => {
+    const split = lookScriptureCamera({ camera: { id: "cam-1", label: "Camera 1" }, ...verse });
+    const swapped = swapSides(split);
+    expect(swapped.layers.map((layer) => layer.bounds.x)).toEqual([50, 0]);
+    expect(swapSides(swapped).layers.map((layer) => layer.bounds)).toEqual(split.layers.map((layer) => layer.bounds));
+    const corner = swapSides(lookScriptureCountdown(verse));
+    expect(corner.layers[1]!.bounds.x).toBe(3);
+    expect(swapSides({ ...split, locked: true })).toEqual({ ...split, locked: true });
   });
 });

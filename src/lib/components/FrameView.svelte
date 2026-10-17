@@ -179,7 +179,8 @@
     <img class="cover" src={model.imageUrl} alt="" />
   {:else if model.layout === "logo" && model.imageUrl}
     <img class="logo" src={model.imageUrl} alt="" />
-  {:else if model.layout !== "empty" && model.layout !== "black"}
+  {:else if model.layout !== "empty" && model.layout !== "black" && !(stream && (playing || audio))}
+    <!-- A camera's name card is for the desk while the feed starts; it never sits on a live picture or reaches the audience. -->
     <div
       class="stack"
       style:text-align={model.theme.align}

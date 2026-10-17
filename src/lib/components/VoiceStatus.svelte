@@ -35,7 +35,7 @@
     {#if voice.status === "listening"}
       <span class="meter" aria-hidden="true"><span style="width: {Math.max(4, Math.round(voice.level * 100))}%"></span></span>
     {/if}
-    <label class="live" data-tip="Let voice send Take, Cut, Clear, Black and Logo to Program. Off on every launch.">
+    <label class="live" data-tip="Let voice go live, cut, clear, black and show the logo. Off on every launch.">
       <input type="checkbox" checked={voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
       Live voice commands
     </label>

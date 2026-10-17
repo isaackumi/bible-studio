@@ -27,7 +27,7 @@ export type VoiceParseOptions = {
 export const VOICE_ACTIONS: Array<{ id: VoiceAction; label: string }> = [
   { id: "next", label: "Next" },
   { id: "previous", label: "Previous" },
-  { id: "take", label: "Take (Program)" },
+  { id: "take", label: "Go live" },
   { id: "cut", label: "Cut (Program)" },
   { id: "clear", label: "Clear (Program)" },
   { id: "black", label: "Black (Program)" },

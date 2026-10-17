@@ -466,3 +466,13 @@ Built and verified in the browser build (Chrome, fake camera/microphone where ne
 | — | External display: AppKit frame placement for the audience window | Unit tests | Dell / Retina run |
 
 Not started (need outside services or SDKs): NDI (CS-P1-007/008, CS-P2-009), cloud remote and multi-operator (CS-P2-005/006), external song/scripture providers (CS-P2-003/004), plugin ecosystem and registry (CS-P1-009 runtime, CS-P2-001/002/010), recording and streaming (CS-P3-002).
+
+## Parked — 2026-10-17
+
+### CS-BIZ-001 Selling Premium through Paddle (parked by the owner)
+
+Code is in place and tested with a fake network; nothing is live.
+
+- Built: signed `CS1-` license keys checked offline (`src/lib/domain/license.ts`, `scripts/license.ts`), Buy buttons that open Paddle checkout (`CHECKOUT` in `src/lib/domain/plans.ts`, empty so they show "coming soon"), and the license server that emails a key after payment (`server/paddle.ts`, setup in `server/README.md`).
+- To resume: Paddle sandbox account with Premium/Church monthly and yearly prices and hosted checkout links; Resend account and sending domain; deploy the Worker with its four secrets; one sandbox purchase end to end (confirm `user_email` prefills); then live.
+- Open questions: real prices (placeholders $12 / $29), monthly vs yearly only (monthly emails a new key each month), whether to add online key refresh and seat limits later.

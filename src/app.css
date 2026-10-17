@@ -304,7 +304,7 @@ button { cursor: pointer; }
 .comp-layer.fit-cover :is(.frame img.cover, .frame video.cover) { object-fit: cover; }
 .comp-layer.fit-fill :is(.frame img.cover, .frame video.cover) { object-fit: fill; }
 .frame video.cover.mirror { transform: scaleX(-1); }
-.frame video.live { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 160ms ease-out; }
+.frame video.live { position: absolute; inset: 0; z-index: 2; background: #000; opacity: 0; transition: opacity 160ms ease-out; }
 .frame video.live.ready { opacity: 1; }
 .comp-layer.enter-fade { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
 .comp-layer.enter-dissolve { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }

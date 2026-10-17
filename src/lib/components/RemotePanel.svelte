@@ -91,7 +91,7 @@
   {:else}
     <section class="rows">
       <div class="row">
-        <div class="row-copy"><strong>Pair a phone</strong><span>The phone and this computer must be on the same network. Next and Previous on the phone change Preview; Take changes Program.</span></div>
+        <div class="row-copy"><strong>Pair a phone</strong><span>The phone and this computer must be on the same network. Next and Previous on the phone change Preview; Go live changes what the audience sees.</span></div>
         <button type="button" class="btn primary" onclick={() => void session.openRemotePairing()}>Pair</button>
       </div>
       {#if session.remoteLanUrl}
