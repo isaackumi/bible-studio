@@ -85,6 +85,15 @@
   }
 
   const prefix = $derived(settings.wake ? "studio " : "");
+  const SAY = $derived([
+    { title: "Move", phrases: ["next", "next verse", "go to the next verse", "move on", "previous", "go back", "the verse before"] },
+    { title: "Find", phrases: ["turn to John 3:16", "go to Romans 8", "find the song Amazing Grace", "open songs", "open the bible"] },
+    {
+      title: "Translation",
+      phrases: ["give me King James", "give me KJV", "read it in the American Standard", ...session.translations.slice(0, 4).map((translation) => `switch to ${translation.abbreviation}`)],
+    },
+    { title: "Program", phrases: ["go live", "clear the screen", "black screen", "show the logo", "pause the timer"] },
+  ]);
   const actionLabel = (id: string) => VOICE_ACTIONS.find((entry) => entry.id === id)?.label ?? id;
 </script>
 
@@ -116,25 +125,23 @@
     <input type="checkbox" class="switch" role="switch" aria-label="Voice commands" checked={settings.commands} onchange={(event) => session.saveVoiceSettings({ commands: event.currentTarget.checked })} />
   </div>
   <div class="row" class:dim={!settings.commands}>
-    <div class="row-copy"><strong>Start commands with “Studio”</strong><span>Recommended. Stops sermon words such as “take this to heart” from acting. Off: only a phrase spoken on its own counts.</span></div>
-    <input type="checkbox" class="switch" role="switch" aria-label="Require Studio wake word" disabled={!settings.commands} checked={settings.wake} onchange={(event) => session.saveVoiceSettings({ wake: event.currentTarget.checked })} />
+    <div class="row-copy"><strong>Require “Studio” first</strong><span>Off: just say the words (“next verse”, “give me King James”). A command counts only when it is said on its own, so sermon sentences never act. On: every command starts with “Studio”.</span></div>
+    <input type="checkbox" class="switch" role="switch" aria-label="Require Studio wake word" disabled={!settings.commands} checked={settings.wake} onchange={(event) => session.saveVoiceSettings({ wake: event.currentTarget.checked, wakeChosen: true })} />
   </div>
   <div class="row" class:dim={!settings.commands}>
     <div class="row-copy"><strong>Live voice commands</strong><span>Let voice change Program (Take, Cut, Clear, Black, Logo, timer). Off every time Church Studio starts.</span></div>
     <input type="checkbox" class="switch" role="switch" aria-label="Live voice commands" disabled={!settings.commands} checked={session.voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
   </div>
   <div class="row stack">
-    <div class="row-copy"><strong>Say</strong></div>
-    <div class="chips">
-      {#each ["next", "previous", "take", "show John 3 verse 16", "search song amazing grace", "open songs", "pause timer"] as example (example)}
-        <code>{prefix}{example}</code>
-      {/each}
-      {#if session.translations.length > 1}
-        {#each session.translations as translation (translation.id)}
-          <code>{prefix}use {translation.abbreviation}</code>
-        {/each}
-      {/if}
-    </div>
+    <div class="row-copy"><strong>Just say</strong><span>Plain words work. These are examples; similar phrasings work too.</span></div>
+    {#each SAY as group (group.title)}
+      <div class="say">
+        <span class="say-title">{group.title}</span>
+        <div class="chips">
+          {#each group.phrases as example (example)}<code>{prefix}{example}</code>{/each}
+        </div>
+      </div>
+    {/each}
   </div>
 </section>
 
@@ -165,6 +172,8 @@
   .verdict { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #3ccf6e 14%, transparent); font-size: 13px; flex: 1; }
   .verdict[data-status="quiet"], .verdict[data-status="cut-out"] { background: color-mix(in srgb, #ff5a5a 14%, transparent); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .say { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .say-title { padding-top: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
   code { padding: 4px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; font-weight: 500; }
   form.row select.field { width: 190px; }
 </style>

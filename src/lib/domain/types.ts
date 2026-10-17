@@ -376,8 +376,10 @@ export type Workspace = {
 export type VoiceSettings = {
   /** Spoken commands on at all (verse detection always runs while listening). */
   commands: boolean;
-  /** Require "Studio …" before a command. */
+  /** Require "Studio …" before a command (off by default; plain phrases work). */
   wake: boolean;
+  /** The operator chose the wake setting themselves. */
+  wakeChosen?: boolean;
   custom: Array<{ phrase: string; action: string }>;
 };
 

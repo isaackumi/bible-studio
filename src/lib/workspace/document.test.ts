@@ -22,7 +22,7 @@ describe("workspace document", () => {
     expect(workspace.pew).toMatchObject({ focus: false, columns: [46, 30, 24] });
     expect(workspace.production).toEqual({ stage: [42, 16, 42], docks: [20, 28, 32, 20], rows: [74, 26], mediaOpen: true });
     expect(workspace.remoteDevices).toEqual([]);
-    expect(workspace.voice).toEqual({ commands: true, wake: true, custom: [] });
+    expect(workspace.voice).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [] });
     expect(workspace.decks).toEqual([]);
     expect(workspace).not.toHaveProperty("program");
     expect(workspace.compositions).toEqual([]);

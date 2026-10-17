@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { parseVoiceCommand, sanitizeVoiceSettings, type CustomVoiceCommand } from "./commands";
 
 describe("voice commands", () => {
-  it("ignores speech without the wake word, so sermon words never act", () => {
-    expect(parseVoiceCommand("take this to heart")).toBeNull();
-    expect(parseVoiceCommand("next we read from john")).toBeNull();
-    expect(parseVoiceCommand("clear")).toBeNull();
+  it("with the wake word required, ignores speech without it", () => {
+    expect(parseVoiceCommand("take this to heart", { wake: true })).toBeNull();
+    expect(parseVoiceCommand("next we read from john", { wake: true })).toBeNull();
+    expect(parseVoiceCommand("clear", { wake: true })).toBeNull();
+    expect(parseVoiceCommand("studio next", { wake: true })).toMatchObject({ id: "next" });
   });
 
   it("maps navigation to Preview-only commands", () => {
@@ -53,8 +54,11 @@ describe("voice settings storage", () => {
   it("keeps valid custom phrases only", () => {
     expect(
       sanitizeVoiceSettings({ wake: false, custom: [{ phrase: " Lights Out ", action: "black" }, { phrase: "lights out", action: "next" }, { phrase: "x", action: "format" }, { phrase: "", action: "next" }] }),
-    ).toEqual({ commands: true, wake: false, custom: [{ phrase: "lights out", action: "black" }] });
-    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: true, custom: [] });
+    ).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [{ phrase: "lights out", action: "black" }] });
+    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [] });
+    // Older saves had the wake word on by default; it stays on only when the operator chose it.
+    expect(sanitizeVoiceSettings({ wake: true }).wake).toBe(false);
+    expect(sanitizeVoiceSettings({ wake: true, wakeChosen: true }).wake).toBe(true);
   });
 });
 
@@ -89,6 +93,64 @@ describe("voice settings: translations, custom phrases, wake word", () => {
     expect(parseVoiceCommand("take this to heart", { wake: false })).toBeNull();
     expect(parseVoiceCommand("studio next", { wake: false })).toMatchObject({ id: "next" });
     expect(parseVoiceCommand("show me 3 things", { wake: false })).toBeNull();
-    expect(parseVoiceCommand("search song amazing grace", { wake: false })).toBeNull();
+    // Song search names what it wants, so it works without the wake word.
+    expect(parseVoiceCommand("search song amazing grace", { wake: false })).toMatchObject({ kind: "search", scope: "songs" });
+  });
+});
+
+describe("plain-language commands (no wake word)", () => {
+  const translations = [
+    { id: "kjv", abbreviation: "KJV", name: "King James Version" },
+    { id: "asv", abbreviation: "ASV", name: "American Standard Version" },
+    { id: "web", abbreviation: "WEB", name: "World English Bible" },
+    { id: "bbe", abbreviation: "BBE", name: "Bible in Basic English" },
+  ];
+  const say = (text: string) => parseVoiceCommand(text, { translations });
+
+  it("moves through verses the way people say it", () => {
+    for (const text of ["next", "Next verse.", "go to the next verse", "go to next verse", "okay, next verse please", "move on", "the next one", "can you go to the next slide", "let's go to the next verse"]) {
+      expect(say(text), text).toMatchObject({ kind: "command", id: "next", live: false });
+    }
+    for (const text of ["previous", "go back", "Go back please", "previous verse", "the verse before", "back one", "go back to the previous verse", "last verse"]) {
+      expect(say(text), text).toMatchObject({ kind: "command", id: "previous", live: false });
+    }
+  });
+
+  it("switches translation by nickname, abbreviation or name", () => {
+    expect(say("give me king james")).toMatchObject({ kind: "translation", id: "kjv" });
+    expect(say("give me KJV")).toMatchObject({ kind: "translation", id: "kjv" });
+    expect(say("give me the king james version please")).toMatchObject({ kind: "translation", id: "kjv" });
+    expect(say("King James")).toMatchObject({ kind: "translation", id: "kjv" });
+    expect(say("read it in the American Standard")).toMatchObject({ kind: "translation", id: "asv" });
+    expect(say("switch to WEB")).toMatchObject({ kind: "translation", id: "web" });
+    expect(say("basic english")).toMatchObject({ kind: "translation", id: "bbe" });
+  });
+
+  it("finds a passage or a song when asked plainly", () => {
+    expect(say("turn to John 3 verse 16")).toMatchObject({ kind: "reference", query: "john 3:16" });
+    expect(say("let's turn to Romans chapter 8")).toMatchObject({ kind: "reference", query: "romans 8" });
+    expect(say("find the song amazing grace")).toMatchObject({ kind: "search", scope: "songs", query: "amazing grace" });
+    expect(say("open songs")).toMatchObject({ kind: "library", tab: "songs" });
+  });
+
+  it("keeps Program changes marked live", () => {
+    expect(say("go live")).toMatchObject({ id: "take", live: true });
+    expect(say("take it down")).toMatchObject({ id: "clear", live: true });
+    expect(say("black screen")).toMatchObject({ id: "black", live: true });
+  });
+
+  it("never acts on sermon sentences", () => {
+    for (const text of [
+      "take this to heart",
+      "next we read from john",
+      "and the next verse says this",
+      "let us go back to the beginning of creation",
+      "show me 3 things",
+      "the king james translators were careful",
+      "songs of praise fill this house",
+      "we will clear the air today",
+    ]) {
+      expect(say(text), text).toBeNull();
+    }
   });
 });

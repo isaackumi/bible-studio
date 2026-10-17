@@ -1257,7 +1257,7 @@ class Session {
     this.voice.hearing = !final;
     const settings = this.workspace.voice;
     if (final && settings?.commands !== false) {
-      const options = { wake: settings?.wake !== false, custom: settings?.custom as CustomVoiceCommand[] | undefined, translations: this.translations };
+      const options = { wake: settings?.wake === true, custom: settings?.custom as CustomVoiceCommand[] | undefined, translations: this.translations };
       const command = parseVoiceCommand(latest, options) ?? alternatives.map((option) => parseVoiceCommand(option, options)).find(Boolean) ?? null;
       if (command) {
         void this.runVoiceCommand(command);
