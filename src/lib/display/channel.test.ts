@@ -78,7 +78,10 @@ describe("stage snapshot", () => {
   it("accepts a whole snapshot and rejects partial or broken ones", () => {
     const model = emptyModel(defaultTheme());
     const snapshot = { program: model, next: model, live: true, desk: "Grace", at: 1 };
-    expect(parseStage(JSON.stringify(snapshot))).toEqual(snapshot);
+    // Older desks send no message or layout: the stage fills in the defaults.
+    expect(parseStage(JSON.stringify(snapshot))).toEqual({ ...snapshot, message: "", notes: "", layout: { next: true, clock: true, notes: true, size: "m" } });
+    const withMessage = { ...snapshot, message: "Wrap up", layout: { next: false, clock: true, notes: false, size: "l" } };
+    expect(parseStage(JSON.stringify(withMessage))).toMatchObject({ message: "Wrap up", layout: { next: false, size: "l" } });
     expect(parseStage(JSON.stringify({ program: model, at: 1 }))).toBeNull();
     expect(parseStage("{oops")).toBeNull();
     expect(parseStage(null)).toBeNull();
