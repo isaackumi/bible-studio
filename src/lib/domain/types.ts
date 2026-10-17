@@ -405,6 +405,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** Planning Center Personal Access Token (kept on this computer). */
+  pco: { appId: string; secret: string };
   /** What the stage (confidence) screen shows. */
   stageLayout: import("../display/channel").StageLayout;
   /** A second translation shown beside the first on scripture slides, or null. */

@@ -285,6 +285,7 @@ export function defaultWorkspace(): Workspace {
     songUses: [],
     parallelTranslationId: null,
     stageLayout: { next: true, clock: true, notes: true, size: "m" },
+    pco: { appId: "", secret: "" },
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,

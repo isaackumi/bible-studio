@@ -1,4 +1,5 @@
 import { noteSongUse } from "../domain/song-usage";
+import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
@@ -1826,6 +1827,31 @@ class Session {
     }
     await this.controlVideo({ kind: "pause" });
     await this.controlVideo({ kind: "volume", volume: start });
+  };
+
+  // Planning Center Services import.
+  setPcoToken = (appId: string, secret: string) => {
+    this.workspace = { ...this.workspace, pco: { appId: appId.trim(), secret: secret.trim() } };
+    this.persistSoon();
+  };
+
+  private pcoGet = (url: string) => api.pcoGet(url, pcoAuthorization(this.workspace.pco.appId, this.workspace.pco.secret));
+
+  pcoServiceTypes = () => listServiceTypes(this.pcoGet);
+  pcoPlans = (serviceTypeId: string) => listPlans(this.pcoGet, serviceTypeId);
+
+  /** Bring a plan in as a service (and its new songs into the library), then open it. */
+  importPcoPlan = async (plan: PcoPlan) => {
+    const result = await importPlan(this.pcoGet, plan, ({ title, ccli }) =>
+      this.songs.find((song) => (ccli && song.ccli === ccli) || song.title.trim().toLowerCase() === title.trim().toLowerCase()),
+    );
+    for (const song of result.songs) await this.saveSong(song);
+    await api.serviceSave(result.service);
+    this.services = await api.serviceList();
+    await this.openService(result.service.id);
+    const count = result.service.sections.reduce((total, section) => total + section.items.length, 0);
+    this.message = `${result.service.name} imported: ${count} item${count === 1 ? "" : "s"}, ${result.songs.length} new song${result.songs.length === 1 ? "" : "s"}. Open the Service page to run it.`;
+    return result;
   };
 
   /** A slide deck playing on Program by itself (announcements before the service), looping. */

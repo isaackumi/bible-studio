@@ -117,6 +117,11 @@ export const api = {
       : desktop()
       ? invoke<SearchHit[]>("bible_search", { translationId, query }).then((hits) => hits.map((hit) => ({ ...hit, text: cleanVerse(hit.text) })))
       : bundledSearch(translationId, query),
+  /** Planning Center requests: through the desktop app (the API refuses web pages). */
+  pcoGet: async (url: string, authorization: string): Promise<unknown> => {
+    if (!desktop()) throw new Error("Planning Center import works in the desktop app.");
+    return JSON.parse(await invoke<string>("pco_get", { url, authorization }));
+  },
   startRemoteLan: () =>
     desktop()
       ? invoke<RemoteLanStatus>("start_remote_lan")

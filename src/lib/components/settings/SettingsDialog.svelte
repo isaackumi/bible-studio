@@ -14,6 +14,7 @@
   import Icon from "../Icon.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { usageCsv, usageReport, type UsageRow } from "../../domain/song-usage";
+  import type { PcoPlan } from "../../integrations/pco";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
@@ -35,6 +36,7 @@
     | "media"
     | "audio"
     | "storage"
+    | "planning"
     | "performance"
     | "updates"
     | "account"
@@ -77,6 +79,7 @@
         { id: "bible", title: "Bible", icon: "bible", color: "#a07a52", about: "Scripture translations on this computer.", keywords: "translation kjv scripture" },
         { id: "lyrics", title: "Songs", icon: "lyrics", color: "#e93d82", about: "Songs, folders, imports and copyright.", keywords: "lyrics hymns ccli songselect openlyrics" },
         { id: "media", title: "Media", icon: "media", color: "#12a5b8", about: "Pictures and videos for backgrounds and the logo.", keywords: "images video background logo camera" },
+        { id: "planning", title: "Planning Center", icon: "list", color: "#2266e3", about: "Bring upcoming plans in as services.", keywords: "planning center pco services plan import" },
         { id: "storage", title: "Backup", icon: "files", color: "#2f80ed", about: "Export or import the whole library.", keywords: "export import backup files library" },
       ],
     },
@@ -112,6 +115,52 @@
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
+
+  // Planning Center.
+  let pcoApp = $state(session.workspace.pco.appId);
+  let pcoSecret = $state(session.workspace.pco.secret);
+  let pcoBusy = $state(false);
+  let pcoError = $state("");
+  let pcoTypes = $state<Array<{ id: string; name: string }>>([]);
+  let pcoType = $state("");
+  let pcoPlans = $state<PcoPlan[]>([]);
+
+  async function connectPco() {
+    pcoBusy = true;
+    pcoError = "";
+    session.setPcoToken(pcoApp, pcoSecret);
+    try {
+      pcoTypes = await session.pcoServiceTypes();
+      pcoType = pcoTypes[0]?.id ?? "";
+      await loadPcoPlans();
+    } catch (error) {
+      pcoTypes = [];
+      pcoError = error instanceof Error ? error.message : "Planning Center could not be reached.";
+    } finally {
+      pcoBusy = false;
+    }
+  }
+
+  async function loadPcoPlans() {
+    if (!pcoType) return;
+    try {
+      pcoPlans = await session.pcoPlans(pcoType);
+    } catch (error) {
+      pcoError = error instanceof Error ? error.message : "Plans could not be loaded.";
+    }
+  }
+
+  async function importPco(plan: PcoPlan) {
+    pcoBusy = true;
+    try {
+      await session.importPcoPlan(plan);
+      pcoError = "";
+    } catch (error) {
+      pcoError = error instanceof Error ? error.message : "That plan could not be imported.";
+    } finally {
+      pcoBusy = false;
+    }
+  }
 
   // CCLI usage report.
   let usagePeriod = $state<"month" | "quarter" | "half" | "year">("quarter");
@@ -729,6 +778,35 @@
             </select>
           </div>
         </section>
+      {:else if section === "planning"}
+        <section class="rows">
+          <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>
+            <div class="row-copy"><strong>Personal Access Token</strong><span class:form-error={!!pcoError}>{pcoError || "Make one at api.planningcenteronline.com › Personal Access Tokens, then paste the application id and secret. They stay on this computer."}</span></div>
+            <div class="row-end">
+              <input class="field" aria-label="Planning Center application id" placeholder="Application id" autocomplete="off" bind:value={pcoApp} />
+              <input class="field" type="password" aria-label="Planning Center secret" placeholder="Secret" autocomplete="off" bind:value={pcoSecret} />
+              <button type="submit" class="btn primary" disabled={!pcoApp.trim() || !pcoSecret.trim() || pcoBusy || !isDesktop()}>{pcoBusy ? "Connecting…" : "Connect"}</button>
+            </div>
+          </form>
+          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>Planning Center import works in the desktop app.</span></div></div>{/if}
+          {#if pcoTypes.length}
+            <div class="row">
+              <div class="row-copy"><strong>Service type</strong></div>
+              <select class="field" aria-label="Service type" bind:value={pcoType} onchange={() => void loadPcoPlans()}>
+                {#each pcoTypes as type (type.id)}<option value={type.id}>{type.name}</option>{/each}
+              </select>
+            </div>
+            {#each pcoPlans as plan (plan.id)}
+              <div class="row">
+                <div class="row-copy"><strong>{plan.title || plan.dates}</strong><span>{plan.dates} · {plan.items} item{plan.items === 1 ? "" : "s"}</span></div>
+                <button type="button" class="btn" disabled={pcoBusy} onclick={() => void importPco(plan)}>Import</button>
+              </div>
+            {:else}
+              <div class="row"><div class="row-copy"><span>No upcoming plans for this service type.</span></div></div>
+            {/each}
+          {/if}
+        </section>
+        <p class="note stand">Headers become sections, songs come with their lyrics (new ones go into a "Planning Center" folder), and other items become editable slides. Nothing goes live on its own.</p>
       {:else if section === "storage"}
         <section class="rows">
           <div class="row">

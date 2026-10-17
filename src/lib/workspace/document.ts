@@ -130,6 +130,10 @@ export function normalizeWorkspace(input: unknown): Workspace {
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
     songUses: sanitizeSongUses(value.songUses),
     stageLayout: sanitizeStageLayout(value.stageLayout),
+    pco: {
+      appId: typeof value.pco?.appId === "string" ? value.pco.appId.trim().slice(0, 200) : "",
+      secret: typeof value.pco?.secret === "string" ? value.pco.secret.trim().slice(0, 200) : "",
+    },
     parallelTranslationId: typeof value.parallelTranslationId === "string" && value.parallelTranslationId ? value.parallelTranslationId.slice(0, 120) : null,
   };
 }

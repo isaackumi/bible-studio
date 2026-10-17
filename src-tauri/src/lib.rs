@@ -327,6 +327,34 @@ fn remote_reply(lan: State<Arc<remote::LanRemote>>, id: String, envelope: Value)
     remote::reply(&lan, id, envelope);
 }
 
+/// GET JSON from Planning Center for the Services import. Only that API host is allowed, and
+/// the response is returned as text whatever the status (its error bodies explain the problem).
+#[tauri::command]
+async fn pco_get(url: String, authorization: String) -> Result<String, String> {
+    if !url.starts_with("https://api.planningcenteronline.com/") {
+        return Err("Only Planning Center can be reached from here.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .timeout_global(Some(std::time::Duration::from_secs(20)))
+            .build()
+            .into();
+        let mut response = agent
+            .get(&url)
+            .header("Authorization", &authorization)
+            .header("Accept", "application/json")
+            .call()
+            .map_err(|error| format!("Planning Center could not be reached. {error}"))?;
+        response
+            .body_mut()
+            .read_to_string()
+            .map_err(|error| format!("Planning Center sent an unreadable reply. {error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -345,6 +373,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            pco_get,
             output_status,
             open_audience,
             close_audience,
