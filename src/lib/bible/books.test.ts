@@ -68,6 +68,17 @@ describe("misheard and misspelled book names", () => {
     expect(spokenReference("jew twelve four")).toBeNull();
   });
 
+  it("hears a range of verses", () => {
+    const range = (text: string) => {
+      const hit = spokenReference(text);
+      return hit ? `${hit.bookName} ${hit.chapter}:${hit.startVerse}-${hit.endVerse}` : null;
+    };
+    expect(range("john three sixteen to eighteen")).toBe("John 3:16-18");
+    expect(range("romans eight verses twenty eight through thirty")).toBe("Romans 8:28-30");
+    expect(range("psalm twenty three one and two")).toBe("Psalms 23:1-2");
+    expect(range("john three sixteen and then we pray")).toBe("John 3:16-16");
+  });
+
   it("opens a chapter when only the chapter is said", () => {
     expect(ref(spokenReference("let us read romans chapter eight"))).toBe("Romans 8:1");
     expect(ref(spokenReference("psalm chapter twenty three"))).toBe("Psalms 23:1");

@@ -15,34 +15,87 @@ function haystack(song: Song, section: Song["sections"][number]): string {
   return `${song.title} ${song.author} ${section.label} ${section.lines.join(" ")}`.toLowerCase();
 }
 
-function snippetFor(song: Song, section: Song["sections"][number], needle: string): string {
-  const line = section.lines.find((entry) => entry.toLowerCase().includes(needle));
-  if (line?.trim()) return line.trim();
-  if (song.title.toLowerCase().includes(needle) || song.author.toLowerCase().includes(needle)) {
-    return section.lines.find((entry) => entry.trim())?.trim() || section.label;
-  }
-  return section.lines.find((entry) => entry.trim())?.trim() || section.label;
+function words(text: string): string[] {
+  return text.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
 }
 
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    previous = current;
+  }
+  return previous[b.length]!;
+}
+
+/** A typed word matches a song word exactly, as its start ("amaz" → "amazing"), or with a slip. */
+function wordMatches(typed: string, word: string): boolean {
+  if (word === typed) return true;
+  if (typed.length >= 3 && word.startsWith(typed)) return true;
+  if (typed.length < 4 || Math.abs(word.length - typed.length) > 2) return false;
+  return editDistance(typed, word) <= (typed.length >= 7 ? 2 : 1);
+}
+
+function snippetFor(song: Song, section: Song["sections"][number], typed: string[]): string {
+  const line = section.lines.find((entry) => {
+    const lineWords = words(entry);
+    return typed.some((word) => lineWords.some((candidate) => wordMatches(word, candidate)));
+  });
+  return line?.trim() || section.lines.find((entry) => entry.trim())?.trim() || section.label;
+}
+
+// Words per section, worked out once per song edit (search runs on every keystroke).
+const wordCache = new WeakMap<Song["sections"][number], { head: string; words: string[] }>();
+function sectionWords(song: Song, section: Song["sections"][number], titleWords: string[]): string[] {
+  const head = `${song.title}\n${song.author}`;
+  const cached = wordCache.get(section);
+  if (cached && cached.head === head) return cached.words;
+  const built = [...new Set([...titleWords, ...words(`${section.label} ${section.lines.join(" ")}`)])];
+  wordCache.set(section, { head, words: built });
+  return built;
+}
+
+/**
+ * Songs by title, author or lyrics. The exact phrase ranks first (title before lyrics), then
+ * sections holding most of the typed words; a word can be the start of one or have a slip,
+ * so "amazng grase" and "how swet the" still find Amazing Grace.
+ */
 export function searchSongHits(songs: Song[], query: string, limit = 24): SongHit[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
-  const hits: SongHit[] = [];
+  const typed = words(needle);
+  if (typed.length === 0) return [];
+  const need = typed.length <= 2 ? typed.length : typed.length - 1;
+  const scored: Array<{ hit: SongHit; score: number; order: number }> = [];
+  let order = 0;
   for (const song of songs) {
+    const titleWords = words(`${song.title} ${song.author}`);
     for (const section of song.sections) {
-      if (!haystack(song, section).includes(needle)) continue;
-      hits.push({
-        songId: song.id,
-        sectionId: section.id,
-        title: song.title || "Untitled song",
-        author: song.author,
-        label: section.label,
-        snippet: snippetFor(song, section, needle),
+      order += 1;
+      const text = haystack(song, section);
+      const all = sectionWords(song, section, titleWords);
+      const found = typed.filter((word) => all.some((candidate) => wordMatches(word, candidate))).length;
+      const exact = text.includes(needle);
+      if (!exact && found < need) continue;
+      const inTitle = song.title.toLowerCase().includes(needle);
+      const score = (exact ? 1000 : 0) + (inTitle ? 500 : 0) + found * 10 - (section.kind === "verse" ? 0 : 1);
+      scored.push({
+        hit: {
+          songId: song.id,
+          sectionId: section.id,
+          title: song.title || "Untitled song",
+          author: song.author,
+          label: section.label,
+          snippet: snippetFor(song, section, typed),
+        },
+        score,
+        order,
       });
-      if (hits.length >= limit) return hits;
     }
   }
-  return hits;
+  scored.sort((a, b) => b.score - a.score || a.order - b.order);
+  return scored.slice(0, limit).map((entry) => entry.hit);
 }
 
 export function recentSongHits(songs: Song[], recents: SongRecent[], limit = 8): SongHit[] {

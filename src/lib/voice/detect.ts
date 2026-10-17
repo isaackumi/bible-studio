@@ -81,9 +81,12 @@ function splitGlued(chapters: number, digits: string): { chapter: number; verse:
 }
 
 /** The chapter and verse spoken right after a book name: "3 16", "316", or "chapter 8" alone. */
-function numbersAfter(tail: string, chapters: number): { chapter: number; verse: number; exact: boolean } | null {
-  const pair = tail.match(/^\s+(?:ch\s+)?(\d+)\s+(\d+)\b/);
-  if (pair) return { chapter: Number(pair[1]), verse: Number(pair[2]), exact: true };
+function numbersAfter(tail: string, chapters: number): { chapter: number; verse: number; end?: number; exact: boolean } | null {
+  const pair = tail.match(/^\s+(?:ch\s+)?(\d+)\s+(\d+)\b(?:\s+(?:to|through|thru|till|until|and)\s+(\d+)\b)?/);
+  if (pair) {
+    const end = pair[3] ? Number(pair[3]) : undefined;
+    return { chapter: Number(pair[1]), verse: Number(pair[2]), end: end && end > Number(pair[2]) && end - Number(pair[2]) <= 40 ? end : undefined, exact: true };
+  }
   const glued = tail.match(/^\s+(\d{3,4})\b/);
   const split = glued ? splitGlued(chapters, glued[1]!) : null;
   if (split) return { ...split, exact: true };
@@ -115,7 +118,7 @@ export function spokenReference(raw: string): ParsedReference | null {
   const accept = (book: CanonBook, at: number, size: number, tail: string) => {
     const numbers = numbersAfter(tail, book.chapters);
     if (!numbers) return false;
-    const hit = parseReference(`${book.name} ${numbers.chapter}:${numbers.verse}`);
+    const hit = parseReference(`${book.name} ${numbers.chapter}:${numbers.verse}${numbers.end ? `-${numbers.end}` : ""}`);
     if (!hit?.startVerse) return false;
     found.push({ at, size: size + (numbers.exact ? 1000 : 0), hit });
     return true;

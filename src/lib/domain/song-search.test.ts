@@ -35,6 +35,18 @@ describe("song search hits", () => {
     expect(lyric[0]?.snippet).toMatch(/Amazing grace/i);
   });
 
+  it("forgives slips and partial words, exact phrase first", () => {
+    const ids = (query: string) => searchSongHits([morning, grace], query).map((hit) => hit.songId);
+    expect(ids("amazng grase")[0]).toBe("song-2");
+    expect(ids("how swet the sond")[0]).toBe("song-2");
+    expect(ids("amaz")).toEqual(["song-2"]);
+    expect(ids("mornin ligt")[0]).toBe("song-1");
+    expect(ids("zebra")).toEqual([]);
+    const both: Song = { ...grace, id: "song-3", title: "Sweet sound", sections: [{ id: "v1", kind: "verse", label: "Verse 1", lines: ["Grace so amazing"] }] };
+    expect(ids.call(null, "sweet the sound")).toEqual(["song-2"]);
+    expect(searchSongHits([both, grace], "sweet the sound").map((hit) => hit.songId)[0]).toBe("song-2");
+  });
+
   it("returns recent section hits when the query is empty", () => {
     expect(searchSongHits([morning, grace], "   ")).toEqual([]);
     const recent = recentSongHits([morning, grace], [
