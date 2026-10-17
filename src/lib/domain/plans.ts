@@ -1,7 +1,10 @@
 // Plans: what a church gets on Free, Premium and Church. One table drives the Account page, the
 // upgrade prompts and every gate, so changing what a plan includes is a one-line edit here.
-// Entitlement is local for now (Free, or a 14-day Premium trial on this computer). A billing
-// service will later write the same Entitlement record after a purchase.
+// A paid plan comes from a signed license key (domain/license.ts), checked again every time the
+// workspace loads, so editing the saved file cannot grant a plan. Free and the 14-day trial are
+// local to this computer.
+
+import { looksLikeLicense, normalizeLicense, readLicense } from "./license";
 
 export type PlanId = "free" | "premium" | "church";
 
@@ -64,7 +67,7 @@ export const PLANS: Plan[] = [
 
 export const TRIAL_DAYS = 14;
 
-export type EntitlementSource = "free" | "trial" | "promo" | "purchase";
+export type EntitlementSource = "free" | "trial" | "promo" | "license";
 
 export type Entitlement = {
   plan: PlanId;
@@ -72,8 +75,12 @@ export type Entitlement = {
   source: EntitlementSource;
   /** ISO time a promo or purchase ends; null for no end. */
   expiresAt: string | null;
-  /** The promo code that granted the plan, for display. */
+  /** The test code that granted the plan (development builds only). */
   code: string | null;
+  /** The license key that grants the plan; re-checked on every load. */
+  license: string | null;
+  /** Who the license was issued to. */
+  holder: string | null;
   /** ISO time a Premium trial on this computer ends; null when no trial was started. */
   trialEndsAt: string | null;
   /** The trial can be started once per workspace. */
@@ -81,23 +88,39 @@ export type Entitlement = {
 };
 
 export function freeEntitlement(): Entitlement {
-  return { plan: "free", source: "free", expiresAt: null, code: null, trialEndsAt: null, trialUsed: false };
+  return { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false };
 }
 
-export function sanitizeEntitlement(value: unknown): Entitlement {
+/** Test codes work in development builds only: shipped apps take signed license keys. */
+const TEST_CODES: Record<string, { plan: Exclude<PlanId, "free">; note: string }> = {
+  "PREMIUM-TEST": { plan: "premium", note: "Premium for testing" },
+  "CHURCH-TEST": { plan: "church", note: "Church for testing" },
+};
+
+/** `now`, test-code permission and the public key, overridable for tests. */
+export type LicenseCheck = { now?: number; allowTest?: boolean; publicKey?: string };
+
+function checks(options: LicenseCheck) {
+  return { now: options.now ?? Date.now(), allowTest: options.allowTest ?? import.meta.env?.DEV === true, publicKey: options.publicKey };
+}
+
+export function sanitizeEntitlement(value: unknown, options: LicenseCheck = {}): Entitlement {
+  const { now, allowTest, publicKey } = checks(options);
   const record = value && typeof value === "object" ? (value as Partial<Entitlement>) : {};
-  const plan: PlanId = record.plan === "premium" || record.plan === "church" ? record.plan : "free";
   const time = (value: unknown) => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : null);
   const ends = time(record.trialEndsAt);
-  const source: EntitlementSource = plan === "free" ? "free" : record.source === "purchase" ? "purchase" : "promo";
-  return {
-    plan,
-    source,
-    expiresAt: plan === "free" ? null : time(record.expiresAt),
-    code: plan !== "free" && typeof record.code === "string" ? record.code.slice(0, 40) : null,
-    trialEndsAt: ends,
-    trialUsed: record.trialUsed === true || ends !== null,
-  };
+  const trial = { trialEndsAt: ends, trialUsed: record.trialUsed === true || ends !== null };
+  const license = typeof record.license === "string" ? readLicense(record.license, publicKey) : null;
+  if (license) {
+    // A launch-offer key runs a set number of days from redemption: never longer than that from now.
+    const stored = time(record.expiresAt);
+    const cap = license.days ? now + license.days * 86_400_000 : null;
+    const expiresAt = license.until ?? (cap === null ? null : stored && Date.parse(stored) <= cap ? stored : new Date(cap).toISOString());
+    return { plan: license.plan, source: "license", expiresAt, code: null, license: record.license!, holder: license.holder || null, ...trial };
+  }
+  const test = allowTest && typeof record.code === "string" ? TEST_CODES[record.code] : undefined;
+  if (test && record.source === "promo") return { ...freeEntitlement(), plan: test.plan, source: "promo", code: record.code!, ...trial };
+  return { ...freeEntitlement(), ...trial };
 }
 
 export function trialActive(entitlement: Entitlement, now = Date.now()): boolean {
@@ -136,41 +159,35 @@ export function startTrial(entitlement: Entitlement, now = Date.now()): Entitlem
   return { ...entitlement, trialEndsAt: new Date(now + TRIAL_DAYS * 86_400_000).toISOString(), trialUsed: true };
 }
 
-// Promo codes. They ship inside the app, so treat them as test and launch codes, not secrets:
-// a billing service should check codes once accounts exist. `days: null` never expires.
-const PROMO_CODES: Record<string, { plan: Exclude<PlanId, "free">; days: number | null; note: string }> = {
-  "PREMIUM-TEST": { plan: "premium", days: null, note: "Premium for testing" },
-  "CHURCH-TEST": { plan: "church", days: null, note: "Church for testing" },
-  LAUNCH30: { plan: "premium", days: 30, note: "Premium for 30 days" },
-};
-
 export function normalizeCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, "");
 }
 
 export type RedeemResult = { ok: true; entitlement: Entitlement; note: string } | { ok: false; error: string };
 
-export function redeemCode(entitlement: Entitlement, code: string, now = Date.now()): RedeemResult {
-  const key = normalizeCode(code);
-  if (!key) return { ok: false, error: "Type a code first." };
-  const promo = PROMO_CODES[key];
-  if (!promo) return { ok: false, error: "That code is not valid." };
+/** Redeem a license key (or, in development, a test code). */
+export function redeemCode(entitlement: Entitlement, code: string, options: LicenseCheck = {}): RedeemResult {
+  const { now, allowTest, publicKey } = checks(options);
+  const typed = normalizeCode(code);
+  if (!typed) return { ok: false, error: "Paste your license key first." };
+  const test = allowTest ? TEST_CODES[typed] : undefined;
+  if (test) return { ok: true, note: test.note, entitlement: { ...entitlement, plan: test.plan, source: "promo", code: typed, license: null, holder: null, expiresAt: null } };
+  if (!looksLikeLicense(code)) return { ok: false, error: "That is not a license key. Keys start with CS1; paste the whole key from your email." };
+  const license = readLicense(code, publicKey);
+  if (!license) return { ok: false, error: "That license key is not valid. Check it was copied in full." };
+  if (license.until && Date.parse(license.until) <= now) return { ok: false, error: `That license key ended on ${new Date(license.until).toLocaleDateString()}.` };
+  const expiresAt = license.until ?? (license.days ? new Date(now + license.days * 86_400_000).toISOString() : null);
+  const name = planById(license.plan).name;
   return {
     ok: true,
-    note: promo.note,
-    entitlement: {
-      ...entitlement,
-      plan: promo.plan,
-      source: "promo",
-      code: key,
-      expiresAt: promo.days === null ? null : new Date(now + promo.days * 86_400_000).toISOString(),
-    },
+    note: license.days ? `${name} for ${license.days} days` : license.until ? `${name} until ${new Date(license.until).toLocaleDateString()}` : name,
+    entitlement: { ...entitlement, plan: license.plan, source: "license", code: null, license: normalizeLicense(code), holder: license.holder || null, expiresAt },
   };
 }
 
 /** Back to Free (keeps the record of a used trial). */
 export function dropToFree(entitlement: Entitlement): Entitlement {
-  return { ...entitlement, plan: "free", source: "free", expiresAt: null, code: null };
+  return { ...entitlement, plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null };
 }
 
 /** Yearly price per month, and the saving against twelve monthly payments. */

@@ -251,7 +251,7 @@ export function defaultWorkspace(): Workspace {
     songFolders: [],
     ccliLicense: "",
     installedPacks: [],
-    entitlement: { plan: "free", source: "free", expiresAt: null, code: null, trialEndsAt: null, trialUsed: false },
+    entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,
     churchName: "",

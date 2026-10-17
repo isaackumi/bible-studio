@@ -835,14 +835,15 @@
             <h3>
               {current.name}
               {#if session.trialDays > 0 && ent.plan === "free"}<span class="pill">Trial · {session.trialDays} day{session.trialDays === 1 ? "" : "s"} left</span>
-              {:else if ent.source === "promo" && session.plan !== "free"}<span class="pill">Code {ent.code}{ent.expiresAt ? ` · until ${new Date(ent.expiresAt).toLocaleDateString()}` : ""}</span>{/if}
+              {:else if ent.source === "promo" && session.plan !== "free"}<span class="pill">Test code {ent.code}</span>
+              {:else if ent.source === "license" && session.plan !== "free"}<span class="pill">{ent.expiresAt ? `Until ${new Date(ent.expiresAt).toLocaleDateString()}` : "No end date"}</span>{/if}
             </h3>
-            <p>{current.tagline}</p>
+            <p>{ent.source === "license" && ent.holder && session.plan !== "free" ? `Licensed to ${ent.holder}.` : current.tagline}</p>
           </div>
           {#if ent.plan === "free" && !ent.trialUsed}
             <button type="button" class="btn primary" onclick={() => session.startTrial()}>Try Premium free · {TRIAL_DAYS} days</button>
-          {:else if ent.source === "promo" && session.plan !== "free"}
-            <button type="button" class="btn" onclick={() => session.useFreePlan()}>Return to Free</button>
+          {:else if (ent.source === "promo" || ent.source === "license") && session.plan !== "free"}
+            <button type="button" class="btn" onclick={() => session.useFreePlan()}>{ent.source === "license" ? "Remove license" : "Return to Free"}</button>
           {/if}
         </section>
         {#if ent.trialUsed && session.trialDays === 0 && session.plan === "free"}
@@ -898,7 +899,7 @@
         </div>
         <p class="note stand">Prices are placeholders while pricing is decided. Your songs, sermons and settings stay yours on every plan.</p>
 
-        <p class="section-label">Promo code</p>
+        <p class="section-label">License key</p>
         <section class="rows">
           <form
             class="row"
@@ -908,10 +909,10 @@
               if (!codeError) code = "";
             }}
           >
-            <div class="row-copy"><strong>Redeem a code</strong><span>{codeError || "A code from Church Studio unlocks a plan on this computer."}</span></div>
+            <div class="row-copy"><strong>Add a license key</strong><span class:form-error={!!codeError}>{codeError || "Paste the key from your purchase email. It starts with CS1 and is checked on this computer, no internet needed."}</span></div>
             <div class="row-end">
-              <input class="field" aria-label="Promo code" placeholder="CODE" autocapitalize="characters" bind:value={code} />
-              <button type="submit" class="btn primary" disabled={!code.trim()}>Redeem</button>
+              <input class="field license-field" aria-label="License key" placeholder="CS1-…" autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
+              <button type="submit" class="btn primary" disabled={!code.trim()}>Add key</button>
             </div>
           </form>
         </section>
@@ -1157,6 +1158,7 @@
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
   .sign-in .field { min-width: 160px; }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
+  .license-field { width: 280px; letter-spacing: 0.02em; }
   .pricing-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 6px; }
   .billing { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
   .billing button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }

@@ -1881,18 +1881,18 @@ class Session {
     this.message = "Signed out. Your library stays on this computer.";
   };
 
-  /** Redeem a promo code. Returns an error to show, or null on success. */
+  /** Add a license key (or a test code in development). Returns an error to show, or null on success. */
   redeemCode = (code: string): string | null => {
-    const result = redeemCode(this.workspace.entitlement, code);
+    const result = redeemCode(this.workspace.entitlement, code, { now: Date.now() });
     if (!result.ok) return result.error;
     this.workspace = { ...this.workspace, entitlement: result.entitlement };
     this.planClock = Date.now();
     this.persistSoon();
-    this.message = `Code accepted: ${result.note}.`;
+    this.message = `License added: ${result.note}.`;
     return null;
   };
 
-  /** Return to Free (for testing plans, or ending a promo). */
+  /** Return to Free: removes a license key or test code from this computer. */
   useFreePlan = () => {
     this.workspace = { ...this.workspace, entitlement: dropToFree(this.workspace.entitlement) };
     this.persistSoon();

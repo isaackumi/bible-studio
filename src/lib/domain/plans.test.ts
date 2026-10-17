@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { licenseKeyPair, signLicense } from "./license";
 import { dropToFree, effectivePlan, freeEntitlement, redeemCode, yearlyDeal, planFor, planIncludes, sanitizeEntitlement, startTrial, trialActive, trialDaysLeft } from "./plans";
 
 const DAY = 86_400_000;
@@ -29,27 +30,57 @@ describe("plans", () => {
   it("repairs stored entitlements", () => {
     expect(sanitizeEntitlement(undefined)).toEqual(freeEntitlement());
     expect(sanitizeEntitlement({ plan: "gold", trialEndsAt: "nope" })).toEqual(freeEntitlement());
-    expect(sanitizeEntitlement({ plan: "church" }).plan).toBe("church");
+    // A plan in the saved file counts only with a valid license (or a test code in development).
+    expect(sanitizeEntitlement({ plan: "church" }).plan).toBe("free");
+    expect(sanitizeEntitlement({ plan: "church", source: "promo", code: "CHURCH-TEST" }, { allowTest: true }).plan).toBe("church");
+    expect(sanitizeEntitlement({ plan: "church", source: "promo", code: "CHURCH-TEST" }, { allowTest: false }).plan).toBe("free");
     expect(sanitizeEntitlement({ trialEndsAt: "2026-11-01T00:00:00Z" }).trialUsed).toBe(true);
   });
 });
 
-describe("promo codes and prices", () => {
-  it("redeems test codes, ignoring case and spaces, and rejects others", () => {
-    const premium = redeemCode(freeEntitlement(), " premium-test ", now);
+describe("license keys, test codes and prices", () => {
+  const pair = licenseKeyPair();
+  const opts = { now, publicKey: pair.publicKey, allowTest: false };
+
+  it("redeems test codes only when allowed, ignoring case and spaces", () => {
+    const premium = redeemCode(freeEntitlement(), " premium-test ", { now, allowTest: true });
     expect(premium.ok && premium.entitlement).toMatchObject({ plan: "premium", source: "promo", code: "PREMIUM-TEST", expiresAt: null });
     expect(premium.ok && effectivePlan(premium.entitlement, now + 400 * DAY)).toBe("premium");
-    const church = redeemCode(freeEntitlement(), "Church-Test", now);
+    const church = redeemCode(freeEntitlement(), "Church-Test", { now, allowTest: true });
     expect(church.ok && effectivePlan(church.entitlement, now)).toBe("church");
-    expect(redeemCode(freeEntitlement(), "nope", now)).toEqual({ ok: false, error: "That code is not valid." });
-    expect(redeemCode(freeEntitlement(), "  ", now).ok).toBe(false);
+    expect(redeemCode(freeEntitlement(), "PREMIUM-TEST", opts).ok).toBe(false);
+    expect(redeemCode(freeEntitlement(), "nope", opts).ok).toBe(false);
+    expect(redeemCode(freeEntitlement(), "  ", opts).ok).toBe(false);
   });
 
-  it("ends a timed code and drops back to Free", () => {
-    const launch = redeemCode(freeEntitlement(), "LAUNCH30", now);
+  it("redeems a signed key and re-checks it on load", () => {
+    const key = signLicense({ plan: "church", holder: "Grace Chapel" }, pair.secretKey);
+    const result = redeemCode(freeEntitlement(), key.toLowerCase(), opts);
+    expect(result.ok && result.entitlement).toMatchObject({ plan: "church", source: "license", holder: "Grace Chapel", expiresAt: null });
+    const saved = result.ok ? result.entitlement : freeEntitlement();
+    expect(sanitizeEntitlement(saved, opts)).toEqual(saved);
+    // Editing the saved plan does nothing: the key decides.
+    expect(sanitizeEntitlement({ ...saved, plan: "premium" }, opts).plan).toBe("church");
+    // A key from another signer is refused, at redeem and at load.
+    const other = licenseKeyPair();
+    expect(redeemCode(freeEntitlement(), key, { ...opts, publicKey: other.publicKey }).ok).toBe(false);
+    expect(sanitizeEntitlement(saved, { ...opts, publicKey: other.publicKey }).plan).toBe("free");
+  });
+
+  it("ends dated and launch-offer keys, and drops back to Free", () => {
+    const dated = signLicense({ plan: "premium", until: "2026-12-31" }, pair.secretKey);
+    const kept = redeemCode(freeEntitlement(), dated, opts);
+    expect(kept.ok && effectivePlan(kept.entitlement, Date.parse("2026-12-31T23:00:00Z"))).toBe("premium");
+    expect(kept.ok && effectivePlan(kept.entitlement, Date.parse("2027-01-01T00:00:01Z"))).toBe("free");
+    expect(redeemCode(freeEntitlement(), dated, { ...opts, now: Date.parse("2027-02-01") }).ok).toBe(false);
+
+    const launch = redeemCode(freeEntitlement(), signLicense({ plan: "premium", days: 30 }, pair.secretKey), opts);
     expect(launch.ok && effectivePlan(launch.entitlement, now + 29 * DAY)).toBe("premium");
     expect(launch.ok && effectivePlan(launch.entitlement, now + 31 * DAY)).toBe("free");
-    expect(launch.ok && dropToFree(launch.entitlement)).toMatchObject({ plan: "free", source: "free", code: null });
+    // Pushing the saved end date out is capped at the key's days from now.
+    const stretched = launch.ok ? { ...launch.entitlement, expiresAt: new Date(now + 900 * DAY).toISOString() } : freeEntitlement();
+    expect(Date.parse(sanitizeEntitlement(stretched, opts).expiresAt!)).toBeLessThanOrEqual(now + 30 * DAY);
+    expect(launch.ok && dropToFree(launch.entitlement)).toMatchObject({ plan: "free", source: "free", code: null, license: null });
   });
 
   it("shows the yearly saving", () => {
