@@ -12,7 +12,6 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
-  import MediaPane from "../MediaPane.svelte";
   import OutputType from "../OutputType.svelte";
 
   type SettingsSectionId =
@@ -135,6 +134,29 @@
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileMessage = $state("");
   const IMPORT_ACCEPT = ".json,.txt,.md,.markdown,.text,.pdf,application/json,text/plain,text/markdown,application/pdf";
+
+  let mediaInput = $state<HTMLInputElement | null>(null);
+
+  $effect(() => {
+    if (section === "media") void session.loadCameras();
+  });
+
+  async function importMedia() {
+    if (!isDesktop()) {
+      mediaInput?.click();
+      return;
+    }
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({ multiple: false, filters: [{ name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
+    if (typeof picked === "string") await session.importImage(picked);
+  }
+
+  async function importMediaFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) await session.importImage(file);
+  }
 
   async function downloadLibrary() {
     const snapshot = await session.exportLibrary();
@@ -279,10 +301,7 @@
           </div>
         </section>
       {:else if section === "system"}
-        <section class="card">
-          <h3>On this computer</h3>
-          <CapabilityList />
-        </section>
+        <CapabilityList />
       {:else if section === "appearance"}
         <section class="card">
           <h3>Desk</h3>
@@ -348,109 +367,132 @@
           <OutputType />
         </section>
       {:else if section === "workspace"}
-        <section class="card">
-          <label>
-            Current layout
-            <select class="field" value={layout.id} onchange={(event) => session.useLayout(event.currentTarget.value)}>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Current layout</strong><span>{layout.builtin ? "Built in. Rearrange it freely; Reset brings it back." : "Your own layout."}</span></div>
+            <select class="field" aria-label="Current layout" value={layout.id} onchange={(event) => session.useLayout(event.currentTarget.value)}>
               {#each session.workspace.layouts as item (item.id)}
-                <option value={item.id}>{item.name}</option>
+                <option value={item.id}>{item.name}{item.builtin ? " · built in" : ""}</option>
               {/each}
             </select>
-          </label>
-          <label>Name <input class="field" bind:value={layoutName} onchange={() => session.renameActiveLayout(layoutName)} /></label>
-          <div class="actions">
-            <button type="button" class="primary" onclick={() => session.saveLayout()}>Save layout</button>
-            <button type="button" onclick={() => session.duplicateActiveLayout()}>Duplicate</button>
-            <button type="button" onclick={() => session.resetActiveLayout()} disabled={!layout.builtin}>Reset</button>
-            <button type="button" onclick={() => session.deleteLayoutById(layout.id)} disabled={layout.builtin}>Delete</button>
           </div>
+          <div class="row">
+            <div class="row-copy"><strong>Name</strong><span>Rename the layout you are using.</span></div>
+            <input class="field" aria-label="Layout name" bind:value={layoutName} onchange={() => session.renameActiveLayout(layoutName)} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>This layout</strong><span>Save keeps panel sizes. Duplicate makes a personal copy.</span></div>
+            <div class="row-end">
+              <button type="button" class="btn primary" onclick={() => session.saveLayout()}>Save</button>
+              <button type="button" class="btn" onclick={() => session.duplicateActiveLayout()}>Duplicate</button>
+              <button type="button" class="btn" onclick={() => session.resetActiveLayout()} disabled={!layout.builtin}>Reset</button>
+              <button type="button" class="btn danger" onclick={() => session.deleteLayoutById(layout.id)} disabled={layout.builtin}>Delete</button>
+            </div>
+          </div>
+        </section>
+        <p class="section-label">New layout</p>
+        <section class="rows">
           <form
-            class="actions"
+            class="row"
             onsubmit={(event) => {
               event.preventDefault();
               session.saveLayoutAs(newLayout);
               newLayout = "";
             }}
           >
-            <input class="field" placeholder="New layout name" bind:value={newLayout} aria-label="New layout name" />
-            <button type="submit" class="primary">Save as</button>
+            <div class="row-copy"><strong>Save as</strong><span>Keep the current arrangement under a new name.</span></div>
+            <div class="row-end">
+              <input class="field" placeholder="Layout name" bind:value={newLayout} aria-label="New layout name" />
+              <button type="submit" class="btn primary" disabled={!newLayout.trim()}>Save as</button>
+            </div>
           </form>
-          <p class="note">Built-in layouts can be rearranged. Reset returns the selected one. Save as keeps a personal copy.</p>
-          <button type="button" class="text" onclick={() => session.restoreBuiltinWorkspaces()}>Restore built-in layouts</button>
+          <div class="row">
+            <div class="row-copy"><strong>Built-in layouts</strong><span>Put back any built-in layout that was deleted or changed.</span></div>
+            <button type="button" class="btn" onclick={() => session.restoreBuiltinWorkspaces()}>Restore</button>
+          </div>
         </section>
       {:else if section === "audience"}
         <section class="status-card" class:on={session.output.online}>
           <span class="lamp" class:on={session.output.online}></span>
-          <div>
+          <div class="head-copy">
             <p class="eyebrow">{session.output.online ? "Showing" : status.detail.startsWith("External display detected") ? "Detected" : "Output"}</p>
             <h3>{status.title}</h3>
             <p>{status.detail}</p>
           </div>
-        </section>
-        <section class="card">
-          <h3>Audience window</h3>
-          <div class="actions">
+          <div class="row-end">
             {#if session.output.desired}
-              <button type="button" class="primary" onclick={() => session.closeAudience()}>Close output</button>
+              <button type="button" class="btn" onclick={() => session.closeAudience()}>Close</button>
             {:else}
-              <button type="button" class="primary" onclick={() => session.openAudience()}>Open output</button>
-            {/if}
-            {#if session.output.desired && !session.output.online}
-              <button type="button" onclick={() => session.openAudience()}>Reopen</button>
-            {/if}
-            <button type="button" onclick={() => session.testOutput()}>Test</button>
-            {#if !session.controlsAudience}
-              <button type="button" onclick={() => session.claimAudience()}>Take control</button>
+              <button type="button" class="btn primary" onclick={() => session.openAudience()}>Open output</button>
             {/if}
           </div>
-          <p class="note">Test flashes the audience window. It does not change Program.</p>
         </section>
-        <section class="card">
-          <h3>How it fills the screen</h3>
-          <div class="segment" role="group" aria-label="Output mode">
-            <button type="button" class:active={profile.outputMode !== "fullscreen"} onclick={() => setMode("window")}>Window</button>
-            <button type="button" class:active={profile.outputMode === "fullscreen"} onclick={() => setMode("fullscreen")}>Fullscreen</button>
-          </div>
-          <p class="note">Fullscreen covers the audience screen. The desk stays on its own display.</p>
-        </section>
-        <section class="card">
-          <h3>Which screen</h3>
-          {#if isDesktop() && session.output.displays.length > 0}
-            <div class="monitor-list">
-              {#each session.output.displays as display (display.key)}
-                <button
-                  type="button"
-                  class="monitor"
-                  class:on={profile.assignments.audience === display.key || (!profile.assignments.audience && display.audience)}
-                  onclick={() => session.setAssignments(assignments("audience", display.key))}
-                >
-                  <span class="mini" aria-hidden="true"><span>Program</span></span>
-                  <span class="monitor-copy">
-                    <strong>{display.name}</strong>
-                    <span>{display.width} × {display.height}{display.primary ? " · Primary" : " · External"}</span>
-                  </span>
-                </button>
-              {/each}
+        <section class="rows">
+          {#if session.output.desired && !session.output.online}
+            <div class="row">
+              <div class="row-copy"><strong>Output was closed</strong><span>The audience window is not showing. Open it again.</span></div>
+              <button type="button" class="btn primary" onclick={() => session.openAudience()}>Reopen</button>
             </div>
-          {:else if !isDesktop()}
-            <p class="note">This browser cannot list monitors. Open output, drag that window to the screen, then choose Fill this screen.</p>
-          {:else}
-            <p class="note">No displays were detected. Connect a monitor, then refresh.</p>
-            <button type="button" onclick={() => session.refreshDisplays()}>Refresh displays</button>
           {/if}
-          <button type="button" class="text" onclick={() => (section = "displays")}>Arrange desk and audience</button>
+          <div class="row">
+            <div class="row-copy"><strong>Fullscreen</strong><span>Cover the whole audience screen. The desk stays on its own display.</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label="Fullscreen output" checked={profile.outputMode === "fullscreen"} onchange={(event) => setMode(event.currentTarget.checked ? "fullscreen" : "window")} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Test the output</strong><span>Flashes the audience window. Program does not change.</span></div>
+            <button type="button" class="btn" onclick={() => session.testOutput()}>Test</button>
+          </div>
+          {#if !session.controlsAudience}
+            <div class="row">
+              <div class="row-copy"><strong>Another window is in control</strong><span>Send to the audience from this window instead.</span></div>
+              <button type="button" class="btn" onclick={() => session.claimAudience()}>Take control</button>
+            </div>
+          {/if}
         </section>
-        <p class="note stand">The audience window shows Program only. Preview, theme edits, and Next stay on this desk until LIVE, Clear, or Black.</p>
+        <p class="section-label">Screen</p>
+        {#if isDesktop() && session.output.displays.length > 0}
+          <div class="monitor-list">
+            {#each session.output.displays as display (display.key)}
+              <button
+                type="button"
+                class="monitor"
+                class:on={profile.assignments.audience === display.key || (!profile.assignments.audience && display.audience)}
+                onclick={() => session.setAssignments(assignments("audience", display.key))}
+              >
+                <span class="mini" aria-hidden="true"><span>Program</span></span>
+                <span class="monitor-copy">
+                  <strong>{display.name}</strong>
+                  <span>{display.width} × {display.height}{display.primary ? " · Primary" : " · External"}</span>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy">
+                <strong>{isDesktop() ? "No displays detected" : "Choose the screen yourself"}</strong>
+                <span>{isDesktop() ? "Connect a monitor, then refresh." : "This browser cannot list monitors. Open output, drag the window to the screen, then choose Fill this screen."}</span>
+              </div>
+              {#if isDesktop()}<button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh</button>{/if}
+            </div>
+          </section>
+        {/if}
+        <p class="note stand">The audience window shows Program only. Preview, theme edits and Next stay on this desk until LIVE, Clear or Black. <button type="button" class="link" onclick={() => (section = "displays")}>Arrange desk and audience</button></p>
       {:else if section === "displays"}
         {#if !isDesktop()}
-          <section class="card">
-            <p class="note">This browser cannot list monitors or move a window onto one. Open output, drag that window to the external display, then choose Fill this screen on it.</p>
-            <button type="button" class="text" onclick={() => (section = "audience")}>Open output</button>
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy"><strong>Browser window</strong><span>A browser cannot list monitors or move a window onto one. Open output, drag it to the external display, then choose Fill this screen.</span></div>
+              <button type="button" class="btn" onclick={() => (section = "audience")}>Audience output</button>
+            </div>
           </section>
         {:else if session.output.displays.length === 0}
-          <section class="card">
-            <p class="note">No displays were detected. Refresh after a monitor is connected. The operator window stays here.</p>
-            <button type="button" onclick={() => session.refreshDisplays()}>Refresh displays</button>
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy"><strong>No displays detected</strong><span>Refresh after a monitor is connected. The operator window stays here.</span></div>
+              <button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh</button>
+            </div>
           </section>
         {:else}
           <div class="monitor-list">
@@ -468,71 +510,68 @@
               </article>
             {/each}
           </div>
-          <button type="button" onclick={() => session.refreshDisplays()}>Refresh displays</button>
+          <button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh displays</button>
         {/if}
-        <section class="card">
-          <label>
-            Profile
-            <select class="field" value={profile.id} onchange={(event) => session.useDisplayProfile(event.currentTarget.value)}>
+        <p class="section-label">Profile</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Display profile</strong><span>Save a setup per room or per computer.</span></div>
+            <select class="field" aria-label="Display profile" value={profile.id} onchange={(event) => session.useDisplayProfile(event.currentTarget.value)}>
               {#each session.workspace.displayProfiles as item (item.id)}
                 <option value={item.id}>{item.name}</option>
               {/each}
             </select>
-          </label>
-          <label>Profile name <input class="field" bind:value={profileName} onchange={() => session.renameDisplayProfile(profileName)} /></label>
-          <label>
-            Desk
-            <select class="field" value={profile.assignments.operator ?? ""} onchange={(event) => session.setAssignments(assignments("operator", event.currentTarget.value))}>
-              <option value="">Automatic, primary display</option>
-              {#each session.output.displays as display (display.key)}
-                <option value={display.key}>{display.name}</option>
-              {/each}
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Name</strong></div>
+            <input class="field" aria-label="Profile name" bind:value={profileName} onchange={() => session.renameDisplayProfile(profileName)} />
+          </div>
+        </section>
+        <p class="section-label">Screens</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>Desk</strong><span>Where you operate.</span></div></div>
+            <select class="field" aria-label="Desk display" value={profile.assignments.operator ?? ""} onchange={(event) => session.setAssignments(assignments("operator", event.currentTarget.value))}>
+              <option value="">Automatic · primary display</option>
+              {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
             </select>
-          </label>
-          <label>
-            Audience
-            <select class="field" value={profile.assignments.audience ?? ""} onchange={(event) => session.setAssignments(assignments("audience", event.currentTarget.value))}>
-              <option value="">Automatic, external display</option>
-              {#each session.output.displays as display (display.key)}
-                <option value={display.key}>{display.name}</option>
-              {/each}
-              {#if profile.assignments.audience && audience.missing}
-                <option value={profile.assignments.audience}>Saved display is disconnected</option>
-              {/if}
+          </div>
+          <div class="row">
+            <div class="row-lead"><span class="row-icon"><Icon name="cast" size={16} /></span><div class="row-copy"><strong>Audience</strong><span>{audience.missing && audience.mode === "assigned" ? "Disconnected. Program is held until it returns." : audience.missing ? "Connect an external display, or assign this screen." : sameScreen(profile.assignments) ? "Same display as the desk." : "What the congregation sees."}</span></div></div>
+            <select class="field" aria-label="Audience display" value={profile.assignments.audience ?? ""} onchange={(event) => session.setAssignments(assignments("audience", event.currentTarget.value))}>
+              <option value="">Automatic · external display</option>
+              {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
+              {#if profile.assignments.audience && audience.missing}<option value={profile.assignments.audience}>Saved display is disconnected</option>{/if}
             </select>
-          </label>
-          <label>
-            Stage
-            <select class="field" value={profile.assignments.stage ?? ""} onchange={(event) => session.setAssignments(assignments("stage", event.currentTarget.value))}>
+          </div>
+          <div class="row">
+            <div class="row-lead"><span class="row-icon"><Icon name="stage" size={16} /></span><div class="row-copy"><strong>Stage</strong><span>The confidence screen for the platform.</span></div></div>
+            <select class="field" aria-label="Stage display" value={profile.assignments.stage ?? ""} onchange={(event) => session.setAssignments(assignments("stage", event.currentTarget.value))}>
               <option value="">Off</option>
-              {#each session.output.displays as display (display.key)}
-                <option value={display.key}>{display.name}</option>
-              {/each}
+              {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
             </select>
-          </label>
-          {#if audience.missing && audience.mode === "assigned"}
-            <p class="note">The assigned audience display is disconnected. Program is held until that display returns.</p>
-          {:else if audience.missing}
-            <p class="note">Connect an external display, or assign this screen as the audience.</p>
-          {/if}
-          {#if sameScreen(profile.assignments)}
-            <p class="note">Audience and desk are the same display.</p>
-          {/if}
-          {#if profile.assignments.stage}
-            <p class="note">Stage is saved on this profile. The stage window stays closed in this release.</p>
-          {/if}
+          </div>
+        </section>
+        <p class="section-label">Save</p>
+        <section class="rows">
           <form
-            class="actions"
+            class="row"
             onsubmit={(event) => {
               event.preventDefault();
               session.saveDisplayProfileAs(newProfile);
               newProfile = "";
             }}
           >
-            <input class="field" placeholder="Profile name" bind:value={newProfile} aria-label="New display profile" />
-            <button type="submit" class="primary">Save profile</button>
+            <div class="row-copy"><strong>Save as a new profile</strong></div>
+            <div class="row-end">
+              <input class="field" placeholder="Profile name" bind:value={newProfile} aria-label="New display profile" />
+              <button type="submit" class="btn primary" disabled={!newProfile.trim()}>Save</button>
+            </div>
           </form>
-          <button type="button" onclick={() => session.deleteDisplayProfile(profile.id)} disabled={profile.builtin}>Delete profile</button>
+          <div class="row">
+            <div class="row-copy"><strong>Delete this profile</strong><span>{profile.builtin ? "Built-in profiles stay." : "Removes the saved screen choices."}</span></div>
+            <button type="button" class="btn danger" onclick={() => session.deleteDisplayProfile(profile.id)} disabled={profile.builtin}>Delete</button>
+          </div>
         </section>
       {:else if section === "keyboard"}
         {#each shortcutGroups as group (group)}
@@ -552,40 +591,42 @@
       {:else if section === "remote"}
         <RemotePanel />
       {:else if section === "stage"}
-        <section class="card">
-          <h3>Stage display</h3>
-          <p class="note">
-            A confidence screen for the platform: what is live now, what is next (Preview), the time, and any timer. It never
-            sends anything to the audience. With three screens it opens on the one that is neither this desk nor the audience;
-            otherwise drag it to the platform screen.
-          </p>
-          <div class="actions">
-            <button type="button" class="primary" onclick={() => void session.openStage()}>Open stage display</button>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Stage display</strong><span>What is live now, what is next (Preview), the time and any timer. It never sends anything to the audience.</span></div>
+            <button type="button" class="btn primary" onclick={() => void session.openStage()}>Open</button>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Which screen</strong><span>With three screens it opens on the one that is neither the desk nor the audience. Otherwise drag it to the platform screen.</span></div>
+            <button type="button" class="btn" onclick={() => (section = "displays")}>Displays</button>
           </div>
         </section>
       {:else if section === "storage"}
-        <section class="card">
-          <p class="note">Songs, services, and themes stored on this device. Import a Church Studio library, or a text or Markdown file as slides. Import replaces a library record only when its id matches. Program is not included. Images import from Media.</p>
-          <div class="actions">
-            <button type="button" class="primary" onclick={() => downloadLibrary()}>Export library</button>
-            <button type="button" onclick={() => fileInput?.click()}>Import</button>
+        <section class="rows">
+          <div class="row">
+            <div class="row-lead"><span class="row-icon"><Icon name="files" size={16} /></span><div class="row-copy"><strong>Export library</strong><span>Songs, services and themes as one file. Program is not included.</span></div></div>
+            <button type="button" class="btn primary" onclick={() => downloadLibrary()}>Export</button>
+          </div>
+          <div class="row">
+            <div class="row-lead"><span class="row-icon"><Icon name="refresh" size={16} /></span><div class="row-copy"><strong>Import</strong><span>A Church Studio library, or a text or Markdown file as slides. A record is replaced only when its id matches.</span></div></div>
+            <button type="button" class="btn" onclick={() => fileInput?.click()}>Choose file…</button>
             <input bind:this={fileInput} type="file" accept={IMPORT_ACCEPT} hidden onchange={(event) => void importFile(event)} />
           </div>
-          {#if fileMessage}<p class="note">{fileMessage}</p>{/if}
         </section>
+        {#if fileMessage}<p class="note stand">{fileMessage}</p>{/if}
+        <p class="note stand">Pictures and videos import in Media. Songs import and export in the Songs window.</p>
       {:else if section === "bible"}
-        <section class="card">
-          <h3>On this computer</h3>
-          <p class="note">Public-domain scripture is stored locally. Search, Listen, and the next verse stay on Preview until LIVE.</p>
-          <div class="rows inset">
-            {#each session.translations as translation (translation.id)}
-              <div class="row">
-                <div class="row-copy"><strong>{translation.name}</strong><span>{translation.licenseNote ?? "Public domain"}</span></div>
-                <span class="pill">{translation.abbreviation}</span>
-              </div>
-            {/each}
-          </div>
+        <section class="rows">
+          {#each session.translations as translation (translation.id)}
+            <div class="row">
+              <div class="row-lead"><span class="row-icon"><Icon name="bible" size={16} /></span><div class="row-copy"><strong>{translation.name}</strong><span>{translation.licenseNote ?? "Public domain"}</span></div></div>
+              <span class="pill">{translation.abbreviation}</span>
+            </div>
+          {:else}
+            <div class="row"><div class="row-copy"><strong>Loading translations…</strong></div></div>
+          {/each}
         </section>
+        <p class="note stand">Scripture is stored on this computer. Search, Listen and the next verse stay on Preview until LIVE.</p>
       {:else if section === "lyrics"}
         <section class="rows">
           <div class="row">
@@ -601,26 +642,55 @@
           </div>
         </section>
       {:else if section === "media"}
-        <section class="card">
-          <h3>Pictures</h3>
-          <p class="note">Import stays on this computer. Preview and Use as logo do not change Program. A camera reaches Program and the audience only on LIVE. Permission denied is a desk message. A missing picture shows the empty frame instead of crashing. If the audience window cannot open a camera, it shows the camera card.</p>
-          <MediaPane />
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Pictures and videos</strong><span>{session.media.length} item{session.media.length === 1 ? "" : "s"} on this computer. Use them as backgrounds, the logo, or sources in a scene.</span></div>
+            <button type="button" class="btn primary" onclick={() => void importMedia()}>Import…</button>
+            <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
+          </div>
+          {#each session.media as asset (asset.id)}
+            <div class="row">
+              <div class="row-lead"><span class="row-icon"><Icon name="media" size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? "Video" : "Image"}{session.workspace.logoAssetId === asset.id ? " · logo" : ""}</span></div></div>
+              {#if asset.kind === "image"}
+                <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? "Logo" : "Use as logo"}</button>
+              {/if}
+            </div>
+          {/each}
+        </section>
+        <p class="section-label">Cameras</p>
+        <section class="rows">
+          {#each session.cameras as camera (camera.deviceId)}
+            <div class="row">
+              <div class="row-lead"><span class="row-icon"><Icon name="cast" size={16} /></span><div class="row-copy"><strong>{camera.label}</strong></div></div>
+              <button type="button" class="btn" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
+            </div>
+          {:else}
+            <div class="row"><div class="row-copy"><strong>No cameras listed</strong><span>{session.cameraNote || "Connect a camera, then refresh."}</span></div></div>
+          {/each}
+          <div class="row">
+            <div class="row-copy"><span>Preview only. A camera reaches Program and the audience on LIVE.</span></div>
+            <button type="button" class="btn" onclick={() => void session.loadCameras()}>Refresh</button>
+          </div>
         </section>
       {:else if section === "audio"}
         <AudioSettings />
-        <section class="card">
-          <h3>{canUse("voice-detect") ? "Voice detection" : "Not in this release"}</h3>
-          <p class="note">
-            {canUse("voice-detect")
-              ? "Listen on Live transcript. A match is Preview only. LIVE still sends Program. Recognition stays on this computer. Cloud AI is off. If macOS already refused the mic, turn Church Studio on under Microphone and Speech Recognition."
-              : "Audio recognition is not connected. Nothing here starts a microphone."}
-          </p>
-          {#if canUse("voice-detect") && isDesktop()}
-            <div class="actions">
-              <button type="button" class="primary" onclick={() => void allowMicrophone()}>Allow microphone</button>
-              <button type="button" onclick={() => void openPrivacySettings()}>Open Privacy settings</button>
+        <p class="section-label">Verse detection</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy">
+              <strong>{canUse("voice-detect") ? "Listen for scripture" : "Not in this release"}</strong>
+              <span>{canUse("voice-detect") ? "Press Listen on the Scriptures desk. A match goes to Preview only; LIVE still sends Program. Recognition stays on this computer." : "Audio recognition is not connected. Nothing here starts a microphone."}</span>
             </div>
-            {#if audioNote}<p class="note">{audioNote}</p>{/if}
+            <span class="pill" class:ok={canUse("voice-detect")} class:muted={!canUse("voice-detect")}>{canUse("voice-detect") ? "On" : "Off"}</span>
+          </div>
+          {#if canUse("voice-detect") && isDesktop()}
+            <div class="row">
+              <div class="row-copy"><strong>Microphone permission</strong><span>{audioNote || "If macOS refused the mic, turn Church Studio on under Microphone and Speech Recognition."}</span></div>
+              <div class="row-end">
+                <button type="button" class="btn primary" onclick={() => void allowMicrophone()}>Allow</button>
+                <button type="button" class="btn" onclick={() => void openPrivacySettings()}>Privacy settings</button>
+              </div>
+            </div>
           {/if}
         </section>
       {:else if section === "performance"}
@@ -717,8 +787,8 @@
   .nav-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
   .nav-search input::-webkit-search-cancel-button { display: none; }
   .nav-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; padding: 0 2px; }
-  .nav-group { margin: 10px 10px 3px; font-size: 11px; font-weight: 600; color: var(--muted); }
-  .nav-group:first-child { margin-top: 2px; }
+  .nav-group { margin: 16px 10px 6px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .nav-group:first-child { margin-top: 4px; }
   .nav-item {
     display: flex;
     align-items: center;
@@ -783,47 +853,67 @@
     color: var(--muted);
   }
   .icon-close:hover { color: var(--ink); }
-  .section-label { margin: 6px 4px -6px; font-size: 12px; font-weight: 600; color: var(--muted); }
-  .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-  .note.stand { padding: 0 4px; }
-  .text, .link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
-  .text:hover, .link:hover { text-decoration: underline; }
+  /* Shared pieces for every page, including child components (Remote, Audio, Capabilities). */
+  .settings-body :global(.section-label) { margin: 8px 4px -4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .settings-body :global(.note) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .settings-body :global(.note.stand) { padding: 0 4px; }
+  .settings-body :global(.text), .settings-body :global(.link) { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; width: fit-content; }
+  .settings-body :global(.text:hover), .settings-body :global(.link:hover) { text-decoration: underline; }
 
   /* Rows: label and help on the left, control on the right */
-  .rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--field); overflow: hidden; }
-  .rows.inset { background: var(--panel); }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; padding: 10px 16px; }
-  .row + .row { border-top: 1px solid var(--line); }
-  .row-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .row-copy strong { font-size: 13px; font-weight: 600; }
-  .row-copy span { font-size: 12px; color: var(--muted); line-height: 1.4; }
-  .row .field { width: min(300px, 45%); height: 34px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
-  .row .field:focus { border-color: var(--accent); outline: none; }
-  .pill {
+  .settings-body :global(.rows) { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--field); overflow: hidden; flex: none; }
+  .settings-body :global(.rows.inset) { background: var(--panel); }
+  .settings-body :global(.row) { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; padding: 10px 16px; }
+  .settings-body :global(.row + .row) { border-top: 1px solid var(--line); }
+  .settings-body :global(.row.stack) { flex-direction: column; align-items: stretch; gap: 10px; }
+  .settings-body :global(.row.dim) { opacity: 0.55; }
+  .settings-body :global(.row-copy) { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .settings-body :global(.row-copy strong) { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .settings-body :global(.row-copy span), .settings-body :global(.row-copy small) { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .settings-body :global(.row-icon) { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--panel); color: var(--muted); }
+  .settings-body :global(.row-lead) { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+  .settings-body :global(.row-end) { display: flex; align-items: center; gap: 8px; flex: none; }
+  .settings-body :global(.row .field), .settings-body :global(.row select.field) { width: min(300px, 45%); height: 34px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+  .settings-body :global(.row .field:focus) { border-color: var(--accent); outline: none; }
+  .settings-body :global(.row .field.grow) { width: auto; flex: 1; }
+  .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+  .settings-body :global(.pill.ok) { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
+  .settings-body :global(.pill.muted) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
+
+  /* Toggle switch: <input type="checkbox" class="switch" role="switch"> */
+  .settings-body :global(input.switch) {
+    appearance: none;
+    position: relative;
+    width: 40px;
+    height: 24px;
     flex: none;
-    padding: 3px 10px;
+    margin: 0;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+    cursor: pointer;
+    transition: background 150ms;
   }
-  .pill.muted { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
+  .settings-body :global(input.switch::after) {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 150ms;
+  }
+  .settings-body :global(input.switch:checked) { background: var(--accent); }
+  .settings-body :global(input.switch:checked::after) { transform: translateX(16px); }
+  .settings-body :global(input.switch:disabled) { opacity: 0.45; cursor: default; }
+  .settings-body :global(input.switch:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Cards */
-  .card, .status-card {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--field);
-  }
-  .card h3 { margin: 0; font-size: 13px; font-weight: 650; }
-  .card :global(.field), .card select, .card input:not([type]) { background: var(--panel); }
-  .status-card { flex-direction: row; align-items: center; gap: 14px; }
+  .settings-body :global(.card) { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); flex: none; }
+  .settings-body :global(.card h3) { margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); }
+  .status-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .status-card.on { border-color: color-mix(in srgb, var(--presence, #3fb950) 60%, var(--line)); }
   .status-card .eyebrow { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
   .status-card h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
@@ -870,24 +960,31 @@
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .split > div { display: flex; flex-direction: column; gap: 10px; }
 
-  /* Forms */
+  /* Forms and buttons */
   label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
-  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .actions button, .settings-body > button, .card > button:not(.text):not(.link) {
-    height: 34px;
+  .settings-body :global(.actions) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .settings-body :global(.btn), .settings-body :global(.actions button:not(.text):not(.link)), .settings-body :global(.card > button:not(.text):not(.link)) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
     padding: 0 14px;
     border: 1px solid var(--line);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--panel);
     color: var(--ink);
     font: inherit;
     font-size: 13px;
     font-weight: 600;
     width: fit-content;
+    white-space: nowrap;
+    cursor: pointer;
   }
-  .actions button:hover:not(:disabled), .card > button:not(.text):not(.link):hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
-  .actions .primary, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .actions button:disabled, .card > button:disabled { opacity: 0.4; }
+  .settings-body :global(.btn:hover:not(:disabled)), .settings-body :global(.actions button:not(.text):not(.link):hover:not(:disabled)) { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .settings-body :global(.btn.primary), .settings-body :global(.actions button.primary), .settings-body :global(button.primary) { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .settings-body :global(.btn.danger) { color: var(--live, #e5484d); }
+  .settings-body :global(.btn:disabled), .settings-body :global(.actions button:disabled) { opacity: 0.4; cursor: default; }
 
   /* Displays */
   .monitor-list { display: flex; flex-direction: column; gap: 8px; }

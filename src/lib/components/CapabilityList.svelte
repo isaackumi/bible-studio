@@ -15,24 +15,14 @@
   });
 </script>
 
-<ul class="capabilities">
+<section class="rows">
   {#each rows as row (row.id)}
-    <li data-available={row.available}>
-      <span class="mark" aria-hidden="true">{row.available ? "✓" : "—"}</span>
-      <span class="text">
+    <div class="row" class:dim={!row.available}>
+      <div class="row-copy">
         <strong>{row.label}</strong>
-        <small>{row.available ? "" : "Unavailable. "}{row.detail}</small>
-      </span>
-    </li>
+        <span>{row.detail}</span>
+      </div>
+      <span class="pill" class:ok={row.available} class:muted={!row.available}>{row.available ? "Ready" : "Not here"}</span>
+    </div>
   {/each}
-</ul>
-
-<style>
-  .capabilities { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
-  .mark { width: 18px; text-align: center; font-weight: 700; color: #3ccf6e; }
-  li[data-available="false"] .mark { color: var(--muted); }
-  li[data-available="false"] strong { color: var(--muted); }
-  .text { display: flex; flex-direction: column; gap: 2px; }
-  small { color: var(--muted); }
-</style>
+</section>
