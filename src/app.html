@@ -1,13 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background: #050505; color-scheme: dark">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Church Studio</title>
     %sveltekit.head%
+    <style>
+      /* Shown before any script runs, matching the app's loading screen; the app removes it. */
+      #preboot { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; justify-items: center; gap: 14px; background: #050505; color: #f5f5f5; font: 700 22px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+      #preboot .mark { width: 64px; height: 64px; border-radius: 18px; background: #fa4f00; box-shadow: 0 16px 40px rgba(250, 79, 0, 0.35); }
+      #preboot .bar { width: 160px; height: 3px; border-radius: 3px; background: rgba(245, 245, 245, 0.1); overflow: hidden; }
+      #preboot .bar i { display: block; width: 40%; height: 100%; background: #fa4f00; animation: preboot 1.1s ease-in-out infinite; }
+      @keyframes preboot { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+      @media (prefers-reduced-motion: reduce) { #preboot .bar i { animation: none; width: 100%; } }
+      .no-preboot #preboot { display: none; }
+    </style>
+    <script>
+      // Only the operator desk shows the loading mark; audience, stage and phone pages start dark.
+      (function () {
+        try {
+          var meta = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.metadata;
+          var label = meta && meta.currentWindow && meta.currentWindow.label;
+          if (/[?&](display|stage|remote)=1/.test(location.search) || window.__CHURCH_STUDIO_SURFACE__ === "audience" || (label && label !== "main")) {
+            document.documentElement.classList.add("no-preboot");
+          }
+        } catch (error) {}
+      })();
+    </script>
   </head>
-  <body data-sveltekit-preload-data="hover">
+  <body data-sveltekit-preload-data="hover" style="margin: 0; background: #050505">
+    <div id="preboot" aria-hidden="true"><span class="mark"></span><span>Church Studio</span><span class="bar"><i></i></span></div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>
