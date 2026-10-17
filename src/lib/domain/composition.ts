@@ -137,51 +137,56 @@ const SPLIT: CompositionSlot[] = [
   { id: "b", name: "Region B", bounds: { x: 50, y: 0, w: 50, h: 100 }, fit: "cover" },
 ];
 
+/** Tag each slot with what fills it, so a layout can be filled from the desk. */
+function withRoles(slots: CompositionSlot[], roles: SlotRole[]): CompositionSlot[] {
+  return slots.map((slot, index) => (roles[index] ? { ...slot, role: roles[index] } : slot));
+}
+
 export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
-  { id: "full-frame", name: "Full Camera", slots: [FULL] },
-  { id: "full-scripture", name: "Full Scripture", slots: [{ ...FULL, fit: "contain" }] },
-  { id: "full-lyrics", name: "Full Lyrics", slots: [{ ...FULL, fit: "contain" }] },
-  { id: "countdown", name: "Countdown", slots: [{ ...FULL, fit: "contain" }] },
-  { id: "announcement", name: "Announcement", slots: [{ ...FULL, fit: "contain" }] },
-  { id: "split-two", name: "Two regions", slots: SPLIT },
-  { id: "scripture-camera", name: "Scripture + Camera", slots: SPLIT },
-  { id: "lyrics-camera", name: "Lyrics + Camera", slots: SPLIT },
-  { id: "image-camera", name: "Image + Camera", slots: SPLIT },
-  { id: "two-cameras", name: "Two Cameras", slots: SPLIT },
-  { id: "camera-presentation", name: "Camera + Presentation", slots: SPLIT },
+  { id: "full-frame", name: "Full Camera", slots: withRoles([FULL], ["camera"]) },
+  { id: "full-scripture", name: "Full Scripture", slots: withRoles([{ ...FULL, fit: "contain" }], ["scripture"]) },
+  { id: "full-lyrics", name: "Full Lyrics", slots: withRoles([{ ...FULL, fit: "contain" }], ["lyrics"]) },
+  { id: "countdown", name: "Countdown", slots: withRoles([{ ...FULL, fit: "contain" }], ["timer"]) },
+  { id: "announcement", name: "Announcement", slots: withRoles([{ ...FULL, fit: "contain" }], ["text"]) },
+  { id: "split-two", name: "Two regions", slots: withRoles(SPLIT, ["scripture", "camera"]) },
+  { id: "scripture-camera", name: "Scripture + Camera", slots: withRoles(SPLIT, ["scripture", "camera"]) },
+  { id: "lyrics-camera", name: "Lyrics + Camera", slots: withRoles(SPLIT, ["lyrics", "camera"]) },
+  { id: "image-camera", name: "Image + Camera", slots: withRoles(SPLIT, ["image", "camera"]) },
+  { id: "two-cameras", name: "Two Cameras", slots: withRoles(SPLIT, ["camera", "camera"]) },
+  { id: "camera-presentation", name: "Camera + Presentation", slots: withRoles(SPLIT, ["camera", "image"]) },
   {
     id: "three-cameras",
     name: "Three Cameras",
     slots: [
-      { id: "main", name: "Main camera", bounds: { x: 0, y: 0, w: 66.6667, h: 100 }, fit: "cover" },
-      { id: "top", name: "Camera 2", bounds: { x: 66.6667, y: 0, w: 33.3333, h: 50 }, fit: "cover" },
-      { id: "bottom", name: "Camera 3", bounds: { x: 66.6667, y: 50, w: 33.3333, h: 50 }, fit: "cover" },
+      { id: "main", name: "Main camera", bounds: { x: 0, y: 0, w: 66.6667, h: 100 }, fit: "cover", role: "camera" },
+      { id: "top", name: "Camera 2", bounds: { x: 66.6667, y: 0, w: 33.3333, h: 50 }, fit: "cover", role: "camera" },
+      { id: "bottom", name: "Camera 3", bounds: { x: 66.6667, y: 50, w: 33.3333, h: 50 }, fit: "cover", role: "camera" },
     ],
   },
   {
     id: "four-cameras",
     name: "Four Cameras",
     slots: [
-      { id: "a", name: "Camera 1", bounds: { x: 0, y: 0, w: 50, h: 50 }, fit: "cover" },
-      { id: "b", name: "Camera 2", bounds: { x: 50, y: 0, w: 50, h: 50 }, fit: "cover" },
-      { id: "c", name: "Camera 3", bounds: { x: 0, y: 50, w: 50, h: 50 }, fit: "cover" },
-      { id: "d", name: "Camera 4", bounds: { x: 50, y: 50, w: 50, h: 50 }, fit: "cover" },
+      { id: "a", name: "Camera 1", bounds: { x: 0, y: 0, w: 50, h: 50 }, fit: "cover", role: "camera" },
+      { id: "b", name: "Camera 2", bounds: { x: 50, y: 0, w: 50, h: 50 }, fit: "cover", role: "camera" },
+      { id: "c", name: "Camera 3", bounds: { x: 0, y: 50, w: 50, h: 50 }, fit: "cover", role: "camera" },
+      { id: "d", name: "Camera 4", bounds: { x: 50, y: 50, w: 50, h: 50 }, fit: "cover", role: "camera" },
     ],
   },
   {
     id: "camera-lower-third",
     name: "Camera + Lower Third",
     slots: [
-      { id: "fill", name: "Fill", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover" },
-      { id: "lower", name: "Lower third", bounds: { x: 6, y: 72, w: 55, h: 22 }, fit: "contain" },
+      { id: "fill", name: "Fill", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "lower", name: "Lower third", bounds: { x: 6, y: 72, w: 55, h: 22 }, fit: "contain", role: "lower-third" },
     ],
   },
   {
     id: "camera-countdown",
     name: "Camera + Countdown",
     slots: [
-      { id: "fill", name: "Fill", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover" },
-      { id: "timer", name: "Timer", bounds: { x: 68, y: 8, w: 28, h: 18 }, fit: "contain" },
+      { id: "fill", name: "Fill", bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover", role: "camera" },
+      { id: "timer", name: "Timer", bounds: { x: 68, y: 8, w: 28, h: 18 }, fit: "contain", role: "timer" },
     ],
   },
   {
@@ -269,16 +274,16 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
     id: "scripture-countdown",
     name: "Scripture + Countdown",
     slots: [
-      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain" },
-      { id: "timer", name: "Countdown", bounds: { x: 70, y: 3, w: 27, h: 16 }, fit: "contain" },
+      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain", role: "scripture" },
+      { id: "timer", name: "Countdown", bounds: { x: 70, y: 3, w: 27, h: 16 }, fit: "contain", role: "timer" },
     ],
   },
   {
     id: "scripture-clock",
     name: "Scripture + Time",
     slots: [
-      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain" },
-      { id: "clock", name: "Time", bounds: { x: 76, y: 3, w: 21, h: 13 }, fit: "contain" },
+      { id: "verse", name: "Scripture", bounds: { x: 0, y: 14, w: 100, h: 86 }, fit: "contain", role: "scripture" },
+      { id: "clock", name: "Time", bounds: { x: 76, y: 3, w: 21, h: 13 }, fit: "contain", role: "clock" },
     ],
   },
 ];
@@ -867,9 +872,22 @@ export function fillTemplate(template: CompositionTemplate, content: DeskContent
       text: () => sourceRef("text", "announcement", content.announcement.heading, { heading: content.announcement.heading, body: content.announcement.body }),
     };
     composition = assignLayerSource(composition, layer.id, source[slot.role]());
+    // Generic slot names ("Region A", "Fill") become what the layer shows.
+    if (/^(region [a-z]|fill|main|inset)$/i.test(layer.name)) composition = renameLayer(composition, layer.id, ROLE_NAMES[slot.role]);
   });
   return composition;
 }
+
+const ROLE_NAMES: Record<SlotRole, string> = {
+  camera: "Camera",
+  scripture: "Scripture",
+  lyrics: "Lyrics",
+  timer: "Countdown",
+  clock: "Time",
+  image: "Picture",
+  text: "Text",
+  "lower-third": "Lower third",
+};
 
 function roleOf(type: SourceType): SlotRole | undefined {
   if (type === "camera" || type === "video" || type === "ndi") return "camera";

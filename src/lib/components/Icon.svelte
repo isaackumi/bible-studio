@@ -25,6 +25,14 @@
   import Trash from "@lucide/svelte/icons/trash-2";
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
+  import CameraIcon from "@lucide/svelte/icons/camera";
+  import VideoIcon from "@lucide/svelte/icons/video";
+  import QrCode from "@lucide/svelte/icons/qr-code";
+  import ClockIcon from "@lucide/svelte/icons/clock";
+  import TimerIcon from "@lucide/svelte/icons/timer";
+  import TypeIcon from "@lucide/svelte/icons/type";
+  import Captions from "@lucide/svelte/icons/captions";
+  import Layers from "@lucide/svelte/icons/layers";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Gauge from "@lucide/svelte/icons/gauge";
   import Image from "@lucide/svelte/icons/image";
@@ -128,6 +136,14 @@
     trash: Trash,
     phone: Smartphone,
     view: PanelsTopLeft,
+    camera: CameraIcon,
+    video: VideoIcon,
+    qr: QrCode,
+    clock: ClockIcon,
+    timer: TimerIcon,
+    type: TypeIcon,
+    captions: Captions,
+    layers: Layers,
   };
 
   let { name, size = 16 }: { name: string; size?: number } = $props();

@@ -38,6 +38,9 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { dockShare, mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
   import MediaDock from "./MediaDock.svelte";
+  import SourcePicker from "./SourcePicker.svelte";
+  import NewSceneDialog from "./NewSceneDialog.svelte";
+  import { sourceMeta } from "./source-meta";
 
   let query = $state("");
   let kind = $state<"cut" | "fade">("fade");
@@ -47,6 +50,9 @@
   let selectedLayerId = $state<string | null>(null);
   let renameDraft = $state("");
   let typeMenu = $state(false);
+  let newSceneOpen = $state(false);
+  /** The scene being renamed in place (double-click its name). */
+  let renamingId = $state<string | null>(null);
   let addSourceButton = $state<HTMLButtonElement | undefined>();
   /** Scenes list: drag-to-reorder (insertion index) and the folder color menu. */
   let sceneDragId = $state<string | null>(null);
@@ -228,9 +234,28 @@
   }
 
   function newScene() {
-    const scene = session.createSceneLook(`Scene ${scenes.length + 1}`);
+    newSceneOpen = true;
+  }
+
+  async function createScene(name: string, color: string | null, templateId: string | null) {
+    newSceneOpen = false;
+    const scene = await session.createSceneFromLayout(name, color, templateId);
     selectedLayerId = scene.layers[0]?.id ?? null;
     renameDraft = scene.name;
+  }
+
+  function renameScene(entry: Composition, name: string) {
+    renamingId = null;
+    if (entry.locked || !name.trim() || name.trim() === entry.name) return;
+    session.editSceneLook(renameComposition(entry, name.trim()));
+  }
+
+  /** A line under each source saying what it shows. */
+  function sourceDetail(layer: Composition["layers"][number]): string {
+    const payload = layer.source.payload;
+    const candidates = [payload.reference, payload.heading, payload.label, payload.title, payload.mode, layer.source.title, payload.body?.replace(/\s+/g, " ").slice(0, 60)];
+    const text = candidates.find((entry) => entry && entry.trim() && entry.trim() !== layer.name);
+    return text ?? (sourceMeta(layer.source.type).blurb || layer.source.type);
   }
 
   /** Removing is two clicks: the first arms the button for three seconds, the second removes. */
@@ -486,7 +511,10 @@
       {#if scenesOpen}
         <Pane defaultSize={dockSize(0)} minSize={15} order={1}>
         <section class="dock" data-tour="scenes">
-          <header><Icon name="studio" size={16} /> Scenes</header>
+          <header>
+            <Icon name="studio" size={16} /> Scenes <span class="count">{scenes.length}</span>
+            <button type="button" class="dock-add" onclick={newScene} aria-label="New scene"><Icon name="plus" size={14} /> New</button>
+          </header>
           <div
             class="list"
             role="list"
@@ -504,7 +532,10 @@
             }}
           >
             {#if scenes.length === 0}
-              <button type="button" onclick={newScene}>New scene</button>
+              <button type="button" class="empty-cta" onclick={newScene}>
+                <Icon name="plus" size={18} />
+                <span><strong>Make your first scene</strong><em>A saved screen: a camera, a verse, a countdown.</em></span>
+              </button>
             {/if}
             {#each scenes as entry, index (entry.id)}
               <div
@@ -550,11 +581,22 @@
                     requestAnimationFrame(() => target.focus());
                   }}
                 ><Icon name="grip" size={16} /></button>
-                <button type="button" class="pick scene-pick" class:on={activeScene?.id === entry.id} onclick={() => pickScene(entry.id)}>
-                  <span class="folder" style:color={entry.color ?? "var(--muted)"}>
-                    <Icon name={entry.locked ? "folder-lock" : activeScene?.id === entry.id ? "folder-open" : "folder"} size={18} />
+                <button type="button" class="pick scene-pick" class:on={activeScene?.id === entry.id} style:--scene={entry.color ?? "var(--line)"} onclick={() => pickScene(entry.id)} ondblclick={() => !entry.locked && (renamingId = entry.id)}>
+                  <span class="scene-thumb" aria-hidden="true">
+                    {#each entry.layers.filter((layer) => layer.visible) as layer (layer.id)}
+                      <i style:left="{layer.bounds.x}%" style:top="{layer.bounds.y}%" style:width="{layer.bounds.w}%" style:height="{layer.bounds.h}%" style:--tint={sourceMeta(layer.source.type).color}></i>
+                    {/each}
+                    {#if session.live.program.sourceId?.includes(entry.id)}<b class="badge live">Live</b>{:else if activeScene?.id === entry.id}<b class="badge">Preview</b>{/if}
                   </span>
-                  <span class="scene-label">{entry.name}</span>
+                  <span class="scene-text">
+                    {#if renamingId === entry.id}
+                      <!-- svelte-ignore a11y_autofocus -->
+                      <input class="scene-rename" aria-label="Scene name" value={entry.name} autofocus onclick={(event) => event.stopPropagation()} onkeydown={(event) => { if (event.key === "Enter") renameScene(entry, event.currentTarget.value); if (event.key === "Escape") renamingId = null; }} onblur={(event) => renameScene(entry, event.currentTarget.value)} />
+                    {:else}
+                      <span class="scene-label">{#if entry.locked}<Icon name="lock" size={11} />{/if}{entry.name}</span>
+                    {/if}
+                    <span class="scene-sub">{entry.layers.length} source{entry.layers.length === 1 ? "" : "s"}</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -574,6 +616,16 @@
                   data-tip={entry.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
                   onclick={() => session.setSceneLocked(entry.id, !entry.locked)}
                 ><Icon name={entry.locked ? "lock" : "lock-open"} size={16} /></button>
+                {#if activeScene?.id === entry.id && !entry.locked}
+                  <button
+                    type="button"
+                    class="desk-btn ghost icon toggle"
+                    class:armed={armed === "scene"}
+                    aria-label={armed === "scene" ? `Confirm delete ${entry.name}` : `Delete ${entry.name}`}
+                    data-tip={armed === "scene" ? "Click again to delete" : "Delete scene"}
+                    onclick={removeActiveScene}
+                  ><Icon name="trash" size={14} /></button>
+                {/if}
                 {#if colorFor === entry.id}
                   <div
                     class="swatches"
@@ -613,34 +665,6 @@
               </div>
             {/each}
           </div>
-          {#if activeScene}
-            <label class="scene-name">
-              Name
-              <input
-                aria-label="Scene name"
-                bind:value={renameDraft}
-                disabled={sceneLocked}
-                onchange={commitSceneName}
-              />
-            </label>
-          {/if}
-          <footer class="bar">
-            <button type="button" class="desk-btn icon" data-tip="Add scene" aria-label="Add scene" onclick={newScene}>
-              <Icon name="plus" size={16} />
-            </button>
-            <button
-              type="button"
-              class="desk-btn"
-              class:icon={armed !== "scene"}
-              class:armed={armed === "scene"}
-              data-tip="Remove scene (click twice)"
-              aria-label={armed === "scene" ? `Confirm remove ${activeScene?.name ?? "scene"}` : "Remove scene"}
-              disabled={!activeScene || sceneLocked}
-              onclick={removeActiveScene}
-            >
-              {#if armed === "scene"}Remove?{:else}<Icon name="minus" size={16} />{/if}
-            </button>
-          </footer>
         </section>
         </Pane>
         <PaneResizer />
@@ -648,7 +672,10 @@
 
       <Pane defaultSize={dockSize(1)} minSize={20} order={2}>
       <section class="dock" data-tour="sources">
-        <header><Icon name="list" size={16} /> Sources</header>
+        <header>
+          <Icon name="layers" size={16} /> Sources {#if activeScene}<span class="count">{activeScene.name}</span>{/if}
+          <button type="button" class="dock-add" disabled={sceneLocked} onclick={() => (typeMenu = true)} aria-label="Add source"><Icon name="plus" size={14} /> Add</button>
+        </header>
         <div class="list">
           {#each sourceLayers as layer, index (layer.id)}
             <div
@@ -698,15 +725,19 @@
               {/if}
               <button
                 type="button"
-                class="pick"
+                class="pick source-pick"
                 class:on={selectedLayer?.id === layer.id}
                 class:hidden-layer={!layer.visible}
                 data-tip="Double-click for properties"
+                style:--tint={sourceMeta(layer.source.type).color}
                 onclick={() => (selectedLayerId = layer.id)}
                 ondblclick={() => openProperties(layer)}
               >
-                <span>{layer.name}</span>
-                <span class="kind">{layer.source.type}{layer.sourceKey ? " · shared" : ""}{layer.visible ? "" : " · hidden"}{layer.locked ? " · locked" : ""}</span>
+                <span class="source-icon"><Icon name={sourceMeta(layer.source.type).icon} size={15} /></span>
+                <span class="source-text">
+                  <span class="source-name">{layer.name}</span>
+                  <span class="kind">{sourceDetail(layer)}{layer.sourceKey ? " · shared" : ""}{layer.visible ? "" : " · hidden"}</span>
+                </span>
               </button>
               {#if fieldsFromSource(layer.source)}
                 <button type="button" class="desk-btn ghost icon" aria-label="Source properties" data-tip="Properties" onclick={() => openProperties(layer)}>
@@ -716,7 +747,7 @@
               {#if activeScene && !sceneLocked}
 <button
                   type="button"
-                  class="desk-btn ghost icon toggle"
+                  class="desk-btn ghost icon toggle eye"
                   class:off={!layer.visible}
                   aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
                   aria-pressed={!layer.visible}
@@ -732,70 +763,28 @@
                   data-tip={layer.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
                   onclick={() => mutate(setLayerLocked(activeScene, layer.id, !layer.locked))}
                 ><Icon name={layer.locked ? "lock" : "lock-open"} size={16} /></button>
+                {#if selectedLayer?.id === layer.id}
+                  <button
+                    type="button"
+                    class="desk-btn ghost icon toggle"
+                    class:armed={armed === "source"}
+                    aria-label={armed === "source" ? `Confirm remove ${layer.name}` : `Remove ${layer.name}`}
+                    data-tip={armed === "source" ? "Click again to remove" : "Remove from this scene"}
+                    onclick={removeSelectedSource}
+                  ><Icon name="trash" size={14} /></button>
+                {/if}
               {/if}
             </div>
           {/each}
           {#if !activeScene}
             <p class="empty">Select or create a scene.</p>
           {:else if sourceLayers.length === 0}
-            <p class="empty">No sources yet.</p>
+            <button type="button" class="empty-cta" disabled={sceneLocked} onclick={() => (typeMenu = true)}>
+              <Icon name="plus" size={18} />
+              <span><strong>Add the first source</strong><em>A camera, a verse, lyrics, a timer or a picture.</em></span>
+            </button>
           {/if}
         </div>
-        <form class="add" onsubmit={(event) => void addScriptureLayer(event)}>
-          <input
-            aria-label="Add scripture"
-            placeholder="John 3:16"
-            bind:value={query}
-            disabled={sceneLocked}
-            data-tip="Add scripture as a layer on this scene (Preview only)."
-          />
-          <button type="button" class="desk-btn" disabled={sceneLocked} data-tip="Add scripture layer" onclick={() => void addScriptureLayer()}>Add</button>
-        </form>
-        <footer class="bar source-add">
-          {#if typeMenu}
-            <div class="type-menu" role="menu" aria-label="Source type">
-              {#each SOURCE_KINDS as kind (kind.type)}
-                <button type="button" role="menuitem" onclick={() => pickType(kind.type)}>{kind.label}</button>
-              {/each}
-            </div>
-          {/if}
-          <button
-            type="button"
-            class="desk-btn icon"
-            class:on={typeMenu}
-            aria-label="Add source"
-            bind:this={addSourceButton}
-            aria-haspopup="menu"
-            aria-expanded={typeMenu}
-            data-tip="Add source"
-            disabled={sceneLocked}
-            onclick={() => (typeMenu = !typeMenu)}
-          >
-            <Icon name="plus" size={16} />
-          </button>
-          <button
-            type="button"
-            class="desk-btn"
-            class:icon={armed !== "source"}
-            class:armed={armed === "source"}
-            aria-label={armed === "source" ? `Confirm remove ${selectedLayer?.name ?? "source"}` : "Remove source"}
-            data-tip="Remove source from this scene (click twice)"
-            disabled={sceneLocked || !selectedLayer}
-            onclick={removeSelectedSource}
-          >
-            {#if armed === "source"}Remove?{:else}<Icon name="minus" size={16} />{/if}
-          </button>
-          <button
-            type="button"
-            class="desk-btn icon"
-            aria-label="Properties of selected source"
-            data-tip="Properties"
-            disabled={!selectedLayer || !fieldsFromSource(selectedLayer.source)}
-            onclick={() => selectedLayer && openProperties(selectedLayer)}
-          >
-            <Icon name="settings" size={16} />
-          </button>
-        </footer>
       </section>
       </Pane>
 
@@ -886,14 +875,24 @@
 
 <svelte:window
   onpointerdown={(event) => {
-    if (typeMenu && !(event.target as Element | null)?.closest?.(".source-add")) typeMenu = false;
     if (colorFor && !(event.target as Element | null)?.closest?.(".swatches, .scene-row [aria-haspopup]")) colorFor = null;
   }}
   onkeydown={(event) => {
-    if (typeMenu && event.key === "Escape") typeMenu = false;
     if (colorFor && event.key === "Escape") colorFor = null;
   }}
 />
+
+{#if typeMenu}
+  <SourcePicker
+    scene={activeScene?.name ?? "a new scene"}
+    onpick={(type) => pickType(type)}
+    onscripture={(reference) => { typeMenu = false; query = reference; void addScriptureLayer(); }}
+    onclose={() => (typeMenu = false)}
+  />
+{/if}
+{#if newSceneOpen}
+  <NewSceneDialog suggested={`Scene ${scenes.length + 1}`} colors={SCENE_COLORS} oncreate={(name, color, template) => void createScene(name, color, template)} onclose={() => (newSceneOpen = false)} />
+{/if}
 
 {#if adding}
   <AddSourceDialog
@@ -1102,6 +1101,35 @@
   .prod :global([data-pane-resizer]:hover::after),
   .prod :global([data-pane-resizer][data-active]::after) { background: var(--accent); }
   .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+  .dock header .count { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--field); color: var(--muted); font-weight: 600; letter-spacing: 0; text-transform: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dock-add { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; }
+  .dock-add:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .dock-add:disabled { opacity: 0.4; cursor: default; }
+  .list .empty-cta { display: flex !important; flex-direction: row !important; align-items: center; gap: 12px; margin: 6px; padding: 14px !important; border: 1px dashed var(--line) !important; border-radius: 12px; background: none; color: var(--muted); text-align: left; }
+  .list .empty-cta:hover:not(:disabled) { border-color: var(--accent) !important; color: var(--ink); }
+  .empty-cta span { display: grid; gap: 2px; }
+  .empty-cta strong { color: var(--ink); font-size: 13px; }
+  .empty-cta em { font-style: normal; font-size: 11px; }
+  .scene-thumb { position: relative; flex: none; width: 54px; aspect-ratio: 16 / 9; border-radius: 5px; background: #0b0b0d; box-shadow: inset 0 0 0 2px var(--scene); overflow: hidden; }
+  .scene-thumb i { position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--tint) 60%, #111); outline: 1px solid rgba(0, 0, 0, 0.45); }
+  .scene-text { flex: 1; display: grid; gap: 2px; min-width: 0; text-align: left; }
+  .scene-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+  .scene-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
+  .badge.live { background: var(--live); color: #fff; }
+  .scene-rename { height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-weight: 600; min-width: 0; }
+  /* Row tools appear on hover, focus or selection; what is switched on always shows. */
+  .scene-row:not(:hover):not(:focus-within) > .desk-btn:not(.on):not(.armed) { display: none; }
+  .scene-row:has(.scene-pick.on) > .desk-btn { display: inline-grid !important; }
+  .source-row:not(:hover):not(:focus-within) > .desk-btn:not(.eye):not(.on):not(.armed) { display: none; }
+  .source-row:has(.source-pick.on) > .desk-btn { display: inline-grid !important; }
+  .scene-row > .desk-btn, .source-row > .desk-btn { width: 26px; min-width: 26px; height: 26px; padding: 0; }
+  .source-pick { flex-direction: row !important; align-items: center !important; gap: 10px; }
+  .source-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--tint) 18%, transparent); color: var(--tint); }
+  .source-text { display: grid; gap: 1px; min-width: 0; }
+  .source-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 14%, transparent) !important; }
   .list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding: 4px; gap: 2px; }
   .list button {
     text-align: left;
@@ -1125,7 +1153,6 @@
   .scene-row .grip:hover { color: var(--ink); background: var(--field); }
   .scene-row > .scene-pick { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; }
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .folder { display: inline-grid; place-items: center; flex: none; }
   .scene-row .toggle { color: var(--muted); }
   .scene-row .toggle:hover { color: var(--ink); }
   .scene-row .toggle.on { color: var(--accent); }
@@ -1145,36 +1172,8 @@
   .source-row.drop-before { border-top-color: var(--accent); }
   .source-row > .pick { flex: 1 1 8rem; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 8px; min-height: 36px; }
   .source-row .kind { font-size: 11px; color: var(--muted); }
-  .scene-name { display: flex; flex-direction: column; gap: 4px; padding: 6px; font-size: 11px; color: var(--muted); }
-  .scene-name input { height: var(--control-h); border-radius: var(--radius-control); border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 0 8px; }
   .empty { margin: 8px; color: var(--muted); font-size: 12px; }
-  .source-add { flex-wrap: wrap; position: relative; }
-  .type-menu {
-    position: absolute;
-    left: 6px;
-    bottom: calc(100% + 4px);
-    z-index: 3;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(96px, 1fr));
-    gap: 2px;
-    padding: 4px;
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  }
-  .type-menu button {
-    text-align: left;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--ink);
-    padding: 6px 8px;
-  }
-  .type-menu button:hover, .type-menu button:focus-visible { background: color-mix(in srgb, var(--ink) 8%, transparent); }
-  .bar { justify-content: flex-start; gap: 4px; }
-  .add { display: flex; gap: 6px; padding: 0 6px 6px; }
-  .add input, .dock select, .duration input {
+  .dock select, .duration input {
     width: 100%;
     height: var(--control-h);
     border-radius: var(--radius-control);

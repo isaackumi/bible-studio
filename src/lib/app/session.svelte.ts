@@ -23,6 +23,8 @@ import {
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
   createScene,
+  COMPOSITION_TEMPLATES,
+  fillTemplate,
   persistLook,
   presentComposition,
   swapSides,
@@ -1248,6 +1250,40 @@ class Session {
   /** Create an empty scene (look), persist it, and stage Preview only. */
   createSceneLook = (name = "Scene") => {
     const scene = createScene(name);
+    this.saveLook(scene);
+    this.previewLook(scene);
+    this.message = `${scene.name} is on Preview. LIVE still sends Program.`;
+    return scene;
+  };
+
+  /**
+   * A new scene, empty or started from a layout and filled from the desk: its cameras, the
+   * verse or song on Preview, the first picture, the church name. Goes to Preview only.
+   */
+  createSceneFromLayout = async (name: string, color: string | null, templateId: string | null) => {
+    const template = templateId ? COMPOSITION_TEMPLATES.find((entry) => entry.id === templateId) : undefined;
+    let scene: Composition;
+    if (!template) scene = createScene(name);
+    else {
+      if (template.slots.some((slot) => slot.role === "camera")) await this.loadCameras();
+      const preview = this.live.preview.model;
+      const verse = preview.layout === "scripture" ? preview : null;
+      const words = preview.layout === "lyrics" ? preview : null;
+      const picture = this.media.find((asset) => asset.kind !== "video");
+      scene = fillTemplate(template, {
+        scripture: verse
+          ? { reference: verse.reference ?? "", body: verse.lines.map((line) => line.text).join(" "), attribution: verse.attribution ?? "", verse: Number(verse.lines[0]?.marker) || 1 }
+          : { reference: "John 3:16", body: "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.", attribution: "KJV", verse: 16 },
+        lyrics: words ? { label: words.reference ?? "Lyrics", lines: words.lines.map((line) => line.text) } : { label: "Verse 1", lines: ["Add the words in the Properties"] },
+        cameras: this.cameras.map((camera) => ({ id: camera.deviceId, label: camera.label })),
+        image: { imageUrl: (picture && this.mediaSrc(picture.id)) || "", title: picture?.name ?? "Picture" },
+        announcement: { heading: this.workspace.churchName || "Welcome", body: "" },
+        timer: { durationMs: 5 * 60_000, label: "Service starts in" },
+        lowerThird: { title: this.workspace.churchName || "Speaker", subtitle: "" },
+      });
+      scene = { ...scene, name };
+    }
+    if (color) scene = { ...scene, color };
     this.saveLook(scene);
     this.previewLook(scene);
     this.message = `${scene.name} is on Preview. LIVE still sends Program.`;
