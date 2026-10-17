@@ -47,7 +47,10 @@
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
   /** Program is showing something: the desk is on air (the audience sees it once output is open). */
-  const displayLive = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
+  /** Program has something on it. */
+  const programSet = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
+  /** On air only when the audience can actually see Program. */
+  const displayLive = $derived(programSet && session.output.online);
   const activeLayout = $derived(
     session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
   );
@@ -462,7 +465,7 @@
         class="desk-btn primary live"
         class:on-air={displayLive}
         aria-label={displayLive ? "On air. Send Preview to Program" : "Go live: send Preview to Program"}
-        data-tip={displayLive ? (session.output.online ? "On air: the audience sees Program" : "On air on the desk. Open output so the audience sees it") : "Send Preview to Program"}
+        data-tip={displayLive ? "On air: the audience sees Program" : programSet ? "Program is set, but the audience window is closed" : "Send Preview to Program"}
         onclick={() => session.take()}
       ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
       <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>

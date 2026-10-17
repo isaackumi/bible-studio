@@ -101,5 +101,6 @@ describe("audience status", () => {
       label: "Audience · DELL U2415",
     });
     expect(audienceChip(output({}), false)).toEqual({ on: false, label: "Audience · Closed" });
+    expect(audienceChip(output({ desired: true, online: true }), false)).toEqual({ on: true, label: "Audience · Showing" });
   });
 });

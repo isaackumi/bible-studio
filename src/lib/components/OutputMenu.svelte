@@ -14,12 +14,18 @@
   const chip = $derived(audienceChip(session.output, isDesktop()));
   const external = $derived(session.output.displays.find((display) => !display.primary));
   const fullscreen = $derived(profile?.outputMode === "fullscreen");
+  /** Program has content the audience cannot see yet: ask for attention. */
+  const unseen = $derived(!session.output.online && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
 </script>
 
-<ToolMenu label="Audience output" tip={`${desk.title} · ${desk.line}`} className="desk-btn output-trigger">
+<ToolMenu
+  label="Audience output"
+  tip={unseen ? "Program has content, but the audience window is closed. Open output." : `${desk.title} · ${desk.line}`}
+  className={unseen ? "desk-btn output-trigger unseen" : "desk-btn output-trigger"}
+>
   {#snippet trigger()}
-    <span class="lamp" class:on={chip.on}></span>
-    <span class="name">{chip.label}</span>
+    <span class="lamp" class:on={chip.on} class:warn={unseen}></span>
+    <span class="name">{unseen ? "Not showing · Open" : chip.label}</span>
     <Icon name="chevron-down" size={14} />
   {/snippet}
   {#snippet children(close)}
@@ -48,5 +54,9 @@
   :global(.output-trigger) { max-width: min(260px, 28vw); }
   .lamp { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line); }
   .lamp.on { background: var(--presence); box-shadow: 0 0 8px var(--presence); }
+  .lamp.warn { background: #f5a524; box-shadow: 0 0 8px #f5a524; animation: warn-blink 1.2s ease-in-out infinite; }
+  :global(.output-trigger.unseen) { border-color: #f5a524 !important; color: #f5a524 !important; background: color-mix(in srgb, #f5a524 12%, var(--field)) !important; }
+  @keyframes warn-blink { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .lamp.warn { animation: none; } }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 </style>

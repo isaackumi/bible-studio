@@ -6,7 +6,9 @@
   // Framed Preview and Program monitors for the Songs and Sermon windows.
   let { place = "", onstep }: { place?: string; onstep?: (direction: 1 | -1) => void } = $props();
 
-  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const programSet = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  /** On air only when the audience window is open to see it. */
+  const programLive = $derived(programSet && session.output.online);
 </script>
 
 <figure class="screen preview">
@@ -25,7 +27,7 @@
 <figure class="screen program" class:on-air={programLive}>
   <figcaption>
     <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
-    <span class="place">{programLive ? "Audience sees this" : "Nothing live"}</span>
+    <span class="place" class:warn={programSet && !programLive}>{programLive ? "Audience sees this" : programSet ? "Audience window closed" : "Nothing live"}</span>
   </figcaption>
   <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
 </figure>
@@ -47,6 +49,7 @@
   .program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
   .program .kicker { color: var(--live); }
   .program.on-air { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 18px color-mix(in srgb, var(--live) 25%, transparent); }
+  .place.warn { color: #f5a524; font-weight: 600; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); box-shadow: 0 0 6px var(--live); }
   .steps { display: flex; gap: 2px; }
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); }

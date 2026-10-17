@@ -58,7 +58,8 @@ export function audienceChip(output: OutputStatus, desktop: boolean): { on: bool
   const external = output.displays.find((display) => !display.primary);
   if (output.online && live) return { on: true, label: `Audience · ${live.name}` };
   if (!output.desired && external) return { on: false, label: `Audience · ${external.name}` };
-  if (output.online) return { on: true, label: `Audience · ${desk.title}` };
+  // Showing, but not on a named display (a browser window): say so plainly.
+  if (output.online) return { on: true, label: "Audience · Showing" };
   if (desk.title === "Audience is closed") return { on: false, label: "Audience · Closed" };
   return { on: false, label: `Audience · ${desk.title}` };
 }
