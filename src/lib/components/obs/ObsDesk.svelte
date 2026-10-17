@@ -396,7 +396,7 @@
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
         onclick={() => (alertsOpen = true)}
       ><Icon name="alerts" size={16} /></button>
-      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Take the tour of this desk" onclick={() => session.startTour("production")}><Icon name="help" size={16} /></button>
+      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}

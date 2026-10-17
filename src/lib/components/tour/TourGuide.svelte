@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { fade } from "svelte/transition";
   import { session } from "../../app/session.svelte";
   import { placeCard, TOURS, type Rect, type TourStep } from "../../tour/steps";
@@ -27,11 +27,20 @@
   }
 
   /** Steps that can be shown right now: centered cards, and targets that are on screen. */
-  const steps = $derived.by(() => {
+  const entries = $derived.by(() => {
     void session.tour;
-    return (tour?.steps ?? []).filter((step) => !step.target || find(step));
+    return (tour?.steps ?? []).map((step, at) => ({ step, at })).filter(({ step }) => !step.target || find(step));
   });
+  const steps = $derived(entries.map((entry) => entry.step));
   const step = $derived(steps[Math.min(index, steps.length - 1)] ?? null);
+  /** This step's place in the tour's full list (what progress is saved against). */
+  const at = $derived(entries[Math.min(index, entries.length - 1)]?.at ?? 0);
+
+  $effect(() => {
+    const id = session.tour;
+    const place = at;
+    if (id && step) untrack(() => session.noteTourStep(id, place));
+  });
 
   function measure() {
     view = { width: window.innerWidth, height: window.innerHeight };
@@ -51,7 +60,9 @@
   });
 
   onMount(() => {
-    index = 0;
+    // Start at the chosen step, or the next one on screen after it.
+    const from = entries.findIndex((entry) => entry.at >= session.tourFrom);
+    index = from < 0 ? 0 : from;
     // Panels can move (resizing, a menu closing): keep the spotlight on its target.
     const timer = setInterval(measure, 400);
     window.addEventListener("resize", measure);
@@ -66,7 +77,10 @@
   function go(delta: number) {
     const next = index + delta;
     if (next < 0) return;
-    if (next >= steps.length) return close();
+    if (next >= steps.length) {
+      if (session.tour) session.noteTourStep(session.tour, (tour?.steps.length ?? 1) - 1, true);
+      return close();
+    }
     index = next;
   }
 
@@ -113,7 +127,9 @@
       <div class="dim"></div>
     {/if}
     <div class="card" bind:this={card} style:left="{spot.left}px" style:top="{spot.top}px">
-      <p class="count">{tour.name} tour · {index + 1} of {steps.length}</p>
+      <p class="count">{tour.name} tour · {index + 1} of {steps.length}
+        <button type="button" class="all-tours" onclick={() => { close(); session.tourHubOpen = true; }}>All tours</button>
+      </p>
       <h2 id="tour-title">{step.title}</h2>
       <p id="tour-body" class="body">{step.body}</p>
       <div class="bar">
@@ -150,7 +166,9 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
     transition: left 280ms cubic-bezier(0.2, 0.8, 0.2, 1), top 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .count { margin: 0 0 6px; font-size: 11px; font-weight: 650; color: var(--accent); }
+  .count { display: flex; align-items: center; margin: 0 0 6px; font-size: 11px; font-weight: 650; color: var(--accent); }
+  .all-tours { margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
+  .all-tours:hover { color: var(--ink); }
   h2 { margin: 0 0 6px; font-size: 17px; font-weight: 750; letter-spacing: -0.01em; }
   .body { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
   .bar { display: flex; align-items: center; gap: 6px; margin-top: 14px; }

@@ -1,4 +1,4 @@
-import type { TourId } from "../tour/steps";
+import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
@@ -1836,14 +1836,46 @@ class Session {
   /** The library and workspace have loaded (the loading screen can go). */
   booted = $state(false);
 
-  /** The screen tour running now, if any. */
+  /** The screen tour running now, if any, and the step (in the full list) it starts from. */
   tour = $state<TourId | null>(null);
-  startTour = (id: TourId) => {
+  tourFrom = $state(0);
+  tourHubOpen = $state(false);
+  /** A Presenter Desk page the tour needs open (PewDesk switches to it). */
+  pageRequest = $state<PewPage | null>(null);
+
+  /** Start a tour, on its own page or desk, from any step. */
+  startTour = (id: TourId, from = 0) => {
     this.settingsOpen = false;
-    this.tour = id;
+    this.tourHubOpen = false;
+    if (id === "production") {
+      if (!this.requireFeature("production")) return;
+      if (this.workspace.appearance.desk !== "obs") this.setAppearance({ desk: "obs" });
+    } else {
+      if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
+      this.pageRequest = id;
+    }
+    this.tour = null;
+    this.tourFrom = Math.max(0, from);
+    // Let the page or desk switch paint before the spotlight looks for its targets.
+    setTimeout(() => (this.tour = id), 180);
   };
+
   endTour = () => {
     this.tour = null;
+  };
+
+  /** Remember the furthest step seen; `done` when the tour was finished. */
+  noteTourStep = (id: TourId, index: number, done = false) => {
+    const current = this.workspace.tours[id];
+    const seen = Math.max(current.seen, index);
+    if (seen === current.seen && (current.done || !done)) return;
+    this.workspace = { ...this.workspace, tours: { ...this.workspace.tours, [id]: { seen, done: current.done || done } } };
+    this.persistSoon();
+  };
+
+  resetTours = () => {
+    this.workspace = { ...this.workspace, tours: emptyTourProgress() };
+    this.persistSoon();
   };
 
   /** First-run setup is done (or skipped). Settings > Updates can run it again. */

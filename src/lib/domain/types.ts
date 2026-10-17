@@ -392,6 +392,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** How far the operator got in each screen tour. */
+  tours: import("../tour/steps").TourProgress;
   /** Layouts the church saved from its own looks ("Start from a layout"). */
   customLayouts: import("./composition").CompositionTemplate[];
   /** Shared sources. Scenes link to these by layer sourceKey. */

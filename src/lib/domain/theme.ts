@@ -1,3 +1,4 @@
+import { emptyTourProgress } from "../tour/steps";
 import { displayWash, motionById } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
 import { SCREEN_FONTS } from "./fonts";
@@ -279,6 +280,7 @@ export function defaultWorkspace(): Workspace {
     ccliLicense: "",
     installedPacks: [],
     customLayouts: [],
+    tours: emptyTourProgress(),
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,

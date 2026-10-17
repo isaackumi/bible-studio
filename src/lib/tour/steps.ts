@@ -224,3 +224,39 @@ export function placeCard(target: Rect | null, card: { width: number; height: nu
   // Huge target: sit inside it, near the bottom.
   return { left: clampLeft(centerX), top: clampTop(target.top + target.height - card.height - margin * 2) };
 }
+
+/** Tours grouped by desk, in the order the hub lists them. */
+export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
+  { name: "Presenter Desk", tours: ["scriptures", "songs", "sermon"] },
+  { name: "Production Desk", tours: ["production"] },
+];
+
+/** How far someone got in each tour: the furthest step seen (index into the full list), and done. */
+export type TourProgress = Record<TourId, { seen: number; done: boolean }>;
+
+const TOUR_IDS = Object.keys(TOURS) as TourId[];
+
+export function emptyTourProgress(): TourProgress {
+  return Object.fromEntries(TOUR_IDS.map((id) => [id, { seen: -1, done: false }])) as TourProgress;
+}
+
+export function sanitizeTourProgress(value: unknown): TourProgress {
+  const record = value && typeof value === "object" ? (value as Record<string, { seen?: unknown; done?: unknown }>) : {};
+  return Object.fromEntries(
+    TOUR_IDS.map((id) => {
+      const seen = Number(record[id]?.seen);
+      const last = TOURS[id].steps.length - 1;
+      return [id, { seen: Number.isInteger(seen) ? Math.min(last, Math.max(-1, seen)) : -1, done: record[id]?.done === true }];
+    }),
+  ) as TourProgress;
+}
+
+export type TourStatus = { label: string; state: "done" | "partial" | "new"; seen: number; total: number };
+
+export function tourStatus(progress: TourProgress, id: TourId): TourStatus {
+  const total = TOURS[id].steps.length;
+  const { seen, done } = progress[id];
+  if (done) return { label: "Done", state: "done", seen: total, total };
+  if (seen < 0) return { label: "Not started", state: "new", seen: 0, total };
+  return { label: `${seen + 1} of ${total}`, state: "partial", seen: seen + 1, total };
+}

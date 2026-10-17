@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeCard, TOURS } from "./steps";
+import { emptyTourProgress, placeCard, sanitizeTourProgress, TOUR_GROUPS, tourStatus, TOURS } from "./steps";
 
 describe("screen tour", () => {
   it("has a tour for every page, each ending on the way back to it", () => {
@@ -22,5 +22,27 @@ describe("screen tour", () => {
     const huge = placeCard({ left: 0, top: 0, width: 1280, height: 800 }, card, view);
     expect(huge.left).toBeGreaterThanOrEqual(12);
     expect(huge.top + card.height).toBeLessThanOrEqual(800 - 12);
+  });
+});
+
+describe("tour progress", () => {
+  it("groups every tour once, by desk", () => {
+    expect(TOUR_GROUPS.flatMap((group) => group.tours).sort()).toEqual(Object.keys(TOURS).sort());
+  });
+
+  it("reports not started, part way and done", () => {
+    const progress = emptyTourProgress();
+    expect(tourStatus(progress, "songs")).toMatchObject({ state: "new", label: "Not started" });
+    progress.songs = { seen: 2, done: false };
+    expect(tourStatus(progress, "songs")).toMatchObject({ state: "partial", label: `3 of ${TOURS.songs.steps.length}`, seen: 3 });
+    progress.songs = { seen: 2, done: true };
+    expect(tourStatus(progress, "songs")).toMatchObject({ state: "done", label: "Done" });
+  });
+
+  it("repairs saved progress", () => {
+    const fixed = sanitizeTourProgress({ songs: { seen: 999, done: "yes" }, sermon: { seen: 1.5 }, nope: {} });
+    expect(fixed.songs).toEqual({ seen: TOURS.songs.steps.length - 1, done: false });
+    expect(fixed.sermon).toEqual({ seen: -1, done: false });
+    expect(sanitizeTourProgress(undefined)).toEqual(emptyTourProgress());
   });
 });

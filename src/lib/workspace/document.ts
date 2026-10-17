@@ -12,6 +12,7 @@ import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
 import { normalizePew } from "./pew";
 import { normalizeProductionLayout } from "./production";
+import { sanitizeTourProgress } from "../tour/steps";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -122,5 +123,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     onboarded: value.onboarded !== false,
     installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
     customLayouts: sanitizeLayouts(value.customLayouts),
+    tours: sanitizeTourProgress(value.tours),
   };
 }
