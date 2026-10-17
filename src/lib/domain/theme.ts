@@ -282,6 +282,7 @@ export function defaultWorkspace(): Workspace {
     customLayouts: [],
     tours: emptyTourProgress(),
     onlineBibles: { key: "", bibles: [] },
+    songUses: [],
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,

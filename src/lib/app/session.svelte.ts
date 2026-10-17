@@ -1,3 +1,4 @@
+import { noteSongUse } from "../domain/song-usage";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -2624,6 +2625,17 @@ class Session {
       { title: this.logoTitle(), imageUrl },
       takeTransition ? { transition: takeTransition.type } : undefined,
     );
+    // A song the congregation now sees counts for CCLI reporting (once per day).
+    if ((action === "take" || action === "cut") && this.live.program.model.layout === "lyrics" && this.songFocus) {
+      const song = this.songs.find((entry) => entry.id === this.songFocus?.songId);
+      if (song) {
+        const songUses = noteSongUse(this.workspace.songUses, song);
+        if (songUses !== this.workspace.songUses) {
+          this.workspace = { ...this.workspace, songUses };
+          this.persistSoon();
+        }
+      }
+    }
     await this.pushProgram();
     this.message =
       action === "take"

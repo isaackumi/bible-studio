@@ -14,6 +14,7 @@ import { normalizePew } from "./pew";
 import { normalizeProductionLayout } from "./production";
 import { sanitizeTourProgress } from "../tour/steps";
 import { sanitizeOnlineBibles } from "../bible/online-bibles";
+import { sanitizeSongUses } from "../domain/song-usage";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -126,5 +127,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     customLayouts: sanitizeLayouts(value.customLayouts),
     tours: sanitizeTourProgress(value.tours),
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
+    songUses: sanitizeSongUses(value.songUses),
   };
 }

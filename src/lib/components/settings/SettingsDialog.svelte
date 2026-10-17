@@ -13,6 +13,7 @@
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
+  import { usageCsv, usageReport, type UsageRow } from "../../domain/song-usage";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
@@ -109,6 +110,25 @@
 
   let search = $state("");
   let billing = $state<"monthly" | "yearly">("yearly");
+
+  // CCLI usage report.
+  let usagePeriod = $state<"month" | "quarter" | "half" | "year">("quarter");
+  const usageTo = $derived(new Date().toISOString().slice(0, 10));
+  const usageFrom = $derived.by(() => {
+    const now = new Date();
+    if (usagePeriod === "month") return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const months = usagePeriod === "quarter" ? 3 : usagePeriod === "half" ? 6 : 12;
+    return new Date(now.getFullYear(), now.getMonth() - months, now.getDate()).toISOString().slice(0, 10);
+  });
+
+  function exportUsage(rows: UsageRow[]) {
+    const url = URL.createObjectURL(new Blob([usageCsv(rows, session.workspace.ccliLicense)], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `CCLI usage ${usageFrom} to ${usageTo}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   // Licensed translations through API.Bible.
   let apiKey = $state(session.workspace.onlineBibles.key);
@@ -758,6 +778,31 @@
         </section>
         <p class="note stand">King James and the World English Bible come with Church Studio. Download others when you need them; scripture stays on this computer, and Search, Listen and the next verse stay on Preview until LIVE.</p>
       {:else if section === "lyrics"}
+        {@const report = usageReport(session.workspace.songUses, usageFrom, usageTo)}
+        <p class="section-label">CCLI usage report</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Songs shown live</strong><span>Each song counts once per day it went live. Enter these in your CCLI copy report.</span></div>
+            <div class="row-end">
+              <select class="field" aria-label="Report period" bind:value={usagePeriod}>
+                <option value="month">This month</option>
+                <option value="quarter">Last 3 months</option>
+                <option value="half">Last 6 months</option>
+                <option value="year">Last 12 months</option>
+              </select>
+              <button type="button" class="btn" disabled={report.length === 0} onclick={() => exportUsage(report)}><Icon name="download" size={14} /> CSV</button>
+            </div>
+          </div>
+          {#each report.slice(0, 12) as row (row.songId)}
+            <div class="row">
+              <div class="row-copy"><strong>{row.title}</strong><span>{row.ccli ? `CCLI ${row.ccli}` : "No CCLI number. Add it in the song's details."} · last {new Date(`${row.last}T12:00`).toLocaleDateString()}</span></div>
+              <span class="pill">{row.times}×</span>
+            </div>
+          {:else}
+            <div class="row"><div class="row-copy"><span>No songs went live in this period.</span></div></div>
+          {/each}
+          {#if report.length > 12}<div class="row"><div class="row-copy"><span>{report.length - 12} more in the CSV.</span></div></div>{/if}
+        </section>
         <section class="rows">
           <div class="row">
             <div class="row-copy"><strong>Song library</strong><span>{session.songs.length} song{session.songs.length === 1 ? "" : "s"} in {session.workspace.songFolders.length} folder{session.workspace.songFolders.length === 1 ? "" : "s"}. Write, import and organize them in the Songs window.</span></div>

@@ -392,6 +392,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** Songs shown live, once per day, for CCLI copy reporting. */
+  songUses: import("./song-usage").SongUse[];
   /** Licensed translations through the church's own API.Bible key. */
   onlineBibles: { key: string; bibles: import("../bible/online-bibles").OnlineBibleChoice[] };
   /** How far the operator got in each screen tour. */
