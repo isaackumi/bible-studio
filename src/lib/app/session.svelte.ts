@@ -278,6 +278,9 @@ class Session {
   private audienceWindow: { closed: boolean; close(): void; focus(): void; postMessage(message: unknown, targetOrigin: string): void } | null = null;
   private browserWatch: ReturnType<typeof setInterval> | undefined;
   private unlisten: UnlistenFn | undefined;
+  private unlistenAudienceCamera: UnlistenFn | undefined;
+  /** Cameras the audience window reported it could not open, by camera source id. */
+  audienceCameraErrors = $state<Record<string, string>>({});
   private unlistenRemote: (() => void) | undefined;
   private unlistenLan: UnlistenFn | undefined;
 
@@ -377,6 +380,17 @@ class Session {
     this.unlisten = await listen<OutputStatus>("output-status", (event) => {
       this.output = event.payload;
     });
+    this.unlistenAudienceCamera = await listen<{ id?: unknown; error?: unknown }>("audience-camera", (event) => {
+      const id = typeof event.payload?.id === "string" ? event.payload.id : "";
+      const error = typeof event.payload?.error === "string" ? event.payload.error.slice(0, 200) : "";
+      if (!id) return;
+      const label = this.cameraLabel(id);
+      this.audienceCameraErrors = error
+        ? { ...this.audienceCameraErrors, [id]: error }
+        : Object.fromEntries(Object.entries(this.audienceCameraErrors).filter(([key]) => key !== id));
+      if (error) this.message = `The audience screen cannot show ${label}: ${error} It keeps trying.`;
+      else if (this.message.startsWith(`The audience screen cannot show ${label}`)) this.message = `${label} is showing on the audience screen.`;
+    });
     this.translations = await api.translations();
     const translationId = this.translations[0]?.id;
     if (translationId) {
@@ -445,6 +459,7 @@ class Session {
 
   destroy = () => {
     this.unlisten?.();
+    this.unlistenAudienceCamera?.();
     this.unlistenRemote?.();
     this.unlistenLan?.();
     this.releaseCameras();
@@ -1837,6 +1852,11 @@ class Session {
   };
   private discovering: Promise<{ cameras: CameraDevice[]; note: string }> | null = null;
   private watchingDevices = false;
+
+  private cameraLabel = (id: string) => {
+    const deviceId = cameraDeviceId(id);
+    return this.cameras.find((camera) => camera.deviceId === deviceId)?.label ?? "the camera";
+  };
 
   previewCamera = async (deviceId: string) => {
     const ok = await this.openFeed(cameraSourceId(deviceId));

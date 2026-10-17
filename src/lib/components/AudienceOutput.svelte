@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { listen } from "@tauri-apps/api/event";
+  import { emit, listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import { acceptProgramPacket, readLocal, readOwner, readStandbyLocal, subscribeLocal, subscribeStandbyLocal } from "../display/channel";
   import { frameBackground } from "../domain/backgrounds";
@@ -55,20 +55,53 @@
     feeds = next;
   }
 
+  /** Tell the desk whether this window could open a camera, so a failure never hides behind the camera card. */
+  function report(id: string, error: string) {
+    if (isDesktop()) void emit("audience-camera", { id, error }).catch(() => {});
+  }
+
+  const retries = new Map<string, ReturnType<typeof setTimeout>>();
+
   async function openFeed(id: string) {
     const media = navigator.mediaDevices;
-    if (!media?.getUserMedia || opening.has(id)) return;
+    if (!media?.getUserMedia) return report(id, "This window cannot use cameras.");
+    if (opening.has(id)) return;
     opening.add(id);
+    clearTimeout(retries.get(id));
     try {
-      const stream = (await openCamera(media, cameraDeviceId(id))) as MediaStream;
+      const stream = (await withTimeout(openCamera(media, cameraDeviceId(id)), 8000)) as MediaStream;
       if (closed || !wanted().includes(id)) stopCameraStream(stream);
-      else feeds = { ...feeds, [id]: stream };
+      else {
+        feeds = { ...feeds, [id]: stream };
+        report(id, "");
+        // A phone camera that drops (Wi-Fi, app closed) ends its track; forget it so the window reopens it.
+        stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+          if (feeds[id] === stream) dropFeeds([id]);
+        });
+      }
     } catch (error) {
-      // The camera card stays on screen; the rest of the frame is unaffected.
+      // The camera card stays on screen; the rest of the frame is unaffected. Try again while it is still wanted.
+      const reason = error instanceof Error ? `${error.name === "Error" ? "" : `${error.name}: `}${error.message}` : String(error);
       console.warn("Audience camera unavailable", id, error);
+      report(id, reason);
+      if (!closed) retries.set(id, setTimeout(() => wanted().includes(id) && !feeds[id] && void openFeed(id), 3000));
     } finally {
       opening.delete(id);
     }
+  }
+
+  function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        // A late stream must not stay open behind our back.
+        void work.then((late) => stopCameraStream(late as MediaStream)).catch(() => {});
+        reject(new Error("The camera did not start within 8 seconds."));
+      }, ms);
+      work.then(
+        (value) => (clearTimeout(timer), resolve(value)),
+        (error) => (clearTimeout(timer), reject(error)),
+      );
+    });
   }
 
   $effect(() => {
@@ -104,6 +137,7 @@
       const stopStandby = subscribeStandbyLocal((ids) => (standby = ids));
       return () => {
         closed = true;
+        retries.forEach((timer) => clearTimeout(timer));
         dropFeeds(Object.keys(feeds));
         stop();
         stopStandby();
@@ -129,6 +163,7 @@
     });
     return () => {
       closed = true;
+      retries.forEach((timer) => clearTimeout(timer));
       dropFeeds(Object.keys(feeds));
       unlistenStandby();
       unlistenFrame();
