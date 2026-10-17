@@ -7,6 +7,7 @@
   import Icon from "../Icon.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import MonitorPair from "./MonitorPair.svelte";
+  import ItemEditor from "./ItemEditor.svelte";
 
   // The running order for a whole service: sections in order, any kind of item, and a way to
   // move through it item by item. Nothing here changes Program; LIVE still does.
@@ -21,6 +22,19 @@
   let referenceNote = $state("");
   let heading = $state("");
   let body = $state("");
+  /** The item open in the editor. */
+  let editing = $state<PresentationItem | null>(null);
+
+  function edit(itemId: string) {
+    editing = service?.sections.flatMap((section) => section.items).find((entry) => entry.id === itemId) ?? null;
+  }
+
+  /** A blank text slide, opened straight in the editor. */
+  async function addText() {
+    adding = null;
+    const id = await session.addToService({ kind: "slide", title: "Text", slide: { heading: "Text", body: "", imageId: null } }, true);
+    edit(id);
+  }
 
   const service = $derived(session.service);
   const count = $derived(service?.sections.reduce((total, section) => total + section.items.length, 0) ?? 0);
@@ -37,7 +51,7 @@
     lyric: { icon: "note", label: "Song" },
     bible: { icon: "bible", label: "Scripture" },
     deck: { icon: "stage", label: "Slides" },
-    slide: { icon: "stage", label: "Slide" },
+    slide: { icon: "pencil", label: "Text" },
     image: { icon: "media", label: "Picture" },
     video: { icon: "play", label: "Video" },
     announcement: { icon: "alerts", label: "Announcement" },
@@ -113,6 +127,10 @@
 
 <svelte:window onkeydown={onKey} />
 
+{#if editing}
+  <ItemEditor item={editing} onclose={() => (editing = null)} />
+{/if}
+
 <section class="service-desk">
   <LibrarySidebar title="Services" icon="list" count={session.services.length} storageKey="services">
     {#snippet actions()}
@@ -154,7 +172,7 @@
               {#each section.items as item (item.id)}
                 {@const kind = kindOf(item)}
                 <li class="item" class:on={session.cursor.itemId === item.id} class:live={live(item)}>
-                  <button type="button" class="item-main" onclick={(event) => open(item, event)}>
+                  <button type="button" class="item-main" onclick={(event) => open(item, event)} ondblclick={() => edit(item.id)} title="Click for Preview; double-click to edit">
                     <span class="kind" title={kind.label}><Icon name={kind.icon} size={14} /></span>
                     <span class="item-copy"><strong>{item.title}</strong><em>{detail(item)}</em></span>
                     {#if live(item)}<span class="badge live-badge">Live</span>{:else if session.cursor.itemId === item.id}<span class="badge">Preview</span>{/if}
@@ -166,6 +184,7 @@
                         <Icon name="refresh" size={12} /> {looping ? "Stop loop" : "Loop"}
                       </button>
                     {/if}
+                    <button type="button" class="row-tool" aria-label={`Edit ${item.title}`} title="Edit" onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
                     <button type="button" class="row-tool" aria-label="Move up" onclick={() => session.moveItem(item.id, -1)}><Icon name="chevron-up" size={14} /></button>
                     <button type="button" class="row-tool" aria-label="Move down" onclick={() => session.moveItem(item.id, 1)}><Icon name="chevron-down" size={14} /></button>
                     <button type="button" class="row-tool" aria-label={`Remove ${item.title}`} onclick={() => session.removeItem(item.id)}><Icon name="close" size={13} /></button>
@@ -186,6 +205,7 @@
 
       <footer class="add-bar">
         <span class="add-label">Add to {service.sections.find((section) => section.id === session.cursor.sectionId)?.name ?? service.sections[0]?.name ?? "the service"}</span>
+        <button type="button" class="add" onclick={() => void addText()}><Icon name="pencil" size={14} /> Text</button>
         {#each [["song", "Song", "note"], ["scripture", "Scripture", "bible"], ["slides", "Slides", "stage"], ["media", "Media", "media"], ["announcement", "Announcement", "alerts"], ["look", "Look", "studio"]] as [id, label, icon] (id)}
           <button type="button" class="add" class:on={adding === id} aria-expanded={adding === id} onclick={() => (adding = adding === id ? null : (id as Adding))}><Icon name={icon} size={14} /> {label}</button>
         {/each}

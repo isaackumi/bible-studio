@@ -1030,6 +1030,9 @@ class Session {
   private mediaSrc = (id: string | null | undefined) => mediaUrl(this.media.find((asset) => asset.id === id) ?? null);
 
   /** An item's own text style (slides, announcements) applies on top of the theme. */
+  /** What an item looks like on screen (the item editor's live preview). */
+  renderItem = (item: PresentationItem): Promise<PresentationModel> => this.modelFor(item);
+
   private async modelFor(item: PresentationItem): Promise<PresentationModel> {
     const model = await this.baseModelFor(item);
     return this.withBackdrop(item.style ? styleModel(model, item.style) : model);
