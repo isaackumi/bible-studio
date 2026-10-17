@@ -2,16 +2,28 @@ import AVFoundation
 import Foundation
 import Speech
 
-private let bookNames = [
+private let singleBooks = [
     "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
-    "Samuel", "Kings", "Chronicles", "Ezra", "Nehemiah", "Esther", "Job", "Psalm", "Psalms",
-    "Proverbs", "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", "Lamentations",
-    "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum",
-    "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi", "Matthew", "Mark", "Luke",
-    "John", "Acts", "Romans", "Corinthians", "Galatians", "Ephesians", "Philippians",
-    "Colossians", "Thessalonians", "Timothy", "Titus", "Philemon", "Hebrews", "James",
-    "Peter", "Jude", "Revelation", "First John", "Second John", "Third John", "chapter", "verse",
+    "Ezra", "Nehemiah", "Esther", "Job", "Psalm", "Psalms", "Proverbs", "Ecclesiastes",
+    "Song of Solomon", "Song of Songs", "Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel",
+    "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+    "Haggai", "Zechariah", "Malachi", "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+    "Galatians", "Ephesians", "Philippians", "Colossians", "Titus", "Philemon", "Hebrews",
+    "James", "Jude", "Revelation",
 ]
+
+/// Numbered books the way pastors say them: "First Corinthians", "Second Kings", "Third John".
+private let numberedBooks: [String] = {
+    let volumes: [(String, [String])] = [
+        ("Samuel", ["First", "Second"]), ("Kings", ["First", "Second"]),
+        ("Chronicles", ["First", "Second"]), ("Corinthians", ["First", "Second"]),
+        ("Thessalonians", ["First", "Second"]), ("Timothy", ["First", "Second"]),
+        ("Peter", ["First", "Second"]), ("John", ["First", "Second", "Third"]),
+    ]
+    return volumes.flatMap { name, ordinals in ordinals.map { "\($0) \(name)" } + [name] }
+}()
+
+private let bookNames = singleBooks + numberedBooks + ["chapter", "verse", "verses", "the Lord", "Jesus Christ"]
 
 private func emit(_ payload: [String: Any]) {
     guard JSONSerialization.isValidJSONObject(payload),

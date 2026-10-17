@@ -1,4 +1,5 @@
 import canon from "./canon.json";
+import { closestBook, normalizeOrdinals } from "./books";
 
 export type CanonBook = {
   ord: number;
@@ -20,20 +21,40 @@ export const CANON = canon as CanonBook[];
 
 type Alias = { alias: string; book: CanonBook };
 
-function aliasIndex(books: CanonBook[]): Alias[] {
-  return books
+const aliasCache = new WeakMap<CanonBook[], Alias[]>();
+
+/** Every alias, longest first (cached per book list: speech asks many times a second). */
+export function aliasIndex(books: CanonBook[]): Alias[] {
+  const cached = aliasCache.get(books);
+  if (cached) return cached;
+  const built = books
     .flatMap((book) => book.aliases.map((alias) => ({ alias, book })))
     .sort((a, b) => b.alias.length - a.alias.length);
+  aliasCache.set(books, built);
+  return built;
+}
+
+/** The book at the start of typed text: an exact name or abbreviation, else the closest spelling. */
+function findBook(text: string, books: CanonBook[]): { book: CanonBook; length: number } | null {
+  const exact = aliasIndex(books).find((entry) => text === entry.alias || (text.startsWith(entry.alias) && /[\s\d]/.test(text[entry.alias.length] ?? "")));
+  if (exact) return { book: exact.book, length: exact.alias.length };
+  // "galations 5:22", "1 corintians 13": the words before the numbers, matched loosely.
+  const loose = text.match(/^(?:([123])\s*)?([a-z][a-z ]*?)\s*(?=\d|$)/);
+  if (!loose?.[2] || loose[2].replace(/ /g, "").length < 3) return null;
+  const guess = closestBook(loose[2], books, loose[1] ? Number(loose[1]) : null);
+  return guess ? { book: guess.book, length: loose[0].length } : null;
 }
 
 export function parseReference(raw: string, books: CanonBook[] = CANON): ParsedReference | null {
-  const text = raw.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  const text = normalizeOrdinals(raw.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " "));
   if (!text) return null;
-  const match = aliasIndex(books).find((entry) => text === entry.alias || text.startsWith(`${entry.alias} `));
-  if (!match) return null;
-  const rest = text.slice(match.alias.length).trim();
+  const found = findBook(text, books);
+  if (!found) return null;
+  const match = { book: found.book };
+  const rest = text.slice(found.length).trim();
   if (!rest) return null;
-  const parts = rest.match(/^(\d+)\s*(?::\s*(\d+))?(?:\s*-\s*(\d+))?$/);
+  // "13:4", "13 4" and "13v4" all mean chapter 13, verse 4.
+  const parts = rest.match(/^(\d+)(?:\s*(?::|v|\s)\s*(\d+))?(?:\s*-\s*(\d+))?$/);
   if (!parts) return null;
 
   let chapter = Number(parts[1]);

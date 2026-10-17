@@ -31,3 +31,15 @@ describe("voice listen", () => {
     expect(accessMessage({ microphone: "granted", speech: "granted" })).toBeNull();
   });
 });
+
+describe("a reference said across two speech pieces", () => {
+  it("is still found once the pieces are joined", async () => {
+    const { spokenReference } = await import("./detect");
+    const { stitchTranscript } = await import("./listen");
+    const first = stitchTranscript("", { text: "turn to first corinthians", final: true, alternatives: [] });
+    const second = stitchTranscript(first.committed, { text: "thirteen four", final: false, alternatives: [] });
+    expect(spokenReference("thirteen four")).toBeNull();
+    const hit = spokenReference(second.text);
+    expect(hit && `${hit.bookName} ${hit.chapter}:${hit.startVerse}`).toBe("1 Corinthians 13:4");
+  });
+});

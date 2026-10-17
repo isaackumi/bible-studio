@@ -177,6 +177,8 @@ export function startNativeListening(handlers: ListenHandlers): () => void {
 export function startListening(handlers: ListenHandlers): () => void {
   let stopped = false;
   let networkErrors = 0;
+  /** Finished pieces of speech, kept across results and recognizer restarts (last 48 words). */
+  let committed = "";
   let rec: SpeechRec | null = null;
   let stream: MediaStream | null = null;
   let context: AudioContext | null = null;
@@ -218,16 +220,31 @@ export function startListening(handlers: ListenHandlers): () => void {
     next.interimResults = true;
     next.maxAlternatives = 5;
     next.onresult = (event) => {
-      const latest = event.results[event.results.length - 1];
-      if (!latest) return;
-      const alternatives: string[] = [];
-      for (let index = 0; index < latest.length; index += 1) {
-        const phrase = latest[index]?.transcript?.trim();
-        if (phrase) alternatives.push(phrase);
+      // Chrome splits speech into pieces ("first corinthians" | "thirteen four"). Keep the
+      // finished pieces, like the desktop path, so a reference said across two is still whole.
+      let stitched: ReturnType<typeof stitchTranscript> | null = null;
+      let latest = "";
+      let final = false;
+      let pieceOptions: string[] = [];
+      for (let at = event.resultIndex; at < event.results.length; at += 1) {
+        const result = event.results[at];
+        if (!result) continue;
+        const alternatives: string[] = [];
+        for (let index = 0; index < result.length; index += 1) {
+          const phrase = result[index]?.transcript?.trim();
+          if (phrase) alternatives.push(phrase);
+        }
+        if (alternatives.length === 0) continue;
+        stitched = stitchTranscript(committed, { text: alternatives[0]!, final: result.isFinal, alternatives });
+        if (result.isFinal) committed = stitched.committed;
+        latest = alternatives[0]!;
+        final = result.isFinal;
+        pieceOptions = alternatives;
       }
-      if (alternatives.length === 0) return;
+      if (!stitched) return;
       networkErrors = 0;
-      handlers.onHeard(alternatives[0], latest.isFinal, alternatives, alternatives[0]);
+      // The bare piece's alternatives too, so a short command heard second-best still counts.
+      handlers.onHeard(stitched.text, final, [...new Set([...stitched.alternatives, ...pieceOptions])], latest);
     };
     next.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;

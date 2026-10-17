@@ -115,3 +115,33 @@ describe("voice verse detection", () => {
   });
 });
 
+
+describe("finding a verse from part of it (KJV)", async () => {
+  const { buildQuoteIndex, searchQuotes } = await import("./detect");
+  const index = buildQuoteIndex(await bundledQuoteCatalog("kjv"));
+  const heard = (text: string) => matchSpoken(text, index, "kjv")?.item.reference ?? null;
+
+  it("pulls the verse from the middle of it", () => {
+    expect(heard("charity suffereth long and is kind")).toBe("1 Corinthians 13:4");
+    expect(heard("they shall mount up with wings as eagles")).toBe("Isaiah 40:31");
+    expect(heard("i can do all things through christ")).toBe("Philippians 4:13");
+  });
+
+  it("survives a misheard word", () => {
+    // "strengtheneth" heard as "strength in it", "eagles" as "eagle".
+    expect(heard("all things through christ which strength in it me")).toBe("Philippians 4:13");
+    expect(heard("mount up with wings as eagle they shall run")).toBe("Isaiah 40:31");
+  });
+
+  it("ranks a typed phrase by the words it contains, slips allowed", () => {
+    const first = (query: string) => {
+      const hit = searchQuotes(query, index)[0];
+      return hit ? `${hit.bookName} ${hit.chapter}:${hit.verse}` : null;
+    };
+    expect(first("charity suffereth long kind")).toBe("1 Corinthians 13:4");
+    expect(first("lord is my shepherd")).toBe("Psalms 23:1");
+    expect(first("wings eagles run weary")).toBe("Isaiah 40:31");
+    expect(first("shepard want")).toBe("Psalms 23:1");
+    expect(searchQuotes("the and of", index)).toEqual([]);
+  });
+});

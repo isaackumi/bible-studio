@@ -12,7 +12,7 @@
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
-  import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
+  import { buildQuoteIndex, chooseHeard, detectVerse, searchQuotes, type QuoteIndex } from "../../voice/detect";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import SongDesk from "./SongDesk.svelte";
@@ -239,7 +239,17 @@
   }
 
   async function findPhrase(text: string) {
-    const hits = await api.search(translationId, text);
+    // Exact wording first, then verses with most of the words (spelling slips allowed).
+    const exact = await api.search(translationId, text);
+    const ranked = quoteIndex ? searchQuotes(text, quoteIndex, 40) : [];
+    const key = (hit: SearchHit) => `${hit.bookOrd}:${hit.chapter}:${hit.verse}`;
+    const exactKeys = new Set(exact.map(key));
+    const rankedKeys = new Set(ranked.map(key));
+    const hits = [
+      ...ranked.filter((hit) => exactKeys.has(key(hit))),
+      ...exact.filter((hit) => !rankedKeys.has(key(hit))),
+      ...ranked.filter((hit) => !exactKeys.has(key(hit))),
+    ].slice(0, 40);
     detections = hits;
     note = hits.length ? `${hits.length} matches for “${text.trim()}”.` : `No matches for “${text.trim()}”.`;
     const first = hits[0];

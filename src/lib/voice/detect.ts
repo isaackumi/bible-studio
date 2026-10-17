@@ -1,4 +1,5 @@
-import { CANON, formatReference, parseReference, type ParsedReference } from "../bible/reference";
+import { closestBook, normalizeOrdinals } from "../bible/books";
+import { aliasIndex, CANON, formatReference, parseReference, type CanonBook, type ParsedReference } from "../bible/reference";
 import type { BibleItem, VerseText } from "../domain/types";
 
 export function normalizeSpeech(text: string): string {
@@ -79,22 +80,49 @@ function splitGlued(chapters: number, digits: string): { chapter: number; verse:
   return options.length === 1 ? options[0] : null;
 }
 
-/** Turn spoken "john 3 16", "john 316", or "joshua one verse eight" into a reference. The latest one wins. */
+/** The chapter and verse spoken right after a book name: "3 16", "316", or "chapter 8" alone. */
+function numbersAfter(tail: string, chapters: number): { chapter: number; verse: number; exact: boolean } | null {
+  const pair = tail.match(/^\s+(?:ch\s+)?(\d+)\s+(\d+)\b/);
+  if (pair) return { chapter: Number(pair[1]), verse: Number(pair[2]), exact: true };
+  const glued = tail.match(/^\s+(\d{3,4})\b/);
+  const split = glued ? splitGlued(chapters, glued[1]!) : null;
+  if (split) return { ...split, exact: true };
+  // "Romans chapter eight": the chapter, from its first verse.
+  const chapterOnly = tail.match(/^\s+ch\s+(\d+)\b(?!\s+\d)/);
+  if (chapterOnly) return { chapter: Number(chapterOnly[1]), verse: 1, exact: false };
+  return null;
+}
+
+/**
+ * Turn spoken "john 3 16", "first corinthians thirteen four", "romans chapter eight" into a
+ * reference. Book names are matched exactly first; when none is, the closest sound-alike
+ * ("ga tians" → Galatians, "siah" → Isaiah) is tried, and only kept if the numbers fit that
+ * book. The latest reference in the phrase wins.
+ */
 export function spokenReference(raw: string): ParsedReference | null {
   const prepared = spellNumbers(
-    raw
-      .toLowerCase()
-      .replace(/\bchapters?\b/g, " ")
-      .replace(/\bverses?\b/g, " ")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim(),
+    normalizeOrdinals(
+      raw
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\bchapters?\b/g, " ch ")
+        .replace(/\bverses?\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    ),
   );
-  const found: Array<{ at: number; alias: string; hit: ParsedReference }> = [];
-  const aliases = CANON.flatMap((book) => book.aliases.map((alias) => ({ alias, book })))
-    .filter((entry) => entry.alias.length >= 3)
-    .sort((a, b) => b.alias.length - a.alias.length);
-  for (const entry of aliases) {
+  const found: Array<{ at: number; size: number; hit: ParsedReference }> = [];
+  const accept = (book: CanonBook, at: number, size: number, tail: string) => {
+    const numbers = numbersAfter(tail, book.chapters);
+    if (!numbers) return false;
+    const hit = parseReference(`${book.name} ${numbers.chapter}:${numbers.verse}`);
+    if (!hit?.startVerse) return false;
+    found.push({ at, size: size + (numbers.exact ? 1000 : 0), hit });
+    return true;
+  };
+  // Longest names first; a longer name claims its words ("1 john" is not also "john").
+  const claimed: Array<[number, number]> = [];
+  for (const entry of spokenAliases()) {
     let from = 0;
     while (from < prepared.length) {
       const at = prepared.indexOf(entry.alias, from);
@@ -102,24 +130,53 @@ export function spokenReference(raw: string): ParsedReference | null {
       const before = at === 0 || prepared[at - 1] === " ";
       const after = at + entry.alias.length;
       const ended = after === prepared.length || prepared[after] === " ";
-      if (before && ended) {
-        const tail = prepared.slice(after);
-        const pair = tail.match(/^\s+(\d+)\s+(\d+)\b/);
-        const glued = pair ? null : tail.match(/^\s+(\d{3,4})\b/);
-        const split = glued ? splitGlued(entry.book.chapters, glued[1]) : null;
-        const reference = pair
-          ? `${entry.alias} ${pair[1]}:${pair[2]}`
-          : split
-            ? `${entry.alias} ${split.chapter}:${split.verse}`
-            : null;
-        const hit = reference ? parseReference(reference) : null;
-        if (hit?.startVerse) found.push({ at, alias: entry.alias, hit });
+      const inside = claimed.some(([start, end]) => at >= start && after <= end);
+      if (before && ended && !inside) {
+        claimed.push([at, after]);
+        accept(entry.book, at, entry.alias.length, prepared.slice(after));
       }
       from = at + Math.max(entry.alias.length, 1);
     }
   }
-  found.sort((a, b) => a.at - b.at || a.alias.length - b.alias.length);
+  if (found.length === 0) fuzzyReferences(prepared, accept);
+  found.sort((a, b) => a.at - b.at || a.size - b.size);
   return found.at(-1)?.hit ?? null;
+}
+
+let spokenAliasList: ReturnType<typeof aliasIndex> | null = null;
+function spokenAliases() {
+  spokenAliasList ??= aliasIndex(CANON).filter((entry) => entry.alias.length >= 3);
+  return spokenAliasList;
+}
+
+const FILLER = new Set(["to", "the", "in", "at", "of", "and", "turn", "open", "read", "go", "let", "us", "me", "with", "from", "our", "book", "ch"]);
+
+/** For each spoken chapter number, try the one to three words before it as a misheard book name. */
+function fuzzyReferences(prepared: string, accept: (book: CanonBook, at: number, size: number, tail: string) => boolean) {
+  const tokens = prepared.split(" ");
+  const starts: number[] = [];
+  let offset = 0;
+  for (const token of tokens) {
+    starts.push(offset);
+    offset += token.length + 1;
+  }
+  for (let index = 1; index < tokens.length; index += 1) {
+    const isChapterMark = tokens[index] === "ch" && /^\d+$/.test(tokens[index + 1] ?? "");
+    if (!/^\d+$/.test(tokens[index]!) && !isChapterMark) continue;
+    let best: { book: CanonBook; score: number; first: number } | null = null;
+    for (let size = 1; size <= 3; size += 1) {
+      const first = index - size;
+      if (first < 0) break;
+      const words = tokens.slice(first, index);
+      if (words.some((word) => /\d/.test(word))) break;
+      if (FILLER.has(words[0]!)) continue;
+      const volumeToken = tokens[first - 1];
+      const volume = volumeToken && /^[123]$/.test(volumeToken) ? Number(volumeToken) : null;
+      const guess = closestBook(words.join(" "), CANON, volume);
+      if (guess && (!best || guess.score > best.score)) best = { ...guess, first };
+    }
+    if (best) accept(best.book, starts[best.first]!, 0, " " + tokens.slice(index).join(" "));
+  }
 }
 
 export type QuoteVerse = {
@@ -141,7 +198,9 @@ function skeleton(word: string): string {
 function sameWord(heard: string, verse: string): boolean {
   if (heard === verse) return true;
   if (heard.length < 4 || verse.length < 4) return false;
-  return skeleton(heard) === skeleton(verse);
+  if (skeleton(heard) === skeleton(verse)) return true;
+  // A clipped word: "strength" heard for "strengtheneth", "rejoice" for "rejoiceth".
+  return heard.length >= 5 && verse.length > heard.length && verse.startsWith(heard);
 }
 
 const STOP = new Set([
@@ -164,6 +223,8 @@ export type QuoteIndex = {
   catalog: QuoteVerse[];
   words: string[][];
   postings: Map<string, number[]>;
+  /** Every distinct word, built on first typed search that needs spelling help. */
+  vocabulary?: string[];
 };
 
 export function buildQuoteIndex(catalog: QuoteVerse[]): QuoteIndex {
@@ -187,8 +248,8 @@ function asIndex(source: QuoteVerse[] | QuoteIndex): QuoteIndex {
   return "postings" in source ? source : buildQuoteIndex(source);
 }
 
-/** How many spoken content words appear in order, close together, inside one verse. */
-function alignment(needle: string[], verse: string[]): { hits: number; span: number } | null {
+/** How many spoken content words appear in order inside one verse, and over how many words. */
+function inOrder(needle: string[], verse: string[]): { hits: number; span: number } {
   let from = 0;
   let hits = 0;
   let start = -1;
@@ -207,10 +268,40 @@ function alignment(needle: string[], verse: string[]): { hits: number; span: num
     hits += 1;
     from = at + 1;
   }
-  if (hits < 3) return null;
-  const span = end - start + 1;
-  if (span > hits * 3) return null;
+  return { hits, span: hits ? end - start + 1 : 0 };
+}
+
+/** In order and close together, with enough words to trust it. */
+function alignment(needle: string[], verse: string[]): { hits: number; span: number } | null {
+  const { hits, span } = inOrder(needle, verse);
+  if (hits < 3 || span > hits * 3) return null;
   return { hits, span };
+}
+
+/** Real words in the index closest to a typed word that is not one ("shepard" → "shepherd"). */
+function nearWords(index: QuoteIndex, word: string): string[] {
+  if (word.length < 4) return [];
+  index.vocabulary ??= [...new Set(index.words.flat())];
+  const allowed = word.length >= 7 ? 2 : 1;
+  const found: Array<{ key: string; distance: number }> = [];
+  for (const key of index.vocabulary) {
+    if (key[0] !== word[0] || Math.abs(key.length - word.length) > allowed) continue;
+    const distance = editDistance(word, key);
+    if (distance <= allowed) found.push({ key, distance });
+  }
+  // Closest first; among equals, the commoner word ("shepherd" before the place Shepham).
+  const common = (key: string) => index.postings.get(key)?.length ?? 0;
+  return found.sort((a, b) => a.distance - b.distance || common(b.key) - common(a.key)).slice(0, 4).map((entry) => entry.key);
+}
+
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    previous = current;
+  }
+  return previous[b.length]!;
 }
 
 function passageFor(verse: QuoteVerse, translationId: string): BibleItem {
@@ -237,7 +328,13 @@ export function matchQuote(heard: string, source: QuoteVerse[] | QuoteIndex, tra
   const rank = (score: { hits: number; span: number }) => score.hits * 1000 - score.span;
   let best: { verse: QuoteVerse; hits: number; span: number } | null = null;
   let runner: { hits: number; span: number } | null = null;
-  for (const verseIndex of new Set(lists[0])) {
+  // Candidates from the three rarest words, so one misheard word does not lose the verse.
+  const candidates = new Set<number>();
+  for (const list of lists.slice(0, 3)) {
+    if (candidates.size > 0 && candidates.size + list.length > 6000) break;
+    for (const verseIndex of list) candidates.add(verseIndex);
+  }
+  for (const verseIndex of candidates) {
     const aligned = alignment(needle, index.words[verseIndex]);
     if (!aligned) continue;
     if (!best || rank(aligned) > rank(best)) {
@@ -343,4 +440,41 @@ export function detectVerse(
     endVerse: best.verse,
     reference: formatReference(book.name, chapter, best.verse, best.verse, book.chapters),
   };
+}
+
+export type QuoteHit = { bookOrd: number; bookName: string; chapter: number; verse: number; text: string; score: number };
+
+/**
+ * Typed phrase search: verses ranked by how many of the typed words they contain (spelling
+ * slips allowed), with words in order and close together ranked first. Not exact-substring,
+ * so "love patient kind" finds 1 Corinthians 13:4.
+ */
+export function searchQuotes(query: string, source: QuoteIndex, limit = 30): QuoteHit[] {
+  const typed = [...new Set(contentWords(query))].slice(0, 12);
+  if (typed.length === 0) return [];
+  // A typed word that is not in the Bible is read as the nearest word that is.
+  const choices = typed.map((word) => (source.postings.has(word) ? [word] : nearWords(source, word).concat(word)));
+  const needle = choices.map((options) => options[0]!);
+  const counts = new Map<number, number>();
+  for (const options of choices) {
+    const verses = new Set<number>();
+    for (const word of options) {
+      for (const verseIndex of source.postings.get(word) ?? (word.length >= 4 ? source.postings.get(skeleton(word)) : undefined) ?? []) verses.add(verseIndex);
+    }
+    for (const verseIndex of verses) counts.set(verseIndex, (counts.get(verseIndex) ?? 0) + 1);
+  }
+  const need = needle.length <= 2 ? needle.length : Math.ceil(needle.length * 0.6);
+  const scored: Array<{ index: number; score: number }> = [];
+  for (const [index, count] of counts) {
+    if (count < need) continue;
+    const words = source.words[index]!;
+    const order = inOrder(needle, words);
+    // More words, then words in order and close, then the shorter (denser) verse.
+    scored.push({ index, score: count * 100 + order.hits * 10 - order.span - words.length * 0.5 });
+  }
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.slice(0, limit).map(({ index, score }) => {
+    const verse = source.catalog[index]!;
+    return { bookOrd: verse.bookOrd, bookName: verse.bookName, chapter: verse.chapter, verse: verse.verse, text: verse.text, score };
+  });
 }
