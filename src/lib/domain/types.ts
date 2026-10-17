@@ -101,6 +101,8 @@ export type PaintedLayer = {
   mirror?: boolean;
   /** A backing behind the layer so text reads over a camera or picture (CSS color). */
   backing?: string;
+  /** How a region's edge shows on screen: a line around it, or a framed panel with rounded corners. */
+  edge?: "line" | "framed";
   animation?: {
     entrance: string;
     exit: string;

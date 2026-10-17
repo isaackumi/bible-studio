@@ -72,6 +72,7 @@ import {
   queueLook,
   presentSavedLook,
   sourceRef,
+  setCompositionEdges,
 } from "./composition";
 import { applyProgramAction, createLiveState, programPacket, sameProgram } from "./live";
 import { deliverProgram, outputSinks } from "../display/engine";
@@ -1287,5 +1288,50 @@ describe("layouts filled from the desk, and the church's own layouts", () => {
     const again = fillTemplate(saved, { ...desk, scripture: { ...desk.scripture, reference: "Psalm 23:1" } });
     expect(again.layers[1]!.source.payload.reference).toBe("Psalm 23:1");
     expect(sanitizeLayouts([saved, { id: 4 }, { id: "x", slots: [] }, "junk"])).toEqual([saved]);
+  });
+});
+
+describe("side-by-side regions fill the screen and show their edges", () => {
+  const ctx = { theme: defaultTheme(), now: 0 };
+  const video = sourceRef("video", "clip", "Clip", { videoUrl: "clip.mp4" });
+  const words = sourceRef("text", "t", "Words", { heading: "Hello", body: "" });
+
+  it("cameras and video fill their half instead of sitting letterboxed", () => {
+    const two = COMPOSITION_TEMPLATES.find((entry) => entry.id === "two-cameras")!;
+    expect(two.slots.map((slot) => slot.fit)).toEqual(["cover", "cover"]);
+    const look = lookTwoRegions({ left: words, right: words });
+    const filled = assignLayerSource(look, look.layers[0]!.id, video);
+    expect(filled.layers[0]!.fit).toBe("cover");
+  });
+
+  it("draws a line around each region by default, never around overlays or the full screen", () => {
+    const look = lookTwoRegions({ left: video, right: words });
+    const painted = presentComposition(look, ctx);
+    expect(painted.layers!.map((layer) => layer.edge)).toEqual(["line", "line"]);
+    const bar = presentComposition(lookCameraLowerThird({ camera: { id: "c", label: "Cam" }, title: "Pastor", subtitle: "" }), ctx);
+    expect(bar.layers!.every((layer) => layer.edge === undefined)).toBe(true);
+  });
+
+  it("framed regions pull in from the edges and each other; touching has no edge", () => {
+    const look = setCompositionEdges(lookTwoRegions({ left: video, right: words }), "framed");
+    const [left, right] = presentComposition(look, ctx).layers!;
+    expect(left!.edge).toBe("framed");
+    expect(left!.bounds.x).toBeGreaterThan(0);
+    expect(left!.bounds.y).toBeGreaterThan(0);
+    expect(right!.bounds.x).toBeGreaterThan(left!.bounds.x + left!.bounds.w);
+    expect(right!.bounds.x + right!.bounds.w).toBeLessThan(100);
+    const touching = presentComposition(setCompositionEdges(look, "touch"), ctx);
+    expect(touching.layers!.every((layer) => layer.edge === undefined)).toBe(true);
+  });
+
+  it("older saved looks get filled video and keep a chosen edge setting", () => {
+    const old = { ...lookTwoRegions({ left: video, right: words }), edges: undefined };
+    old.layers = old.layers.map((layer) => ({ ...layer, fit: "contain" as const }));
+    const restored = restoreComposition(JSON.parse(JSON.stringify(old)));
+    expect(restored.layers[0]!.fit).toBe("cover");
+    expect(restored.edges).toBe("line");
+    const chosen = restoreComposition(JSON.parse(JSON.stringify({ ...old, edges: "touch" })));
+    expect(chosen.layers[0]!.fit).toBe("contain");
+    expect(chosen.edges).toBe("touch");
   });
 });

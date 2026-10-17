@@ -195,6 +195,8 @@
         class="comp-layer enter-{layer.animation?.entrance ?? "none"}"
         class:fit-cover={layer.fit === "cover"}
         class:fit-fill={layer.fit === "fill"}
+        class:edge-line={layer.edge === "line"}
+        class:edge-framed={layer.edge === "framed"}
         style:left="{layer.bounds.x}%"
         style:top="{layer.bounds.y}%"
         style:width="{layer.bounds.w}%"

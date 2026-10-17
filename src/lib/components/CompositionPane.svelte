@@ -54,6 +54,8 @@
     duplicateLayer,
     duplicateLook,
     setCompositionTransition,
+    setCompositionEdges,
+    DEFAULT_EDGES,
     showLayer,
     sourceRef,
     type Composition,
@@ -741,6 +743,19 @@
             <span>ms</span>
           </label>
         {/if}
+        <div class="edges" role="radiogroup" aria-label="Where regions meet">
+          <span>Edges</span>
+          {#each [["touch", "Touching"], ["line", "Line"], ["framed", "Framed"]] as [value, label] (value)}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={(draft.edges ?? DEFAULT_EDGES) === value}
+              class:on={(draft.edges ?? DEFAULT_EDGES) === value}
+              title={value === "touch" ? "Regions meet with no line" : value === "line" ? "A clear line around each region" : "Each region on its own panel, with a gap"}
+              onclick={() => draft && touch(setCompositionEdges(draft, value as "touch" | "line" | "framed"))}
+            >{label}</button>
+          {/each}
+        </div>
         <div class="head-actions">
           <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> Preview</button>
           <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>Save look</button>
@@ -1092,6 +1107,11 @@
   .look-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; }
   .look-name { flex: 1 1 200px; height: 36px; font-size: 16px; font-weight: 650; }
   .inline { flex-direction: row; align-items: center; gap: 6px; }
+  .edges { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
+  .edges > span { padding: 0 8px 0 6px; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .edges button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .edges button:hover { color: var(--ink); }
+  .edges button.on { background: var(--accent); color: var(--on-accent); }
   .ms { width: 80px; }
   .head-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .primary-soft { border-color: var(--accent); color: var(--accent); }

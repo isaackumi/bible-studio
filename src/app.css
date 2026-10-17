@@ -325,6 +325,11 @@ button { cursor: pointer; }
   position: absolute;
   overflow: hidden;
 }
+/* Region edges (a look's "Edges" setting): a clear line around each region, or framed panels. */
+.comp-layer.edge-line::after, .comp-layer.edge-framed::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.comp-layer.edge-line::after { border: 6px solid rgba(255, 255, 255, 0.92); }
+.comp-layer.edge-framed { border-radius: 18px; box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5); }
+.comp-layer.edge-framed::after { border-radius: inherit; border: 3px solid rgba(255, 255, 255, 0.35); }
 .comp-layer.fit-cover :is(.frame img.cover, .frame video.cover) { object-fit: cover; }
 .comp-layer.fit-fill :is(.frame img.cover, .frame video.cover) { object-fit: fill; }
 .frame video.cover.mirror { transform: scaleX(-1); }

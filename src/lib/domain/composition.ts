@@ -86,7 +86,12 @@ export type Composition = {
   canvas: { width: number; height: number };
   layers: CompositionLayer[];
   transition: { type: "cut" | "fade"; ms: number };
+  /** Where regions meet: touching, a line around each region, or framed panels with a gap. */
+  edges?: CompositionEdges;
 };
+
+export type CompositionEdges = "touch" | "line" | "framed";
+export const DEFAULT_EDGES: CompositionEdges = "line";
 
 /** What a layout slot is for, so a layout can be filled from what is on the desk. */
 export type SlotRole = "camera" | "scripture" | "lyrics" | "timer" | "clock" | "image" | "text" | "lower-third";
@@ -138,8 +143,15 @@ const SPLIT: CompositionSlot[] = [
 ];
 
 /** Tag each slot with what fills it, so a layout can be filled from the desk. */
+/** Cameras and pictures fill their region edge to edge; words fit inside it. */
+const FILLS: ReadonlySet<SlotRole> = new Set<SlotRole>(["camera", "image"]);
+
 function withRoles(slots: CompositionSlot[], roles: SlotRole[]): CompositionSlot[] {
-  return slots.map((slot, index) => (roles[index] ? { ...slot, role: roles[index] } : slot));
+  return slots.map((slot, index) => {
+    const role = roles[index];
+    if (!role) return slot;
+    return { ...slot, role, fit: FILLS.has(role) ? "cover" : slot.fit };
+  });
 }
 
 export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
@@ -153,7 +165,8 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
   { id: "lyrics-camera", name: "Lyrics + Camera", slots: withRoles(SPLIT, ["lyrics", "camera"]) },
   { id: "image-camera", name: "Image + Camera", slots: withRoles(SPLIT, ["image", "camera"]) },
   { id: "two-cameras", name: "Two Cameras", slots: withRoles(SPLIT, ["camera", "camera"]) },
-  { id: "camera-presentation", name: "Camera + Presentation", slots: withRoles(SPLIT, ["camera", "image"]) },
+  // Slides stay whole (nothing cropped off a page).
+  { id: "camera-presentation", name: "Camera + Presentation", slots: withRoles(SPLIT, ["camera", "image"]).map((slot) => (slot.id === "b" ? { ...slot, fit: "contain" as const } : slot)) },
   {
     id: "three-cameras",
     name: "Three Cameras",
@@ -265,9 +278,9 @@ export const COMPOSITION_TEMPLATES: CompositionTemplate[] = [
     id: "three-across",
     name: "Three Across",
     slots: [
-      { id: "a", name: "Camera 1", bounds: { x: 0, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
-      { id: "b", name: "Camera 2", bounds: { x: 33.3333, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
-      { id: "c", name: "Camera 3", bounds: { x: 66.6667, y: 22, w: 33.3333, h: 56 }, fit: "cover", role: "camera" },
+      { id: "a", name: "Camera 1", bounds: { x: 0, y: 0, w: 33.3333, h: 100 }, fit: "cover", role: "camera" },
+      { id: "b", name: "Camera 2", bounds: { x: 33.3333, y: 0, w: 33.3333, h: 100 }, fit: "cover", role: "camera" },
+      { id: "c", name: "Camera 3", bounds: { x: 66.6667, y: 0, w: 33.3333, h: 100 }, fit: "cover", role: "camera" },
     ],
   },
   {
@@ -630,9 +643,41 @@ export function assignLayerSource(composition: Composition, layerId: string, sou
       const kept = layer.source.type === source.type && layer.source.payload.style && !source.payload.style
         ? { ...source, payload: { ...source.payload, style: layer.source.payload.style } }
         : source;
-      return { ...layer, source: sanitizeSource(kept) };
+      // A camera or video arriving in a layer fills it; keep the layer's fit if it already showed one.
+      const fit = MOVING.has(source.type) && !MOVING.has(layer.source.type) ? "cover" : layer.fit;
+      return { ...layer, fit, source: sanitizeSource(kept) };
     }),
   };
+}
+
+/** Moving pictures: they fill their region rather than sit letterboxed inside it. */
+const MOVING: ReadonlySet<SourceType> = new Set<SourceType>(["camera", "video", "ndi"]);
+
+/** Overlays (lower thirds, timers, the time, QR codes, shapes) never get region edges. */
+const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "timer", "clock", "countdown", "qr", "shape", "empty"]);
+
+export function setCompositionEdges(composition: Composition, edges: CompositionEdges): Composition {
+  if (composition.locked) return composition;
+  return { ...composition, edges };
+}
+
+/** Regions that get an edge: not the full screen, not an overlay, not a words bar on a backing. */
+function isRegion(layer: CompositionLayer): boolean {
+  const full = layer.bounds.x <= 0.01 && layer.bounds.y <= 0.01 && layer.bounds.w >= 99.99 && layer.bounds.h >= 99.99;
+  return !full && !layer.backing && !OVERLAYS.has(layer.source.type);
+}
+
+/** Framed regions pull in from the screen edges by a gap, and from each other by the same gap. */
+const FRAME_GAP = 28;
+
+function framedBounds(bounds: LayerBounds, canvas: { width: number; height: number }): LayerBounds {
+  const gx = (FRAME_GAP / canvas.width) * 100;
+  const gy = (FRAME_GAP / canvas.height) * 100;
+  const left = bounds.x <= 0.01 ? gx : gx / 2;
+  const right = bounds.x + bounds.w >= 99.99 ? gx : gx / 2;
+  const top = bounds.y <= 0.01 ? gy : gy / 2;
+  const bottom = bounds.y + bounds.h >= 99.99 ? gy : gy / 2;
+  return { x: bounds.x + left, y: bounds.y + top, w: Math.max(1, bounds.w - left - right), h: Math.max(1, bounds.h - top - bottom) };
 }
 
 /** Set a layer's text style (stored on its source payload). Scene lock wins. */
@@ -1250,6 +1295,7 @@ export function sanitizeComposition(value: unknown): Composition {
     locked: record.locked === true,
     canvas: record.canvas?.width && record.canvas?.height ? record.canvas : base.canvas,
     transition: sanitizeTransition(record.transition),
+    edges: record.edges === "touch" || record.edges === "framed" || record.edges === "line" ? record.edges : DEFAULT_EDGES,
     layers: layers.map((layer, index) => ({
       id: layer.id || `layer:${index}`,
       name: layer.name || `Layer ${index + 1}`,
@@ -1258,13 +1304,18 @@ export function sanitizeComposition(value: unknown): Composition {
       locked: layer.locked === true,
       opacity: Number.isFinite(layer.opacity) ? Math.min(1, Math.max(0, layer.opacity)) : 1,
       bounds: sanitizeBounds(layer.bounds ?? { x: 0, y: 0, w: 100, h: 100 }),
-      fit: layer.fit === "cover" || layer.fit === "fill" ? layer.fit : "contain",
+      fit: layer.fit === "cover" || layer.fit === "fill" ? layer.fit : legacyFill(record, layer) ? "cover" : "contain",
       source: sanitizeSource(layer.source),
       animation: sanitizeAnimation(layer.animation),
       ...(typeof layer.sourceKey === "string" && layer.sourceKey ? { sourceKey: layer.sourceKey } : {}),
       ...(sanitizeBacking(layer.backing) ? { backing: sanitizeBacking(layer.backing)! } : {}),
     })),
   };
+}
+
+/** Looks saved before region edges existed letterboxed cameras and video in split regions; they now fill. */
+function legacyFill(record: Partial<Composition>, layer: Partial<CompositionLayer>): boolean {
+  return record.edges === undefined && !!layer.source && MOVING.has(layer.source.type);
 }
 
 function sanitizeBacking(value: unknown): LayerBacking | null {
@@ -1540,13 +1591,15 @@ export function presentLowerThird(theme: Theme, title: string, subtitle: string)
 }
 
 export function presentComposition(composition: Composition, ctx: CompileContext): PresentationModel {
+  const edges = composition.background ? "touch" : (composition.edges ?? DEFAULT_EDGES);
   const layers = layerOrder(composition)
     .filter((layer) => layer.visible)
     .map((layer) => ({
       id: layer.id,
       zIndex: layer.zIndex,
       opacity: layer.opacity,
-      bounds: layer.bounds,
+      bounds: edges === "framed" && isRegion(layer) ? framedBounds(layer.bounds, composition.canvas) : layer.bounds,
+      ...(edges !== "touch" && isRegion(layer) ? { edge: edges } : {}),
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,
       // On a deck page the page background shows through every element.
