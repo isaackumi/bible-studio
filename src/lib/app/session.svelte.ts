@@ -371,6 +371,7 @@ class Session {
         this.browserWatch = setInterval(() => this.noteBrowserAudience(), 1000);
       }
       this.ready = true;
+      this.booted = true;
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       if (this.message === "Opening workspace") {
@@ -380,6 +381,7 @@ class Session {
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
       this.ready = true;
+      this.booted = true;
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       console.error(error);
@@ -1792,6 +1794,20 @@ class Session {
   };
 
   songPacks = $state<SongPack[]>([]);
+
+  /** The library and workspace have loaded (the loading screen can go). */
+  booted = $state(false);
+
+  /** First-run setup is done (or skipped). Settings > Updates can run it again. */
+  finishOnboarding = () => {
+    this.workspace = { ...this.workspace, onboarded: true };
+    this.persistSoon();
+  };
+
+  restartOnboarding = () => {
+    this.settingsOpen = false;
+    this.workspace = { ...this.workspace, onboarded: false };
+  };
 
   /** Translation ids being downloaded (installed) right now. */
   bibleBusy = $state<string[]>([]);

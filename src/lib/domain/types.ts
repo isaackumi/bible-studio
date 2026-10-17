@@ -370,6 +370,8 @@ export type Workspace = {
   installedPacks: string[];
   /** Plan on this computer (Free, a Premium trial, or a purchased plan). See domain/plans. */
   entitlement: import("./plans").Entitlement;
+  /** First-run setup finished or skipped. */
+  onboarded: boolean;
   /** Who is signed in on this computer (local until accounts are online). */
   profile: { name: string; email: string } | null;
 };

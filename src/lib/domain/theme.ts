@@ -225,6 +225,7 @@ export function defaultWorkspace(): Workspace {
     installedPacks: [],
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, trialEndsAt: null, trialUsed: false },
     profile: null,
+    onboarded: false,
     churchName: "",
     logoAssetId: null,
     logoText: "Church Studio",

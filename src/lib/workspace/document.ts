@@ -117,6 +117,8 @@ export function normalizeWorkspace(input: unknown): Workspace {
     ccliLicense: cleanCcli(value.ccliLicense),
     entitlement: sanitizeEntitlement(value.entitlement),
     profile: sanitizeProfile(value.profile),
+    // Saved before setup existed: an existing church, so do not show first-run setup.
+    onboarded: value.onboarded !== false,
     installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
   };
 }

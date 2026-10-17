@@ -1,6 +1,7 @@
 <script lang="ts">
   import RemoteApproval from "./RemoteApproval.svelte";
   import UpgradePrompt from "./UpgradePrompt.svelte";
+  import Welcome from "./onboarding/Welcome.svelte";
   import { onMount } from "svelte";
   import { session } from "../app/session.svelte";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
@@ -71,9 +72,7 @@
 
 <svelte:window onkeydown={onKeyDown} />
 
-{#if !session.ready}
-  <div class="boot">CHURCH STUDIO</div>
-{:else}
+{#if session.ready}
   <div class="app pb-app">
     <!-- The Production Desk is a Premium feature: on Free (or after a trial) the Presenter Desk shows. -->
     {#if session.workspace.appearance.desk === "obs" && session.entitled("production")}
@@ -88,4 +87,7 @@
     <RemoteApproval />
     <UpgradePrompt />
   </div>
+{/if}
+{#if !session.booted || !session.workspace.onboarded}
+  <Welcome booting={!session.booted} />
 {/if}

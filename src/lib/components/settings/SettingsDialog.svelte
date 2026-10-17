@@ -772,6 +772,10 @@
             <div class="row-copy"><strong>Automatic updates</strong><span>Not configured in this release.</span></div>
             <span class="pill muted">Off</span>
           </div>
+          <div class="row">
+            <div class="row-copy"><strong>First-run setup</strong><span>Walk through church name, look, scripture and voice again.</span></div>
+            <button type="button" class="btn" onclick={() => session.restartOnboarding()}>Run setup again</button>
+          </div>
         </section>
       {:else if section === "account"}
         {@const current = planById(session.plan)}
