@@ -42,7 +42,8 @@
   --desk: #1a1a1a;
   --field: #1b1b1b;
   --accent: var(--brass);
-  --live: #ff4458;
+  /* On-air red: a true broadcast red, not pink. */
+  --live: #f21b1b;
   --presence: #3dce7a;
   --mustard: #e2cc9d;
   /* SF Pro is the Mac system face. Instrument Sans remains the fallback off Apple platforms. */

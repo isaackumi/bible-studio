@@ -46,9 +46,8 @@
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
-  const displayLive = $derived(
-    session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
-  );
+  /** Program is showing something: the desk is on air (the audience sees it once output is open). */
+  const displayLive = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
   const activeLayout = $derived(
     session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
   );
@@ -458,7 +457,14 @@
         <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
       <OutputMenu />
-      <button type="button" class="desk-btn primary live" class:on-air={displayLive} data-tip={displayLive ? "Audience display is live" : "Send preview to program"} onclick={() => session.take()}><span class="pip"></span>LIVE</button>
+      <button
+        type="button"
+        class="desk-btn primary live"
+        class:on-air={displayLive}
+        aria-label={displayLive ? "On air. Send Preview to Program" : "Go live: send Preview to Program"}
+        data-tip={displayLive ? (session.output.online ? "On air: the audience sees Program" : "On air on the desk. Open output so the audience sees it") : "Send Preview to Program"}
+        onclick={() => session.take()}
+      ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
       <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
       <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
@@ -801,8 +807,9 @@
     z-index: 2;
     background: var(--desk);
   }
-  .live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 78px; }
-  .live.on-air { animation: live-glow 1.6s ease-in-out infinite; }
+  .live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 92px; letter-spacing: 0.08em; }
+  .live.on-air { background: #ff1414; border-color: #ff1414; animation: live-glow 1.4s ease-in-out infinite; }
+  .live.on-air .pip { animation: live-blink 1s steps(1, end) infinite; }
   .pip { width: 7px; height: 7px; border-radius: 50%; background: white; position: relative; display: inline-block; flex: none; }
   .pip.on::after, .live.on-air .pip::after {
     content: "";
@@ -824,11 +831,19 @@
     100% { box-shadow: 0 0 0 0 transparent; }
   }
   @keyframes live-glow {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; }
-    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 45%, transparent); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 20, 20, 0.55), 0 0 10px 0 rgba(255, 20, 20, 0.35); }
+    50% { box-shadow: 0 0 0 6px rgba(255, 20, 20, 0), 0 0 22px 4px rgba(255, 20, 20, 0.55); }
+  }
+  @keyframes live-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+  @keyframes program-beam {
+    0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 45%, transparent), 0 0 0 0 transparent; }
+    50% { box-shadow: inset 0 0 0 2px var(--live), 0 0 18px 0 color-mix(in srgb, var(--live) 45%, transparent); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .live.on-air, .pip.on::after, .live.on-air .pip::after { animation: none; }
+    .live.on-air, .pip.on::after, .live.on-air .pip::after, .live.on-air .pip, .pb-panel.output.on-air { animation: none; }
   }
   .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); flex: none; }
   .pb-tools > button {
@@ -1048,7 +1063,7 @@
   .kicker.program { color: var(--live); }
   .pb-panel.preview { border-style: dashed; }
   .pb-panel.output { border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
-  .pb-panel.output.on-air { border-color: var(--live); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 35%, transparent); }
+  .pb-panel.output.on-air { border-color: var(--live); animation: program-beam 1.8s ease-in-out infinite; }
   .style-name {
     margin-left: auto;
     border: 0;
