@@ -111,8 +111,8 @@
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    await session.importImage(file);
-    const added = session.media[session.media.length - 1];
+    // Use the asset this import made (the library lists newest first).
+    const added = await session.importImage(file);
     if (added) setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
   }
 
@@ -120,8 +120,7 @@
     const { open } = await import("@tauri-apps/plugin-dialog");
     const picked = await open({ multiple: false, filters: [{ name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
     if (typeof picked !== "string") return;
-    await session.importImage(picked);
-    const added = session.media[session.media.length - 1];
+    const added = await session.importImage(picked);
     if (added) setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
   }
 
