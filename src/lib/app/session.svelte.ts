@@ -1,3 +1,4 @@
+import type { TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
@@ -1834,6 +1835,16 @@ class Session {
 
   /** The library and workspace have loaded (the loading screen can go). */
   booted = $state(false);
+
+  /** The screen tour running now, if any. */
+  tour = $state<TourId | null>(null);
+  startTour = (id: TourId) => {
+    this.settingsOpen = false;
+    this.tour = id;
+  };
+  endTour = () => {
+    this.tour = null;
+  };
 
   /** First-run setup is done (or skipped). Settings > Updates can run it again. */
   finishOnboarding = () => {

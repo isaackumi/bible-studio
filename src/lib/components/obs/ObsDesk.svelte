@@ -396,6 +396,7 @@
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
         onclick={() => (alertsOpen = true)}
       ><Icon name="alerts" size={16} /></button>
+      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Take the tour of this desk" onclick={() => session.startTour("production")}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
@@ -482,7 +483,7 @@
     <PaneGroup class="docks" direction="horizontal" onLayoutChange={onDocksLayout}>
       {#if scenesOpen}
         <Pane defaultSize={dockSize(0)} minSize={15} order={1}>
-        <section class="dock">
+        <section class="dock" data-tour="scenes">
           <header><Icon name="studio" size={16} /> Scenes</header>
           <div
             class="list"
@@ -644,7 +645,7 @@
       {/if}
 
       <Pane defaultSize={dockSize(1)} minSize={20} order={2}>
-      <section class="dock">
+      <section class="dock" data-tour="sources">
         <header><Icon name="list" size={16} /> Sources</header>
         <div class="list">
           {#each sourceLayers as layer, index (layer.id)}
@@ -799,7 +800,7 @@
       {#if mediaOpen}
         <PaneResizer />
         <Pane defaultSize={dockSize(2)} minSize={15} order={3}>
-        <section class="dock">
+        <section class="dock" data-tour="media">
           <header><Icon name="media" size={16} /> Media</header>
           <MediaDock locked={sceneLocked} onadd={addMediaSource} />
         </section>
@@ -809,7 +810,7 @@
       {#if controlsOpen}
         <PaneResizer />
         <Pane defaultSize={dockSize(3)} minSize={15} order={4}>
-        <section class="dock">
+        <section class="dock" data-tour="controls">
           <header><Icon name="settings" size={16} /> Controls</header>
           <div class="controls">
             <p class="studio-mode">Studio — select stays on Preview</p>

@@ -515,11 +515,13 @@
       >
         {@render icon("alerts")}
       </button>
+      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Take the tour of this page" onclick={() => session.startTour(mode)}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look, help and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} Displays…</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} Themes…</button>
+          <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} Take the tour</button>
           <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} Help</button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} Settings… <span class="menu-key">⌘,</span></button>

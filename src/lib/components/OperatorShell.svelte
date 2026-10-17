@@ -2,6 +2,7 @@
   import RemoteApproval from "./RemoteApproval.svelte";
   import UpgradePrompt from "./UpgradePrompt.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
+  import TourGuide from "./tour/TourGuide.svelte";
   import { onMount } from "svelte";
   import { session } from "../app/session.svelte";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
@@ -87,6 +88,7 @@
     {/if}
     <RemoteApproval />
     <UpgradePrompt />
+    {#if session.tour}<TourGuide />{/if}
   </div>
 {/if}
 {#if !session.booted || !session.workspace.onboarded}

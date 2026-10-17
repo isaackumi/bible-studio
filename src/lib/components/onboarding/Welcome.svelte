@@ -21,14 +21,23 @@
   // everything at once, the church name and verses render through the real slide engine.
   let { booting = false }: { booting?: boolean } = $props();
 
-  type Step = "welcome" | "church" | "look" | "scripture" | "voice" | "ready";
+  type Step = "welcome" | "church" | "look" | "scripture" | "screen" | "voice" | "ready";
   const STEPS: { id: Step; label: string }[] = [
     { id: "welcome", label: "Welcome" },
     { id: "church", label: "Church" },
     { id: "look", label: "Look" },
     { id: "scripture", label: "Bible" },
+    { id: "screen", label: "Screen" },
     { id: "voice", label: "Voice" },
     { id: "ready", label: "Ready" },
+  ];
+  /** What the church puts on screen. It picks the desk, so nobody has to know the desks yet. */
+  type Use = "scripture" | "songs" | "sermon" | "cameras";
+  const USES: { id: Use; label: string; icon: string }[] = [
+    { id: "scripture", label: "Scripture", icon: "bible" },
+    { id: "songs", label: "Song lyrics", icon: "note" },
+    { id: "sermon", label: "Sermon points", icon: "book" },
+    { id: "cameras", label: "Cameras and video", icon: "obs" },
   ];
   const THEMES: { id: OperatorTheme; name: string; note: string; ground: string; panel: string; ink: string }[] = [
     { id: "dark", name: "Night", note: "Black desk", ground: "#050505", panel: "#141414", ink: "#f5f5f5" },
@@ -46,7 +55,7 @@
   const GENESIS: VerseText[] = [{ verse: 3, text: "And God said, Let there be light: and there was light." }];
 
   /** The sky behind the desk for each step: real theme-library backgrounds. */
-  const SKY: Record<Step, MotionId> = { welcome: "rays", church: "bokeh", look: "aurora", scripture: "embers", voice: "waves", ready: "stars" };
+  const SKY: Record<Step, MotionId> = { welcome: "rays", church: "bokeh", look: "aurora", scripture: "embers", screen: "stars", voice: "waves", ready: "rays" };
 
   /** A line of scripture set large over the sky; the church step shows the church name. */
   const LINES: Record<Step, { text: string; ref: string }> = {
@@ -54,6 +63,7 @@
     church: { text: "", ref: "Your logo slide" },
     look: { text: "Arise, shine; for thy light is come.", ref: "Isaiah 60:1" },
     scripture: { text: "Thy word is a lamp unto my feet.", ref: "Psalm 119:105" },
+    screen: { text: "Ye are the light of the world.", ref: "Matthew 5:14" },
     voice: { text: "Faith cometh by hearing.", ref: "Romans 10:17" },
     ready: { text: "This is the day which the Lord hath made.", ref: "Psalm 118:24" },
   };
@@ -73,7 +83,11 @@
   });
   let micNote = $state("");
   let micAsked = $state(false);
-  let desk = $state<DeskStyle>("pewbeam");
+  let uses = $state<Use[]>(["scripture", "songs"]);
+  /** Set only when the operator changes the desk on the last step. */
+  let deskChoice = $state<DeskStyle | null>(null);
+  const desk = $derived<DeskStyle>(deskChoice ?? (uses.includes("cameras") ? "obs" : "pewbeam"));
+  let tested = $state(false);
   /** Voice demo beat: 0 "next verse" → 1 John 3:17 on Preview → 2 "go live" → 3 on air. */
   let beat = $state(0);
 
@@ -110,6 +124,7 @@
       return { preview: genesis, program: empty, onAir: false, reference: "Genesis 1:3", heard: "" };
     }
     if (step === "church") return { preview: title(), program: empty, onAir: false, reference: "Logo slide", heard: "" };
+    if (step === "screen") return { preview: scripture(verses.v16, 16), program: title(), onAir: session.output.online, reference: "John 3:16", heard: "" };
     if (step === "look" || step === "scripture") return { preview: scripture(verses.v16, 16), program: empty, onAir: false, reference: `John 3:16 ${chosen.abbreviation}`, heard: "" };
     if (step === "voice") {
       const next = beat >= 1;
@@ -150,19 +165,38 @@
     }
   }
 
-  function finish(withTrial = false) {
-    if (step === "church") go(index);
-    if (withTrial) session.startTrial();
-    if (desk === "obs" && (withTrial || session.entitled("production"))) session.setAppearance({ desk: "obs" });
-    session.finishOnboarding();
+  function toggleUse(id: Use) {
+    uses = uses.includes(id) ? uses.filter((entry) => entry !== id) : [...uses, id];
   }
+
+  async function openScreen() {
+    await session.openAudience();
+  }
+
+  async function sendTest() {
+    await session.testOutput();
+    tested = true;
+  }
+
+  /** Finish setup; with `tour`, start the tour of the desk they land on. */
+  function finish(tour = false) {
+    if (step === "church") go(index);
+    const trial = desk === "obs" && !session.entitled("production");
+    if (trial) session.startTrial();
+    session.setAppearance({ desk });
+    session.finishOnboarding();
+    if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
+  }
+
+  const themeName = $derived(THEMES.find((entry) => entry.id === appearance.theme)?.name ?? "Night");
+  const accentName = $derived(ACCENTS.find((entry) => entry.value === appearance.accent)?.name ?? "Custom");
 
   function onKey(event: KeyboardEvent) {
     if (booting) return;
     const target = event.target as HTMLElement | null;
     if (event.key === "Enter" && !target?.closest("button, textarea")) {
       event.preventDefault();
-      if (step === "ready") finish(desk === "obs" && !session.entitled("production"));
+      if (step === "ready") finish(true);
       else go(index + 1);
     }
   }
@@ -201,19 +235,31 @@
             <div class="step" in:fade={{ duration: 240 }}>
               {#if step === "welcome"}
                 <h1 id="step-title">Let’s get your church on screen</h1>
-                <p class="lede">Six quick choices. The desk beside you is the real thing: it changes as you answer, so you see Sunday before it starts.</p>
+                <p class="lede">About a minute. The desk beside you is the real thing: it changes as you answer, so you see Sunday before it starts.</p>
                 <ul class="promises">
                   <li><span class="pi"><Icon name="bible" size={15} /></span><span>Scripture, songs and sermons, ready offline</span></li>
                   <li><span class="pi"><Icon name="mic" size={15} /></span><span>Say “next verse” and the desk follows</span></li>
                   <li><span class="pi"><Icon name="cast" size={15} /></span><span>Nothing reaches the screen until you press LIVE</span></li>
                 </ul>
               {:else if step === "church"}
-                <h1 id="step-title">What is your church called?</h1>
-                <p class="lede">It becomes your logo slide, and it heads the app.</p>
+                <h1 id="step-title">Tell us about your church</h1>
+                <p class="lede">The name becomes your logo slide. What you put on screen sets up the right desk.</p>
                 <label class="field-wrap">
                   <span>Church name</span>
                   <input use:focusOnShow placeholder="Grace Chapel" maxlength="80" bind:value={churchName} />
                 </label>
+                <div class="uses" role="group" aria-label="What you put on screen">
+                  <span class="ob-label">On Sunday we show</span>
+                  <div class="use-grid">
+                    {#each USES as entry (entry.id)}
+                      <button type="button" class="use" class:on={uses.includes(entry.id)} aria-pressed={uses.includes(entry.id)} onclick={() => toggleUse(entry.id)}>
+                        <Icon name={entry.icon} size={16} />
+                        <span>{entry.label}</span>
+                        {#if uses.includes(entry.id)}<Icon name="check" size={14} />{/if}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
               {:else if step === "look"}
                 <h1 id="step-title">Make the desk yours</h1>
                 <p class="lede">The theme and accent apply right away, here and on the desk. The sky follows your accent too.</p>
@@ -262,6 +308,22 @@
                     </button>
                   {/each}
                 </div>
+              {:else if step === "screen"}
+                <h1 id="step-title">Put it on the big screen</h1>
+                <p class="lede">Plug in the projector or TV first. The audience window opens there, full screen, and shows only what you send live.</p>
+                <div class="screen-steps">
+                  <div class="screen-row" class:done={session.output.online}>
+                    <span class="num">{#if session.output.online}<Icon name="check" size={14} />{:else}1{/if}</span>
+                    <div class="screen-copy"><strong>Open the audience window</strong><span>{session.output.online ? "It is open. Move it to the projector if it opened here." : "It opens on the second screen when there is one."}</span></div>
+                    {#if !session.output.online}<button type="button" class="btn" onclick={() => void openScreen()}><Icon name="cast" size={15} /> Open</button>{/if}
+                  </div>
+                  <div class="screen-row" class:done={tested} class:off={!session.output.online}>
+                    <span class="num">{#if tested}<Icon name="check" size={14} />{:else}2{/if}</span>
+                    <div class="screen-copy"><strong>Check it from the back row</strong><span>A test pattern flashes on the audience screen. Nothing live changes.</span></div>
+                    <button type="button" class="btn" disabled={!session.output.online} onclick={() => void sendTest()}>Test</button>
+                  </div>
+                </div>
+                <p class="hint">No projector here yet? Continue. The Audience button at the top of the desk does this any time.</p>
               {:else if step === "voice"}
                 <h1 id="step-title">Run it with your voice</h1>
                 <p class="lede">Say plain words like “next verse”, “go back” or “give me King James”. A command counts only when it is said on its own, so the sermon never moves the screen.</p>
@@ -272,16 +334,21 @@
                   {#if micNote}<p role="status">{micNote}</p>{/if}
                 </div>
               {:else}
-                <h1 id="step-title">Where do you want to start?</h1>
-                <p class="lede">Switch any time with the two icons at the top left of the desk.</p>
-                <div class="desks" role="radiogroup" aria-label="Desk">
-                  <button type="button" role="radio" aria-checked={desk === "pewbeam"} class="desk" class:on={desk === "pewbeam"} onclick={() => (desk = "pewbeam")}>
-                    <span class="pi"><Icon name="pew" size={18} /></span>
-                    <span class="desk-copy"><strong>Presenter Desk</strong><span>Scripture, songs and sermons. Free.</span></span>
+                <h1 id="step-title">{name} is ready</h1>
+                <p class="lede">Here is what is set up. Change any of it later in Settings.</p>
+                <ul class="summary">
+                  <li><Icon name="church" size={15} /><span><strong>{name}</strong> on the logo slide</span></li>
+                  <li><Icon name="themes" size={15} /><span><strong>{themeName}</strong> desk with the <strong>{accentName}</strong> accent</span></li>
+                  <li><Icon name="bible" size={15} /><span><strong>{chosen.name}</strong> on screen</span></li>
+                  <li class:pending={!session.output.online}><Icon name="cast" size={15} /><span>{session.output.online ? "Audience window open" : "Audience screen: open it from the desk when the projector is on"}</span></li>
+                  <li class:pending={!micAsked}><Icon name="mic" size={15} /><span>{micAsked ? "Microphone allowed for voice" : "Voice: turn on Listen when you want it"}</span></li>
+                </ul>
+                <div class="desk-pick" role="radiogroup" aria-label="Desk">
+                  <button type="button" role="radio" aria-checked={desk === "pewbeam"} class:on={desk === "pewbeam"} onclick={() => (deskChoice = "pewbeam")}>
+                    <Icon name="pew" size={16} /><span><strong>Presenter Desk</strong><em>Scripture, songs and sermons</em></span>
                   </button>
-                  <button type="button" role="radio" aria-checked={desk === "obs"} class="desk" class:on={desk === "obs"} onclick={() => (desk = "obs")}>
-                    <span class="pi"><Icon name="obs" size={18} /></span>
-                    <span class="desk-copy"><strong>Production Desk</strong><span>Scenes, cameras and video. Premium, free for {TRIAL_DAYS} days.</span></span>
+                  <button type="button" role="radio" aria-checked={desk === "obs"} class:on={desk === "obs"} onclick={() => (deskChoice = "obs")}>
+                    <Icon name="obs" size={16} /><span><strong>Production Desk</strong><em>{session.entitled("production") ? "Cameras, scenes and video" : `Premium, free for ${TRIAL_DAYS} days`}</em></span>
                   </button>
                 </div>
               {/if}
@@ -292,11 +359,10 @@
         <footer class="nav">
           {#if index > 0}<button type="button" class="btn quiet" onclick={() => go(index - 1)}>Back</button>{:else}<span></span>{/if}
           {#if step === "ready"}
-            {#if desk === "obs" && !session.entitled("production")}
-              <button type="button" class="btn primary" onclick={() => finish(true)}>Start trial and open the desk</button>
-            {:else}
-              <button type="button" class="btn primary" onclick={() => finish()}>Open the desk</button>
-            {/if}
+            <span class="ready-buttons">
+              <button type="button" class="btn" onclick={() => finish(false)}>Skip tour</button>
+              <button type="button" class="btn primary" onclick={() => finish(true)}>Take the tour</button>
+            </span>
           {:else}
             <button type="button" class="btn primary" onclick={() => go(index + 1)}>{step === "welcome" ? "Get started" : "Continue"}</button>
           {/if}
@@ -411,7 +477,7 @@
   .field-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 
   .themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
-  .theme, .bible, .desk {
+  .theme, .bible {
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -425,10 +491,10 @@
     cursor: pointer;
     transition: border-color 140ms ease;
   }
-  .theme:hover, .bible:hover:not(:disabled), .desk:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
-  .theme.on, .bible.on, .desk.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .theme strong, .desk strong { font-size: 13px; }
-  .theme > span:last-child, .desk-copy span { font-size: 12px; color: var(--muted); }
+  .theme:hover, .bible:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .theme.on, .bible.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .theme strong { font-size: 13px; }
+  .theme > span:last-child { font-size: 12px; color: var(--muted); }
   .swatch { position: relative; display: block; height: 46px; margin-bottom: 6px; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25); }
   .swatch i { position: absolute; left: 8px; top: 8px; width: 40%; height: 30px; border-radius: 4px; }
   .swatch b { position: absolute; right: 8px; top: 8px; width: 22px; height: 8px; border-radius: 3px; }
@@ -450,9 +516,37 @@
   .mic { display: grid; gap: 10px; justify-items: start; }
   .mic p { margin: 0; font-size: 13px; color: var(--muted); }
 
-  .desks { display: grid; gap: 8px; margin-top: 4px; }
-  .desk { flex-direction: row; align-items: center; gap: 12px; padding: 14px; }
-  .desk-copy { display: grid; gap: 2px; }
+  .uses { display: grid; gap: 8px; margin-top: 6px; }
+  .use-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .use { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+  .use span { flex: 1; }
+  .use :global(svg:first-child) { color: var(--muted); }
+  .use.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .use.on :global(svg) { color: var(--accent); }
+  .screen-steps { display: grid; gap: 8px; margin-top: 4px; }
+  .screen-row { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
+  .screen-row.done { border-color: color-mix(in srgb, var(--presence, #3fb950) 55%, var(--line)); }
+  .screen-row.off { opacity: 0.6; }
+  .num { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; font-weight: 800; }
+  .screen-row.done .num { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
+  .screen-copy { flex: 1; display: grid; gap: 2px; min-width: 0; }
+  .screen-copy strong { font-size: 13px; }
+  .screen-copy span { font-size: 12px; color: var(--muted); }
+  .hint { margin: 0; font-size: 12px; color: var(--muted); }
+  .summary { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 9px; }
+  .summary li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .summary li :global(svg) { flex: none; color: var(--presence, #3fb950); }
+  .summary li.pending { color: var(--muted); }
+  .summary li.pending :global(svg) { color: var(--muted); }
+  .desk-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .desk-pick button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .desk-pick button :global(svg) { flex: none; color: var(--accent); }
+  .desk-pick span { display: grid; gap: 1px; }
+  .desk-pick strong { font-size: 13px; }
+  .desk-pick em { font-style: normal; font-size: 11.5px; color: var(--muted); }
+  .desk-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .ready-buttons { display: flex; gap: 8px; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
 
   .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .progress { display: flex; gap: 5px; }
@@ -464,7 +558,7 @@
   .btn.primary:hover { filter: brightness(1.08); }
   .btn.quiet { border-color: transparent; background: none; color: var(--muted); padding: 0 6px; }
   .btn.quiet:hover { color: var(--ink); }
-  :is(.btn, .tick, .theme, .bible, .desk, .accent, .skip):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  :is(.btn, .tick, .theme, .bible, .accent, .skip, .use, .desk-pick button):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   /* The art: a living sky from the theme library, with the desk floating in it. */
   .art { position: relative; min-width: 0; overflow: hidden; background: #000; isolation: isolate; }
