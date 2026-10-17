@@ -1909,6 +1909,16 @@ class Session {
     return true;
   };
 
+  deleteSermon = async (id: string) => {
+    await api.sermonDelete(id);
+    this.sermons = await api.sermonList();
+    if (this.sermonFocus?.sermonId === id) {
+      this.sermonFocus = null;
+      this.previewModel(emptyModel(this.theme()), null);
+    }
+    this.message = "Sermon deleted.";
+  };
+
   addSermonSection = (section: Sermon["sections"][number], title: string) => {
     if (!this.service) return;
     const target = this.cursor.sectionId ?? this.service.sections[0]?.id;

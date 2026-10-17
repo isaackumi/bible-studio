@@ -4,7 +4,7 @@
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
-  import Screen from "../Screen.svelte";
+  import MonitorPair from "./MonitorPair.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
 
   // Songs window: library in folders, the song's sections one click from Preview, and detection
@@ -375,8 +375,8 @@
           <div class="edit-section">
             <div class="edit-section-head">
               <input aria-label="Section label" bind:value={section.label} />
-              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} up`} disabled={i === 0} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, -1).sections)}><Icon name="chevron-left" size={14} /></button>
-              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} down`} disabled={i === draft.sections.length - 1} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, 1).sections)}><Icon name="chevron-right" size={14} /></button>
+              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} up`} disabled={i === 0} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, -1).sections)}><Icon name="chevron-up" size={14} /></button>
+              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} down`} disabled={i === draft.sections.length - 1} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, 1).sections)}><Icon name="chevron-down" size={14} /></button>
               <button type="button" class="desk-btn ghost icon" aria-label={`Remove ${section.label}`} onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="close" size={14} /></button>
             </div>
             <textarea
@@ -463,24 +463,7 @@
 
   <!-- Monitors and detection -->
   <aside class="stage">
-    <figure class="screen preview">
-      <figcaption>
-        <span class="kicker">Preview</span>
-        <span class="place">{session.songPlace()}</span>
-        <span class="steps">
-          <button type="button" class="row-tool" aria-label="Previous section" title="Previous section" onclick={() => session.stepSong(-1)}><Icon name="chevron-left" size={14} /></button>
-          <button type="button" class="row-tool" aria-label="Next section" title="Next section" onclick={() => session.stepSong(1)}><Icon name="chevron-right" size={14} /></button>
-        </span>
-      </figcaption>
-      <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
-    </figure>
-    <figure class="screen program" class:on-air={programLive}>
-      <figcaption>
-        <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
-        <span class="place">{programLive ? "Audience sees this" : "Nothing live"}</span>
-      </figcaption>
-      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
-    </figure>
+    <MonitorPair place={session.songPlace()} onstep={(direction) => session.stepSong(direction)} />
 
     <section class="detect" aria-label="Song detection">
       <header>
@@ -709,25 +692,7 @@
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .detect > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-  .screen {
-    margin: 0;
-    flex: none;
-    border: 1px solid color-mix(in srgb, var(--ink) 22%, var(--line));
-    border-radius: var(--radius-control, 8px);
-    background: var(--field);
-    overflow: hidden;
-  }
-  .screen figcaption { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 6px 4px 10px; border-bottom: 1px solid var(--line); }
-  .screen .place { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .screen.preview { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-  .screen.preview .kicker { color: var(--accent); }
-  .screen.program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
-  .screen.program .kicker { color: var(--live); }
-  .screen.program.on-air { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 18px color-mix(in srgb, var(--live) 25%, transparent); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); box-shadow: 0 0 6px var(--live); }
-  .dot.listen { background: var(--presence, #3fb950); box-shadow: 0 0 6px var(--presence, #3fb950); }
-  .steps { display: flex; gap: 2px; }
-  .monitor { container-type: inline-size; background: #000; }
+  .dot.listen { width: 7px; height: 7px; border-radius: 50%; background: var(--presence, #3fb950); box-shadow: 0 0 6px var(--presence, #3fb950); }
   .detect { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
   .follow { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
   .follow input { height: auto; margin-top: 3px; }

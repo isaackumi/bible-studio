@@ -6,6 +6,7 @@
   import BookOpen from "@lucide/svelte/icons/book-open";
   import Cast from "@lucide/svelte/icons/cast";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Church from "@lucide/svelte/icons/church";
@@ -72,6 +73,7 @@
     "chevron-left": ChevronLeft,
     "chevron-right": ChevronRight,
     "chevron-down": ChevronDown,
+    "chevron-up": ChevronUp,
     expand: Maximize2,
     church: Church,
     layout: LayoutGrid,
