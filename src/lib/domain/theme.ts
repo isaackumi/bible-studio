@@ -6,6 +6,7 @@ import { factoryLayouts } from "../workspace/layout";
 import { defaultPewDesk } from "../workspace/pew";
 import { defaultProductionLayout } from "../workspace/production";
 import type { AppearanceSettings, PresentationModel, Theme, Workspace } from "./types";
+import { emptyFavorites } from "./favorites";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
 export const MIN_TRANSITION_MS = 0;
@@ -277,6 +278,7 @@ export function defaultWorkspace(): Workspace {
   return {
     schemaVersion: 2,
     songFolders: [],
+    favorites: emptyFavorites(),
     ccliLicense: "",
     installedPacks: [],
     customLayouts: [],

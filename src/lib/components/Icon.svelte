@@ -18,6 +18,7 @@
   import FolderLock from "@lucide/svelte/icons/folder-lock";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import Pencil from "@lucide/svelte/icons/pencil";
+  import Star from "@lucide/svelte/icons/star";
   import Copy from "@lucide/svelte/icons/copy";
   import Laptop from "@lucide/svelte/icons/laptop";
   import Check from "@lucide/svelte/icons/check";
@@ -74,6 +75,7 @@
     outputs: Monitor,
     themes: SwatchBook,
     look: Palette,
+    star: Star,
     alerts: Bell,
     help: CircleQuestionMark,
     settings: Settings,

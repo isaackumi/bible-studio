@@ -6,6 +6,8 @@
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
+  import FavoriteStar from "../FavoriteStar.svelte";
+  import { favoritesFirst } from "../../domain/favorites";
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SearchField from "./SearchField.svelte";
@@ -54,20 +56,28 @@
   const unfiled = $derived(session.songs.filter((song) => !cleanFolder(song.folder)).length);
   /** The "Recent" view: songs put on Preview this session, newest first. */
   const RECENT = "\u0000recent";
+  /** The "Favorites" view: starred songs. */
+  const FAVORITES = "\u0000favorites";
+  const starred = $derived(session.songs.filter((song) => session.isFavorite("songs", song.id)));
   const recent = $derived(
     [...new Set(session.recentSongs.map((entry) => entry.songId))]
       .map((id) => session.songs.find((song) => song.id === id))
       .filter((song): song is Song => !!song),
   );
   const visible = $derived(
-    folder === RECENT
-      ? recent.filter((song) => filterSongs([song], null, query).length > 0)
-      : folder === ""
-        ? filterSongs(session.songs.filter((song) => !cleanFolder(song.folder)), null, query)
-        : filterSongs(session.songs, folder, query),
+    favoritesFirst(
+      folder === RECENT
+        ? recent.filter((song) => filterSongs([song], null, query).length > 0)
+        : folder === FAVORITES
+          ? filterSongs(starred, null, query)
+          : folder === ""
+            ? filterSongs(session.songs.filter((song) => !cleanFolder(song.folder)), null, query)
+            : filterSongs(session.songs, folder, query),
+      (song) => session.isFavorite("songs", song.id),
+    ),
   );
   /** Where new songs and imports go: the open folder, or none. */
-  const targetFolder = $derived(folder && folder !== RECENT ? folder : "");
+  const targetFolder = $derived(folder && folder !== RECENT && folder !== FAVORITES ? folder : "");
 
   /** First lyric line, or the line that matches the search. */
   function snippet(song: Song): string {
@@ -95,7 +105,7 @@
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
-  const listTitle = $derived(folder === null ? "All songs" : folder === RECENT ? "Recent" : folder === "" ? "Unfiled" : folder);
+  const listTitle = $derived(folder === null ? "All songs" : folder === RECENT ? "Recent" : folder === FAVORITES ? "Favorites" : folder === "" ? "Unfiled" : folder);
 
   // Messages fade after a few seconds so they never crowd the song.
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -388,6 +398,11 @@
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
       </button>
+      {#if starred.length > 0}
+        <button type="button" class="folder" class:on={folder === FAVORITES} onclick={() => (folder = FAVORITES)}>
+          <Icon name="star" size={16} /><span>Favorites</span><small>{starred.length}</small>
+        </button>
+      {/if}
       {#if recent.length > 0}
         <button type="button" class="folder" class:on={folder === RECENT} onclick={() => (folder = RECENT)}>
           <Icon name="reset" size={16} /><span>Recent</span><small>{recent.length}</small>
@@ -480,7 +495,8 @@
         <li class="empty">{query.trim() ? "No songs match." : session.songs.length ? "This folder is empty." : "No songs yet. Create one or import lyric files."}</li>
       {/if}
       {#each visible as song (song.id)}
-        <li>
+        <li class="song-item">
+          <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || "this song"} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
           <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
             <strong>
               {song.title || "Untitled song"}
@@ -801,6 +817,10 @@
     text-align: left;
     font: inherit;
   }
+  .song-item { position: relative; }
+  .song-item .song { padding-right: 32px; }
+  .song-star { position: absolute; top: 6px; right: 6px; z-index: 1; opacity: 0; transition: opacity 120ms; }
+  .song-item:hover .song-star, .song-star:focus-within, .song-star:has(:global(.fav-star.on)) { opacity: 1; }
   .song strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
   .song span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .song .first-line { font-size: 12px; color: color-mix(in srgb, var(--ink) 70%, var(--muted)); font-style: italic; }

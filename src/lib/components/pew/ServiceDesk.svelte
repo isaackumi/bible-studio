@@ -45,9 +45,9 @@
   const songs = $derived(
     songQuery.trim()
       ? [...new Set(searchSongHits(session.songs, songQuery, 40).map((hit) => hit.songId))].map((id) => session.songs.find((song) => song.id === id)!).filter(Boolean)
-      : session.songs.slice(0, 40),
+      : session.songsByFavorite.slice(0, 40),
   );
-  const looks = $derived(session.workspace.compositions);
+  const looks = $derived(session.looksByFavorite);
 
   const KIND: Record<string, { icon: string; label: string }> = {
     lyric: { icon: "note", label: "Song" },
@@ -251,7 +251,7 @@
             </div>
           {:else if adding === "media"}
             <div class="pick-list">
-              {#each session.media as asset (asset.id)}
+              {#each session.mediaByFavorite as asset (asset.id)}
                 <button type="button" onclick={() => session.addMediaToService(asset)}><Icon name="plus" size={13} /> <strong>{asset.name}</strong><em>{asset.kind}</em></button>
               {:else}
                 <p class="empty">No pictures or videos yet. Import them in Settings › Media.</p>

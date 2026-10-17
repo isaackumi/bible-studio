@@ -8,11 +8,13 @@
   import type { PresentationModel, Theme, ThemeBackground, ThemePanelStyle } from "../../domain/types";
   import { isDesktop } from "../../platform/runtime";
   import Icon from "../Icon.svelte";
+  import FavoriteStar from "../FavoriteStar.svelte";
+  import { favoritesFirst } from "../../domain/favorites";
   import Screen from "../Screen.svelte";
 
   // Theme library: browse every look for the audience screen, preview it live, and (Premium)
   // edit or create one with color, gradient, animated, photo or video backgrounds.
-  type Filter = "all" | "broadcast" | "still" | "animated" | "media" | "mine";
+  type Filter = "all" | "favorites" | "broadcast" | "still" | "animated" | "media" | "mine";
   type Tab = "background" | "text" | "details";
 
   let filter = $state<Filter>("all");
@@ -30,11 +32,17 @@
   const isMine = (theme: Theme) => !factoryIds.has(theme.id);
   const kind = (theme: Theme) =>
     theme.background.type === "motion" ? "animated" : theme.background.type === "image" || theme.background.type === "video" ? "media" : "still";
+  const starred = (theme: Theme) => session.isFavorite("themes", theme.id);
   const shown = $derived(
-    session.themes.filter((theme) => filter === "all" || (filter === "mine" ? isMine(theme) : filter === "broadcast" ? !!theme.panel || theme.layout === "lower-third" : kind(theme) === filter)),
+    favoritesFirst(
+      session.themes.filter((theme) =>
+        filter === "all" || (filter === "favorites" ? starred(theme) : filter === "mine" ? isMine(theme) : filter === "broadcast" ? !!theme.panel || theme.layout === "lower-third" : kind(theme) === filter),
+      ),
+      starred,
+    ),
   );
-  const images = $derived(session.media.filter((asset) => asset.kind === "image"));
-  const videos = $derived(session.media.filter((asset) => asset.kind === "video"));
+  const images = $derived(session.mediaByFavorite.filter((asset) => asset.kind === "image"));
+  const videos = $derived(session.mediaByFavorite.filter((asset) => asset.kind === "video"));
 
   /** A sample verse through the real renderer, with photo and video backgrounds resolved. */
   function sample(theme: Theme): PresentationModel {
@@ -201,13 +209,15 @@
   <div class="gallery-head">
     <p class="section-label">Library <span>{shown.length}</span></p>
     <div class="filters" role="radiogroup" aria-label="Show">
-      {#each [["all", "All"], ["broadcast", "Broadcast"], ["still", "Still"], ["animated", "Animated"], ["media", "Photo & video"], ["mine", "My themes"]] as [id, label] (id)}
+      {#each [["all", "All"], ["favorites", "Favorites"], ["broadcast", "Broadcast"], ["still", "Still"], ["animated", "Animated"], ["media", "Photo & video"], ["mine", "My themes"]] as [id, label] (id)}
         <button type="button" role="radio" aria-checked={filter === id} class:on={filter === id} onclick={() => (filter = id as Filter)}>{label}</button>
       {/each}
     </div>
   </div>
   <div class="gallery">
     {#each shown as theme (theme.id)}
+      <div class="card-wrap">
+      <span class="card-star"><FavoriteStar on={starred(theme)} label={theme.name} onclick={() => session.toggleFavorite("themes", theme.id)} /></span>
       <button type="button" class="card" class:on={selectedId === theme.id} class:current={session.workspace.themeId === theme.id} onclick={() => (selectedId = theme.id)} ondblclick={() => apply(theme)}>
         <span class="thumb"><Screen model={sample(theme)} still /></span>
         <span class="card-meta">
@@ -217,8 +227,9 @@
           {:else if badge(theme)}<em class="pill muted">{badge(theme)}</em>{/if}
         </span>
       </button>
+      </div>
     {:else}
-      <p class="note">{filter === "mine" ? "No themes of your own yet. Duplicate one to start." : "Nothing here yet."}</p>
+      <p class="note">{filter === "mine" ? "No themes of your own yet. Duplicate one to start." : filter === "favorites" ? "No favorite themes yet. Star a theme to keep it here." : "Nothing here yet."}</p>
     {/each}
   </div>
 
@@ -474,6 +485,12 @@
   .filters button { border-radius: 999px; }
   .filters button.on { background: var(--ink); color: var(--panel); }
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .card-wrap { position: relative; display: flex; min-width: 0; }
+  .card-wrap > .card { flex: 1; min-width: 0; }
+  .card-star { position: absolute; top: 10px; right: 10px; z-index: 2; border-radius: 7px; background: rgba(0, 0, 0, 0.55); opacity: 0; transition: opacity 120ms; }
+  .card-star :global(.fav-star) { color: #fff; }
+  .card-star :global(.fav-star.on) { color: #f5b301; }
+  .card-wrap:hover .card-star, .card-star:focus-within, .card-star:has(:global(.fav-star.on)) { opacity: 1; }
   .card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

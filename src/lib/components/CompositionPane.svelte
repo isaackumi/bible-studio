@@ -1,7 +1,8 @@
 <script lang="ts">
   import TextStyleEditor from "./TextStyleEditor.svelte";
   import { parseTextStyle } from "../domain/text-style";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import { parseReference } from "../bible/reference";
   import { session } from "../app/session.svelte";
   import {
     addLayer,
@@ -66,6 +67,8 @@
   import { targetAtFromClock, type TimerMode } from "../domain/timer";
   import Screen from "./Screen.svelte";
   import Icon from "./Icon.svelte";
+  import FavoriteStar from "./FavoriteStar.svelte";
+  import { favoritesFirst } from "../domain/favorites";
   import LibrarySidebar from "./pew/LibrarySidebar.svelte";
 
   let draft = $state<Composition | null>(null);
@@ -96,10 +99,15 @@
     ["slide-right", "Slide right"],
   ];
 
-  const saved = $derived(session.workspace.compositions.map((entry) => restoreComposition(entry)));
+  const saved = $derived(
+    favoritesFirst(
+      session.workspace.compositions.map((entry) => restoreComposition(entry)),
+      (look) => session.isFavorite("looks", look.id),
+    ),
+  );
 
-  type LayoutGroup = "all" | "scripture" | "lyrics" | "camera" | "timer";
-  const LAYOUT_GROUPS: [LayoutGroup, string][] = [["all", "All"], ["scripture", "Scripture"], ["lyrics", "Lyrics"], ["camera", "Cameras"], ["timer", "Timers"]];
+  type LayoutGroup = "all" | "favorites" | "scripture" | "lyrics" | "camera" | "timer";
+  const LAYOUT_GROUPS: [LayoutGroup, string][] = [["all", "All"], ["favorites", "Favorites"], ["scripture", "Scripture"], ["lyrics", "Lyrics"], ["camera", "Cameras"], ["timer", "Timers"]];
   let layoutGroup = $state<LayoutGroup>("all");
   /** Which filter chips a layout belongs to, from its slot roles or its name. */
   function groupsOf(template: CompositionTemplate): Set<LayoutGroup> {
@@ -112,8 +120,14 @@
     if (roles.has("timer") || roles.has("clock") || /countdown|time\b/.test(words)) groups.add("timer");
     return groups;
   }
-  const layouts = $derived(COMPOSITION_TEMPLATES.filter((template) => layoutGroup === "all" || groupsOf(template).has(layoutGroup)));
-  const customLayouts = $derived(session.workspace.customLayouts);
+  const starredLayout = (template: CompositionTemplate) => session.isFavorite("layouts", template.id);
+  const layouts = $derived(
+    favoritesFirst(
+      COMPOSITION_TEMPLATES.filter((template) => layoutGroup === "all" || (layoutGroup === "favorites" ? starredLayout(template) : groupsOf(template).has(layoutGroup))),
+      starredLayout,
+    ),
+  );
+  const customLayouts = $derived(favoritesFirst(session.workspace.customLayouts, starredLayout));
 
   /** Everything on the desk a layout's slots can be filled with. */
   async function deskContent() {
@@ -160,6 +174,68 @@
         verse: Number(selected.source.payload.verse) || 1,
       }),
     );
+  }
+
+  // Find a verse for a scripture region without leaving the look.
+  let verseQuery = $state("");
+  let verseNote = $state("");
+  let verseTranslation = $state(untrack(() => session.translations[0]?.id ?? ""));
+  let finding = $state(false);
+
+  async function findVerse(reference: string, translationId = verseTranslation) {
+    if (!draft || !selected || !reference.trim()) return;
+    finding = true;
+    verseNote = "";
+    try {
+      const fields = await session.scriptureFields(reference, translationId);
+      if (!fields || fields.type !== "scripture" || !draft || !selected) {
+        verseNote = `Nothing found for “${reference.trim()}”. Try a reference like John 3:16 or Psalm 23:1-3.`;
+        return false;
+      }
+      scriptureRef = fields.reference;
+      scriptureBody = fields.body;
+      scriptureAttr = fields.attribution;
+      verseQuery = fields.reference;
+      if (translationId) verseTranslation = translationId;
+      touch(assignScripture(draft, selected.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse }));
+      return true;
+    } catch (error) {
+      verseNote = error instanceof Error ? error.message : "That verse could not be loaded.";
+      return false;
+    } finally {
+      finding = false;
+    }
+  }
+
+  /** Next or previous verse (a range moves by its own length). */
+  async function stepVerse(direction: 1 | -1) {
+    const parsed = parseReference(scriptureRef, session.books);
+    if (!parsed?.startVerse) {
+      verseNote = "Find a verse first.";
+      return;
+    }
+    const length = (parsed.endVerse ?? parsed.startVerse) - parsed.startVerse + 1;
+    const from = parsed.startVerse + direction * length;
+    if (from < 1) {
+      verseNote = "That is the first verse of the chapter.";
+      return;
+    }
+    const to = from + length - 1;
+    const range = length > 1 ? `${from}-${to}` : `${from}`;
+    const found = await findVerse(`${parsed.bookName} ${parsed.chapter}:${range}`);
+    if (found === false && direction === 1) verseNote = "That is the end of the chapter.";
+  }
+
+  // Lyrics regions: pick a song and a section from the library.
+  let lookSongId = $state("");
+  const lookSong = $derived(session.songs.find((song) => song.id === lookSongId));
+
+  function useSongSection(sectionId: string) {
+    const section = lookSong?.sections.find((entry) => entry.id === sectionId);
+    if (!draft || !selected || !lookSong || !section) return;
+    songLabel = section.label;
+    songBody = section.lines.filter((line) => line.trim()).join("\n");
+    touch(assignSong(draft, selected.id, { label: section.label, body: songBody }));
   }
 
   function applySongCopy() {
@@ -632,6 +708,7 @@
         <div class="tiles">
           {#each customLayouts as template (template.id)}
             <div class="tile-wrap">
+              <span class="tile-star"><FavoriteStar on={starredLayout(template)} label={template.name} onclick={() => session.toggleFavorite("layouts", template.id)} size={12} /></span>
               <button type="button" class="tile" title={template.name} onclick={() => void openTemplate(template.id)}>
                 <span class="schema" aria-hidden="true">
                   {#each template.slots as slot, n (slot.id)}
@@ -670,6 +747,8 @@
       </div>
       <div class="tiles">
         {#each layouts as template (template.id)}
+          <div class="tile-wrap">
+          <span class="tile-star"><FavoriteStar on={starredLayout(template)} label={template.name} onclick={() => session.toggleFavorite("layouts", template.id)} size={12} /></span>
           <button
             type="button"
             class="tile"
@@ -684,6 +763,9 @@
             </span>
             <span class="tile-name">{template.name}</span>
           </button>
+          </div>
+        {:else}
+          <p class="empty">No favorite layouts yet. Star a layout to keep it here.</p>
         {/each}
       </div>
 
@@ -692,6 +774,7 @@
       <ul class="saved">
         {#each saved as look (look.id)}
           <li class:on={draft?.id === look.id}>
+            <FavoriteStar on={session.isFavorite("looks", look.id)} label={look.name} onclick={() => session.toggleFavorite("looks", look.id)} size={13} />
             <button type="button" class="saved-main" onclick={() => openSaved(look)}>
               <strong>{look.name}</strong>
               <span>{look.layers.length} layer{look.layers.length === 1 ? "" : "s"}{look.locked ? " · locked" : ""}</span>
@@ -906,11 +989,50 @@
         <div class="group-box">
           <p class="box-title">Content</p>
           {#if selected.source.type === "scripture"}
-            <input aria-label="Scripture reference" placeholder="Reference" bind:value={scriptureRef} oninput={(event) => { scriptureRef = event.currentTarget.value; applyScriptureCopy(); }} />
-            <textarea aria-label="Scripture body" placeholder="Verse text" rows="3" bind:value={scriptureBody} oninput={(event) => { scriptureBody = event.currentTarget.value; applyScriptureCopy(); }}></textarea>
-            <input aria-label="Scripture attribution" placeholder="Attribution" bind:value={scriptureAttr} oninput={(event) => { scriptureAttr = event.currentTarget.value; applyScriptureCopy(); }} />
+            <form class="verse-find" onsubmit={(event) => { event.preventDefault(); void findVerse(verseQuery); }}>
+              <label class="find-field">
+                <Icon name="search" size={14} />
+                <input aria-label="Find a verse" placeholder="John 3:16, 1 Cor 13:4-7, Psalm 23" bind:value={verseQuery} />
+              </label>
+              <div class="find-row">
+                <select aria-label="Translation" bind:value={verseTranslation}>
+                  {#each session.translations as translation (translation.id)}<option value={translation.id}>{translation.abbreviation}</option>{/each}
+                </select>
+                <button type="submit" class="desk-btn primary-soft" disabled={!verseQuery.trim() || finding}>{finding ? "Finding…" : "Show"}</button>
+              </div>
+              {#if verseNote}<p class="note">{verseNote}</p>{/if}
+            </form>
+            <div class="verse-step">
+              <button type="button" class="desk-btn ghost icon" aria-label="Previous verse" title="Previous verse" disabled={finding} onclick={() => void stepVerse(-1)}><Icon name="chevron-left" size={14} /></button>
+              <strong title={scriptureRef}>{scriptureRef || "No verse yet"}</strong>
+              <button type="button" class="desk-btn ghost icon" aria-label="Next verse" title="Next verse" disabled={finding} onclick={() => void stepVerse(1)}><Icon name="chevron-right" size={14} /></button>
+            </div>
+            {#if session.workspace.favorites.passages.length > 0}
+              <div class="chips" aria-label="Favorite verses">
+                {#each session.workspace.favorites.passages.slice(0, 10) as item (`${item.bookOrd}:${item.chapter}:${item.startVerse}-${item.endVerse}`)}
+                  <button type="button" class="chip" class:on={scriptureRef === item.reference} onclick={() => void findVerse(item.reference, item.translationId)}><span class="chip-star">★</span>{item.reference}</button>
+                {/each}
+              </div>
+            {/if}
             <button type="button" class="desk-btn" onclick={() => assign("scripture")}>Use the verse on the Presenter Desk</button>
+            <details class="by-hand">
+              <summary>Edit the words by hand</summary>
+              <input aria-label="Scripture reference" placeholder="Reference" bind:value={scriptureRef} oninput={(event) => { scriptureRef = event.currentTarget.value; applyScriptureCopy(); }} />
+              <textarea aria-label="Scripture body" placeholder="Verse text" rows="3" bind:value={scriptureBody} oninput={(event) => { scriptureBody = event.currentTarget.value; applyScriptureCopy(); }}></textarea>
+              <input aria-label="Scripture attribution" placeholder="Attribution" bind:value={scriptureAttr} oninput={(event) => { scriptureAttr = event.currentTarget.value; applyScriptureCopy(); }} />
+            </details>
           {:else if selected.source.type === "song"}
+            <select aria-label="Song" value={lookSongId} onchange={(event) => (lookSongId = event.currentTarget.value)}>
+              <option value="">Pick a song…</option>
+              {#each session.songsByFavorite as song (song.id)}<option value={song.id}>{session.isFavorite("songs", song.id) ? "★ " : ""}{song.title || "Untitled song"}</option>{/each}
+            </select>
+            {#if lookSong}
+              <div class="chips" aria-label="Song sections">
+                {#each lookSong.sections as section (section.id)}
+                  <button type="button" class="chip" class:on={songLabel === `${lookSong.title} — ${section.label}` || songLabel === section.label} onclick={() => useSongSection(section.id)}>{section.label}</button>
+                {/each}
+              </div>
+            {/if}
             <input aria-label="Lyrics label" placeholder="Section" bind:value={songLabel} oninput={(event) => { songLabel = event.currentTarget.value; applySongCopy(); }} />
             <textarea aria-label="Lyrics body" placeholder="Lines" rows="4" bind:value={songBody} oninput={(event) => { songBody = event.currentTarget.value; applySongCopy(); }}></textarea>
             <button type="button" class="desk-btn" onclick={() => assign("song")}>Use the lyrics on Preview</button>
@@ -926,7 +1048,7 @@
               <p class="note">No images yet. Import them in the Production Desk's Media panel.</p>
             {/if}
             <div class="chips">
-              {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
+              {#each session.mediaByFavorite.filter((asset) => asset.kind === "image") as asset (asset.id)}
                 <button
                   type="button"
                   class="chip"
@@ -1088,6 +1210,10 @@
   .tile:hover .schema i.main, .tile.on .schema i.main { background: color-mix(in srgb, var(--accent) 55%, transparent); }
   .tile-name { font-size: 11px; font-weight: 600; line-height: 1.25; }
   .tile-wrap { position: relative; display: grid; }
+  .tile-star { position: absolute; top: 4px; left: 4px; z-index: 1; border-radius: 6px; background: color-mix(in srgb, #000 55%, transparent); opacity: 0; }
+  .tile-star :global(.fav-star) { width: 20px; height: 20px; color: #fff; }
+  .tile-star :global(.fav-star.on) { color: #f5b301; }
+  .tile-wrap:hover .tile-star, .tile-star:focus-within, .tile-star:has(:global(.fav-star.on)) { opacity: 1; }
   .tile-delete { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: color-mix(in srgb, #000 55%, transparent); color: #fff; opacity: 0; cursor: pointer; }
   .tile-wrap:hover .tile-delete, .tile-delete:focus-visible, .tile-delete.armed { opacity: 1; }
   .tile-delete.armed { background: var(--live); }
@@ -1095,6 +1221,7 @@
   .layout-chips button { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
   .layout-chips button.on { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
   .empty { margin: 0 4px; font-size: 12px; color: var(--muted); }
+  .tiles .empty { grid-column: 1 / -1; }
   .saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .saved li { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); }
   .saved li:hover { background: var(--field); }
@@ -1153,6 +1280,18 @@
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; }
+  .chip-star { margin-right: 4px; color: #f5b301; }
+  .verse-find { display: grid; gap: 6px; margin: 0; }
+  .find-field { display: flex; flex-direction: row; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--panel); color: var(--muted); }
+  .find-field:focus-within { border-color: var(--accent); }
+  .find-field input { flex: 1; min-width: 0; width: auto; height: 100%; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; outline: none; }
+  .find-row { display: flex; gap: 6px; }
+  .find-row select { flex: 1; min-width: 0; }
+  .verse-step { display: flex; align-items: center; gap: 4px; }
+  .verse-step strong { flex: 1; min-width: 0; text-align: center; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .by-hand { display: grid; gap: 6px; }
+  .by-hand summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  .by-hand[open] summary { margin-bottom: 4px; }
   .chip:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .chip.on { border-color: var(--accent); color: var(--accent); }
   .clears { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -174,6 +174,7 @@ import {
   restoreBuiltinLayouts,
   showPanel,
 } from "../workspace/layout";
+import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -1574,10 +1575,10 @@ class Session {
     return true;
   };
 
-  /** Resolve a typed reference to scripture fields (first translation). */
-  scriptureFields = async (reference: string): Promise<SourceFields | null> => {
+  /** Resolve a typed reference to scripture fields (a chosen translation, else the first). */
+  scriptureFields = async (reference: string, translationId?: string): Promise<SourceFields | null> => {
     const parsed = parseReference(reference, this.books);
-    const translation = this.translations[0];
+    const translation = this.translations.find((entry) => entry.id === translationId) ?? this.translations[0];
     if (!parsed?.startVerse || !translation) return null;
     const book = this.books.find((entry) => entry.ord === parsed.bookOrd);
     const end = parsed.endVerse ?? parsed.startVerse;
@@ -3245,6 +3246,46 @@ class Session {
     this.workspace = { ...this.workspace, production: next };
     this.persistSoon();
   };
+
+  /** Star or unstar a song, theme, layout, look or picture; stars sit at the top of their list. */
+  toggleFavorite = (kind: Exclude<FavoriteKind, "passages">, id: string, name = "") => {
+    const was = isFavorite(this.workspace.favorites, kind, id);
+    this.workspace = { ...this.workspace, favorites: toggleFavorite(this.workspace.favorites, kind, id) };
+    this.persistSoon();
+    if (name) this.message = was ? `${name} removed from favorites.` : `${name} added to favorites.`;
+  };
+
+  isFavorite = (kind: Exclude<FavoriteKind, "passages">, id: string) => isFavorite(this.workspace.favorites, kind, id);
+
+  /** Pictures and videos with starred ones first, for every media list and picker. */
+  get mediaByFavorite() {
+    return favoritesFirst(this.media, (asset) => isFavorite(this.workspace.favorites, "media", asset.id));
+  }
+
+  /** Themes with starred ones first, for quick theme pickers. */
+  get themesByFavorite() {
+    return favoritesFirst(this.themes, (theme) => isFavorite(this.workspace.favorites, "themes", theme.id));
+  }
+
+  /** Saved looks with starred ones first. */
+  get looksByFavorite() {
+    return favoritesFirst(this.workspace.compositions, (look) => isFavorite(this.workspace.favorites, "looks", look.id));
+  }
+
+  /** Songs with starred ones first, for pickers outside the Songs page. */
+  get songsByFavorite() {
+    return favoritesFirst(this.songs, (song) => isFavorite(this.workspace.favorites, "songs", song.id));
+  }
+
+  /** Star a verse or passage (any translation) to keep it one click away. */
+  toggleFavoritePassage = (item: BibleItem) => {
+    const was = isFavoritePassage(this.workspace.favorites, item);
+    this.workspace = { ...this.workspace, favorites: toggleFavoritePassage(this.workspace.favorites, item) };
+    this.persistSoon();
+    this.message = was ? `${item.reference} removed from favorites.` : `${item.reference} added to favorites.`;
+  };
+
+  isFavoritePassage = (item: Pick<BibleItem, "bookOrd" | "chapter" | "startVerse" | "endVerse">) => isFavoritePassage(this.workspace.favorites, item);
 
   /** The audience screen's shape. "auto" fills whatever screen the output is on. */
   setScreenShape = (shape: ScreenShape) => {

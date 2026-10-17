@@ -17,6 +17,7 @@ import { sanitizeOnlineBibles } from "../bible/online-bibles";
 import { sanitizeSongUses } from "../domain/song-usage";
 import { sanitizeStageLayout } from "../display/channel";
 import { cleanAspect, sanitizeScreenShape } from "../display/shape";
+import { sanitizeFavorites } from "../domain/favorites";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -122,6 +123,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],
     songFolders: sanitizeFolderNames(value.songFolders),
+    favorites: sanitizeFavorites(value.favorites),
     ccliLicense: cleanCcli(value.ccliLicense),
     entitlement: sanitizeEntitlement(value.entitlement),
     profile: sanitizeProfile(value.profile),

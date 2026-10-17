@@ -50,7 +50,7 @@
 <div class="type">
   <p class="label">Display theme</p>
   <div class="themes" role="group" aria-label="Display theme">
-    {#each session.themes as item (item.id)}
+    {#each session.themesByFavorite as item (item.id)}
       <button
         type="button"
         class:on={item.id === theme.id}

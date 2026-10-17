@@ -7,6 +7,7 @@
   import type { SourceFields } from "../../domain/sources";
   import { isDesktop } from "../../platform/runtime";
   import Icon from "../Icon.svelte";
+  import FavoriteStar from "../FavoriteStar.svelte";
   import SlidesPanel from "../SlidesPanel.svelte";
 
   // Production Desk media: files, cameras and slide decks. "Add to scene" puts a source on the
@@ -101,8 +102,9 @@
       {#if session.media.length === 0}
         <p class="empty">Import images and videos for backgrounds, walk-in loops and clips.</p>
       {/if}
-      {#each session.media as asset (asset.id)}
+      {#each session.mediaByFavorite as asset (asset.id)}
         <div class="row">
+          <FavoriteStar on={session.isFavorite("media", asset.id)} label={asset.name} onclick={() => session.toggleFavorite("media", asset.id)} size={13} />
           <span class="name"><strong>{asset.name}</strong><small>{asset.kind === "video" ? "Video" : "Image"}</small></span>
           <button type="button" class="desk-btn ghost" data-tip="Show alone on Preview" onclick={() => previewFile(asset.id)}>Preview</button>
           <button type="button" class="desk-btn" disabled={locked} data-tip={locked ? lockedTip : "Add to the scene on Preview"} onclick={() => addFile(asset.id)}>Add to scene</button>

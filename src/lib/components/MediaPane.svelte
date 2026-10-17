@@ -5,6 +5,7 @@
   import { mediaUrl } from "../db/api";
   import { presentImage, presentVideo } from "../domain/present";
   import { isDesktop } from "../platform/runtime";
+  import FavoriteStar from "./FavoriteStar.svelte";
 
   let picker: HTMLInputElement | null = $state(null);
 
@@ -65,9 +66,9 @@
   {#if session.media.some((asset) => asset.kind === "video")}
     <label class="loop"><input type="checkbox" bind:checked={loop} /> Loop videos (backgrounds, walk-in loops)</label>
   {/if}
-  {#each session.media as asset (asset.id)}
+  {#each session.mediaByFavorite as asset (asset.id)}
     <div class="hit">
-      <strong>{asset.name}</strong>
+      <strong><FavoriteStar on={session.isFavorite("media", asset.id)} label={asset.name} onclick={() => session.toggleFavorite("media", asset.id)} size={13} />{asset.name}</strong>
       <span class="kind">{asset.kind === "video" ? "Video" : "Image"}</span>
       <div class="actions">
         <button type="button" onclick={() => preview(asset.id)}>Preview</button>

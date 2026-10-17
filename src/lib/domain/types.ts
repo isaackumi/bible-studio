@@ -436,6 +436,8 @@ export type Workspace = {
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];
+  /** Starred songs, verses, themes, layouts, looks and media, shown first in their lists. */
+  favorites: import("./favorites").Favorites;
   /** The church's CCLI Church Copyright License number, shown with song copyright. */
   ccliLicense: string;
   /** Song pack ids already installed (static/song-packs), so they are not offered twice. */

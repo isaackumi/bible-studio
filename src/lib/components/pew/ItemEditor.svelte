@@ -22,8 +22,8 @@
   /** Words on screen: slides, announcements and text all edit the same way. */
   const wordy = $derived(draft.kind === "slide" || draft.kind === "announcement" || draft.kind === "text");
   const words = $derived(draft.slide ?? draft.announcement ?? { heading: draft.title, body: "" });
-  const images = $derived(session.media.filter((asset) => asset.kind !== "video"));
-  const videos = $derived(session.media.filter((asset) => asset.kind === "video"));
+  const images = $derived(session.mediaByFavorite.filter((asset) => asset.kind !== "video"));
+  const videos = $derived(session.mediaByFavorite.filter((asset) => asset.kind === "video"));
   const song = $derived(draft.lyric ? session.songs.find((entry) => entry.id === draft.lyric?.songId) : undefined);
 
   // Re-render the preview as the draft changes (a short pause keeps typing smooth).
@@ -128,7 +128,7 @@
               draft.title = next.title;
             }
           }}>
-            {#each session.songs as entry (entry.id)}<option value={entry.id}>{entry.title || "Untitled song"}</option>{/each}
+            {#each session.songsByFavorite as entry (entry.id)}<option value={entry.id}>{entry.title || "Untitled song"}</option>{/each}
           </select>
         </label>
         {#if song}
@@ -169,7 +169,7 @@
         <label class="field-row">
           <span>Look</span>
           <select aria-label="Look" value={draft.composition.compositionId} onchange={(event) => (draft.composition = { compositionId: event.currentTarget.value })}>
-            {#each session.workspace.compositions as look (look.id)}<option value={look.id}>{restoreComposition(look).name}</option>{/each}
+            {#each session.looksByFavorite as look (look.id)}<option value={look.id}>{restoreComposition(look).name}</option>{/each}
           </select>
         </label>
       {/if}

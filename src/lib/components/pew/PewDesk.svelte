@@ -16,6 +16,7 @@
   import { buildQuoteIndex, chooseHeard, detectVerse, searchQuotes, type QuoteIndex } from "../../voice/detect";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
+  import FavoriteStar from "../FavoriteStar.svelte";
   import SongDesk from "./SongDesk.svelte";
   import VideoControls from "../VideoControls.svelte";
   import ServiceDesk from "./ServiceDesk.svelte";
@@ -675,10 +676,22 @@
                   <kbd aria-hidden="true">/</kbd>
                 {/if}
               </label>
+              {#if passage()}
+                {@const current = passage()!}
+                <FavoriteStar on={session.isFavoritePassage(current)} label={current.reference} onclick={() => session.toggleFavoritePassage(current)} size={16} />
+              {/if}
               <button type="button" class="mini" aria-label="Previous chapter" onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
               <button type="button" class="mini" aria-label="Next chapter" onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
               <button type="button" class="mini" aria-label="Hide library" title="Hide library" onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
             </form>
+            {#if session.workspace.favorites.passages.length > 0}
+              <div class="recent favorites" aria-label="Favorite passages">
+                <span><Icon name="star" size={12} /> Favorites</span>
+                {#each session.workspace.favorites.passages.slice(0, 12) as item (`${item.bookOrd}:${item.chapter}:${item.startVerse}-${item.endVerse}`)}
+                  <button type="button" class:on={passage()?.reference === item.reference} onclick={() => openRecent(item)}>{item.reference}</button>
+                {/each}
+              </div>
+            {/if}
             {#if session.workspace.recent.length > 0}
               <div class="recent" aria-label="Recent passages">
                 <span>Recent</span>
@@ -997,6 +1010,8 @@
   .recent button { flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap; }
   .recent button:hover { background: var(--field); }
   .recent button.on { border-color: var(--accent); color: var(--accent); }
+  .recent.favorites span { display: inline-flex; align-items: center; gap: 4px; color: #f5b301; }
+  .recent.favorites button { border-color: color-mix(in srgb, #f5b301 40%, var(--line)); }
   .fill { height: 100%; min-width: 0; min-height: 0; }
   .pb-grid :global([data-pane-group]) { width: 100%; height: 100%; }
   .pb-grid :global([data-pane]) { min-width: 0; min-height: 0; overflow: hidden; }
