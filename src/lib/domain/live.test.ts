@@ -87,3 +87,12 @@ describe("preview and program", () => {
     expect(state.preview.model.reference).toBe("John 3:17");
   });
 });
+
+describe("video on Program follows one clock", async () => {
+  const { videoPosition } = await import("./types");
+  it("moves while playing and holds while paused", () => {
+    expect(videoPosition({ playing: true, at: 10, stamp: 1000, volume: 1 }, 4000)).toBe(13);
+    expect(videoPosition({ playing: false, at: 10, stamp: 1000, volume: 1 }, 9000)).toBe(10);
+    expect(videoPosition({ playing: true, at: 0, stamp: 5000, volume: 1 }, 4000)).toBe(0);
+  });
+});

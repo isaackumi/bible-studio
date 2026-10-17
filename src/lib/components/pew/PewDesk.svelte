@@ -17,6 +17,7 @@
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import SongDesk from "./SongDesk.svelte";
+  import VideoControls from "../VideoControls.svelte";
   import ServiceDesk from "./ServiceDesk.svelte";
   import SermonDesk from "./SermonDesk.svelte";
   import OutputMenu from "../OutputMenu.svelte";
@@ -760,6 +761,7 @@
                   </header>
                   <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
                   <TimerControls compact />
+                  <VideoControls />
                   <footer class="output-tools">
                     <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
                     <span class="steppers">

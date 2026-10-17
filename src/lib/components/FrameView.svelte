@@ -5,7 +5,8 @@
   import { cubicIn, cubicInOut, cubicOut, linear } from "svelte/easing";
   import type { TransitionConfig } from "svelte/transition";
   import { timerDisplay, timerFromPaint } from "../domain/timer";
-  import type { PaintedLayer, PresentationModel } from "../domain/types";
+  import type { PaintedLayer, PresentationModel, VideoControl } from "../domain/types";
+  import { videoPosition } from "../domain/types";
   import FrameView from "./FrameView.svelte";
   import QrView from "./QrView.svelte";
   import MotionBackground from "./MotionBackground.svelte";
@@ -53,19 +54,38 @@
   }
 
   /** Start playback; if sound is not allowed without a click, keep playing muted. */
-  function playClip(node: HTMLVideoElement, muted: boolean) {
-    node.muted = muted;
+  function playClip(node: HTMLVideoElement, options: { muted: boolean; control?: VideoControl }) {
     const start = () => {
       void node.play().catch(() => {
         node.muted = true;
         void node.play().catch(() => {});
       });
     };
-    start();
-    return {
-      update(next: boolean) {
-        node.muted = next;
+    // Follow the operator's controls: play or pause, jump when more than half a second off.
+    const apply = ({ muted, control }: { muted: boolean; control?: VideoControl }) => {
+      node.muted = muted;
+      if (!control) {
         if (node.paused) start();
+        return;
+      }
+      node.volume = Math.min(1, Math.max(0, control.volume));
+      const target = videoPosition(control);
+      const end = Number.isFinite(node.duration) ? node.duration : Infinity;
+      const wanted = node.loop && Number.isFinite(end) && end > 0 ? target % end : Math.min(target, end);
+      if (Math.abs(node.currentTime - wanted) > 0.5) node.currentTime = wanted;
+      if (control.playing && node.paused) start();
+      if (!control.playing && !node.paused) node.pause();
+    };
+    apply(options);
+    const onReady = () => apply(options);
+    node.addEventListener("loadedmetadata", onReady);
+    return {
+      update(next: { muted: boolean; control?: VideoControl }) {
+        options = next;
+        apply(next);
+      },
+      destroy() {
+        node.removeEventListener("loadedmetadata", onReady);
       },
     };
   }
@@ -198,7 +218,7 @@
   {:else if model.layout === "video" && model.video}
     {#key model.video.url}
       <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
-      <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={!audio || model.video.muted}></video>
+      <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control }}></video>
     {/key}
   {:else if model.layout === "shape" && model.shape}
     <div

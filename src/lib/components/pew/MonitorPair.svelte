@@ -2,6 +2,7 @@
   import { session } from "../../app/session.svelte";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
+  import VideoControls from "../VideoControls.svelte";
   import type { PewPage } from "../../domain/types";
 
   // Framed Preview and Program monitors for the Songs and Sermon windows.
@@ -39,6 +40,7 @@
     {/if}
   </figcaption>
   <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+  <VideoControls />
 </figure>
 {/if}
 

@@ -135,7 +135,7 @@ export type PresentationModel = {
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */
   style?: TextStyle;
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
-  video?: { url: string; loop: boolean; muted: boolean };
+  video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl };
   /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
   qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
   /** An alert riding on top of Program (never Preview), e.g. a nursery call. */
@@ -147,6 +147,17 @@ export type PresentationModel = {
   /** Scripture in a second translation, shown beside the first. */
   parallel?: { attribution: string | null; lines: PresentationLine[] };
 };
+
+/**
+ * The operator's play state for a video on Program. Every window plays from the same clock:
+ * position = at + (now - stamp) while playing, so the audience and monitors stay in step.
+ */
+export type VideoControl = { playing: boolean; at: number; stamp: number; volume: number };
+
+/** Where a controlled video should be, in seconds, at a given time. */
+export function videoPosition(control: VideoControl, now = Date.now()): number {
+  return control.playing ? control.at + Math.max(0, now - control.stamp) / 1000 : control.at;
+}
 
 export type ProgramAlert = {
   id: string;

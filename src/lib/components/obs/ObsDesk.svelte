@@ -1,4 +1,5 @@
 <script lang="ts">
+  import VideoControls from "../VideoControls.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
@@ -459,6 +460,7 @@
         </button>
       </div>
       <TimerControls />
+      <VideoControls />
     </aside>
     </Pane>
     <PaneResizer />

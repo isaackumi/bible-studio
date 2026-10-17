@@ -1,4 +1,5 @@
 import { noteSongUse } from "../domain/song-usage";
+import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -1786,6 +1787,47 @@ class Session {
     this.message = `${deck.name}: page ${index + 1} of ${deck.pages.length} on Preview. LIVE sends Program.`;
   };
 
+  /** Play, pause, jump or change the volume of the video on Program, on every screen at once. */
+  controlVideo = async (change: { kind: "play" | "pause" | "restart" } | { kind: "seek"; at: number } | { kind: "volume"; volume: number }) => {
+    const model = this.live.program.model;
+    if (model.layout !== "video" || !model.video) return;
+    const now = Date.now();
+    const current = model.video.control ?? { playing: true, at: 0, stamp: now, volume: 1 };
+    const at = videoPosition(current, now);
+    let control: VideoControl;
+    switch (change.kind) {
+      case "play":
+        control = { ...current, playing: true, at, stamp: now };
+        break;
+      case "pause":
+        control = { ...current, playing: false, at, stamp: now };
+        break;
+      case "restart":
+        control = { ...current, playing: true, at: 0, stamp: now };
+        break;
+      case "seek":
+        control = { ...current, at: Math.max(0, change.at), stamp: now };
+        break;
+      default:
+        control = { ...current, at, stamp: now, volume: Math.min(1, Math.max(0, change.volume)) };
+    }
+    this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video, control } } } };
+    await this.pushProgram();
+  };
+
+  /** Bring the sound down over a few seconds, then pause; the picture stays. */
+  fadeOutVideo = async (seconds = 3) => {
+    const start = this.live.program.model.video?.control?.volume ?? 1;
+    const steps = 12;
+    for (let step = 1; step <= steps; step += 1) {
+      if (this.live.program.model.layout !== "video") return;
+      await new Promise((resolve) => setTimeout(resolve, (seconds * 1000) / steps));
+      await this.controlVideo({ kind: "volume", volume: start * (1 - step / steps) });
+    }
+    await this.controlVideo({ kind: "pause" });
+    await this.controlVideo({ kind: "volume", volume: start });
+  };
+
   /** A slide deck playing on Program by itself (announcements before the service), looping. */
   deckLoop = $state<{ deckId: string; seconds: number; index: number } | null>(null);
   private loopTimer: ReturnType<typeof setInterval> | undefined;
@@ -2716,6 +2758,11 @@ class Session {
       { title: this.logoTitle(), imageUrl },
       takeTransition ? { transition: takeTransition.type } : undefined,
     );
+    // A video going live starts on a shared clock, so every screen plays it in step.
+    if ((action === "take" || action === "cut") && this.live.program.model.layout === "video" && this.live.program.model.video) {
+      const model = this.live.program.model;
+      this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video!, control: { playing: true, at: 0, stamp: Date.now(), volume: 1 } } } } };
+    }
     // A song the congregation now sees counts for CCLI reporting (once per day).
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "lyrics" && this.songFocus) {
       const song = this.songs.find((entry) => entry.id === this.songFocus?.songId);
