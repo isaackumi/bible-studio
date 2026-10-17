@@ -523,3 +523,26 @@ mod tests {
         assert_eq!(percent_decode("%zz"), "%zz");
     }
 }
+
+#[cfg(test)]
+mod backup_tests {
+    use super::{backup_latest, backup_write};
+
+    #[test]
+    fn writes_keeps_twenty_and_reads_the_newest() {
+        let dir = std::env::temp_dir().join(format!("cs-backup-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let folder = dir.to_string_lossy().to_string();
+        for day in 1..=23 {
+            let name = format!("Church Studio backup 2026-01-{day:02} 0900.json");
+            backup_write(folder.clone(), name, format!("{{\"day\":{day}}}")).unwrap();
+        }
+        let count = std::fs::read_dir(&dir).unwrap().count();
+        assert_eq!(count, 20);
+        let (name, contents) = backup_latest(folder.clone()).unwrap().unwrap();
+        assert_eq!(name, "Church Studio backup 2026-01-23 0900.json");
+        assert_eq!(contents, "{\"day\":23}");
+        assert!(backup_write(folder.clone(), "../escape.json".into(), "x".into()).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
