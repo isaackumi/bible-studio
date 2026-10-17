@@ -19,6 +19,8 @@
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Copy from "@lucide/svelte/icons/copy";
+  import Laptop from "@lucide/svelte/icons/laptop";
+  import Smartphone from "@lucide/svelte/icons/smartphone";
   import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Gauge from "@lucide/svelte/icons/gauge";
@@ -117,6 +119,8 @@
     more: Ellipsis,
     pencil: Pencil,
     copy: Copy,
+    laptop: Laptop,
+    phone: Smartphone,
     view: PanelsTopLeft,
   };
 

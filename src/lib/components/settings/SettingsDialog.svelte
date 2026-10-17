@@ -34,7 +34,7 @@
     | "updates"
     | "account"
     | "license";
-  type SettingsEntry = readonly [SettingsSectionId, string, string];
+  type SettingsEntry = { id: SettingsSectionId; title: string; icon: string; color: string; about: string; keywords: string };
   type SettingsGroup = { label: string; items: SettingsEntry[] };
 
   let audioNote = $state("");
@@ -46,46 +46,62 @@
     if (blocked) void openPrivacySettings();
   }
 
+  // Each page: a colored icon tile (System Settings style), a one-line description and search words.
   const groups: SettingsGroup[] = [
     {
       label: "Studio",
       items: [
-        ["general", "Church", "church"],
-        ["system", "This computer", "screens"],
-        ["appearance", "Look", "look"],
-        ["workspace", "Layouts", "layout"],
-        ["keyboard", "Keys", "keys"],
+        { id: "general", title: "Church", icon: "church", color: "#f08a24", about: "Your church's name, logo text and CCLI license.", keywords: "name logo ccli license copyright" },
+        { id: "system", title: "This computer", icon: "laptop", color: "#8e8e93", about: "What works in this window, and why some things do not.", keywords: "capabilities browser desktop features" },
+        { id: "appearance", title: "Appearance", icon: "look", color: "#a259e6", about: "Desk, theme, accent color and type size on this computer.", keywords: "theme dark light accent color size spacing desk verse font" },
+        { id: "workspace", title: "Layouts", icon: "layout", color: "#5b5bd6", about: "How the operator desk is arranged.", keywords: "workspace panels arrange reset" },
+        { id: "keyboard", title: "Keyboard", icon: "keys", color: "#636366", about: "Keys that drive the desk.", keywords: "shortcuts keys hotkeys" },
       ],
     },
     {
       label: "Output",
       items: [
-        ["audience", "Output", "cast"],
-        ["displays", "Displays", "screens"],
-        ["stage", "Stage", "stage"],
-        ["remote", "Remote", "cast"],
+        { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test" },
+        { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
+        { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
+        { id: "remote", title: "Phone remote", icon: "phone", color: "#30a46c", about: "Pair a phone as a controller. It is never a display.", keywords: "phone tablet pair qr lan" },
       ],
     },
     {
       label: "Library",
       items: [
-        ["bible", "Bible", "bible"],
-        ["lyrics", "Songs", "lyrics"],
-        ["media", "Media", "media"],
-        ["audio", "Audio", "audio"],
-        ["storage", "Files", "files"],
+        { id: "bible", title: "Bible", icon: "bible", color: "#a07a52", about: "Scripture translations on this computer.", keywords: "translation kjv scripture" },
+        { id: "lyrics", title: "Songs", icon: "lyrics", color: "#e93d82", about: "Songs, folders, imports and copyright.", keywords: "lyrics hymns ccli songselect openlyrics" },
+        { id: "media", title: "Media", icon: "media", color: "#12a5b8", about: "Pictures and videos for backgrounds and the logo.", keywords: "images video background logo camera" },
+        { id: "audio", title: "Sound & voice", icon: "audio", color: "#3e63dd", about: "Microphone, listening and voice commands.", keywords: "microphone voice speech listen detection" },
+        { id: "storage", title: "Backup", icon: "files", color: "#2f80ed", about: "Export or import the whole library.", keywords: "export import backup files library" },
       ],
     },
     {
       label: "System",
       items: [
-        ["performance", "Speed", "speed"],
-        ["updates", "Updates", "refresh"],
-        ["account", "Account", "user"],
-        ["license", "License", "key"],
+        { id: "performance", title: "Performance", icon: "speed", color: "#30a46c", about: "How much of the desk is on screen.", keywords: "speed density size" },
+        { id: "updates", title: "Updates", icon: "refresh", color: "#0a84ff", about: "Which version is running.", keywords: "version update release" },
+        { id: "account", title: "Account", icon: "user", color: "#8e8e93", about: "Who is signed in.", keywords: "sign in user cloud" },
+        { id: "license", title: "License", icon: "key", color: "#d4a017", about: "How this copy of Church Studio is entitled.", keywords: "license plan" },
       ],
     },
   ];
+
+  let search = $state("");
+  const visibleGroups = $derived.by(() => {
+    const needle = search.trim().toLowerCase();
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) =>
+            (item.id !== "remote" || canUse("remote-control")) &&
+            (!needle || `${item.title} ${item.about} ${item.keywords} ${group.label}`.toLowerCase().includes(needle)),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  });
 
   const sections: SettingsEntry[] = groups.flatMap((group) => group.items);
   const themes: { id: OperatorTheme; name: string; note: string; ground: string; ink: string }[] = [
@@ -102,7 +118,7 @@
   ];
 
   function isSettingsSection(value: string): value is SettingsSectionId {
-    return sections.some(([id]) => id === value);
+    return sections.some((entry) => entry.id === value);
   }
 
   let section = $state<SettingsSectionId>(
@@ -161,7 +177,7 @@
   const audience = $derived(resolveAudience(profile.assignments.audience, session.output.displays));
   const shortcuts = $derived(session.workspace.shortcuts ?? defaultShortcuts);
   const status = $derived(audienceStatus(session.output, isDesktop()));
-  const page = $derived(sections.find((item) => item[0] === section));
+  const page = $derived(sections.find((item) => item.id === section));
   const shortcutGroups = $derived([...new Set(COMMANDS.map((command) => command.group))]);
 
   $effect(() => {
@@ -200,47 +216,67 @@
   <button type="button" class="settings-backdrop" aria-label="Close settings" onclick={close}></button>
   <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="settings-title">
     <nav class="settings-nav" aria-label="Settings">
-      <p id="settings-title">Settings</p>
-      {#each groups as group (group.label)}
-        <p class="group">{group.label}</p>
-        {#each group.items as [id, title, icon] (id)}
-          {#if id !== "remote" || canUse("remote-control")}
-            <button type="button" class:active={section === id} onclick={() => (section = id)}>
-              <Icon name={icon} size={15} />
-              <span>{title}</span>
+      <div class="set-brand">
+        <span class="set-brand-mark" style:background={session.workspace.appearance.accent}><Icon name="church" size={18} /></span>
+        <div>
+          <p id="settings-title">Settings</p>
+          <span>{session.workspace.churchName || "Church Studio"}</span>
+        </div>
+      </div>
+      <label class="nav-search">
+        <Icon name="search" size={14} />
+        <input type="search" placeholder="Search settings" aria-label="Search settings" bind:value={search} />
+      </label>
+      <div class="nav-list">
+        {#each visibleGroups as group (group.label)}
+          <p class="nav-group">{group.label}</p>
+          {#each group.items as item (item.id)}
+            <button type="button" class="nav-item" class:active={section === item.id} aria-current={section === item.id ? "page" : undefined} onclick={() => (section = item.id)}>
+              <span class="tile" style:background={item.color}><Icon name={item.icon} size={14} /></span>
+              <span class="nav-title">{item.title}</span>
             </button>
-          {/if}
+          {/each}
+        {:else}
+          <p class="nav-empty">No settings match “{search}”.</p>
         {/each}
-      {/each}
+      </div>
+      <p class="nav-foot">Church Studio 0.1.0 · offline</p>
     </nav>
 
     <div class="settings-body">
       <header class="set-head">
-        <div>
-          <h2>{page?.[1]}</h2>
-          <p>
-            {#if section === "general"}The name on the logo slide, and the CCLI license shown with songs.{:else if section === "system"}What works in this window, and why some things do not.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
-          </p>
+        <span class="tile big" style:background={page?.color}><Icon name={page?.icon ?? "settings"} size={22} /></span>
+        <div class="head-copy">
+          <h2>{page?.title}</h2>
+          <p>{page?.about}</p>
         </div>
-        <button type="button" class="icon-close" aria-label="Close" onclick={close}><Icon name="close" size={16} /></button>
+        <button type="button" class="icon-close" aria-label="Close settings" title="Close (Esc)" onclick={close}><Icon name="close" size={16} /></button>
       </header>
 
       {#if section === "general"}
-        <section class="card">
-          <label>Church name <input class="field" bind:value={churchName} onchange={() => session.setChurchName(churchName)} /></label>
-          <label>Logo text <input class="field" bind:value={logoText} onchange={() => session.setLogoText(logoText)} /></label>
-          <label>
-            CCLI license #
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Church name</strong><span>Shown in Settings and used for the logo slide.</span></div>
+            <input class="field" aria-label="Church name" placeholder="Grace Chapel" bind:value={churchName} onchange={() => session.setChurchName(churchName)} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Logo text</strong><span>The Logo button sends this to Program. Pick the picture in Media.</span></div>
+            <input class="field" aria-label="Logo text" bind:value={logoText} onchange={() => session.setLogoText(logoText)} />
+          </div>
+        </section>
+        <p class="section-label">Copyright</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>CCLI license #</strong><span>Shown with each song's © line on its first and last slide, as the CCLI license asks.</span></div>
             <input
               class="field"
+              aria-label="CCLI license number"
               inputmode="numeric"
               placeholder="Church Copyright License number"
               value={session.workspace.ccliLicense}
               onchange={(event) => session.setCcliLicense(event.currentTarget.value)}
             />
-          </label>
-          <p class="note">Shown with each song's © line and CCLI song number on its first and last slide, as the CCLI license asks.</p>
-          <p class="note">The logo picture is chosen in Media. The Logo button sends this name to Program.</p>
+          </div>
         </section>
       {:else if section === "system"}
         <section class="card">
@@ -506,7 +542,7 @@
               {#each COMMANDS.filter((command) => command.group === group) as command (command.id)}
                 <li>
                   <span>{command.title}</span>
-                  <span class="kbd">{command.shortcut ? shortcutLabel(shortcuts, command.shortcut) : command.id === "open-settings" ? "⌘," : "—"}</span>
+                  <kbd class="kbd">{command.shortcut ? shortcutLabel(shortcuts, command.shortcut) : command.id === "open-settings" ? "⌘," : "—"}</kbd>
                 </li>
               {/each}
             </ul>
@@ -541,17 +577,28 @@
         <section class="card">
           <h3>On this computer</h3>
           <p class="note">Public-domain scripture is stored locally. Search, Listen, and the next verse stay on Preview until LIVE.</p>
-          <ul class="plain">
+          <div class="rows inset">
             {#each session.translations as translation (translation.id)}
-              <li>{translation.abbreviation} — {translation.name}. {translation.licenseNote ?? "Public domain"}.</li>
+              <div class="row">
+                <div class="row-copy"><strong>{translation.name}</strong><span>{translation.licenseNote ?? "Public domain"}</span></div>
+                <span class="pill">{translation.abbreviation}</span>
+              </div>
             {/each}
-          </ul>
+          </div>
         </section>
       {:else if section === "lyrics"}
-        <section class="card">
-          <h3>Library</h3>
-          <p class="note">Write and reorder songs on the desk. A saved song can be queued into the service. Export them from Files.</p>
-          <button type="button" class="text" onclick={() => (section = "storage")}>Open Files</button>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Song library</strong><span>{session.songs.length} song{session.songs.length === 1 ? "" : "s"} in {session.workspace.songFolders.length} folder{session.workspace.songFolders.length === 1 ? "" : "s"}. Write, import and organize them in the Songs window.</span></div>
+            <span class="pill">{session.songs.length}</span>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Imports</strong><span>Plain text, ChordPro, SongSelect (.usr / .txt) and OpenLyrics (.xml / .zip).</span></div>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>CCLI license #</strong><span>{session.workspace.ccliLicense ? `CCLI License # ${session.workspace.ccliLicense} is shown with song copyright.` : "Not set. Songs show their © line and CCLI song number only."}</span></div>
+            <button type="button" class="link" onclick={() => (section = "general")}>{session.workspace.ccliLicense ? "Change" : "Add"}</button>
+          </div>
         </section>
       {:else if section === "media"}
         <section class="card">
@@ -577,25 +624,36 @@
           {/if}
         </section>
       {:else if section === "performance"}
-        <section class="card">
-          <h3>Desk size</h3>
-          <p class="note">Spacing and type size for the operator window live in Look. The audience window draws Program only.</p>
-          <button type="button" class="text" onclick={() => (section = "appearance")}>Open Look</button>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Desk size</strong><span>Spacing and type size for the operator window. The audience window draws Program only.</span></div>
+            <button type="button" class="link" onclick={() => (section = "appearance")}>Open Appearance</button>
+          </div>
         </section>
       {:else if section === "updates"}
-        <section class="card">
-          <h3>This build</h3>
-          <p class="note">Church Studio 0.1.0. Updates are not configured. The copy you launched is the one that is running.</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Church Studio 0.1.0</strong><span>The copy you launched is the one that is running.</span></div>
+            <span class="pill">Current</span>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Automatic updates</strong><span>Not configured in this release.</span></div>
+            <span class="pill muted">Off</span>
+          </div>
         </section>
       {:else if section === "account"}
-        <section class="card">
-          <h3>Offline</h3>
-          <p class="note">This desktop app runs without an account. Sign-in is not part of this release.</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Offline</strong><span>Church Studio runs without an account. Sign-in is not part of this release.</span></div>
+            <span class="pill muted">No account</span>
+          </div>
         </section>
       {:else}
-        <section class="card">
-          <h3>Included</h3>
-          <p class="note">Presentation, the library, and audience output run offline. A license check is not required for this release.</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Included</strong><span>Presentation, the library and audience output run offline. No license check is needed in this release.</span></div>
+            <span class="pill">Active</span>
+          </div>
         </section>
       {/if}
     </div>
@@ -603,304 +661,285 @@
 </div>
 
 <style>
-  .settings-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-    display: grid;
-    place-items: center;
-  }
+  /* Layer and window */
+  .settings-layer { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; }
   .settings-backdrop {
     position: absolute;
     inset: 0;
     border: 0;
-    background: rgba(0, 0, 0, 0.72);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
     cursor: default;
   }
   .settings {
     position: relative;
-    width: min(980px, calc(100% - 28px));
-    height: min(700px, calc(100% - 28px));
-    background: color-mix(in srgb, var(--booth) 88%, #000);
-    color: var(--ink);
-    border: 1px solid var(--line);
-    border-radius: 16px;
+    width: min(1040px, calc(100% - 32px));
+    height: min(740px, calc(100% - 32px));
     display: grid;
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: 248px minmax(0, 1fr);
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid color-mix(in srgb, var(--ink) 12%, var(--line));
+    border-radius: 18px;
     font-family: var(--font-ui);
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.3);
     overflow: hidden;
   }
+  .settings :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Sidebar */
   .settings-nav {
-    border-right: 1px solid var(--line);
-    overflow: auto;
-    padding: 18px 12px 20px;
-    background: color-mix(in srgb, var(--desk) 70%, #000);
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    min-height: 0;
+    padding: 18px 12px 12px;
+    border-right: 1px solid var(--line);
+    background: color-mix(in srgb, var(--desk) 80%, var(--panel));
   }
-  .settings-nav > p {
-    margin: 0 8px 12px;
-    font-size: 15px;
-    font-weight: 650;
-    color: var(--ink);
-  }
-  .group {
-    margin: 14px 8px 4px;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .settings-nav button {
-    width: 100%;
-    height: 32px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--muted);
+  .set-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 14px; }
+  .set-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: #fff; flex: none; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
+  .set-brand p { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .set-brand div span { display: block; font-size: 11px; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-search {
     display: flex;
     align-items: center;
     gap: 8px;
+    height: 32px;
+    margin: 0 4px 10px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--field);
+    color: var(--muted);
+    flex-direction: row;
+  }
+  .nav-search:focus-within { border-color: var(--accent); color: var(--ink); }
+  .nav-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
+  .nav-search input::-webkit-search-cancel-button { display: none; }
+  .nav-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; padding: 0 2px; }
+  .nav-group { margin: 10px 10px 3px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .nav-group:first-child { margin-top: 2px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 31px;
     padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
     font: inherit;
     font-size: 13px;
     text-align: left;
   }
-  .settings-nav button.active {
-    color: var(--ink);
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  .nav-item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .nav-item.active { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .nav-item.active .nav-title { font-weight: 600; }
+  .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 7px;
+    color: #fff;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25);
   }
-  .settings :global(svg) {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .settings-body {
-    min-width: 0;
-    overflow: auto;
-    padding: 22px 26px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
+  .tile.big { width: 44px; height: 44px; border-radius: 12px; }
+  .nav-empty { margin: 12px 10px; font-size: 12px; color: var(--muted); }
+  .nav-foot { margin: 8px 10px 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+
+  /* Page */
+  .settings-body { min-width: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 28px 32px; }
   .set-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
+    align-items: center;
+    gap: 14px;
+    margin: 0 -28px;
+    padding: 20px 28px 16px;
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
   }
-  .set-head h2 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 620;
-    letter-spacing: -0.03em;
-    color: var(--ink);
-  }
-  .set-head p, .note {
-    margin: 4px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.45;
-  }
-  .note.stand { margin-top: 0; }
-  .plain {
-    margin: 12px 0 0;
-    padding: 0 0 0 18px;
-    color: var(--ink);
-    font-size: 13px;
-    line-height: 1.5;
-  }
-  .icon-close, .text {
-    border: 0;
-    background: transparent;
-    color: var(--ink);
+  .head-copy { flex: 1; min-width: 0; }
+  .set-head h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .set-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .icon-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
     height: 32px;
-    padding: 0 8px;
-  }
-  .text { color: var(--accent); padding: 0; height: auto; text-align: left; }
-  .card, .status-card {
+    flex: none;
     border: 1px solid var(--line);
-    background: color-mix(in srgb, var(--panel) 86%, #000);
-    border-radius: 12px;
-    padding: 14px 16px;
+    border-radius: 999px;
+    background: var(--field);
+    color: var(--muted);
+  }
+  .icon-close:hover { color: var(--ink); }
+  .section-label { margin: 6px 4px -6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .note.stand { padding: 0 4px; }
+  .text, .link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+  .text:hover, .link:hover { text-decoration: underline; }
+
+  /* Rows: label and help on the left, control on the right */
+  .rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--field); overflow: hidden; }
+  .rows.inset { background: var(--panel); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; padding: 10px 16px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .row-copy strong { font-size: 13px; font-weight: 600; }
+  .row-copy span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .row .field { width: min(300px, 45%); height: 34px; flex: none; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+  .row .field:focus { border-color: var(--accent); outline: none; }
+  .pill {
+    flex: none;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .pill.muted { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
+
+  /* Cards */
+  .card, .status-card {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--field);
   }
-  .card h3, .status-card h3 {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 620;
-    color: var(--ink);
-  }
-  .status-card {
-    flex-direction: row;
-    align-items: center;
-    gap: 14px;
-  }
-  .status-card .eyebrow {
-    margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .status-card h3 { font-size: 22px; letter-spacing: -0.03em; }
+  .card h3 { margin: 0; font-size: 13px; font-weight: 650; }
+  .card :global(.field), .card select, .card input:not([type]) { background: var(--panel); }
+  .status-card { flex-direction: row; align-items: center; gap: 14px; }
+  .status-card.on { border-color: color-mix(in srgb, var(--presence, #3fb950) 60%, var(--line)); }
+  .status-card .eyebrow { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .status-card h3 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
   .status-card p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
-  .lamp {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--line);
-    flex: none;
-  }
-  .lamp.on { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
-  .choice-row, .theme-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lamp { width: 12px; height: 12px; border-radius: 50%; background: var(--line); flex: none; }
+  .lamp.on { background: var(--presence, #3fb950); box-shadow: 0 0 0 5px color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); }
+
+  /* Appearance */
+  .choice-row, .theme-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .theme-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .choice, .theme-card {
-    border: 1px solid var(--line);
-    background: var(--field);
-    color: var(--ink);
-    border-radius: 10px;
-    min-height: 88px;
-    padding: 10px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
-    text-align: left;
-  }
-  .choice strong, .theme-card strong { font-size: 13px; font-weight: 620; }
-  .choice span, .theme-card span { color: var(--muted); font-size: 12px; }
-  .choice.active, .theme-card.active { border-color: var(--accent); }
-  .chip {
-    width: 100%;
-    height: 54px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    font-family: var(--font-scripture);
-    font-size: 22px;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 6px;
-  }
-  .chip-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
-  .accent-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-  .swatch {
-    width: auto;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-  }
-  .dot { width: 28px; height: 28px; border-radius: 50%; }
-  .swatch.active .dot { outline: 2px solid var(--ink); outline-offset: 3px; }
-  .custom-accent { display: flex; flex-direction: column; gap: 6px; font-size: 10px; color: var(--muted); }
-  .custom-accent input { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; }
-  .segment {
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 10px;
-    background: var(--field);
+    gap: 3px;
+    min-height: 88px;
+    padding: 12px;
     border: 1px solid var(--line);
-    width: fit-content;
-    max-width: 100%;
-    flex-wrap: wrap;
-  }
-  .segment button {
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 7px;
-  }
-  .segment button.active { background: var(--ink); color: var(--booth); }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .actions button, .settings-body > button, .card > button:not(.text) {
-    border: 1px solid var(--line);
-    background: transparent;
+    border-radius: 12px;
+    background: var(--panel);
     color: var(--ink);
-    height: 34px;
-    padding: 0 12px;
-    border-radius: 8px;
+    text-align: left;
+    font: inherit;
+    transition: border-color 120ms, box-shadow 120ms;
   }
-  .actions .primary, button.primary { background: var(--ink); color: var(--booth); border-color: var(--ink); }
-  .actions button:disabled { opacity: 0.4; }
+  .choice:hover, .theme-card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .choice strong, .theme-card strong { font-size: 13px; font-weight: 650; }
+  .choice span, .theme-card span { color: var(--muted); font-size: 12px; }
+  .choice.active, .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .choice :global(svg) { color: var(--accent); margin-bottom: 4px; }
+  .chip { position: relative; display: grid; place-items: center; width: 100%; height: 60px; margin-bottom: 8px; border-radius: 8px; overflow: hidden; font-family: var(--font-scripture); font-size: 22px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25); }
+  .chip-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; }
+  .accent-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; }
+  .dot { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2); }
+  .swatch.active { color: var(--ink); }
+  .swatch.active .dot { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .custom-accent { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .custom-accent input { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: transparent; }
+  .segment { display: inline-flex; flex-wrap: wrap; gap: 2px; width: fit-content; max-width: 100%; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .segment button { height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
+  .segment button:hover:not(.active) { color: var(--ink); }
+  .segment button.active { background: var(--accent); color: #fff; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .split > div { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Forms */
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .actions button, .settings-body > button, .card > button:not(.text):not(.link) {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    width: fit-content;
+  }
+  .actions button:hover:not(:disabled), .card > button:not(.text):not(.link):hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .actions .primary, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .actions button:disabled, .card > button:disabled { opacity: 0.4; }
+
+  /* Displays */
   .monitor-list { display: flex; flex-direction: column; gap: 8px; }
   .monitor {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1fr) auto;
-    gap: 12px;
+    grid-template-columns: 76px minmax(0, 1fr) auto;
     align-items: center;
+    gap: 14px;
     width: 100%;
-    text-align: left;
+    padding: 10px 12px;
     border: 1px solid var(--line);
+    border-radius: 12px;
     background: var(--field);
     color: var(--ink);
-    border-radius: 12px;
-    padding: 10px;
+    font: inherit;
+    text-align: left;
   }
-  button.monitor { grid-template-columns: 72px minmax(0, 1fr); }
-  .monitor.on { border-color: var(--accent); }
+  button.monitor { grid-template-columns: 76px minmax(0, 1fr); }
+  button.monitor:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .monitor.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .monitor.static { cursor: default; }
-  .mini {
-    height: 42px;
-    border-radius: 6px;
-    background: #050505;
-    color: #f5f5f5;
-    display: grid;
-    place-items: center;
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .monitor-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .monitor-copy strong { font-size: 14px; }
-  .monitor-copy span, .monitor-copy { color: var(--muted); font-size: 12px; }
-  .monitor-copy strong { color: var(--ink); }
-  .monitor-actions { display: flex; gap: 6px; }
-  .monitor-actions button {
-    height: 28px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: var(--ink);
-    font-size: 12px;
-  }
-  .monitor-actions button.on { background: var(--ink); color: var(--booth); border-color: var(--ink); }
+  .mini { display: grid; place-items: center; height: 44px; border: 2px solid color-mix(in srgb, var(--ink) 25%, transparent); border-radius: 6px; background: #050505; color: #f5f5f5; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .monitor-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 12px; }
+  .monitor-copy strong { color: var(--ink); font-size: 14px; }
+  .monitor-actions { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+  .monitor-actions button { height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; }
+  .monitor-actions button.on { background: var(--accent); color: #fff; }
+
+  /* Keyboard */
   .keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-  .keys li {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
-    font-size: 13px;
-  }
+  .keys li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   .keys li:last-child { border-bottom: 0; }
   .kbd {
-    color: var(--muted);
+    min-width: 28px;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
     font-variant-numeric: tabular-nums;
   }
+
   @media (max-width: 760px) {
     .settings { grid-template-columns: 1fr; height: min(92dvh, 760px); }
-    .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 180px; }
+    .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }
     .theme-row, .split, .choice-row { grid-template-columns: 1fr 1fr; }
+    .row { flex-direction: column; align-items: stretch; }
+    .row .field { width: 100%; }
   }
 </style>
