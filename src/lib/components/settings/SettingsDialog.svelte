@@ -13,6 +13,8 @@
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
+  import { listOnlineBibles, type OnlineBible } from "../../bible/online";
+  import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
 
@@ -107,6 +109,33 @@
 
   let search = $state("");
   let billing = $state<"monthly" | "yearly">("yearly");
+
+  // Licensed translations through API.Bible.
+  let apiKey = $state(session.workspace.onlineBibles.key);
+  let apiList = $state<OnlineBible[]>([]);
+  let apiFilter = $state("");
+  let apiBusy = $state(false);
+  let apiError = $state("");
+
+  async function connectApiBible() {
+    apiBusy = true;
+    apiError = "";
+    try {
+      apiList = await listOnlineBibles(apiKey.trim());
+      await session.setOnlineBibles(apiKey, session.workspace.onlineBibles.bibles);
+    } catch (error) {
+      apiList = [];
+      apiError = error instanceof Error ? error.message : "API.Bible could not be reached.";
+    } finally {
+      apiBusy = false;
+    }
+  }
+
+  function toggleApiBible(bible: OnlineBibleChoice, on: boolean) {
+    const current = session.workspace.onlineBibles.bibles.filter((entry) => entry.id !== bible.id);
+    const next = on ? [...current, { id: bible.id, abbreviation: bible.abbreviation, name: bible.name, language: bible.language }] : current;
+    void session.setOnlineBibles(apiKey || session.workspace.onlineBibles.key, next);
+  }
   let code = $state("");
   let codeError = $state("");
   let signInName = $state("");
@@ -694,6 +723,39 @@
             {/each}
           </section>
         {/if}
+        <p class="section-label">Licensed translations (online)</p>
+        <section class="rows">
+          <form class="row" onsubmit={(event) => { event.preventDefault(); void connectApiBible(); }}>
+            <div class="row-copy"><strong>API.Bible key</strong><span class:form-error={!!apiError}>{apiError || "NIV, NKJV, ESV and others, where the publisher allows it. Get a free key at scripture.api.bible; text is fetched when shown and needs the internet."}</span></div>
+            <div class="row-end">
+              <input class="field license-field" type="password" autocomplete="off" spellcheck="false" aria-label="API.Bible key" placeholder="Paste your key" bind:value={apiKey} />
+              <button type="submit" class="btn primary" disabled={!apiKey.trim() || apiBusy}>{apiBusy ? "Checking…" : apiList.length ? "Refresh" : "Connect"}</button>
+            </div>
+          </form>
+          {#if apiList.length}
+            <div class="row">
+              <div class="row-copy"><strong>Find a translation</strong><span>{apiList.length} available to your key. Tick the ones to show in the translation list.</span></div>
+              <input class="field" aria-label="Filter translations" placeholder="NIV, King James, Twi…" bind:value={apiFilter} />
+            </div>
+            {#each apiList.filter((bible) => !apiFilter.trim() || `${bible.abbreviation} ${bible.name} ${bible.language}`.toLowerCase().includes(apiFilter.trim().toLowerCase())).slice(0, 40) as bible (bible.id)}
+              {@const on = session.workspace.onlineBibles.bibles.some((entry) => entry.id === bible.id)}
+              <label class="row">
+                <div class="row-lead">
+                  <span class="bible-badge" class:muted={!on}>{bible.abbreviation || "—"}</span>
+                  <div class="row-copy"><strong>{bible.name}</strong><span>{bible.language}</span></div>
+                </div>
+                <input type="checkbox" class="switch" role="switch" aria-label={`Use ${bible.name}`} checked={on} onchange={(event) => toggleApiBible(bible, event.currentTarget.checked)} />
+              </label>
+            {/each}
+          {:else if session.workspace.onlineBibles.bibles.length}
+            {#each session.workspace.onlineBibles.bibles as bible (bible.id)}
+              <div class="row">
+                <div class="row-lead"><span class="bible-badge">{bible.abbreviation}</span><div class="row-copy"><strong>{bible.name}</strong><span>{bible.language} · online</span></div></div>
+                <button type="button" class="btn icon-btn" aria-label={`Remove ${bible.name}`} onclick={() => toggleApiBible(bible, false)}><Icon name="trash" size={14} /></button>
+              </div>
+            {/each}
+          {/if}
+        </section>
         <p class="note stand">King James and the World English Bible come with Church Studio. Download others when you need them; scripture stays on this computer, and Search, Listen and the next verse stay on Preview until LIVE.</p>
       {:else if section === "lyrics"}
         <section class="rows">

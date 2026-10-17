@@ -281,6 +281,7 @@ export function defaultWorkspace(): Workspace {
     installedPacks: [],
     customLayouts: [],
     tours: emptyTourProgress(),
+    onlineBibles: { key: "", bibles: [] },
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,
     onboarded: false,

@@ -1,3 +1,4 @@
+import { isOnlineTranslation, onlineChapter, onlinePassage, onlineTranslations, WORDS_TRANSLATION } from "../bible/online-bibles";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { cleanVerse } from "../bible/clean";
 import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch, browserInstalledBibles, browserInstallBible, browserRemoveBible } from "../bible/texts";
@@ -84,26 +85,36 @@ export const api = {
     return browserMedia.importFile(source);
   },
   translations: () =>
-    desktop()
+    (desktop()
       ? invoke<TranslationInfo[]>("bible_translations")
-      : Promise.resolve(BUNDLED_TRANSLATIONS.filter((entry) => browserInstalledBibles().includes(entry.id))),
+      : Promise.resolve(BUNDLED_TRANSLATIONS.filter((entry) => browserInstalledBibles().includes(entry.id)))
+    ).then((bundled) => [...bundled, ...onlineTranslations()]),
   bibleInstall: (id: string) => (desktop() ? invoke<void>("bible_install", { id }) : browserInstallBible(id)),
   bibleRemove: (id: string) => (desktop() ? invoke<void>("bible_remove", { id }) : Promise.resolve(browserRemoveBible(id))),
-  books: (translationId: string) =>
-    desktop()
+  books: (translationId: string): Promise<BookInfo[]> =>
+    isOnlineTranslation(translationId)
+      ? api.books(WORDS_TRANSLATION)
+      : desktop()
       ? invoke<BookInfo[]>("bible_books", { translationId })
       : Promise.resolve(BUNDLED_TRANSLATIONS.some((entry) => entry.id === translationId) ? bundledBooks() : []),
   // Desktop databases seeded before the text cleanup still hold the old text; tidy it as it is read.
-  verses: (translationId: string, bookOrd: number, chapter: number) =>
-    desktop()
+  verses: (translationId: string, bookOrd: number, chapter: number): Promise<VerseText[]> =>
+    isOnlineTranslation(translationId)
+      ? onlineChapter(translationId, bookOrd, chapter)
+      : desktop()
       ? invoke<VerseText[]>("bible_verses", { translationId, bookOrd, chapter }).then(cleanRows)
       : bundledChapter(translationId, bookOrd, chapter),
-  passage: (translationId: string, bookOrd: number, chapter: number, startVerse: number, endVerse: number) =>
-    desktop()
+  passage: (translationId: string, bookOrd: number, chapter: number, startVerse: number, endVerse: number): Promise<VerseText[]> =>
+    isOnlineTranslation(translationId)
+      ? onlinePassage(translationId, bookOrd, chapter, startVerse, endVerse)
+      : desktop()
       ? invoke<VerseText[]>("bible_passage", { translationId, bookOrd, chapter, startVerse, endVerse }).then(cleanRows)
       : bundledPassage(translationId, bookOrd, chapter, startVerse, endVerse),
-  search: (translationId: string, query: string) =>
-    desktop()
+  // Licensed text is not stored, so search reads the bundled words; the hit opens in the chosen translation.
+  search: (translationId: string, query: string): Promise<SearchHit[]> =>
+    isOnlineTranslation(translationId)
+      ? api.search(WORDS_TRANSLATION, query)
+      : desktop()
       ? invoke<SearchHit[]>("bible_search", { translationId, query }).then((hits) => hits.map((hit) => ({ ...hit, text: cleanVerse(hit.text) })))
       : bundledSearch(translationId, query),
   startRemoteLan: () =>

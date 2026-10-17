@@ -13,6 +13,7 @@ import { defaultShortcuts } from "../keyboard/manager";
 import { normalizePew } from "./pew";
 import { normalizeProductionLayout } from "./production";
 import { sanitizeTourProgress } from "../tour/steps";
+import { sanitizeOnlineBibles } from "../bible/online-bibles";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -124,5 +125,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
     customLayouts: sanitizeLayouts(value.customLayouts),
     tours: sanitizeTourProgress(value.tours),
+    onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
   };
 }

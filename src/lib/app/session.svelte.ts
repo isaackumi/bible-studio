@@ -1,3 +1,4 @@
+import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { stepVerse } from "../bible/passage";
@@ -395,6 +396,7 @@ class Session {
   };
 
   private loadBibleCatalog = async () => {
+    configureOnlineBibles(this.workspace.onlineBibles.key, this.workspace.onlineBibles.bibles);
     this.translations = await api.translations();
     const translationId = this.translations[0]?.id;
     if (translationId) this.books = withChapterCounts(await api.books(translationId));
@@ -416,6 +418,7 @@ class Session {
       if (error) this.message = `The audience screen cannot show ${label}: ${error} It keeps trying.`;
       else if (this.message.startsWith(`The audience screen cannot show ${label}`)) this.message = `${label} is showing on the audience screen.`;
     });
+    configureOnlineBibles(this.workspace.onlineBibles.key, this.workspace.onlineBibles.bibles);
     this.translations = await api.translations();
     const translationId = this.translations[0]?.id;
     if (translationId) {
@@ -955,7 +958,7 @@ class Session {
         theme,
         backgroundImageUrl,
         reference: item.bible.reference,
-        attribution: translation ? `${translation.name}` : null,
+        attribution: attributionFor(translation),
         verses,
       });
     }
@@ -1413,7 +1416,7 @@ class Session {
       type: "scripture",
       reference: formatReference(book?.name ?? "", parsed.chapter, parsed.startVerse, end, book?.chapters ?? 1),
       body: verses.map((verse) => verse.text).join(" "),
-      attribution: translation.abbreviation || translation.name,
+      attribution: attributionFor(translation) ?? translation.abbreviation,
       verse: parsed.startVerse,
       style: {},
     };
@@ -1917,6 +1920,14 @@ class Session {
 
   /** Translation ids being downloaded (installed) right now. */
   bibleBusy = $state<string[]>([]);
+
+  /** The church's API.Bible key and chosen licensed translations. */
+  setOnlineBibles = async (key: string, bibles: OnlineBibleChoice[]) => {
+    this.workspace = { ...this.workspace, onlineBibles: { key: key.trim(), bibles } };
+    configureOnlineBibles(key, bibles);
+    this.persistSoon();
+    this.translations = await api.translations();
+  };
 
   installBible = async (id: string) => {
     if (this.bibleBusy.includes(id)) return;

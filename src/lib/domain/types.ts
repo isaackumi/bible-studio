@@ -392,6 +392,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** Licensed translations through the church's own API.Bible key. */
+  onlineBibles: { key: string; bibles: import("../bible/online-bibles").OnlineBibleChoice[] };
   /** How far the operator got in each screen tour. */
   tours: import("../tour/steps").TourProgress;
   /** Layouts the church saved from its own looks ("Start from a layout"). */

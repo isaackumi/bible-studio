@@ -12,6 +12,7 @@
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
+  import { isOnlineTranslation, WORDS_TRANSLATION } from "../../bible/online-bibles";
   import { buildQuoteIndex, chooseHeard, detectVerse, searchQuotes, type QuoteIndex } from "../../voice/detect";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
@@ -133,7 +134,8 @@
 
   $effect(() => {
     const id = translationId;
-    void bundledQuoteCatalog(id).then((rows) => {
+    // Online translations are not stored, so matching reads a bundled translation's words.
+    void bundledQuoteCatalog(isOnlineTranslation(id) ? WORDS_TRANSLATION : id).then((rows) => {
       if (id === translationId) quoteIndex = buildQuoteIndex(rows);
     });
   });
