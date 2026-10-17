@@ -119,6 +119,19 @@
   {#if model.reference && model.theme.reference.show}
     <p class="ref" style:font-size="{model.theme.reference.size}px" style:color={model.theme.reference.color}>{model.reference}</p>
   {/if}
+  {#if model.parallel && model.layout === "scripture"}
+    <!-- Two translations side by side: one reference, each column with its own attribution. -->
+    <div class="parallel">
+      {#each [{ lines: displayLines, attribution: model.attribution }, { lines: model.parallel.lines, attribution: model.parallel.attribution }] as column, n (n)}
+        <div class="parallel-col">
+          {#each column.lines as line}
+            <p class="line" style:font-size="{Math.round(model.theme.fontSize * 0.74)}px">{#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}</p>
+          {/each}
+          {#if column.attribution}<p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{column.attribution}</p>{/if}
+        </div>
+      {/each}
+    </div>
+  {:else}
   {#each displayLines as line}
     <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
       {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
@@ -126,6 +139,7 @@
   {/each}
   {#if model.attribution}
     <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
+  {/if}
   {/if}
 {/snippet}
 

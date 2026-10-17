@@ -11,16 +11,22 @@ export function presentScripture(
     reference: string;
     attribution: string | null;
     verses: VerseText[];
+    /** A second translation shown beside the first. */
+    second?: { attribution: string | null; verses: VerseText[] } | null;
   },
 ): PresentationModel {
+  const lines = (verses: VerseText[]) => verses.map((verse) => ({ marker: String(verse.verse), text: verse.text }));
   return {
     layout: "scripture",
     theme: input.theme,
     reference: input.reference,
     attribution: input.theme.attribution.show ? input.attribution : null,
-    lines: input.verses.map((verse) => ({ marker: String(verse.verse), text: verse.text })),
+    lines: lines(input.verses),
     imageUrl: null,
     backgroundImageUrl: input.backgroundImageUrl ?? null,
+    ...(input.second?.verses.length
+      ? { parallel: { attribution: input.theme.attribution.show ? input.second.attribution : null, lines: lines(input.second.verses) } }
+      : {}),
   };
 }
 

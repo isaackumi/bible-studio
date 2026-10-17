@@ -128,5 +128,6 @@ export function normalizeWorkspace(input: unknown): Workspace {
     tours: sanitizeTourProgress(value.tours),
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
     songUses: sanitizeSongUses(value.songUses),
+    parallelTranslationId: typeof value.parallelTranslationId === "string" && value.parallelTranslationId ? value.parallelTranslationId.slice(0, 120) : null,
   };
 }

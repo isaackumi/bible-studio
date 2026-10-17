@@ -37,3 +37,19 @@ describe("presentation model", () => {
     expect(model.imageUrl).toBeNull();
   });
 });
+
+describe("two translations side by side", async () => {
+  const { presentScripture } = await import("./present");
+  const { defaultTheme } = await import("./theme");
+  it("carries the second translation with its own attribution", () => {
+    const model = presentScripture({
+      theme: defaultTheme(),
+      reference: "John 3:16",
+      attribution: "King James Version",
+      verses: [{ verse: 16, text: "For God so loved the world" }],
+      second: { attribution: "World English Bible", verses: [{ verse: 16, text: "For God so loved the world, that he gave" }] },
+    });
+    expect(model.parallel).toEqual({ attribution: "World English Bible", lines: [{ marker: "16", text: "For God so loved the world, that he gave" }] });
+    expect(presentScripture({ theme: defaultTheme(), reference: "John 3:16", attribution: null, verses: [], second: { attribution: "x", verses: [] } }).parallel).toBeUndefined();
+  });
+});

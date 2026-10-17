@@ -647,6 +647,21 @@
                 {/if}
                 <option value="__more">More translations…</option>
               </select>
+              {#if session.translations.length > 1}
+                <select
+                  class="parallel-pick"
+                  class:on={!!session.workspace.parallelTranslationId}
+                  value={session.workspace.parallelTranslationId ?? ""}
+                  aria-label="Side-by-side translation"
+                  title="Show a second translation beside the first"
+                  onchange={(event) => void session.setParallelTranslation(event.currentTarget.value || null)}
+                >
+                  <option value="">One</option>
+                  {#each session.translations.filter((entry) => entry.id !== translationId) as translation (translation.id)}
+                    <option value={translation.id}>+ {translation.abbreviation}</option>
+                  {/each}
+                </select>
+              {/if}
               <button type="button" class="mini" aria-label="Edit reference" onclick={() => document.querySelector<HTMLInputElement>('[aria-label="Bible search"]')?.select()}>{@render icon("book")}</button>
               <button type="button" class="mini" class:on={wrapVerses} aria-label="Verse layout" onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
               <label class="bible-search">
@@ -1066,6 +1081,8 @@
   }
   select { width: 88px; }
   .script-bar input { flex: 1; min-width: 0; }
+  .script-bar .parallel-pick { width: 74px; flex: none; color: var(--muted); }
+  .script-bar .parallel-pick.on { border-color: var(--accent); color: var(--accent); }
   .verse-list, .queue { overflow: auto; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
   .verse, .queue button {
     border: 1px solid var(--line);

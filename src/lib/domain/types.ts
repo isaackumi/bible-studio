@@ -144,6 +144,8 @@ export type PresentationModel = {
   fill?: string;
   /** layout "shape": a filled rectangle or ellipse. */
   shape?: { kind: "rect" | "ellipse"; fill: string; radius: number };
+  /** Scripture in a second translation, shown beside the first. */
+  parallel?: { attribution: string | null; lines: PresentationLine[] };
 };
 
 export type ProgramAlert = {
@@ -392,6 +394,8 @@ export type Workspace = {
   displayProfiles: DisplayProfile[];
   /** Saved looks. Preview only until LIVE. */
   compositions: CompositionDocument[];
+  /** A second translation shown beside the first on scripture slides, or null. */
+  parallelTranslationId: string | null;
   /** Songs shown live, once per day, for CCLI copy reporting. */
   songUses: import("./song-usage").SongUse[];
   /** Licensed translations through the church's own API.Bible key. */

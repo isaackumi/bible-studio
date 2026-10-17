@@ -103,6 +103,7 @@ import type {
   AppearanceSettings,
   PewDeskState,
   PewMonitors,
+  VerseText,
   LiveFrame,
   PewPage,
   ProductionLayout,
@@ -978,6 +979,28 @@ class Session {
     return { ...model, backgroundVideoUrl: this.mediaSrc(background.assetId) };
   };
 
+  /** The same verses in the side-by-side translation, if one is chosen and it is not this one. */
+  private async parallelVerses(bible: BibleItem): Promise<{ attribution: string | null; verses: VerseText[] } | null> {
+    const id = this.workspace.parallelTranslationId;
+    if (!id || id === bible.translationId) return null;
+    const translation = this.translations.find((entry) => entry.id === id);
+    if (!translation) return null;
+    try {
+      const verses = await api.passage(id, bible.bookOrd, bible.chapter, bible.startVerse, bible.endVerse);
+      return { attribution: attributionFor(translation), verses };
+    } catch {
+      // An online translation that cannot be reached leaves the slide in one translation.
+      return null;
+    }
+  }
+
+  /** Choose the side-by-side translation (null for one translation), and refresh Preview. */
+  setParallelTranslation = async (id: string | null) => {
+    this.workspace = { ...this.workspace, parallelTranslationId: id };
+    this.persistSoon();
+    if (this.previewBible) await this.previewPassage(this.previewBible);
+  };
+
   private async baseModelFor(item: PresentationItem): Promise<PresentationModel> {
     const theme = this.theme();
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
@@ -990,12 +1013,14 @@ class Session {
         item.bible.endVerse,
       );
       const translation = this.translations.find((entry) => entry.id === item.bible?.translationId);
+      const second = await this.parallelVerses(item.bible);
       return presentScripture({
         theme,
         backgroundImageUrl,
         reference: item.bible.reference,
         attribution: attributionFor(translation),
         verses,
+        second,
       });
     }
     if (item.kind === "lyric" && item.lyric) {

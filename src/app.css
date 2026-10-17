@@ -258,6 +258,11 @@ button { cursor: pointer; }
   padding: 28px 72px 40px;
   background: color-mix(in srgb, #050505 78%, transparent);
 }
+/* Two translations side by side. */
+.frame .parallel { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; text-align: inherit; }
+.frame .parallel-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.frame .parallel-col + .parallel-col { padding-left: 64px; margin-left: -32px; border-left: 2px solid color-mix(in srgb, currentColor 22%, transparent); }
+.frame.lower .parallel { gap: 40px; }
 /* Theme text panels: words on a box, frosted glass, a full-width band, or a broadcast bar. */
 .frame .tpanel { position: relative; display: flex; flex-direction: column; gap: inherit; max-width: 100%; background: var(--panel-bg); }
 .frame .tpanel.box { padding: 44px 60px; border-radius: 22px; border-top: 6px solid var(--panel-accent); max-width: 88%; }
