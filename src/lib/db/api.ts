@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { cleanVerse } from "../bible/clean";
 import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch, browserInstalledBibles, browserInstallBible, browserRemoveBible } from "../bible/texts";
 import { browserMedia } from "../platform/browser-media";
 import { browserLibrary } from "../platform/browser-store";
@@ -22,6 +23,8 @@ import type {
 function desktop(): boolean {
   return isDesktop();
 }
+
+const cleanRows = (rows: VerseText[]) => rows.map((row) => ({ ...row, text: cleanVerse(row.text) }));
 
 export const api = {
   outputStatus: () => invoke<OutputStatus>("output_status"),
@@ -89,14 +92,19 @@ export const api = {
     desktop()
       ? invoke<BookInfo[]>("bible_books", { translationId })
       : Promise.resolve(BUNDLED_TRANSLATIONS.some((entry) => entry.id === translationId) ? bundledBooks() : []),
+  // Desktop databases seeded before the text cleanup still hold the old text; tidy it as it is read.
   verses: (translationId: string, bookOrd: number, chapter: number) =>
-    desktop() ? invoke<VerseText[]>("bible_verses", { translationId, bookOrd, chapter }) : bundledChapter(translationId, bookOrd, chapter),
+    desktop()
+      ? invoke<VerseText[]>("bible_verses", { translationId, bookOrd, chapter }).then(cleanRows)
+      : bundledChapter(translationId, bookOrd, chapter),
   passage: (translationId: string, bookOrd: number, chapter: number, startVerse: number, endVerse: number) =>
     desktop()
-      ? invoke<VerseText[]>("bible_passage", { translationId, bookOrd, chapter, startVerse, endVerse })
+      ? invoke<VerseText[]>("bible_passage", { translationId, bookOrd, chapter, startVerse, endVerse }).then(cleanRows)
       : bundledPassage(translationId, bookOrd, chapter, startVerse, endVerse),
   search: (translationId: string, query: string) =>
-    desktop() ? invoke<SearchHit[]>("bible_search", { translationId, query }) : bundledSearch(translationId, query),
+    desktop()
+      ? invoke<SearchHit[]>("bible_search", { translationId, query }).then((hits) => hits.map((hit) => ({ ...hit, text: cleanVerse(hit.text) })))
+      : bundledSearch(translationId, query),
   startRemoteLan: () =>
     desktop()
       ? invoke<RemoteLanStatus>("start_remote_lan")

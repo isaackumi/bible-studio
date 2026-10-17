@@ -60,16 +60,12 @@
   const chosen = $derived(BIBLE_CATALOG.find((entry) => entry.id === translation) ?? BIBLE_CATALOG[0]!);
   const name = $derived(churchName.trim() || "Your church");
 
-  // The bundled WEB text has stray spaces around punctuation ("world , that", "didn’ t").
-  const tidy = (rows: VerseText[]) =>
-    rows.map((row) => ({ ...row, text: row.text.replace(/\s+([,.;:!?])/g, "$1").replace(/(\w)([’'])\s+(\w)/g, "$1$2$3") }));
-
   $effect(() => {
     const id = translation;
     if (!installedIds.includes(id)) return;
     void Promise.all([api.passage(id, 43, 3, 16, 16), api.passage(id, 43, 3, 17, 17)])
       .then(([v16, v17]) => {
-        if (id === translation && v16.length && v17.length) verses = { v16: tidy(v16), v17: tidy(v17) };
+        if (id === translation && v16.length && v17.length) verses = { v16, v17 };
       })
       .catch(() => {});
   });
