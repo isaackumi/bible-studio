@@ -18,7 +18,7 @@
 <figure class="screen preview">
   <figcaption>
     <span class="kicker">Preview</span>
-    <span class="place">{place}</span>
+    <span class="place">{place || (session.live.preview.model.layout === "empty" ? "Nothing staged on this page yet" : "")}</span>
     {#if onstep}
       <span class="steps">
         <button type="button" class="row-tool" aria-label="Previous section" title="Previous section" onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>

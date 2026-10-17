@@ -51,7 +51,7 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       {
         target: [".pb-modes"],
         title: "Scripture, Songs and Sermon",
-        body: "Switch pages here. Each page keeps its own panels, and what is live stays live while you move.",
+        body: "Switch pages here. Each page keeps its own Preview and panels, and what is live stays live while you move.",
       },
       {
         target: ["label.bible-search"],

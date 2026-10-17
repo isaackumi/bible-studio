@@ -363,9 +363,17 @@
     session.pageRequest = null;
   });
 
-  function pickMode(next: Mode) {
+  /** Change page; each page keeps its own Preview (Program stays as it is). */
+  function setMode(next: Mode): boolean {
+    const restored = session.switchPage(mode, next);
     mode = next;
-    if (next !== "scriptures") return;
+    return restored;
+  }
+
+  function pickMode(next: Mode) {
+    const restored = setMode(next);
+    if (next !== "scriptures" || restored) return;
+    // First visit back to Scripture: stage the passage that is open.
     const item = passage();
     if (item) void session.previewPassage(item);
   }
@@ -419,7 +427,7 @@
     const stopHeard = session.onVoiceHeard(detectSpokenVerse);
     const stopDesk = session.attachVoiceDesk(async (request) => {
       if (request.kind === "library") {
-        mode = request.tab === "songs" ? "songs" : "scriptures";
+        setMode(request.tab === "songs" ? "songs" : "scriptures");
         return true;
       }
       if (request.kind === "translation") {
@@ -430,7 +438,7 @@
         if (item) await session.previewPassage(item);
         return true;
       }
-      mode = "scriptures";
+      setMode("scriptures");
       query = request.query;
       takeAfterPreview = false;
       await findInScripture();

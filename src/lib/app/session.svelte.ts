@@ -101,6 +101,7 @@ import type {
   AppearanceSettings,
   PewDeskState,
   PewMonitors,
+  LiveFrame,
   PewPage,
   ProductionLayout,
   BibleItem,
@@ -1836,6 +1837,31 @@ class Session {
   /** The library and workspace have loaded (the loading screen can go). */
   booted = $state(false);
 
+  /** What each Presenter Desk page last staged on Preview, so every page keeps its own. */
+  private pageStage: Partial<Record<PewPage, { preview: LiveFrame; songFocus: Session["songFocus"]; sermonFocus: Session["sermonFocus"]; previewBible: BibleItem | null; lookOnPreview: Composition | null }>> = {};
+
+  /**
+   * Leaving one page for another: put away this page's Preview and bring back the other's
+   * (empty if it has staged nothing). Program never changes. Returns whether one came back.
+   */
+  switchPage = (from: PewPage, to: PewPage): boolean => {
+    if (from === to) return true;
+    this.pageStage[from] = {
+      preview: this.live.preview,
+      songFocus: this.songFocus,
+      sermonFocus: this.sermonFocus,
+      previewBible: this.previewBible,
+      lookOnPreview: this.lookOnPreview,
+    };
+    const saved = this.pageStage[to];
+    this.live = { ...this.live, preview: saved?.preview ?? { transition: "cut", sourceId: null, model: emptyModel(this.theme()) } };
+    this.songFocus = saved?.songFocus ?? null;
+    this.sermonFocus = saved?.sermonFocus ?? null;
+    this.previewBible = saved?.previewBible ?? null;
+    this.lookOnPreview = saved?.lookOnPreview ?? null;
+    return !!saved;
+  };
+
   /** The screen tour running now, if any, and the step (in the full list) it starts from. */
   tour = $state<TourId | null>(null);
   tourFrom = $state(0);
@@ -2469,6 +2495,11 @@ class Session {
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {
     if (!this.desktop() && !this.controlsAudience) {
       this.message = "This window is not sending to the audience.";
+      return;
+    }
+    // An empty Preview (a page with nothing staged yet) never clears the screen by accident.
+    if ((action === "take" || action === "cut") && this.live.preview.model.layout === "empty") {
+      this.message = "Nothing on Preview yet. Program did not change.";
       return;
     }
     const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
