@@ -20,6 +20,7 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import Copy from "@lucide/svelte/icons/copy";
   import Laptop from "@lucide/svelte/icons/laptop";
+  import Check from "@lucide/svelte/icons/check";
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
@@ -120,6 +121,7 @@
     pencil: Pencil,
     copy: Copy,
     laptop: Laptop,
+    check: Check,
     phone: Smartphone,
     view: PanelsTopLeft,
   };

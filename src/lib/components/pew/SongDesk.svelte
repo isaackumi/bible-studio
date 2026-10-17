@@ -44,6 +44,7 @@
   });
 
   async function install(pack: (typeof packs)[number]) {
+    if (!session.requireFeature("song-packs")) return;
     installing = pack.id;
     const ok = await session.installSongPack(pack);
     installing = null;
@@ -637,7 +638,7 @@
         </button>
       </header>
       <label class="follow">
-        <input type="checkbox" bind:checked={follow} />
+        <input type="checkbox" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
         <span>Follow singing <small>Put the section being sung on Preview</small></span>
       </label>
       {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}

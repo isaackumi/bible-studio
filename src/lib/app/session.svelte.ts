@@ -87,6 +87,7 @@ import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
+import { effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
@@ -318,6 +319,7 @@ class Session {
   init = async () => {
     this.ready = true;
     void this.startCameraRelay();
+    if (typeof window !== "undefined") setInterval(() => (this.planClock = Date.now()), 60_000);
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
@@ -725,6 +727,7 @@ class Session {
   };
 
   openRemotePairing = async () => {
+    if (!this.requireFeature("phone-remote")) return;
     this.remotePairing = createPairing(Date.now(), randomCode(), randomToken(24));
     this.message = `Scan the QR code on the phone, or type code ${this.remotePairing.code}. You approve each phone here.`;
     if (this.desktop()) await this.attachLanRemote(true);
@@ -1196,6 +1199,7 @@ class Session {
       this.stopVoice("Listening stopped. Preview and Program were left as they were.");
       return;
     }
+    if (!this.requireFeature("voice")) return;
     await this.startVoice();
   };
 
@@ -1789,6 +1793,38 @@ class Session {
 
   songPacks = $state<SongPack[]>([]);
 
+  // Plans. `now` ticks once a minute so a trial ends on time without a restart.
+  planClock = $state(Date.now());
+  /** The feature an upgrade prompt is explaining, or null when no prompt is open. */
+  upgradeFor = $state<PlanFeature | null>(null);
+
+  get plan(): PlanId {
+    return effectivePlan(this.workspace.entitlement, this.planClock);
+  }
+
+  get trialDays(): number {
+    return trialDaysLeft(this.workspace.entitlement, this.planClock);
+  }
+
+  entitled = (feature: PlanFeature): boolean => planIncludes(this.plan, feature);
+
+  /** True when the plan includes the feature; otherwise opens the upgrade prompt and returns false. */
+  requireFeature = (feature: PlanFeature): boolean => {
+    if (this.entitled(feature)) return true;
+    this.upgradeFor = feature;
+    return false;
+  };
+
+  startTrial = () => {
+    const next = startTrial(this.workspace.entitlement);
+    if (next === this.workspace.entitlement) return false;
+    this.workspace = { ...this.workspace, entitlement: next };
+    this.planClock = Date.now();
+    this.persistSoon();
+    this.message = `Premium trial started: ${TRIAL_DAYS} days on this computer.`;
+    return true;
+  };
+
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
   loadSongPacks = async () => {
     try {
@@ -2133,6 +2169,7 @@ class Session {
 
   /** Open the stage display: a popup in the browser, a separate window on desktop. Never Program. */
   openStage = async () => {
+    if (!this.requireFeature("stage-display")) return;
     this.stageOpen = true;
     this.publishStage();
     if (isDesktop()) {

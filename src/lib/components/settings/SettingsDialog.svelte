@@ -12,6 +12,7 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+  import { FEATURE_LABELS, PLANS, planById, TRIAL_DAYS } from "../../domain/plans";
   import OutputType from "../OutputType.svelte";
 
   type SettingsSectionId =
@@ -81,7 +82,7 @@
       items: [
         { id: "performance", title: "Performance", icon: "speed", color: "#30a46c", about: "How much of the desk is on screen.", keywords: "speed density size" },
         { id: "updates", title: "Updates", icon: "refresh", color: "#0a84ff", about: "Which version is running.", keywords: "version update release" },
-        { id: "account", title: "Account", icon: "user", color: "#8e8e93", about: "Who is signed in.", keywords: "sign in user cloud" },
+        { id: "account", title: "Plan & account", icon: "user", color: "#8e8e93", about: "Your plan, the Premium trial, and what each plan includes.", keywords: "sign in user cloud plan premium free church trial upgrade billing" },
         { id: "license", title: "License", icon: "key", color: "#d4a017", about: "How this copy of Church Studio is entitled.", keywords: "license plan" },
       ],
     },
@@ -589,7 +590,16 @@
         {/each}
         <p class="note stand">These keys call the command list. Remapping will use the same commands.</p>
       {:else if section === "remote"}
-        <RemotePanel />
+        {#if session.entitled("phone-remote")}
+          <RemotePanel />
+        {:else}
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy"><strong>Phone remote is part of Premium</strong><span>Pair a phone to move through the service and Take from anywhere in the room.</span></div>
+              <button type="button" class="btn primary" onclick={() => session.requireFeature("phone-remote")}>Unlock</button>
+            </div>
+          </section>
+        {/if}
       {:else if section === "stage"}
         <section class="rows">
           <div class="row">
@@ -712,17 +722,66 @@
           </div>
         </section>
       {:else if section === "account"}
+        {@const current = planById(session.plan)}
+        {@const ent = session.workspace.entitlement}
+        <section class="plan-hero" style:--plan={current.color}>
+          <span class="plan-badge"><Icon name="key" size={20} /></span>
+          <div class="head-copy">
+            <p class="eyebrow">Your plan</p>
+            <h3>{current.name}{#if session.trialDays > 0}<span class="pill">Trial · {session.trialDays} day{session.trialDays === 1 ? "" : "s"} left</span>{/if}</h3>
+            <p>{current.tagline}</p>
+          </div>
+          {#if ent.plan === "free" && !ent.trialUsed}
+            <button type="button" class="btn primary" onclick={() => session.startTrial()}>Try Premium free for {TRIAL_DAYS} days</button>
+          {/if}
+        </section>
+        {#if ent.trialUsed && session.trialDays === 0 && ent.plan === "free"}
+          <p class="note stand">Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.</p>
+        {/if}
+        <p class="section-label">Compare plans</p>
+        <div class="plan-grid">
+          {#each PLANS as plan, i (plan.id)}
+            <article class="plan-card" class:current={plan.id === session.plan} style:--plan={plan.color}>
+              <header>
+                <strong>{plan.name}</strong>
+                {#if plan.id === session.plan}<span class="pill ok">Current</span>{/if}
+              </header>
+              <p>{plan.tagline}</p>
+              {#if i > 0}<p class="plus">Everything in {PLANS[i - 1]!.name}, plus</p>{/if}
+              <ul>
+                {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
+                  <li class:soon={FEATURE_LABELS[feature].soon}>
+                    <Icon name="check" size={13} />
+                    <span>{FEATURE_LABELS[feature].label}{#if FEATURE_LABELS[feature].soon}<em>soon</em>{/if}</span>
+                  </li>
+                {/each}
+              </ul>
+              {#if plan.id === "free"}
+                <span class="plan-cta muted">Included</span>
+              {:else if plan.id === session.plan && session.trialDays === 0}
+                <span class="plan-cta muted">Active</span>
+              {:else}
+                <button type="button" class="btn plan-cta" disabled title="Purchasing is coming soon">Upgrade · coming soon</button>
+              {/if}
+            </article>
+          {/each}
+        </div>
+        <p class="section-label">Account</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Offline</strong><span>Church Studio runs without an account. Sign-in is not part of this release.</span></div>
-            <span class="pill muted">No account</span>
+            <div class="row-copy"><strong>Sign in</strong><span>Accounts arrive with purchasing and cloud sync. Church Studio works fully offline without one.</span></div>
+            <span class="pill muted">Offline</span>
           </div>
         </section>
       {:else}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Included</strong><span>Presentation, the library and audience output run offline. No license check is needed in this release.</span></div>
-            <span class="pill">Active</span>
+            <div class="row-copy"><strong>{planById(session.plan).name}</strong><span>{session.trialDays > 0 ? `Premium trial on this computer · ${session.trialDays} day${session.trialDays === 1 ? "" : "s"} left.` : session.plan === "free" ? "Free forever. Presentation, the library and audience output run offline." : "Licensed on this computer."}</span></div>
+            <span class="pill" class:ok={session.plan !== "free"} class:muted={session.plan === "free"}>{session.plan === "free" ? "Free" : "Active"}</span>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Plans and features</strong><span>See what each plan includes.</span></div>
+            <button type="button" class="btn" onclick={() => (section = "account")}>Compare plans</button>
           </div>
         </section>
       {/if}
@@ -921,6 +980,28 @@
   .lamp { width: 12px; height: 12px; border-radius: 50%; background: var(--line); flex: none; }
   .lamp.on { background: var(--presence, #3fb950); box-shadow: 0 0 0 5px color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); }
 
+  /* Plans */
+  .plan-hero { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid color-mix(in srgb, var(--plan) 50%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--plan) 18%, var(--field)), var(--field) 70%); flex: none; }
+  .plan-badge { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; background: var(--plan); color: #fff; }
+  .plan-hero .eyebrow { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .plan-hero h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 20px; font-weight: 700; }
+  .plan-hero p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  .plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; flex: none; }
+  .plan-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-top: 3px solid var(--plan); border-radius: 12px; background: var(--field); }
+  .plan-card.current { box-shadow: 0 0 0 1px var(--plan); }
+  .plan-card header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .plan-card header strong { font-size: 15px; }
+  .plan-card > p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; min-height: 34px; }
+  .plan-card > p.plus { min-height: 0; font-weight: 700; color: var(--ink); }
+  .plan-card ul { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .plan-card li { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.35; }
+  .plan-card li :global(svg) { flex: none; margin-top: 1px; color: var(--plan); }
+  .plan-card li.soon { color: var(--muted); }
+  .plan-card li em { margin-left: 6px; font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .plan-card :global(.btn.plan-cta) { width: 100%; }
+  span.plan-cta { display: block; padding: 7px 0; text-align: center; font-size: 12px; font-weight: 600; }
+  .plan-cta.muted { color: var(--muted); }
+
   /* Appearance */
   .choice-row, .theme-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .theme-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1035,7 +1116,7 @@
   @media (max-width: 760px) {
     .settings { grid-template-columns: 1fr; height: min(92dvh, 760px); }
     .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }
-    .theme-row, .split, .choice-row { grid-template-columns: 1fr 1fr; }
+    .theme-row, .split, .choice-row, .plan-grid { grid-template-columns: 1fr 1fr; }
     .row { flex-direction: column; align-items: stretch; }
     .row .field { width: 100%; }
   }

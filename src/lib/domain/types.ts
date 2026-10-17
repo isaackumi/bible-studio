@@ -368,6 +368,8 @@ export type Workspace = {
   ccliLicense: string;
   /** Song pack ids already installed (static/song-packs), so they are not offered twice. */
   installedPacks: string[];
+  /** Plan on this computer (Free, a Premium trial, or a purchased plan). See domain/plans. */
+  entitlement: import("./plans").Entitlement;
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */

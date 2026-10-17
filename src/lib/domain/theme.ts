@@ -223,6 +223,7 @@ export function defaultWorkspace(): Workspace {
     songFolders: [],
     ccliLicense: "",
     installedPacks: [],
+    entitlement: { plan: "free", trialEndsAt: null, trialUsed: false },
     churchName: "",
     logoAssetId: null,
     logoText: "Church Studio",
