@@ -539,6 +539,7 @@ class Session {
       ...programPacket(this.live, lookTransition.ms),
       sessionId: this.sessionId,
       generation: this.audienceGeneration,
+      calm: this.workspace.appearance.calm === true,
     };
     if (!this.desktop()) {
       if (!this.controlsAudience) {
@@ -2746,6 +2747,12 @@ class Session {
     if (sameProductionLayout(next, this.workspace.production)) return;
     this.workspace = { ...this.workspace, production: next };
     this.persistSoon();
+  };
+
+  /** Calm backgrounds: hold animated backgrounds still here and on the audience screen. */
+  setCalmBackgrounds = (calm: boolean) => {
+    this.setAppearance({ calm });
+    if (this.live.program.model.layout !== "empty") void this.pushProgram();
   };
 
   setAppearance = (patch: Partial<AppearanceSettings>) => {

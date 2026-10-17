@@ -23,6 +23,7 @@
     root.style.setProperty("--ui-scale", String(appearance.scale));
     root.style.setProperty("zoom", String(appearance.scale));
     root.dataset.desk = appearance.desk;
+    root.toggleAttribute("data-calm", appearance.calm === true);
     root.style.setProperty("--accent", appearance.accent);
     root.style.setProperty("--brass", appearance.accent);
     root.style.setProperty("--focus", appearance.accent);

@@ -223,6 +223,13 @@
     {/each}
   </div>
 
+  <section class="rows">
+    <div class="row">
+      <div class="row-copy"><strong>Calm backgrounds</strong><span>Hold animated backgrounds still on this computer and its audience screen. Turn on if motion stutters on an older projector computer.</span></div>
+      <input type="checkbox" class="switch" role="switch" aria-label="Calm backgrounds" checked={session.workspace.appearance.calm === true} onchange={(event) => session.setCalmBackgrounds(event.currentTarget.checked)} />
+    </div>
+  </section>
+
   <!-- Editor -->
   <div class="editor" class:locked={!canEdit}>
     <p class="section-label">Customize {selected.name}</p>

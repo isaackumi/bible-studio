@@ -37,6 +37,7 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
     scale: value?.scale === undefined ? base.scale : clampScale(value.scale),
     accent: sanitizeAccent(value?.accent?.toLowerCase() === "#c6a15b" ? undefined : (value?.accent ?? base.accent)),
     desk: value?.desk === "obs" ? "obs" : value?.desk === "pewbeam" ? "pewbeam" : base.desk,
+    calm: value?.calm === true,
   };
 }
 

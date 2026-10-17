@@ -40,6 +40,7 @@
     fadeMs = packet.transitionMs;
     current = next;
     currentSource = packet.frame.sourceId ?? null;
+    document.documentElement.toggleAttribute("data-calm", packet.calm === true);
   }
 
   function wanted(): string[] {

@@ -346,6 +346,8 @@ export type AppearanceSettings = {
   scale: number;
   accent: string;
   desk: DeskStyle;
+  /** Hold animated theme backgrounds still on this computer, for slower projector machines. */
+  calm?: boolean;
 };
 
 export type Workspace = {
@@ -443,6 +445,8 @@ export type ProgramPacket = {
   transition: TransitionKind;
   transitionMs: number;
   frame: LiveFrame;
+  /** Hold animated backgrounds still on the audience screen. */
+  calm?: boolean;
 };
 
 export type TranslationInfo = {
