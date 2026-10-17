@@ -1,9 +1,15 @@
 export type TransitionKind = "cut" | "fade";
 
+export type MotionId = "aurora" | "rays" | "bokeh" | "waves" | "stars" | "embers" | "clouds";
+
 export type ThemeBackground =
   | { type: "color"; color: string }
+  | { type: "gradient"; from: string; to: string; angle: number }
   | { type: "image"; assetId: string }
-  | { type: "wash"; washId: string };
+  | { type: "video"; assetId: string }
+  | { type: "wash"; washId: string }
+  /** An animated scene drawn in CSS (no file), tinted with one color over a base color. */
+  | { type: "motion"; motionId: MotionId; tint: string; base: string };
 
 export type ThemeLayout = "frame" | "lower-third";
 
@@ -23,6 +29,10 @@ export type Theme = {
   transition: { type: TransitionKind; ms: number };
   /** Bold, italic, underline, uppercase and shadow for every frame using this theme. */
   effects?: TextStyle;
+  /** Darken the background (0–0.8) so text reads over photos, video and motion. */
+  dim?: number;
+  /** A Premium library theme (animated, photo or video). */
+  premium?: boolean;
 };
 
 /**
@@ -101,6 +111,8 @@ export type PresentationModel = {
   lines: PresentationLine[];
   imageUrl: string | null;
   backgroundImageUrl: string | null;
+  /** A looping background video (theme background "video"), resolved to a playable URL. */
+  backgroundVideoUrl?: string | null;
   layers?: PaintedLayer[];
   timer?: TimerPaint;
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */

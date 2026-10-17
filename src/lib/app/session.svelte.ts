@@ -91,7 +91,7 @@ import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, pla
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
-import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
+import { blackModel, DEFAULT_THEME_ID, defaultTheme, defaultWorkspace, emptyModel, factoryThemes, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
 import { defaultProductionLayout, normalizeProductionLayout, sameProductionLayout } from "../workspace/production";
 import type {
@@ -922,8 +922,15 @@ class Session {
   /** An item's own text style (slides, announcements) applies on top of the theme. */
   private async modelFor(item: PresentationItem): Promise<PresentationModel> {
     const model = await this.baseModelFor(item);
-    return item.style ? styleModel(model, item.style) : model;
+    return this.withBackdrop(item.style ? styleModel(model, item.style) : model);
   }
+
+  /** A theme's video background travels in the frame as a playable URL (the audience window has no library). */
+  private withBackdrop = (model: PresentationModel): PresentationModel => {
+    const background = model.theme.background;
+    if (background.type !== "video") return model;
+    return { ...model, backgroundVideoUrl: this.mediaSrc(background.assetId) };
+  };
 
   private async baseModelFor(item: PresentationItem): Promise<PresentationModel> {
     const theme = this.theme();
@@ -1751,7 +1758,7 @@ class Session {
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
     const lyrics = lyricsFor(clean, section.id, clean.title);
     this.previewModel(
-      presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit: creditFor(clean, section.id, this.workspace.ccliLicense) }),
+      this.withBackdrop(presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit: creditFor(clean, section.id, this.workspace.ccliLicense) })),
       `song:${clean.id}:${section.id}`,
     );
   };
@@ -2354,9 +2361,28 @@ class Session {
     this.showThemeOnPreview(next);
   };
 
+  /** A copy to customise (Premium). Built-in themes are left as they are. */
+  duplicateTheme = (id: string): Theme | null => {
+    if (!this.requireFeature("theme-library")) return null;
+    const source = this.themes.find((theme) => theme.id === id) ?? this.theme();
+    const copy = sanitizeTheme({ ...structuredClone($state.snapshot(source)), id: `theme-${uid()}`, name: `${source.name} copy`, premium: undefined });
+    this.saveTheme(copy);
+    return copy;
+  };
+
+  /** Delete a theme you made. Built-in themes stay. */
+  deleteTheme = async (id: string) => {
+    if (factoryThemes().some((theme) => theme.id === id)) return;
+    await api.themeDelete(id);
+    this.themes = this.themes.filter((theme) => theme.id !== id);
+    if (this.workspace.themeId === id) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
+    this.message = "Theme deleted.";
+  };
+
   useTheme = (id: string) => {
     const next = this.themes.find((theme) => theme.id === id);
     if (!next || next.id === this.workspace.themeId) return;
+    if (next.premium && !this.requireFeature("theme-library")) return;
     this.workspace = { ...this.workspace, themeId: next.id };
     this.persistSoon();
     this.showThemeOnPreview(next);
@@ -2364,7 +2390,7 @@ class Session {
 
   private showThemeOnPreview(next: Theme) {
     if (this.cursor.itemId) void this.selectItem(this.cursor.itemId);
-    else this.live = setPreview(this.live, frame({ ...this.live.preview.model, theme: next }, this.live.preview.sourceId, "cut"));
+    else this.live = setPreview(this.live, frame(this.withBackdrop({ ...this.live.preview.model, theme: next }), this.live.preview.sourceId, "cut"));
   }
 
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {

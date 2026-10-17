@@ -41,6 +41,7 @@ export const api = {
   workspaceSave: (document: Workspace) => invoke<void>("workspace_save", { document }),
   themeList: () => (desktop() ? invoke<Theme[]>("theme_list") : browserLibrary.themes()),
   themeSave: (document: Theme) => (desktop() ? invoke<void>("theme_save", { document }) : browserLibrary.saveTheme(document)),
+  themeDelete: (id: string) => (desktop() ? invoke<void>("theme_delete", { id }) : browserLibrary.deleteTheme(id)),
   songList: () => (desktop() ? invoke<Song[]>("song_list") : browserLibrary.songs()),
   songSearch: async (query: string) => {
     if (desktop()) return invoke<Song[]>("song_search", { query });

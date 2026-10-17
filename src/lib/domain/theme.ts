@@ -1,4 +1,4 @@
-import { displayWash } from "./backgrounds";
+import { displayWash, motionById } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
 import { SCREEN_FONTS } from "./fonts";
 import { factoryLayouts } from "../workspace/layout";
@@ -17,9 +17,22 @@ export function sanitizeTransition(value: unknown): Theme["transition"] {
   return { type, ms: Math.min(MAX_TRANSITION_MS, Math.max(MIN_TRANSITION_MS, ms)) };
 }
 
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const hex = (value: unknown, fallback: string) => (typeof value === "string" && HEX.test(value) ? value.toLowerCase() : fallback);
+
 function sanitizeBackground(background: Theme["background"]): Theme["background"] {
   if (background?.type === "wash" && displayWash(background.washId)) return background;
-  if (background?.type === "image" && typeof background.assetId === "string" && background.assetId) return background;
+  if ((background?.type === "image" || background?.type === "video") && typeof background.assetId === "string" && background.assetId) {
+    return { type: background.type, assetId: background.assetId };
+  }
+  if (background?.type === "gradient") {
+    const angle = typeof background.angle === "number" && Number.isFinite(background.angle) ? ((Math.round(background.angle) % 360) + 360) % 360 : 180;
+    return { type: "gradient", from: hex(background.from, "#0b1020"), to: hex(background.to, "#1f2a44"), angle };
+  }
+  if (background?.type === "motion" && motionById(background.motionId)) {
+    const motion = motionById(background.motionId)!;
+    return { type: "motion", motionId: motion.id, tint: hex(background.tint, motion.tint), base: hex(background.base, motion.base) };
+  }
   if (background?.type === "color" && typeof background.color === "string" && background.color) return background;
   return { type: "color", color: "#050505" };
 }
@@ -41,6 +54,8 @@ export function sanitizeTheme(theme: Theme): Theme {
     layout: theme.layout === "lower-third" ? "lower-third" : "frame",
     transition: sanitizeTransition(theme.transition),
     effects: sanitizeEffects(theme.effects),
+    dim: typeof theme.dim === "number" && Number.isFinite(theme.dim) ? Math.min(0.8, Math.max(0, theme.dim)) : undefined,
+    premium: theme.premium === true ? true : undefined,
   };
 }
 
@@ -196,6 +211,19 @@ export function factoryThemes(): Theme[] {
       reference: { color: "#d7c8ff" },
       attribution: { color: "#c4b6e6" },
     }),
+    // Library themes (Premium): animated scenes and seasonal gradients.
+    displayTheme({ id: "theme-aurora", name: "Aurora", premium: true, background: { type: "motion", motionId: "aurora", tint: "#3ee6b4", base: "#04121a" }, fontFamily: SANS, fontSize: 62, color: "#f2fffb", reference: { color: "#9cf2d6" }, attribution: { color: "#8ccfbd" } }),
+    displayTheme({ id: "theme-candlelight", name: "Candlelight", premium: true, background: { type: "motion", motionId: "embers", tint: "#ff9a4a", base: "#0d0504" }, fontFamily: SERIF, fontSize: 64, color: "#fff4e6", reference: { color: "#ffcf96" }, attribution: { color: "#d9b08a" } }),
+    displayTheme({ id: "theme-starfield", name: "Starfield", premium: true, background: { type: "motion", motionId: "stars", tint: "#e8f0ff", base: "#03050c" }, fontFamily: INTER, fontSize: 60, color: "#f4f7ff", reference: { color: "#b9c8ff" }, attribution: { color: "#8f9bc0" } }),
+    displayTheme({ id: "theme-glory", name: "Glory rays", premium: true, background: { type: "motion", motionId: "rays", tint: "#ffd89a", base: "#140d06" }, fontFamily: SERIF, fontSize: 64, color: "#fffaf0", reference: { color: "#ffe2a8" }, attribution: { color: "#d8bf94" } }),
+    displayTheme({ id: "theme-bokeh", name: "Bokeh", premium: true, background: { type: "motion", motionId: "bokeh", tint: "#b98cff", base: "#0c0716" }, fontFamily: FIGTREE, fontSize: 62, color: "#fbf7ff", reference: { color: "#dcc6ff" }, attribution: { color: "#b8a6d8" } }),
+    displayTheme({ id: "theme-deep-sea", name: "Deep sea", premium: true, background: { type: "motion", motionId: "waves", tint: "#3aa0ff", base: "#02101f" }, fontFamily: SANS, fontSize: 60, color: "#f2f8ff", reference: { color: "#a8d4ff" }, attribution: { color: "#86a9cc" } }),
+    displayTheme({ id: "theme-heaven", name: "Heaven’s clouds", premium: true, background: { type: "motion", motionId: "clouds", tint: "#ffffff", base: "#5d7fa8" }, fontFamily: SERIF, fontSize: 64, color: "#ffffff", dim: 0.15, reference: { color: "#fff3c4" }, attribution: { color: "#e6eefa" }, effects: { shadow: true } }),
+    displayTheme({ id: "theme-advent", name: "Advent", premium: true, background: { type: "gradient", from: "#1b0f2e", to: "#4b2a6b", angle: 160 }, fontFamily: SERIF, fontSize: 62, color: "#f7f0ff", reference: { color: "#d9c2ff" }, attribution: { color: "#b4a2cc" } }),
+    displayTheme({ id: "theme-easter", name: "Easter", premium: true, background: { type: "gradient", from: "#fff6e5", to: "#f2d9a6", angle: 180 }, fontFamily: SERIF, fontSize: 62, color: "#3a2410", reference: { color: "#9a6420" }, attribution: { color: "#8a7258" } }),
+    displayTheme({ id: "theme-pentecost", name: "Pentecost", premium: true, background: { type: "gradient", from: "#2a0606", to: "#c2410c", angle: 200 }, fontFamily: SANS, fontSize: 62, color: "#fff4ec", reference: { color: "#ffd2a8" }, attribution: { color: "#f0b998" } }),
+    displayTheme({ id: "theme-royal", name: "Royal", premium: true, background: { type: "gradient", from: "#070b1f", to: "#1d2a5c", angle: 165 }, fontFamily: SERIF, fontSize: 62, color: "#f6f2e6", reference: { color: "#e6c879" }, attribution: { color: "#a9a48f" } }),
+    displayTheme({ id: "theme-slate", name: "Slate", premium: true, background: { type: "gradient", from: "#111418", to: "#2c333d", angle: 180 }, fontFamily: INTER, fontSize: 60, color: "#eef2f6", reference: { color: "#9fb3c8" }, attribution: { color: "#7d8a98" } }),
   ];
 }
 

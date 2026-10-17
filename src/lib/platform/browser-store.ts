@@ -39,6 +39,7 @@ export type BrowserLibrary = {
   saveService(service: Service): Promise<void>;
   themes(): Promise<Theme[]>;
   saveTheme(theme: Theme): Promise<void>;
+  deleteTheme(id: string): Promise<void>;
   sermons(): Promise<Sermon[]>;
   saveSermon(sermon: Sermon): Promise<void>;
   deleteSermon(id: string): Promise<void>;
@@ -287,6 +288,9 @@ export function createLibrary(getStore: () => Promise<RecordStore>): BrowserLibr
       return byRecent(await (await records()).list<Theme>("themes")).map(sanitizeTheme);
     },
     saveTheme: (theme) => save("themes", sanitizeTheme(theme)),
+    async deleteTheme(id) {
+      await (await records()).remove("themes", id);
+    },
     async sermons() {
       return byRecent(await (await records()).list<Sermon>("sermons")).map(sanitizeSermon);
     },
@@ -350,6 +354,7 @@ export const browserLibrary: BrowserLibrary = {
   saveService: (service) => ready().then((library) => library.saveService(service)),
   themes: () => ready().then((library) => library.themes()),
   saveTheme: (theme) => ready().then((library) => library.saveTheme(theme)),
+  deleteTheme: (id) => ready().then((library) => library.deleteTheme(id)),
   sermons: () => ready().then((library) => library.sermons()),
   saveSermon: (sermon) => ready().then((library) => library.saveSermon(sermon)),
   deleteSermon: (id) => ready().then((library) => library.deleteSermon(id)),

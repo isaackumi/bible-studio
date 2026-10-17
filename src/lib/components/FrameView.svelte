@@ -8,6 +8,7 @@
   import type { PaintedLayer, PresentationModel } from "../domain/types";
   import FrameView from "./FrameView.svelte";
   import QrView from "./QrView.svelte";
+  import MotionBackground from "./MotionBackground.svelte";
 
   let {
     model,
@@ -16,6 +17,7 @@
     nested = false,
     mirror = false,
     audio = false,
+    still = false,
   }: {
     model: PresentationModel;
     /** Live pixels for this frame's own camera source. */
@@ -26,6 +28,8 @@
     mirror?: boolean;
     /** Only the audience screen plays sound; operator monitors stay silent. */
     audio?: boolean;
+    /** Hold animated backgrounds still (gallery thumbnails). */
+    still?: boolean;
   } = $props();
 
   /** A layer that is hidden or leaves the scene plays its exit animation. */
@@ -96,6 +100,10 @@
   );
 
   const background = $derived(frameBackground(model, nested));
+  /** Text frames get the theme's animated, video and darkening layers behind the words. */
+  const TEXT_LAYOUTS = new Set(["scripture", "lyrics", "title", "timer", "lower-third", "empty", "announcement", "slide"]);
+  const backdrop = $derived(!nested && !model.fill && !model.backgroundImageUrl && TEXT_LAYOUTS.has(model.layout) ? model.theme.background : null);
+  const dim = $derived(!nested && TEXT_LAYOUTS.has(model.layout) ? (model.theme.dim ?? 0) : 0);
   const effects = $derived(effectsCss(model.style, model.theme));
 
   const justify = $derived(
@@ -122,6 +130,12 @@
   style:color={model.theme.color}
   style:font-family={model.theme.fontFamily}
 >
+  {#if backdrop?.type === "motion"}
+    <MotionBackground motion={backdrop.motionId} tint={backdrop.tint} base={backdrop.base} {still} />
+  {:else if backdrop?.type === "video" && model.backgroundVideoUrl}
+    <video class="backdrop-video" src={model.backgroundVideoUrl} autoplay loop muted playsinline preload="auto"></video>
+  {/if}
+  {#if dim > 0}<div class="backdrop-dim" style:opacity={dim} aria-hidden="true"></div>{/if}
   {#if model.layout === "composition"}
     {#each model.layers ?? [] as layer (layer.id)}
       <div

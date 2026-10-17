@@ -400,7 +400,7 @@
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}><Icon name="outputs" size={16} /> Displays…</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="themes" size={16} /> Look…</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}><Icon name="themes" size={16} /> Themes…</button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> Settings… <span class="menu-key">⌘,</span></button>
         {/snippet}

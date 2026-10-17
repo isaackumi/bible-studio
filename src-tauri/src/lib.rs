@@ -130,6 +130,11 @@ fn theme_list(db: State<Db>) -> Result<Vec<Value>, String> {
 }
 
 #[tauri::command]
+fn theme_delete(db: State<Db>, id: String) -> Result<(), String> {
+    with_db(&db, |conn| db::theme_delete(conn, &id))
+}
+
+#[tauri::command]
 fn theme_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::theme_save(conn, &document))
 }
@@ -353,6 +358,7 @@ pub fn run() {
             workspace_save,
             theme_list,
             theme_save,
+            theme_delete,
             song_list,
             song_search,
             song_save,

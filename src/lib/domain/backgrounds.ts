@@ -1,4 +1,23 @@
-import type { PresentationModel, ThemeBackground } from "./types";
+import type { MotionId, PresentationModel, ThemeBackground } from "./types";
+
+/** Animated scenes, drawn in CSS by MotionBackground. Each takes a tint over a base color. */
+export const MOTIONS: { id: MotionId; name: string; tint: string; base: string }[] = [
+  { id: "aurora", name: "Aurora", tint: "#3ee6b4", base: "#04121a" },
+  { id: "rays", name: "Light rays", tint: "#ffd89a", base: "#120c06" },
+  { id: "bokeh", name: "Bokeh", tint: "#b98cff", base: "#0c0716" },
+  { id: "waves", name: "Waves", tint: "#3aa0ff", base: "#02101f" },
+  { id: "stars", name: "Starfield", tint: "#e8f0ff", base: "#03050c" },
+  { id: "embers", name: "Embers", tint: "#ff8a3d", base: "#0d0504" },
+  { id: "clouds", name: "Clouds", tint: "#ffffff", base: "#5d7fa8" },
+];
+
+export function motionById(id: string): (typeof MOTIONS)[number] | null {
+  return MOTIONS.find((motion) => motion.id === id) ?? null;
+}
+
+export function gradientCss(from: string, to: string, angle: number): string {
+  return `linear-gradient(${Math.round(angle)}deg, ${from} 0%, ${to} 100%)`;
+}
 
 export type DisplayWash = {
   id: string;
@@ -27,6 +46,8 @@ export function displayWash(id: string): DisplayWash | null {
 
 export function backgroundFill(background: ThemeBackground): string {
   if (background.type === "color") return background.color;
+  if (background.type === "gradient") return gradientCss(background.from, background.to, background.angle);
+  if (background.type === "motion") return background.base;
   if (background.type === "wash") return displayWash(background.washId)?.background ?? "#050505";
   return "#050505";
 }
@@ -40,6 +61,9 @@ export function frameBackground(model: PresentationModel, nested = false): strin
   if (nested && (model.layout === "lower-third" || model.layout === "timer" || model.layout === "empty")) return "transparent";
   if (model.fill) return model.fill;
   if (model.backgroundImageUrl) return `center / cover no-repeat url("${model.backgroundImageUrl}")`;
+  const theme = model.theme.background;
+  if (theme.type === "gradient") return gradientCss(theme.from, theme.to, theme.angle);
+  if (theme.type === "motion" || theme.type === "video") return theme.type === "motion" ? theme.base : "#000000";
   const wash = model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null;
   if (wash) return wash.background;
   if (model.theme.background.type === "color") return model.theme.background.color;

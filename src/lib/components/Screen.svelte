@@ -9,6 +9,7 @@
     sourceId = null,
     feeds = {},
     audio = false,
+    still = false,
     overlay,
   }: {
     model: PresentationModel;
@@ -17,6 +18,8 @@
     feeds?: CameraFeeds<MediaStream>;
     /** Audience only: let video play its sound. */
     audio?: boolean;
+    /** Hold animated backgrounds still (gallery thumbnails). */
+    still?: boolean;
     overlay?: Snippet;
   } = $props();
   let box: HTMLDivElement | undefined = $state();
@@ -39,7 +42,7 @@
 
 <div class="ratio" bind:this={box}>
   <div class="canvas" style:transform="scale({scale})">
-    <FrameView {model} {stream} {feeds} {audio} />
+    <FrameView {model} {stream} {feeds} {audio} {still} />
   </div>
   {@render overlay?.()}
 </div>

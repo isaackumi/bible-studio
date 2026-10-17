@@ -21,12 +21,13 @@ describe("theme transitions", () => {
 
   it("adds the built-in display themes without replacing a saved Signal", () => {
     const names = factoryThemes().map((theme) => theme.name);
-    expect(names).toEqual(["Signal", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
+    // The original eleven come first, unchanged; the library themes follow.
+    expect(names.slice(0, 11)).toEqual(["Signal", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
     expect(new Set(factoryThemes().map((theme) => theme.id)).size).toBe(names.length);
     const custom = { ...defaultTheme(), color: "#ffffff", name: "House" };
     const merged = mergeFactoryThemes([custom]);
     expect(merged[0]).toMatchObject({ id: "theme-manuscript", name: "House", color: "#ffffff" });
-    expect(merged.map((theme) => theme.name)).toEqual(["House", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
+    expect(merged.map((theme) => theme.name).slice(0, 11)).toEqual(["House", "Manuscript", "Vespers", "Nave", "Day", "Caption", "Dawn", "Sea", "Ember", "Garden", "Glass"]);
     expect(merged.find((theme) => theme.name === "Sea")?.background).toEqual({ type: "wash", washId: "sea" });
   });
 

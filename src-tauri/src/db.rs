@@ -109,6 +109,12 @@ pub fn theme_list(conn: &Connection) -> Result<Vec<Value>, String> {
     list_documents(conn, "SELECT document FROM themes ORDER BY id")
 }
 
+pub fn theme_delete(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM themes WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn theme_save(conn: &Connection, document: &Value) -> Result<(), String> {
     let id = document
         .get("id")

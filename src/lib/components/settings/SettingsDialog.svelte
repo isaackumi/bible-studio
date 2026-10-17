@@ -14,7 +14,7 @@
   import Icon from "../Icon.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
-  import OutputType from "../OutputType.svelte";
+  import ThemeLibrary from "./ThemeLibrary.svelte";
 
   type SettingsSectionId =
     | "general"
@@ -23,6 +23,7 @@
     | "workspace"
     | "keyboard"
     | "audience"
+    | "themes"
     | "displays"
     | "stage"
     | "remote"
@@ -61,6 +62,7 @@
     {
       label: "Presenting",
       items: [
+        { id: "themes", title: "Themes", icon: "themes", color: "#c2410c", about: "How verses, songs and slides look on the screen.", keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
         { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test" },
         { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
         { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
@@ -390,9 +392,11 @@
             </div>
           </div>
         </section>
-        <section class="card">
-          <h3>Verse on the screen</h3>
-          <OutputType />
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Screen theme</strong><span>{session.theme().name}. Colors, fonts and backgrounds for the audience screen live in Themes.</span></div>
+            <button type="button" class="btn" onclick={() => (section = "themes")}>Open Themes</button>
+          </div>
         </section>
       {:else if section === "workspace"}
         <section class="rows">
@@ -439,6 +443,8 @@
             <button type="button" class="btn" onclick={() => session.restoreBuiltinWorkspaces()}>Restore</button>
           </div>
         </section>
+      {:else if section === "themes"}
+        <ThemeLibrary />
       {:else if section === "audience"}
         <section class="status-card" class:on={session.output.online}>
           <span class="lamp" class:on={session.output.online}></span>
