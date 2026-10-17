@@ -628,7 +628,7 @@
 
   <!-- Monitors and detection -->
   <aside class="stage">
-    <MonitorPair place={session.songPlace()} onstep={(direction) => session.stepSong(direction)} />
+    <MonitorPair page="songs" place={session.songPlace()} onstep={(direction) => session.stepSong(direction)} />
 
     <section class="detect" aria-label="Song detection">
       <header>

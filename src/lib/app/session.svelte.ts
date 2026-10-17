@@ -98,6 +98,8 @@ import { defaultProductionLayout, normalizeProductionLayout, sameProductionLayou
 import type {
   AppearanceSettings,
   PewDeskState,
+  PewMonitors,
+  PewPage,
   ProductionLayout,
   BibleItem,
   Cursor,
@@ -2742,6 +2744,12 @@ class Session {
     clearTimeout(this.saveTimer);
     await this.persist();
     this.message = "Workspace saved.";
+  };
+
+  /** Show or hide Preview / Program on one Presenter Desk page. */
+  setMonitors = (page: PewPage, patch: Partial<PewMonitors>) => {
+    const monitors = this.workspace.pew.monitors;
+    this.savePew({ monitors: { ...monitors, [page]: { ...monitors[page], ...patch } } });
   };
 
   savePew = (patch: Partial<PewDeskState>) => {

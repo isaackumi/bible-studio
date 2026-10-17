@@ -657,6 +657,8 @@ button { cursor: pointer; }
 }
 /* The desk switch sits at the window's left edge: open its tips rightward. */
 .desk-switch [data-tip]:hover::after { left: 0; transform: none; }
+/* Tools at the window's right edge: open their tips leftward. */
+.pb-tools [data-tip]:hover::after, .prod-tools [data-tip]:hover::after { left: auto; right: 0; transform: none; }
 
 .desk-btn {
   display: inline-flex;

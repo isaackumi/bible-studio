@@ -459,7 +459,7 @@
       </header>
       <p class:empty-notes={!deskNotes}>{deskNotes || "Notes for the section on Preview show here. They never reach Preview or Program."}</p>
     </section>
-    <MonitorPair {place} onstep={(direction) => void session.stepSermon(direction)} />
+    <MonitorPair page="sermon" {place} onstep={(direction) => void session.stepSermon(direction)} />
   </aside>
 </section>
 

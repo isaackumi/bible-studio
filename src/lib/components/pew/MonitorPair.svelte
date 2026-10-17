@@ -2,15 +2,19 @@
   import { session } from "../../app/session.svelte";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
+  import type { PewPage } from "../../domain/types";
 
   // Framed Preview and Program monitors for the Songs and Sermon windows.
-  let { place = "", onstep }: { place?: string; onstep?: (direction: 1 | -1) => void } = $props();
+  // Each page chooses which monitors it shows (View menu); Program keeps running when hidden.
+  let { page, place = "", onstep }: { page: PewPage; place?: string; onstep?: (direction: 1 | -1) => void } = $props();
+  const shown = $derived(session.workspace.pew.monitors[page]);
 
   const programSet = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
   /** On air only when the audience window is open to see it. */
   const programLive = $derived(programSet && session.output.online);
 </script>
 
+{#if shown.preview}
 <figure class="screen preview">
   <figcaption>
     <span class="kicker">Preview</span>
@@ -24,6 +28,8 @@
   </figcaption>
   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
 </figure>
+{/if}
+{#if shown.program}
 <figure class="screen program" class:on-air={programLive}>
   <figcaption>
     <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
@@ -31,6 +37,7 @@
   </figcaption>
   <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
 </figure>
+{/if}
 
 <style>
   .screen {

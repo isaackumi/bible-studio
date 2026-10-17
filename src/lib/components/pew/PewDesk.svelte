@@ -60,12 +60,17 @@
   const showLibrary = $derived(libraryVisible && !focus);
   const showReading = $derived(!focus);
   const showQueue = $derived(queueVisible && !focus);
+  /** This page's monitor choice; Focus always shows both. */
+  const monitors = $derived(session.workspace.pew.monitors[mode]);
+  const showPreview = $derived(focus || session.workspace.pew.monitors.scriptures.preview);
+  const showProgram = $derived(focus || session.workspace.pew.monitors.scriptures.program);
+  const showRight = $derived(showProgram || showQueue);
   let epoch = $state(0);
   let frozen = $state(session.workspace.pew);
   let applying = false;
   let chromeReady = false;
   const chrome = $derived(
-    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${session.workspace.activeLayoutId}`,
+    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}`,
   );
 
   function retarget() {
@@ -76,7 +81,8 @@
   }
 
   function onColumns(reported: number[]) {
-    if (applying || focus) return;
+    // Without the right column the reported sizes don't map onto the saved three; keep them.
+    if (applying || focus || !showRight) return;
     session.savePew({ columns: mergeColumns(session.workspace.pew.columns, reported, showLibrary) });
   }
 
@@ -86,12 +92,12 @@
   }
 
   function onStageSplit(reported: number[]) {
-    if (applying || focus) return;
+    if (applying || focus || !showPreview) return;
     session.savePew({ stageSplit: mergeSplit(session.workspace.pew.stageSplit, reported) });
   }
 
   function onProgramSplit(reported: number[]) {
-    if (applying || focus) return;
+    if (applying || focus || !showProgram || !showQueue) return;
     session.savePew({ programSplit: mergeSplit(session.workspace.pew.programSplit, reported) });
   }
 
@@ -472,7 +478,7 @@
       <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
-      <ToolMenu label="View" tip="Panels and focus">
+      <ToolMenu label="View" tip="Panels, monitors and focus">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitemcheckbox" aria-checked={libraryVisible} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
@@ -483,6 +489,14 @@
           </button>
           <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}>
             <Icon name="focus" size={16} /> Focus Preview and Program
+          </button>
+          <div class="menu-sep"></div>
+          <p class="menu-label">On {mode === "scriptures" ? "Scripture" : mode === "songs" ? "Songs" : "Sermon"}</p>
+          <button type="button" role="menuitemcheckbox" aria-checked={monitors.preview} onclick={() => session.setMonitors(mode, { preview: !monitors.preview })}>
+            <Icon name="eye" size={16} /> Preview monitor
+          </button>
+          <button type="button" role="menuitemcheckbox" aria-checked={monitors.program} onclick={() => session.setMonitors(mode, { program: !monitors.program })}>
+            <Icon name="cast" size={16} /> Program monitor
           </button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.resetActiveLayout(); close(); }}>
@@ -643,11 +657,11 @@
           </Pane>
           <PaneResizer />
         {/if}
-        <Pane defaultSize={showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
+        <Pane defaultSize={!showRight ? (showLibrary ? frozen.columns[1] + frozen.columns[2] : 100) : showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
           <div class="fill">
             <PaneGroup direction="vertical" onLayoutChange={onStageSplit}>
               {#if showReading}
-                <Pane defaultSize={frozen.stageSplit} minSize={20} order={1}>
+                <Pane defaultSize={showPreview ? frozen.stageSplit : 100} minSize={20} order={1}>
                   <section class="pb-panel">
                     <header class="pb-head"><span class="kicker">Scripture reading</span></header>
           <div class="pb-body display">
@@ -662,21 +676,25 @@
           </div>
         </section>
                 </Pane>
-                <PaneResizer />
+                {#if showPreview}<PaneResizer />{/if}
               {/if}
+              {#if showPreview}
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
                 </section>
               </Pane>
+              {/if}
             </PaneGroup>
           </div>
         </Pane>
+        {#if showRight}
         <PaneResizer />
         <Pane defaultSize={showLibrary ? frozen.columns[2] : share(frozen.columns[2], frozen.columns[1])} minSize={showLibrary ? 22 : 32} order={3}>
           <div class="fill">
             <PaneGroup direction="vertical" onLayoutChange={onProgramSplit}>
+              {#if showProgram}
               <Pane defaultSize={showQueue ? frozen.programSplit : 100} minSize={showQueue ? 28 : 20} order={1}>
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head">
@@ -701,9 +719,10 @@
                   </footer>
                 </section>
               </Pane>
+              {/if}
               {#if showQueue}
-                <PaneResizer />
-                <Pane defaultSize={100 - frozen.programSplit} minSize={18} order={2}>
+                {#if showProgram}<PaneResizer />{/if}
+                <Pane defaultSize={showProgram ? 100 - frozen.programSplit : 100} minSize={18} order={2}>
                   <section class="pb-panel">
                     <header class="pb-head">
                       <span>Queue</span>
@@ -723,6 +742,7 @@
             </PaneGroup>
           </div>
         </Pane>
+        {/if}
       </PaneGroup>
       </div>
     </div>

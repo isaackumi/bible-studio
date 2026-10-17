@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { factoryLayouts, hidePanel } from "./layout";
-import { LIBRARY_PANEL, QUEUE_PANEL, defaultPewDesk, mergeColumns, mergeSplit, normalizePew, panelOpen } from "./pew";
+import { LIBRARY_PANEL, QUEUE_PANEL, defaultPewDesk, mergeColumns, mergeSplit, normalizePew, panelOpen, samePew } from "./pew";
 
 describe("pew desk chrome", () => {
   it("repairs a missing or broken size record", () => {
@@ -27,5 +27,22 @@ describe("pew desk chrome", () => {
     expect(panelOpen(hidden, QUEUE_PANEL)).toBe(false);
     expect(hidden.panels.find((panel) => panel.panelId === "preview")?.visible).toBe(true);
     expect(hidden.panels.find((panel) => panel.panelId === "program")?.visible).toBe(true);
+  });
+});
+
+describe("monitors per page", () => {
+  it("shows both monitors on every page by default, and on older saves", () => {
+    expect(defaultPewDesk().monitors.songs).toEqual({ preview: true, program: true });
+    expect(normalizePew({ focus: false }).monitors).toEqual(defaultPewDesk().monitors);
+  });
+
+  it("keeps each page's choice separately", () => {
+    const pew = normalizePew({ monitors: { songs: { preview: false }, sermon: { program: false }, scriptures: "junk" } });
+    expect(pew.monitors).toEqual({
+      scriptures: { preview: true, program: true },
+      songs: { preview: false, program: true },
+      sermon: { preview: true, program: false },
+    });
+    expect(samePew(pew, defaultPewDesk())).toBe(false);
   });
 });

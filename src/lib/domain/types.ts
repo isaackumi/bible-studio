@@ -322,8 +322,14 @@ export type DeskStyle = "pewbeam" | "obs";
 export type OperatorTheme = "dark" | "vespers" | "nave" | "light";
 
 /** Presenter Desk column sizes. Panel visibility stays on the workspace layout. */
+/** Which monitors a Presenter Desk page shows. Program keeps running when its monitor is hidden. */
+export type PewMonitors = { preview: boolean; program: boolean };
+export type PewPage = "scriptures" | "songs" | "sermon";
+
 export type PewDeskState = {
   focus: boolean;
+  /** Each page chooses its own monitors. */
+  monitors: Record<PewPage, PewMonitors>;
   columns: [number, number, number];
   librarySplit: number;
   stageSplit: number;
