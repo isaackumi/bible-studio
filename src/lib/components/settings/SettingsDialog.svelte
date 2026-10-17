@@ -117,6 +117,16 @@
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
+  let backupNote = $state("");
+
+  async function chooseBackupFolder() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({ directory: true, multiple: false, title: "Choose the backup folder" });
+    if (typeof picked === "string" && picked) {
+      session.setBackupFolder(picked);
+      backupNote = (await session.backupNow()) ?? "Backed up. New backups go here every 30 minutes.";
+    }
+  }
 
   // Problem reports.
   let problems = $state(readProblems());
@@ -831,6 +841,24 @@
         </section>
         <p class="note stand">Headers become sections, songs come with their lyrics (new ones go into a "Planning Center" folder), and other items become editable slides. Nothing goes live on its own.</p>
       {:else if section === "storage"}
+        <p class="section-label">Automatic backup and a second computer</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Backup folder</strong><span>{session.workspace.backup.folder || "Pick a folder your cloud drive keeps (Google Drive, OneDrive, Dropbox, iCloud). Church Studio saves there every 30 minutes and keeps the newest 20."}</span></div>
+            <button type="button" class="btn" disabled={!isDesktop()} onclick={() => void chooseBackupFolder()}>{session.workspace.backup.folder ? "Change" : "Choose folder"}</button>
+          </div>
+          {#if session.workspace.backup.folder}
+            <div class="row">
+              <div class="row-copy"><strong>{session.workspace.backup.lastAt ? `Last backup ${new Date(session.workspace.backup.lastAt).toLocaleString()}` : "Not backed up yet"}</strong><span>{backupNote || "On another computer, choose the same folder and restore: songs, services, sermons, slide decks, looks and layouts come across. Display settings stay per computer."}</span></div>
+              <div class="row-end">
+                <button type="button" class="btn primary" onclick={async () => (backupNote = (await session.backupNow()) ?? "Backed up.")}>Back up now</button>
+                <button type="button" class="btn" onclick={async () => (backupNote = await session.restoreLatestBackup().catch((error) => (error instanceof Error ? error.message : String(error))))}>Restore latest</button>
+              </div>
+            </div>
+          {/if}
+          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>Folder backups work in the desktop app. Here, use Export below.</span></div></div>{/if}
+        </section>
+        <p class="section-label">Files</p>
         <section class="rows">
           <div class="row">
             <div class="row-lead"><span class="row-icon"><Icon name="files" size={16} /></span><div class="row-copy"><strong>Export library</strong><span>Songs, services and themes as one file. Program is not included.</span></div></div>

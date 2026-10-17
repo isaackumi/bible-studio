@@ -388,6 +388,8 @@ class Session {
       this.booted = true;
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
+      // Automatic backups to the chosen folder, every half hour while the app is open.
+      if (this.desktop()) setInterval(() => void (this.workspace.backup.folder && this.backupNow()), 30 * 60 * 1000);
       if (this.message === "Opening workspace") {
         this.message = this.desktop() ? this.output.message : "Browser session. Audience output opens in its own window.";
       }
