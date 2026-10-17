@@ -57,7 +57,7 @@
   .quick-copy { flex: 1; display: grid; gap: 4px; min-width: 0; }
   .quick-copy strong { font-size: 12px; }
   .quick-copy input { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; min-width: 0; }
-  .group { margin: 14px 2px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 14px 2px 8px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
   .tile { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
   .tile:hover { border-color: var(--tint); box-shadow: 0 8px 24px color-mix(in srgb, var(--tint) 16%, transparent); transform: translateY(-1px); }

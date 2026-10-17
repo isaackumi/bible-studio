@@ -95,7 +95,7 @@
 
 <style>
   h4 { margin: 16px 0 6px; font-size: 13px; }
-  .kind { font-size: 11px; color: var(--muted, #a3a3a3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .kind { font-size: 12px; color: var(--muted, #a3a3a3); letter-spacing: 0; }
   .loop { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted, #a3a3a3); margin: 8px 0; }
   .camera-note { margin: 0 0 8px; font-size: 12px; color: var(--muted, #a3a3a3); }
 </style>

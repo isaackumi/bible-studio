@@ -785,7 +785,7 @@
         onpointerup={endDrag}
         onpointercancel={endDrag}
       >
-        <Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds}>
+        <Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide.">
           {#snippet overlay()}
             {#if draft && session.live.preview.model.layout === "composition"}
               {#each draft.layers.filter((layer) => layer.visible) as layer (layer.id)}
@@ -866,7 +866,7 @@
         <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
         <span class="hint">{programLive ? "Audience sees this" : "Nothing live"}</span>
       </figcaption>
-      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
     </figure>
 
     {#if draft && selected}
@@ -1060,7 +1060,7 @@
 
   /* Library */
   .lib-scroll { overflow: auto; min-height: 0; padding: 0 10px 14px; display: flex; flex-direction: column; gap: 6px; }
-  .group { margin: 8px 4px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 8px 4px 2px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .group span { margin-left: 4px; opacity: 0.8; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
   .tile { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; text-align: left; }
@@ -1078,7 +1078,7 @@
   .tile-delete.armed { background: var(--live); }
   .layout-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
   .layout-chips button { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
-  .layout-chips button.on { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .layout-chips button.on { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
   .empty { margin: 0 4px; font-size: 12px; color: var(--muted); }
   .saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .saved li { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); }
@@ -1115,7 +1115,7 @@
   .layer-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; }
   .layer-icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--field); color: var(--muted); flex: none; }
   .layer-main strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .layer-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .layer-kind { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
 
   /* Side */
   .screen.program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
@@ -1126,7 +1126,7 @@
   .inspector > header { display: flex; align-items: center; gap: 8px; }
   .group-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
   .group-box input, .group-box select, .group-box textarea { background: var(--panel); }
-  .box-title { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); cursor: default; }
+  .box-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); cursor: default; }
   details.group-box > summary { cursor: pointer; }
   details.group-box[open] > summary { margin-bottom: 8px; }
   .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
@@ -1142,7 +1142,7 @@
   .layer-frame { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); cursor: move; z-index: 2; }
   .layer-frame.on { border: 2px solid var(--accent); }
   .layer-frame:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
-  .frame-label { position: absolute; left: 0; top: 0; padding: 1px 6px; border-radius: 0 0 4px 0; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+  .frame-label { position: absolute; left: 0; top: 0; padding: 1px 6px; border-radius: 0 0 4px 0; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; }
   .handle { position: absolute; width: 10px; height: 10px; padding: 0; border: 2px solid #fff; border-radius: 2px; background: var(--accent); }
   .handle.n { top: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
   .handle.s { bottom: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }

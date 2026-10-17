@@ -330,7 +330,7 @@
   .block { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); overflow: hidden; }
   .block.target { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .block-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border-bottom: 1px solid var(--line); }
-  .section-name { flex: 1; height: 28px; border-color: transparent; background: none; font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .section-name { flex: 1; height: 28px; border-color: transparent; background: none; font-size: 12px; font-weight: 750; letter-spacing: 0; color: var(--muted); }
   .section-name:focus { border-color: var(--line); background: var(--field); color: var(--ink); }
   .tools { display: flex; gap: 2px; flex: none; }
   .row-tool { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
@@ -377,7 +377,7 @@
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .next { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); flex: none; }
   .next-copy { display: grid; gap: 4px; }
-  .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .next-copy strong { font-size: 15px; }
   .item-steps { display: flex; gap: 6px; }
   .item-steps :global(.desk-btn) { flex: 1; justify-content: center; }

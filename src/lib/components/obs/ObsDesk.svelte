@@ -393,7 +393,7 @@
       {/if}
       <OutputMenu />
       {#if looksOpen}
-        <button type="button" class="desk-btn primary" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
+        <button type="button" class="desk-btn live" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
           <Icon name="play" size={16} /> GO LIVE
         </button>
         <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
@@ -450,7 +450,7 @@
         <span class="kicker">Preview</span>
         <span class="meta">{sceneName}</span>
       </header>
-      <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
+      <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Click a scene to put it here." /></div>
       <footer>
         <span>{previewLabel}</span>
         {#if session.canSwapPreview()}
@@ -464,7 +464,7 @@
     <Pane defaultSize={frozen.stage[1]} minSize={12} maxSize={28} order={2}>
     <aside class="bridge" aria-label="Transition">
       <p class="flow">Preview <Icon name="transition" size={16} /> Program</p>
-      <button type="button" class="desk-btn primary" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
+      <button type="button" class="desk-btn live" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
         <Icon name="play" size={16} /> GO LIVE
       </button>
       <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
@@ -495,7 +495,7 @@
         <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}Program</span>
         <span class="meta">{programLabel}</span>
       </header>
-      <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+      <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. GO LIVE sends Preview here." /></div>
       <footer>
         <span>{session.live.program.model.reference || "Audience sees this frame."}</span>
       </footer>
@@ -1044,9 +1044,8 @@
     gap: 6px;
     color: var(--muted);
     font-family: var(--font-label);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-size: 10px;
+    letter-spacing: 0;
+    font-size: 12px;
   }
   .bridge .desk-btn { width: 100%; }
   .resets { display: flex; flex-direction: column; gap: 6px; }
@@ -1088,10 +1087,10 @@
   }
   .prod :global([data-pane-resizer]:hover::after),
   .prod :global([data-pane-resizer][data-active]::after) { background: var(--accent); }
-  .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+  .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; letter-spacing: 0; font-size: 12px; }
   .dock header .count { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--field); color: var(--muted); font-weight: 600; letter-spacing: 0; text-transform: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dock-add { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; }
-  .dock-add:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .dock-add:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
   .dock-add:disabled { opacity: 0.4; cursor: default; }
   .list .empty-cta { display: flex !important; flex-direction: row !important; align-items: center; gap: 12px; margin: 6px; padding: 14px !important; border: 1px dashed var(--line) !important; border-radius: 12px; background: none; color: var(--muted); text-align: left; }
   .list .empty-cta:hover:not(:disabled) { border-color: var(--accent) !important; color: var(--ink); }
@@ -1104,7 +1103,7 @@
   .scene-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
   .scene-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
+  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
   .badge.live { background: var(--live); color: #fff; }
   .scene-rename { height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-weight: 600; min-width: 0; }
   /* Row tools appear on hover, focus or selection; what is switched on always shows. */
@@ -1166,7 +1165,7 @@
   .ctl-label { font-size: 11px; font-weight: 700; color: var(--muted); }
   .seg { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
   .seg button { flex: 1; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; letter-spacing: normal; text-transform: none; cursor: pointer; }
-  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button.on { background: var(--accent); color: var(--on-accent); }
   .seg.small button { height: 24px; font-size: 11px; }
   .ms { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px; font-size: 11px; color: var(--muted); }
   .ms input { width: 56px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-size: 11px; }

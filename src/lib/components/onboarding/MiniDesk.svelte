@@ -73,7 +73,7 @@
   .ic.on { color: var(--accent); border-color: var(--accent); }
   .modes { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); }
   .modes span { padding: 3px 8px; border-radius: 5px; color: var(--muted); font-size: 10px; }
-  .modes span.on { background: var(--accent); color: #fff; }
+  .modes span.on { background: var(--accent); color: var(--on-accent); }
   .grow { flex: 1; }
   .aud { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--muted); }
   .aud i { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }

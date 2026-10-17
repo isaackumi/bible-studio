@@ -502,7 +502,7 @@
   .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live); }
 
   /* Library */
-  .group { margin: 0; padding: 10px 6px 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 0; padding: 10px 6px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .group span { margin-left: 4px; opacity: 0.8; }
   .list { margin: 0; padding: 0 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .list > :global(*) { flex: none; }
@@ -539,7 +539,7 @@
   .card-head strong { font-size: 14px; }
   .tags { margin-left: auto; display: flex; gap: 4px; }
   .seen { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .kind { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .kind { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
   .seen-title { font-size: 14px; font-weight: 600; }
   .seen-body { font-size: 12px; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
   .notes { padding-left: 12px; border-left: 1px dashed var(--line); }
@@ -553,7 +553,7 @@
   .editor { display: flex; flex-direction: column; gap: 12px; }
   .fields { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
   .desk-only { display: flex; flex-direction: column; gap: 6px; }
-  .desk-only > span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .desk-only > span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .desk-only textarea { border-style: dashed; }
   .edit-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
   .edit-card input, .edit-card select, .edit-card textarea { background: var(--panel); }
@@ -563,7 +563,7 @@
   .audience-edit { display: flex; flex-direction: column; gap: 8px; }
   .seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
   .seg button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; }
-  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button.on { background: var(--accent); color: var(--on-accent); }
   .add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); background: none; color: var(--muted); font: inherit; font-weight: 600; }
   .add:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
 
@@ -571,7 +571,7 @@
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .speaker { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed color-mix(in srgb, var(--ink) 25%, var(--line)); border-radius: var(--radius-control, 8px); background: var(--field); flex: none; }
   .speaker header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .speaker p { margin: 0; font-size: 16px; line-height: 1.5; white-space: pre-wrap; max-height: 220px; overflow: auto; }
   .speaker p.empty-notes { font-size: 12px; color: var(--muted); }
 

@@ -688,10 +688,9 @@
   .group {
     margin: 0;
     padding: 0 16px 6px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    letter-spacing: 0;
     color: var(--muted);
   }
   .group span { margin-left: 4px; font-weight: 600; opacity: 0.8; }
@@ -845,7 +844,7 @@
   .section.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .section.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
   .section.heard { outline: 2px dashed color-mix(in srgb, var(--presence, #3fb950) 80%, transparent); outline-offset: 2px; }
-  .section .label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .section .label { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
   .section .label i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--panel); color: var(--ink); letter-spacing: 0; }
   .section .tags { margin-left: auto; display: flex; gap: 4px; }
   .section .line { font-size: 14px; line-height: 1.4; }
@@ -868,7 +867,7 @@
   /* Stage */
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .detect > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .dot.listen { width: 7px; height: 7px; border-radius: 50%; background: var(--presence, #3fb950); box-shadow: 0 0 6px var(--presence, #3fb950); }
   .detect { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
   .follow { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }

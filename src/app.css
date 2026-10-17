@@ -44,6 +44,8 @@
   --accent: var(--brass);
   /* On-air red: a true broadcast red, not pink. */
   --live: #f21b1b;
+  /* Text on accent fills; OperatorShell switches it to black for light accents. */
+  --on-accent: #fff;
   --presence: #3dce7a;
   --mustard: #e2cc9d;
   /* SF Pro is the Mac system face. Instrument Sans remains the fallback off Apple platforms. */
@@ -140,9 +142,8 @@ button { cursor: pointer; }
   padding: 10px 4px;
   color: var(--muted);
   font-family: var(--font-label);
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   font-size: 12px;
-  text-transform: uppercase;
 }
 .tabs button.active { color: var(--ink); box-shadow: inset 0 -2px 0 var(--brass); }
 .pane { padding: 12px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -386,10 +387,9 @@ button { cursor: pointer; }
 .item-row.selected { box-shadow: inset 2px 0 0 var(--brass); }
 .item-row .kind {
   font-family: var(--font-label);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .on-air-mark { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
 .on-air-mark.live { background: var(--onair); }
@@ -499,9 +499,8 @@ button { cursor: pointer; }
   gap: 8px;
   color: var(--muted);
   font-family: var(--font-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 .chrome-select, .panel-menu summary {
   background: var(--panel-2);
@@ -567,9 +566,8 @@ button { cursor: pointer; }
   background: transparent;
   padding: 0;
   font-family: var(--font-label);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-size: 11px;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 .grip { cursor: grab; color: var(--muted); }
 .panel-actions { display: flex; align-items: center; }
@@ -592,9 +590,8 @@ button { cursor: pointer; }
   color: var(--muted);
   padding: 6px 10px;
   font-family: var(--font-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 11px;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 .panel-tabs button.active { color: var(--ink); box-shadow: inset 0 -2px 0 var(--brass); }
 .splitter { background: var(--booth); cursor: row-resize; touch-action: none; }
@@ -699,9 +696,21 @@ button { cursor: pointer; }
 .desk-btn:active:not(:disabled) { opacity: 0.88; }
 .desk-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .desk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.desk-btn.primary { background: var(--live); border-color: var(--live); color: #fff; }
-.desk-btn.danger { background: var(--panel-2); color: var(--ink); }
-.desk-btn.ghost { background: transparent; color: var(--accent); border-color: var(--accent); }
+/*
+ * One button system, one meaning per color:
+ *   live   red: sends something to the audience (LIVE, GO LIVE, Show alert). Nothing else is red.
+ *   primary accent: the main action in a place (Save, OK, Allow).
+ *   primary-soft accent tint: a secondary main action (Create scene, Next item).
+ *   ghost  quiet: Cancel, CLEAR and other low-key actions.
+ *   danger black: BLACK, the screen-off button.
+ */
+.desk-btn.live { background: var(--live); border-color: var(--live); color: #fff; }
+.desk-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.desk-btn.primary-soft { background: color-mix(in srgb, var(--accent) 14%, var(--field)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--ink); }
+.desk-btn.primary-soft:hover:not(:disabled) { border-color: var(--accent); }
+.desk-btn.danger { background: #000; border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); color: #fff; }
+.desk-btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.desk-btn.ghost:hover:not(:disabled) { background: var(--field); border-color: var(--line); color: var(--ink); }
 .desk-btn.icon {
   width: var(--tool-size);
   min-width: var(--tool-size);

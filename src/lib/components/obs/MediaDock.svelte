@@ -173,5 +173,5 @@
   .row:hover { background: var(--field); }
   .name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
   .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-  .name small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .name small { font-size: 12px; color: var(--muted); letter-spacing: 0; }
 </style>

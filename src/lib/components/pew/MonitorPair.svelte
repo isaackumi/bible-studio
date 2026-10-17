@@ -27,7 +27,7 @@
       </span>
     {/if}
   </figcaption>
-  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
+  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
 </figure>
 {/if}
 {#if shown.program}
@@ -39,7 +39,7 @@
       <button type="button" class="loop-chip" title="Stop the loop; Program stays on this page" onclick={() => session.stopDeckLoop()}><Icon name="refresh" size={12} /> Looping · Stop</button>
     {/if}
   </figcaption>
-  <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+  <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
   <VideoControls />
 </figure>
 {/if}

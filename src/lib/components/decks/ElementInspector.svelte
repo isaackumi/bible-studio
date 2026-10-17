@@ -134,7 +134,7 @@
   .area { height: auto; padding: 6px 8px; resize: vertical; }
   .inline { display: flex; gap: 6px; }
   input[type="color"] { width: 40px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
-  h4 { margin: 6px 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  h4 { margin: 6px 0 0; font-size: 12px; letter-spacing: 0; color: var(--muted); }
   .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .grid4 label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 11px; }
   .actions { display: flex; flex-wrap: wrap; gap: 6px; }

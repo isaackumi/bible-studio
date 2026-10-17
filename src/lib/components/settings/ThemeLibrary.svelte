@@ -455,7 +455,7 @@
   .editor.locked :global(.rows) { opacity: 0.6; }
   .tabs { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
   .tabs button, .seg button, .filters button { text-transform: none; letter-spacing: normal; height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-  .tabs button.on, .seg button.on { background: var(--accent); color: #fff; }
+  .tabs button.on, .seg button.on { background: var(--accent); color: var(--on-accent); }
   .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
   .seg.small button { height: 26px; padding: 0 10px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }

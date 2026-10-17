@@ -9,12 +9,12 @@
   {#if part === "preview"}
     <div class="well preview-well">
       <div class="well-label"><span>Preview</span><span>Preparing</span></div>
-      <div class="mat"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
+      <div class="mat"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
     </div>
   {:else}
     <div class="well program-well">
       <div class="well-label"><span>Program</span><span class="lamp" aria-hidden="true"></span></div>
-      <div class="mat"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+      <div class="mat"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
     </div>
   {/if}
 </section>

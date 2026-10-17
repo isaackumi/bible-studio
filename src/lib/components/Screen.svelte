@@ -11,6 +11,7 @@
     audio = false,
     still = false,
     overlay,
+    hint = "",
   }: {
     model: PresentationModel;
     sourceId?: string | null;
@@ -21,6 +22,8 @@
     /** Hold animated backgrounds still (gallery thumbnails). */
     still?: boolean;
     overlay?: Snippet;
+    /** Operator monitors only: a quiet line shown while nothing is up. Never on the audience screen. */
+    hint?: string;
   } = $props();
   let box: HTMLDivElement | undefined = $state();
   let scale = $state(0.3);
@@ -44,5 +47,24 @@
   <div class="canvas" style:transform="scale({scale})">
     <FrameView {model} {stream} {feeds} {audio} {still} />
   </div>
+  {#if hint && model.layout === "empty"}
+    <p class="screen-hint" style:font-size="{Math.max(10, Math.min(14, scale * 1920 * 0.028))}px">{hint}</p>
+  {/if}
   {@render overlay?.()}
 </div>
+
+<style>
+  .screen-hint {
+    position: absolute;
+    inset: auto 8% 50% 8%;
+    transform: translateY(50%);
+    margin: 0;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.62);
+    font-weight: 550;
+    line-height: 1.35;
+    text-wrap: balance;
+    pointer-events: none;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  }
+</style>

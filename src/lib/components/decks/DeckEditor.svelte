@@ -320,7 +320,7 @@
   .history button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: 16px; cursor: pointer; }
   .history button:disabled { opacity: 0.4; cursor: default; }
   .status { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
-  .save { height: 36px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+  .save { height: 36px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
   .save:disabled { opacity: 0.45; cursor: default; }
   .close { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
   .close.warn { background: #c8102e; border-color: #c8102e; color: #fff; }
@@ -358,7 +358,7 @@
   .note { margin: 0; color: var(--muted); font-size: 12px; }
   .text-edit { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); z-index: 40; width: min(560px, calc(100% - 40px)); display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--accent); background: var(--panel); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); }
   .text-edit textarea { border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 8px; font: 16px/1.4 var(--font-ui); resize: vertical; }
-  .text-edit button { align-self: flex-end; min-height: 32px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  .text-edit button { align-self: flex-end; min-height: 32px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer; }
   :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
   @media (max-width: 1100px) { .body { grid-template-columns: 180px minmax(0, 1fr) 260px; } }
 </style>

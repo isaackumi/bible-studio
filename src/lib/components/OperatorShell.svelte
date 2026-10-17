@@ -27,6 +27,7 @@
     root.dataset.desk = appearance.desk;
     root.toggleAttribute("data-calm", appearance.calm === true);
     root.style.setProperty("--accent", appearance.accent);
+    root.style.setProperty("--on-accent", readableOn(appearance.accent));
     root.style.setProperty("--brass", appearance.accent);
     root.style.setProperty("--focus", appearance.accent);
   });
@@ -70,6 +71,17 @@
       defaultPrevented: event.defaultPrevented,
       preventDefault: () => event.preventDefault(),
     });
+  }
+
+  /** Black or white text, whichever reads on this accent (a light Mustard accent needs black). */
+  function readableOn(hex: string): string {
+    const value = hex.replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(value)) return "#fff";
+    const [r, g, b] = [0, 2, 4].map((at) => {
+      const channel = parseInt(value.slice(at, at + 2), 16) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b! > 0.45 ? "#111" : "#fff";
   }
 </script>
 

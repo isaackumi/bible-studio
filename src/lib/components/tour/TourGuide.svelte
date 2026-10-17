@@ -179,7 +179,7 @@
   .bar button { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; text-transform: none; letter-spacing: normal; }
   .ghost { border: 0; background: none; color: var(--muted); }
   .ghost:hover { color: var(--ink); }
-  .next { min-width: 72px; border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  .next { min-width: 72px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); }
   .bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) {
     .spot, .card { transition: none; }

@@ -431,7 +431,7 @@
 
   /* Loading */
   .ob-boot { position: relative; display: grid; justify-items: center; gap: 14px; }
-  .mark { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: var(--accent); color: #fff; box-shadow: 0 16px 40px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .mark { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: var(--accent); color: var(--on-accent); box-shadow: 0 16px 40px color-mix(in srgb, var(--accent) 35%, transparent); }
   .mark.halo { animation: halo 2.4s ease-in-out infinite; }
   @keyframes halo { 50% { box-shadow: 0 16px 70px color-mix(in srgb, var(--accent) 60%, transparent); } }
   .mark.small { width: 28px; height: 28px; border-radius: 8px; box-shadow: none; }
@@ -507,7 +507,7 @@
   .bibles { display: grid; gap: 6px; margin-top: 4px; }
   .bible { flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; }
   .abbr { display: grid; place-items: center; min-width: 44px; height: 28px; border-radius: 7px; background: var(--panel); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
-  .bible.on .abbr { background: var(--accent); color: #fff; }
+  .bible.on .abbr { background: var(--accent); color: var(--on-accent); }
   .bname { flex: 1; font-size: 13px; font-weight: 600; }
   .state { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 650; color: var(--muted); }
   .bible.on .state { color: var(--accent); }
@@ -554,7 +554,7 @@
   .tick.done { background: color-mix(in srgb, var(--accent) 55%, transparent); }
   .tick.here { width: 34px; background: var(--accent); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 22px; border: 1px solid var(--line); border-radius: 11px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
-  .btn.primary { min-width: 150px; border-color: var(--accent); background: var(--accent); color: #fff; box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .btn.primary { min-width: 150px; border-color: var(--accent); background: var(--accent); color: var(--on-accent); box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 30%, transparent); }
   .btn.primary:hover { filter: brightness(1.08); }
   .btn.quiet { border-color: transparent; background: none; color: var(--muted); padding: 0 6px; }
   .btn.quiet:hover { color: var(--ink); }

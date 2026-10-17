@@ -134,7 +134,7 @@
   .state circle { fill: none; stroke: color-mix(in srgb, var(--ink) 16%, transparent); stroke-width: 2.5; }
   .state circle.arc { stroke: var(--accent); stroke-linecap: round; }
   .go { flex: none; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
-  .go.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .go.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
   .steps { list-style: none; margin: 0; padding: 2px 8px 8px 40px; display: grid; gap: 1px; }
   .steps button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; text-align: left; text-transform: none; letter-spacing: normal; cursor: pointer; }
   .steps button.seen { color: var(--ink); }

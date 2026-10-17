@@ -126,7 +126,7 @@
     color: var(--ink);
     padding: 0 10px;
   }
-  .service-slides { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+  .service-slides { color: var(--muted); font-size: 12px; letter-spacing: 0; white-space: nowrap; }
   .new-slide { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
   .new-slide:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .note { margin: 0; padding: 0 10px 8px; font-size: 12px; color: var(--muted); }

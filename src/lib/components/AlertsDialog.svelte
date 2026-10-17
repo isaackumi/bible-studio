@@ -76,7 +76,7 @@
   </form>
   {#snippet footer()}
     <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn primary" disabled={!text.trim()} onclick={() => void show()}>Show alert</button>
+    <button type="button" class="desk-btn live" disabled={!text.trim()} onclick={() => void show()}>Show alert</button>
   {/snippet}
 </DeskDialog>
 

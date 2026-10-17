@@ -75,7 +75,7 @@
   .swatch { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
   .swatch.none { background: repeating-linear-gradient(45deg, var(--field), var(--field) 4px, var(--line) 4px, var(--line) 6px); }
   .swatch.on { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .group { margin: 16px 2px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 16px 2px 8px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; max-height: 46vh; overflow: auto; padding: 2px; }
   .layout { display: grid; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .layout:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }

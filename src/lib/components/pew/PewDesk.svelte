@@ -499,7 +499,7 @@
       <OutputMenu />
       <button
         type="button"
-        class="desk-btn primary live"
+        class="desk-btn live"
         class:on-air={displayLive}
         aria-label={displayLive ? "On air. Send Preview to Program" : "Go live: send Preview to Program"}
         data-tip={displayLive ? "On air: the audience sees Program" : programSet ? "Program is set, but the audience window is closed" : "Send Preview to Program"}
@@ -715,7 +715,7 @@
               {#if showReading}
                 <Pane defaultSize={showPreview ? frozen.stageSplit : 100} minSize={20} order={1}>
                   <section class="pb-panel">
-                    <header class="pb-head"><span class="kicker">Scripture reading</span></header>
+                    <header class="pb-head"><span class="kicker plain">Scripture reading</span></header>
           <div class="pb-body display">
             {#if mode === "scriptures"}
               <article class="reading">
@@ -734,7 +734,7 @@
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
                 </section>
               </Pane>
               {/if}
@@ -760,7 +760,7 @@
                       {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
                     </button>
                   </header>
-                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
                   <TimerControls compact />
                   <VideoControls />
                   <footer class="output-tools">
@@ -993,7 +993,7 @@
   .bible-search .clear { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 5px; background: var(--panel); color: var(--muted); }
   .bible-search kbd { padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 11px; color: var(--muted); }
   .recent { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px; overflow-x: auto; scrollbar-width: none; flex: none; }
-  .recent span { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); flex: none; }
+  .recent span { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); flex: none; }
   .recent button { flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap; }
   .recent button:hover { background: var(--field); }
   .recent button.on { border-color: var(--accent); color: var(--accent); }
@@ -1151,6 +1151,7 @@
     background: #050505;
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+  .kicker.plain { font-size: 12px; letter-spacing: 0; text-transform: none; }
   .kicker.program { color: var(--live); }
   .pb-panel.preview { border-style: dashed; }
   .pb-panel.output { border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
