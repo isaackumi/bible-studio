@@ -86,7 +86,7 @@ function rms(samples: Uint8Array): number {
   return Math.min(1, Math.sqrt(total / samples.length) * 4);
 }
 
-type NativePhrase = { kind: string; text?: string; final?: boolean; alternatives?: string[]; value?: number; message?: string };
+type NativePhrase = { kind: string; text?: string; final?: boolean; alternatives?: string[] | string; value?: number; message?: string };
 
 const TRANSCRIPT_WORDS = 48;
 
@@ -139,7 +139,8 @@ export function startNativeListening(handlers: ListenHandlers): () => void {
       const stitched = stitchTranscript(committed, {
         text: message.text,
         final: Boolean(message.final),
-        alternatives: message.alternatives?.filter(Boolean) ?? [],
+        // PowerShell writes a one-item list as plain text; accept both.
+        alternatives: (Array.isArray(message.alternatives) ? message.alternatives : typeof message.alternatives === "string" ? [message.alternatives] : []).filter(Boolean),
       });
       committed = stitched.committed;
       handlers.onHeard(stitched.text, Boolean(message.final), stitched.alternatives, message.text.trim());

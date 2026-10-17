@@ -40,16 +40,94 @@ pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
     {
         macos::start_transcribe(app, run)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        windows::start_transcribe(app, run)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = (app, run);
-        Err("On-device sermon transcription runs on macOS.".into())
+        Err("Listening runs on macOS and Windows.".into())
     }
 }
 
 pub fn stop_transcribe() {
-    #[cfg(target_os = "macos")]
-    macos::stop_transcribe();
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    helper::stop();
+}
+
+/// The speech helper process, shared by macOS (Swift) and Windows (PowerShell): it prints one
+/// JSON line per phrase, which is forwarded to the app as a `listen-phrase` event.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod helper {
+    use std::time::Duration;
+
+    struct Running {
+        child: std::process::Child,
+        stdin: std::process::ChildStdin,
+    }
+
+    static RUNNING: std::sync::Mutex<Option<Running>> = std::sync::Mutex::new(None);
+
+    pub fn start(app: tauri::AppHandle, run: u64, mut command: std::process::Command) -> Result<(), String> {
+        stop();
+        let mut child = command
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("Could not start the speech helper. {error}"))?;
+        let stdout = child.stdout.take().ok_or("The speech helper produced no transcript stream.")?;
+        let stdin = child.stdin.take().ok_or("The speech helper could not be stopped later.")?;
+        std::thread::spawn(move || {
+            use tauri::Emitter;
+            let reader = std::io::BufReader::new(stdout);
+            for line in std::io::BufRead::lines(reader) {
+                let Ok(line) = line else { break };
+                let _ = app.emit("listen-phrase", super::ListenLine { run, line });
+            }
+            let end = super::ListenLine { run, line: r#"{"kind":"end"}"#.into() };
+            let _ = app.emit("listen-phrase", end);
+        });
+        let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
+        *guard = Some(Running { child, stdin });
+        Ok(())
+    }
+
+    pub fn stop() {
+        let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
+        let Some(mut running) = guard.take() else { return };
+        drop(guard);
+        let _ = std::io::Write::write_all(&mut running.stdin, b"stop\n");
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let _ = running.child.kill();
+            let _ = running.child.wait();
+        });
+    }
+}
+
+/// Windows: the offline recognizer built into Windows, through a bundled PowerShell script.
+#[cfg(target_os = "windows")]
+mod windows {
+    use tauri::Manager;
+
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
+        let script = app
+            .path()
+            .resolve("resources/transcribe-windows.ps1", tauri::path::BaseDirectory::Resource)
+            .ok()
+            .filter(|path| path.exists())
+            .ok_or("The Windows speech helper is missing from this install. Reinstall Church Studio.")?;
+        let mut command = std::process::Command::new("powershell.exe");
+        command.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
+        {
+            use std::os::windows::process::CommandExt;
+            // No console window flashing up behind the desk.
+            command.creation_flags(0x0800_0000);
+        }
+        super::helper::start(app, run, command)
+    }
 }
 
 pub fn request_access() -> Result<ListenAccess, String> {
@@ -220,53 +298,13 @@ mod macos {
         Ok(())
     }
 
-    struct TranscribeRun {
-        child: std::process::Child,
-        stdin: std::process::ChildStdin,
-    }
-
-    static TRANSCRIBE: std::sync::Mutex<Option<TranscribeRun>> = std::sync::Mutex::new(None);
-
     pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
-        stop_transcribe();
         let path = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-transcribe")))
             .filter(|path| path.exists())
             .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
-        let mut child = std::process::Command::new(&path)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::inherit())
-            .spawn()
-            .map_err(|error| format!("Could not start the on-device transcriber. {error}"))?;
-        let stdout = child.stdout.take().ok_or("The transcriber produced no transcript stream.")?;
-        let stdin = child.stdin.take().ok_or("The transcriber could not be stopped later.")?;
-        std::thread::spawn(move || {
-            use tauri::Emitter;
-            let reader = std::io::BufReader::new(stdout);
-            for line in std::io::BufRead::lines(reader) {
-                let Ok(line) = line else { break };
-                let _ = app.emit("listen-phrase", super::ListenLine { run, line });
-            }
-            let end = super::ListenLine { run, line: r#"{"kind":"end"}"#.into() };
-            let _ = app.emit("listen-phrase", end);
-        });
-        let mut guard = TRANSCRIBE.lock().unwrap_or_else(|poison| poison.into_inner());
-        *guard = Some(TranscribeRun { child, stdin });
-        Ok(())
-    }
-
-    pub fn stop_transcribe() {
-        let mut guard = TRANSCRIBE.lock().unwrap_or_else(|poison| poison.into_inner());
-        let Some(mut run) = guard.take() else { return };
-        drop(guard);
-        let _ = std::io::Write::write_all(&mut run.stdin, b"stop\n");
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
-            let _ = run.child.kill();
-            let _ = run.child.wait();
-        });
+        super::helper::start(app, run, std::process::Command::new(&path))
     }
 
     pub fn request_access() -> Result<ListenAccess, String> {
