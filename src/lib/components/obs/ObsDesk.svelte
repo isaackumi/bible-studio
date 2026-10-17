@@ -10,6 +10,7 @@
     reorderLayers,
     restoreComposition,
     setLayerLocked,
+    SCENE_COLORS,
     showLayer,
     type Composition,
     type CompositionLayer,
@@ -44,6 +45,10 @@
   let renameDraft = $state("");
   let typeMenu = $state(false);
   let addSourceButton = $state<HTMLButtonElement | undefined>();
+  /** Scenes list: drag-to-reorder (insertion index) and the folder color menu. */
+  let sceneDragId = $state<string | null>(null);
+  let sceneDrop = $state<number | null>(null);
+  let colorFor = $state<string | null>(null);
   /** Drag-to-reorder in the Sources list (front of the stack is the top row). */
   let dragId = $state<string | null>(null);
   let dropIndex = $state<number | null>(null);
@@ -465,14 +470,130 @@
         <Pane defaultSize={dockSize(0)} minSize={15} order={1}>
         <section class="dock">
           <header><Icon name="studio" size={16} /> Scenes</header>
-          <div class="list">
+          <div
+            class="list"
+            role="list"
+            ondragover={(event) => {
+              if (!sceneDragId || event.target !== event.currentTarget) return;
+              event.preventDefault();
+              sceneDrop = scenes.length;
+            }}
+            ondrop={(event) => {
+              if (!sceneDragId || event.target !== event.currentTarget) return;
+              event.preventDefault();
+              session.moveScene(sceneDragId, scenes.length);
+              sceneDragId = null;
+              sceneDrop = null;
+            }}
+          >
             {#if scenes.length === 0}
               <button type="button" onclick={newScene}>New scene</button>
             {/if}
-            {#each scenes as entry (entry.id)}
-              <button type="button" class:on={activeScene?.id === entry.id} onclick={() => pickScene(entry.id)}>
-                {entry.name}{entry.locked ? " · locked" : ""}
-              </button>
+            {#each scenes as entry, index (entry.id)}
+              <div
+                class="scene-row"
+                class:dragging={sceneDragId === entry.id}
+                class:drop-before={sceneDrop === index && sceneDragId !== entry.id}
+                class:drop-after={sceneDrop === scenes.length && index === scenes.length - 1 && sceneDragId !== entry.id}
+                role="listitem"
+                draggable="true"
+                ondragstart={(event) => {
+                  sceneDragId = entry.id;
+                  colorFor = null;
+                  event.dataTransfer?.setData("text/plain", entry.id);
+                  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+                }}
+                ondragover={(event) => {
+                  if (!sceneDragId) return;
+                  event.preventDefault();
+                  const box = event.currentTarget.getBoundingClientRect();
+                  sceneDrop = event.clientY > box.top + box.height / 2 ? index + 1 : index;
+                }}
+                ondrop={(event) => {
+                  event.preventDefault();
+                  if (sceneDragId && sceneDrop !== null) session.moveScene(sceneDragId, sceneDrop);
+                  sceneDragId = null;
+                  sceneDrop = null;
+                }}
+                ondragend={() => {
+                  sceneDragId = null;
+                  sceneDrop = null;
+                }}
+              >
+                <button
+                  type="button"
+                  class="grip"
+                  aria-label={`Reorder ${entry.name}. Drag, or press arrow up or down`}
+                  data-tip="Drag to reorder"
+                  onkeydown={(event) => {
+                    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                    event.preventDefault();
+                    session.moveScene(entry.id, event.key === "ArrowUp" ? index - 1 : index + 2);
+                    const target = event.currentTarget;
+                    requestAnimationFrame(() => target.focus());
+                  }}
+                ><Icon name="grip" size={16} /></button>
+                <button type="button" class="pick scene-pick" class:on={activeScene?.id === entry.id} onclick={() => pickScene(entry.id)}>
+                  <span class="folder" style:color={entry.color ?? "var(--muted)"}>
+                    <Icon name={entry.locked ? "folder-lock" : activeScene?.id === entry.id ? "folder-open" : "folder"} size={18} />
+                  </span>
+                  <span class="scene-label">{entry.name}</span>
+                </button>
+                <button
+                  type="button"
+                  class="desk-btn ghost icon toggle"
+                  aria-label={`Color for ${entry.name}`}
+                  aria-haspopup="menu"
+                  aria-expanded={colorFor === entry.id}
+                  data-tip="Folder color"
+                  onclick={() => (colorFor = colorFor === entry.id ? null : entry.id)}
+                ><span class="swatch" class:none={!entry.color} style:background={entry.color ?? "transparent"}></span></button>
+                <button
+                  type="button"
+                  class="desk-btn ghost icon toggle"
+                  class:on={entry.locked}
+                  aria-label={entry.locked ? `Unlock ${entry.name}` : `Lock ${entry.name}`}
+                  aria-pressed={entry.locked}
+                  data-tip={entry.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
+                  onclick={() => session.setSceneLocked(entry.id, !entry.locked)}
+                ><Icon name={entry.locked ? "lock" : "lock-open"} size={16} /></button>
+                {#if colorFor === entry.id}
+                  <div
+                    class="swatches"
+                    role="menu"
+                    tabindex="-1"
+                    aria-label={`Folder color for ${entry.name}`}
+                    onkeydown={(event) => event.key === "Escape" && (colorFor = null)}
+                  >
+                    {#each SCENE_COLORS as color (color)}
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={entry.color === color}
+                        aria-label={`Color ${color}`}
+                        class="swatch-pick"
+                        class:on={entry.color === color}
+                        style:background={color}
+                        onclick={() => {
+                          session.setSceneColor(entry.id, color);
+                          colorFor = null;
+                        }}
+                      ></button>
+                    {/each}
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={!entry.color}
+                      class="swatch-pick none"
+                      aria-label="No color"
+                      onclick={() => {
+                        session.setSceneColor(entry.id, null);
+                        colorFor = null;
+                      }}
+                    ></button>
+                  </div>
+                {/if}
+              </div>
             {/each}
           </div>
           {#if activeScene}
@@ -490,14 +611,6 @@
             <button type="button" class="desk-btn icon" data-tip="Add scene" aria-label="Add scene" onclick={newScene}>
               <Icon name="plus" size={16} />
             </button>
-            <button
-              type="button"
-              class="desk-btn"
-              data-tip={sceneLocked ? "Unlock scene" : "Lock scene"}
-              aria-label={sceneLocked ? "Unlock scene" : "Lock scene"}
-              disabled={!activeScene}
-              onclick={toggleSceneLock}
-            >{sceneLocked ? "Unlock" : "Lock"}</button>
             <button
               type="button"
               class="desk-btn"
@@ -747,9 +860,11 @@
 <svelte:window
   onpointerdown={(event) => {
     if (typeMenu && !(event.target as Element | null)?.closest?.(".source-add")) typeMenu = false;
+    if (colorFor && !(event.target as Element | null)?.closest?.(".swatches, .scene-row [aria-haspopup]")) colorFor = null;
   }}
   onkeydown={(event) => {
     if (typeMenu && event.key === "Escape") typeMenu = false;
+    if (colorFor && event.key === "Escape") colorFor = null;
   }}
 />
 
@@ -978,6 +1093,24 @@
   .source-row .grip { display: grid; place-items: center; width: 22px; min-height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: grab; flex: none; }
   .source-row .grip:hover { color: var(--ink); background: var(--field); }
   .source-row .grip:active { cursor: grabbing; }
+  .scene-row { position: relative; display: flex; gap: 2px; align-items: center; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+  .scene-row.dragging { opacity: 0.45; }
+  .scene-row.drop-before { border-top-color: var(--accent); }
+  .scene-row.drop-after { border-bottom-color: var(--accent); }
+  .scene-row .grip { display: grid; place-items: center; width: 22px; min-height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: grab; flex: none; }
+  .scene-row .grip:hover { color: var(--ink); background: var(--field); }
+  .scene-row > .scene-pick { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; }
+  .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder { display: inline-grid; place-items: center; flex: none; }
+  .scene-row .toggle { color: var(--muted); }
+  .scene-row .toggle:hover { color: var(--ink); }
+  .scene-row .toggle.on { color: var(--accent); }
+  .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
+  .swatch.none { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%) !important; }
+  .swatches { position: absolute; right: 4px; top: calc(100% + 2px); z-index: 4; display: grid; grid-template-columns: repeat(5, 26px); gap: 6px; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); }
+  .swatches .swatch-pick { width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .swatches .swatch-pick.on { border-color: var(--ink); }
+  .swatches .swatch-pick.none { background: linear-gradient(135deg, var(--field) 45%, var(--muted) 45% 55%, var(--field) 55%); border-color: var(--line); }
   .source-row .hidden-layer > span:first-child { opacity: 0.5; }
   .source-row .toggle { color: var(--muted); }
   .source-row .toggle:hover { color: var(--ink); }

@@ -4,6 +4,8 @@ import { presentScripture, presentText } from "./present";
 import { presentCamera } from "./camera";
 import {
   setLayerStyle,
+  moveLook,
+  setCompositionColor,
   lookMultiCamera,
   moveLayerTo,
   addLayer,
@@ -1188,5 +1190,29 @@ describe("layer text style", () => {
     expect(scene.layers[0]!.source.payload.style).toBeDefined();
     scene = setLayerStyle(scene, id, {});
     expect(scene.layers[0]!.source.payload.style).toBeUndefined();
+  });
+});
+
+describe("scene folders", () => {
+  it("sets, normalizes, clears, and rejects folder colors, and keeps them through sanitize", () => {
+    const scene = createScene("Welcome");
+    const colored = setCompositionColor(scene, "#4C8DFF");
+    expect(colored.color).toBe("#4c8dff");
+    expect(sanitizeComposition(JSON.parse(JSON.stringify(colored))).color).toBe("#4c8dff");
+    expect("color" in setCompositionColor(colored, null)).toBe(false);
+    expect("color" in setCompositionColor(colored, "red")).toBe(false);
+    expect(sanitizeComposition({ ...colored, color: "url(x)" }).color).toBeUndefined();
+  });
+
+  it("moves a scene to an insertion index and ignores unknown ids", () => {
+    const list = ["a", "b", "c", "d"].map((id) => ({ id }));
+    const ids = (next: { id: string }[]) => next.map((entry) => entry.id).join("");
+    expect(ids(moveLook(list, "a", 4))).toBe("bcda");
+    expect(ids(moveLook(list, "d", 0))).toBe("dabc");
+    expect(ids(moveLook(list, "b", 3))).toBe("acbd");
+    expect(ids(moveLook(list, "c", 1))).toBe("acbd");
+    expect(ids(moveLook(list, "a", -1))).toBe("abcd");
+    expect(ids(moveLook(list, "d", 99))).toBe("abcd");
+    expect(moveLook(list, "zz", 0)).toBe(list);
   });
 });

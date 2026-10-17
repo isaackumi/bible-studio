@@ -14,6 +14,8 @@
   import Columns2 from "@lucide/svelte/icons/columns-2";
   import Focus from "@lucide/svelte/icons/focus";
   import Folder from "@lucide/svelte/icons/folder";
+  import FolderLock from "@lucide/svelte/icons/folder-lock";
+  import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Gauge from "@lucide/svelte/icons/gauge";
   import Image from "@lucide/svelte/icons/image";
   import Keyboard from "@lucide/svelte/icons/keyboard";
@@ -102,6 +104,9 @@
     grip: GripVertical,
     lock: Lock,
     "lock-open": LockOpen,
+    folder: Folder,
+    "folder-open": FolderOpen,
+    "folder-lock": FolderLock,
   };
 
   let { name, size = 16 }: { name: string; size?: number } = $props();

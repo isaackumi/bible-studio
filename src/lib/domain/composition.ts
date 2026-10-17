@@ -77,6 +77,8 @@ export type Composition = {
   background?: PageBackground;
   /** Full freeze: no rename, layer, or transition edits until unlock. */
   locked: boolean;
+  /** Folder color in the Scenes list (#rrggbb). Organizing only; allowed while locked. */
+  color?: string;
   canvas: { width: number; height: number };
   layers: CompositionLayer[];
   transition: { type: "cut" | "fade"; ms: number };
@@ -254,6 +256,25 @@ export function createScene(name = "Scene"): Composition {
     fit: "contain",
     source: sourceRef("empty", "main", "Main"),
   });
+}
+
+/** Folder colors offered in the Scenes list. */
+export const SCENE_COLORS = ["#e8603c", "#f2b33d", "#3fb950", "#2fb8a6", "#4c8dff", "#8b6cff", "#e05da8", "#8a8f98"] as const;
+
+export function setCompositionColor(composition: Composition, color: string | null): Composition {
+  const { color: _old, ...rest } = composition;
+  return color && HEX_COLOR.test(color) ? { ...rest, color: color.toLowerCase() } : rest;
+}
+
+/** Move a saved scene to a new position in the list. Unknown ids leave the list as is. */
+export function moveLook<T extends { id: string }>(looks: T[], id: string, toIndex: number): T[] {
+  const from = looks.findIndex((entry) => entry.id === id);
+  if (from < 0) return looks;
+  const next = looks.slice();
+  const [moved] = next.splice(from, 1);
+  const target = Math.max(0, Math.min(next.length, toIndex > from ? toIndex - 1 : toIndex));
+  next.splice(target, 0, moved!);
+  return next;
 }
 
 export function setCompositionLocked(composition: Composition, locked: boolean): Composition {
@@ -954,6 +975,7 @@ export function sanitizeComposition(value: unknown): Composition {
   return {
     ...base,
     ...(background ? { background } : {}),
+    ...(typeof record.color === "string" && HEX_COLOR.test(record.color) ? { color: record.color.toLowerCase() } : {}),
     id: typeof record.id === "string" && record.id ? record.id : base.id,
     locked: record.locked === true,
     canvas: record.canvas?.width && record.canvas?.height ? record.canvas : base.canvas,

@@ -25,7 +25,9 @@ import {
   removeLook,
   restoreComposition,
   sanitizeComposition,
+  setCompositionColor,
   setCompositionLocked,
+  moveLook,
   takeTransitionForPreview,
   type Composition,
   type SourceRef,
@@ -1090,6 +1092,24 @@ class Session {
     this.saveLook(next);
     if (this.lookOnPreview?.id === id) this.previewLook(next);
     this.message = locked ? `${next.name} locked.` : `${next.name} unlocked.`;
+  };
+
+  /** Folder color for a scene. Organizing only, so it works on locked scenes too. */
+  setSceneColor = (id: string, color: string | null) => {
+    const saved = this.workspace.compositions.find((entry) => entry.id === id);
+    if (!saved) return;
+    const next = setCompositionColor(restoreComposition(saved), color);
+    this.workspace = { ...this.workspace, compositions: this.workspace.compositions.map((entry) => (entry.id === id ? next : entry)) };
+    if (this.lookOnPreview?.id === id) this.lookOnPreview = next;
+    this.persistSoon();
+  };
+
+  /** Reorder the Scenes list: drop `id` before the scene now at `toIndex` (or at the end). */
+  moveScene = (id: string, toIndex: number) => {
+    const next = moveLook(this.workspace.compositions, id, toIndex);
+    if (next === this.workspace.compositions) return;
+    this.workspace = { ...this.workspace, compositions: next };
+    this.persistSoon();
   };
 
   get sharedSources(): SharedSource[] {

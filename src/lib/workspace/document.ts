@@ -95,6 +95,8 @@ export function normalizeWorkspace(input: unknown): Workspace {
             id: clean.id,
             name: clean.name,
             locked: clean.locked,
+            ...(clean.color ? { color: clean.color } : {}),
+            ...(clean.background ? { background: clean.background } : {}),
             canvas: clean.canvas,
             layers: clean.layers,
             transition: clean.transition,

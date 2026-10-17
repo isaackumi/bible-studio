@@ -391,6 +391,9 @@ export type CompositionDocument = {
   id: string;
   name: string;
   locked?: boolean;
+  /** Folder color in the Scenes list (#rrggbb). */
+  color?: string;
+  background?: unknown;
   canvas: { width: number; height: number };
   layers: unknown[];
   transition: { type: TransitionKind; ms: number };
