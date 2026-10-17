@@ -314,9 +314,12 @@ export type PewDeskState = {
 
 export type ProductionLayout = {
   stage: [number, number, number];
-  docks: [number, number, number];
+  /** Scenes, Sources, Media, Controls. */
+  docks: [number, number, number, number];
   /** Monitors row vs docks row, percent of the desk height. */
   rows: [number, number];
+  /** Media dock (files, cameras, slides) shown. */
+  mediaOpen: boolean;
 };
 
 export type AppearanceSettings = {

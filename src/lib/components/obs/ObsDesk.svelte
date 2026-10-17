@@ -34,7 +34,8 @@
   import OutputControls from "../OutputControls.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
-  import { mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
+  import { dockShare, mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
+  import MediaDock from "./MediaDock.svelte";
 
   let query = $state("");
   let kind = $state<"cut" | "fade">("fade");
@@ -113,8 +114,10 @@
   );
   const scenesOpen = $derived(activeLayout?.panels.find((panel) => panel.panelId === "service")?.visible !== false);
   const controlsOpen = $derived(activeLayout?.panels.find((panel) => panel.panelId === "controls")?.visible !== false);
+  const mediaOpen = $derived(session.workspace.production.mediaOpen);
+  const docksVisible = $derived<[boolean, boolean, boolean, boolean]>([scenesOpen, true, mediaOpen, controlsOpen]);
   const chrome = $derived(
-    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}`,
+    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(mediaOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}`,
   );
 
   function retarget() {
@@ -143,22 +146,21 @@
     if (applying || focus) return;
     session.saveProductionLayout({
       ...session.workspace.production,
-      docks: mergeProductionDocks(session.workspace.production.docks, reported, scenesOpen, controlsOpen),
+      docks: mergeProductionDocks(session.workspace.production.docks, reported, docksVisible),
     });
   }
 
-  function dockSize(index: 0 | 1 | 2): number {
-    const sizes = frozen.docks;
-    if (scenesOpen && controlsOpen) return sizes[index];
-    if (!scenesOpen && controlsOpen) {
-      if (index === 1) return (sizes[1] / (100 - sizes[0])) * 100;
-      if (index === 2) return (sizes[2] / (100 - sizes[0])) * 100;
-    }
-    if (scenesOpen && !controlsOpen) {
-      if (index === 0) return (sizes[0] / (100 - sizes[2])) * 100;
-      if (index === 1) return (sizes[1] / (100 - sizes[2])) * 100;
-    }
-    return 100;
+  function dockSize(index: 0 | 1 | 2 | 3): number {
+    return dockShare(frozen.docks, docksVisible, index);
+  }
+
+  function toggleMedia() {
+    session.saveProductionLayout({ ...session.workspace.production, mediaOpen: !mediaOpen });
+  }
+
+  function addMediaSource(name: string, fields: SourceFields) {
+    if (sceneLocked) return;
+    selectedLayerId = session.createSourceInScene(ensureScene(), name, buildSource(fields)) ?? selectedLayerId;
   }
 
   function toggleDock(panelId: "service" | "controls") {
@@ -376,6 +378,9 @@
       </button>
       <button type="button" class="desk-btn icon" class:on={scenesOpen} aria-pressed={scenesOpen} aria-label={scenesOpen ? "Hide scenes" : "Show scenes"} data-tip={scenesOpen ? "Hide scenes" : "Show scenes"} onclick={() => toggleDock("service")}>
         <Icon name="studio" size={16} />
+      </button>
+      <button type="button" class="desk-btn icon" class:on={mediaOpen} aria-pressed={mediaOpen} aria-label={mediaOpen ? "Hide media" : "Show media"} data-tip={mediaOpen ? "Hide media" : "Show media — files, cameras, slides"} onclick={toggleMedia}>
+        <Icon name="media" size={16} />
       </button>
       <button type="button" class="desk-btn icon" class:on={controlsOpen} aria-pressed={controlsOpen} aria-label={controlsOpen ? "Hide controls" : "Show controls"} data-tip={controlsOpen ? "Hide controls" : "Show controls"} onclick={() => toggleDock("controls")}>
         <Icon name="list" size={16} />
@@ -782,9 +787,19 @@
       </section>
       </Pane>
 
-      {#if controlsOpen}
+      {#if mediaOpen}
         <PaneResizer />
         <Pane defaultSize={dockSize(2)} minSize={15} order={3}>
+        <section class="dock">
+          <header><Icon name="media" size={16} /> Media</header>
+          <MediaDock locked={sceneLocked} onadd={addMediaSource} />
+        </section>
+        </Pane>
+      {/if}
+
+      {#if controlsOpen}
+        <PaneResizer />
+        <Pane defaultSize={dockSize(3)} minSize={15} order={4}>
         <section class="dock">
           <header><Icon name="settings" size={16} /> Controls</header>
           <div class="controls">

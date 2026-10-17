@@ -1,7 +1,8 @@
 import type { ProductionLayout } from "../domain/types";
 
 const DEFAULT_STAGE: [number, number, number] = [42, 16, 42];
-const DEFAULT_DOCKS: [number, number, number] = [28, 44, 28];
+/** Scenes, Sources, Media, Controls. */
+const DEFAULT_DOCKS: [number, number, number, number] = [20, 28, 32, 20];
 const DEFAULT_ROWS: [number, number] = [74, 26];
 
 export function defaultProductionLayout(): ProductionLayout {
@@ -9,6 +10,7 @@ export function defaultProductionLayout(): ProductionLayout {
     stage: [...DEFAULT_STAGE],
     docks: [...DEFAULT_DOCKS],
     rows: [...DEFAULT_ROWS],
+    mediaOpen: true,
   };
 }
 
@@ -41,12 +43,25 @@ function normalizedSizes(value: unknown, fallback: [number, number, number]): [n
   return [(first / total) * 100, (second / total) * 100, (third / total) * 100];
 }
 
+/** Four dock widths. A layout saved before the Media dock splits its Sources width with Media. */
+function normalizedDocks(value: unknown): [number, number, number, number] {
+  if (!Array.isArray(value)) return [...DEFAULT_DOCKS];
+  if (value.length === 3) {
+    const [scenes, sources, controls] = normalizedSizes(value, [28, 44, 28]);
+    return [scenes, sources * 0.45, sources * 0.55, controls];
+  }
+  if (value.length !== 4 || value.some((size) => typeof size !== "number" || !Number.isFinite(size) || size <= 0)) return [...DEFAULT_DOCKS];
+  const total = (value as number[]).reduce((sum, size) => sum + size, 0);
+  return (value as number[]).map((size) => (size / total) * 100) as [number, number, number, number];
+}
+
 export function normalizeProductionLayout(value: unknown): ProductionLayout {
   const record = value && typeof value === "object" ? (value as Partial<ProductionLayout>) : {};
   return {
     stage: normalizedSizes(record.stage, DEFAULT_STAGE),
-    docks: normalizedSizes(record.docks, DEFAULT_DOCKS),
+    docks: normalizedDocks(record.docks),
     rows: normalizedRows(record.rows),
+    mediaOpen: record.mediaOpen !== false,
   };
 }
 
@@ -68,33 +83,30 @@ export function mergeProductionRows(saved: [number, number], reported: number[])
   return [(reported[0]! / total) * 100, (reported[1]! / total) * 100];
 }
 
+/** Write reported widths of the visible docks back, keeping hidden docks at their saved width. */
 export function mergeProductionDocks(
-  saved: [number, number, number],
+  saved: [number, number, number, number],
   reported: number[],
-  scenesVisible: boolean,
-  controlsVisible: boolean,
-): [number, number, number] {
+  visible: [boolean, boolean, boolean, boolean],
+): [number, number, number, number] {
   const total = positiveTotal(reported);
-  if (total === null) return saved;
-  if (scenesVisible && controlsVisible && reported.length === 3) {
-    return [(reported[0]! / total) * 100, (reported[1]! / total) * 100, (reported[2]! / total) * 100];
-  }
-  if (!scenesVisible && controlsVisible && reported.length === 2) {
-    const available = 100 - saved[0];
-    const sourceShare = (reported[0]! / total) * available;
-    return [saved[0], sourceShare, available - sourceShare];
-  }
-  if (scenesVisible && !controlsVisible && reported.length === 2) {
-    const available = 100 - saved[2];
-    const sceneShare = (reported[0]! / total) * available;
-    return [sceneShare, available - sceneShare, saved[2]];
-  }
-  return saved;
+  const shown = visible.filter(Boolean).length;
+  if (total === null || shown === 0 || reported.length !== shown) return saved;
+  const available = saved.reduce((sum, size, index) => sum + (visible[index] ? size : 0), 0);
+  let next = 0;
+  return saved.map((size, index) => (visible[index] ? (reported[next++]! / total) * available : size)) as [number, number, number, number];
+}
+
+/** Default pane size for a visible dock: its saved share of the visible docks. */
+export function dockShare(saved: [number, number, number, number], visible: [boolean, boolean, boolean, boolean], index: number): number {
+  const available = saved.reduce((sum, size, at) => sum + (visible[at] ? size : 0), 0);
+  return available > 0 ? (saved[index]! / available) * 100 : 100;
 }
 
 export function sameProductionLayout(left: ProductionLayout, right: ProductionLayout): boolean {
   const near = (a: number, b: number) => Math.abs(a - b) < 0.4;
   return left.stage.every((size, index) => near(size, right.stage[index]!)) &&
     left.docks.every((size, index) => near(size, right.docks[index]!)) &&
-    left.rows.every((size, index) => near(size, right.rows[index]!));
+    left.rows.every((size, index) => near(size, right.rows[index]!)) &&
+    left.mediaOpen === right.mediaOpen;
 }

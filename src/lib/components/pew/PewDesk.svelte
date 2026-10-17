@@ -1,9 +1,6 @@
 <script lang="ts">
-  import DeckLibrary from "../decks/DeckLibrary.svelte";
-  import DeckEditor from "../decks/DeckEditor.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
-  import MediaPane from "../MediaPane.svelte";
   import { findItem } from "../../domain/service";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
@@ -25,9 +22,8 @@
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
-  import CompositionPane from "../CompositionPane.svelte";
 
-  type Mode = "scriptures" | "slides" | "songs" | "media" | "sermon" | "looks";
+  type Mode = "scriptures" | "songs" | "sermon";
   type DraftSermonSection = {
     id: string;
     name: string;
@@ -48,8 +44,6 @@
   let end = $state<number | null>(1);
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
-  let slideQuery = $state("");
-  let slideImport = $state<HTMLInputElement | null>(null);
   let detections = $state<SearchHit[]>([]);
   let note = $state("Loading scripture…");
   let sheet = $state<"help" | "lexicon" | "type" | null>(null);
@@ -142,34 +136,6 @@
     });
   });
   const queue = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
-  const slides = $derived(queue.filter((item) => item.kind === "slide" || item.kind === "announcement"));
-  const editingSlide = $derived.by(() => {
-    const id = session.cursor.itemId;
-    if (!session.service || !id) return null;
-    const item = findItem(session.service, id)?.item;
-    return item && (item.kind === "slide" || item.kind === "announcement") ? item : null;
-  });
-
-  /** Edit the selected slide's text or style. Preview refreshes; Program waits for LIVE. */
-  function patchSlide(patch: { heading?: string; body?: string; style?: TextStyle }) {
-    const item = editingSlide;
-    if (!item) return;
-    const text = item.slide ?? item.announcement ?? { heading: "", body: "" };
-    const heading = patch.heading ?? text.heading;
-    const body = patch.body ?? text.body;
-    const style = patch.style ?? item.style;
-    const next: PresentationItem = {
-      ...item,
-      title: heading.trim() || item.title,
-      ...(item.kind === "slide" ? { slide: { heading, body, imageId: item.slide?.imageId ?? null } } : { announcement: { heading, body } }),
-      ...(style && Object.keys(style).length ? { style } : { style: undefined }),
-    };
-    session.updateItem(next);
-  }
-
-  const visibleSlides = $derived(
-    slides.filter((item) => item.title.toLowerCase().includes(slideQuery.trim().toLowerCase())),
-  );
   const reading = $derived(
     verses.filter((verse) => start !== null && verse.verse >= start && verse.verse <= (end ?? start)),
   );
@@ -381,25 +347,27 @@
     note = `${item.reference} added to the queue.`;
   }
 
-  async function createSlide() {
-    await ensureService("Service");
-    session.addSlide("slide");
-    mode = "slides";
+  // Presenter Desk is the words desk. Slides, media and Looks live on the Production Desk.
+  const modes = $derived<{ id: Mode; label: string }[]>([
+    { id: "scriptures", label: "Scriptures" },
+    { id: "songs", label: "Songs" },
+    ...(canUse("sermon") ? [{ id: "sermon" as const, label: "Sermon" }] : []),
+  ]);
+
+  function pickMode(next: Mode) {
+    mode = next;
+    if (next !== "scriptures") return;
+    const item = passage();
+    if (item) void session.previewPassage(item);
   }
 
-  async function importSlides(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) return;
-    try {
-      if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") await session.importPdf(file);
-      else await session.importDocument(file.name, await file.text());
-      note = session.message;
-      mode = "slides";
-    } catch (error) {
-      note = error instanceof Error ? error.message : "The file was not imported.";
-    }
+  function onModeKey(event: KeyboardEvent) {
+    if (!event.altKey || event.metaKey || event.ctrlKey || session.settingsOpen) return;
+    const index = ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (index < 0 || !modes[index] || target?.closest('[aria-modal="true"]')) return;
+    event.preventDefault();
+    pickMode(modes[index]!.id);
   }
 
   function open(item: PresentationItem) {
@@ -690,21 +658,23 @@
     note = `${section.name} added to the queue. Notes were not queued.`;
   }
   let alertsOpen = $state(false);
-  let editingDeckId = $state<string | null>(null);
-  const editingDeck = $derived(session.decks.find((deck) => deck.id === editingDeckId) ?? null);
 </script>
+
+<svelte:window onkeydown={onModeKey} />
 
 <div class="pb" class:focus>
   <header class="pb-bar">
     <nav class="pb-modes" aria-label="Library">
-      <button type="button" class:on={mode === "scriptures"} onclick={() => { mode = "scriptures"; const item = passage(); if (item) void session.previewPassage(item); }}>Scriptures</button>
-      <button type="button" class:on={mode === "slides"} onclick={() => (mode = "slides")}>Slides</button>
-      <button type="button" class:on={mode === "songs"} onclick={() => (mode = "songs")}>Songs</button>
-      <button type="button" class:on={mode === "media"} onclick={() => (mode = "media")}>Media</button>
-      {#if canUse("sermon")}
-        <button type="button" class:on={mode === "sermon"} onclick={() => (mode = "sermon")}>Sermon</button>
-      {/if}
-      <button type="button" class:on={mode === "looks"} onclick={() => (mode = "looks")}>Looks</button>
+      {#each modes as entry, index (entry.id)}
+        <button
+          type="button"
+          class:on={mode === entry.id}
+          aria-pressed={mode === entry.id}
+          aria-keyshortcuts={`Alt+${index + 1}`}
+          data-tip={`${entry.label} (Alt+${index + 1})`}
+          onclick={() => pickMode(entry.id)}
+        >{entry.label}</button>
+      {/each}
     </nav>
     <div class="pb-actions">
       <OutputControls compact />
@@ -755,13 +725,7 @@
     </nav>
   </header>
 
-  {#if mode === "looks"}
-    <CompositionPane />
-  {:else if mode === "media"}
-    <section class="pb-songs pb-media">
-      <MediaPane />
-    </section>
-  {:else if mode === "sermon"}
+  {#if mode === "sermon"}
     <section class="pb-songs">
       <div class="song-desk">
         <form class="song-editor" onsubmit={saveSermonForm}>
@@ -1036,53 +1000,6 @@
               {/each}
             </div>
           </section>
-        {:else}
-          <section class="pb-panel slides">
-            <DeckLibrary onedit={(id) => (editingDeckId = id)} />
-            <div class="slide-bar">
-              <span class="service-slides">Service slides</span>
-              <button type="button" class="new-slide" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Slide</button>
-              <button type="button" class="new-slide" onclick={() => slideImport?.click()}>Import text</button>
-              <input
-                bind:this={slideImport}
-                type="file"
-                accept=".txt,.md,.markdown,.text,.pdf,text/plain,text/markdown,application/pdf"
-                hidden
-                aria-label="Import text or Markdown"
-                onchange={(event) => void importSlides(event)}
-              />
-              <input placeholder="Search for slide title or content" aria-label="Search slides" bind:value={slideQuery} />
-            </div>
-            {#if note}<p class="script-note">{note}</p>{/if}
-            <div class="slide-row">
-              {#each visibleSlides as item, index (item.id)}
-                <button type="button" class="card" class:hot={index % 3 !== 2} class:cool={index % 3 === 2} onclick={(event) => { event.currentTarget.blur(); open(item); }}>
-                  <strong>{item.title}</strong>
-                  <span>{item.kind === "announcement" ? "Announcement" : "Slide"}</span>
-                </button>
-              {/each}
-            </div>
-            {#if editingSlide}
-              {@const slideText = editingSlide.slide ?? editingSlide.announcement ?? { heading: "", body: "" }}
-              <div class="slide-editor">
-                <input
-                  aria-label="Slide heading"
-                  placeholder="Heading"
-                  value={slideText.heading}
-                  oninput={(event) => patchSlide({ heading: event.currentTarget.value })}
-                />
-                <textarea
-                  aria-label="Slide body"
-                  rows="4"
-                  placeholder="Body text"
-                  value={slideText.body}
-                  oninput={(event) => patchSlide({ body: event.currentTarget.value })}
-                ></textarea>
-                <TextStyleEditor style={editingSlide.style ?? {}} onchange={(style) => patchSlide({ style })} />
-                <p class="script-note">Edits show on Preview. LIVE sends Program.</p>
-              </div>
-            {/if}
-          </section>
         {/if}
                 </Pane>
               </PaneGroup>
@@ -1105,14 +1022,6 @@
                   <p><sup>{verse.verse}</sup> {verse.text}</p>
                 {/each}
               </article>
-            {:else if visibleSlides.length > 0}
-              <div class="display-grid">
-                {#each visibleSlides.slice(0, 4) as item, index (item.id)}
-                  <button type="button" class="tile" class:cool={index % 2 === 0} class:hot={index % 2 === 1} onclick={(event) => { event.currentTarget.blur(); open(item); }}>
-                    {item.title}
-                  </button>
-                {/each}
-              </div>
             {/if}
           </div>
         </section>
@@ -1214,11 +1123,6 @@
   <AlertsDialog onclose={() => (alertsOpen = false)} />
 {/if}
 
-{#if editingDeck}
-  {#key editingDeck.id}
-    <DeckEditor deck={editingDeck} onclose={() => (editingDeckId = null)} />
-  {/key}
-{/if}
 
 <style>
   .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
@@ -1244,18 +1148,28 @@
     flex: none;
     overflow: hidden;
   }
-  .pb-modes { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: auto; flex: 1 1 0; }
+  /* Segmented switch: never shrinks, so every mode stays visible; the tools give way instead. */
+  .pb-modes {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: calc(var(--radius-control) + 3px);
+    background: var(--field);
+  }
   .pb-modes button {
     border: 0;
     background: transparent;
     color: var(--muted);
     border-radius: var(--radius-control);
-    padding: 7px 14px;
+    padding: 5px 14px;
     font-weight: 560;
     font-size: 14px;
     flex: none;
   }
-  .pb-modes button:hover:not(.on) { background: var(--field); color: var(--ink); }
+  .pb-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
   .pb-actions {
     margin-left: auto;
@@ -1299,7 +1213,7 @@
   @media (prefers-reduced-motion: reduce) {
     .live.on-air, .pip.on::after, .live.on-air .pip::after { animation: none; }
   }
-  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: none; }
+  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
   .pb-tools > button {
     width: var(--tool-size);
     height: var(--tool-size);
@@ -1311,6 +1225,7 @@
     place-items: center;
     padding: 0;
   }
+  .pb-tools > :global(*) { flex: none; }
   .pb-tools > button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .pb-tools > button.on { color: var(--accent); border-color: var(--accent); }
   @media (max-width: 1440px) {
@@ -1368,7 +1283,7 @@
     border-radius: var(--radius-panel);
     overflow: hidden;
   }
-  .pb-head, .pb-foot, .script-bar, .slide-bar, .output-tools {
+  .pb-head, .pb-foot, .script-bar, .output-tools {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1379,7 +1294,7 @@
   }
   .pb-head { justify-content: space-between; }
   .pb-body { flex: 1; min-height: 0; }
-  .quiet, .mini, .go, .lex, .new-slide {
+  .quiet, .mini, .go, .lex {
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -1400,10 +1315,10 @@
     place-items: center;
     flex: none;
   }
-  .mini:hover, .lex:hover, .steppers button:hover, .new-slide:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+  .mini:hover, .lex:hover, .steppers button:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .mini.on { color: var(--accent); border-color: var(--accent); }
-  .script-bar, .slide-bar { padding: 8px; }
-  select, .script-bar input, .slide-bar input {
+  .script-bar { padding: 8px; }
+  select, .script-bar input {
     height: 32px;
     border-radius: 8px;
     border: 1px solid var(--line);
@@ -1412,9 +1327,9 @@
     padding: 0 10px;
   }
   select { width: 88px; }
-  .script-bar input, .slide-bar input { flex: 1; min-width: 0; }
+  .script-bar input { flex: 1; min-width: 0; }
   .verse-list, .queue { overflow: auto; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
-  .verse, .queue button, .card, .tile {
+  .verse, .queue button {
     border: 1px solid var(--line);
     background: var(--field);
     color: var(--ink);
@@ -1462,36 +1377,6 @@
   .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
   .display { padding: 12px; }
-  .display-grid { height: 100%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
-  .tile, .card {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    padding: 12px;
-    min-height: 72px;
-    color: white;
-    font-weight: 600;
-  }
-  .hot { background: linear-gradient(160deg, #ff8a3d, #ff5a1f); border-color: transparent; }
-  .cool { background: linear-gradient(160deg, #1aa8a0, #0e6e74); border-color: transparent; }
-  .slides .slide-bar { flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 10px; }
-  .slides .slide-bar input { flex: 1 1 200px; }
-  .service-slides { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
-  .pb-panel.slides { overflow: auto; }
-  .slide-row { display: flex; gap: 10px; overflow: auto; padding: 4px 10px 12px; }
-  .slide-editor { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; }
-  .slide-editor input, .slide-editor textarea {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    background: var(--field);
-    color: var(--ink);
-    padding: 8px 10px;
-    font: inherit;
-  }
-  .card { width: 180px; flex: none; min-height: 108px; }
-  .card span, .tile { font-weight: 500; }
-  .card span { font-size: 12px; opacity: 0.85; }
-  .new-slide { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
   .monitor {
     flex: 1;
     min-height: 0;
@@ -1538,7 +1423,6 @@
   .steppers button { width: 32px; padding: 0; justify-content: center; }
   .queue button { padding: 8px 10px; }
   .queue button.on { border-color: var(--accent); }
-  .pb-media { overflow: auto; padding: 16px 20px; }
   .pb-songs {
     flex: 1;
     min-height: 0;
