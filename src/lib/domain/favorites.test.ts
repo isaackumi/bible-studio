@@ -15,8 +15,9 @@ describe("favorites", () => {
 
   it("keeps a verse by its place in the Bible, whatever the translation", () => {
     const favorites = toggleFavoritePassage(emptyFavorites(), john);
-    expect(isFavoritePassage(favorites, { ...john, translationId: "web" })).toBe(true);
-    expect(toggleFavoritePassage(favorites, { ...john, translationId: "web" }).passages).toEqual([]);
+    const web = { ...john, translationId: "web" };
+    expect(isFavoritePassage(favorites, web)).toBe(true);
+    expect(toggleFavoritePassage(favorites, web).passages).toEqual([]);
   });
 
   it("puts starred items first without changing the rest of the order", () => {
