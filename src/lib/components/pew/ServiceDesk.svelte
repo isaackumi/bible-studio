@@ -160,6 +160,12 @@
                     {#if live(item)}<span class="badge live-badge">Live</span>{:else if session.cursor.itemId === item.id}<span class="badge">Preview</span>{/if}
                   </button>
                   <span class="tools">
+                    {#if item.kind === "deck" && item.deck}
+                      {@const looping = session.deckLoop?.deckId === item.deck.deckId}
+                      <button type="button" class="loop" class:on={looping} title={looping ? "Stop the loop" : "Play on the screen by itself, a page every 8 seconds, round and round"} onclick={() => (looping ? session.stopDeckLoop() : void session.startDeckLoop(item.deck!.deckId, 8))}>
+                        <Icon name="refresh" size={12} /> {looping ? "Stop loop" : "Loop"}
+                      </button>
+                    {/if}
                     <button type="button" class="row-tool" aria-label="Move up" onclick={() => session.moveItem(item.id, -1)}><Icon name="chevron-up" size={14} /></button>
                     <button type="button" class="row-tool" aria-label="Move down" onclick={() => session.moveItem(item.id, 1)}><Icon name="chevron-down" size={14} /></button>
                     <button type="button" class="row-tool" aria-label={`Remove ${item.title}`} onclick={() => session.removeItem(item.id)}><Icon name="close" size={13} /></button>
@@ -323,6 +329,9 @@
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10px; font-weight: 750; }
   .live-badge { background: var(--live); color: #fff; }
+  .loop { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+  .loop:hover { color: var(--ink); border-color: var(--accent); }
+  .loop.on { border-color: var(--live); color: var(--live); background: color-mix(in srgb, var(--live) 10%, transparent); }
   .add-section { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .add-section input { width: 180px; }
   .chip { height: 28px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }

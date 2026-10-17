@@ -34,6 +34,9 @@
   <figcaption>
     <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
     <span class="place" class:warn={programSet && !programLive}>{programLive ? "Audience sees this" : programSet ? "Audience window closed" : "Nothing live"}</span>
+    {#if session.deckLoop}
+      <button type="button" class="loop-chip" title="Stop the loop; Program stays on this page" onclick={() => session.stopDeckLoop()}><Icon name="refresh" size={12} /> Looping · Stop</button>
+    {/if}
   </figcaption>
   <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
 </figure>
@@ -62,4 +65,5 @@
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
   .row-tool:hover { background: var(--panel); color: var(--ink); }
   .monitor { container-type: inline-size; background: #000; }
+  .loop-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 24px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--live) 50%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--live) 12%, transparent); color: var(--live); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 </style>

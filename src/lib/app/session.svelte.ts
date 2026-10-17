@@ -1766,6 +1766,50 @@ class Session {
     this.message = `${deck.name}: page ${index + 1} of ${deck.pages.length} on Preview. LIVE sends Program.`;
   };
 
+  /** A slide deck playing on Program by itself (announcements before the service), looping. */
+  deckLoop = $state<{ deckId: string; seconds: number; index: number } | null>(null);
+  private loopTimer: ReturnType<typeof setInterval> | undefined;
+
+  /** Put a deck on Program and advance it every few seconds, round and round, until stopped. */
+  startDeckLoop = async (deckId: string, seconds = 8) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    if (!deck || deck.pages.length === 0) return;
+    if (!this.desktop() && !this.controlsAudience) {
+      this.message = "This window is not sending to the audience.";
+      return;
+    }
+    this.stopDeckLoop();
+    const every = Math.min(600, Math.max(3, Math.round(seconds)));
+    this.deckLoop = { deckId, seconds: every, index: 0 };
+    await this.showLoopPage();
+    this.loopTimer = setInterval(() => {
+      const loop = this.deckLoop;
+      const current = loop && this.decks.find((entry) => entry.id === loop.deckId);
+      if (!loop || !current?.pages.length) return this.stopDeckLoop();
+      this.deckLoop = { ...loop, index: (loop.index + 1) % current.pages.length };
+      void this.showLoopPage();
+    }, every * 1000);
+    this.message = `${deck.name} is looping on Program, a page every ${every} seconds. Preview is free for what comes next.`;
+  };
+
+  stopDeckLoop = () => {
+    clearInterval(this.loopTimer);
+    this.loopTimer = undefined;
+    if (this.deckLoop) this.message = "Loop stopped. Program stays on the page it was showing.";
+    this.deckLoop = null;
+  };
+
+  /** The loop writes Program directly, so the operator can keep staging on Preview. */
+  private showLoopPage = async () => {
+    const loop = this.deckLoop;
+    const deck = loop && this.decks.find((entry) => entry.id === loop.deckId);
+    const page = deck?.pages[loop!.index];
+    if (!loop || !deck || !page) return;
+    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    this.live = { ...this.live, program: frame(model, `deck:${deck.id}:${loop.index}`, page.transition.type === "cut" ? "cut" : "fade"), revision: this.live.revision + 1 };
+    await this.pushProgram();
+  };
+
   addDeckToService = async (deckId: string) => {
     const deck = this.decks.find((entry) => entry.id === deckId);
     if (!deck) return;
@@ -2637,6 +2681,8 @@ class Session {
       this.message = "Nothing on Preview yet. Program did not change.";
       return;
     }
+    // The operator taking over Program ends a running loop.
+    if (this.deckLoop) this.stopDeckLoop();
     const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
     const themeTransition = this.theme().transition;
     const takeTransition =

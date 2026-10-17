@@ -105,6 +105,7 @@
           <div class="menu" role="menu">
             <button type="button" role="menuitem" onclick={() => { menuFor = null; onedit(deck.id); }}>Edit</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.addDeckToService(deck.id); }}>Add to queue</button>
+            <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.startDeckLoop(deck.id, 8); }}>Loop on Program (8 s a page)</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; session.saveDeck(duplicateDeck(deck)); }}>Duplicate</button>
             <button type="button" role="menuitem" class="danger" onclick={() => remove(deck.id)}>{armedDelete === deck.id ? "Delete? Click again" : "Delete"}</button>
           </div>
