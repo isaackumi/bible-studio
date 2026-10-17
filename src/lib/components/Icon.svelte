@@ -18,6 +18,7 @@
   import FolderLock from "@lucide/svelte/icons/folder-lock";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import Pencil from "@lucide/svelte/icons/pencil";
+  import Copy from "@lucide/svelte/icons/copy";
   import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Gauge from "@lucide/svelte/icons/gauge";
@@ -115,6 +116,7 @@
     "folder-lock": FolderLock,
     more: Ellipsis,
     pencil: Pencil,
+    copy: Copy,
     view: PanelsTopLeft,
   };
 

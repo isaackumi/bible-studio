@@ -934,9 +934,8 @@
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    padding: 0 12px 12px;
+    padding: var(--gap, 10px) 12px 12px;
   }
-  .prod-looks :global(.pb-songs) { height: 100%; }
   .prod-bar {
     display: flex;
     align-items: center;

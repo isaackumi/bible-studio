@@ -58,6 +58,8 @@
   import { mediaUrl } from "../db/api";
   import { targetAtFromClock, type TimerMode } from "../domain/timer";
   import Screen from "./Screen.svelte";
+  import Icon from "./Icon.svelte";
+  import LibrarySidebar from "./pew/LibrarySidebar.svelte";
 
   let draft = $state<Composition | null>(null);
   let selectedId = $state<string | null>(null);
@@ -77,6 +79,15 @@
   let previewFrame = $state<HTMLDivElement | undefined>();
   let drag = $state<{ layerId: string; handle: LayerDragHandle; startX: number; startY: number; origin: Composition } | null>(null);
   const dragHandles: LayerDragHandle[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+  const ANIMATIONS: [LayerAnimationKind, string][] = [
+    ["none", "None"],
+    ["fade", "Fade"],
+    ["dissolve", "Dissolve"],
+    ["slide-up", "Slide up"],
+    ["slide-down", "Slide down"],
+    ["slide-left", "Slide left"],
+    ["slide-right", "Slide right"],
+  ];
 
   const saved = $derived(session.workspace.compositions.map((entry) => restoreComposition(entry)));
   const selected = $derived(draft?.layers.find((layer) => layer.id === selectedId) ?? draft?.layers[0] ?? null);
@@ -266,6 +277,26 @@
     draft = instantiateTemplate(template, template.name);
     selectedId = draft.layers[0]?.id ?? null;
     session.previewLook(draft);
+  }
+
+  let armedDelete = $state<string | null>(null);
+  let armTimer: ReturnType<typeof setTimeout> | undefined;
+  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const SOURCE_ICON: Record<string, string> = { camera: "cast", scripture: "bible", song: "lyrics", image: "media", video: "media", timer: "speed", clock: "speed", text: "list", "lower-third": "stage", qr: "layout", empty: "square" };
+
+  function deleteSaved(look: Composition) {
+    clearTimeout(armTimer);
+    if (armedDelete !== look.id) {
+      armedDelete = look.id;
+      armTimer = setTimeout(() => (armedDelete = null), 3000);
+      return;
+    }
+    armedDelete = null;
+    session.deleteLook(look.id);
+    if (draft?.id === look.id) {
+      draft = null;
+      selectedId = null;
+    }
   }
 
   function openSaved(composition: Composition) {
@@ -540,417 +571,117 @@
   }
 </script>
 
-<section class="pb-songs">
-  <div class="song-desk">
-    <div class="song-editor">
-      <h1>Looks</h1>
-      <p>Choose a layout, assign sources, then Preview. LIVE still sends Program.</p>
-      <div class="templates">
+<section class="looks-desk">
+  <!-- Library: templates and saved looks -->
+  <LibrarySidebar title="Looks" icon="layout" count={saved.length} storageKey="looks">
+    <div class="lib-scroll">
+      <p class="group">Start from a layout</p>
+      <div class="tiles">
         {#each COMPOSITION_TEMPLATES as template (template.id)}
-          <button type="button" class:on={draft && !saved.some((entry) => entry.id === draft?.id) && draft.name === template.name} onclick={() => void openTemplate(template.id)}>{template.name}</button>
+          <button
+            type="button"
+            class="tile"
+            class:on={draft && !saved.some((entry) => entry.id === draft?.id) && draft.name === template.name}
+            title={template.name}
+            onclick={() => void openTemplate(template.id)}
+          >
+            <span class="schema" aria-hidden="true">
+              {#each template.slots as slot, n (slot.id)}
+                <i style:left="{slot.bounds.x}%" style:top="{slot.bounds.y}%" style:width="{slot.bounds.w}%" style:height="{slot.bounds.h}%" class:main={n === 0}></i>
+              {/each}
+            </span>
+            <span class="tile-name">{template.name}</span>
+          </button>
         {/each}
       </div>
-      {#if draft}
-        <label>Name
-          <input
-            aria-label="Look name"
-            value={draft.name}
-            onchange={(event) => touch(renameComposition(draft!, event.currentTarget.value))}
-          />
-        </label>
-        <div class="bounds">
-          <label>Transition
-            <select
-              aria-label="Look transition"
-              value={draft.transition.type}
-              onchange={(event) =>
-                draft &&
-                touch(
-                  setCompositionTransition(draft, {
-                    type: event.currentTarget.value === "cut" ? "cut" : "fade",
-                    ms: draft.transition.ms,
-                  }),
-                )}
-            >
-              <option value="fade">Fade</option>
-              <option value="cut">Cut</option>
-            </select>
-          </label>
-          {#if draft.transition.type === "fade"}
-            <label>Transition ms
-              <input
-                type="number"
-                min="0"
-                max="2000"
-                step="50"
-                aria-label="Look transition duration"
-                value={draft.transition.ms}
-                oninput={(event) =>
-                  draft &&
-                  touch(setCompositionTransition(draft, { type: "fade", ms: Number(event.currentTarget.value) }))}
-              />
-            </label>
-          {/if}
-        </div>
-        <ul class="layers">
-          {#each draft.layers as layer (layer.id)}
-            <li>
-              <button type="button" class:on={selected?.id === layer.id} onclick={() => (selectedId = layer.id)}>
-                <strong>{layer.name}</strong>
-                <span>{layer.source.type}{layer.visible ? "" : " · hidden"}{layer.locked ? " · locked" : ""}</span>
-              </button>
-              <span class="row">
-                <button type="button" onclick={() => touch(reorderLayers(draft!, layer.id, -1))}>Up</button>
-                <button type="button" onclick={() => touch(reorderLayers(draft!, layer.id, 1))}>Down</button>
-                <button type="button" onclick={() => touch(layer.visible ? hideLayer(draft!, layer.id) : showLayer(draft!, layer.id))}>{layer.visible ? "Hide" : "Show"}</button>
-                <button type="button" onclick={() => touch(setLayerLocked(draft!, layer.id, !layer.locked))}>{layer.locked ? "Unlock" : "Lock"}</button>
-                <button
-                  type="button"
-                  onclick={() => {
-                    const next = duplicateLayer(draft!, layer.id);
-                    selectedId = next.layers[next.layers.length - 1]?.id ?? selectedId;
-                    touch(next);
-                  }}
-                >Duplicate</button>
-                <button
-                  type="button"
-                  onclick={() => {
-                    const next = removeLayer(draft!, layer.id);
-                    selectedId = next.layers.find((entry) => entry.id === selectedId)?.id ?? next.layers[0]?.id ?? null;
-                    touch(next);
-                  }}
-                >Remove</button>
-              </span>
-            </li>
-          {/each}
-        </ul>
-        <button
-          type="button"
-          onclick={() => {
-            const next = addLayer(draft!, {
-              name: `Layer ${draft!.layers.length + 1}`,
-              bounds: { x: 10, y: 10, w: 40, h: 40 },
-              source: sourceRef("empty", "empty", "Empty"),
-            });
-            selectedId = next.layers[next.layers.length - 1]?.id ?? null;
-            touch(next);
-          }}
-        >Add layer</button>
-        {#if selected}
-          <label>Layer name
-            <input
-              aria-label="Layer name"
-              value={selected.name}
-              onchange={(event) => draft && selected && touch(renameLayer(draft, selected.id, event.currentTarget.value))}
-            />
-          </label>
-          <label>Source
-            <select
-              aria-label="Layer source"
-              value={selected.source.type}
-              onchange={(event) => assign(event.currentTarget.value as SourceType)}
-              oninput={(event) => assign(event.currentTarget.value as SourceType)}
-            >
-              <option value="empty">Empty</option>
-              <option value="scripture">Scripture</option>
-              <option value="song">Lyrics</option>
-              <option value="image">Image</option>
-              <option value="camera">Camera</option>
-              <option value="timer">Timer</option>
-              <option value="lower-third">Lower third</option>
-              <option value="text">Text</option>
-            </select>
-          </label>
-          <div class="bounds">
-            <label>X <input type="number" min="0" max="100" aria-label="X" disabled={selected.locked} value={selected.bounds.x} oninput={(event) => setBound("x", Number(event.currentTarget.value))} /></label>
-            <label>Y <input type="number" min="0" max="100" aria-label="Y" disabled={selected.locked} value={selected.bounds.y} oninput={(event) => setBound("y", Number(event.currentTarget.value))} /></label>
-            <label>W <input type="number" min="1" max="100" aria-label="W" disabled={selected.locked} value={selected.bounds.w} oninput={(event) => setBound("w", Number(event.currentTarget.value))} /></label>
-            <label>H <input type="number" min="1" max="100" aria-label="H" disabled={selected.locked} value={selected.bounds.h} oninput={(event) => setBound("h", Number(event.currentTarget.value))} /></label>
-            <label>Opacity <input type="number" min="0" max="100" aria-label="Layer opacity" value={Math.round(selected.opacity * 100)} oninput={(event) => setOpacity(Number(event.currentTarget.value))} /></label>
-            <label>Fit
-              <select
-                aria-label="Layer fit"
-                value={selected.fit}
-                onchange={(event) => draft && selected && touch(setLayerFit(draft, selected.id, event.currentTarget.value as "contain" | "cover" | "fill"))}
-                oninput={(event) => draft && selected && touch(setLayerFit(draft, selected.id, event.currentTarget.value as "contain" | "cover" | "fill"))}
-              >
-                <option value="contain">Contain</option>
-                <option value="cover">Cover</option>
-                <option value="fill">Fill</option>
-              </select>
-            </label>
-            <label>Entrance
-              <select
-                aria-label="Layer entrance"
-                value={selected.animation.entrance}
-                onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}
-                oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}
-              >
-                <option value="none">None</option>
-                <option value="fade">Fade</option>
-                <option value="dissolve">Dissolve</option>
-                <option value="slide-up">Slide up</option>
-                <option value="slide-down">Slide down</option>
-                <option value="slide-left">Slide left</option>
-                <option value="slide-right">Slide right</option>
-              </select>
-            </label>
-            <label>Exit
-              <select
-                aria-label="Layer exit"
-                value={selected.animation.exit}
-                onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { exit: event.currentTarget.value as LayerAnimationKind }))}
-                oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { exit: event.currentTarget.value as LayerAnimationKind }))}
-              >
-                <option value="none">None</option>
-                <option value="fade">Fade</option>
-                <option value="dissolve">Dissolve</option>
-                <option value="slide-up">Slide up</option>
-                <option value="slide-down">Slide down</option>
-                <option value="slide-left">Slide left</option>
-                <option value="slide-right">Slide right</option>
-              </select>
-            </label>
-            <label>Anim ms
-              <input
-                type="number"
-                min="0"
-                max="2000"
-                step="50"
-                aria-label="Layer animation duration"
-                value={selected.animation.durationMs}
-                oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { durationMs: Number(event.currentTarget.value) }))}
-              />
-            </label>
-            <label>Easing
-              <select
-                aria-label="Layer easing"
-                value={selected.animation.easing}
-                onchange={(event) =>
-                  draft &&
-                  selected &&
-                  touch(setLayerAnimation(draft, selected.id, { easing: event.currentTarget.value as LayerAnimation["easing"] }))}
-                oninput={(event) =>
-                  draft &&
-                  selected &&
-                  touch(setLayerAnimation(draft, selected.id, { easing: event.currentTarget.value as LayerAnimation["easing"] }))}
-              >
-                <option value="ease-out">Ease out</option>
-                <option value="ease">Ease</option>
-                <option value="ease-in">Ease in</option>
-                <option value="linear">Linear</option>
-              </select>
-            </label>
-          </div>
-          {#if selected.source.type === "scripture"}
-            <input
-              aria-label="Scripture reference"
-              placeholder="Reference"
-              bind:value={scriptureRef}
-              oninput={(event) => {
-                scriptureRef = event.currentTarget.value;
-                applyScriptureCopy();
-              }}
-            />
-            <textarea
-              aria-label="Scripture body"
-              placeholder="Verse text"
-              rows="3"
-              bind:value={scriptureBody}
-              oninput={(event) => {
-                scriptureBody = event.currentTarget.value;
-                applyScriptureCopy();
-              }}
-            ></textarea>
-            <input
-              aria-label="Scripture attribution"
-              placeholder="Attribution"
-              bind:value={scriptureAttr}
-              oninput={(event) => {
-                scriptureAttr = event.currentTarget.value;
-                applyScriptureCopy();
-              }}
-            />
-            <button type="button" onclick={() => assign("scripture")}>Use current verse</button>
-          {/if}
-          {#if selected.source.type === "song"}
-            <input
-              aria-label="Lyrics label"
-              placeholder="Section"
-              bind:value={songLabel}
-              oninput={(event) => {
-                songLabel = event.currentTarget.value;
-                applySongCopy();
-              }}
-            />
-            <textarea
-              aria-label="Lyrics body"
-              placeholder="Lines"
-              rows="4"
-              bind:value={songBody}
-              oninput={(event) => {
-                songBody = event.currentTarget.value;
-                applySongCopy();
-              }}
-            ></textarea>
-            <button type="button" onclick={() => assign("song")}>Use current lyrics</button>
-          {/if}
-          {#if selected.source.type === "camera"}
-            <p class="camera-note">{session.cameraNote || "Camera pixels stay on Preview. LIVE still sends the camera card."}</p>
-            {#each session.cameras as camera (camera.deviceId)}
-              <button type="button" onclick={() => touch(assignLayerSource(draft!, selected.id, sourceRef("camera", camera.deviceId, camera.label, { deviceId: camera.deviceId, label: camera.label })))}>{camera.label}</button>
-            {/each}
-          {/if}
-          {#if selected.source.type === "image"}
-            <p class="camera-note">Pick a library image for Preview. LIVE still sends Program.</p>
-            {#if !session.media.some((asset) => asset.kind === "image")}
-              <p class="camera-note">No media in the library yet.</p>
-            {/if}
-            {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
-              <button
-                type="button"
-                onclick={() => {
-                  const imageUrl = mediaUrl(asset);
-                  if (!imageUrl || !draft || !selected) return;
-                  touch(assignLayerSource(draft, selected.id, sourceRef("image", asset.id, asset.name, { imageUrl })));
-                }}
-              >{asset.name}</button>
-            {/each}
-          {/if}
-          {#if selected.source.type === "lower-third"}
-            <input
-              aria-label="Lower third title"
-              placeholder="Title"
-              bind:value={lowerTitle}
-              onchange={() => {
-                const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!;
-                if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle));
-              }}
-            />
-            <input
-              aria-label="Lower third subtitle"
-              placeholder="Subtitle"
-              bind:value={lowerSubtitle}
-              onchange={() => {
-                const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!;
-                if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle));
-              }}
-            />
-            <div class="templates">
-              {#each LOWER_THIRD_TEMPLATES as template (template.id)}
-                <button type="button" onclick={() => applyLowerThird(template)}>{template.name}</button>
-              {/each}
-            </div>
-          {/if}
-          {#if selected.source.type === "text"}
-            <input
-              aria-label="Announcement heading"
-              placeholder="Heading"
-              bind:value={textHeading}
-              oninput={(event) => {
-                textHeading = event.currentTarget.value;
-                assign("text");
-              }}
-            />
-            <textarea
-              aria-label="Announcement body"
-              placeholder="Body"
-              rows="4"
-              bind:value={textBody}
-              oninput={(event) => {
-                textBody = event.currentTarget.value;
-                assign("text");
-              }}
-            ></textarea>
-          {/if}
-          {#if selected.source.type === "timer"}
-            <label>Label <input aria-label="Timer label" bind:value={timerLabel} onchange={() => assign("timer")} /></label>
-            <label>Mode
-              <select
-                aria-label="Timer mode"
-                bind:value={timerMode}
-                onchange={() => assign("timer")}
-                oninput={() => assign("timer")}
-              >
-                <option value="countdown">Countdown</option>
-                <option value="countup">Count up</option>
-                <option value="clock">Clock</option>
-                <option value="target">Target time</option>
-              </select>
-            </label>
-            {#if timerMode === "countdown" || timerMode === "countup"}
-              <label>Minutes <input type="number" min="1" max="180" bind:value={timerMinutes} onchange={() => assign("timer")} /></label>
-            {/if}
-            {#if timerMode === "target"}
-              <label>At <input type="time" aria-label="Target time" bind:value={timerClock} onchange={() => assign("timer")} /></label>
-            {/if}
-          {/if}
-          {#if ["scripture", "song", "text", "lower-third", "timer", "clock"].includes(selected.source.type)}
-            <TextStyleEditor
-              style={parseTextStyle(selected.source.payload.style)}
-              onchange={(style) => {
-                if (draft && selected) touch(setLayerStyle(draft, selected.id, style));
-              }}
-            />
-          {/if}
-          <div class="song-actions">
-            <button type="button" onclick={() => draft && session.previewLook(draft)}>Preview</button>
-            <button type="button" onclick={() => draft && touch(clearLowerThird(draft))}>Clear overlay</button>
-            <button type="button" onclick={() => draft && touch(clearTimer(draft))}>Clear timer</button>
-            <button type="button" onclick={() => draft && session.saveLook(draft)}>Save look</button>
-            <button
-              type="button"
-              onclick={() => {
-                if (!draft) return;
-                const copy = duplicateLook(draft);
-                draft = copy;
-                selectedId = copy.layers[0]?.id ?? null;
-                session.saveLook(copy);
-                session.previewLook(copy);
-              }}
-            >Duplicate look</button>
-            <button type="button" onclick={() => draft && void session.addLookToService(draft)}>Queue</button>
-          </div>
-        {/if}
-      {/if}
-    </div>
-    <div class="song-library">
-      <h1>Saved</h1>
-      {#if saved.length === 0}
-        <p class="song-empty">No saved looks yet.</p>
-      {/if}
-      <ul class="song-list">
+
+      <p class="group">Saved <span>{saved.length}</span></p>
+      {#if saved.length === 0}<p class="empty">Save a look to reuse it in any service.</p>{/if}
+      <ul class="saved">
         {#each saved as look (look.id)}
-          <li>
-            <button type="button" onclick={() => openSaved(look)}>
+          <li class:on={draft?.id === look.id}>
+            <button type="button" class="saved-main" onclick={() => openSaved(look)}>
               <strong>{look.name}</strong>
-              <span>{look.layers.length} layers</span>
+              <span>{look.layers.length} layer{look.layers.length === 1 ? "" : "s"}{look.locked ? " · locked" : ""}</span>
             </button>
+            <button type="button" class="tool" title="Duplicate" aria-label={`Duplicate ${look.name}`} onclick={() => { const copy = duplicateLook(look); session.saveLook(copy); openSaved(copy); }}><Icon name="copy" size={14} /></button>
+            <button type="button" class="tool" title="Add to queue" aria-label={`Queue ${look.name}`} onclick={() => void session.addLookToService(look)}><Icon name="queue" size={14} /></button>
             <button
               type="button"
-              onclick={() => {
-                const copy = duplicateLook(look);
-                session.saveLook(copy);
-                openSaved(copy);
-              }}
-            >Duplicate</button>
-            <button type="button" onclick={() => void session.addLookToService(look)}>Queue</button>
-            <button
-              type="button"
-              onclick={() => {
-                session.deleteLook(look.id);
-                if (draft?.id === look.id) {
-                  draft = null;
-                  selectedId = null;
-                }
-              }}
-            >Delete</button>
+              class="tool"
+              class:armed={armedDelete === look.id}
+              title={armedDelete === look.id ? "Click again to delete" : "Delete"}
+              aria-label={armedDelete === look.id ? `Confirm delete ${look.name}` : `Delete ${look.name}`}
+              onclick={() => deleteSaved(look)}
+            ><Icon name="close" size={14} /></button>
           </li>
         {/each}
       </ul>
     </div>
-    <aside class="song-stage">
-      <header><span class="kicker">Preview</span></header>
+  </LibrarySidebar>
+
+  <!-- Editor: name, canvas, layers -->
+  <div class="editor">
+    {#if draft}
+      <header class="look-head">
+        <input class="look-name" aria-label="Look name" value={draft.name} onchange={(event) => touch(renameComposition(draft!, event.currentTarget.value))} />
+        <label class="inline">
+          <span>Transition</span>
+          <select
+            aria-label="Look transition"
+            value={draft.transition.type}
+            onchange={(event) => draft && touch(setCompositionTransition(draft, { type: event.currentTarget.value === "cut" ? "cut" : "fade", ms: draft.transition.ms }))}
+          >
+            <option value="fade">Fade</option>
+            <option value="cut">Cut</option>
+          </select>
+        </label>
+        {#if draft.transition.type === "fade"}
+          <label class="inline">
+            <input
+              class="ms"
+              type="number"
+              min="0"
+              max="2000"
+              step="50"
+              aria-label="Look transition duration"
+              value={draft.transition.ms}
+              oninput={(event) => draft && touch(setCompositionTransition(draft, { type: "fade", ms: Number(event.currentTarget.value) }))}
+            />
+            <span>ms</span>
+          </label>
+        {/if}
+        <div class="head-actions">
+          <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> Preview</button>
+          <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>Save look</button>
+          <button
+            type="button"
+            class="desk-btn ghost icon"
+            title="Duplicate look"
+            aria-label="Duplicate look"
+            onclick={() => {
+              if (!draft) return;
+              const copy = duplicateLook(draft);
+              draft = copy;
+              selectedId = copy.layers[0]?.id ?? null;
+              session.saveLook(copy);
+              session.previewLook(copy);
+            }}
+          ><Icon name="copy" size={14} /></button>
+          <button type="button" class="desk-btn ghost icon" title="Add to queue" aria-label="Queue" onclick={() => draft && void session.addLookToService(draft)}><Icon name="queue" size={14} /></button>
+        </div>
+      </header>
+    {:else}
+      <header class="look-head empty-head">
+        <p>Pick a layout or a saved look. It goes to <b>Preview</b> to arrange; <b>TAKE</b> sends it to Program.</p>
+      </header>
+    {/if}
+
+    <figure class="edit-frame">
+      <figcaption>
+        <span class="kicker">Preview</span>
+        <span class="hint">{draft ? "Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)" : "Nothing to arrange yet"}</span>
+      </figcaption>
       <div
         class="monitor preview-edit"
         bind:this={previewFrame}
@@ -974,32 +705,21 @@
                   role="button"
                   tabindex="0"
                   aria-label="Move {layer.name}"
-                  onpointerdown={(event) => startDrag(layer.id, "move", event)}
+                  onpointerdown={(event) => { selectedId = layer.id; startDrag(layer.id, "move", event); }}
                   onkeydown={(event) => {
                     const step = event.shiftKey ? 5 : 1;
-                    if (event.key === "ArrowLeft") {
-                      event.preventDefault();
-                      touch(applyLayerDrag(draft!, layer.id, "move", { dx: -step, dy: 0 }));
-                    } else if (event.key === "ArrowRight") {
-                      event.preventDefault();
-                      touch(applyLayerDrag(draft!, layer.id, "move", { dx: step, dy: 0 }));
-                    } else if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      touch(applyLayerDrag(draft!, layer.id, "move", { dx: 0, dy: -step }));
-                    } else if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      touch(applyLayerDrag(draft!, layer.id, "move", { dx: 0, dy: step }));
-                    }
+                    const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+                    const move = moves[event.key];
+                    if (!move) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    touch(applyLayerDrag(draft!, layer.id, "move", { dx: move[0], dy: move[1] }));
                   }}
                 >
+                  {#if selected?.id === layer.id}<span class="frame-label">{layer.name}</span>{/if}
                   {#if selected?.id === layer.id && !layer.locked}
                     {#each dragHandles as handle (handle)}
-                      <button
-                        type="button"
-                        class="handle {handle}"
-                        aria-label="Resize {layer.name} {handle}"
-                        onpointerdown={(event) => startDrag(layer.id, handle, event)}
-                      ></button>
+                      <button type="button" class="handle {handle}" aria-label="Resize {layer.name} {handle}" onpointerdown={(event) => startDrag(layer.id, handle, event)}></button>
                     {/each}
                   {/if}
                 </div>
@@ -1008,115 +728,329 @@
           {/snippet}
         </Screen>
       </div>
-      <header><span class="kicker program">{#if session.output.online}<span class="pip on"></span>{/if}Program</span></header>
-      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
-    </aside>
+    </figure>
+
+    {#if draft}
+      <section class="layers-panel" aria-label="Layers">
+        <header>
+          <span class="kicker">Layers <span class="count">{draft.layers.length}</span></span>
+          <button
+            type="button"
+            class="desk-btn"
+            onclick={() => {
+              const next = addLayer(draft!, { name: `Layer ${draft!.layers.length + 1}`, bounds: { x: 10, y: 10, w: 40, h: 40 }, source: sourceRef("empty", "empty", "Empty") });
+              selectedId = next.layers[next.layers.length - 1]?.id ?? null;
+              touch(next);
+            }}
+          ><Icon name="plus" size={14} /> Add layer</button>
+        </header>
+        <ul class="layers">
+          {#each draft.layers as layer, n (layer.id)}
+            <li class:on={selected?.id === layer.id} class:dim={!layer.visible}>
+              <button type="button" class="layer-main" onclick={() => (selectedId = layer.id)}>
+                <span class="layer-icon"><Icon name={SOURCE_ICON[layer.source.type] ?? "square"} size={14} /></span>
+                <strong>{layer.name}</strong>
+                <span class="layer-kind">{layer.source.type === "song" ? "lyrics" : layer.source.type}</span>
+              </button>
+              <button type="button" class="tool" title="Move up" aria-label={`Move ${layer.name} up`} disabled={n === 0} onclick={() => touch(reorderLayers(draft!, layer.id, -1))}><Icon name="chevron-up" size={14} /></button>
+              <button type="button" class="tool" title="Move down" aria-label={`Move ${layer.name} down`} disabled={n === draft.layers.length - 1} onclick={() => touch(reorderLayers(draft!, layer.id, 1))}><Icon name="chevron-down" size={14} /></button>
+              <button type="button" class="tool" class:off={!layer.visible} title={layer.visible ? "Hide" : "Show"} aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`} onclick={() => touch(layer.visible ? hideLayer(draft!, layer.id) : showLayer(draft!, layer.id))}><Icon name={layer.visible ? "eye" : "eye-off"} size={14} /></button>
+              <button type="button" class="tool" class:lit={layer.locked} title={layer.locked ? "Unlock" : "Lock"} aria-label={layer.locked ? `Unlock ${layer.name}` : `Lock ${layer.name}`} onclick={() => touch(setLayerLocked(draft!, layer.id, !layer.locked))}><Icon name={layer.locked ? "lock" : "lock-open"} size={14} /></button>
+              <button type="button" class="tool" title="Duplicate" aria-label={`Duplicate ${layer.name}`} onclick={() => { const next = duplicateLayer(draft!, layer.id); selectedId = next.layers[next.layers.length - 1]?.id ?? selectedId; touch(next); }}><Icon name="copy" size={14} /></button>
+              <button type="button" class="tool" title="Remove" aria-label={`Remove ${layer.name}`} onclick={() => { const next = removeLayer(draft!, layer.id); selectedId = next.layers.find((entry) => entry.id === selectedId)?.id ?? next.layers[0]?.id ?? null; touch(next); }}><Icon name="close" size={14} /></button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   </div>
+
+  <!-- Program and the selected layer's settings -->
+  <aside class="side">
+    <figure class="screen program" class:on-air={programLive}>
+      <figcaption>
+        <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
+        <span class="hint">{programLive ? "Audience sees this" : "Nothing live"}</span>
+      </figcaption>
+      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} /></div>
+    </figure>
+
+    {#if draft && selected}
+      <section class="inspector" aria-label="Layer settings">
+        <header><span class="kicker">Layer</span><span class="hint">{selected.name}</span></header>
+        <div class="group-box">
+          <label>Name <input aria-label="Layer name" value={selected.name} onchange={(event) => draft && selected && touch(renameLayer(draft, selected.id, event.currentTarget.value))} /></label>
+          <label>Source
+            <select aria-label="Layer source" value={selected.source.type} onchange={(event) => assign(event.currentTarget.value as SourceType)}>
+              <option value="empty">Empty</option>
+              <option value="scripture">Scripture</option>
+              <option value="song">Lyrics</option>
+              <option value="image">Image</option>
+              <option value="camera">Camera</option>
+              <option value="timer">Timer</option>
+              <option value="lower-third">Lower third</option>
+              <option value="text">Text</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="group-box">
+          <p class="box-title">Content</p>
+          {#if selected.source.type === "scripture"}
+            <input aria-label="Scripture reference" placeholder="Reference" bind:value={scriptureRef} oninput={(event) => { scriptureRef = event.currentTarget.value; applyScriptureCopy(); }} />
+            <textarea aria-label="Scripture body" placeholder="Verse text" rows="3" bind:value={scriptureBody} oninput={(event) => { scriptureBody = event.currentTarget.value; applyScriptureCopy(); }}></textarea>
+            <input aria-label="Scripture attribution" placeholder="Attribution" bind:value={scriptureAttr} oninput={(event) => { scriptureAttr = event.currentTarget.value; applyScriptureCopy(); }} />
+            <button type="button" class="desk-btn" onclick={() => assign("scripture")}>Use the verse on the Presenter Desk</button>
+          {:else if selected.source.type === "song"}
+            <input aria-label="Lyrics label" placeholder="Section" bind:value={songLabel} oninput={(event) => { songLabel = event.currentTarget.value; applySongCopy(); }} />
+            <textarea aria-label="Lyrics body" placeholder="Lines" rows="4" bind:value={songBody} oninput={(event) => { songBody = event.currentTarget.value; applySongCopy(); }}></textarea>
+            <button type="button" class="desk-btn" onclick={() => assign("song")}>Use the lyrics on Preview</button>
+          {:else if selected.source.type === "camera"}
+            <p class="note">{session.cameraNote || "Pick the camera for this region."}</p>
+            <div class="chips">
+              {#each session.cameras as camera (camera.deviceId)}
+                <button type="button" class="chip" class:on={selected.source.payload.deviceId === camera.deviceId} onclick={() => touch(assignLayerSource(draft!, selected.id, sourceRef("camera", camera.deviceId, camera.label, { deviceId: camera.deviceId, label: camera.label })))}>{camera.label}</button>
+              {/each}
+            </div>
+          {:else if selected.source.type === "image"}
+            {#if !session.media.some((asset) => asset.kind === "image")}
+              <p class="note">No images yet. Import them in the Production Desk's Media panel.</p>
+            {/if}
+            <div class="chips">
+              {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
+                <button
+                  type="button"
+                  class="chip"
+                  class:on={selected.source.id === asset.id}
+                  onclick={() => {
+                    const imageUrl = mediaUrl(asset);
+                    if (!imageUrl || !draft || !selected) return;
+                    touch(assignLayerSource(draft, selected.id, sourceRef("image", asset.id, asset.name, { imageUrl })));
+                  }}
+                >{asset.name}</button>
+              {/each}
+            </div>
+          {:else if selected.source.type === "lower-third"}
+            <input aria-label="Lower third title" placeholder="Title" bind:value={lowerTitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
+            <input aria-label="Lower third subtitle" placeholder="Subtitle" bind:value={lowerSubtitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
+            <div class="chips">
+              {#each LOWER_THIRD_TEMPLATES as template (template.id)}
+                <button type="button" class="chip" class:on={selected.source.payload.templateId === template.id} onclick={() => applyLowerThird(template)}>{template.name}</button>
+              {/each}
+            </div>
+          {:else if selected.source.type === "text"}
+            <input aria-label="Announcement heading" placeholder="Heading" bind:value={textHeading} oninput={(event) => { textHeading = event.currentTarget.value; assign("text"); }} />
+            <textarea aria-label="Announcement body" placeholder="Body" rows="4" bind:value={textBody} oninput={(event) => { textBody = event.currentTarget.value; assign("text"); }}></textarea>
+          {:else if selected.source.type === "timer"}
+            <label>Label <input aria-label="Timer label" bind:value={timerLabel} onchange={() => assign("timer")} /></label>
+            <label>Mode
+              <select aria-label="Timer mode" bind:value={timerMode} onchange={() => assign("timer")}>
+                <option value="countdown">Countdown</option>
+                <option value="countup">Count up</option>
+                <option value="clock">Clock</option>
+                <option value="target">Target time</option>
+              </select>
+            </label>
+            {#if timerMode === "countdown" || timerMode === "countup"}
+              <label>Minutes <input type="number" min="1" max="180" bind:value={timerMinutes} onchange={() => assign("timer")} /></label>
+            {/if}
+            {#if timerMode === "target"}
+              <label>At <input type="time" aria-label="Target time" bind:value={timerClock} onchange={() => assign("timer")} /></label>
+            {/if}
+          {:else}
+            <p class="note">Choose a source above to fill this region.</p>
+          {/if}
+          {#if ["scripture", "song", "text", "lower-third", "timer", "clock"].includes(selected.source.type)}
+            <TextStyleEditor style={parseTextStyle(selected.source.payload.style)} onchange={(style) => { if (draft && selected) touch(setLayerStyle(draft, selected.id, style)); }} />
+          {/if}
+        </div>
+
+        <div class="group-box">
+          <p class="box-title">Position {#if selected.locked}<span class="hint">· locked</span>{/if}</p>
+          <div class="grid4">
+            <label>X <input type="number" min="0" max="100" aria-label="X" disabled={selected.locked} value={Math.round(selected.bounds.x * 10) / 10} oninput={(event) => setBound("x", Number(event.currentTarget.value))} /></label>
+            <label>Y <input type="number" min="0" max="100" aria-label="Y" disabled={selected.locked} value={Math.round(selected.bounds.y * 10) / 10} oninput={(event) => setBound("y", Number(event.currentTarget.value))} /></label>
+            <label>W <input type="number" min="1" max="100" aria-label="W" disabled={selected.locked} value={Math.round(selected.bounds.w * 10) / 10} oninput={(event) => setBound("w", Number(event.currentTarget.value))} /></label>
+            <label>H <input type="number" min="1" max="100" aria-label="H" disabled={selected.locked} value={Math.round(selected.bounds.h * 10) / 10} oninput={(event) => setBound("h", Number(event.currentTarget.value))} /></label>
+          </div>
+          <div class="grid2">
+            <label>Opacity % <input type="number" min="0" max="100" aria-label="Layer opacity" value={Math.round(selected.opacity * 100)} oninput={(event) => setOpacity(Number(event.currentTarget.value))} /></label>
+            <label>Fit
+              <select aria-label="Layer fit" value={selected.fit} onchange={(event) => draft && selected && touch(setLayerFit(draft, selected.id, event.currentTarget.value as "contain" | "cover" | "fill"))}>
+                <option value="contain">Contain</option>
+                <option value="cover">Cover</option>
+                <option value="fill">Fill</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <details class="group-box">
+          <summary class="box-title">Motion</summary>
+          <div class="grid2">
+            <label>Entrance
+              <select aria-label="Layer entrance" value={selected.animation.entrance} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}>
+                {#each ANIMATIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
+              </select>
+            </label>
+            <label>Exit
+              <select aria-label="Layer exit" value={selected.animation.exit} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { exit: event.currentTarget.value as LayerAnimationKind }))}>
+                {#each ANIMATIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
+              </select>
+            </label>
+            <label>Duration ms
+              <input type="number" min="0" max="2000" step="50" aria-label="Layer animation duration" value={selected.animation.durationMs} oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { durationMs: Number(event.currentTarget.value) }))} />
+            </label>
+            <label>Easing
+              <select aria-label="Layer easing" value={selected.animation.easing} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { easing: event.currentTarget.value as LayerAnimation["easing"] }))}>
+                <option value="ease-out">Ease out</option>
+                <option value="ease">Ease</option>
+                <option value="ease-in">Ease in</option>
+                <option value="linear">Linear</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <div class="clears">
+          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearLowerThird(draft))}>Clear overlay</button>
+          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearTimer(draft))}>Clear timer</button>
+        </div>
+      </section>
+    {:else}
+      <p class="side-empty">Select a layer to edit its source, position and motion.</p>
+    {/if}
+  </aside>
 </section>
 
 <style>
-  .pb-songs {
+  .looks-desk {
     height: 100%;
     min-height: 0;
-    margin: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(280px, 360px);
+    gap: var(--gap, 10px);
+  }
+  .editor, .side {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    background-color: var(--desk);
-    background-image: radial-gradient(var(--line) 1.1px, transparent 1.2px);
-    background-size: 18px 18px;
+    border-radius: var(--radius-panel, 12px);
     overflow: auto;
   }
-  .song-desk {
-    width: min(920px, 100%);
-    margin: 28px auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 0.8fr);
-    gap: 18px;
-    padding: 0 18px 24px;
-  }
-  .song-editor, .song-library {
-    background: rgba(20, 20, 20, 0.92);
+  input, select, textarea {
+    min-width: 0;
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .song-editor h1 { margin: 4px 0 0; font-size: 20px; font-weight: 650; }
-  .song-editor p, .song-empty { margin: 0; color: var(--muted); line-height: 1.45; }
-  .song-editor input, .song-editor textarea, .song-editor select {
-    width: 100%;
-    border-radius: 8px;
-    border: 1px solid var(--line);
+    border-radius: var(--radius-control, 8px);
     background: var(--field);
     color: var(--ink);
-    padding: 8px 10px;
+    font: inherit;
   }
-  .song-stage { display: flex; flex-direction: column; gap: 8px; min-height: 420px; }
-  .song-stage header { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
-  .song-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .song-actions button, .song-list li button:last-child {
-    height: 32px;
-    border-radius: 8px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    padding: 0 12px;
-  }
-  .song-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  .song-list li { display: flex; flex-wrap: wrap; gap: 8px; }
-  .song-list li button:first-child {
-    flex: 1;
-    text-align: left;
-    border: 1px solid var(--line);
-    background: var(--field);
-    color: white;
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .song-list span { color: var(--muted); font-size: 12px; }
-  .templates, .row, .bounds, .song-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-  .templates button, .row button { font-size: 12px; }
-  .layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .layers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
-  .layers button { text-align: left; }
-  .bounds label, label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
-  .bounds input, select, input, textarea { min-width: 0; }
-  textarea { width: 100%; }
-  .on { outline: 1px solid var(--accent); }
-  .camera-note { margin: 0; font-size: 12px; color: var(--muted); }
+  input, select { height: 32px; padding: 0 10px; }
+  textarea { width: 100%; padding: 8px 10px; resize: vertical; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
+  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .hint { font-size: 11px; color: var(--muted); }
+  .note { margin: 0; font-size: 12px; color: var(--muted); }
+  .count { opacity: 0.7; }
+  .tool { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border: 0; border-radius: 6px; background: none; color: var(--muted); }
+  .tool:hover:not(:disabled) { background: var(--field); color: var(--ink); }
+  .tool:disabled { opacity: 0.3; }
+  .tool.off { color: var(--muted); opacity: 0.6; }
+  .tool.lit { color: var(--accent); }
+  .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 15%, transparent) !important; }
+
+  /* Library */
+  .lib-scroll { overflow: auto; min-height: 0; padding: 0 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .group { margin: 8px 4px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .group span { margin-left: 4px; opacity: 0.8; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  .tile { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; text-align: left; }
+  .tile:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .schema { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 4px; background: #000; overflow: hidden; }
+  .schema { background: var(--panel) !important; }
+  .schema i { position: absolute; box-sizing: border-box; border: 1.5px solid var(--field); border-radius: 3px; background: color-mix(in srgb, var(--muted) 28%, transparent); }
+  .schema i.main { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+  .tile:hover .schema i.main, .tile.on .schema i.main { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .tile-name { font-size: 11px; font-weight: 600; line-height: 1.25; }
+  .empty { margin: 0 4px; font-size: 12px; color: var(--muted); }
+  .saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .saved li { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); }
+  .saved li:hover { background: var(--field); }
+  .saved li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .saved-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; }
+  .saved-main strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .saved-main span { font-size: 11px; color: var(--muted); }
+
+  /* Editor */
+  .look-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; }
+  .look-name { flex: 1 1 200px; height: 36px; font-size: 16px; font-weight: 650; }
+  .inline { flex-direction: row; align-items: center; gap: 6px; }
+  .ms { width: 80px; }
+  .head-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .primary-soft { border-color: var(--accent); color: var(--accent); }
+  .empty-head p { margin: 0; font-size: 13px; color: var(--muted); }
+  .empty-head b { color: var(--ink); }
+  .edit-frame, .screen { margin: 0; flex: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: var(--radius-control, 8px); background: var(--field); overflow: hidden; }
+  .edit-frame figcaption, .screen figcaption { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 10px; border-bottom: 1px solid var(--line); }
+  .edit-frame .kicker { color: var(--accent); }
+  .monitor { container-type: inline-size; background: #000; }
   .preview-edit { position: relative; overflow: hidden; }
   .preview-edit :global(.ratio) { position: relative; }
-  .layer-frame {
-    position: absolute;
-    box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-    cursor: move;
-    z-index: 2;
-  }
-  .layer-frame.on { border-color: var(--accent); }
-  .handle {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    padding: 0;
-    border: 1px solid var(--desk);
-    border-radius: 1px;
-    background: var(--accent);
-  }
-  .handle.n { top: -4px; left: 50%; margin-left: -4px; cursor: ns-resize; }
-  .handle.s { bottom: -4px; left: 50%; margin-left: -4px; cursor: ns-resize; }
-  .handle.e { right: -4px; top: 50%; margin-top: -4px; cursor: ew-resize; }
-  .handle.w { left: -4px; top: 50%; margin-top: -4px; cursor: ew-resize; }
-  .handle.ne { top: -4px; right: -4px; cursor: nesw-resize; }
-  .handle.nw { top: -4px; left: -4px; cursor: nwse-resize; }
-  .handle.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
-  .handle.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
-  @media (max-width: 980px) {
-    .song-desk { grid-template-columns: 1fr; }
+  .layers-panel { display: flex; flex-direction: column; gap: 6px; flex: none; }
+  .layers-panel > header { display: flex; align-items: center; justify-content: space-between; }
+  .layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .layers li { display: flex; align-items: center; gap: 2px; padding-right: 4px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); }
+  .layers li:hover { background: var(--field); }
+  .layers li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .layers li.dim .layer-main { opacity: 0.5; }
+  .layer-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; }
+  .layer-icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--field); color: var(--muted); flex: none; }
+  .layer-main strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+  /* Side */
+  .screen.program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
+  .screen.program .kicker { color: var(--live); }
+  .screen.program.on-air { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 18px color-mix(in srgb, var(--live) 25%, transparent); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); box-shadow: 0 0 6px var(--live); }
+  .inspector { display: flex; flex-direction: column; gap: 10px; }
+  .inspector > header { display: flex; align-items: center; gap: 8px; }
+  .group-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
+  .group-box input, .group-box select, .group-box textarea { background: var(--panel); }
+  .box-title { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); cursor: default; }
+  details.group-box > summary { cursor: pointer; }
+  details.group-box[open] > summary { margin-bottom: 8px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; }
+  .chip:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .chip.on { border-color: var(--accent); color: var(--accent); }
+  .clears { display: flex; gap: 6px; flex-wrap: wrap; }
+  .side-empty { margin: 0; font-size: 12px; color: var(--muted); }
+
+  /* Canvas frames */
+  .layer-frame { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); cursor: move; z-index: 2; }
+  .layer-frame.on { border: 2px solid var(--accent); }
+  .layer-frame:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+  .frame-label { position: absolute; left: 0; top: 0; padding: 1px 6px; border-radius: 0 0 4px 0; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+  .handle { position: absolute; width: 10px; height: 10px; padding: 0; border: 2px solid #fff; border-radius: 2px; background: var(--accent); }
+  .handle.n { top: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+  .handle.s { bottom: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+  .handle.e { right: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+  .handle.w { left: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+  .handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+  .handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+  .handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+  .handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+
+  @media (max-width: 1280px) {
+    .looks-desk { grid-template-columns: auto minmax(0, 1fr) minmax(260px, 300px); }
   }
 </style>
