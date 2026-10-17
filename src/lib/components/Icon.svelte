@@ -15,6 +15,8 @@
   import Focus from "@lucide/svelte/icons/focus";
   import Folder from "@lucide/svelte/icons/folder";
   import FolderLock from "@lucide/svelte/icons/folder-lock";
+  import Ellipsis from "@lucide/svelte/icons/ellipsis";
+  import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Gauge from "@lucide/svelte/icons/gauge";
   import Image from "@lucide/svelte/icons/image";
@@ -107,6 +109,8 @@
     folder: Folder,
     "folder-open": FolderOpen,
     "folder-lock": FolderLock,
+    more: Ellipsis,
+    view: PanelsTopLeft,
   };
 
   let { name, size = 16 }: { name: string; size?: number } = $props();

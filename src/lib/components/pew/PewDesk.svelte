@@ -17,7 +17,8 @@
   import { buildQuoteIndex, chooseHeard, detectVerse, type QuoteIndex } from "../../voice/detect";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
-  import OutputControls from "../OutputControls.svelte";
+  import OutputMenu from "../OutputMenu.svelte";
+  import ToolMenu from "../ToolMenu.svelte";
   import OutputType from "../OutputType.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
@@ -91,7 +92,8 @@
   function retarget() {
     applying = true;
     frozen = untrack(() => session.workspace.pew);
-    epoch += 1;
+    // Untracked: this runs inside the chrome effect, and reading epoch there would re-run it forever.
+    epoch = untrack(() => epoch) + 1;
   }
 
   function onColumns(reported: number[]) {
@@ -664,50 +666,52 @@
 
 <div class="pb" class:focus>
   <header class="pb-bar">
-    <nav class="pb-modes" aria-label="Library">
-      {#each modes as entry, index (entry.id)}
-        <button
-          type="button"
-          class:on={mode === entry.id}
-          aria-pressed={mode === entry.id}
-          aria-keyshortcuts={`Alt+${index + 1}`}
-          data-tip={`${entry.label} (Alt+${index + 1})`}
-          onclick={() => pickMode(entry.id)}
-        >{entry.label}</button>
-      {/each}
-    </nav>
+    <div class="pb-left">
+      <DeskSwitcher compact />
+      <nav class="pb-modes" aria-label="Library">
+        {#each modes as entry, index (entry.id)}
+          <button
+            type="button"
+            class:on={mode === entry.id}
+            aria-pressed={mode === entry.id}
+            aria-keyshortcuts={`Alt+${index + 1}`}
+            data-tip={`${entry.label} (Alt+${index + 1})`}
+            onclick={() => pickMode(entry.id)}
+          >{entry.label}</button>
+        {/each}
+      </nav>
+    </div>
     <div class="pb-actions">
-      <OutputControls compact />
       {#if !session.controlsAudience}
         <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
+      <OutputMenu />
       <button type="button" class="desk-btn primary live" class:on-air={displayLive} data-tip={displayLive ? "Audience display is live" : "Send preview to program"} onclick={() => session.take()}><span class="pip"></span>LIVE</button>
       <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
       <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
     </div>
     <nav class="pb-tools" aria-label="Tools">
-      <button type="button" class="desk-btn icon" class:on={libraryVisible} aria-pressed={libraryVisible} aria-label={libraryVisible ? "Hide library" : "Show library"} data-tip={libraryVisible ? "Hide library" : "Show library"} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
-        <Icon name="library" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={queueVisible} aria-pressed={queueVisible} aria-label={queueVisible ? "Hide queue" : "Show queue"} data-tip={queueVisible ? "Hide queue" : "Show queue"} onclick={() => session.togglePanel(QUEUE_PANEL)}>
-        <Icon name="queue" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus preview and program"} data-tip={focus ? "Leave focus" : "Focus preview and program"} onclick={() => session.savePew({ focus: !focus })}>
-        <Icon name="focus" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" aria-label="Reset workspace" data-tip="Reset workspace" onclick={() => session.resetActiveLayout()}>
-        <Icon name="reset" size={16} />
-      </button>
-      <DeskSwitcher />
-      <button type="button" class="desk-btn icon secondary" data-tip="Displays" aria-label="Displays" onclick={() => session.openSettings("displays")}>
-        {@render icon("outputs")}
-      </button>
-      <button type="button" class="desk-btn icon secondary" data-tip="Look" aria-label="Look" onclick={() => session.openSettings("appearance")}>
-        {@render icon("themes")}
-      </button>
+      <ToolMenu label="View" tip="Panels and focus">
+        {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
+        {#snippet children(close)}
+          <button type="button" role="menuitemcheckbox" aria-checked={libraryVisible} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
+            <Icon name="library" size={16} /> Library
+          </button>
+          <button type="button" role="menuitemcheckbox" aria-checked={queueVisible} onclick={() => session.togglePanel(QUEUE_PANEL)}>
+            <Icon name="queue" size={16} /> Queue
+          </button>
+          <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}>
+            <Icon name="focus" size={16} /> Focus Preview and Program
+          </button>
+          <div class="menu-sep"></div>
+          <button type="button" role="menuitem" onclick={() => { session.resetActiveLayout(); close(); }}>
+            <Icon name="reset" size={16} /> Reset workspace
+          </button>
+        {/snippet}
+      </ToolMenu>
       <button
         type="button"
-        class="desk-btn icon secondary alerts-btn"
+        class="desk-btn icon alerts-btn"
         class:on={!!session.alert}
         aria-pressed={!!session.alert}
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
@@ -716,12 +720,16 @@
       >
         {@render icon("alerts")}
       </button>
-      <button type="button" class="desk-btn icon secondary" data-tip="Help" aria-label="Help" onclick={() => (sheet = sheet === "help" ? null : "help")}>
-        {@render icon("help")}
-      </button>
-      <button type="button" class="desk-btn icon" data-tip="Settings" aria-label="Settings" onclick={() => session.openSettings("appearance")}>
-        {@render icon("settings")}
-      </button>
+      <ToolMenu label="More" tip="Displays, look, help and settings">
+        {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
+        {#snippet children(close)}
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} Displays…</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("themes")} Look…</button>
+          <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} Help</button>
+          <div class="menu-sep"></div>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} Settings… <span class="menu-key">⌘,</span></button>
+        {/snippet}
+      </ToolMenu>
     </nav>
   </header>
 
@@ -1146,8 +1154,11 @@
     padding: 6px calc(var(--panel-pad) + 2px);
     min-height: var(--chrome-h);
     flex: none;
-    overflow: hidden;
+    position: relative;
+    z-index: 5;
   }
+  /* Three groups: where you are (desk + mode), what goes out (output + LIVE/BLACK/CLEAR), and tools. */
+  .pb-left { display: flex; align-items: center; gap: 10px; flex: none; }
   /* Segmented switch: never shrinks, so every mode stays visible; the tools give way instead. */
   .pb-modes {
     display: flex;
@@ -1183,7 +1194,6 @@
     z-index: 2;
     background: var(--desk);
   }
-  .pb-actions :global(.output-controls) { min-width: 0; }
   .live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 78px; }
   .live.on-air { animation: live-glow 1.6s ease-in-out infinite; }
   .pip { width: 7px; height: 7px; border-radius: 50%; background: white; position: relative; display: inline-block; flex: none; }
@@ -1213,7 +1223,7 @@
   @media (prefers-reduced-motion: reduce) {
     .live.on-air, .pip.on::after, .live.on-air .pip::after { animation: none; }
   }
-  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); flex: none; }
   .pb-tools > button {
     width: var(--tool-size);
     height: var(--tool-size);
@@ -1225,15 +1235,8 @@
     place-items: center;
     padding: 0;
   }
-  .pb-tools > :global(*) { flex: none; }
   .pb-tools > button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .pb-tools > button.on { color: var(--accent); border-color: var(--accent); }
-  @media (max-width: 1440px) {
-    .pb-tools > button.secondary { display: none; }
-  }
-  @media (max-width: 1280px) {
-    .pb-actions :global(.output-controls .desk-btn) { display: none; }
-  }
   .pb button:active { opacity: 0.84; }
   .pb-grid {
     flex: 1;
