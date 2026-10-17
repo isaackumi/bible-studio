@@ -117,6 +117,49 @@
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
+
+  // Updates (desktop): signed releases from GitHub.
+  let updateNote = $state("");
+  let updateBusy = $state(false);
+  let updateReady = $state<string | null>(null);
+  let pendingUpdate: { downloadAndInstall: () => Promise<void> } | null = null;
+
+  async function checkUpdate() {
+    updateBusy = true;
+    updateNote = "";
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (update) {
+        pendingUpdate = update;
+        updateReady = update.version;
+        updateNote = `Church Studio ${update.version} is ready.${update.body ? ` ${update.body.split("\n")[0]}` : ""} Install it after the service.`;
+      } else {
+        updateNote = "You have the latest version.";
+      }
+    } catch (error) {
+      updateNote = `Updates could not be checked. ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      updateBusy = false;
+    }
+  }
+
+  async function installUpdate() {
+    if (!pendingUpdate) return;
+    if (session.output.online && session.live.program.model.layout !== "empty") {
+      updateNote = "Something is live on the audience screen. Clear it, then install, so the screen does not go dark mid-service.";
+      return;
+    }
+    updateBusy = true;
+    try {
+      await pendingUpdate.downloadAndInstall();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch (error) {
+      updateNote = `The update could not be installed. ${error instanceof Error ? error.message : String(error)}`;
+      updateBusy = false;
+    }
+  }
   let backupNote = $state("");
 
   async function chooseBackupFolder() {
@@ -1047,8 +1090,14 @@
             <span class="pill">Current</span>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Automatic updates</strong><span>Not configured in this release.</span></div>
-            <span class="pill muted">Off</span>
+            <div class="row-copy"><strong>Updates</strong><span>{updateNote || (isDesktop() ? "New versions are signed by Church Studio; only those install. Your library stays as it is." : "The browser version is always the latest.")}</span></div>
+            <div class="row-end">
+              {#if updateReady}
+                <button type="button" class="btn primary" disabled={updateBusy} onclick={() => void installUpdate()}>{updateBusy ? "Installing…" : `Install ${updateReady} and restart`}</button>
+              {:else}
+                <button type="button" class="btn" disabled={!isDesktop() || updateBusy} onclick={() => void checkUpdate()}>{updateBusy ? "Checking…" : "Check for updates"}</button>
+              {/if}
+            </div>
           </div>
           <div class="row">
             <div class="row-copy"><strong>First-run setup</strong><span>Walk through church name, look, scripture and voice again.</span></div>

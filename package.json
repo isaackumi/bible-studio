@@ -26,6 +26,8 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.8.2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.0",
     "paneforge": "^1.0.2",
     "pdfjs-dist": "5.4.296",
     "qrcode": "1.5.4"

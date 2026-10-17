@@ -26,14 +26,18 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**"]
+        "scope": [
+          "$APPDATA/**"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": ["resources/*"],
+    "resources": [
+      "resources/*"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -44,6 +48,14 @@
     "macOS": {
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEREQUFDQkQ2NEYwRjgwQTUKUldTbGdBOVAxc3VxM2FxalBOOEhTRE1SVXRlbWRzcTU1aG9oVGtSNzE4QVdnTUFjbktmSi9lbnMK",
+      "endpoints": [
+        "https://github.com/isaackumi/bible-studio/releases/latest/download/latest.json"
+      ]
     }
   }
 }
