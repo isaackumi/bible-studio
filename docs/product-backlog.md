@@ -476,3 +476,28 @@ Code is in place and tested with a fake network; nothing is live.
 - Built: signed `CS1-` license keys checked offline (`src/lib/domain/license.ts`, `scripts/license.ts`), Buy buttons that open Paddle checkout (`CHECKOUT` in `src/lib/domain/plans.ts`, empty so they show "coming soon"), and the license server that emails a key after payment (`server/paddle.ts`, setup in `server/README.md`).
 - To resume: Paddle sandbox account with Premium/Church monthly and yearly prices and hosted checkout links; Resend account and sending domain; deploy the Worker with its four secrets; one sandbox purchase end to end (confirm `user_email` prefills); then live.
 - Open questions: real prices (placeholders $12 / $29), monthly vs yearly only (monthly emails a new key each month), whether to add online key refresh and seat limits later.
+
+## Status update — 2026-10-17 (gap list)
+
+Built and tested in the browser build or by unit tests; anything marked "needs a real run" has not met real hardware or a real account yet.
+
+| Gap | Now | Needs a real run |
+| --- | --- | --- |
+| Modern translations | API.Bible with the church's key; text fetched when shown, copyright line, voice/search on bundled words | A real API.Bible key (response format, FUMS reporting) |
+| Voice on older Macs and Windows | SFSpeechRecognizer on macOS 13–15; Windows built-in recognizer via PowerShell | A macOS 13–15 Mac; a Windows PC |
+| PowerPoint | .pptx → editable deck (text, styles, pictures, shapes, backgrounds). No tables, charts, SmartArt | Real church decks |
+| Service running order | Service page: sections, any item, Up next, next/previous item | — |
+| Windows build | CI builds Windows, macOS and Linux on every push | First CI run after push |
+| CCLI reporting | Songs live logged once per day; report and CSV | — |
+| Two translations side by side | Second translation column with its own attribution | — |
+| Announcement loops | Deck loops on Program every 8 s; Preview stays free | — |
+| Controllers | Controller keys and GET links for Companion / Stream Deck | A real Companion setup |
+| Stream output | /stream lower-third overlay for OBS / vMix Browser Source | OBS on the church computer |
+| Video controls | Play/pause, restart, scrub, volume, fade; shared clock | Long videos on the audience screen |
+| Stage display | Messages to the stage; Next / clock / notes / size | A real stage screen |
+| Planning Center | Token connect, plans, import as a service with songs | A real Planning Center account |
+| Problem reports | Local error and crash log; Save report | — |
+| Backup / second computer | Folder backups every 30 min, restore latest | Two computers on a cloud drive |
+| Auto-update | Signed updater, release workflow, Settings › Updates | First tagged release (add TAURI_SIGNING_PRIVATE_KEY secret) |
+
+Not done: interface languages (needs choosing languages and translating every screen), bundled hymn texts (needs the files), payments (parked as CS-BIZ-001).
