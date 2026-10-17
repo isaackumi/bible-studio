@@ -13,6 +13,8 @@ use uuid::Uuid;
 pub const PORT: u16 = 17891;
 /// The same phone page the browser build serves; one UI for every transport.
 const PAD: &str = include_str!("../../static/remote.html");
+/// The livestream lower-third overlay, for an OBS or vMix Browser Source.
+const STREAM: &str = include_str!("../../static/stream.html");
 /// Concurrent connections; a phone polls once a second, so this is generous.
 const MAX_CONNECTIONS: usize = 32;
 const MAX_REQUEST: usize = 64 * 1024;
@@ -219,6 +221,10 @@ fn parse_http(buf: &[u8]) -> Parsed {
 fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRequest) {
     if req.method == "GET" && (req.path == "/" || req.path == "/remote.html" || req.path == "/index.html") {
         write_http(stream, 200, "text/html; charset=utf-8", PAD.as_bytes());
+        return;
+    }
+    if req.method == "GET" && req.path == "/stream" {
+        write_http(stream, 200, "text/html; charset=utf-8", STREAM.as_bytes());
         return;
     }
     // Controllers (Stream Deck via Companion, scripts): GET /v1/command/<id>?token=…

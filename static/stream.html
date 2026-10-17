@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Church Studio stream overlay</title>
+<!--
+  A lower-third overlay for livestreams. Add it to OBS or vMix as a Browser Source
+  (1920×1080). It shows the words on Program (scripture, lyrics, titles) on a transparent
+  background, so the camera shows through; pictures, video and cameras are left to the switcher.
+  Options in the link: pos=bottom|top, style=dark|light|accent, size=s|m|l, bg=transparent|green.
+-->
+<style>
+  :root { --bar: rgba(8, 10, 14, 0.86); --ink: #ffffff; --cue: #ffcf7a; --accent: #fa4f00; --size: 42px; }
+  html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
+  body.green { background: #00b140; }
+  .lower { position: absolute; left: 6%; right: 6%; bottom: 7%; display: flex; flex-direction: column; gap: 10px; padding: 26px 40px 30px; border-left: 12px solid var(--accent); border-radius: 6px; background: var(--bar); color: var(--ink); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35); opacity: 0; transform: translateY(16px); transition: opacity 260ms ease, transform 260ms ease; }
+  body.top .lower { bottom: auto; top: 7%; }
+  .lower.show { opacity: 1; transform: none; }
+  .cue { margin: 0; font-size: calc(var(--size) * 0.5); font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cue); }
+  .body { margin: 0; font-size: var(--size); font-weight: 600; line-height: 1.25; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  body.light { --bar: rgba(255, 255, 255, 0.94); --ink: #0b0d12; --cue: #b4330b; }
+  body.accent { --bar: color-mix(in srgb, var(--accent) 88%, black); --cue: #ffe2c2; }
+  .note { position: absolute; left: 24px; bottom: 24px; padding: 10px 14px; border-radius: 8px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 16px; display: none; }
+  .note.show { display: block; }
+</style>
+</head>
+<body>
+<div class="lower" id="lower"><p class="cue" id="cue"></p><p class="body" id="body"></p></div>
+<p class="note" id="note"></p>
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get("token") || "";
+  document.body.classList.add(params.get("pos") === "top" ? "top" : "bottom");
+  document.body.classList.add(["light", "accent"].includes(params.get("style")) ? params.get("style") : "dark");
+  if (params.get("bg") === "green") document.body.classList.add("green");
+  document.documentElement.style.setProperty("--size", { s: "32px", m: "42px", l: "54px" }[params.get("size")] || "42px");
+  const lower = document.getElementById("lower");
+  const cue = document.getElementById("cue");
+  const body = document.getElementById("body");
+  const note = document.getElementById("note");
+  // Words only: everything else (pictures, video, cameras, black) clears the overlay.
+  const WORDS = new Set(["scripture", "lyrics", "title", "lower-third"]);
+  let shown = "";
+
+  function say(text) {
+    note.textContent = text;
+    note.classList.toggle("show", !!text);
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch("/v1/remote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ v: 2, type: "state", payload: { token } }),
+      });
+      const reply = await response.json();
+      if (reply.type === "unauthorized" || reply.type === "denied") {
+        say("This overlay link is not allowed. Make a new one in Church Studio › Settings › Phone remote.");
+        lower.classList.remove("show");
+      } else {
+        say("");
+        const p = reply.payload || {};
+        const words = WORDS.has(p.programLayout) && (p.programBody || "").trim();
+        const key = words ? `${p.programCue}\n${p.programBody}` : "";
+        if (key !== shown) {
+          shown = key;
+          if (words) {
+            cue.textContent = p.programCue || "";
+            body.textContent = p.programBody.replace(/^\d+ /gm, "");
+          }
+          lower.classList.toggle("show", !!words);
+        }
+      }
+    } catch {
+      say("Waiting for Church Studio…");
+    }
+    setTimeout(poll, 400);
+  }
+  poll();
+</script>
+</body>
+</html>

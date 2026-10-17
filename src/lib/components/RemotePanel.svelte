@@ -119,7 +119,13 @@
   </form>
   {#if newKey && session.remoteLanUrl}
     <div class="row links">
-      <div class="row-copy"><strong>Links for your buttons</strong><span>Copy them now: the key is not shown again. In Companion use a Generic HTTP "GET" action.</span></div>
+      <div class="row-copy"><strong>Links for this controller</strong><span>Copy them now: the key is not shown again. In Companion use a Generic HTTP "GET" action for each button.</span></div>
+      <div class="overlay-link">
+        <strong>Stream overlay</strong>
+        <span>Add as a Browser Source (1920×1080) in OBS or vMix: the words on Program as a lower third over your camera.</span>
+        <code>{new URL(`/stream?token=${encodeURIComponent(newKey)}`, session.remoteLanUrl).toString()}</code>
+        <button type="button" class="btn small" onclick={() => void navigator.clipboard?.writeText(new URL(`/stream?token=${encodeURIComponent(newKey!)}`, session.remoteLanUrl).toString())}>Copy overlay link</button>
+      </div>
       <ul class="cmd-list">
         {#each REMOTE_COMMANDS as command (command)}
           {@const url = commandUrl(session.remoteLanUrl, command, newKey)}
@@ -168,5 +174,8 @@
   .cmd-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
   .cmd-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
   .cmd-list code { font-size: 12px; }
+  .overlay-link { display: grid; gap: 4px; justify-items: start; margin-top: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .overlay-link span { font-size: 12px; color: var(--muted); }
+  .overlay-link code { font-size: 11px; word-break: break-all; }
   .error { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, #ff5a5a 14%, transparent); color: #ff8a8a; font-size: 13px; }
 </style>
