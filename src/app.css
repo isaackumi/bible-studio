@@ -46,6 +46,12 @@
   --live: #f21b1b;
   /* Text on accent fills; OperatorShell switches it to black for light accents. */
   --on-accent: #fff;
+  /* Song sections: one colour per part, kept clear of the accent (Preview) and red (live). */
+  --sec-verse: #4f8ff7;
+  --sec-pre-chorus: #22b8cf;
+  --sec-chorus: #c264f0;
+  --sec-bridge: #e0a03a;
+  --sec-ending: #8a94a6;
   --presence: #3dce7a;
   --mustard: #e2cc9d;
   /* SF Pro is the Mac system face. Instrument Sans remains the fallback off Apple platforms. */

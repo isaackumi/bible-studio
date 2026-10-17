@@ -171,6 +171,31 @@ export function lyricsFor(song: Song | undefined, sectionId: string, fallbackTit
   return { label: section.label, lines: lines.length > 0 ? lines : ["This section is empty."] };
 }
 
+/** How a section is coloured and abbreviated on the desk. The label wins (people rename sections), then the kind. */
+export type SectionTone = "verse" | "pre-chorus" | "chorus" | "bridge" | "ending";
+
+export function sectionTone(section: Pick<SongSection, "kind" | "label">): SectionTone {
+  const label = section.label.trim().toLowerCase();
+  if (/^pre[- ]?chorus/.test(label)) return "pre-chorus";
+  if (/^(chorus|refrain)/.test(label)) return "chorus";
+  if (/^bridge/.test(label)) return "bridge";
+  if (/^(tag|outro|ending|intro|coda|interlude|vamp)/.test(label)) return "ending";
+  if (/^verse/.test(label)) return "verse";
+  return section.kind === "tag" ? "ending" : section.kind;
+}
+
+/** "Verse 2" → "V2", "Chorus" → "C", "Pre-Chorus" → "PC", "Bridge 2" → "B2", "Intro" → "I", "Tag" → "T". */
+export function sectionShort(section: Pick<SongSection, "kind" | "label">): string {
+  const number = section.label.match(/(\d+)\s*$/)?.[1] ?? "";
+  const tone = sectionTone(section);
+  if (tone === "ending") {
+    const word = section.label.trim().toLowerCase().replace(/\s*\d+$/, "");
+    const ENDINGS: Record<string, string> = { intro: "I", outro: "O", ending: "E", coda: "Co", interlude: "It", vamp: "Va" };
+    return (ENDINGS[word] ?? "T") + number;
+  }
+  return { verse: "V", "pre-chorus": "PC", chorus: "C", bridge: "B" }[tone] + number;
+}
+
 const HEADERS: Array<[RegExp, SongSectionKind, string | null]> = [
   [/^pre[- ]?chorus(?:\s+\d+)?$/i, "chorus", "Pre-Chorus"],
   [/^chorus(?:\s+\d+)?$/i, "chorus", null],

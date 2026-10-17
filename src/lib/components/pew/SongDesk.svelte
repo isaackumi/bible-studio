@@ -2,7 +2,7 @@
   import { session } from "../../app/session.svelte";
   import { songFileName, songToOpenLyrics } from "../../domain/openlyrics";
   import { createZip, readZip } from "../../domain/zip";
-  import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, songCredit, songFolders } from "../../domain/song";
+  import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, sectionShort, sectionTone, songCredit, songFolders } from "../../domain/song";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
@@ -531,7 +531,7 @@
           <button type="button" class="desk-btn" disabled={!pasteText.trim()} onclick={applyPaste}>Split into sections</button>
         </details>
         {#each draft.sections as section, i (section.id)}
-          <div class="edit-section">
+          <div class="edit-section" style:--tone="var(--sec-{sectionTone(section)})">
             <div class="edit-section-head">
               <input aria-label="Section label" bind:value={section.label} />
               <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} up`} disabled={i === 0} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, -1).sections)}><Icon name="chevron-up" size={14} /></button>
@@ -593,12 +593,27 @@
         </div>
       </header>
       <p class="hint">Click a section for <b>Preview</b> · double-click sends it <b>LIVE</b> · <kbd>←</kbd> <kbd>→</kbd> step sections</p>
+      <nav class="song-map" aria-label="Song map">
+        {#each selected.sections as section (section.id)}
+          <button
+            type="button"
+            style:--tone="var(--sec-{sectionTone(section)})"
+            class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
+            class:live={programLive && programSource === `song:${selected.id}:${section.id}`}
+            title={section.label}
+            aria-label={section.label}
+            onclick={() => show(selected, section.id)}
+            ondblclick={() => void showAndTake(selected, section.id)}
+          >{sectionShort(section)}</button>
+        {/each}
+      </nav>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
           {@const isLive = programLive && programSource === `song:${selected.id}:${section.id}`}
           <button
             type="button"
-            class="section {section.kind}"
+            class="section"
+            style:--tone="var(--sec-{sectionTone(section)})"
             class:live={isLive}
             class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
             class:heard={detected?.songId === selected.id && detected.sectionId === section.id}
@@ -837,15 +852,30 @@
     font: inherit;
     min-height: 96px;
   }
-  .section.chorus { border-left-color: var(--accent); }
-  .section.bridge { border-left-color: #8b6cff; }
-  .section.tag { border-left-color: #2fb8a6; }
+  .section { border-left-color: var(--tone, var(--muted)); }
+  .song-map { display: flex; flex-wrap: wrap; gap: 4px; }
+  .song-map button {
+    min-width: 34px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--tone) 45%, var(--line));
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--tone) 18%, var(--field));
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .song-map button:hover { background: color-mix(in srgb, var(--tone) 30%, var(--field)); }
+  .song-map button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .song-map button.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
   .section:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .section.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .section.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
   .section.heard { outline: 2px dashed color-mix(in srgb, var(--presence, #3fb950) 80%, transparent); outline-offset: 2px; }
   .section .label { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-  .section .label i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--panel); color: var(--ink); letter-spacing: 0; }
+  .section .label i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: color-mix(in srgb, var(--tone, var(--muted)) 26%, var(--panel)); color: var(--ink); letter-spacing: 0; }
   .section .tags { margin-left: auto; display: flex; gap: 4px; }
   .section .line { font-size: 14px; line-height: 1.4; }
   .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
@@ -860,7 +890,7 @@
   .paste { display: flex; flex-direction: column; gap: 8px; }
   .paste summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .paste textarea { width: 100%; margin: 8px 0; }
-  .edit-section { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); }
+  .edit-section { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-left: 4px solid var(--tone, var(--line)); border-radius: var(--radius-control, 8px); }
   .edit-section-head { display: flex; gap: 4px; }
   .edit-section-head input { flex: 1; }
 

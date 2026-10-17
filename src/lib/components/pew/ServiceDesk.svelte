@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
   import { parseReference, formatReference } from "../../bible/reference";
+  import { sectionShort, sectionTone } from "../../domain/song";
   import { searchSongHits } from "../../domain/song-search";
   import { restoreComposition } from "../../domain/composition";
   import type { PresentationItem } from "../../domain/types";
@@ -8,6 +9,7 @@
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import MonitorPair from "./MonitorPair.svelte";
   import ItemEditor from "./ItemEditor.svelte";
+  import ItemThumb from "./ItemThumb.svelte";
 
   // The running order for a whole service: sections in order, any kind of item, and a way to
   // move through it item by item. Nothing here changes Program; LIVE still does.
@@ -61,6 +63,8 @@
   function kindOf(item: PresentationItem) {
     return KIND[item.kind] ?? { icon: "list", label: item.kind };
   }
+
+  const songOf = (item: PresentationItem) => (item.lyric ? session.songs.find((entry) => entry.id === item.lyric?.songId) : undefined);
 
   function detail(item: PresentationItem): string {
     if (item.kind === "lyric" && item.lyric) {
@@ -173,8 +177,17 @@
                 {@const kind = kindOf(item)}
                 <li class="item" class:on={session.cursor.itemId === item.id} class:live={live(item)}>
                   <button type="button" class="item-main" onclick={(event) => open(item, event)} ondblclick={() => edit(item.id)} title="Click for Preview; double-click to edit">
-                    <span class="kind" title={kind.label}><Icon name={kind.icon} size={14} /></span>
-                    <span class="item-copy"><strong>{item.title}</strong><em>{detail(item)}</em></span>
+                    <ItemThumb {item} icon={kind.icon} label={kind.label} />
+                    <span class="item-copy">
+                      <strong>{item.title}</strong>
+                      {#if item.kind === "lyric" && songOf(item)}
+                        <span class="mini-map" aria-label="Song map">
+                          {#each songOf(item)!.sections as part (part.id)}<i style:--tone="var(--sec-{sectionTone(part)})" title={part.label}>{sectionShort(part)}</i>{/each}
+                        </span>
+                      {:else}
+                        <em>{detail(item)}</em>
+                      {/if}
+                    </span>
                     {#if live(item)}<span class="badge live-badge">Live</span>{:else if session.cursor.itemId === item.id}<span class="badge">Preview</span>{/if}
                   </button>
                   <span class="tools">
@@ -343,9 +356,10 @@
   .item.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
   .item.live { box-shadow: inset 3px 0 0 var(--live); }
   .item-main { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .kind { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 7px; background: var(--panel); color: var(--accent); border: 1px solid var(--line); }
   .item-copy { flex: 1; display: grid; gap: 1px; min-width: 0; }
   .item-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini-map { display: flex; gap: 2px; overflow: hidden; }
+  .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 10px; font-weight: 700; line-height: 15px; }
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10px; font-weight: 750; }
   .live-badge { background: var(--live); color: #fff; }

@@ -3,7 +3,7 @@ import { applyProgramAction, createLiveState, frame, sameProgram, setPreview } f
 import { presentLyrics, presentScripture } from "./present";
 import { defaultTheme, sanitizeTheme } from "./theme";
 import type { Song } from "./types";
-import { creditFor, filterSongs, lyricsFor, parseSongFile, songCredit, moveSongSection, parseLyrics, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFolders, songFromFile, stepSongSection } from "./song";
+import { creditFor, filterSongs, lyricsFor, parseSongFile, songCredit, moveSongSection, parseLyrics, sanitizeFolderNames, sanitizeSong, sectionPlace, sectionShort, sectionTone, songError, songFolders, songFromFile, stepSongSection } from "./song";
 
 const theme = defaultTheme();
 
@@ -255,5 +255,25 @@ describe("song copyright and SongSelect files", () => {
     expect(song).toMatchObject({ title: "Example Song", author: "First Writer, Second Writer", ccli: "7654321", copyright: "2015 Example Publishing", folder: "Worship" });
     expect(song?.sections.map((section) => section.label)).toEqual(["Verse 1", "Chorus"]);
     expect(song?.sections.flatMap((section) => section.lines).join(" ")).not.toMatch(/CCLI|Terms|©/);
+  });
+});
+
+describe("section colours and short names", () => {
+  const at = (kind: "verse" | "chorus" | "bridge" | "tag", label: string) => ({ kind, label });
+  it("reads the label first, then the kind", () => {
+    expect(sectionTone(at("chorus", "Pre-Chorus"))).toBe("pre-chorus");
+    expect(sectionTone(at("verse", "Chorus 2"))).toBe("chorus");
+    expect(sectionTone(at("verse", "Refrain"))).toBe("chorus");
+    expect(sectionTone(at("tag", "Outro"))).toBe("ending");
+    expect(sectionTone(at("bridge", "Part B"))).toBe("bridge");
+    expect(sectionTone(at("verse", "Verse 3"))).toBe("verse");
+  });
+  it("abbreviates for the song map", () => {
+    expect(sectionShort(at("verse", "Verse 2"))).toBe("V2");
+    expect(sectionShort(at("chorus", "Chorus"))).toBe("C");
+    expect(sectionShort(at("chorus", "Pre-Chorus"))).toBe("PC");
+    expect(sectionShort(at("bridge", "Bridge 2"))).toBe("B2");
+    expect(sectionShort(at("tag", "Intro"))).toBe("I");
+    expect(sectionShort(at("tag", "Tag"))).toBe("T");
   });
 });

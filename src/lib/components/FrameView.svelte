@@ -185,7 +185,7 @@
   {#if backdrop?.type === "motion"}
     <MotionBackground motion={backdrop.motionId} tint={backdrop.tint} base={backdrop.base} {still} />
   {:else if backdrop?.type === "video" && model.backgroundVideoUrl}
-    <video class="backdrop-video" src={model.backgroundVideoUrl} autoplay loop muted playsinline preload="auto"></video>
+    <video class="backdrop-video" src={still ? `${model.backgroundVideoUrl}#t=0.1` : model.backgroundVideoUrl} autoplay={!still} loop muted playsinline preload={still ? "metadata" : "auto"}></video>
   {/if}
   {#if dim > 0}<div class="backdrop-dim" style:opacity={dim} aria-hidden="true"></div>{/if}
   {#if model.layout === "composition"}
@@ -218,7 +218,12 @@
   {:else if model.layout === "video" && model.video}
     {#key model.video.url}
       <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
-      <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control }}></video>
+      {#if still}
+        <!-- Thumbnails: the first frame, silent and paused. -->
+        <video class="cover" src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
+      {:else}
+        <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control }}></video>
+      {/if}
     {/key}
   {:else if model.layout === "shape" && model.shape}
     <div
