@@ -1069,7 +1069,11 @@ class Session {
 
   step = async (direction: 1 | -1) => {
     if (this.songFocus) {
-      this.stepSong(direction);
+      if (this.stepSong(direction)) return;
+      // Past the last (or first) section of a song in the service: on to the next item.
+      const cursorItem = this.service && this.cursor.itemId ? findItem(this.service, this.cursor.itemId)?.item : null;
+      if (cursorItem?.kind !== "lyric" || cursorItem.lyric?.songId !== this.songFocus.songId) return;
+      await this.stepItem(direction);
       return;
     }
     // A deck on Preview steps by page, then on through the rundown at either end.
@@ -1622,6 +1626,64 @@ class Session {
     void this.selectItem(item.id);
   };
 
+  /** The next or previous item in the running order, whatever is inside the current one. */
+  stepItem = async (direction: 1 | -1) => {
+    if (!this.service) return;
+    const next = stepCursor(this.service, this.cursor, direction);
+    if (next.itemId && next.itemId !== this.cursor.itemId) await this.selectItem(next.itemId);
+  };
+
+  /** The item after the selected one, for "Up next". */
+  nextItem = (): PresentationItem | null => {
+    if (!this.service) return null;
+    const next = stepCursor(this.service, this.cursor, 1);
+    return next.itemId && next.itemId !== this.cursor.itemId ? (findItem(this.service, next.itemId)?.item ?? null) : null;
+  };
+
+  /**
+   * Add anything to the running order: into the selected section, or a first "Service" section
+   * (creating today's service when there is none). Preview changes only when asked.
+   */
+  addToService = async (item: Omit<PresentationItem, "id">, preview = false): Promise<string> => {
+    if (!this.service) await this.createService(`Service ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`);
+    if (!this.service!.sections.length) this.addSection("Service");
+    const target = sectionIdForInsert(this.service!, this.cursor)!;
+    const full = { ...item, id: uid() } as PresentationItem;
+    this.insertItem(target, full);
+    this.persistSoon();
+    if (preview) await this.selectItem(full.id);
+    this.message = `${full.title} added to ${this.service!.name}.`;
+    return full.id;
+  };
+
+  addSongToService = (song: Song) => {
+    const first = song.sections[0];
+    if (!first) {
+      this.message = `${song.title || "That song"} has no sections yet.`;
+      return;
+    }
+    void this.addToService({ kind: "lyric", title: song.title || "Untitled song", lyric: { songId: song.id, sectionId: first.id } });
+  };
+
+  addMediaToService = (asset: MediaAsset) => {
+    const video = asset.kind === "video";
+    void this.addToService(
+      video
+        ? { kind: "video", title: asset.name, video: { assetId: asset.id, loop: false, muted: false } }
+        : { kind: "image", title: asset.name, image: { assetId: asset.id } },
+    );
+  };
+
+  addAnnouncementToService = (heading: string, body: string) => {
+    const title = heading.trim() || "Announcement";
+    void this.addToService({ kind: "announcement", title, announcement: { heading: title, body: body.trim() } });
+  };
+
+  addPassageToService = (passage: BibleItem) => {
+    this.remember(passage);
+    void this.addToService({ kind: "bible", title: passage.reference, bible: passage });
+  };
+
   addLyric = (songId: string, sectionId: string, title: string) => {
     if (!this.service) return;
     const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
@@ -1844,7 +1906,8 @@ class Session {
       return false;
     }
     const next = stepSongSection(song, focus.sectionId, direction);
-    if (!next) return false;
+    // At the first or last section there is nowhere further inside the song.
+    if (!next || next.id === focus.sectionId) return false;
     this.previewSongSection(song, next.id);
     return true;
   };

@@ -7,7 +7,7 @@ export const QUEUE_PANEL = "service";
 export function defaultPewDesk(): PewDeskState {
   return {
     focus: false,
-    monitors: { scriptures: { preview: true, program: true }, songs: { preview: true, program: true }, sermon: { preview: true, program: true } },
+    monitors: { scriptures: { preview: true, program: true }, songs: { preview: true, program: true }, sermon: { preview: true, program: true }, service: { preview: true, program: true } },
     columns: [46, 30, 24],
     librarySplit: 42,
     stageSplit: 46,
@@ -28,7 +28,7 @@ function triple(value: unknown, fallback: [number, number, number]): [number, nu
   return [(nums[0] / sum) * 100, (nums[1] / sum) * 100, (nums[2] / sum) * 100];
 }
 
-const PAGES: PewPage[] = ["scriptures", "songs", "sermon"];
+const PAGES: PewPage[] = ["scriptures", "songs", "sermon", "service"];
 
 function monitors(value: unknown): Record<PewPage, PewMonitors> {
   const record = value && typeof value === "object" ? (value as Record<string, Partial<PewMonitors>>) : {};

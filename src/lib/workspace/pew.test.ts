@@ -42,6 +42,7 @@ describe("monitors per page", () => {
       scriptures: { preview: true, program: true },
       songs: { preview: false, program: true },
       sermon: { preview: true, program: false },
+      service: { preview: true, program: true },
     });
     expect(samePew(pew, defaultPewDesk())).toBe(false);
   });

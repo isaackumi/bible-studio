@@ -17,6 +17,7 @@
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import SongDesk from "./SongDesk.svelte";
+  import ServiceDesk from "./ServiceDesk.svelte";
   import SermonDesk from "./SermonDesk.svelte";
   import OutputMenu from "../OutputMenu.svelte";
   import ToolMenu from "../ToolMenu.svelte";
@@ -25,7 +26,7 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
 
-  type Mode = "scriptures" | "songs" | "sermon";
+  type Mode = "scriptures" | "songs" | "sermon" | "service";
   let mode = $state<Mode>("scriptures");
   let translationId = $state("kjv");
   let bookOrd = $state(1);
@@ -365,6 +366,7 @@
     { id: "scriptures", label: "Scriptures" },
     { id: "songs", label: "Songs" },
     ...(canUse("sermon") ? [{ id: "sermon" as const, label: "Sermon" }] : []),
+    { id: "service", label: "Service" },
   ]);
 
   // A tour started from the hub can ask for another page.
@@ -392,7 +394,7 @@
 
   function onModeKey(event: KeyboardEvent) {
     if (!event.altKey || event.metaKey || event.ctrlKey || session.settingsOpen) return;
-    const index = ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
+    const index = ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (index < 0 || !modes[index] || target?.closest('[aria-modal="true"]')) return;
     event.preventDefault();
@@ -559,7 +561,9 @@
     </nav>
   </header>
 
-  {#if mode === "sermon"}
+  {#if mode === "service"}
+    <ServiceDesk />
+  {:else if mode === "sermon"}
     <SermonDesk {translationId} />
   {:else if mode === "songs"}
     <SongDesk />

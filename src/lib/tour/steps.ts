@@ -2,7 +2,7 @@
 // screen (the first selector that is on screen wins) and says what it is for in plain words.
 // Steps whose target is not showing (a hidden panel, a closed menu) are skipped.
 
-export type TourId = "scriptures" | "songs" | "sermon" | "production";
+export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production";
 
 export type TourStep = {
   /** CSS selectors, tried in order. None: a centered card with no spotlight. */
@@ -149,6 +149,37 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       TOUR_BUTTON,
     ],
   },
+  service: {
+    name: "Service",
+    steps: [
+      {
+        title: "Run the whole service",
+        body: "Plan everything in order, then move through it item by item on Sunday. Press Esc to stop at any time.",
+      },
+      {
+        target: [".service-desk .sidebar", ".service-desk .rail"],
+        title: "Your services",
+        body: "Each Sunday or event is its own service. Open last week's to reuse it.",
+      },
+      {
+        target: [".service-desk .order", ".service-desk .blank"],
+        title: "The running order",
+        body: "Sections in order, like Welcome, Worship, Word and Closing. Click an item to put it on Preview; the arrows reorder it.",
+      },
+      {
+        target: [".service-desk .add-bar"],
+        title: "Add anything",
+        body: "Songs, scripture, slide decks (PowerPoint too), pictures and videos, announcements and looks go into the selected section.",
+      },
+      {
+        target: [".service-desk .next"],
+        title: "Up next",
+        body: "Next item moves Preview on through the service. The arrows step inside an item first, like a song's sections.",
+      },
+      ...LIVE_STEPS,
+      TOUR_BUTTON,
+    ],
+  },
   production: {
     name: "Production",
     steps: [
@@ -227,7 +258,7 @@ export function placeCard(target: Rect | null, card: { width: number; height: nu
 
 /** Tours grouped by desk, in the order the hub lists them. */
 export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
-  { name: "Presenter Desk", tours: ["scriptures", "songs", "sermon"] },
+  { name: "Presenter Desk", tours: ["scriptures", "songs", "sermon", "service"] },
   { name: "Production Desk", tours: ["production"] },
 ];
 

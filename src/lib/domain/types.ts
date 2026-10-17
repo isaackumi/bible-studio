@@ -341,7 +341,7 @@ export type OperatorTheme = "dark" | "vespers" | "nave" | "light";
 /** Presenter Desk column sizes. Panel visibility stays on the workspace layout. */
 /** Which monitors a Presenter Desk page shows. Program keeps running when its monitor is hidden. */
 export type PewMonitors = { preview: boolean; program: boolean };
-export type PewPage = "scriptures" | "songs" | "sermon";
+export type PewPage = "scriptures" | "songs" | "sermon" | "service";
 
 export type PewDeskState = {
   focus: boolean;
