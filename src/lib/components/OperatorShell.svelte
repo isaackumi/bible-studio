@@ -5,7 +5,11 @@
   import TourGuide from "./tour/TourGuide.svelte";
   import TourHub from "./tour/TourHub.svelte";
   import { onMount } from "svelte";
+  import { listen } from "@tauri-apps/api/event";
   import { session } from "../app/session.svelte";
+  import { outputShape } from "../display/output-shape.svelte";
+  import { AUDIENCE_ASPECT_KEY, aspectFor, sanitizeScreenShape } from "../display/shape";
+  import { isDesktop } from "../platform/runtime";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
   import FindOverlay from "./FindOverlay.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
@@ -14,7 +18,25 @@
 
   onMount(() => {
     void session.init();
-    return () => session.destroy();
+    // The audience window reports the shape of its screen; every monitor here follows it.
+    let stopShape = () => {};
+    if (isDesktop()) {
+      void listen<number>("audience-shape", (event) => session.noteAudienceAspect(event.payload)).then((stop) => (stopShape = stop));
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === AUDIENCE_ASPECT_KEY && event.newValue) session.noteAudienceAspect(Number(event.newValue));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      stopShape();
+      window.removeEventListener("storage", onStorage);
+      session.destroy();
+    };
+  });
+
+  $effect(() => {
+    const appearance = session.workspace.appearance;
+    outputShape.aspect = aspectFor(sanitizeScreenShape(appearance.screenShape), appearance.measuredAspect ?? null);
   });
 
   $effect(() => {

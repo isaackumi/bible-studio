@@ -16,6 +16,7 @@ import { sanitizeTourProgress } from "../tour/steps";
 import { sanitizeOnlineBibles } from "../bible/online-bibles";
 import { sanitizeSongUses } from "../domain/song-usage";
 import { sanitizeStageLayout } from "../display/channel";
+import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -42,6 +43,8 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
     accent: sanitizeAccent(value?.accent?.toLowerCase() === "#c6a15b" ? undefined : (value?.accent ?? base.accent)),
     desk: value?.desk === "obs" ? "obs" : value?.desk === "pewbeam" ? "pewbeam" : base.desk,
     calm: value?.calm === true,
+    screenShape: sanitizeScreenShape(value?.screenShape),
+    ...(value?.measuredAspect ? { measuredAspect: cleanAspect(value.measuredAspect) } : {}),
   };
 }
 

@@ -4,6 +4,8 @@
   import { withMediaUrls } from "../../domain/sources";
   import { mediaUrl } from "../../db/api";
   import FrameView from "../FrameView.svelte";
+  import { canvasFor } from "../../display/shape";
+  import { outputShape } from "../../display/output-shape.svelte";
 
   // The editable page: the real frame underneath, selection boxes and handles on top.
   let {
@@ -28,10 +30,12 @@
 
   let canvas = $state<HTMLDivElement | undefined>();
   let scale = $state(0.4);
+  // Pages are edited at the audience screen's shape, so what you lay out is what the room sees.
+  const size = $derived(canvasFor(outputShape.aspect));
   $effect(() => {
     const node = canvas;
     if (!node) return;
-    const measure = () => (scale = node.clientWidth / 1920);
+    const measure = () => (scale = node.clientWidth / size.width);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -76,7 +80,7 @@
 
 <div class="stage-wrap" style:width="{zoom}%">
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="page-canvas" bind:this={canvas} onpointerdown={() => onselect(null)} onpointermove={move} onpointerup={up} onpointercancel={up}>
+  <div class="page-canvas" style:--aspect={outputShape.aspect} style:--canvas-w="{size.width}px" style:--canvas-h="{size.height}px" bind:this={canvas} onpointerdown={() => onselect(null)} onpointermove={move} onpointerup={up} onpointercancel={up}>
     <div class="paint" style:transform="scale({scale})">
       <FrameView {model} />
     </div>
@@ -107,8 +111,8 @@
 
 <style>
   .stage-wrap { max-width: 100%; margin: 0 auto; }
-  .page-canvas { position: relative; aspect-ratio: 16 / 9; width: 100%; background: #000; overflow: hidden; border-radius: 6px; touch-action: none; user-select: none; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); }
-  .paint { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: top left; pointer-events: none; }
+  .page-canvas { position: relative; aspect-ratio: var(--aspect, 16 / 9); width: 100%; background: #000; overflow: hidden; border-radius: 6px; touch-action: none; user-select: none; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); }
+  .paint { position: absolute; left: 0; top: 0; width: var(--canvas-w, 1920px); height: var(--canvas-h, 1080px); transform-origin: top left; pointer-events: none; }
   .box { position: absolute; outline: 1px dashed transparent; cursor: move; }
   .box:hover { outline-color: color-mix(in srgb, #fff 45%, transparent); }
   .box.selected { outline: 2px solid var(--accent); }

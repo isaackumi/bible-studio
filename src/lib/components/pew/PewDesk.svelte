@@ -1144,7 +1144,7 @@
     padding: 8px 12px 12px;
   }
   .monitor :global(.ratio) {
-    width: min(100cqw, calc(100cqh * 16 / 9));
+    width: min(100cqw, calc(100cqh * var(--aspect, 1.7778)));
     max-height: 100cqh;
     border-radius: 10px;
     overflow: hidden;

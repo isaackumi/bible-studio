@@ -386,6 +386,10 @@ export type AppearanceSettings = {
   desk: DeskStyle;
   /** Hold animated theme backgrounds still on this computer, for slower projector machines. */
   calm?: boolean;
+  /** The audience screen's shape: "auto" fills whatever screen the output is on. */
+  screenShape?: "auto" | "16:9" | "16:10" | "4:3" | "21:9" | "9:16";
+  /** Width ÷ height the audience window last measured, so the desk matches it before it opens. */
+  measuredAspect?: number;
 };
 
 export type Workspace = {
@@ -501,6 +505,8 @@ export type ProgramPacket = {
   frame: LiveFrame;
   /** Hold animated backgrounds still on the audience screen. */
   calm?: boolean;
+  /** A chosen screen shape (width ÷ height); absent = fill the screen the window is on. */
+  aspect?: number;
 };
 
 export type TranslationInfo = {

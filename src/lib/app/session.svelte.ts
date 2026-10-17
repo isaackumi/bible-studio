@@ -158,6 +158,7 @@ import {
 import { parseLibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
+import { aspectFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
 import {
   activateTab,
   collapsePanel,
@@ -173,6 +174,8 @@ import {
   restoreBuiltinLayouts,
   showPanel,
 } from "../workspace/layout";
+
+const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
 function uid(): string {
   return crypto.randomUUID();
@@ -560,6 +563,7 @@ class Session {
       sessionId: this.sessionId,
       generation: this.audienceGeneration,
       calm: this.workspace.appearance.calm === true,
+      ...(fixedShape(this.workspace.appearance.screenShape) ? { aspect: aspectFor(sanitizeScreenShape(this.workspace.appearance.screenShape), null) } : {}),
     };
     if (!this.desktop()) {
       if (!this.controlsAudience) {
@@ -3240,6 +3244,19 @@ class Session {
     if (sameProductionLayout(next, this.workspace.production)) return;
     this.workspace = { ...this.workspace, production: next };
     this.persistSoon();
+  };
+
+  /** The audience screen's shape. "auto" fills whatever screen the output is on. */
+  setScreenShape = (shape: ScreenShape) => {
+    this.setAppearance({ screenShape: sanitizeScreenShape(shape) });
+    if (this.live.program.model.layout !== "empty") void this.pushProgram();
+  };
+
+  /** The audience window measured its screen; the desk's monitors follow it. */
+  noteAudienceAspect = (value: unknown) => {
+    const aspect = cleanAspect(value);
+    if (Math.abs((this.workspace.appearance.measuredAspect ?? 0) - aspect) < 0.005) return;
+    this.setAppearance({ measuredAspect: aspect });
   };
 
   /** Calm backgrounds: hold animated backgrounds still here and on the audience screen. */

@@ -11,6 +11,7 @@
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel, ProgramPacket } from "../domain/types";
   import Screen from "./Screen.svelte";
+  import { AUDIENCE_ASPECT_KEY, cleanAspect } from "../display/shape";
 
   let current = $state<PresentationModel>(emptyModel(defaultTheme()));
   let currentSource = $state<string | null>(null);
@@ -22,9 +23,12 @@
   let fading = $state(false);
   let fadeMs = $state(0);
   let revision = -1;
-  let shown: ProgramPacket | null = null;
+  let shown = $state.raw<ProgramPacket | null>(null);
   let testing = $state(false);
   let fillable = $state(false);
+  /** This window's own shape; a chosen shape in the packet wins over it. */
+  let own = $state(16 / 9);
+  const aspect = $derived(shown?.aspect ? cleanAspect(shown.aspect) : own);
   let testTimer: ReturnType<typeof setTimeout> | undefined;
 
   function show(packet: ProgramPacket | null) {
@@ -148,7 +152,34 @@
     }, 1600);
   }
 
+  /** Measure the screen this window fills and tell the desk, so its monitors show the same shape. */
+  function measureShape() {
+    if (!window.innerWidth || !window.innerHeight) return;
+    const next = cleanAspect(window.innerWidth / window.innerHeight);
+    own = next;
+    if (Math.abs(next - reported) < 0.005) return;
+    reported = next;
+    if (isDesktop()) void emit("audience-shape", next).catch(() => {});
+    else {
+      try {
+        localStorage.setItem(AUDIENCE_ASPECT_KEY, String(next));
+      } catch {
+        // Private windows can refuse storage; the desk keeps its last shape.
+      }
+    }
+  }
+
+  let reported = 0;
+  let shapeTimer: ReturnType<typeof setTimeout> | undefined;
+  function onResize() {
+    clearTimeout(shapeTimer);
+    // Wait for a resize or fullscreen change to settle before reporting.
+    shapeTimer = setTimeout(measureShape, 250);
+  }
+
   onMount(() => {
+    measureShape();
+    window.addEventListener("resize", onResize);
     const desktop = isDesktop();
     fillable = !desktop;
     const onMessage = (event: MessageEvent) => {
@@ -175,6 +206,8 @@
         stop();
         stopStandby();
         window.removeEventListener("message", onMessage);
+        window.removeEventListener("resize", onResize);
+        clearTimeout(shapeTimer);
         document.removeEventListener("fullscreenchange", onFullscreen);
         clearTimeout(testTimer);
       };
@@ -203,6 +236,8 @@
       unlistenFrame();
       unlistenTest();
       window.removeEventListener("message", onMessage);
+        window.removeEventListener("resize", onResize);
+        clearTimeout(shapeTimer);
       document.removeEventListener("fullscreenchange", onFullscreen);
       clearTimeout(testTimer);
     };
@@ -213,9 +248,9 @@
   }
 </script>
 
-<div class="audience" style:background={frameBackground(current)}>
+<div class="audience" style:background={frameBackground(current)} style:--aspect={aspect}>
   <div class:fade-in={fading} style:--fade="{fadeMs}ms">
-    <Screen model={current} sourceId={currentSource} {feeds} audio />
+    <Screen model={current} sourceId={currentSource} {feeds} {aspect} audio />
   </div>
   {#if testing}
     <p class="test-card">Test. Program was not changed.</p>

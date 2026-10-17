@@ -1018,8 +1018,8 @@
     overflow: hidden;
   }
   .well :global(.ratio) {
-    width: min(100cqw, calc(100cqh * 16 / 9));
-    height: min(100cqh, calc(100cqw * 9 / 16));
+    width: min(100cqw, calc(100cqh * var(--aspect, 1.7778)));
+    height: min(100cqh, calc(100cqw / var(--aspect, 1.7778)));
     max-width: 100%;
     max-height: 100%;
     aspect-ratio: auto;

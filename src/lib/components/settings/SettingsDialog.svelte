@@ -7,6 +7,7 @@
   import { audienceStatus } from "../../display/status";
   import { resolveAudience, sameScreen } from "../../display/profiles";
   import type { DeskStyle, DisplayAssignment, OperatorTheme, OutputMode, OutputRole } from "../../domain/types";
+  import { describeAspect, SCREEN_SHAPES, type ScreenShape } from "../../display/shape";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { canUse } from "../../platform/capabilities";
   import { isDesktop, openExternal } from "../../platform/runtime";
@@ -70,7 +71,7 @@
       label: "Presenting",
       items: [
         { id: "themes", title: "Themes", icon: "themes", color: "#c2410c", about: "How verses, songs and slides look on the screen.", keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
-        { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test" },
+        { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
         { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
         { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
       ],
@@ -647,6 +648,21 @@
           <div class="row">
             <div class="row-copy"><strong>Fullscreen</strong><span>Cover the whole audience screen. The desk stays on its own display.</span></div>
             <input type="checkbox" class="switch" role="switch" aria-label="Fullscreen output" checked={profile.outputMode === "fullscreen"} onchange={(event) => setMode(event.currentTarget.checked ? "fullscreen" : "window")} />
+          </div>
+          <div class="row">
+            <div class="row-copy">
+              <strong>Screen shape</strong>
+              <span>
+                {#if (session.workspace.appearance.screenShape ?? "auto") === "auto"}
+                  Fills any screen: TV, projector, LED wall or portrait.{session.workspace.appearance.measuredAspect ? ` The audience screen is ${describeAspect(session.workspace.appearance.measuredAspect)}; the monitors here show the same shape.` : " Open the output once so the desk learns its shape."}
+                {:else}
+                  Always {session.workspace.appearance.screenShape}. A screen of another shape shows bars at the sides or top.
+                {/if}
+              </span>
+            </div>
+            <select class="field" aria-label="Screen shape" value={session.workspace.appearance.screenShape ?? "auto"} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
+              {#each SCREEN_SHAPES as shape (shape.id)}<option value={shape.id}>{shape.label} · {shape.detail}</option>{/each}
+            </select>
           </div>
           <div class="row">
             <div class="row-copy"><strong>Test the output</strong><span>Flashes the audience window. Program does not change.</span></div>
