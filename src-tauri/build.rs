@@ -18,7 +18,14 @@ fn compile_transcriber() {
     let dest_dir = target.join(profile);
     std::fs::create_dir_all(&dest_dir).expect("create the transcriber output folder");
     let dest = dest_dir.join("church-studio-transcribe");
+    // Build for macOS 13 and later, so older church Macs run it (SpeechAnalyzer is used only on 26+).
+    let arch = match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("x86_64") => "x86_64",
+        _ => "arm64",
+    };
     let status = std::process::Command::new("swiftc")
+        .arg("-target")
+        .arg(format!("{arch}-apple-macos13.0"))
         .arg("-parse-as-library")
         .arg("-O")
         .arg("-framework")
