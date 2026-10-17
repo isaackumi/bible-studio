@@ -7,6 +7,12 @@
   import type { SourceFields } from "../../domain/sources";
   import type { TimerMode } from "../../domain/timer";
   import DeskDialog from "./DeskDialog.svelte";
+  import Icon from "../Icon.svelte";
+  import Screen from "../Screen.svelte";
+  import { sourceMeta } from "../obs/source-meta";
+  import { buildSource, sourceKindLabel } from "../../domain/sources";
+  import { compileSource } from "../../domain/composition";
+  import { emptyModel } from "../../domain/theme";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import type { TextStyle } from "../../domain/types";
 
@@ -31,6 +37,15 @@
   // Local drafts; the dialog is remounted per edit, so initial props are read once.
   let name = $state(untrack(() => initialName));
   let fields = $state<SourceFields>(untrack(() => structuredClone($state.snapshot(initialFields)) as SourceFields));
+  const meta = $derived(sourceMeta(fields.type));
+  /** The source as it will paint, from the fields as they are now. */
+  const previewModel = $derived.by(() => {
+    try {
+      return compileSource(buildSource($state.snapshot(fields) as SourceFields), { theme: session.theme(), now: Date.now() });
+    } catch {
+      return emptyModel(session.theme());
+    }
+  });
   let error = $state<string | null>(null);
   let video = $state<HTMLVideoElement | undefined>();
   let lookingUp = $state(false);
@@ -148,10 +163,16 @@
   }
 </script>
 
-<DeskDialog title={`Properties for “${initialName}”`} {onclose} {returnTo}>
+<DeskDialog title={`Properties for “${initialName}”`} {onclose} {returnTo} wide>
   {#if notice}
     <p class="notice" role="status">{notice}</p>
   {/if}
+  <div class="layout" style:--tint={meta.color}>
+  <div class="form">
+  <div class="intro">
+    <span class="type-icon"><Icon name={meta.icon} size={18} /></span>
+    <span><strong>{sourceKindLabel(fields.type)}</strong><em>{meta.blurb}</em></span>
+  </div>
   <fieldset disabled={readonly}>
     <label class="row">
       <span>Name</span>
@@ -417,7 +438,13 @@
   {#if error}
     <p class="error" role="alert">{error}</p>
   {/if}
-  <p class="note">Changes show on Preview. Program updates when you go live.</p>
+  </div>
+  <figure class="live-preview">
+    <figcaption>How it looks</figcaption>
+    <div class="screen-box"><Screen model={previewModel} /></div>
+    <p class="note">Changes show on Preview. Program updates when you go live.</p>
+  </figure>
+  </div>
   {#snippet footer()}
     <button type="button" class="desk-btn" onclick={onclose}>{readonly ? "Close" : "Cancel"}</button>
     {#if !readonly}
@@ -427,6 +454,17 @@
 </DeskDialog>
 
 <style>
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: 18px; align-items: start; }
+  .form { display: grid; gap: 12px; min-width: 0; }
+  .intro { display: flex; align-items: center; gap: 10px; }
+  .intro span:last-child { display: grid; gap: 1px; }
+  .intro strong { font-size: 14px; }
+  .intro em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .type-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--tint) 18%, transparent); color: var(--tint); }
+  .live-preview { position: sticky; top: 0; margin: 0; display: grid; gap: 8px; }
+  .live-preview figcaption { font-size: 12px; font-weight: 650; color: var(--muted); }
+  .screen-box { container-type: inline-size; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } .live-preview { position: static; } }
   fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 10px; }
   .row > span:first-child { color: var(--muted); }
