@@ -31,7 +31,8 @@
   import TimerControls from "../TimerControls.svelte";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
-  import OutputControls from "../OutputControls.svelte";
+  import OutputMenu from "../OutputMenu.svelte";
+  import ToolMenu from "../ToolMenu.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { dockShare, mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
@@ -353,13 +354,18 @@
 
 <div class="prod" class:focus class:looks={looksOpen}>
   <header class="prod-bar">
-    <DeskSwitcher />
-    <p class="desk-title">Production Desk</p>
+    <div class="prod-left">
+      <DeskSwitcher compact />
+      <nav class="prod-modes" aria-label="Production view">
+        <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip="Scenes, sources and media — select stays on Preview" onclick={() => (looksOpen = false)}>Studio</button>
+        <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip="Looks — compositions stay on Preview until TAKE" onclick={() => (looksOpen = true)}>Looks</button>
+      </nav>
+    </div>
     <div class="prod-actions">
-      <OutputControls compact />
       {#if !session.controlsAudience}
         <button type="button" class="desk-btn" data-tip="Send from this window after you Take" onclick={() => session.claimAudience()}>Take control</button>
       {/if}
+      <OutputMenu />
       {#if looksOpen}
         <button type="button" class="desk-btn primary" data-tip="Send Preview to Program" onclick={() => void transition()}>
           <Icon name="play" size={16} /> TAKE
@@ -370,35 +376,35 @@
       {/if}
     </div>
     <nav class="prod-tools" aria-label="Workspace">
-      <button type="button" class="desk-btn icon" class:on={looksOpen} aria-pressed={looksOpen} aria-label={looksOpen ? "Hide Looks" : "Show Looks"} data-tip={looksOpen ? "Hide Looks" : "Looks — compositions stay on Preview until TAKE"} onclick={() => (looksOpen = !looksOpen)}>
-        <Icon name="layout" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={focus} aria-pressed={focus} aria-label={focus ? "Leave focus" : "Focus Preview and Program"} data-tip={focus ? "Leave focus" : "Focus Preview and Program"} onclick={() => session.savePew({ focus: !focus })}>
-        <Icon name="focus" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={scenesOpen} aria-pressed={scenesOpen} aria-label={scenesOpen ? "Hide scenes" : "Show scenes"} data-tip={scenesOpen ? "Hide scenes" : "Show scenes"} onclick={() => toggleDock("service")}>
-        <Icon name="studio" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={mediaOpen} aria-pressed={mediaOpen} aria-label={mediaOpen ? "Hide media" : "Show media"} data-tip={mediaOpen ? "Hide media" : "Show media — files, cameras, slides"} onclick={toggleMedia}>
-        <Icon name="media" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" class:on={controlsOpen} aria-pressed={controlsOpen} aria-label={controlsOpen ? "Hide controls" : "Show controls"} data-tip={controlsOpen ? "Hide controls" : "Show controls"} onclick={() => toggleDock("controls")}>
-        <Icon name="list" size={16} />
-      </button>
-      <button type="button" class="desk-btn icon" aria-label="Reset workspace" data-tip="Reset workspace" onclick={resetWorkspace}>
-        <Icon name="reset" size={16} />
-      </button>
+      <ToolMenu label="View" tip="Panels and focus">
+        {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
+        {#snippet children(close)}
+          <button type="button" role="menuitemcheckbox" aria-checked={scenesOpen} onclick={() => toggleDock("service")}><Icon name="studio" size={16} /> Scenes</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={mediaOpen} onclick={toggleMedia}><Icon name="media" size={16} /> Media</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={controlsOpen} onclick={() => toggleDock("controls")}><Icon name="list" size={16} /> Controls</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}><Icon name="focus" size={16} /> Focus Preview and Program</button>
+          <div class="menu-sep"></div>
+          <button type="button" role="menuitem" onclick={() => { resetWorkspace(); close(); }}><Icon name="reset" size={16} /> Reset workspace</button>
+        {/snippet}
+      </ToolMenu>
       <button
         type="button"
-        class="desk-btn alerts-btn"
+        class="desk-btn icon alerts-btn"
         class:on={!!session.alert}
         aria-pressed={!!session.alert}
+        aria-label="Alerts"
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
         onclick={() => (alertsOpen = true)}
-      >Alerts</button>
-      <button type="button" class="desk-btn icon" aria-label="Settings" data-tip="Settings" onclick={() => session.openSettings("appearance")}>
-        <Icon name="settings" size={16} />
-      </button>
+      ><Icon name="alerts" size={16} /></button>
+      <ToolMenu label="More" tip="Displays, look and settings">
+        {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
+        {#snippet children(close)}
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}><Icon name="outputs" size={16} /> Displays…</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="themes" size={16} /> Look…</button>
+          <div class="menu-sep"></div>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> Settings… <span class="menu-key">⌘,</span></button>
+        {/snippet}
+      </ToolMenu>
     </nav>
   </header>
 
@@ -940,17 +946,15 @@
     padding: 6px var(--panel-pad);
     border-bottom: 1px solid var(--line);
     background: var(--panel);
-    overflow: hidden;
+    position: relative;
+    z-index: 5;
   }
-  .desk-title {
-    margin: 0;
-    flex: none;
-    font-family: var(--font-label);
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
+  /* Same three groups as the Presenter Desk: where you are, what goes out, tools. */
+  .prod-left { display: flex; align-items: center; gap: 10px; flex: none; }
+  .prod-modes { display: flex; align-items: center; gap: 2px; flex: none; padding: 3px; border: 1px solid var(--line); border-radius: calc(var(--radius-control) + 3px); background: var(--field); }
+  .prod-modes button { border: 0; background: transparent; color: var(--muted); border-radius: var(--radius-control); padding: 5px 14px; font-weight: 560; font-size: 14px; }
+  .prod-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
+  .prod-modes button.on { background: var(--accent); color: white; }
   .prod-actions {
     margin-left: auto;
     display: flex;
@@ -962,7 +966,7 @@
     z-index: 2;
     background: var(--panel);
   }
-  .prod-tools { display: flex; align-items: center; gap: 4px; flex: none; }
+  .prod-tools { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); flex: none; }
   :global(.studio) {
     width: 100%;
     height: 100%;
@@ -1184,10 +1188,4 @@
   .control-actions { display: flex; flex-wrap: wrap; gap: 4px; }
   .control-actions .desk-btn { flex: 1 1 72px; }
   .prod :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-  @media (max-width: 1440px) {
-    .desk-title { display: none; }
-  }
-  @media (max-width: 1280px) {
-    .prod-actions :global(.output-controls button:not(:first-child):not(:last-child)) { display: none; }
-  }
 </style>
