@@ -238,6 +238,43 @@
     if (first) openHit(first);
   }
 
+  /** Go back to a passage from the Recent row (Preview only). */
+  function openRecent(item: BibleItem) {
+    if (session.translations.some((entry) => entry.id === item.translationId)) translationId = item.translationId;
+    bookOrd = item.bookOrd;
+    chapter = item.chapter;
+    anchor = item.startVerse;
+    query = item.reference;
+    void showPassage(item.startVerse, item.endVerse);
+  }
+
+  let bibleInput = $state<HTMLInputElement | undefined>();
+
+  // The desk's "/" focuses the Bible search while Scriptures is open with its library showing.
+  $effect(() => {
+    if (mode !== "scriptures" || !showLibrary) return;
+    const focusBible = () => {
+      bibleInput?.focus();
+      bibleInput?.select();
+    };
+    session.localSearch = focusBible;
+    return () => {
+      if (session.localSearch === focusBible) session.localSearch = null;
+    };
+  });
+
+  /** ↑ ↓ in the search box move the picked verse; the desk's own arrows still step Preview elsewhere. */
+  function bibleKey(event: KeyboardEvent) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (verses.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const current = anchor ?? 0;
+    const next = Math.min(verses.length, Math.max(1, current + (event.key === "ArrowDown" ? 1 : -1)));
+    pick(next);
+    requestAnimationFrame(() => document.querySelector(".verse-list .verse.picked")?.scrollIntoView({ block: "nearest" }));
+  }
+
   function openHit(hit: SearchHit) {
     bookOrd = hit.bookOrd;
     chapter = hit.chapter;
@@ -475,6 +512,13 @@
   {:else}
     {#key epoch}
     <div class="pb-grid">
+      {#if !libraryVisible && !focus}
+        <button type="button" class="lib-rail" aria-label="Show library" title="Show library" onclick={() => session.togglePanel(LIBRARY_PANEL)}>
+          <Icon name="library" size={16} />
+          <span>{mode === "scriptures" ? "Scripture" : "Library"}</span>
+        </button>
+      {/if}
+      <div class="pb-panes">
       <PaneGroup direction="horizontal" onLayoutChange={onColumns}>
         {#if showLibrary}
           <Pane defaultSize={frozen.columns[0]} minSize={18} order={1}>
@@ -534,10 +578,27 @@
               </select>
               <button type="button" class="mini" aria-label="Edit reference" onclick={() => document.querySelector<HTMLInputElement>('[aria-label="Bible search"]')?.select()}>{@render icon("book")}</button>
               <button type="button" class="mini" class:on={wrapVerses} aria-label="Verse layout" onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
-              <input aria-label="Bible search" bind:value={query} />
+              <label class="bible-search">
+                <Icon name="search" size={14} />
+                <input bind:this={bibleInput} type="search" aria-label="Bible search" placeholder="John 3:16, or a book" bind:value={query} onkeydown={bibleKey} />
+                {#if query}
+                  <button type="button" class="clear" aria-label="Clear Bible search" onclick={() => { query = ""; bibleInput?.focus(); }}><Icon name="close" size={12} /></button>
+                {:else}
+                  <kbd aria-hidden="true">/</kbd>
+                {/if}
+              </label>
               <button type="button" class="mini" aria-label="Previous chapter" onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
               <button type="button" class="mini" aria-label="Next chapter" onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
+              <button type="button" class="mini" aria-label="Hide library" title="Hide library" onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
             </form>
+            {#if session.workspace.recent.length > 0}
+              <div class="recent" aria-label="Recent passages">
+                <span>Recent</span>
+                {#each session.workspace.recent.slice(0, 6) as item (`${item.translationId}:${item.reference}`)}
+                  <button type="button" class:on={passage()?.reference === item.reference} onclick={() => openRecent(item)}>{item.reference}</button>
+                {/each}
+              </div>
+            {/if}
             {#if note}<p class="script-note">{note}</p>{/if}
             <div class="verse-list" class:wrap={wrapVerses}>
               {#each verses as verse (verse.verse)}
@@ -641,6 +702,7 @@
           </div>
         </Pane>
       </PaneGroup>
+      </div>
     </div>
     {/key}
   {/if}
@@ -787,8 +849,50 @@
     flex: 1;
     min-height: 0;
     min-width: 0;
+    display: flex;
+    gap: 8px;
     padding: 0 var(--panel-pad) var(--panel-pad);
   }
+  .pb-panes { flex: 1; min-width: 0; min-height: 0; }
+  .lib-rail {
+    flex: none;
+    width: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-panel, 12px);
+    background: var(--panel);
+    color: var(--muted);
+    font: inherit;
+  }
+  .lib-rail:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .lib-rail span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .bible-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 6px 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--field);
+    color: var(--muted);
+  }
+  .bible-search:focus-within { border-color: var(--accent); color: var(--ink); }
+  .script-bar .bible-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; outline: none; }
+  .bible-search input::-webkit-search-cancel-button { display: none; }
+  .bible-search .clear { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 5px; background: var(--panel); color: var(--muted); }
+  .bible-search kbd { padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 11px; color: var(--muted); }
+  .recent { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px; overflow-x: auto; scrollbar-width: none; flex: none; }
+  .recent span { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); flex: none; }
+  .recent button { flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap; }
+  .recent button:hover { background: var(--field); }
+  .recent button.on { border-color: var(--accent); color: var(--accent); }
   .fill { height: 100%; min-width: 0; min-height: 0; }
   .pb-grid :global([data-pane-group]) { width: 100%; height: 100%; }
   .pb-grid :global([data-pane]) { min-width: 0; min-height: 0; overflow: hidden; }
