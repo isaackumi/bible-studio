@@ -25,13 +25,13 @@ export function presentScripture(
 }
 
 export function presentLyrics(
-  input: BuildBase & { label: string; lines: string[] },
+  input: BuildBase & { label: string; lines: string[]; credit?: string | null },
 ): PresentationModel {
   return {
     layout: "lyrics",
     theme: input.theme,
     reference: input.label,
-    attribution: null,
+    attribution: input.credit?.trim() || null,
     lines: input.lines.filter((line) => line.trim().length > 0).map((text) => ({ text })),
     imageUrl: null,
     backgroundImageUrl: input.backgroundImageUrl ?? null,

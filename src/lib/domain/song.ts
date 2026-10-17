@@ -20,13 +20,52 @@ export function sanitizeSong(song: Song): Song {
     sections.push({ id: section.id, kind, label, lines });
   }
   const folder = cleanFolder(song.folder);
+  const ccli = cleanCcli(song.ccli);
+  const copyright = cleanCopyright(song.copyright);
   return {
     id: song.id,
     title: song.title.trim(),
     author: song.author.trim(),
     sections,
     ...(folder ? { folder } : {}),
+    ...(ccli ? { ccli } : {}),
+    ...(copyright ? { copyright } : {}),
   };
+}
+
+/** CCLI numbers are digits; anything else (spaces, "#", "CCLI") is dropped. */
+export function cleanCcli(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\D+/g, "").slice(0, 12) : "";
+}
+
+/** A copyright line without a leading "©", "(c)" or "Copyright". */
+export function cleanCopyright(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/^\s*(©|\(c\)|copyright)\s*/i, "")
+    .trim()
+    .slice(0, 300);
+}
+
+/**
+ * The small print under a lyric slide: © line, CCLI song number and the church's license.
+ * Empty when the song has no copyright details (public-domain hymns, own songs).
+ */
+export function songCredit(song: Pick<Song, "copyright" | "ccli">, license: string): string {
+  const copyright = cleanCopyright(song.copyright);
+  const ccli = cleanCcli(song.ccli);
+  if (!copyright && !ccli) return "";
+  const lic = cleanCcli(license);
+  return [copyright ? `© ${copyright}` : "", ccli ? `CCLI Song # ${ccli}` : "", lic ? `CCLI License # ${lic}` : ""].filter(Boolean).join(" · ");
+}
+
+/** CCLI asks for the credit at the start or end of a song: show it on the first and last section. */
+export function creditFor(song: Song, sectionId: string, license: string): string | null {
+  const first = song.sections[0]?.id;
+  const last = song.sections[song.sections.length - 1]?.id;
+  if (sectionId !== first && sectionId !== last) return null;
+  return songCredit(song, license) || null;
 }
 
 /** A folder name: trimmed, single-spaced, at most 60 characters. Empty means no folder. */
@@ -78,7 +117,7 @@ export function filterSongs(songs: Song[], folder: string | null, query: string)
 
 /** A song from a lyric or ChordPro file. The title falls back to the file name. Null when no lyrics. */
 export function songFromFile(filename: string, text: string, folder: string, newId: () => string = () => crypto.randomUUID()): Song | null {
-  const parsed = parseLyrics(text, newId);
+  const parsed = parseSongFile(filename, text, newId);
   if (parsed.sections.length === 0) return null;
   const fallback = filename.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled song";
   return sanitizeSong({
@@ -87,6 +126,8 @@ export function songFromFile(filename: string, text: string, folder: string, new
     author: parsed.author?.trim() ?? "",
     sections: parsed.sections,
     folder,
+    ...(parsed.ccli ? { ccli: parsed.ccli } : {}),
+    ...(parsed.copyright ? { copyright: parsed.copyright } : {}),
   });
 }
 
@@ -158,9 +199,11 @@ const stripChords = (line: string) => line.replace(/\[[^\]]*\]/g, "").replace(/\
 export function parseLyrics(
   text: string,
   newId: () => string = () => crypto.randomUUID(),
-): { title?: string; author?: string; sections: SongSection[] } {
+): { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[] } {
   let title: string | undefined;
   let author: string | undefined;
+  let ccli: string | undefined;
+  let copyright: string | undefined;
   const blocks: Array<{ header: { kind: SongSectionKind; label: string } | null; lines: string[] }> = [];
   let current: (typeof blocks)[number] | null = null;
   const close = () => {
@@ -175,6 +218,8 @@ export function parseLyrics(
       const name = directive[1]!.toLowerCase();
       const value = (directive[2] ?? "").trim();
       if (name === "title" || name === "t") title = value || title;
+      else if (name === "ccli") ccli = cleanCcli(value) || ccli;
+      else if (name === "copyright" || name === "footer") copyright = cleanCopyright(value) || copyright;
       else if (name === "artist" || name === "subtitle" || name === "st" || name === "composer") author = author || value || undefined;
       else if (name === "start_of_chorus" || name === "soc") {
         close();
@@ -224,5 +269,79 @@ export function parseLyrics(
       : defaultLabel(kind, sections);
     sections.push({ id: newId(), kind, label, lines: block.lines });
   }
-  return { ...(title ? { title } : {}), ...(author ? { author } : {}), sections };
+  return { ...(title ? { title } : {}), ...(author ? { author } : {}), ...(ccli ? { ccli } : {}), ...(copyright ? { copyright } : {}), sections };
+}
+
+type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[] };
+
+/** Pick the reader by file name and content: SongSelect .usr, SongSelect text, else plain lyrics / ChordPro. */
+export function parseSongFile(filename: string, text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {
+  if (/\.usr$/i.test(filename) || (/^\s*\[File\]/m.test(text) && /^\s*Type\s*=\s*SongSelect/im.test(text))) return parseSongSelectUsr(text, newId);
+  if (/^\s*CCLI Song\s*#/im.test(text)) return parseSongSelectText(text, newId);
+  return parseLyrics(text, newId);
+}
+
+function sectionFor(label: string, lines: string[], existing: SongSection[], newId: () => string): SongSection {
+  const header = readHeader(label);
+  const kind = header?.kind ?? "verse";
+  return { id: newId(), kind, label: header?.label || label.trim() || defaultLabel(kind, existing), lines };
+}
+
+/**
+ * SongSelect "USR" download (INI style). Fields= names the sections and Words= holds them, both split
+ * by "/t"; lines inside a section are split by "/n". The CCLI number is in the "[S A123…]" header.
+ */
+export function parseSongSelectUsr(text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {
+  const values = new Map<string, string>();
+  let ccli = "";
+  for (const raw of text.replace(/\r\n?/g, "\n").split("\n")) {
+    const line = raw.trim();
+    const header = /^\[S\s+A?(\d+)\s*\]/i.exec(line);
+    if (header) {
+      ccli = header[1]!;
+      continue;
+    }
+    const eq = line.indexOf("=");
+    if (eq > 0) values.set(line.slice(0, eq).trim().toLowerCase(), line.slice(eq + 1).trim());
+  }
+  const labels = (values.get("fields") ?? "").split("/t");
+  const sections: SongSection[] = [];
+  (values.get("words") ?? "").split("/t").forEach((block, index) => {
+    const lines = block.split("/n").map((entry) => entry.trim()).filter(Boolean);
+    if (lines.length) sections.push(sectionFor(labels[index] ?? "", lines, sections, newId));
+  });
+  const author = (values.get("author") ?? "").split("|").map((name) => name.trim()).filter(Boolean).join(", ");
+  const copyright = cleanCopyright((values.get("copyright") ?? "").split("|").map((part) => part.trim()).filter(Boolean).join(", "));
+  const title = values.get("title")?.trim();
+  return { ...(title ? { title } : {}), ...(author ? { author } : {}), ...(ccli ? { ccli } : {}), ...(copyright ? { copyright } : {}), sections };
+}
+
+/**
+ * SongSelect lyrics text download: title, labelled sections, then a footer with "CCLI Song #",
+ * the writers, a "©" line, the terms-of-use line and the church's "CCLI License #".
+ */
+export function parseSongSelectText(text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const footerAt = lines.findIndex((line) => /^\s*CCLI Song\s*#/i.test(line));
+  const body = footerAt >= 0 ? lines.slice(0, footerAt) : lines;
+  const footer = footerAt >= 0 ? lines.slice(footerAt) : [];
+  const ccli = cleanCcli(footer[0] ?? "");
+  let author = "";
+  let copyright = "";
+  for (const raw of footer.slice(1)) {
+    const line = raw.trim();
+    if (!line || /^for use solely/i.test(line) || /^ccli licen[cs]e/i.test(line) || /^note:/i.test(line)) continue;
+    if (/^(©|\(c\)|copyright)/i.test(line)) copyright ||= cleanCopyright(line);
+    else if (!author) author = line.split("|").map((name) => name.trim()).filter(Boolean).join(", ");
+  }
+  const firstAt = body.findIndex((line) => line.trim());
+  const title = firstAt >= 0 ? body[firstAt]!.trim() : "";
+  const parsed = parseLyrics(body.slice(firstAt + 1).join("\n"), newId);
+  return {
+    ...(title ? { title } : {}),
+    ...(author ? { author } : {}),
+    ...(ccli ? { ccli } : {}),
+    ...(copyright ? { copyright } : {}),
+    sections: parsed.sections,
+  };
 }

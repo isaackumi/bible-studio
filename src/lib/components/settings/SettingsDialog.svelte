@@ -219,7 +219,7 @@
         <div>
           <h2>{page?.[1]}</h2>
           <p>
-            {#if section === "general"}The name on the logo slide.{:else if section === "system"}What works in this window, and why some things do not.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
+            {#if section === "general"}The name on the logo slide, and the CCLI license shown with songs.{:else if section === "system"}What works in this window, and why some things do not.{:else if section === "appearance"}Desk, color, and type size for this computer.{:else if section === "workspace"}How the operator desk is arranged.{:else if section === "keyboard"}Keys that drive the desk.{:else if section === "audience"}What the congregation sees.{:else if section === "displays"}Which screen is the desk, and which screen is the audience.{:else if section === "stage"}A private screen for the people on stage.{:else if section === "remote"}A paired phone is a controller, not a display.{:else if section === "bible"}Scripture on this computer.{:else if section === "lyrics"}Songs in the library.{:else if section === "media"}Pictures for backgrounds and the logo.{:else if section === "audio"}Sound and recognition.{:else if section === "storage"}A copy of the library on this device.{:else if section === "performance"}How much of the desk is on screen.{:else if section === "updates"}How this app is replaced.{:else if section === "account"}Who is signed in.{:else}How this copy of Church Studio is entitled.{/if}
           </p>
         </div>
         <button type="button" class="icon-close" aria-label="Close" onclick={close}><Icon name="close" size={16} /></button>
@@ -229,6 +229,17 @@
         <section class="card">
           <label>Church name <input class="field" bind:value={churchName} onchange={() => session.setChurchName(churchName)} /></label>
           <label>Logo text <input class="field" bind:value={logoText} onchange={() => session.setLogoText(logoText)} /></label>
+          <label>
+            CCLI license #
+            <input
+              class="field"
+              inputmode="numeric"
+              placeholder="Church Copyright License number"
+              value={session.workspace.ccliLicense}
+              onchange={(event) => session.setCcliLicense(event.currentTarget.value)}
+            />
+          </label>
+          <p class="note">Shown with each song's © line and CCLI song number on its first and last slide, as the CCLI license asks.</p>
           <p class="note">The logo picture is chosen in Media. The Logo button sends this name to Program.</p>
         </section>
       {:else if section === "system"}

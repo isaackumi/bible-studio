@@ -1,6 +1,6 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { cleanFolder, filterSongs, moveSongSection, parseLyrics, removeSongSection, songFolders } from "../../domain/song";
+  import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, songCredit, songFolders } from "../../domain/song";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
@@ -12,7 +12,7 @@
   // Songs window: library in folders, the song's sections one click from Preview, and detection
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
 
-  type Draft = { id: string; title: string; author: string; folder: string; sections: SongSection[]; isNew: boolean };
+  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; isNew: boolean };
 
   let query = $state("");
   /** null: All songs. "": Unfiled. Otherwise a folder name. */
@@ -179,9 +179,9 @@
   // Import
 
   async function importFiles(list: FileList | null, into: string) {
-    const files = [...(list ?? [])].filter((file) => /\.(txt|cho|chordpro|chopro|crd|pro|md)$/i.test(file.name) || file.type === "text/plain");
+    const files = [...(list ?? [])].filter((file) => /\.(txt|cho|chordpro|chopro|crd|pro|md|usr)$/i.test(file.name) || file.type === "text/plain");
     if (files.length === 0) {
-      note = "No lyric files found. Use .txt or ChordPro files.";
+      note = "No lyric files found. Use .txt, ChordPro or SongSelect (.usr) files.";
       return;
     }
     const read = await Promise.all(files.filter((file) => file.size <= 512 * 1024).map(async (file) => ({ name: file.name, text: await file.text() })));
@@ -212,6 +212,8 @@
       title: "",
       author: "",
       folder: targetFolder,
+      ccli: "",
+      copyright: "",
       sections: [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }],
       isNew: true,
     };
@@ -224,6 +226,8 @@
       title: song.title,
       author: song.author,
       folder: cleanFolder(song.folder),
+      ccli: song.ccli ?? "",
+      copyright: song.copyright ?? "",
       sections: song.sections.map((section) => ({ ...section, lines: [...section.lines] })),
       isNew: false,
     };
@@ -231,12 +235,12 @@
   }
 
   function asSong(value: Draft): Song {
-    return { id: value.id, title: value.title, author: value.author, folder: value.folder, sections: value.sections };
+    return { id: value.id, title: value.title, author: value.author, folder: value.folder, ccli: value.ccli, copyright: value.copyright, sections: value.sections };
   }
 
   function applyPaste() {
     if (!draft) return;
-    const parsed = parseLyrics(pasteText);
+    const parsed = parseSongFile("pasted.txt", pasteText);
     if (parsed.sections.length === 0) {
       note = "No lyrics found. Paste lines of a song, with a blank line between sections.";
       return;
@@ -244,6 +248,8 @@
     draft.sections = parsed.sections;
     if (!draft.title.trim() && parsed.title) draft.title = parsed.title;
     if (!draft.author.trim() && parsed.author) draft.author = parsed.author;
+    if (!draft.ccli.trim() && parsed.ccli) draft.ccli = parsed.ccli;
+    if (!draft.copyright.trim() && parsed.copyright) draft.copyright = parsed.copyright;
     pasteText = "";
     note = `${parsed.sections.length} section${parsed.sections.length === 1 ? "" : "s"} ready. Check the labels, then Save.`;
   }
@@ -352,10 +358,10 @@
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
       <div class="imports">
-        <button type="button" class="import" title="Lyric or ChordPro files, into the open folder" onclick={() => fileInput?.click()}>Import files</button>
+        <button type="button" class="import" title="Lyric, ChordPro or SongSelect (.usr / .txt) files, into the open folder" onclick={() => fileInput?.click()}>Import files</button>
         <button type="button" class="import" title="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
       </div>
-      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,text/plain" hidden onchange={onFiles} />
+      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 
@@ -398,6 +404,8 @@
           <input aria-label="Song title" placeholder="Title" bind:value={draft.title} />
           <input aria-label="Song author" placeholder="Author" bind:value={draft.author} />
           <input aria-label="Song folder" placeholder="Folder (optional)" list="song-folder-names" bind:value={draft.folder} />
+          <input aria-label="CCLI song number" placeholder="CCLI song # (optional)" inputmode="numeric" bind:value={draft.ccli} />
+          <input class="wide" aria-label="Copyright" placeholder="Copyright, e.g. 2015 Publisher (blank for public domain)" bind:value={draft.copyright} />
           <datalist id="song-folder-names">
             {#each folders as entry (entry.name)}<option value={entry.name}></option>{/each}
           </datalist>
@@ -407,7 +415,7 @@
           <textarea
             aria-label="Paste lyrics"
             rows="6"
-            placeholder="Blank lines split sections. “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro works too."
+            placeholder="Blank lines split sections. “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro and SongSelect lyrics (with their CCLI footer) work too."
             bind:value={pasteText}
           ></textarea>
           <button type="button" class="desk-btn" disabled={!pasteText.trim()} onclick={applyPaste}>Split into sections</button>
@@ -446,6 +454,11 @@
             <span>{selected.sections.length} section{selected.sections.length === 1 ? "" : "s"}</span>
             {#if selected.folder}<span class="chip"><Icon name="folder" size={12} />{selected.folder}</span>{/if}
           </p>
+          {#if songCredit(selected, session.workspace.ccliLicense)}
+            <p class="credit">{songCredit(selected, session.workspace.ccliLicense)}</p>
+          {:else}
+            <p class="credit none">No copyright details — fine for public-domain hymns and your own songs.</p>
+          {/if}
         </div>
         <div class="row-actions">
           <select
@@ -721,6 +734,9 @@
   /* Editor */
   .editor { display: flex; flex-direction: column; gap: 10px; }
   .fields { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; }
+  .fields .wide { grid-column: span 2; }
+  .credit { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+  .credit.none { font-style: italic; opacity: 0.8; }
   .paste { display: flex; flex-direction: column; gap: 8px; }
   .paste summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .paste textarea { width: 100%; margin: 8px 0; }

@@ -86,7 +86,7 @@ import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
-import { cleanFolder, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
+import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, defaultTheme, defaultWorkspace, emptyModel, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
@@ -941,7 +941,8 @@ class Session {
     if (item.kind === "lyric" && item.lyric) {
       const song = this.songs.find((entry) => entry.id === item.lyric?.songId);
       const lyrics = lyricsFor(song, item.lyric.sectionId, item.title);
-      return presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines });
+      const credit = song ? creditFor(song, item.lyric.sectionId, this.workspace.ccliLicense) : null;
+      return presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit });
     }
     if (item.kind === "image" && item.image) {
       return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
@@ -1742,7 +1743,7 @@ class Session {
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
     const lyrics = lyricsFor(clean, section.id, clean.title);
     this.previewModel(
-      presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines }),
+      presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit: creditFor(clean, section.id, this.workspace.ccliLicense) }),
       `song:${clean.id}:${section.id}`,
     );
   };
@@ -2182,6 +2183,11 @@ class Session {
     this.workspace = { ...this.workspace, logoAssetId: assetId };
     this.persistSoon();
     this.message = "Logo updated. Press Logo to send it to program.";
+  };
+
+  setCcliLicense = (value: string) => {
+    this.workspace = { ...this.workspace, ccliLicense: cleanCcli(value) };
+    this.persistSoon();
   };
 
   setChurchName = (churchName: string) => {

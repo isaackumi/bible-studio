@@ -3,7 +3,7 @@ import { applyProgramAction, createLiveState, frame, sameProgram, setPreview } f
 import { presentLyrics, presentScripture } from "./present";
 import { defaultTheme, sanitizeTheme } from "./theme";
 import type { Song } from "./types";
-import { filterSongs, lyricsFor, moveSongSection, parseLyrics, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFolders, songFromFile, stepSongSection } from "./song";
+import { creditFor, filterSongs, lyricsFor, parseSongFile, songCredit, moveSongSection, parseLyrics, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFolders, songFromFile, stepSongSection } from "./song";
 
 const theme = defaultTheme();
 
@@ -178,5 +178,82 @@ describe("song folders", () => {
     expect(made).toMatchObject({ title: "blessed assurance", folder: "Hymns" });
     expect(made?.sections).toHaveLength(2);
     expect(songFromFile("empty.txt", "   \n\n", "Hymns", id)).toBeNull();
+  });
+});
+
+describe("song copyright and SongSelect files", () => {
+  const ids = () => {
+    let n = 0;
+    return () => `s${++n}`;
+  };
+
+  it("keeps a clean CCLI number and copyright, and builds the credit line", () => {
+    const song = sanitizeSong({ id: "a", title: "A", author: "", sections: [{ id: "x", kind: "verse", label: "Verse 1", lines: ["l"] }], ccli: "CCLI # 1234 567", copyright: "© 2010 Example Music" });
+    expect(song.ccli).toBe("1234567");
+    expect(song.copyright).toBe("2010 Example Music");
+    expect(songCredit(song, "  99 88 ")).toBe("© 2010 Example Music · CCLI Song # 1234567 · CCLI License # 9988");
+    expect(songCredit({ copyright: "", ccli: "" }, "9988")).toBe("");
+  });
+
+  it("puts the credit on the first and last section only", () => {
+    const song: Song = {
+      id: "a",
+      title: "A",
+      author: "",
+      ccli: "1",
+      sections: ["v1", "c", "v2"].map((id) => ({ id, kind: "verse" as const, label: id, lines: ["l"] })),
+    };
+    expect(creditFor(song, "v1", "")).toBe("CCLI Song # 1");
+    expect(creditFor(song, "c", "")).toBeNull();
+    expect(creditFor(song, "v2", "")).toBe("CCLI Song # 1");
+  });
+
+  it("reads ChordPro ccli and copyright tags", () => {
+    const parsed = parseLyrics("{title: T}\n{ccli: 777}\n{copyright: 1999 Someone}\nLine one\nLine two", ids());
+    expect(parsed).toMatchObject({ title: "T", ccli: "777", copyright: "1999 Someone" });
+  });
+
+  it("reads a SongSelect .usr file", () => {
+    const usr = [
+      "[File]",
+      "Type=SongSelect Import File",
+      "Version=3.0",
+      "[S A1234567]",
+      "Title=Example Song",
+      "Author=First Writer | Second Writer",
+      "Copyright=2015 Example Publishing | Other Music",
+      "Fields=Verse 1/tChorus/tVerse 2",
+      "Words=Line a/nLine b/tChorus a/nChorus b/tLine c",
+    ].join("\r\n");
+    const parsed = parseSongFile("example.usr", usr, ids());
+    expect(parsed).toMatchObject({ title: "Example Song", author: "First Writer, Second Writer", ccli: "1234567", copyright: "2015 Example Publishing, Other Music" });
+    expect(parsed.sections.map((section) => [section.kind, section.label, section.lines.length])).toEqual([
+      ["verse", "Verse 1", 2],
+      ["chorus", "Chorus", 2],
+      ["verse", "Verse 2", 1],
+    ]);
+  });
+
+  it("reads a SongSelect lyrics text file and drops its footer from the lyrics", () => {
+    const txt = [
+      "Example Song",
+      "",
+      "Verse 1",
+      "Line a",
+      "Line b",
+      "",
+      "Chorus",
+      "Chorus a",
+      "",
+      "CCLI Song # 7654321",
+      "First Writer | Second Writer",
+      "© 2015 Example Publishing",
+      "For use solely with the SongSelect® Terms of Use. All rights reserved. www.ccli.com",
+      "CCLI License # 11111",
+    ].join("\n");
+    const song = songFromFile("whatever.txt", txt, "Worship", ids());
+    expect(song).toMatchObject({ title: "Example Song", author: "First Writer, Second Writer", ccli: "7654321", copyright: "2015 Example Publishing", folder: "Worship" });
+    expect(song?.sections.map((section) => section.label)).toEqual(["Verse 1", "Chorus"]);
+    expect(song?.sections.flatMap((section) => section.lines).join(" ")).not.toMatch(/CCLI|Terms|©/);
   });
 });

@@ -203,6 +203,10 @@ export type Song = {
   sections: SongSection[];
   /** Library folder (Hymns, Worship, Christmas…). Absent: no folder. */
   folder?: string;
+  /** CCLI song number, digits only. */
+  ccli?: string;
+  /** Copyright line as published, without the © sign (e.g. "2010 Some Publisher"). */
+  copyright?: string;
 };
 
 export type SermonSection = {
@@ -360,6 +364,8 @@ export type Workspace = {
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];
+  /** The church's CCLI Church Copyright License number, shown with song copyright. */
+  ccliLicense: string;
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */
