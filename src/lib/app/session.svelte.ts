@@ -61,6 +61,7 @@ import {
   stopCameraStream,
   type CameraDevice,
 } from "../domain/camera";
+import { broadcastRelayTransport, CameraRelaySender, relayEnabled, tauriRelayTransport } from "../display/camera-relay";
 import { importDocument as parseImportedDocument } from "../domain/import-content";
 import {
   approvePending,
@@ -230,7 +231,16 @@ class Session {
   private lastVoiceCommand = { phrase: "", at: 0 };
 
   /** Open feeds by camera source id: one per camera Preview or Program paints. */
-  cameraFeeds = $state.raw<CameraFeeds<MediaStream>>({});
+  #cameraFeeds = $state.raw<CameraFeeds<MediaStream>>({});
+  get cameraFeeds() {
+    return this.#cameraFeeds;
+  }
+  set cameraFeeds(next: CameraFeeds<MediaStream>) {
+    this.#cameraFeeds = next;
+    this.cameraRelay?.sync(next);
+  }
+  /** Streams this window's cameras to the audience window (WebKit lets one window capture a camera). */
+  private cameraRelay: CameraRelaySender | null = null;
   private openingFeeds = new Map<string, Promise<boolean>>();
   private standbySent = "";
   cameraNote = $state("");
@@ -303,6 +313,7 @@ class Session {
 
   init = async () => {
     this.ready = true;
+    void this.startCameraRelay();
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
@@ -463,6 +474,8 @@ class Session {
     this.unlistenRemote?.();
     this.unlistenLan?.();
     this.releaseCameras();
+    this.cameraRelay?.destroy();
+    this.cameraRelay = null;
     this.stopVoiceEngine?.();
     if (this.browserWatch) clearInterval(this.browserWatch);
   };
@@ -1918,6 +1931,18 @@ class Session {
         delete next[id];
       }
       this.cameraFeeds = next;
+    }
+  };
+
+  private startCameraRelay = async () => {
+    if (this.cameraRelay || typeof window === "undefined" || typeof RTCPeerConnection === "undefined") return;
+    if (!relayEnabled(this.desktop(), typeof localStorage === "undefined" ? null : localStorage)) return;
+    try {
+      const transport = this.desktop() ? await tauriRelayTransport("operator") : broadcastRelayTransport("operator");
+      this.cameraRelay = new CameraRelaySender(transport);
+      this.cameraRelay.sync(this.cameraFeeds);
+    } catch (error) {
+      console.error("Camera relay unavailable", error);
     }
   };
 

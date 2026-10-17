@@ -5,6 +5,7 @@
   import { frameBackground } from "../domain/backgrounds";
   import { cameraDeviceId, camerasIn, openCamera, planFeeds, stopCameraStream, type CameraFeeds } from "../domain/camera";
   import { acceptAudienceFrame } from "../display/output";
+  import { broadcastRelayTransport, CameraRelayReceiver, relayEnabled, tauriRelayTransport } from "../display/camera-relay";
   import { api } from "../db/api";
   import { isDesktop } from "../platform/runtime";
   import { emptyModel, defaultTheme } from "../domain/theme";
@@ -104,7 +105,35 @@
     });
   }
 
+  /** On desktop the operator window owns the cameras and relays them here (WebKit allows one capturing window). */
+  const relayed = typeof window !== "undefined" && relayEnabled(isDesktop(), typeof localStorage === "undefined" ? null : localStorage);
+
+  function relayFeed(id: string, stream: MediaStream | null) {
+    if (closed) return;
+    if (stream) {
+      feeds = { ...feeds, [id]: stream };
+      report(id, "");
+    } else if (feeds[id]) {
+      const next = { ...feeds };
+      delete next[id];
+      feeds = next;
+    }
+  }
+
+  async function startRelay(): Promise<() => void> {
+    try {
+      const transport = isDesktop() ? await tauriRelayTransport("audience") : broadcastRelayTransport("audience");
+      if (closed) return () => {};
+      const receiver = new CameraRelayReceiver(transport, relayFeed);
+      return () => receiver.destroy();
+    } catch (error) {
+      console.error("Camera relay unavailable", error);
+      return () => {};
+    }
+  }
+
   $effect(() => {
+    if (relayed) return;
     const plan = planFeeds(Object.keys(feeds), wanted());
     dropFeeds(plan.close);
     for (const id of plan.open) void openFeed(id);
@@ -130,6 +159,8 @@
       fillable = !desktop && !document.fullscreenElement;
     };
     document.addEventListener("fullscreenchange", onFullscreen);
+    let stopRelay = () => {};
+    if (relayed) void startRelay().then((stop) => (stopRelay = stop));
     if (!desktop) {
       show(readLocal());
       standby = readStandbyLocal();
@@ -137,6 +168,7 @@
       const stopStandby = subscribeStandbyLocal((ids) => (standby = ids));
       return () => {
         closed = true;
+        stopRelay();
         retries.forEach((timer) => clearTimeout(timer));
         dropFeeds(Object.keys(feeds));
         stop();
@@ -163,6 +195,7 @@
     });
     return () => {
       closed = true;
+      stopRelay();
       retries.forEach((timer) => clearTimeout(timer));
       dropFeeds(Object.keys(feeds));
       unlistenStandby();
