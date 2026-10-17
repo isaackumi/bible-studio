@@ -1,3 +1,4 @@
+import { isOpenLyrics, parseOpenLyrics } from "./openlyrics";
 import { moveInList } from "./service";
 import type { Song, SongSection, SongSectionKind } from "./types";
 
@@ -274,8 +275,9 @@ export function parseLyrics(
 
 type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[] };
 
-/** Pick the reader by file name and content: SongSelect .usr, SongSelect text, else plain lyrics / ChordPro. */
+/** Pick the reader by file name and content: OpenLyrics, SongSelect .usr, SongSelect text, else plain lyrics / ChordPro. */
 export function parseSongFile(filename: string, text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {
+  if (/\.xml$/i.test(filename) || isOpenLyrics(text)) return parseOpenLyrics(text, newId);
   if (/\.usr$/i.test(filename) || (/^\s*\[File\]/m.test(text) && /^\s*Type\s*=\s*SongSelect/im.test(text))) return parseSongSelectUsr(text, newId);
   if (/^\s*CCLI Song\s*#/im.test(text)) return parseSongSelectText(text, newId);
   return parseLyrics(text, newId);

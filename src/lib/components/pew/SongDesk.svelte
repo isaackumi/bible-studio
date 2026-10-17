@@ -1,5 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
+  import { songFileName, songToOpenLyrics } from "../../domain/openlyrics";
+  import { createZip, readZip } from "../../domain/zip";
   import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, songCredit, songFolders } from "../../domain/song";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
@@ -178,16 +180,92 @@
 
   // Import
 
+  const LYRIC_FILE = /\.(txt|cho|chordpro|chopro|crd|pro|md|usr|xml)$/i;
+
+  /** Lyric files from a pick: plain files as they are, and the lyric files inside any .zip. */
+  async function readLyricFiles(list: File[]): Promise<{ files: { name: string; text: string; dir: string }[]; zipName: string | null }> {
+    const files: { name: string; text: string; dir: string }[] = [];
+    let zipName: string | null = null;
+    const decoder = new TextDecoder();
+    for (const file of list) {
+      if (/\.zip$/i.test(file.name)) {
+        zipName ??= file.name.replace(/\.zip$/i, "");
+        try {
+          for (const entry of await readZip(new Uint8Array(await file.arrayBuffer()))) {
+            const parts = entry.name.split("/").filter(Boolean);
+            const name = parts.pop() ?? entry.name;
+            // A song in a sub-folder of the zip (Hymns/…) goes to that library folder.
+            const dir = parts.length && !parts[0]!.startsWith("__") ? parts[parts.length - 1]! : "";
+            if (LYRIC_FILE.test(name) && !name.startsWith(".") && entry.data.length <= 512 * 1024) files.push({ name, text: decoder.decode(entry.data), dir });
+          }
+        } catch (error) {
+          note = error instanceof Error ? `${file.name}: ${error.message}` : `${file.name} could not be opened.`;
+        }
+      } else if ((LYRIC_FILE.test(file.name) || file.type === "text/plain") && file.size <= 512 * 1024) {
+        files.push({ name: file.name, text: await file.text(), dir: "" });
+      }
+    }
+    return { files, zipName };
+  }
+
   async function importFiles(list: FileList | null, into: string) {
-    const files = [...(list ?? [])].filter((file) => /\.(txt|cho|chordpro|chopro|crd|pro|md|usr)$/i.test(file.name) || file.type === "text/plain");
+    const { files, zipName } = await readLyricFiles([...(list ?? [])]);
     if (files.length === 0) {
-      note = "No lyric files found. Use .txt, ChordPro or SongSelect (.usr) files.";
+      note ||= "No lyric files found. Use .txt, ChordPro, SongSelect (.usr) or OpenLyrics (.xml / .zip) files.";
       return;
     }
-    const read = await Promise.all(files.filter((file) => file.size <= 512 * 1024).map(async (file) => ({ name: file.name, text: await file.text() })));
-    const result = await session.importSongFiles(read, into);
-    note = session.message;
-    if (result.added && into) folder = into;
+    // The open folder wins; otherwise a zip's own sub-folders, then the zip's name (a "Songs" export has none).
+    const fallback = zipName && !/^(songs|all songs|recent|unfiled)$/i.test(zipName) ? zipName : "";
+    const groups = new Map<string, { name: string; text: string }[]>();
+    for (const file of files) {
+      const target = into || file.dir || fallback;
+      groups.set(target, [...(groups.get(target) ?? []), { name: file.name, text: file.text }]);
+    }
+    let added = 0;
+    const skipped: string[] = [];
+    for (const [target, group] of groups) {
+      const result = await session.importSongFiles(group, target);
+      added += result.added;
+      skipped.push(...result.skipped);
+    }
+    const only = groups.size === 1 ? [...groups.keys()][0]! : "";
+    note = `${added} song${added === 1 ? "" : "s"} imported${only ? ` to ${only}` : groups.size > 1 ? ` into ${groups.size} folders` : ""}.${skipped.length ? ` ${skipped.length} file${skipped.length === 1 ? "" : "s"} had no lyrics.` : ""}`;
+    if (added && only) folder = only;
+  }
+
+  // Export: OpenLyrics, one .xml per song; several songs go out as one .zip.
+
+  function save(name: string, data: BlobPart, type: string) {
+    const url = URL.createObjectURL(new Blob([data], { type }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportSong(song: Song) {
+    save(songFileName(song), songToOpenLyrics(song), "application/xml");
+    note = `${song.title} exported as OpenLyrics.`;
+  }
+
+  function exportList() {
+    if (visible.length === 0) return;
+    const encoder = new TextEncoder();
+    const used = new Set<string>();
+    // Exporting more than one folder keeps each song in a sub-folder named after its library folder.
+    const nested = folder === null || folder === RECENT;
+    const safe = (text: string) => text.replace(/[^\w\s-]+/g, "").replace(/\s+/g, " ").trim();
+    const entries = visible.map((song) => {
+      const dir = nested && cleanFolder(song.folder) ? `${safe(cleanFolder(song.folder))}/` : "";
+      let name = `${dir}${songFileName(song)}`;
+      for (let n = 2; used.has(name.toLowerCase()); n += 1) name = `${dir}${songFileName({ title: `${song.title} ${n}` })}`;
+      used.add(name.toLowerCase());
+      return { name, data: encoder.encode(songToOpenLyrics(song)) };
+    });
+    const zip = createZip(entries);
+    save(`${nested ? "Songs" : safe(listTitle) || "Songs"}.zip`, zip.slice().buffer, "application/zip");
+    note = `${entries.length} song${entries.length === 1 ? "" : "s"} exported as OpenLyrics (.zip).`;
   }
 
   async function onFiles(event: Event) {
@@ -358,10 +436,11 @@
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
       <div class="imports">
-        <button type="button" class="import" title="Lyric, ChordPro or SongSelect (.usr / .txt) files, into the open folder" onclick={() => fileInput?.click()}>Import files</button>
+        <button type="button" class="import" title="Lyrics, ChordPro, SongSelect (.usr/.txt) or OpenLyrics (.xml/.zip), into the open folder" onclick={() => fileInput?.click()}>Import files</button>
         <button type="button" class="import" title="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
+        <button type="button" class="import" disabled={visible.length === 0} title={`Save these ${visible.length} songs as OpenLyrics (.zip) — opens in OpenLP, FreeShow and others`} onclick={exportList}>Export</button>
       </div>
-      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,text/plain" hidden onchange={onFiles} />
+      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,.xml,.zip,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 
@@ -471,6 +550,7 @@
           </select>
           <button type="button" class="desk-btn" onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> Queue</button>
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> Edit</button>
+          <button type="button" class="desk-btn ghost" data-tip="Save as OpenLyrics (.xml)" onclick={() => exportSong(selected)}>Export</button>
           <button
             type="button"
             class="desk-btn ghost icon"
@@ -651,7 +731,8 @@
     font-size: 12px;
     font-weight: 600;
   }
-  .import:hover { color: var(--ink); background: var(--field); }
+  .import:hover:not(:disabled) { color: var(--ink); background: var(--field); }
+  .import:disabled { opacity: 0.4; }
   .songs { list-style: none; margin: 0; padding: 4px 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .song {
     width: 100%;
