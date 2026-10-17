@@ -12,3 +12,6 @@ vite.config.ts.timestamp-*
 
 # Logs written into the repo root by other tools
 *.log
+
+# Test screenshots
+sweep/
