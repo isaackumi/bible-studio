@@ -9,11 +9,11 @@
   import type { DeskStyle, DisplayAssignment, OperatorTheme, OutputMode, OutputRole } from "../../domain/types";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { canUse } from "../../platform/capabilities";
-  import { isDesktop } from "../../platform/runtime";
+  import { isDesktop, openExternal } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
-  import { FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
+  import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
 
   type SettingsSectionId =
@@ -891,6 +891,8 @@
                 <span class="plan-cta muted">Always free</span>
               {:else if plan.id === "premium" && ent.plan === "free" && !ent.trialUsed}
                 <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => session.startTrial()}>Start free trial</button>
+              {:else if checkoutUrl(plan.id, billing)}
+                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => void openExternal(checkoutUrl(plan.id, billing, session.workspace.profile?.email)!)}>Buy {plan.name}</button>
               {:else}
                 <button type="button" class="btn plan-cta" disabled title="Purchasing is coming soon">Upgrade · coming soon</button>
               {/if}

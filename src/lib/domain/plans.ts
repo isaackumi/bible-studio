@@ -67,6 +67,28 @@ export const PLANS: Plan[] = [
 
 export const TRIAL_DAYS = 14;
 
+export type Billing = "monthly" | "yearly";
+
+/**
+ * Paddle checkout links for each paid plan. Paste each hosted-checkout link from
+ * Paddle › Checkout › Hosted checkouts here; a plan with no link shows "coming soon".
+ * After payment the license server (server/paddle.ts) emails the buyer a key.
+ */
+export const CHECKOUT: Record<Exclude<PlanId, "free">, Record<Billing, string | null>> = {
+  premium: { monthly: null, yearly: null },
+  church: { monthly: null, yearly: null },
+};
+
+/** The checkout link for a plan, with the buyer's email filled in when known. */
+export function checkoutUrl(plan: PlanId, billing: Billing, email?: string | null, links = CHECKOUT): string | null {
+  if (plan === "free") return null;
+  const link = links[plan][billing];
+  if (!link) return null;
+  const url = new URL(link);
+  if (email) url.searchParams.set("user_email", email);
+  return url.toString();
+}
+
 export type EntitlementSource = "free" | "trial" | "promo" | "license";
 
 export type Entitlement = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { licenseKeyPair, signLicense } from "./license";
-import { dropToFree, effectivePlan, freeEntitlement, redeemCode, yearlyDeal, planFor, planIncludes, sanitizeEntitlement, startTrial, trialActive, trialDaysLeft } from "./plans";
+import { checkoutUrl, dropToFree, effectivePlan, freeEntitlement, redeemCode, yearlyDeal, planFor, planIncludes, sanitizeEntitlement, startTrial, trialActive, trialDaysLeft } from "./plans";
 
 const DAY = 86_400_000;
 const now = Date.parse("2026-10-17T12:00:00Z");
@@ -81,6 +81,13 @@ describe("license keys, test codes and prices", () => {
     const stretched = launch.ok ? { ...launch.entitlement, expiresAt: new Date(now + 900 * DAY).toISOString() } : freeEntitlement();
     expect(Date.parse(sanitizeEntitlement(stretched, opts).expiresAt!)).toBeLessThanOrEqual(now + 30 * DAY);
     expect(launch.ok && dropToFree(launch.entitlement)).toMatchObject({ plan: "free", source: "free", code: null, license: null });
+  });
+
+  it("builds checkout links only for plans that have one", () => {
+    const links = { premium: { monthly: null, yearly: "https://pay.paddle.io/hsc_01test" }, church: { monthly: null, yearly: null } };
+    expect(checkoutUrl("premium", "yearly", "pastor@grace.org", links)).toBe("https://pay.paddle.io/hsc_01test?user_email=pastor%40grace.org");
+    expect(checkoutUrl("premium", "monthly", null, links)).toBeNull();
+    expect(checkoutUrl("free", "yearly", null, links)).toBeNull();
   });
 
   it("shows the yearly saving", () => {

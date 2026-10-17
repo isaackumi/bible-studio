@@ -117,8 +117,7 @@ export function signLicense(
   const id = fields.id ?? crypto.getRandomValues(new Uint8Array(4));
   const body = payload({ plan: fields.plan, until: fields.until ?? null, days: fields.days ?? null, holder: fields.holder ?? "", id });
   const signature = ed.sign(body, fromHex(secretKeyHex));
-  const text = PREFIX + toBase32(new Uint8Array([...body, ...signature]));
-  return text.match(/.{1,5}/g)!.join("-");
+  return `${PREFIX}-${toBase32(new Uint8Array([...body, ...signature])).match(/.{1,5}/g)!.join("-")}`;
 }
 
 /** Read and check a key. Null when it is malformed or not signed by Church Studio. */

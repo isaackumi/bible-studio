@@ -333,6 +333,7 @@ pub fn run() {
     voice::relaunch_inside_bundle();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(Output::default())
         .setup(|app| {
             let database = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;

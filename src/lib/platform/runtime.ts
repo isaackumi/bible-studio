@@ -37,3 +37,14 @@ export function platformCapabilities(desktop = isDesktop()): PlatformCapabilitie
     audienceOutput: desktop ? "native-window" : "browser-window",
   };
 }
+
+/** Open a web page in the system browser (checkout, help). Only http(s) links. */
+export async function openExternal(url: string): Promise<void> {
+  if (!/^https?:\/\//i.test(url)) return;
+  if (isDesktop()) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener");
+}
