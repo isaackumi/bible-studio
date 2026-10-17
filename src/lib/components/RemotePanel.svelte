@@ -2,6 +2,10 @@
   import QRCode from "qrcode";
   import { session } from "../app/session.svelte";
   import { isDesktop } from "../platform/runtime";
+  import { commandUrl, REMOTE_COMMANDS } from "../domain/remote";
+
+  let keyName = $state("");
+  let newKey = $state<string | null>(null);
 
   let qr = $state("");
   let now = $state(Date.now());
@@ -104,9 +108,39 @@
   {/if}
 {/if}
 
+<p class="section-label">Stream Deck and other controllers</p>
+<section class="rows">
+  <form class="row" onsubmit={async (event) => { event.preventDefault(); newKey = await session.createControllerKey(keyName); keyName = ""; }}>
+    <div class="row-copy"><strong>Add a controller</strong><span>Bitfocus Companion (Stream Deck), MIDI bridges and scripts press buttons by opening a link. Each controller gets its own key.</span></div>
+    <div class="row-end">
+      <input class="field" aria-label="Controller name" placeholder="Stream Deck" bind:value={keyName} />
+      <button type="submit" class="btn primary" disabled={!isDesktop()}>Create key</button>
+    </div>
+  </form>
+  {#if newKey && session.remoteLanUrl}
+    <div class="row links">
+      <div class="row-copy"><strong>Links for your buttons</strong><span>Copy them now: the key is not shown again. In Companion use a Generic HTTP "GET" action.</span></div>
+      <ul class="cmd-list">
+        {#each REMOTE_COMMANDS as command (command)}
+          {@const url = commandUrl(session.remoteLanUrl, command, newKey)}
+          <li><code>{command}</code><button type="button" class="btn small" onclick={() => void navigator.clipboard?.writeText(url)}>Copy link</button></li>
+        {/each}
+      </ul>
+    </div>
+  {:else if !isDesktop()}
+    <div class="row"><div class="row-copy"><span>Controllers work with the desktop app, which runs the network server.</span></div></div>
+  {/if}
+  {#each session.remoteDevices.filter((device) => device.controller) as device (device.id)}
+    <div class="row">
+      <div class="row-copy"><strong>{device.name}</strong><span>{device.lastSeen ? `Last used ${ago(device.lastSeen)}` : "Not used yet"} · never signs out</span></div>
+      <button type="button" class="btn danger" aria-label={armed === device.id ? `Confirm remove ${device.name}` : `Remove ${device.name}`} onclick={() => removeDevice(device.id)}>{armed === device.id ? "Remove? Its buttons stop" : "Remove"}</button>
+    </div>
+  {/each}
+</section>
+
 <p class="section-label">Paired phones</p>
 <section class="rows">
-  {#each session.remoteDevices as device (device.id)}
+  {#each session.remoteDevices.filter((device) => !device.controller) as device (device.id)}
     <div class="row">
       <div class="row-copy"><strong>{device.name}</strong><span>Last seen {ago(device.lastSeen)} · signs out after 12 h idle</span></div>
       <button
@@ -130,5 +164,9 @@
   .step { font-size: 12px; color: var(--muted); }
   .url { font-size: 14px; word-break: break-all; }
   .code { margin: 2px 0 6px; font: 700 32px/1.1 var(--font-ui); letter-spacing: 0.2em; }
+  .links { flex-direction: column; align-items: stretch !important; }
+  .cmd-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+  .cmd-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .cmd-list code { font-size: 12px; }
   .error { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, #ff5a5a 14%, transparent); color: #ff8a8a; font-size: 13px; }
 </style>

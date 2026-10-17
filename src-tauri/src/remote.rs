@@ -166,6 +166,7 @@ fn serve(mut stream: TcpStream, app: &AppHandle, lan: &LanRemote) {
 struct HttpRequest {
     method: String,
     path: String,
+    query: String,
     body: Vec<u8>,
 }
 
@@ -203,10 +204,14 @@ fn parse_http(buf: &[u8]) -> Parsed {
         return Parsed::Partial;
     }
     // Route on the path only; the QR pairing token travels in the query.
-    let path = target.split('?').next().unwrap_or("/").to_string();
+    let (path, query) = match target.split_once('?') {
+        Some((path, query)) => (path.to_string(), query.to_string()),
+        None => (target.to_string(), String::new()),
+    };
     Parsed::Complete(HttpRequest {
         method: method.to_string(),
         path,
+        query,
         body: rest[..length].to_vec(),
     })
 }
@@ -216,30 +221,74 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
         write_http(stream, 200, "text/html; charset=utf-8", PAD.as_bytes());
         return;
     }
+    // Controllers (Stream Deck via Companion, scripts): GET /v1/command/<id>?token=…
+    // becomes the same command message a phone sends, checked by the desk the same way.
+    if let Some(command) = req.path.strip_prefix("/v1/command/") {
+        let token = query_value(&req.query, "token").unwrap_or_default();
+        let body = json!({ "v": 2, "type": "command", "payload": { "id": command, "token": token } });
+        forward(stream, app, lan, body);
+        return;
+    }
     // Every remote message, including reading Program, is checked by the desk (token hash).
     if req.method == "POST" && req.path == "/v1/remote" {
         let Ok(body) = serde_json::from_slice::<Value>(&req.body) else {
             write_http(stream, 400, "text/plain", b"Bad request");
             return;
         };
-        let id = Uuid::new_v4().to_string();
-        let (tx, rx) = mpsc::channel();
-        lock(&lan.pending).insert(id.clone(), tx);
-        if app.emit("remote-in", json!({ "id": id, "envelope": body })).is_err() {
-            lock(&lan.pending).remove(&id);
-            write_http(stream, 503, "text/plain", b"Desk unavailable");
-            return;
-        }
-        match rx.recv_timeout(Duration::from_secs(3)) {
-            Ok(reply) => write_json(stream, reply),
-            Err(_) => {
-                lock(&lan.pending).remove(&id);
-                write_http(stream, 503, "text/plain", b"Desk unavailable");
-            }
-        }
+        forward(stream, app, lan, body);
         return;
     }
     write_http(stream, 404, "text/plain", b"Not found");
+}
+
+/// One query value, percent-decoded ("token=ab%2Bc" → "ab+c").
+fn query_value(query: &str, name: &str) -> Option<String> {
+    query.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=')?;
+        if key != name {
+            return None;
+        }
+        let bytes = value.as_bytes();
+        let mut out = Vec::with_capacity(bytes.len());
+        let mut index = 0;
+        while index < bytes.len() {
+            match bytes[index] {
+                b'%' if index + 2 < bytes.len() => {
+                    let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok()?;
+                    out.push(u8::from_str_radix(hex, 16).ok()?);
+                    index += 3;
+                }
+                b'+' => {
+                    out.push(b' ');
+                    index += 1;
+                }
+                byte => {
+                    out.push(byte);
+                    index += 1;
+                }
+            }
+        }
+        String::from_utf8(out).ok()
+    })
+}
+
+/// Hand a remote message to the desk and wait briefly for its reply.
+fn forward(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, body: Value) {
+    let id = Uuid::new_v4().to_string();
+    let (tx, rx) = mpsc::channel();
+    lock(&lan.pending).insert(id.clone(), tx);
+    if app.emit("remote-in", json!({ "id": id, "envelope": body })).is_err() {
+        lock(&lan.pending).remove(&id);
+        write_http(stream, 503, "text/plain", b"Desk unavailable");
+        return;
+    }
+    match rx.recv_timeout(Duration::from_secs(3)) {
+        Ok(reply) => write_json(stream, reply),
+        Err(_) => {
+            lock(&lan.pending).remove(&id);
+            write_http(stream, 503, "text/plain", b"Desk unavailable");
+        }
+    }
 }
 
 fn write_json(stream: &mut TcpStream, value: Value) {
@@ -275,6 +324,14 @@ mod tests {
             Parsed::Partial => panic!("partial"),
             Parsed::Invalid => panic!("invalid"),
         }
+    }
+
+    #[test]
+    fn reads_a_controller_link() {
+        let req = complete(b"GET /v1/command/next?token=ab%2Bc+d&x=1 HTTP/1.1\r\nHost: x\r\n\r\n");
+        assert_eq!(req.path, "/v1/command/next");
+        assert_eq!(query_value(&req.query, "token").as_deref(), Some("ab+c d"));
+        assert_eq!(query_value(&req.query, "missing"), None);
     }
 
     #[test]

@@ -89,6 +89,7 @@ import {
 } from "../domain/remote";
 import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
+import { controllerDevice } from "../domain/remote";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
@@ -807,6 +808,21 @@ class Session {
     this.message = `${name} removed. It can no longer control this desk.`;
   };
 
+  /**
+   * A key for Stream Deck (Bitfocus Companion), scripts or other controllers. Only its hash is
+   * stored; the key itself is returned once to show the operator. Starts the network server.
+   */
+  createControllerKey = async (name: string): Promise<string | null> => {
+    if (!this.requireFeature("phone-remote")) return null;
+    const token = randomToken(24);
+    const device = controllerDevice(crypto.randomUUID(), name.trim() || "Stream Deck", await sha256Hex(token), Date.now());
+    const gate = this.remoteGate();
+    this.applyRemoteGate({ ...gate, devices: [...gate.devices, device] }, true);
+    if (this.desktop() && !this.remoteLanUrl) await this.attachLanRemote(true);
+    this.message = `${device.name} can now control this desk. Copy its links now; the key is shown only once.`;
+    return token;
+  };
+
   stopRemoteLan = async () => {
     this.closeRemotePairing();
     try {
@@ -928,7 +944,11 @@ class Session {
   };
 
   /** Next/Previous move Preview only (songs, sermon sections, verses, then the rundown). */
-  private runFromRemote = async (command: CommandId) => {
+  private runFromRemote = async (command: CommandId | "next-item" | "previous-item") => {
+    if (command === "next-item" || command === "previous-item") {
+      await this.stepItem(command === "next-item" ? 1 : -1);
+      return;
+    }
     if (command === "next" || command === "previous") {
       const direction = command === "next" ? 1 : -1;
       if (this.sermonFocus && (await this.stepSermon(direction))) return;

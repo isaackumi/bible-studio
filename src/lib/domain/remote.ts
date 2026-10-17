@@ -17,7 +17,7 @@ export const REMOTE_PENDING_MS = 2 * 60 * 1000;
 export const REMOTE_SESSION_MS = 12 * 60 * 60 * 1000;
 export const REMOTE_LAN_PORT = 17891;
 
-export const REMOTE_COMMANDS = ["take", "cut", "next", "previous", "clear", "black", "logo", "timer-pause", "timer-resume", "timer-reset"] as const;
+export const REMOTE_COMMANDS = ["take", "cut", "next", "previous", "next-item", "previous-item", "clear", "black", "logo", "timer-pause", "timer-resume", "timer-reset"] as const;
 export type RemoteCommandId = (typeof REMOTE_COMMANDS)[number];
 /** These change Program. Next/Previous only move Preview. */
 export const REMOTE_LIVE_COMMANDS: readonly RemoteCommandId[] = ["take", "cut", "clear", "black", "logo", "timer-pause", "timer-resume", "timer-reset"];
@@ -31,6 +31,8 @@ export type RemoteDevice = {
   pairedAt: number;
   lastSeen: number;
   expiresAt: number;
+  /** A controller key (Stream Deck, Companion, scripts): made in Settings, never expires. */
+  controller?: boolean;
 };
 
 export type RemotePending = {
@@ -126,7 +128,7 @@ export function pruneRemoteGate(gate: RemoteGate, now: number): RemoteGate {
   return {
     pairing: gate.pairing && gate.pairing.expiresAt > now ? gate.pairing : null,
     pending: gate.pending.filter((entry) => now - entry.at < REMOTE_PENDING_MS),
-    devices: gate.devices.filter((device) => device.expiresAt > now),
+    devices: gate.devices.filter((device) => device.controller || device.expiresAt > now),
   };
 }
 
@@ -205,7 +207,7 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
 
   const device = ctx.tokenHash ? gate.devices.find((entry) => entry.tokenHash === ctx.tokenHash) : undefined;
   if (!device) return deny(gate, "unauthorized", "This phone is not paired, or the desk removed it. Pair again.");
-  const seen: RemoteDevice = { ...device, lastSeen: ctx.now, expiresAt: ctx.now + REMOTE_SESSION_MS };
+  const seen: RemoteDevice = { ...device, lastSeen: ctx.now, expiresAt: device.controller ? device.expiresAt : ctx.now + REMOTE_SESSION_MS };
   const next = { ...gate, devices: gate.devices.map((entry) => (entry.id === device.id ? seen : entry)) };
   const ok = (action: RemoteAction, type = "state"): RemoteRoute => ({
     gate: next,
@@ -269,6 +271,7 @@ export function sanitizeRemoteDevices(value: unknown): RemoteDevice[] {
         pairedAt: number(record.pairedAt),
         lastSeen: number(record.lastSeen),
         expiresAt: number(record.expiresAt),
+        ...(record.controller === true ? { controller: true } : {}),
       },
     ];
   });
@@ -294,4 +297,16 @@ export function framePayload(
       .join("\n")
       .slice(0, 600),
   };
+}
+
+/** A controller key: stored by hash like a phone, but never expires. The token is shown once. */
+export function controllerDevice(id: string, name: string, tokenHash: string, now: number): RemoteDevice {
+  return { id, name: deviceName(name) || "Controller", tokenHash, pairedAt: now, lastSeen: 0, expiresAt: Number.MAX_SAFE_INTEGER, controller: true };
+}
+
+/** A one-click link for a controller button: GET /v1/command/<id>?token=… */
+export function commandUrl(base: string, command: RemoteCommandId, token: string): string {
+  const url = new URL(`/v1/command/${command}`, base);
+  url.searchParams.set("token", token);
+  return url.toString();
 }

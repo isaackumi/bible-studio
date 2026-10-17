@@ -138,3 +138,20 @@ describe("remote wire format", () => {
     expect(framePayload("program", { layout: "black", reference: null, attribution: null, lines: [] })).toMatchObject({ programCue: "Black", programLayout: "black" });
   });
 });
+
+describe("controller keys (Stream Deck, scripts)", async () => {
+  const { controllerDevice, commandUrl, pruneRemoteGate, routeRemote, remoteEnvelope } = await import("./remote");
+  it("never expire, and run commands like a paired phone", () => {
+    const device = controllerDevice("c1", "Stream Deck", "a".repeat(64), 1000);
+    const gate = pruneRemoteGate({ pairing: null, pending: [], devices: [device] }, 10 ** 13);
+    expect(gate.devices).toHaveLength(1);
+    const routed = routeRemote(gate, remoteEnvelope("command", { id: "next-item", token: "x" }), { now: 5000, tokenHash: "a".repeat(64), newId: () => "n", newSecret: () => "s" });
+    expect(routed.action).toEqual({ kind: "command", id: "next-item" });
+    expect(routed.gate.devices[0]?.expiresAt).toBe(device.expiresAt);
+    expect(routeRemote(gate, remoteEnvelope("command", { id: "next", token: "y" }), { now: 5000, tokenHash: "b".repeat(64), newId: () => "n", newSecret: () => "s" }).action).toBeNull();
+  });
+
+  it("builds one-click button links", () => {
+    expect(commandUrl("http://192.168.1.20:17891/", "take", "ab+c")).toBe("http://192.168.1.20:17891/v1/command/take?token=ab%2Bc");
+  });
+});
