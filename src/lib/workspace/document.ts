@@ -6,7 +6,7 @@ import { sanitizeRemoteDevices } from "../domain/remote";
 import { sanitizeVoiceSettings } from "../voice/commands";
 import { sanitizeDeck } from "../domain/decks";
 import { cleanCcli, sanitizeFolderNames } from "../domain/song";
-import { sanitizeEntitlement } from "../domain/plans";
+import { sanitizeEntitlement, sanitizeProfile } from "../domain/plans";
 import { defaultWorkspace } from "../domain/theme";
 import { factoryLayouts, normalizeLayout } from "./layout";
 import { defaultShortcuts } from "../keyboard/manager";
@@ -116,6 +116,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     songFolders: sanitizeFolderNames(value.songFolders),
     ccliLicense: cleanCcli(value.ccliLicense),
     entitlement: sanitizeEntitlement(value.entitlement),
+    profile: sanitizeProfile(value.profile),
     installedPacks: Array.isArray(value.installedPacks) ? value.installedPacks.filter((id): id is string => typeof id === "string").slice(0, 200) : [],
   };
 }

@@ -12,7 +12,7 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
-  import { FEATURE_LABELS, PLANS, planById, TRIAL_DAYS } from "../../domain/plans";
+  import { FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import OutputType from "../OutputType.svelte";
 
   type SettingsSectionId =
@@ -103,6 +103,12 @@
   const ALIASES: Partial<Record<string, SettingsSectionId>> = { license: "account", performance: "appearance" };
 
   let search = $state("");
+  let billing = $state<"monthly" | "yearly">("yearly");
+  let code = $state("");
+  let codeError = $state("");
+  let signInName = $state("");
+  let signInEmail = $state("");
+  let signInError = $state("");
   const visibleGroups = $derived.by(() => {
     const needle = search.trim().toLowerCase();
     return groups
@@ -253,10 +259,17 @@
   <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="settings-title">
     <nav class="settings-nav" aria-label="Settings">
       <button type="button" class="account-card" class:active={section === "account"} onclick={() => (section = "account")}>
-        <span class="set-brand-mark" style:background={session.workspace.appearance.accent}><Icon name="church" size={18} /></span>
+        {#if session.workspace.profile}
+          <span class="set-brand-mark avatar-mark" style:background={planById(session.plan).color}>{initials(session.workspace.profile.name)}</span>
+        {:else}
+          <span class="set-brand-mark" style:background={session.workspace.appearance.accent}><Icon name="church" size={18} /></span>
+        {/if}
         <span class="account-copy">
-          <strong id="settings-title">{session.workspace.churchName || "Church Studio"}</strong>
-          <span>{planById(session.plan).name}{session.trialDays > 0 ? ` trial · ${session.trialDays}d left` : ""} · Plan & account</span>
+          <strong id="settings-title">{session.workspace.profile?.name || session.workspace.churchName || "Church Studio"}</strong>
+          <span>
+            <b class="plan-chip" style:color={planById(session.plan).color}>{planById(session.plan).name}{session.trialDays > 0 && session.workspace.entitlement.plan === "free" ? " trial" : ""}</b>
+            · {session.workspace.profile ? session.workspace.churchName || "Plan & account" : "Sign in"}
+          </span>
         </span>
         <Icon name="chevron-right" size={14} />
       </button>
@@ -737,29 +750,95 @@
       {:else if section === "account"}
         {@const current = planById(session.plan)}
         {@const ent = session.workspace.entitlement}
+        {@const profile = session.workspace.profile}
+        <section class="rows">
+          {#if profile}
+            <div class="row">
+              <div class="row-lead">
+                <span class="avatar" style:background={current.color}>{initials(profile.name)}</span>
+                <div class="row-copy"><strong>{profile.name}</strong><span>{profile.email} · signed in on this computer</span></div>
+              </div>
+              <div class="row-end">
+                <span class="pill" style:background={`color-mix(in srgb, ${current.color} 20%, transparent)`} style:color={current.color}>{current.name}</span>
+                <button type="button" class="btn" onclick={() => session.signOut()}>Sign out</button>
+              </div>
+            </div>
+          {:else}
+            <form
+              class="row stack"
+              onsubmit={(event) => {
+                event.preventDefault();
+                signInError = session.signIn(signInName, signInEmail) ?? "";
+              }}
+            >
+              <div class="row-copy"><strong>Sign in</strong><span>Your name and email, kept on this computer. Online accounts arrive with purchasing and cloud sync.</span></div>
+              <div class="sign-in">
+                <input class="field grow" aria-label="Your name" placeholder="Your name" autocomplete="name" bind:value={signInName} />
+                <input class="field grow" aria-label="Email" placeholder="you@church.org" type="email" autocomplete="email" bind:value={signInEmail} />
+                <button type="submit" class="btn primary" disabled={!signInEmail.trim()}>Sign in</button>
+              </div>
+              {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
+              {#if import.meta.env.DEV}
+                <button
+                  type="button"
+                  class="link"
+                  onclick={() => {
+                    session.signIn("Test User", "test@churchstudio.app");
+                    session.redeemCode("PREMIUM-TEST");
+                  }}
+                >Development: sign in as a Premium test user</button>
+              {/if}
+            </form>
+          {/if}
+        </section>
+
         <section class="plan-hero" style:--plan={current.color}>
           <span class="plan-badge"><Icon name="key" size={20} /></span>
           <div class="head-copy">
             <p class="eyebrow">Your plan</p>
-            <h3>{current.name}{#if session.trialDays > 0}<span class="pill">Trial · {session.trialDays} day{session.trialDays === 1 ? "" : "s"} left</span>{/if}</h3>
+            <h3>
+              {current.name}
+              {#if session.trialDays > 0 && ent.plan === "free"}<span class="pill">Trial · {session.trialDays} day{session.trialDays === 1 ? "" : "s"} left</span>
+              {:else if ent.source === "promo" && session.plan !== "free"}<span class="pill">Code {ent.code}{ent.expiresAt ? ` · until ${new Date(ent.expiresAt).toLocaleDateString()}` : ""}</span>{/if}
+            </h3>
             <p>{current.tagline}</p>
           </div>
           {#if ent.plan === "free" && !ent.trialUsed}
-            <button type="button" class="btn primary" onclick={() => session.startTrial()}>Try Premium free for {TRIAL_DAYS} days</button>
+            <button type="button" class="btn primary" onclick={() => session.startTrial()}>Try Premium free · {TRIAL_DAYS} days</button>
+          {:else if ent.source === "promo" && session.plan !== "free"}
+            <button type="button" class="btn" onclick={() => session.useFreePlan()}>Return to Free</button>
           {/if}
         </section>
-        {#if ent.trialUsed && session.trialDays === 0 && ent.plan === "free"}
+        {#if ent.trialUsed && session.trialDays === 0 && session.plan === "free"}
           <p class="note stand">Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.</p>
         {/if}
-        <p class="section-label">Compare plans</p>
+
+        <div class="pricing-head">
+          <p class="section-label">Plans</p>
+          <div class="billing" role="radiogroup" aria-label="Billing">
+            <button type="button" role="radio" aria-checked={billing === "monthly"} class:on={billing === "monthly"} onclick={() => (billing = "monthly")}>Monthly</button>
+            <button type="button" role="radio" aria-checked={billing === "yearly"} class:on={billing === "yearly"} onclick={() => (billing = "yearly")}>Yearly <em>save {yearlyDeal(PLANS[1]!.price).savePercent}%</em></button>
+          </div>
+        </div>
         <div class="plan-grid">
           {#each PLANS as plan, i (plan.id)}
-            <article class="plan-card" class:current={plan.id === session.plan} style:--plan={plan.color}>
+            {@const deal = yearlyDeal(plan.price)}
+            <article class="plan-card" class:current={plan.id === session.plan} class:popular={plan.popular} style:--plan={plan.color}>
+              {#if plan.popular}<span class="ribbon">Most popular</span>{/if}
               <header>
                 <strong>{plan.name}</strong>
                 {#if plan.id === session.plan}<span class="pill ok">Current</span>{/if}
               </header>
-              <p>{plan.tagline}</p>
+              <p class="price">
+                {#if plan.price.monthly === 0}
+                  <b>$0</b><span>forever</span>
+                {:else if billing === "monthly"}
+                  <b>${plan.price.monthly}</b><span>/ month</span>
+                {:else}
+                  <b>${deal.perMonth}</b><span>/ month, billed ${plan.price.yearly} a year</span>
+                {/if}
+              </p>
+              <p class="tag">{plan.tagline}</p>
               {#if i > 0}<p class="plus">Everything in {PLANS[i - 1]!.name}, plus</p>{/if}
               <ul>
                 {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
@@ -769,22 +848,36 @@
                   </li>
                 {/each}
               </ul>
-              {#if plan.id === "free"}
-                <span class="plan-cta muted">Included</span>
-              {:else if plan.id === session.plan && session.trialDays === 0}
-                <span class="plan-cta muted">Active</span>
+              {#if plan.id === session.plan}
+                <span class="plan-cta muted">Your plan</span>
+              {:else if plan.id === "free"}
+                <span class="plan-cta muted">Always free</span>
+              {:else if plan.id === "premium" && ent.plan === "free" && !ent.trialUsed}
+                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => session.startTrial()}>Start free trial</button>
               {:else}
                 <button type="button" class="btn plan-cta" disabled title="Purchasing is coming soon">Upgrade · coming soon</button>
               {/if}
             </article>
           {/each}
         </div>
-        <p class="section-label">Account</p>
+        <p class="note stand">Prices are placeholders while pricing is decided. Your songs, sermons and settings stay yours on every plan.</p>
+
+        <p class="section-label">Promo code</p>
         <section class="rows">
-          <div class="row">
-            <div class="row-copy"><strong>Sign in</strong><span>Accounts arrive with purchasing and cloud sync. Church Studio works fully offline without one.</span></div>
-            <span class="pill muted">Offline</span>
-          </div>
+          <form
+            class="row"
+            onsubmit={(event) => {
+              event.preventDefault();
+              codeError = session.redeemCode(code) ?? "";
+              if (!codeError) code = "";
+            }}
+          >
+            <div class="row-copy"><strong>Redeem a code</strong><span>{codeError || "A code from Church Studio unlocks a plan on this computer."}</span></div>
+            <div class="row-end">
+              <input class="field" aria-label="Promo code" placeholder="CODE" autocapitalize="characters" bind:value={code} />
+              <button type="submit" class="btn primary" disabled={!code.trim()}>Redeem</button>
+            </div>
+          </form>
         </section>
       {:else}
         <section class="rows">
@@ -1013,6 +1106,27 @@
   .status-card p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .lamp { width: 12px; height: 12px; border-radius: 50%; background: var(--line); flex: none; }
   .lamp.on { background: var(--presence, #3fb950); box-shadow: 0 0 0 5px color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); }
+
+  /* Account */
+  .avatar, .avatar-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.02em; }
+  .avatar-mark { border-radius: 50%; }
+  .plan-chip { font-weight: 700; }
+  .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sign-in .field { min-width: 160px; }
+  .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
+  .pricing-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 6px; }
+  .billing { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
+  .billing button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .billing button.on { background: var(--ink); color: var(--panel); }
+  .billing em { margin-left: 4px; font-style: normal; color: var(--presence, #3fb950); }
+  .billing button.on em { color: inherit; opacity: 0.8; }
+  .plan-card { position: relative; }
+  .plan-card.popular { border-color: color-mix(in srgb, var(--plan) 60%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--plan) 10%, var(--field)), var(--field) 45%); }
+  .ribbon { position: absolute; top: -10px; right: 12px; padding: 2px 10px; border-radius: 999px; background: var(--plan); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+  .price { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 0; min-height: 0 !important; }
+  .price b { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .price span { font-size: 12px; color: var(--muted); }
+  .plan-card > p.tag { min-height: 34px; }
 
   /* Plans */
   .plan-hero { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid color-mix(in srgb, var(--plan) 50%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--plan) 18%, var(--field)), var(--field) 70%); flex: none; }

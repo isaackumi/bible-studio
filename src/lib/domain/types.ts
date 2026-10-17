@@ -370,6 +370,8 @@ export type Workspace = {
   installedPacks: string[];
   /** Plan on this computer (Free, a Premium trial, or a purchased plan). See domain/plans. */
   entitlement: import("./plans").Entitlement;
+  /** Who is signed in on this computer (local until accounts are online). */
+  profile: { name: string; email: string } | null;
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */

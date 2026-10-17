@@ -87,7 +87,7 @@ import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
-import { effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
+import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
@@ -1813,6 +1813,39 @@ class Session {
     if (this.entitled(feature)) return true;
     this.upgradeFor = feature;
     return false;
+  };
+
+  /** Local sign-in: name and email on this computer until accounts are online. */
+  signIn = (name: string, email: string): string | null => {
+    if (!validEmail(email)) return "Type a valid email address.";
+    this.workspace = { ...this.workspace, profile: sanitizeProfile({ name, email }) };
+    this.persistSoon();
+    this.message = `Signed in as ${this.workspace.profile?.name}.`;
+    return null;
+  };
+
+  signOut = () => {
+    this.workspace = { ...this.workspace, profile: null };
+    this.persistSoon();
+    this.message = "Signed out. Your library stays on this computer.";
+  };
+
+  /** Redeem a promo code. Returns an error to show, or null on success. */
+  redeemCode = (code: string): string | null => {
+    const result = redeemCode(this.workspace.entitlement, code);
+    if (!result.ok) return result.error;
+    this.workspace = { ...this.workspace, entitlement: result.entitlement };
+    this.planClock = Date.now();
+    this.persistSoon();
+    this.message = `Code accepted: ${result.note}.`;
+    return null;
+  };
+
+  /** Return to Free (for testing plans, or ending a promo). */
+  useFreePlan = () => {
+    this.workspace = { ...this.workspace, entitlement: dropToFree(this.workspace.entitlement) };
+    this.persistSoon();
+    this.message = "Now on Free.";
   };
 
   startTrial = () => {
