@@ -57,6 +57,10 @@
     if (!file) return;
     try {
       if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") await session.importPdf(file);
+      else if (/\.(pptx|ppt|key)$/i.test(file.name)) {
+        const id = await session.importPowerPoint(file);
+        if (id) editingDeckId = id;
+      }
       else await session.importDocument(file.name, await file.text());
       note = session.message;
     } catch (error) {
@@ -74,7 +78,7 @@
     <input
       bind:this={slideImport}
       type="file"
-      accept=".txt,.md,.markdown,.text,.pdf,text/plain,text/markdown,application/pdf"
+      accept=".txt,.md,.markdown,.text,.pdf,.pptx,text/plain,text/markdown,application/pdf"
       hidden
       aria-label="Import text or Markdown"
       onchange={(event) => void importSlides(event)}

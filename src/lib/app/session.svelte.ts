@@ -717,6 +717,41 @@ class Session {
     return items.length;
   };
 
+  /** A PowerPoint file becomes an editable slide deck; its pictures go into the media library. */
+  importPowerPoint = async (file: File): Promise<string | null> => {
+    const name = file.name.replace(/\.pptx$/i, "") || "Presentation";
+    if (/\.(ppt|key)$/i.test(file.name)) {
+      this.message = "Save it as a .pptx (PowerPoint) or a PDF, then import it. Older .ppt and Keynote files cannot be read directly.";
+      return null;
+    }
+    try {
+      const { parsePptx, pptxMediaFiles, pptxToDeck } = await import("../domain/pptx");
+      this.message = `Reading ${file.name}…`;
+      const presentation = await parsePptx(new Uint8Array(await file.arrayBuffer()));
+      const imported = new Map<string, { id: string; name: string; url: string }>();
+      const pictures = pptxMediaFiles(presentation);
+      for (const [index, picture] of pictures.entries()) {
+        this.message = `Importing ${file.name}: picture ${index + 1} of ${pictures.length}…`;
+        const asset = await api.importMediaBytes(`${name} ${picture.name}`, new Blob([picture.data as BlobPart], { type: picture.mime }));
+        this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
+        const url = mediaUrl(asset);
+        if (url) imported.set(picture.path, { id: asset.id, name: asset.name, url });
+      }
+      const deck = pptxToDeck(presentation, name, (path) => imported.get(path) ?? null);
+      if (deck.pages.length === 0) {
+        this.message = `${file.name} has no slides to import.`;
+        return null;
+      }
+      this.saveDeck(deck);
+      const skipped = presentation.slides.length > deck.pages.length ? ` (first ${deck.pages.length})` : "";
+      this.message = `Imported ${deck.pages.length} slide${deck.pages.length === 1 ? "" : "s"} from ${file.name}${skipped} as the deck “${deck.name}”. Tables, charts and SmartArt are not brought over.`;
+      return deck.id;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : `${file.name} could not be imported.`;
+      return null;
+    }
+  };
+
   remotePageUrl = () => {
     if (this.remoteLanUrl) return this.remoteLanUrl;
     if (typeof location === "undefined") return "/?remote=1";
