@@ -21,6 +21,8 @@
   import Copy from "@lucide/svelte/icons/copy";
   import Laptop from "@lucide/svelte/icons/laptop";
   import Check from "@lucide/svelte/icons/check";
+  import Download from "@lucide/svelte/icons/download";
+  import Trash from "@lucide/svelte/icons/trash-2";
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import PanelsTopLeft from "@lucide/svelte/icons/panels-top-left";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
@@ -122,6 +124,8 @@
     copy: Copy,
     laptop: Laptop,
     check: Check,
+    download: Download,
+    trash: Trash,
     phone: Smartphone,
     view: PanelsTopLeft,
   };

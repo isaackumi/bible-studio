@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch } from "../bible/texts";
+import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch, browserInstalledBibles, browserInstallBible, browserRemoveBible } from "../bible/texts";
 import { browserMedia } from "../platform/browser-media";
 import { browserLibrary } from "../platform/browser-store";
 import type { LibrarySnapshot } from "../platform/library";
@@ -79,7 +79,12 @@ export const api = {
     if (typeof source === "string") return Promise.reject(new Error("This browser import needs the image file, not a path."));
     return browserMedia.importFile(source);
   },
-  translations: () => (desktop() ? invoke<TranslationInfo[]>("bible_translations") : Promise.resolve(BUNDLED_TRANSLATIONS)),
+  translations: () =>
+    desktop()
+      ? invoke<TranslationInfo[]>("bible_translations")
+      : Promise.resolve(BUNDLED_TRANSLATIONS.filter((entry) => browserInstalledBibles().includes(entry.id))),
+  bibleInstall: (id: string) => (desktop() ? invoke<void>("bible_install", { id }) : browserInstallBible(id)),
+  bibleRemove: (id: string) => (desktop() ? invoke<void>("bible_remove", { id }) : Promise.resolve(browserRemoveBible(id))),
   books: (translationId: string) =>
     desktop()
       ? invoke<BookInfo[]>("bible_books", { translationId })

@@ -23,7 +23,7 @@ pub fn open(app: &AppHandle) -> Result<Db, String> {
     Ok(Db(Mutex::new(conn)))
 }
 
-fn resource_dir(app: &AppHandle) -> PathBuf {
+pub fn resource_dir(app: &AppHandle) -> PathBuf {
     if let Ok(path) = app
         .path()
         .resolve("resources/kjv.json", tauri::path::BaseDirectory::Resource)

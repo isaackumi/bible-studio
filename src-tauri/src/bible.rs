@@ -31,11 +31,38 @@ const BUNDLED: &[BundledTranslation] = &[
     BundledTranslation { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", file: "bbe.json" },
 ];
 
+/// Installed on first launch. The rest are installed on request (Settings → Bible).
+const DEFAULT_IDS: &[&str] = &["kjv", "web"];
+
 pub fn seed_bundled_translations(conn: &Connection, resource_dir: &Path) -> Result<(), String> {
-    for translation in BUNDLED {
+    for translation in BUNDLED.iter().filter(|t| DEFAULT_IDS.contains(&t.id)) {
         seed_translation_if_needed(conn, resource_dir, translation)?;
     }
     Ok(())
+}
+
+/// Install one translation from the app's resources. Already installed: nothing to do.
+pub fn install_translation(conn: &Connection, resource_dir: &Path, id: &str) -> Result<(), String> {
+    let translation = BUNDLED
+        .iter()
+        .find(|t| t.id == id)
+        .ok_or_else(|| format!("{id} is not in the catalog"))?;
+    seed_translation_if_needed(conn, resource_dir, translation)
+}
+
+/// Remove a translation's verses. The last installed translation cannot be removed.
+pub fn remove_translation(conn: &Connection, id: &str) -> Result<(), String> {
+    let installed: i64 = conn
+        .query_row("SELECT COUNT(*) FROM bible_translations", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if installed <= 1 {
+        return Err("Keep at least one translation installed.".into());
+    }
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM bible_verses WHERE translation_id = ?1", params![id]).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM bible_books WHERE translation_id = ?1", params![id]).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM bible_translations WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
 }
 
 fn seed_translation_if_needed(

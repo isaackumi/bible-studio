@@ -1793,6 +1793,33 @@ class Session {
 
   songPacks = $state<SongPack[]>([]);
 
+  /** Translation ids being downloaded (installed) right now. */
+  bibleBusy = $state<string[]>([]);
+
+  installBible = async (id: string) => {
+    if (this.bibleBusy.includes(id)) return;
+    this.bibleBusy = [...this.bibleBusy, id];
+    try {
+      await api.bibleInstall(id);
+      this.translations = await api.translations();
+      this.message = `${this.translations.find((entry) => entry.id === id)?.name ?? id} is ready.`;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : "That translation could not be downloaded.";
+    } finally {
+      this.bibleBusy = this.bibleBusy.filter((entry) => entry !== id);
+    }
+  };
+
+  removeBible = async (id: string) => {
+    try {
+      await api.bibleRemove(id);
+      this.translations = await api.translations();
+      this.message = "Translation removed. Download it again any time.";
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : "That translation could not be removed.";
+    }
+  };
+
   // Plans. `now` ticks once a minute so a trial ends on time without a restart.
   planClock = $state(Date.now());
   /** The feature an upgrade prompt is explaining, or null when no prompt is open. */

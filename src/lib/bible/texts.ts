@@ -20,6 +20,58 @@ export const BUNDLED_TRANSLATIONS: TranslationInfo[] = [
   { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", licenseNote: "Public domain", source: "bundled" },
 ];
 
+/** Every translation the app can install. `default` ones are installed on first launch. Sizes are the download. */
+export type CatalogEntry = TranslationInfo & { default: boolean; sizeMb: number; language: string };
+
+export const BIBLE_CATALOG: CatalogEntry[] = [
+  { ...BUNDLED_TRANSLATIONS[0]!, default: true, sizeMb: 4.2, language: "English" },
+  { ...BUNDLED_TRANSLATIONS[2]!, default: true, sizeMb: 4.2, language: "English" },
+  { ...BUNDLED_TRANSLATIONS[1]!, default: false, sizeMb: 4.2, language: "English" },
+  { ...BUNDLED_TRANSLATIONS[3]!, default: false, sizeMb: 4.2, language: "English" },
+];
+
+export const DEFAULT_BIBLES = BIBLE_CATALOG.filter((entry) => entry.default).map((entry) => entry.id);
+
+const INSTALLED_KEY = "church-studio.bibles";
+
+/** Browser: which translations this browser has installed (kept in localStorage; defaults when unset). */
+export function browserInstalledBibles(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(INSTALLED_KEY) ?? "null");
+    if (Array.isArray(saved)) {
+      const known = saved.filter((id): id is string => typeof id === "string" && BIBLE_CATALOG.some((entry) => entry.id === id));
+      if (known.length) return known;
+    }
+  } catch {
+    // No storage: defaults.
+  }
+  return [...DEFAULT_BIBLES];
+}
+
+function saveBrowserInstalled(ids: string[]) {
+  try {
+    localStorage.setItem(INSTALLED_KEY, JSON.stringify(ids));
+  } catch {
+    // Not saved; the defaults come back next time.
+  }
+}
+
+/** Browser install: fetch the translation (the real download) and mark it installed. */
+export async function browserInstallBible(id: string): Promise<void> {
+  if (!LOADERS[id]) throw new Error(`${id} is not in the catalog.`);
+  cache.delete(id);
+  const books = await load(id);
+  if (books.length === 0) throw new Error("The download was empty.");
+  saveBrowserInstalled([...new Set([...browserInstalledBibles(), id])]);
+}
+
+export function browserRemoveBible(id: string): void {
+  const next = browserInstalledBibles().filter((entry) => entry !== id);
+  if (next.length === 0) throw new Error("Keep at least one translation installed.");
+  cache.delete(id);
+  saveBrowserInstalled(next);
+}
+
 function load(id: string): Promise<SourceBook[]> {
   const existing = cache.get(id);
   if (existing) return existing;

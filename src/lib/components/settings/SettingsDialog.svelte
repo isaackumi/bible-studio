@@ -12,6 +12,7 @@
   import { isDesktop } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+  import { BIBLE_CATALOG } from "../../bible/texts";
   import { FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import OutputType from "../OutputType.svelte";
 
@@ -652,17 +653,42 @@
         {#if fileMessage}<p class="note stand">{fileMessage}</p>{/if}
         <p class="note stand">Pictures and videos import in Media. Songs import and export in the Songs window.</p>
       {:else if section === "bible"}
+        {@const installedIds = session.translations.map((entry) => entry.id)}
+        <p class="section-label">On this computer</p>
         <section class="rows">
-          {#each session.translations as translation (translation.id)}
+          {#each BIBLE_CATALOG.filter((entry) => installedIds.includes(entry.id)) as entry (entry.id)}
             <div class="row">
-              <div class="row-lead"><span class="row-icon"><Icon name="bible" size={16} /></span><div class="row-copy"><strong>{translation.name}</strong><span>{translation.licenseNote ?? "Public domain"}</span></div></div>
-              <span class="pill">{translation.abbreviation}</span>
+              <div class="row-lead">
+                <span class="bible-badge">{entry.abbreviation}</span>
+                <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? "Public domain"}{entry.default ? " · included" : ""}</span></div>
+              </div>
+              <div class="row-end">
+                <span class="pill ok"><Icon name="check" size={11} /> Installed</span>
+                {#if installedIds.length > 1}
+                  <button type="button" class="btn icon-btn" aria-label={`Remove ${entry.name}`} title="Remove from this computer" onclick={() => void session.removeBible(entry.id)}><Icon name="trash" size={14} /></button>
+                {/if}
+              </div>
             </div>
-          {:else}
-            <div class="row"><div class="row-copy"><strong>Loading translations…</strong></div></div>
           {/each}
         </section>
-        <p class="note stand">Scripture is stored on this computer. Search, Listen and the next verse stay on Preview until LIVE.</p>
+        {#if BIBLE_CATALOG.some((entry) => !installedIds.includes(entry.id))}
+          <p class="section-label">Available to download</p>
+          <section class="rows">
+            {#each BIBLE_CATALOG.filter((entry) => !installedIds.includes(entry.id)) as entry (entry.id)}
+              {@const busy = session.bibleBusy.includes(entry.id)}
+              <div class="row">
+                <div class="row-lead">
+                  <span class="bible-badge muted">{entry.abbreviation}</span>
+                  <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? "Public domain"} · {entry.sizeMb} MB</span></div>
+                </div>
+                <button type="button" class="btn" class:primary={!busy} disabled={busy} onclick={() => void session.installBible(entry.id)}>
+                  {#if busy}<span class="spinner" aria-hidden="true"></span> Downloading…{:else}<Icon name="download" size={14} /> Download{/if}
+                </button>
+              </div>
+            {/each}
+          </section>
+        {/if}
+        <p class="note stand">King James and the World English Bible come with Church Studio. Download others when you need them; scripture stays on this computer, and Search, Listen and the next verse stay on Preview until LIVE.</p>
       {:else if section === "lyrics"}
         <section class="rows">
           <div class="row">
@@ -1106,6 +1132,13 @@
   .status-card p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .lamp { width: 12px; height: 12px; border-radius: 50%; background: var(--line); flex: none; }
   .lamp.on { background: var(--presence, #3fb950); box-shadow: 0 0 0 5px color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); }
+
+  /* Bible */
+  .bible-badge { display: grid; place-items: center; min-width: 42px; height: 30px; padding: 0 6px; flex: none; border-radius: 8px; background: color-mix(in srgb, #a07a52 25%, var(--panel)); color: #e7c9a3; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
+  .bible-badge.muted { background: var(--panel); color: var(--muted); }
+  .icon-btn { width: 32px !important; padding: 0 !important; }
+  .spinner { width: 12px; height: 12px; border: 2px solid color-mix(in srgb, var(--ink) 25%, transparent); border-top-color: var(--ink); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* Account */
   .avatar, .avatar-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.02em; }

@@ -239,6 +239,17 @@ fn bible_translations(db: State<Db>) -> Result<Vec<Value>, String> {
 }
 
 #[tauri::command]
+fn bible_install(app: AppHandle, db: State<Db>, id: String) -> Result<(), String> {
+    let resources = db::resource_dir(&app);
+    with_db(&db, |conn| bible::install_translation(conn, &resources, &id))
+}
+
+#[tauri::command]
+fn bible_remove(db: State<Db>, id: String) -> Result<(), String> {
+    with_db(&db, |conn| bible::remove_translation(conn, &id))
+}
+
+#[tauri::command]
 fn bible_books(db: State<Db>, translation_id: String) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| bible::books(conn, &translation_id))
 }
@@ -357,6 +368,8 @@ pub fn run() {
             import_media,
             import_media_bytes,
             bible_translations,
+            bible_install,
+            bible_remove,
             bible_books,
             bible_verses,
             bible_passage,

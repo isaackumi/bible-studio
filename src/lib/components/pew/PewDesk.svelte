@@ -573,7 +573,19 @@
         {#if mode === "scriptures"}
           <section class="pb-panel scriptures">
             <form class="script-bar" onsubmit={lookup}>
-              <select bind:value={translationId} aria-label="Translation">
+              <select
+                value={translationId}
+                aria-label="Translation"
+                onchange={(event) => {
+                  const value = event.currentTarget.value;
+                  if (value === "__more") {
+                    event.currentTarget.value = translationId;
+                    session.openSettings("bible");
+                    return;
+                  }
+                  translationId = value;
+                }}
+              >
                 {#if session.translations.length === 0}
                   <option value="kjv">KJV</option>
                 {:else}
@@ -581,6 +593,7 @@
                     <option value={translation.id}>{translation.abbreviation}</option>
                   {/each}
                 {/if}
+                <option value="__more">More translations…</option>
               </select>
               <button type="button" class="mini" aria-label="Edit reference" onclick={() => document.querySelector<HTMLInputElement>('[aria-label="Bible search"]')?.select()}>{@render icon("book")}</button>
               <button type="button" class="mini" class:on={wrapVerses} aria-label="Verse layout" onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
