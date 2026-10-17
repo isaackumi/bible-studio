@@ -327,6 +327,38 @@ fn remote_reply(lan: State<Arc<remote::LanRemote>>, id: String, envelope: Value)
     remote::reply(&lan, id, envelope);
 }
 
+/// The desktop crash log (Rust panics), for a problem report. Empty when nothing crashed.
+#[tauri::command]
+fn crash_log(app: tauri::AppHandle) -> String {
+    use tauri::Manager;
+    app.path()
+        .app_log_dir()
+        .ok()
+        .and_then(|dir| std::fs::read_to_string(dir.join("crash.log")).ok())
+        .map(|text| text.chars().rev().take(8000).collect::<Vec<_>>().into_iter().rev().collect())
+        .unwrap_or_default()
+}
+
+/// Write any panic to crash.log in the app's log folder, so a church can send it in.
+fn record_panics(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let Ok(dir) = app.path().app_log_dir() else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    let file = dir.join("crash.log");
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let when = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|time| time.as_secs())
+            .unwrap_or(0);
+        let line = format!("[{when}] {info}\n");
+        if let Ok(mut log) = std::fs::OpenOptions::new().create(true).append(true).open(&file) {
+            let _ = std::io::Write::write_all(&mut log, line.as_bytes());
+        }
+        previous(info);
+    }));
+}
+
 /// GET JSON from Planning Center for the Services import. Only that API host is allowed, and
 /// the response is returned as text whatever the status (its error bodies explain the problem).
 #[tauri::command]
@@ -364,6 +396,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(Output::default())
         .setup(|app| {
+            record_panics(app.handle());
             let database = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;
             app.manage(database);
             displays::place_operator(app.handle());
@@ -374,6 +407,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             pco_get,
+            crash_log,
             output_status,
             open_audience,
             close_audience,

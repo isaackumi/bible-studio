@@ -15,6 +15,8 @@
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { usageCsv, usageReport, type UsageRow } from "../../domain/song-usage";
   import type { PcoPlan } from "../../integrations/pco";
+  import { invoke } from "@tauri-apps/api/core";
+  import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
@@ -115,6 +117,27 @@
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
+
+  // Problem reports.
+  let problems = $state(readProblems());
+
+  async function saveProblemReport() {
+    const crashLog = isDesktop() ? await invoke<string>("crash_log").catch(() => "") : "";
+    const report = problemReport({
+      version: "0.1.0",
+      platform: isDesktop() ? "Desktop app" : "Browser",
+      userAgent: navigator.userAgent,
+      counts: { songs: session.songs.length, services: session.services.length, sermons: session.sermons.length, decks: session.decks.length, media: session.media.length },
+      problems: readProblems(),
+      crashLog,
+    });
+    const url = URL.createObjectURL(new Blob([report], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Church Studio problem report ${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   // Planning Center.
   let pcoApp = $state(session.workspace.pco.appId);
@@ -1002,6 +1025,16 @@
           <div class="row">
             <div class="row-copy"><strong>First-run setup</strong><span>Walk through church name, look, scripture and voice again.</span></div>
             <button type="button" class="btn" onclick={() => session.restartOnboarding()}>Run setup again</button>
+          </div>
+        </section>
+        <p class="section-label">Problem reports</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>{problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} noted on this computer` : "No problems noted"}</strong><span>If something went wrong, save a report and send it to Church Studio support. It holds the errors and a few counts, never your songs, sermons or notes. Nothing is sent by itself.</span></div>
+            <div class="row-end">
+              <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> Save report</button>
+              {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>Clear</button>{/if}
+            </div>
           </div>
         </section>
       {:else if section === "account"}
