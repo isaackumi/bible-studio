@@ -2,7 +2,7 @@ import { defaultTimerSounds } from "./timer-cues";
 import { defaultSwitcher } from "../integrations/switcher";
 import { defaultBroadcast } from "./broadcast";
 import { emptyTourProgress } from "../tour/steps";
-import { displayWash, motionById } from "./backgrounds";
+import { displayWash, motionById, sanitizeBackdrop } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
 import { SCREEN_FONTS } from "./fonts";
 import { factoryLayouts } from "../workspace/layout";
@@ -66,6 +66,7 @@ export function sanitizeTheme(theme: Theme): Theme {
     transition: sanitizeTransition(theme.transition),
     effects: sanitizeEffects(theme.effects),
     dim: typeof theme.dim === "number" && Number.isFinite(theme.dim) ? Math.min(0.8, Math.max(0, theme.dim)) : undefined,
+    backdrop: sanitizeBackdrop(theme.backdrop),
     premium: theme.premium === true ? true : undefined,
     panel: sanitizePanel(theme.panel),
   };

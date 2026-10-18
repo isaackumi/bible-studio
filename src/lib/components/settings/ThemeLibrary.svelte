@@ -1,11 +1,11 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
   import { mediaUrl } from "../../db/api";
-  import { DISPLAY_WASHES, MOTIONS, gradientCss } from "../../domain/backgrounds";
+  import { DEFAULT_BACKDROP, DISPLAY_WASHES, MOTIONS, gradientCss } from "../../domain/backgrounds";
   import { SCREEN_FONTS } from "../../domain/fonts";
   import { presentScripture } from "../../domain/present";
   import { factoryThemes } from "../../domain/theme";
-  import type { PresentationModel, Theme, ThemeBackground, ThemePanelStyle } from "../../domain/types";
+  import type { BackdropLook, PresentationModel, Theme, ThemeBackground, ThemePanelStyle } from "../../domain/types";
   import { isDesktop } from "../../platform/runtime";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
@@ -79,6 +79,10 @@
   function patch(change: Partial<Theme>) {
     if (!session.requireFeature("theme-library")) return;
     session.saveTheme({ ...$state.snapshot(selected), ...change } as Theme);
+  }
+
+  function setLook(change: Partial<BackdropLook>) {
+    patch({ backdrop: { ...DEFAULT_BACKDROP, ...selected?.backdrop, ...change } });
   }
 
   function setBackground(background: ThemeBackground) {
@@ -348,6 +352,35 @@
           <div class="row-copy"><strong>{t("Darken")}</strong><span>{t("{percent}%: helps words read over photos, video and animation.", { percent: Math.round((selected.dim ?? 0) * 100) })}</span></div>
           <input type="range" min="0" max="80" step="5" aria-label={t("Darken background")} value={Math.round((selected.dim ?? 0) * 100)} onchange={(event) => patch({ dim: Number(event.currentTarget.value) / 100 })} />
         </div>
+        {#if selected.background.type === "image" || selected.background.type === "video"}
+          {@const look = { ...DEFAULT_BACKDROP, ...selected.backdrop }}
+          <div class="row">
+            <div class="row-copy"><strong>{t("Fit")}</strong><span>{look.fit === "contain" ? t("The whole picture shows; the edges may stay dark.") : look.fit === "stretch" ? t("Fills the screen without cropping; the picture may look stretched.") : t("Fills the screen; the edges may be cropped.")}</span></div>
+            <div class="seg" role="radiogroup" aria-label={t("Fit")}>
+              {#each [["cover", t("Fill")], ["contain", t("Whole")], ["stretch", t("Stretch")]] as [fit, label] (fit)}
+                <button type="button" role="radio" aria-checked={look.fit === fit} class:on={look.fit === fit} onclick={() => setLook({ fit: fit as typeof look.fit })}>{label}</button>
+              {/each}
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Zoom")}</strong><span>{Math.round(look.scale * 100)}%</span></div>
+            <input type="range" min="100" max="250" step="5" aria-label={t("Background zoom")} value={Math.round(look.scale * 100)} oninput={(event) => setLook({ scale: Number(event.currentTarget.value) / 100 })} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Blur")}</strong><span>{look.blur ? t("{px} px: a soft picture keeps the words clear.", { px: Math.round(look.blur) }) : t("Sharp")}</span></div>
+            <input type="range" min="0" max="40" step="1" aria-label={t("Background blur")} value={look.blur} oninput={(event) => setLook({ blur: Number(event.currentTarget.value) })} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Colour over it")}</strong><span>{look.tintOpacity ? t("{percent}% of the colour over the picture.", { percent: Math.round(look.tintOpacity * 100) }) : t("A wash of your church colour over the picture. Off at 0.")}</span></div>
+            <div class="row-end">
+              <input type="color" class="swatch-input" aria-label={t("Overlay colour")} value={look.tint} onchange={(event) => setLook({ tint: event.currentTarget.value })} />
+              <input type="range" min="0" max="80" step="5" aria-label={t("Overlay strength")} value={Math.round(look.tintOpacity * 100)} oninput={(event) => setLook({ tintOpacity: Number(event.currentTarget.value) / 100 })} />
+            </div>
+          </div>
+          {#if selected.backdrop}
+            <div class="row"><div class="row-copy"><span>{t("Back to the picture as it is.")}</span></div><button type="button" class="btn" onclick={() => patch({ backdrop: undefined })}>{t("Reset picture")}</button></div>
+          {/if}
+        {/if}
       </section>
     {:else if tab === "text"}
       <section class="rows">

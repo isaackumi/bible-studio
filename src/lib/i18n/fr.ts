@@ -2517,4 +2517,21 @@ export const fr: Readonly<Record<string, string>> = {
   "Going live": "Diffusion",
   "Sound & devices": "Son et appareils",
   "Connected services": "Services connectés",
+
+  // Background look
+  "The whole picture shows; the edges may stay dark.": "Toute l’image s’affiche ; les bords peuvent rester sombres.",
+  "Fills the screen without cropping; the picture may look stretched.": "Remplit l’écran sans recadrer ; l’image peut paraître étirée.",
+  "Fills the screen; the edges may be cropped.": "Remplit l’écran ; les bords peuvent être recadrés.",
+  Whole: "Entière",
+  "Background zoom": "Zoom du fond",
+  Blur: "Flou",
+  "{px} px: a soft picture keeps the words clear.": "{px} px : une image douce garde le texte lisible.",
+  Sharp: "Net",
+  "Background blur": "Flou du fond",
+  "Colour over it": "Couleur par-dessus",
+  "{percent}% of the colour over the picture.": "{percent} % de la couleur sur l’image.",
+  "A wash of your church colour over the picture. Off at 0.": "Un voile de la couleur de votre église sur l’image. Désactivé à 0.",
+  "Overlay colour": "Couleur du voile",
+  "Back to the picture as it is.": "Revenir à l’image telle quelle.",
+  "Reset picture": "Réinitialiser l’image",
 };

@@ -256,6 +256,8 @@ button { cursor: pointer; }
 /* Theme background layers sit behind the words (MotionBackground, video, darkening). */
 .frame .backdrop-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .frame .backdrop-dim { position: absolute; inset: 0; background: #000; pointer-events: none; }
+.frame .backdrop-image { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; pointer-events: none; }
+.frame .backdrop-tint { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: normal; }
 .frame.wash .line, .frame.wash .ref, .frame.wash .attr { text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); }
 .frame.wash.light .line, .frame.wash.light .ref, .frame.wash.light .attr { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
 .frame.drift { background-size: 160% 160%; animation: wash-drift 22s ease-in-out infinite alternate; }

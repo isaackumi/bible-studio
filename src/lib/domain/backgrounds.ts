@@ -1,4 +1,4 @@
-import type { MotionId, PresentationModel, ThemeBackground } from "./types";
+import type { BackdropLook, MotionId, PresentationModel, ThemeBackground } from "./types";
 
 /** Animated scenes, drawn in CSS by MotionBackground. Each takes a tint over a base color. */
 export const MOTIONS: { id: MotionId; name: string; tint: string; base: string }[] = [
@@ -69,3 +69,35 @@ export function frameBackground(model: PresentationModel, nested = false): strin
   if (model.theme.background.type === "color") return model.theme.background.color;
   return nested ? "transparent" : "#050505";
 }
+
+export const DEFAULT_BACKDROP: BackdropLook = { fit: "cover", scale: 1, blur: 0, tint: "#000000", tintOpacity: 0 };
+
+export function sanitizeBackdrop(value: unknown): BackdropLook | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Partial<BackdropLook>;
+  const number = (raw: unknown, min: number, max: number, fallback: number) => (typeof raw === "number" && Number.isFinite(raw) ? Math.min(max, Math.max(min, raw)) : fallback);
+  const look: BackdropLook = {
+    fit: record.fit === "contain" || record.fit === "stretch" ? record.fit : "cover",
+    scale: number(record.scale, 1, 3, 1),
+    blur: number(record.blur, 0, 40, 0),
+    tint: typeof record.tint === "string" && /^#[0-9a-f]{6}$/i.test(record.tint) ? record.tint.toLowerCase() : "#000000",
+    tintOpacity: number(record.tintOpacity, 0, 0.8, 0),
+  };
+  return JSON.stringify(look) === JSON.stringify(DEFAULT_BACKDROP) ? undefined : look;
+}
+
+/**
+ * CSS for a photo or video background with its look. A blurred picture is zoomed a touch so its
+ * soft edges never show the colour behind it.
+ */
+export function backdropCss(look: BackdropLook | undefined): { size: string; objectFit: string; transform: string; filter: string } {
+  const value = look ?? DEFAULT_BACKDROP;
+  const zoom = Math.max(value.scale, value.blur > 0 ? 1 + value.blur / 180 : 1);
+  return {
+    size: value.fit === "contain" ? "contain" : value.fit === "stretch" ? "100% 100%" : "cover",
+    objectFit: value.fit === "contain" ? "contain" : value.fit === "stretch" ? "fill" : "cover",
+    transform: zoom === 1 ? "none" : `scale(${Math.round(zoom * 1000) / 1000})`,
+    filter: value.blur > 0 ? `blur(${Math.round(value.blur)}px)` : "none",
+  };
+}
+

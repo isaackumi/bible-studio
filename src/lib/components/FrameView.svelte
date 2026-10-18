@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
-  import { displayWash, frameBackground } from "../domain/backgrounds";
+  import { backdropCss, displayWash, frameBackground } from "../domain/backgrounds";
   import { effectsCss } from "../domain/text-style";
   import { cubicIn, cubicInOut, cubicOut, linear } from "svelte/easing";
   import type { TransitionConfig } from "svelte/transition";
@@ -178,7 +178,10 @@
     model.layout === "timer" && model.timer ? timerDisplay(timerFromPaint(model.timer), now || Date.now()) : null,
   );
 
-  const background = $derived(frameBackground(model, nested));
+  /** A photo background is drawn as its own layer, so it can be fitted, zoomed and softened. */
+  const imageLayer = $derived(!nested && model.backgroundImageUrl && !model.fill && model.layout !== "black" ? model.backgroundImageUrl : null);
+  const look = $derived(backdropCss(model.theme.backdrop));
+  const background = $derived(imageLayer ? "#000000" : frameBackground(model, nested));
   /** Text frames get the theme's animated, video and darkening layers behind the words. */
   const TEXT_LAYOUTS = new Set(["scripture", "lyrics", "title", "timer", "lower-third", "empty", "announcement", "slide"]);
   const backdrop = $derived(!nested && !model.fill && !model.backgroundImageUrl && TEXT_LAYOUTS.has(model.layout) ? model.theme.background : null);
@@ -245,9 +248,11 @@
   {#if backdrop?.type === "motion"}
     <MotionBackground motion={backdrop.motionId} tint={backdrop.tint} base={backdrop.base} {still} />
   {:else if backdrop?.type === "video" && model.backgroundVideoUrl}
-    <video class="backdrop-video" src={still ? `${model.backgroundVideoUrl}#t=0.1` : model.backgroundVideoUrl} autoplay={!still} loop muted playsinline preload={still ? "metadata" : "auto"}></video>
+    <video class="backdrop-video" src={still ? `${model.backgroundVideoUrl}#t=0.1` : model.backgroundVideoUrl} autoplay={!still} loop muted playsinline preload={still ? "metadata" : "auto"} style:object-fit={look.objectFit} style:transform={look.transform} style:filter={look.filter}></video>
   {/if}
+  {#if imageLayer}<div class="backdrop-image" aria-hidden="true" style:background-image={`url("${imageLayer}")`} style:background-size={look.size} style:transform={look.transform} style:filter={look.filter}></div>{/if}
   {#if dim > 0}<div class="backdrop-dim" style:opacity={dim} aria-hidden="true"></div>{/if}
+  {#if !nested && model.theme.backdrop?.tintOpacity && (imageLayer || backdrop?.type === "video")}<div class="backdrop-tint" aria-hidden="true" style:background={model.theme.backdrop.tint} style:opacity={model.theme.backdrop.tintOpacity}></div>{/if}
   {#if model.layout === "composition"}
     {#each model.layers ?? [] as layer (layer.id)}
       <div

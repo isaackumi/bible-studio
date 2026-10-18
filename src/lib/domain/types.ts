@@ -13,6 +13,18 @@ export type ThemeBackground =
 
 export type ThemeLayout = "frame" | "lower-third";
 
+export type BackdropLook = {
+  /** cover: fill the screen (cropping); contain: the whole picture; stretch: fill without cropping. */
+  fit: "cover" | "contain" | "stretch";
+  /** Zoom, 1–3. */
+  scale: number;
+  /** Softness in frame pixels (1080 tall), 0–40. */
+  blur: number;
+  /** A colour laid over the picture, and how strongly (0–0.8). */
+  tint: string;
+  tintOpacity: number;
+};
+
 export type Theme = {
   id: string;
   name: string;
@@ -31,6 +43,8 @@ export type Theme = {
   effects?: TextStyle;
   /** Darken the background (0–0.8) so text reads over photos, video and motion. */
   dim?: number;
+  /** How a photo or video background sits: fit, zoom, blur and a colour wash over it. */
+  backdrop?: BackdropLook;
   /** A Premium library theme (animated, photo or video). */
   premium?: boolean;
   /** A panel behind the words: a box, frosted glass, a full-width band, or a broadcast bar. */
