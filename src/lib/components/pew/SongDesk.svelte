@@ -95,6 +95,7 @@
     if (key === "enter") {
       const song = at >= 0 ? visible[at]! : visible[0]!;
       pick(song);
+      previewOnly = true;
       if (song.sections[0]) show(song, song.sections[0].id);
       return;
     }
@@ -108,6 +109,42 @@
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  /** Live mode: a part goes straight to the screen when chosen (click, chips, arrows, follow singing). */
+  const CLICK_KEY = "church-studio:songs-click-live";
+  let clickLive = $state(readClickLive());
+  function readClickLive(): boolean {
+    try {
+      return localStorage.getItem(CLICK_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function setClickLive(on: boolean) {
+    clickLive = on;
+    try {
+      localStorage.setItem(CLICK_KEY, on ? "1" : "0");
+    } catch {
+      // Private windows can refuse storage; the choice lasts for this session.
+    }
+  }
+  // In Live mode the screen follows Preview: whatever part lands there (by click, chip, arrow key
+  // or follow singing) is sent at once. The first look after opening the page never sends.
+  /** undefined until the page has looked once, so opening Songs never sends anything. */
+  let lastPreview: string | null | undefined = undefined;
+  /** Set for a Preview that must stay on Preview (opening a song from search). */
+  let previewOnly = false;
+  $effect(() => {
+    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}` : null;
+    const was = lastPreview;
+    lastPreview = now;
+    const quiet = previewOnly;
+    previewOnly = false;
+    // Never while editing: the editor's Preview button is for checking, not for the room.
+    if (quiet || draft || !clickLive || !now || was === undefined || now === was) return;
+    if (programSource === `song:${now}`) return;
+    void session.take();
+  });
+
   const listTitle = $derived(folder === null ? "All songs" : folder === RECENT ? "Recent" : folder === FAVORITES ? "Favorites" : folder === "" ? "Unfiled" : folder);
 
   // Messages fade after a few seconds so they never crowd the song.
@@ -164,7 +201,7 @@
 
   async function showAndTake(song: Song, sectionId: string) {
     session.previewSongSection(song, sectionId);
-    await session.take();
+    if (!clickLive) await session.take();
   }
 
   function showDetected() {
@@ -516,8 +553,7 @@
               {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">Live</em>
               {:else if onPreview?.songId === song.id}<em class="badge">Preview</em>{/if}
             </strong>
-            {#if snippet(song)}<span class="first-line">{snippet(song)}</span>{/if}
-            <span>{[song.author, `${song.sections.length} section${song.sections.length === 1 ? "" : "s"}`, folder === null ? song.folder : ""].filter(Boolean).join(" · ")}</span>
+            <span class="sub">{snippet(song) || song.author}<em>{song.sections.length}</em></span>
           </button>
         </li>
       {/each}
@@ -589,15 +625,11 @@
         <div>
           <h2>{selected.title}</h2>
           <p class="meta">
-            <span>{selected.author || "Unknown author"}</span>
-            <span>{selected.sections.length} section{selected.sections.length === 1 ? "" : "s"}</span>
+            {#if selected.author}<span>{selected.author}</span>{/if}
+            <span>{selected.sections.length} part{selected.sections.length === 1 ? "" : "s"}</span>
             {#if selected.folder}<span class="chip"><Icon name="folder" size={12} />{selected.folder}</span>{/if}
+            {#if songCredit(selected, session.workspace.ccliLicense)}<span class="credit">{songCredit(selected, session.workspace.ccliLicense)}</span>{/if}
           </p>
-          {#if songCredit(selected, session.workspace.ccliLicense)}
-            <p class="credit">{songCredit(selected, session.workspace.ccliLicense)}</p>
-          {:else}
-            <p class="credit none">No copyright details — fine for public-domain hymns and your own songs.</p>
-          {/if}
         </div>
         <div class="row-actions">
           <button type="button" class="desk-btn primary-soft" data-tip="Put the first part on Preview" onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> Start</button>
@@ -621,7 +653,7 @@
           </ToolMenu>
         </div>
       </header>
-      <p class="hint"><b>Click</b> a part to put it on Preview. <b>Double-click</b> to show it on the screen. <kbd>←</kbd> <kbd>→</kbd> move between parts.</p>
+      <div class="song-bar">
       <nav class="song-map" aria-label="Song map">
         {#each selected.sections as section (section.id)}
           <button
@@ -636,6 +668,16 @@
           >{sectionShort(section)}</button>
         {/each}
       </nav>
+      <div class="click-mode" role="radiogroup" aria-label="When you click a part">
+        <span>Click</span>
+        <button type="button" role="radio" aria-checked={!clickLive} class:on={!clickLive} data-tip="Click puts a part on Preview; double-click or LIVE shows it" onclick={() => setClickLive(false)}>Preview</button>
+        <button type="button" role="radio" aria-checked={clickLive} class:on={clickLive} class:live-on={clickLive} data-tip="Click shows a part on the screen at once; arrows too" onclick={() => setClickLive(true)}>Live</button>
+      </div>
+      </div>
+      <p class="hint">
+        {#if clickLive}<b>Live:</b> a part you click, or reach with <kbd>←</kbd> <kbd>→</kbd>, shows on the screen at once.
+        {:else}<b>Click</b> a part for Preview, <b>double-click</b> to show it. <kbd>←</kbd> <kbd>→</kbd> move between parts.{/if}
+      </p>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
           {@const isLive = programLive && programSource === `song:${selected.id}:${section.id}`}
@@ -840,7 +882,8 @@
   .song-item:hover .song-star, .song-star:focus-within, .song-star:has(:global(.fav-star.on)) { opacity: 1; }
   .song strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
   .song span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .song .first-line { font-size: 12px; color: color-mix(in srgb, var(--ink) 70%, var(--muted)); font-style: italic; }
+  .song .sub { display: flex; gap: 8px; font-size: 12px; }
+  .song .sub em { margin-left: auto; flex: none; font-style: normal; font-size: 11px; opacity: 0.8; }
   .song:hover { background: var(--field); }
   .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
@@ -889,7 +932,13 @@
     min-height: 96px;
   }
   .section { border-left-color: var(--tone, var(--muted)); }
-  .song-map { display: flex; flex-wrap: wrap; gap: 4px; }
+  .song-bar { position: sticky; top: -14px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 -16px; padding: 10px 16px; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .song-map { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .click-mode { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); flex: none; }
+  .click-mode > span { padding: 0 6px 0 8px; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .click-mode button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .click-mode button.on { background: var(--accent); color: var(--on-accent); }
+  .click-mode button.live-on { background: var(--live); color: #fff; }
   .song-map button {
     min-width: 34px;
     height: 26px;
@@ -922,7 +971,6 @@
   .fields { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; }
   .fields .wide { grid-column: span 2; }
   .credit { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
-  .credit.none { font-style: italic; opacity: 0.8; }
   .paste { display: flex; flex-direction: column; gap: 8px; }
   .paste summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .paste textarea { width: 100%; margin: 8px 0; }
