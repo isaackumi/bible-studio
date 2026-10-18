@@ -4,8 +4,9 @@
   import { quickLabel, quickRead, type QuickRef } from "../../bible/quick";
   import { formatReference } from "../../bible/reference";
   import { api } from "../../db/api";
-  import type { BibleItem, SearchHit, VerseText } from "../../domain/types";
+  import type { BibleItem, PresentationModel, SearchHit, VerseText } from "../../domain/types";
   import DeskDialog from "../sources/DeskDialog.svelte";
+  import Screen from "../Screen.svelte";
   import Icon from "../Icon.svelte";
 
   // Find a verse, fast. Short typing goes a long way: "jn316", "1co13", "ps23", "3:16" or "16" in
@@ -56,6 +57,29 @@
   let note = $state("");
 
   const read = $derived(quickRead(query, here, session.books));
+
+  /** The sections of the Bible, so the book list can be scanned by kind. */
+  const SECTIONS: Array<{ name: string; from: number; to: number; tone: string }> = [
+    { name: "Law", from: 1, to: 5, tone: "#c9a35b" },
+    { name: "History", from: 6, to: 17, tone: "#7fa36b" },
+    { name: "Poetry & Wisdom", from: 18, to: 22, tone: "#b07cc6" },
+    { name: "Major Prophets", from: 23, to: 27, tone: "#d07a5a" },
+    { name: "Minor Prophets", from: 28, to: 39, tone: "#c98a4b" },
+    { name: "Gospels", from: 40, to: 43, tone: "#5aa0d6" },
+    { name: "Acts", from: 44, to: 44, tone: "#58b3a4" },
+    { name: "Paul's Letters", from: 45, to: 57, tone: "#7d8fe0" },
+    { name: "General Letters", from: 58, to: 65, tone: "#9a8fd0" },
+    { name: "Revelation", from: 66, to: 66, tone: "#d9677a" },
+  ];
+  const sectionFor = (ord: number) => SECTIONS.find((section) => ord >= section.from && ord <= section.to) ?? SECTIONS[0]!;
+
+  /** What Enter would open, shown faintly in the box ("jn316" → John 3:16). */
+  const understood = $derived.by(() => {
+    const ref = read.refs[0];
+    if (!ref || !query.trim()) return "";
+    const label = quickLabel(ref, session.books);
+    return label.toLowerCase().replace(/\s+/g, "") === query.trim().toLowerCase().replace(/\s+/g, "") ? "" : label;
+  });
   const bookOf = (ord: number) => session.books.find((book) => book.ord === ord);
   const bookName = (ord: number) => bookOf(ord)?.name ?? "";
   const chapters = (ord: number) => bookOf(ord)?.chapters ?? 1;
@@ -173,6 +197,23 @@
   }
 
   const selectedItem = $derived(itemOf(selected));
+
+  // The picked passage as the audience would see it, in the theme in use.
+  let screenModel = $state<PresentationModel | null>(null);
+  $effect(() => {
+    const item = selectedItem;
+    if (!item) {
+      screenModel = null;
+      return;
+    }
+    const snapshot = { ...item };
+    const timer = setTimeout(() => {
+      void session.renderItem({ id: "find", kind: "bible", title: snapshot.reference, bible: snapshot }).then((model) => {
+        if (selectedItem && keyOf(selectedItem) === keyOf(snapshot) && selectedItem.translationId === snapshot.translationId) screenModel = model;
+      }).catch(() => {});
+    }, 90);
+    return () => clearTimeout(timer);
+  });
 
   // The words of what is picked, with the verse before and after for context.
   let previewKey = "";
@@ -367,6 +408,7 @@
           spellcheck="false"
           bind:value={query}
         />
+        {#if understood}<span class="understood" aria-live="polite"><span>→</span>{understood}</span>{/if}
         {#if searching}<span class="busy">Searching…</span>{/if}
       </label>
       <div class="translations" role="radiogroup" aria-label="Translation">
@@ -394,15 +436,18 @@
     <div class="panes">
       <nav class="browse" aria-label="Books">
         <div class="testaments" role="tablist" aria-label="Testament">
-          <button type="button" role="tab" aria-selected={testament === "old"} onclick={() => { testament = "old"; browseOrd = null; }}>Old Testament</button>
-          <button type="button" role="tab" aria-selected={testament === "new"} onclick={() => { testament = "new"; browseOrd = null; }}>New Testament</button>
+          <button type="button" role="tab" aria-selected={testament === "old"} onclick={() => { testament = "old"; browseOrd = null; input?.focus(); }}>Old Testament</button>
+          <button type="button" role="tab" aria-selected={testament === "new"} onclick={() => { testament = "new"; browseOrd = null; input?.focus(); }}>New Testament</button>
         </div>
         {#if browsing !== null && bookOf(browsing)}
           {@const book = bookOf(browsing)!}
-          <div class="chapters-head">
+          <div class="chapters-head" style:--tone={sectionFor(book.ord).tone}>
             <button type="button" class="back" aria-label="All books" onclick={() => { browseOrd = null; testament = book.ord >= 40 ? "new" : "old"; query = ""; input?.focus(); }}><Icon name="chevron-left" size={14} /></button>
-            <strong>{book.name}</strong>
-            <span>{book.chapters} ch.</span>
+            <span class="tone-dot" aria-hidden="true"></span>
+            <span class="book-title">
+              <strong>{book.name}</strong>
+              <span>{sectionFor(book.ord).name} · {book.chapters} chapter{book.chapters === 1 ? "" : "s"}</span>
+            </span>
           </div>
           <div class="chapter-grid">
             {#each Array.from({ length: book.chapters }, (_, n) => n + 1) as number (number)}
@@ -411,8 +456,12 @@
           </div>
         {:else}
           <div class="book-grid">
-            {#each books as book (book.ord)}
-              <button type="button" class:here={book.ord === here.bookOrd} title={book.name} onclick={() => pickBook(book.ord)}>{book.name}</button>
+            {#each books as book, index (book.ord)}
+              {@const group = sectionFor(book.ord)}
+              {#if index === 0 || sectionFor(books[index - 1]!.ord) !== group}
+                <p class="book-group" style:--tone={group.tone}>{group.name}</p>
+              {/if}
+              <button type="button" class:here={book.ord === here.bookOrd} style:--tone={group.tone} title={book.name} onclick={() => pickBook(book.ord)}>{book.name}</button>
             {/each}
           </div>
         {/if}
@@ -422,7 +471,7 @@
         {#each rows as row, index (index)}
           {@const section = sectionOf(row)}
           {#if index === 0 || sectionOf(rows[index - 1]!) !== section}
-            <p class="section">{section}</p>
+            <p class="section"><span>{section}</span>{#if row.kind === "verse"}<em>{rows.filter((entry) => entry.kind === "verse").length}</em>{/if}</p>
           {/if}
           <button
             type="button"
@@ -443,7 +492,7 @@
               choose(row, event.metaKey || event.ctrlKey);
             }}
           >
-            <strong>{rowLabel(row)}</strong>
+            {#if row.kind === "verse"}<span class="vnum">{row.verse}</span>{:else}<strong>{rowLabel(row)}</strong>{/if}
             {#if row.kind === "verse"}
               <span class="text">{row.text}</span>
             {:else if row.kind === "hit"}
@@ -482,6 +531,9 @@
               onclick={() => selectedItem && session.toggleFavoritePassage(selectedItem)}
             ><Icon name="star" size={16} /></button>
           </div>
+          {#if screenModel}
+            <div class="screen-preview" aria-label="How it looks on the screen"><Screen model={screenModel} still /></div>
+          {/if}
           <div class="words">
             {#each previewText as verse (verse.verse)}
               {@const inside = verse.verse >= selectedItem.startVerse && verse.verse <= selectedItem.endVerse}
@@ -518,6 +570,8 @@
   .box:focus-within { border-color: var(--accent); }
   .box input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 21px; font-weight: 650; outline: none; }
   .busy { font-size: 12px; }
+  .understood { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .understood span { opacity: 0.7; }
   .translations { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); max-width: 46%; overflow-x: auto; scrollbar-width: none; }
   .translations button { flex: none; height: 44px; min-width: 50px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
   .translations button[aria-checked="true"] { background: var(--accent); color: #fff; }
@@ -547,13 +601,19 @@
   .testaments { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 9px; background: var(--field); flex: none; }
   .testaments button { height: 28px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
   .testaments button[aria-selected="true"] { background: var(--panel); color: var(--ink); }
-  .book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; overflow: auto; min-height: 0; align-content: start; }
-  .book-grid button { height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .book-grid button:hover { background: var(--field); }
-  .book-grid button.here { color: var(--accent); font-weight: 650; }
+  .book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 4px; overflow: auto; min-height: 0; align-content: start; padding-right: 2px; }
+  .book-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin: 8px 2px 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .book-group:first-child { margin-top: 0; }
+  .book-group::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--tone); }
+  .book-grid button { position: relative; height: 28px; padding: 0 8px 0 12px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-grid button::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; border-radius: 1px; background: color-mix(in srgb, var(--tone) 55%, transparent); }
+  .book-grid button:hover { background: color-mix(in srgb, var(--tone) 12%, var(--field)); }
+  .book-grid button.here { color: var(--accent); font-weight: 700; }
   .chapters-head { display: flex; align-items: center; gap: 8px; flex: none; }
-  .chapters-head strong { font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chapters-head span { color: var(--muted); font-size: 12px; }
+  .tone-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--tone); flex: none; }
+  .book-title { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+  .book-title strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-title span { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .back { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 7px; background: none; color: var(--ink); display: grid; place-items: center; }
   .chapter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; overflow: auto; min-height: 0; align-content: start; }
   .chapter-grid button { height: 34px; border: 1px solid var(--line); border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -561,13 +621,17 @@
   .chapter-grid button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .results { overflow: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 4px; min-height: 0; }
-  .section { margin: 8px 4px 2px; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .section { display: flex; align-items: center; gap: 8px; margin: 10px 4px 3px; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .section em { font-style: normal; font-size: 11px; min-width: 20px; padding: 1px 6px; border-radius: 9px; background: color-mix(in srgb, var(--ink) 9%, transparent); text-align: center; }
   .section:first-child { margin-top: 0; }
-  .row { display: flex; align-items: baseline; gap: 10px; min-height: 38px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; flex: none; }
+  .row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 7px 10px 7px 12px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; flex: none; }
+  .row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .vnum { flex: none; min-width: 30px; height: 22px; padding: 0 7px; border-radius: 11px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-grid; place-items: center; }
+  .row.on .vnum { background: var(--accent); color: #fff; }
   .row strong { flex: none; font-size: 14px; font-variant-numeric: tabular-nums; }
   .row.verse strong { width: 46px; color: var(--muted); font-weight: 650; }
   .row .text { min-width: 0; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row.on { background: var(--field); border-color: var(--accent); }
+  .row.on { background: var(--field); box-shadow: inset 3px 0 0 var(--accent); }
   .row.range { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .row.ref strong { font-size: 15px; }
   mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; }
@@ -578,7 +642,8 @@
 
   .preview { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--field) 55%, transparent); }
   .preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .preview .ref { margin: 0; font-size: 20px; font-weight: 750; }
+  .preview .ref { margin: 0; font-size: 20px; font-weight: 750; letter-spacing: -0.01em; }
+  .screen-preview { flex: none; width: min(100%, 300px); border-radius: 9px; overflow: hidden; border: 1px solid var(--line); background: #000; box-shadow: 0 8px 24px rgb(0 0 0 / 0.35); }
   .preview .tr { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
   .star { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--muted); display: grid; place-items: center; flex: none; }
   .star.on { color: #f5b301; border-color: color-mix(in srgb, #f5b301 50%, var(--line)); }
