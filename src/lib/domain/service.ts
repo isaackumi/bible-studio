@@ -37,3 +37,37 @@ export function moveInList<T>(list: T[], index: number, direction: 1 | -1): T[] 
   copy.splice(target, 0, item);
   return copy;
 }
+
+/** Move one entry to a new position (drag and drop). Out-of-range positions are clamped. */
+export function moveTo<T>(list: T[], from: number, to: number): T[] {
+  if (from < 0 || from >= list.length) return list;
+  const target = Math.max(0, Math.min(list.length - 1, to));
+  if (target === from) return list;
+  const next = [...list];
+  const [entry] = next.splice(from, 1);
+  next.splice(target, 0, entry!);
+  return next;
+}
+
+/**
+ * Move an item to `index` in a section (its own or another), as when it is dragged there.
+ * `index` counts the target section's items before the move.
+ */
+export function moveItemTo(service: Service, itemId: string, sectionId: string, index: number): Service {
+  const from = service.sections.find((section) => section.items.some((item) => item.id === itemId));
+  const target = service.sections.find((section) => section.id === sectionId);
+  if (!from || !target) return service;
+  const item = from.items.find((entry) => entry.id === itemId)!;
+  const fromIndex = from.items.indexOf(item);
+  // Dropping below itself in the same section: the gap it leaves shifts the place up by one.
+  const place = from.id === target.id && fromIndex < index ? index - 1 : index;
+  return {
+    ...service,
+    sections: service.sections.map((section) => {
+      const without = section.items.filter((entry) => entry.id !== itemId);
+      if (section.id !== target.id) return section.id === from.id ? { ...section, items: without } : section;
+      const at = Math.max(0, Math.min(without.length, place));
+      return { ...section, items: [...without.slice(0, at), item, ...without.slice(at)] };
+    }),
+  };
+}

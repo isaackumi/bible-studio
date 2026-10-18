@@ -111,7 +111,7 @@ import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceT
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
-import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
+import { findItem, moveInList, sectionIdForInsert, stepCursor, moveTo, moveItemTo } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
@@ -2470,6 +2470,22 @@ class Session {
     if (!this.service) return;
     const index = this.service.sections.findIndex((section) => section.id === id);
     this.service = { ...this.service, sections: moveInList(this.service.sections, index, direction) };
+    this.persistSoon();
+  };
+
+  /** Drop a section at a new place in the running order. */
+  moveSectionTo = (id: string, to: number) => {
+    if (!this.service) return;
+    const from = this.service.sections.findIndex((section) => section.id === id);
+    this.service = { ...this.service, sections: moveTo(this.service.sections, from, to) };
+    this.persistSoon();
+  };
+
+  /** Drop an item at a place in a section (its own or another). */
+  moveItemTo = (itemId: string, sectionId: string, index: number) => {
+    if (!this.service) return;
+    this.service = moveItemTo(this.service, itemId, sectionId, index);
+    if (this.cursor.itemId === itemId) this.cursor = { sectionId, itemId };
     this.persistSoon();
   };
 

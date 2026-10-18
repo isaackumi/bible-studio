@@ -41,3 +41,27 @@ describe("service cursor", () => {
     expect(sectionIdForInsert({ ...service, sections: [] }, { sectionId: "open", itemId: null })).toBeNull();
   });
 });
+
+describe("dragging in the running order", () => {
+  const item = (id: string) => ({ id, kind: "slide", title: id });
+  const service = {
+    id: "s",
+    name: "S",
+    updatedAt: "",
+    sections: [
+      { id: "a", name: "A", items: [item("1"), item("2"), item("3")] },
+      { id: "b", name: "B", items: [item("4")] },
+    ],
+  };
+  const ids = (next: typeof service) => next.sections.map((section) => section.items.map((entry) => entry.id).join(""));
+
+  it("moves a section or an item to where it is dropped", async () => {
+    const { moveTo, moveItemTo } = await import("./service");
+    expect(moveTo(["x", "y", "z"], 2, 0)).toEqual(["z", "x", "y"]);
+    expect(moveTo(["x", "y", "z"], 0, 9)).toEqual(["y", "z", "x"]);
+    expect(ids(moveItemTo(service, "1", "a", 3))).toEqual(["231", "4"]);
+    expect(ids(moveItemTo(service, "3", "a", 0))).toEqual(["312", "4"]);
+    expect(ids(moveItemTo(service, "2", "b", 0))).toEqual(["13", "24"]);
+    expect(ids(moveItemTo(service, "4", "a", 1))).toEqual(["1423", ""]);
+  });
+});

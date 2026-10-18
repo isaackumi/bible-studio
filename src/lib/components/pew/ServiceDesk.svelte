@@ -30,6 +30,44 @@
   /** A service whose delete button was pressed once (press again to delete). */
   let armedService = $state<string | null>(null);
   let outlineOpen = $state(false);
+
+  // Drag and drop in the running order: a section by its handle, an item by its handle (into any
+  // section). Alt+arrow keys on a handle move it without a mouse.
+  let dragSection = $state<string | null>(null);
+  let dragItem = $state<string | null>(null);
+  let dropSection = $state<number | null>(null);
+  let dropItem = $state<{ sectionId: string; index: number } | null>(null);
+
+  function endDrag() {
+    dragSection = null;
+    dragItem = null;
+    dropSection = null;
+    dropItem = null;
+  }
+
+  /** Over an item: drop before it, or after it when past its middle. */
+  function overItem(event: DragEvent, sectionId: string, index: number) {
+    if (!dragItem) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    dropItem = { sectionId, index: event.clientY > box.top + box.height / 2 ? index + 1 : index };
+  }
+
+  function dropHere(event: DragEvent) {
+    event.preventDefault();
+    if (dragItem && dropItem) session.moveItemTo(dragItem, dropItem.sectionId, dropItem.index);
+    else if (dragSection && dropSection !== null) session.moveSectionTo(dragSection, dropSection);
+    endDrag();
+  }
+
+  function gripKey(event: KeyboardEvent, move: (direction: 1 | -1) => void) {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    event.preventDefault();
+    move(event.key === "ArrowUp" ? -1 : 1);
+    const target = event.currentTarget as HTMLElement;
+    queueMicrotask(() => document.getElementById(target.id)?.focus());
+  }
   let songQuery = $state("");
   let reference = $state("");
   let referenceNote = $state("");
@@ -209,25 +247,68 @@
         {#each service.sections as section, sectionIndex (section.id)}
           {@const plan = planSchedule(service)}
           {@const slot = plan.slots[sectionIndex]!}
-          <section class="block" class:target={session.cursor.sectionId === section.id} class:running={session.runningSectionId === section.id} style:--tone="var(--slot-{sectionIndex % 8})">
+          <section
+            class="block"
+            role="group"
+            aria-label={section.name}
+            class:target={session.cursor.sectionId === section.id}
+            class:running={session.runningSectionId === section.id}
+            class:dragging={dragSection === section.id}
+            class:drop-before={dragSection !== null && dropSection === sectionIndex && dragSection !== section.id}
+            style:--tone="var(--slot-{sectionIndex % 8})"
+            ondragover={(event) => {
+              if (dragSection) { event.preventDefault(); dropSection = sectionIndex; }
+              else if (dragItem) { event.preventDefault(); dropItem = { sectionId: section.id, index: section.items.length }; }
+            }}
+            ondrop={dropHere}
+          >
             <header class="block-head">
+              <button
+                type="button"
+                id="grip-section-{section.id}"
+                class="grip"
+                draggable="true"
+                aria-label="Move {section.name}: drag, or Alt+arrow keys"
+                title="Drag to move this part"
+                ondragstart={(event) => { dragSection = section.id; event.dataTransfer?.setData("text/plain", section.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
+                ondragend={endDrag}
+                onkeydown={(event) => gripKey(event, (direction) => session.moveSection(section.id, direction))}
+              ><Icon name="grip" size={14} /></button>
               <span class="dot" aria-hidden="true"></span>
               <input class="section-name" aria-label="Section name" value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
               {#if session.runningSectionId === section.id}<span class="now-tag">Now</span>{/if}
               <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
               <span class="tools">
-                <button type="button" class="row-tool" aria-label="Move section up" disabled={sectionIndex === 0} onclick={() => session.moveSection(section.id, -1)}><Icon name="chevron-up" size={14} /></button>
-                <button type="button" class="row-tool" aria-label="Move section down" disabled={sectionIndex === service.sections.length - 1} onclick={() => session.moveSection(section.id, 1)}><Icon name="chevron-down" size={14} /></button>
-                <button type="button" class="row-tool" aria-label="Remove section" onclick={() => session.removeSection(section.id)}><Icon name="trash" size={13} /></button>
+                <button type="button" class="row-tool del" aria-label="Remove section" title="Delete this part" onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
               </span>
             </header>
             {#if section.items.length === 0}
-              <button type="button" class="drop-hint" onclick={() => (session.cursor = { sectionId: section.id, itemId: null })}>Empty. Select this section, then add songs, scripture or slides below.</button>
+              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => (session.cursor = { sectionId: section.id, itemId: null })}>{dragItem ? "Drop here" : "Empty. Select this section, then add songs, scripture or slides below."}</button>
             {/if}
             <ol class="items">
-              {#each section.items as item (item.id)}
+              {#each section.items as item, itemIndex (item.id)}
                 {@const kind = kindOf(item)}
-                <li class="item" class:on={session.cursor.itemId === item.id} class:live={live(item)}>
+                <li
+                  class="item"
+                  class:on={session.cursor.itemId === item.id}
+                  class:live={live(item)}
+                  class:dragging={dragItem === item.id}
+                  class:drop-before={dragItem !== null && dropItem?.sectionId === section.id && dropItem.index === itemIndex}
+                  class:drop-after={dragItem !== null && dropItem?.sectionId === section.id && dropItem.index === itemIndex + 1 && itemIndex === section.items.length - 1}
+                  ondragover={(event) => overItem(event, section.id, itemIndex)}
+                  ondrop={dropHere}
+                >
+                  <button
+                    type="button"
+                    id="grip-item-{item.id}"
+                    class="grip"
+                    draggable="true"
+                    aria-label="Move {item.title}: drag, or Alt+arrow keys"
+                    title="Drag to move (into any part)"
+                    ondragstart={(event) => { dragItem = item.id; event.dataTransfer?.setData("text/plain", item.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
+                    ondragend={endDrag}
+                    onkeydown={(event) => gripKey(event, (direction) => session.moveItem(item.id, direction))}
+                  ><Icon name="grip" size={14} /></button>
                   <button type="button" class="item-main" onclick={(event) => open(item, event)} ondblclick={() => edit(item.id)} title="Click for Preview; double-click to edit">
                     <ItemThumb {item} icon={kind.icon} label={kind.label} />
                     <span class="item-copy">
@@ -250,9 +331,7 @@
                       </button>
                     {/if}
                     <button type="button" class="row-tool" aria-label={`Edit ${item.title}`} title="Edit" onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
-                    <button type="button" class="row-tool" aria-label="Move up" onclick={() => session.moveItem(item.id, -1)}><Icon name="chevron-up" size={14} /></button>
-                    <button type="button" class="row-tool" aria-label="Move down" onclick={() => session.moveItem(item.id, 1)}><Icon name="chevron-down" size={14} /></button>
-                    <button type="button" class="row-tool" aria-label={`Remove ${item.title}`} onclick={() => session.removeItem(item.id)}><Icon name="close" size={13} /></button>
+                    <button type="button" class="row-tool del" aria-label={`Remove ${item.title}`} title="Delete" onclick={() => session.removeItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>
                 </li>
               {/each}
@@ -500,4 +579,13 @@
   .svc-tools { position: absolute; top: 8px; right: 6px; display: none; gap: 2px; }
   .svc:hover .svc-tools, .svc:focus-within .svc-tools, .svc-tools:has(.armed) { display: inline-flex; }
   .svc-tools .armed { width: auto; padding: 0 8px; color: var(--danger, #e5484d); font-size: 12px; font-weight: 700; }
+  .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--ink); background: var(--field); }
+  .grip:active { cursor: grabbing; }
+  .block.dragging, .item.dragging { opacity: 0.4; }
+  .block.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+  .item.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .item.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+  .drop-hint.drop-on { border-color: var(--accent); color: var(--accent); }
+  .row-tool.del:hover { color: var(--danger, #e5484d); }
 </style>
