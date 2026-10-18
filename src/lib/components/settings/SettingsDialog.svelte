@@ -735,6 +735,52 @@
           </div>
         </section>
         <p class="note stand">NDI needs the free NDI Tools or NDI Runtime on this computer: <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
+        <p class="section-label">Second screen</p>
+        {@const second = session.workspace.secondOutput}
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy">
+              <strong>{second.name} screen</strong>
+              <span>{session.secondOpen ? `Open. It follows Program${second.show === "words" ? ", words only" : ""}.` : "A lobby TV, an overflow room or a hallway screen with its own look. It follows Program; nothing you prepare reaches it until LIVE."}</span>
+            </div>
+            {#if session.secondOpen}
+              <button type="button" class="btn" onclick={() => void session.closeSecond()}>Close</button>
+            {:else}
+              <button type="button" class="btn primary" onclick={() => void session.openSecond()}>Open</button>
+            {/if}
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Name</strong><span>What the desk calls this screen.</span></div>
+            <input class="field" aria-label="Second screen name" maxlength="40" value={second.name} onchange={(event) => session.setSecondOutput({ name: event.currentTarget.value.trim() || "Lobby" })} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Shows</strong><span>{second.show === "words" ? "Scripture and lyrics only. Pictures, videos and cameras show the church name instead." : "Everything the audience sees."}</span></div>
+            <select class="field" aria-label="What the second screen shows" value={second.show} onchange={(event) => session.setSecondOutput({ show: event.currentTarget.value === "same" ? "same" : "words" })}>
+              <option value="words">Words only</option>
+              <option value="same">Same as the audience</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Theme</strong><span>A plain, readable theme often suits a lobby TV.</span></div>
+            <select class="field" aria-label="Second screen theme" value={second.themeId ?? ""} onchange={(event) => session.setSecondOutput({ themeId: event.currentTarget.value || null })}>
+              <option value="">Same as the audience</option>
+              {#each session.themes as theme (theme.id)}<option value={theme.id}>{theme.name}</option>{/each}
+            </select>
+          </div>
+          {#if isDesktop() && session.output.displays.length > 1}
+            <div class="row">
+              <div class="row-copy"><strong>Display</strong><span>Where it opens. Close and open it again after changing this.</span></div>
+              <select class="field" aria-label="Second screen display" value={second.displayKey ?? ""} onchange={(event) => session.setSecondOutput({ displayKey: event.currentTarget.value || null })}>
+                <option value="">A free display</option>
+                {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}{display.primary ? " (this screen)" : display.audience ? " (audience)" : ""}</option>{/each}
+              </select>
+            </div>
+          {/if}
+          <div class="row">
+            <div class="row-copy"><strong>Alerts here too</strong><span>Nursery calls and other alerts show on this screen as well.</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label="Alerts on the second screen" checked={second.alerts} onchange={(event) => session.setSecondOutput({ alerts: event.currentTarget.checked })} />
+          </div>
+        </section>
         <p class="section-label">Screen</p>
         {#if isDesktop() && session.output.displays.length > 0}
           <div class="monitor-list">

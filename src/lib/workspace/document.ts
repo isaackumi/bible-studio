@@ -20,6 +20,7 @@ import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 import { sanitizeFavorites } from "../domain/favorites";
 import { sanitizeGoneLive } from "../domain/gone-live";
 import { sanitizeAudioSettings, sanitizePlaylists } from "../domain/playlists";
+import { sanitizeSecondOutput } from "../domain/second-output";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -126,6 +127,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     voice: sanitizeVoiceSettings(value.voice),
     playlists: sanitizePlaylists(value.playlists),
     audio: sanitizeAudioSettings(value.audio),
+    secondOutput: sanitizeSecondOutput(value.secondOutput),
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],

@@ -202,3 +202,36 @@ export function subscribeStageLocal(onStage: (snapshot: StageSnapshot) => void) 
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);
 }
+
+const SECOND_KEY = "church-studio.second";
+
+/** A frame for the second audience screen (lobby, overflow room). */
+export type SecondFrame = { model: PresentationModel; at: number };
+
+export function parseSecond(raw: string | null): SecondFrame | null {
+  try {
+    const value = raw ? (JSON.parse(raw) as Partial<SecondFrame>) : null;
+    if (!value || !value.model || typeof value.model !== "object" || typeof value.model.layout !== "string") return null;
+    return { model: value.model as PresentationModel, at: typeof value.at === "number" ? value.at : 0 };
+  } catch {
+    return null;
+  }
+}
+
+export function publishSecondLocal(frame: SecondFrame) {
+  localStorage.setItem(SECOND_KEY, JSON.stringify(frame));
+}
+
+export function readSecondLocal(): SecondFrame | null {
+  return parseSecond(localStorage.getItem(SECOND_KEY));
+}
+
+export function subscribeSecondLocal(onFrame: (frame: SecondFrame) => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== SECOND_KEY) return;
+    const frame = parseSecond(event.newValue);
+    if (frame) onFrame(frame);
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}

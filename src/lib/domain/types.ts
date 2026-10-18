@@ -449,6 +449,8 @@ export type Workspace = {
   /** Audio playlists (walk-in music, backing tracks). */
   playlists: import("./playlists").Playlist[];
   audio: import("./playlists").AudioSettings;
+  /** A second audience screen with its own look (lobby, overflow room). */
+  secondOutput: import("./second-output").SecondOutputSettings;
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

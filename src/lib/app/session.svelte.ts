@@ -10,7 +10,7 @@ import { shiftPassage, stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
-import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageLayout, type StageSnapshot } from "../display/channel";
+import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageLayout, type StageSnapshot, publishSecondLocal } from "../display/channel";
 import {
   browserAudienceState,
   openBrowserAudience,
@@ -105,6 +105,7 @@ import { presentAnnouncement, type AnnouncementDesign } from "../domain/announce
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
+import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
@@ -320,6 +321,7 @@ class Session {
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
+    this.publishSecond();
     this.pushKeyWords();
   }
   output = $state<OutputStatus>({
@@ -977,6 +979,95 @@ class Session {
   setFadeOnLive = (fadeOnLive: boolean) => {
     this.workspace = { ...this.workspace, audio: { ...this.workspace.audio, fadeOnLive } };
     this.persistSoon();
+  };
+
+  // A second audience screen (lobby, overflow room) with its own look.
+  secondOpen = $state(false);
+
+  setSecondOutput = (patch: Partial<SecondOutputSettings>) => {
+    this.workspace = { ...this.workspace, secondOutput: { ...this.workspace.secondOutput, ...patch } };
+    this.persistSoon();
+    this.publishSecond();
+  };
+
+  /** Program as the second screen shows it. */
+  secondModel = (): PresentationModel => {
+    const settings = this.workspace.secondOutput;
+    const own = settings.themeId ? this.themes.find((theme) => theme.id === settings.themeId) : undefined;
+    const backdrop = own
+      ? {
+          theme: own,
+          photo: own.background.type === "image" ? this.mediaSrc(own.background.assetId) : null,
+          video: own.background.type === "video" ? this.mediaSrc(own.background.assetId) : null,
+        }
+      : null;
+    return secondOutputModel(this.live.program.model, settings, backdrop, {
+      theme: this.theme(),
+      title: this.logoTitle(),
+      imageUrl: this.mediaSrc(this.workspace.logoAssetId),
+    });
+  };
+
+  private publishSecond = () => {
+    if (typeof window === "undefined" || !this.secondOpen) return;
+    const frame = { model: this.secondModel(), at: Date.now() };
+    try {
+      publishSecondLocal(frame);
+    } catch {
+      // Storage full or blocked: the second screen keeps its last frame.
+    }
+    if (isDesktop()) void emit("second-frame", JSON.stringify(frame)).catch(() => {});
+  };
+
+  openSecond = async () => {
+    this.secondOpen = true;
+    const name = this.workspace.secondOutput.name;
+    if (isDesktop()) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const existing = await WebviewWindow.getByLabel("second");
+        if (existing) {
+          await existing.setFocus();
+          this.publishSecond();
+          return;
+        }
+        const chosen = this.workspace.secondOutput.displayKey;
+        const target =
+          (chosen ? this.output.displays.find((display) => display.key === chosen) : undefined) ??
+          this.output.displays.find((display) => !display.primary && !display.audience && display.name !== this.output.displayName) ??
+          null;
+        const second = new WebviewWindow(
+          "second",
+          target
+            ? { url: "/?second=1", title: name, x: target.x, y: target.y, width: target.width, height: target.height, decorations: false }
+            : { url: "/?second=1", title: name, width: 1280, height: 720 },
+        );
+        second.once("tauri://error", (event) => {
+          this.message = `The ${name} screen could not open: ${String(event.payload)}`;
+        });
+        second.once("tauri://destroyed", () => (this.secondOpen = false));
+        setTimeout(() => this.publishSecond(), 600);
+        this.message = target ? `${name} screen is on ${target.name}.` : `${name} screen opened. Drag it to that screen.`;
+      } catch (error) {
+        this.message = error instanceof Error ? error.message : "The second screen could not open.";
+      }
+      return;
+    }
+    this.publishSecond();
+    const opened = window.open("/?second=1", "church-studio-second", "popup=yes,width=1280,height=720");
+    this.message = opened ? `${name} screen opened. Drag it to that screen.` : "The browser blocked the window. Allow pop-ups for this site, then try again.";
+  };
+
+  closeSecond = async () => {
+    this.secondOpen = false;
+    if (isDesktop()) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        await (await WebviewWindow.getByLabel("second"))?.destroy();
+      } catch {
+        // Already closed.
+      }
+    }
   };
 
   /** A stage link for a phone or tablet on the platform: it shows the stage and presses nothing. */
