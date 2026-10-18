@@ -2,6 +2,10 @@
 # (System.Speech), printing one JSON line per phrase in the same shape as the macOS helper:
 #   {"kind":"phrase","text":"...","final":false,"alternatives":[...]}  plus "level", "status", "error".
 # The app reads these lines and finds verses; this script only listens.
+# -Stdin: the app has cleaned the microphone (Noise filter) and sends 16 kHz mono 16-bit PCM on
+# standard input; the app reports levels itself. Closing the input ends the script.
+
+param([switch]$Stdin)
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -28,7 +32,12 @@ if (-not $info) {
 
 $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine($info)
 try {
-  $engine.SetInputToDefaultAudioDevice()
+  if ($Stdin) {
+    $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
+    $engine.SetInputToAudioStream([Console]::OpenStandardInput(), $format)
+  } else {
+    $engine.SetInputToDefaultAudioDevice()
+  }
 } catch {
   Emit @{ kind = "error"; message = "No microphone is available, or Windows blocked it. Check Settings > Privacy & security > Microphone." }
   exit 1
@@ -39,6 +48,8 @@ $engine.MaxAlternates = 5
 $null = Register-ObjectEvent -InputObject $engine -EventName SpeechHypothesized -SourceIdentifier "hyp"
 $null = Register-ObjectEvent -InputObject $engine -EventName SpeechRecognized -SourceIdentifier "rec"
 $null = Register-ObjectEvent -InputObject $engine -EventName AudioLevelUpdated -SourceIdentifier "lvl"
+# A cleaned stream ends when the app stops listening.
+$null = Register-ObjectEvent -InputObject $engine -EventName RecognizeCompleted -SourceIdentifier "done"
 $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
 Emit @{ kind = "status"; message = "Listening. Speak a reference or read a verse." }
 
@@ -56,7 +67,11 @@ while ($true) {
         $alternatives = [string[]]@($result.Alternates | Select-Object -First 5 | ForEach-Object { $_.Text })
         Emit @{ kind = "phrase"; text = $result.Text; final = $true; alternatives = $alternatives }
       }
+      "done" {
+        if ($Stdin) { exit 0 }
+      }
       "lvl" {
+        if ($Stdin) { break }
         if (((Get-Date) - $lastLevel).TotalMilliseconds -gt 80) {
           $lastLevel = Get-Date
           Emit @{ kind = "level"; value = [Math]::Min(1, $event.SourceEventArgs.AudioLevel / 60) }

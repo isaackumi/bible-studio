@@ -42,21 +42,93 @@ private func plain(_ text: AttributedString) -> String {
     String(text.characters)
 }
 
+/// Where the sound comes from: the microphone as is, or (with the app's Noise filter on,
+/// CHURCH_STUDIO_AUDIO=stdin) audio the app has already cleaned, as 16 kHz mono 16-bit PCM on
+/// standard input. Closing that input ends the helper.
+private enum AudioSource {
+    case microphone, standardInput
+
+    static let chosen: AudioSource =
+        ProcessInfo.processInfo.environment["CHURCH_STUDIO_AUDIO"] == "stdin" ? .standardInput : .microphone
+
+    /// The app reports levels itself for cleaned input (it hears the room before cleaning).
+    var reportsLevels: Bool { self != .standardInput }
+}
+
+/// Start the chosen source and hand every buffer to `handler`. `onEnd` runs when cleaned input
+/// closes (the app stopped listening), so the last words are finished before the helper exits.
+private func startAudio(
+    engine: AVAudioEngine,
+    bufferSize: AVAudioFrameCount,
+    onEnd: @escaping () -> Void,
+    handler: @escaping (AVAudioPCMBuffer) -> Void
+) throws {
+    if AudioSource.chosen == .standardInput {
+        readStandardInput(handler, onEnd: onEnd)
+        return
+    }
+    let input = engine.inputNode
+    let hardware = input.outputFormat(forBus: 0)
+    guard hardware.channelCount > 0, hardware.sampleRate > 0 else {
+        fail("No microphone is available.")
+    }
+    input.installTap(onBus: 0, bufferSize: bufferSize, format: hardware) { buffer, _ in handler(buffer) }
+    engine.prepare()
+    try engine.start()
+}
+
+private let cleanedFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
+
+/// Cleaned audio from the app, in 100 ms pieces, until the app closes the pipe.
+private func readStandardInput(_ handler: @escaping (AVAudioPCMBuffer) -> Void, onEnd: @escaping () -> Void) {
+    let thread = Thread {
+        let handle = FileHandle.standardInput
+        var carry = Data()
+        while true {
+            let chunk = handle.readData(ofLength: 3_200)
+            if chunk.isEmpty {
+                onEnd()
+                // Never hang on a recognizer that does not answer.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { exit(0) }
+                return
+            }
+            carry.append(chunk)
+            let frames = carry.count / 2
+            guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: cleanedFormat, frameCapacity: AVAudioFrameCount(frames)),
+                  let channel = buffer.floatChannelData?.pointee else { continue }
+            carry.withUnsafeBytes { raw in
+                for index in 0..<frames {
+                    let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))
+                    channel[index] = Float(sample) / 32_768
+                }
+            }
+            buffer.frameLength = AVAudioFrameCount(frames)
+            carry.removeFirst(frames * 2)
+            handler(buffer)
+        }
+    }
+    thread.start()
+}
+
 /// macOS 26 and later: Apple's SpeechAnalyzer, streaming and fully on device.
 @available(macOS 26.0, *)
 private final class LiveTranscriber: @unchecked Sendable {
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
+    private var target: AVAudioFormat?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
     private var analyzer: SpeechAnalyzer?
     private var results: Task<Void, Never>?
     private var lastLevel = Date.distantPast
 
     func run() async {
-        let allowed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            AVCaptureDevice.requestAccess(for: .audio) { continuation.resume(returning: $0) }
+        // Cleaned audio arrives from the app, which holds the microphone itself.
+        if AudioSource.chosen != .standardInput {
+            let allowed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                AVCaptureDevice.requestAccess(for: .audio) { continuation.resume(returning: $0) }
+            }
+            guard allowed else { fail("macOS blocked the microphone. Turn on Church Studio in Privacy settings.") }
         }
-        guard allowed else { fail("macOS blocked the microphone. Turn on Church Studio in Privacy settings.") }
 
         let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: "en_US"))
             ?? Locale(identifier: "en_US")
@@ -109,23 +181,30 @@ private final class LiveTranscriber: @unchecked Sendable {
     }
 
     private func startMicrophone(format: AVAudioFormat) throws {
-        let input = engine.inputNode
-        let hardware = input.outputFormat(forBus: 0)
-        guard hardware.channelCount > 0, hardware.sampleRate > 0 else {
-            fail("No microphone is available.")
-        }
-        converter = AVAudioConverter(from: hardware, to: format)
-        input.installTap(onBus: 0, bufferSize: 4096, format: hardware) { [weak self] buffer, _ in
+        target = format
+        try startAudio(engine: engine, bufferSize: 4096, onEnd: { [weak self] in self?.finish() }) { [weak self] buffer in
             self?.consume(buffer)
         }
-        engine.prepare()
-        try engine.start()
+    }
+
+    /// The input closed: finish the words already heard, then exit.
+    private func finish() {
+        inputBuilder?.finish()
+        Task {
+            try? await analyzer?.finalizeAndFinishThroughEndOfInput()
+            await results?.value
+            exit(0)
+        }
     }
 
     private func consume(_ buffer: AVAudioPCMBuffer) {
-        if let level = rms(buffer), Date().timeIntervalSince(lastLevel) > 0.08 {
+        if AudioSource.chosen.reportsLevels, let level = rms(buffer), Date().timeIntervalSince(lastLevel) > 0.08 {
             lastLevel = Date()
             emit(["kind": "level", "value": level])
+        }
+        // The cleaned feed (16 kHz) differs from the mic's own format.
+        if converter?.inputFormat != buffer.format, let target {
+            converter = AVAudioConverter(from: buffer.format, to: target)
         }
         guard let converter else { return }
         let outputFormat = converter.outputFormat
@@ -171,10 +250,13 @@ private final class LegacyTranscriber: NSObject, @unchecked Sendable {
     private var restartTimer: Timer?
 
     func run() async {
-        let allowed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            AVCaptureDevice.requestAccess(for: .audio) { continuation.resume(returning: $0) }
+        // Cleaned audio arrives from the app, which holds the microphone itself.
+        if AudioSource.chosen != .standardInput {
+            let allowed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                AVCaptureDevice.requestAccess(for: .audio) { continuation.resume(returning: $0) }
+            }
+            guard allowed else { fail("macOS blocked the microphone. Turn on Church Studio in Privacy settings.") }
         }
-        guard allowed else { fail("macOS blocked the microphone. Turn on Church Studio in Privacy settings.") }
         let speech = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
@@ -183,15 +265,12 @@ private final class LegacyTranscriber: NSObject, @unchecked Sendable {
         if !recognizer.supportsOnDeviceRecognition {
             emit(["kind": "status", "message": "This Mac recognizes speech through Apple's servers. Keep it online."])
         }
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.channelCount > 0, format.sampleRate > 0 else { fail("No microphone is available.") }
-        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
-            self?.consume(buffer)
-        }
-        engine.prepare()
         do {
-            try engine.start()
+            try startAudio(engine: engine, bufferSize: 2048, onEnd: { [weak self] in
+                DispatchQueue.main.async { self?.finish() }
+            }) { [weak self] buffer in
+                self?.consume(buffer)
+            }
         } catch {
             fail("The microphone could not start. \(error.localizedDescription)")
         }
@@ -228,7 +307,16 @@ private final class LegacyTranscriber: NSObject, @unchecked Sendable {
         }
     }
 
+    /// The input closed: let the current request deliver its final words, then exit.
+    private var ending = false
+    private func finish() {
+        ending = true
+        restartTimer?.invalidate()
+        request?.endAudio()
+    }
+
     private func restart() {
+        if ending { exit(0) }
         task?.cancel()
         task = nil
         request = nil
@@ -237,7 +325,7 @@ private final class LegacyTranscriber: NSObject, @unchecked Sendable {
 
     private func consume(_ buffer: AVAudioPCMBuffer) {
         request?.append(buffer)
-        guard Date().timeIntervalSince(lastLevel) > 0.08, let samples = buffer.floatChannelData?.pointee else { return }
+        guard AudioSource.chosen.reportsLevels, Date().timeIntervalSince(lastLevel) > 0.08, let samples = buffer.floatChannelData?.pointee else { return }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return }
         lastLevel = Date()

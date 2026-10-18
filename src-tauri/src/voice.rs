@@ -35,18 +35,19 @@ pub struct ListenLine {
     pub line: String,
 }
 
-pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
+/// `filter` is the Noise filter setting: "off", "light" or "strong".
+pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        macos::start_transcribe(app, run)
+        macos::start_transcribe(app, run, crate::noise::Filter::parse(filter))
     }
     #[cfg(target_os = "windows")]
     {
-        windows::start_transcribe(app, run)
+        windows::start_transcribe(app, run, crate::noise::Filter::parse(filter))
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (app, run);
+        let _ = (app, run, filter);
         Err("Listening runs on macOS and Windows.".into())
     }
 }
@@ -64,12 +65,16 @@ mod helper {
 
     struct Running {
         child: std::process::Child,
-        stdin: std::process::ChildStdin,
+        /// Plain microphone mode: the helper hears the mic itself; "stop" goes down this pipe.
+        stdin: Option<std::process::ChildStdin>,
+        /// Filtered mode: this app captures and cleans the mic and streams it down stdin.
+        feed: Option<crate::noise::Feed>,
     }
 
     static RUNNING: std::sync::Mutex<Option<Running>> = std::sync::Mutex::new(None);
 
-    pub fn start(app: tauri::AppHandle, run: u64, mut command: std::process::Command) -> Result<(), String> {
+    /// `feed`: the share of cleaned signal to stream to the helper (None = the helper uses the mic).
+    pub fn start(app: tauri::AppHandle, run: u64, mut command: std::process::Command, feed: Option<f32>) -> Result<(), String> {
         stop();
         let mut child = command
             .stdin(std::process::Stdio::piped())
@@ -78,7 +83,31 @@ mod helper {
             .spawn()
             .map_err(|error| format!("Could not start the speech helper. {error}"))?;
         let stdout = child.stdout.take().ok_or("The speech helper produced no transcript stream.")?;
-        let stdin = child.stdin.take().ok_or("The speech helper could not be stopped later.")?;
+        let mut stdin = child.stdin.take().ok_or("The speech helper could not be stopped later.")?;
+        let (stdin, feed) = match feed {
+            None => (Some(stdin), None),
+            Some(mix) => {
+                let levels_app = app.clone();
+                let started = crate::noise::start(
+                    mix,
+                    move |bytes| std::io::Write::write_all(&mut stdin, bytes).is_ok(),
+                    move |_room, clean| {
+                        use tauri::Emitter;
+                        let line = format!(r#"{{"kind":"level","value":{:.3}}}"#, (clean * 4.0).min(1.0));
+                        let _ = levels_app.emit("listen-phrase", super::ListenLine { run, line });
+                    },
+                );
+                match started {
+                    // The pipe moved into the feed; closing it is how the helper stops.
+                    Ok(feed) => (None, Some(feed)),
+                    Err(message) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(message);
+                    }
+                }
+            }
+        };
         std::thread::spawn(move || {
             use tauri::Emitter;
             let reader = std::io::BufReader::new(stdout);
@@ -90,7 +119,7 @@ mod helper {
             let _ = app.emit("listen-phrase", end);
         });
         let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
-        *guard = Some(Running { child, stdin });
+        *guard = Some(Running { child, stdin, feed });
         Ok(())
     }
 
@@ -98,7 +127,13 @@ mod helper {
         let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
         let Some(mut running) = guard.take() else { return };
         drop(guard);
-        let _ = std::io::Write::write_all(&mut running.stdin, b"stop\n");
+        // Closing the feed closes the helper's input, which ends it; otherwise ask it to stop.
+        if let Some(feed) = running.feed.take() {
+            feed.stop();
+        }
+        if let Some(stdin) = running.stdin.as_mut() {
+            let _ = std::io::Write::write_all(stdin, b"stop\n");
+        }
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(300));
             let _ = running.child.kill();
@@ -112,7 +147,8 @@ mod helper {
 mod windows {
     use tauri::Manager;
 
-    pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
+    /// With the filter on, the recognizer hears audio cleaned here instead of the microphone.
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter) -> Result<(), String> {
         let script = app
             .path()
             .resolve("resources/transcribe-windows.ps1", tauri::path::BaseDirectory::Resource)
@@ -121,12 +157,16 @@ mod windows {
             .ok_or("The Windows speech helper is missing from this install. Reinstall Church Studio.")?;
         let mut command = std::process::Command::new("powershell.exe");
         command.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
+        if filter != crate::noise::Filter::Off {
+            command.arg("-Stdin");
+        }
         {
             use std::os::windows::process::CommandExt;
             // No console window flashing up behind the desk.
             command.creation_flags(0x0800_0000);
         }
-        super::helper::start(app, run, command)
+        let feed = (filter != crate::noise::Filter::Off).then(|| filter.mix());
+        super::helper::start(app, run, command, feed)
     }
 }
 
@@ -298,13 +338,19 @@ mod macos {
         Ok(())
     }
 
-    pub fn start_transcribe(app: tauri::AppHandle, run: u64) -> Result<(), String> {
+    /// With the filter on, the helper hears audio cleaned here instead of the microphone.
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter) -> Result<(), String> {
         let path = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-transcribe")))
             .filter(|path| path.exists())
             .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
-        super::helper::start(app, run, std::process::Command::new(&path))
+        let mut command = std::process::Command::new(&path);
+        let feed = (filter != crate::noise::Filter::Off).then(|| filter.mix());
+        if feed.is_some() {
+            command.env("CHURCH_STUDIO_AUDIO", "stdin");
+        }
+        super::helper::start(app, run, command, feed)
     }
 
     pub fn request_access() -> Result<ListenAccess, String> {

@@ -2,6 +2,8 @@ mod bible;
 mod db;
 mod displays;
 mod remote;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod noise;
 mod voice;
 
 use serde_json::Value;
@@ -294,8 +296,28 @@ fn open_privacy_settings() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_sermon_listen(app: tauri::AppHandle, run: u64) -> Result<(), String> {
-    voice::start_transcribe(app, run)
+fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>) -> Result<(), String> {
+    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"))
+}
+
+/// Mic check: room and cleaned levels arrive as `noise-test` events until stopped.
+#[tauri::command]
+fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        noise::start_test(app, noise::Filter::parse(&filter))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = (app, filter);
+        Err("The mic check runs on macOS and Windows.".into())
+    }
+}
+
+#[tauri::command]
+fn stop_noise_test() {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    noise::stop_test();
 }
 
 #[tauri::command]
@@ -505,6 +527,8 @@ pub fn run() {
             open_privacy_settings,
             start_sermon_listen,
             stop_sermon_listen,
+            start_noise_test,
+            stop_noise_test,
             start_remote_lan,
             remote_lan_status,
             stop_remote_lan,

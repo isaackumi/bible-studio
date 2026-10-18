@@ -459,7 +459,11 @@ export type VoiceSettings = {
   /** The operator chose the wake setting themselves. */
   wakeChosen?: boolean;
   custom: Array<{ phrase: string; action: string }>;
+  /** Clean the microphone before listening: off, light (keeps some room) or strong. */
+  noiseFilter?: NoiseFilter;
 };
+
+export type NoiseFilter = "off" | "light" | "strong";
 
 export type SlideDeckDocument = {
   id: string;

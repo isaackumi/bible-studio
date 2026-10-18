@@ -188,7 +188,13 @@ export function voiceCommandLabel(command: VoiceCommand): string {
 }
 
 /** Keep valid settings: known actions, short non-empty phrases, no duplicates. */
-export function sanitizeVoiceSettings(value: unknown): { commands: boolean; wake: boolean; wakeChosen: boolean; custom: CustomVoiceCommand[] } {
+export function sanitizeVoiceSettings(value: unknown): {
+  commands: boolean;
+  wake: boolean;
+  wakeChosen: boolean;
+  custom: CustomVoiceCommand[];
+  noiseFilter: "off" | "light" | "strong";
+} {
   const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const actions = new Set<string>(VOICE_ACTIONS.map((entry) => entry.id));
   const seen = new Set<string>();
@@ -204,5 +210,6 @@ export function sanitizeVoiceSettings(value: unknown): { commands: boolean; wake
   }
   // The wake word is off unless the operator turned it on themselves (older saves defaulted it on).
   const wakeChosen = record.wakeChosen === true;
-  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50) };
+  const noiseFilter = record.noiseFilter === "light" || record.noiseFilter === "strong" ? record.noiseFilter : "off";
+  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter };
 }

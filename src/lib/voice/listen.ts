@@ -1,3 +1,4 @@
+import type { NoiseFilter } from "../domain/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "../platform/runtime";
@@ -115,7 +116,7 @@ export function stitchTranscript(
 }
 
 /** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
-export function startNativeListening(handlers: ListenHandlers): () => void {
+export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off"): () => void {
   let detach = () => {};
   let stopped = false;
   let ended = false;
@@ -162,7 +163,7 @@ export function startNativeListening(handlers: ListenHandlers): () => void {
       if (stopped) unlisten();
       else detach = unlisten;
       if (stopped) return;
-      return invoke("start_sermon_listen", { run });
+      return invoke("start_sermon_listen", { run, filter });
     })
     .catch((error: unknown) => {
       handlers.onError(error instanceof Error ? error.message : String(error), "unsupported");
@@ -175,7 +176,8 @@ export function startNativeListening(handlers: ListenHandlers): () => void {
   };
 }
 
-export function startListening(handlers: ListenHandlers): () => void {
+/** In a browser the Noise filter turns on the browser's own noise suppression. */
+export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "off"): () => void {
   let stopped = false;
   let networkErrors = 0;
   /** Finished pieces of speech, kept across results and recognizer restarts (last 48 words). */
@@ -335,7 +337,7 @@ export function startListening(handlers: ListenHandlers): () => void {
 
   if (micAvailable()) {
     navigator.mediaDevices
-      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true } })
+      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: filter !== "off", autoGainControl: true } })
       .then((next) => begin(next))
       .catch((error: unknown) => {
         if (stopped) return;

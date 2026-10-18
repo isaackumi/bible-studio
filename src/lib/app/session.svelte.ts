@@ -119,6 +119,7 @@ import type {
   PewPage,
   ProductionLayout,
   BibleItem,
+  NoiseFilter,
   Cursor,
   DisplayAssignment,
   FloatGeometry,
@@ -1559,7 +1560,8 @@ class Session {
       status: "listening",
       message: "Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”.",
     };
-    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers) : startListening(handlers);
+    const filter = this.workspace.voice.noiseFilter ?? "off";
+    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter) : startListening(handlers, filter);
   };
 
   stopVoice = (message = "Listening stopped.") => {
@@ -1645,6 +1647,18 @@ class Session {
   saveVoiceSettings = (patch: Partial<VoiceSettings>) => {
     this.workspace = { ...this.workspace, voice: sanitizeVoiceSettings({ ...this.workspace.voice, ...patch }) };
     this.persistSoon();
+  };
+
+  /** Noise filter for listening. While listening, restarts it so the change is heard at once. */
+  setNoiseFilter = async (noiseFilter: NoiseFilter) => {
+    this.saveVoiceSettings({ noiseFilter });
+    const names = { off: "off", light: "light", strong: "strong" } as const;
+    if (this.voice.status !== "listening") {
+      this.message = `Noise filter ${names[noiseFilter]}. It applies the next time you listen.`;
+      return;
+    }
+    this.stopVoice(`Noise filter ${names[noiseFilter]}. Listening again…`);
+    await this.startVoice();
   };
 
   /** Reference or phrase → Preview. Used when no desk handles the request. Never Program. */

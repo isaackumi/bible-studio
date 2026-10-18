@@ -54,8 +54,10 @@ describe("voice settings storage", () => {
   it("keeps valid custom phrases only", () => {
     expect(
       sanitizeVoiceSettings({ wake: false, custom: [{ phrase: " Lights Out ", action: "black" }, { phrase: "lights out", action: "next" }, { phrase: "x", action: "format" }, { phrase: "", action: "next" }] }),
-    ).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [{ phrase: "lights out", action: "black" }] });
-    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [] });
+    ).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [{ phrase: "lights out", action: "black" }], noiseFilter: "off" });
+    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [], noiseFilter: "off" });
+    expect(sanitizeVoiceSettings({ noiseFilter: "strong" }).noiseFilter).toBe("strong");
+    expect(sanitizeVoiceSettings({ noiseFilter: "max" }).noiseFilter).toBe("off");
     // Older saves had the wake word on by default; it stays on only when the operator chose it.
     expect(sanitizeVoiceSettings({ wake: true }).wake).toBe(false);
     expect(sanitizeVoiceSettings({ wake: true, wakeChosen: true }).wake).toBe(true);

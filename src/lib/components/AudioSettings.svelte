@@ -3,6 +3,71 @@
   import { session } from "../app/session.svelte";
   import { VOICE_ACTIONS, type VoiceAction } from "../voice/commands";
   import { MIC_SAMPLE_MS, MIC_SIGNAL_LEVEL, MIC_TEST_MS, micVerdict, type MicVerdict } from "../voice/mic-test";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { isDesktop } from "../platform/runtime";
+  import type { NoiseFilter } from "../domain/types";
+  import { noiseCut } from "../voice/noise";
+
+  const bars = 16;
+
+  // ---- Noise filter, with a check that shows the room and what listening hears after cleaning
+  const FILTERS: Array<{ id: NoiseFilter; label: string; detail: string }> = [
+    { id: "off", label: "Off", detail: "Listening hears the microphone as it is." },
+    { id: "light", label: "Light", detail: "Turns down fans, hum and hiss, and keeps some of the room so quiet words are never lost." },
+    { id: "strong", label: "Strong", detail: "Removes as much background noise as it can. Best for noisy rooms; very soft speech can drop out." },
+  ];
+  const filter = $derived(session.workspace.voice.noiseFilter ?? "off");
+  const desktop = isDesktop();
+  let checking = $state(false);
+  let room = $state(0);
+  let clean = $state(0);
+  let checkError = $state("");
+  const rooms: number[] = [];
+  const cleans: number[] = [];
+  let cut = $state<number | null>(null);
+  let stopCheck: (() => void) | null = null;
+
+  async function startCheck(current: NoiseFilter = filter) {
+    stopCheck?.();
+    checkError = "";
+    rooms.length = 0;
+    cleans.length = 0;
+    cut = null;
+    const unlisten = await listen<{ room: number; clean: number }>("noise-test", (event) => {
+      room = Math.min(1, event.payload.room * 4);
+      clean = Math.min(1, event.payload.clean * 4);
+      rooms.push(event.payload.room);
+      cleans.push(event.payload.clean);
+      if (rooms.length % 6 === 0) cut = noiseCut(rooms, cleans);
+    });
+    try {
+      await invoke("start_noise_test", { filter: current });
+    } catch (error) {
+      unlisten();
+      checkError = error instanceof Error ? error.message : String(error);
+      return;
+    }
+    checking = true;
+    const timer = setTimeout(() => stopCheck?.(), 30_000);
+    stopCheck = () => {
+      clearTimeout(timer);
+      unlisten();
+      void invoke("stop_noise_test");
+      checking = false;
+      room = 0;
+      clean = 0;
+      stopCheck = null;
+    };
+  }
+
+  async function chooseFilter(next: NoiseFilter) {
+    await session.setNoiseFilter(next);
+    // A running check follows the new setting straight away.
+    if (checking) await startCheck(next);
+  }
+
+  onDestroy(() => stopCheck?.());
 
   // ---- 20-second microphone test (its own stream; it never starts listening or touches Program)
   let testing = $state(false);
@@ -64,7 +129,6 @@
 
   onDestroy(() => stopTest?.());
 
-  const bars = 16;
   const lit = $derived(Math.round(level * bars));
 
   // ---- Voice command settings
@@ -97,6 +161,52 @@
   const actionLabel = (id: string) => VOICE_ACTIONS.find((entry) => entry.id === id)?.label ?? id;
 </script>
 
+<p class="section-label">Noise filter</p>
+<section class="rows">
+  <div class="row stack">
+    <div class="row-copy">
+      <strong>Clean the microphone before listening</strong>
+      <span>{FILTERS.find((entry) => entry.id === filter)?.detail} It runs on this computer; no sound leaves it.</span>
+    </div>
+    <div class="filter-seg" role="radiogroup" aria-label="Noise filter">
+      {#each FILTERS as entry (entry.id)}
+        <button type="button" role="radio" aria-checked={filter === entry.id} class:on={filter === entry.id} onclick={() => void chooseFilter(entry.id)}>{entry.label}</button>
+      {/each}
+    </div>
+  </div>
+  {#if desktop}
+    <div class="row">
+      <div class="row-copy"><strong>Check it in your room</strong><span>Play the room as it is on a Sunday (fans, music, the PA) and speak. Compare the two meters.</span></div>
+      <button type="button" class="btn" class:primary={!checking} onclick={() => (checking ? stopCheck?.() : void startCheck())}>{checking ? "Stop check" : "Start check"}</button>
+    </div>
+    <div class="row">
+      <div class="row-copy"><strong>Room</strong><span>What the microphone hears</span></div>
+      <div class="meter" role="meter" aria-label="Room level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(room * 100)}>
+        {#each Array.from({ length: bars }) as _, index (index)}<i class:on={checking && index < Math.round(room * bars)} class:loud={index >= bars - 3}></i>{/each}
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-copy"><strong>After the filter</strong><span>What listening hears</span></div>
+      <div class="meter" role="meter" aria-label="Level after the filter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(clean * 100)}>
+        {#each Array.from({ length: bars }) as _, index (index)}<i class:on={checking && index < Math.round(clean * bars)} class:loud={index >= bars - 3}></i>{/each}
+      </div>
+    </div>
+    {#if cut !== null && filter !== "off"}
+      <div class="row"><p class="verdict" data-status="ok" role="status">Background noise is about {cut} dB quieter after the filter.{cut < 3 ? " Little to remove here: the room is quiet, or the noise sounds like speech (music, the PA)." : ""}</p></div>
+    {/if}
+    {#if checkError}<div class="row"><p class="verdict" data-status="cut-out" role="alert">! {checkError}</p></div>{/if}
+  {:else}
+    <div class="row"><div class="row-copy"><strong>In this browser</strong><span>Light and Strong turn on the browser's own noise suppression. The desktop app has the stronger filter and the room check.</span></div></div>
+  {/if}
+  <div class="row">
+    <div class="row-copy">
+      <strong>Best results</strong>
+      <span>A filter removes steady noise, not the PA. If the preacher's voice comes back through the speakers mixed with music, take a feed from the sound desk (an aux send) or put a microphone near the pulpit. That helps detection more than any filter.</span>
+    </div>
+  </div>
+</section>
+
+<p class="section-label">Microphone</p>
 <section class="rows">
   <div class="row">
     <div class="row-copy"><strong>Test microphone</strong><span>Listens for 20 seconds, long enough to catch a microphone that cuts out shortly after it starts.</span></div>
@@ -168,6 +278,10 @@
   .meter { display: flex; gap: 3px; flex: none; }
   .meter i { width: 6px; height: 20px; border-radius: 2px; background: var(--line); }
   .meter i.on { background: #3ccf6e; }
+  .filter-seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
+  .filter-seg button { height: 28px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .filter-seg button:hover { color: var(--ink); }
+  .filter-seg button.on { background: var(--accent); color: var(--on-accent); }
   .meter i.on.loud { background: #e0b341; }
   .verdict { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #3ccf6e 14%, transparent); font-size: 13px; flex: 1; }
   .verdict[data-status="quiet"], .verdict[data-status="cut-out"] { background: color-mix(in srgb, #ff5a5a 14%, transparent); }
