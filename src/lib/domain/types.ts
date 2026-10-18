@@ -85,7 +85,8 @@ export type PresentationLayout =
   | "lower-third"
   | "video"
   | "qr"
-  | "shape";
+  | "shape"
+  | "web";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -140,6 +141,8 @@ export type PresentationModel = {
   video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl };
   /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
   qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
+  /** A web page shown live: a website, a YouTube or Vimeo player, Google Slides. */
+  web?: { url: string; kind: import("./web").WebKind; label: string; zoom: number; mute: boolean };
   /** An alert riding on top of Program (never Preview), e.g. a nursery call. */
   alert?: ProgramAlert;
   /** Overlays that are on (logo bug, ticker, clock…), painted above everything on Program. */

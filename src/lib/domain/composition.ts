@@ -6,6 +6,7 @@ import { encodeTextStyle, parseTextStyle, styleModel } from "./text-style";
 import { presentQr } from "./overlays";
 import { emptyModel } from "./theme";
 import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, TextStyle, Theme } from "./types";
+import { webTarget } from "./web";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -35,7 +36,8 @@ export type SourceType =
   | "plugin"
   | "qr"
   | "shape"
-  | "empty";
+  | "empty"
+  | "web";
 
 export type SourceRef = {
   type: SourceType;
@@ -1555,6 +1557,20 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
         fill: payload.fill && HEX_COLOR.test(payload.fill) ? payload.fill : "#ffffff",
         radius: Math.min(50, Math.max(0, Number(payload.radius) || 0)),
       },
+    };
+  }
+  if (source.type === "web") {
+    const zoom = Number(payload.zoom);
+    const target = webTarget(payload.url ?? "", { mute: payload.mute === "true" });
+    return {
+      layout: "web",
+      theme: ctx.theme,
+      reference: target?.label ?? "Website",
+      attribution: null,
+      lines: [],
+      imageUrl: null,
+      backgroundImageUrl: null,
+      ...(target ? { web: { url: target.url, kind: target.kind, label: target.label, zoom: Number.isFinite(zoom) && zoom > 0 ? Math.min(3, Math.max(0.5, zoom)) : 1, mute: payload.mute === "true" } } : {}),
     };
   }
   if (source.type === "qr") {

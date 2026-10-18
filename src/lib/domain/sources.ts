@@ -11,10 +11,11 @@ import {
 import { encodeTextStyle, parseTextStyle } from "./text-style";
 import { DEFAULT_TIMER_WARNING_MS, type TimerMode } from "./timer";
 import type { CompositionDocument, TextStyle } from "./types";
+import { webTarget } from "./web";
 
 export type SharedSource = { id: string; name: string; source: SourceRef };
 
-export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video" | "qr";
+export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video" | "qr" | "web";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "camera", label: "Camera" },
@@ -27,6 +28,7 @@ export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "image", label: "Image" },
   { type: "video", label: "Video" },
   { type: "qr", label: "QR code" },
+  { type: "web", label: "Website" },
 ];
 
 export type SourceFields =
@@ -39,7 +41,8 @@ export type SourceFields =
   | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle }
   | { type: "image"; assetId: string; name: string; imageUrl: string }
   | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean }
-  | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
+  | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string }
+  | { type: "web"; url: string; zoom: number; mute: boolean };
 
 /** Payload entry for a style: omitted entirely when no style is set. */
 function stylePayload(style: TextStyle): Record<string, string> {
@@ -250,6 +253,8 @@ export function buildSource(fields: SourceFields): SourceRef {
         assetId: fields.assetId,
         imageUrl: fields.imageUrl,
       });
+    case "web":
+      return sourceRef("web", "web", webTarget(fields.url)?.label ?? "Website", { url: fields.url.trim(), zoom: String(fields.zoom), mute: String(fields.mute) });
     case "qr":
       return sourceRef("qr", "qr", fields.caption || "QR code", {
         data: fields.data,
@@ -296,6 +301,10 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "", style: parseTextStyle(p.style) };
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
+    case "web": {
+      const zoom = Number(p.zoom);
+      return { type: "web", url: p.url ?? "", zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1, mute: p.mute === "true" };
+    }
     case "qr":
       return {
         type: "qr",
@@ -338,6 +347,8 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
       return { type: "video", assetId: "", name: "", videoUrl: "", loop: false, muted: false };
     case "qr":
       return { type: "qr", data: "https://", pattern: "rounded", dark: "#000000", light: "#ffffff", caption: "" };
+    case "web":
+      return { type: "web", url: "", zoom: 1, mute: false };
   }
 }
 

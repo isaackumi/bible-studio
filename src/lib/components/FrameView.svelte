@@ -11,6 +11,7 @@
   import QrView from "./QrView.svelte";
   import MotionBackground from "./MotionBackground.svelte";
   import OverlayLayer from "./OverlayLayer.svelte";
+  import { mutedUrl } from "../domain/web";
 
   let {
     model,
@@ -234,6 +235,24 @@
       style:background={model.shape.fill}
       style:border-radius={model.shape.kind === "ellipse" ? "50%" : `${model.shape.radius}%`}
     ></div>
+  {:else if model.layout === "web" && model.web}
+    {#if still}
+      <div class="web-card"><span>{model.web.kind === "youtube" ? "YouTube" : model.web.kind === "vimeo" ? "Vimeo" : model.web.kind === "slides" ? "Google Slides" : "Website"}</span><strong>{model.web.label}</strong></div>
+    {:else}
+      {#key `${model.web.url}:${audio}`}
+        <!-- Sound only on the audience screen: desk monitors always load the player muted. -->
+        <iframe
+          class="web-frame"
+          title={model.web.label}
+          src={audio ? model.web.url : mutedUrl(model.web.url, model.web.kind)}
+          style:width="{100 / model.web.zoom}%"
+          style:height="{100 / model.web.zoom}%"
+          style:transform="scale({model.web.zoom})"
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      {/key}
+    {/if}
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}

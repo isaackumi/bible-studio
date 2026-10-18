@@ -56,6 +56,8 @@
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Plus from "@lucide/svelte/icons/plus";
   import Presentation from "@lucide/svelte/icons/presentation";
+  import Globe from "@lucide/svelte/icons/globe";
+  import FileText from "@lucide/svelte/icons/file-text";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import Search from "@lucide/svelte/icons/search";
   import Settings from "@lucide/svelte/icons/settings";
@@ -98,6 +100,8 @@
     cast: Cast,
     screens: Monitor,
     stage: Presentation,
+    globe: Globe,
+    pdf: FileText,
     lyrics: Music,
     media: Image,
     logo: Image,

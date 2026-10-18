@@ -15,6 +15,7 @@ export const SOURCE_META: Record<string, SourceMeta> = {
   clock: { icon: "clock", color: "#0d9488", blurb: "The time of day", group: "Time" },
   image: { icon: "media", color: "#12a5b8", blurb: "A picture or logo", group: "Graphics" },
   qr: { icon: "qr", color: "#525252", blurb: "A code to scan: giving, sign-up, Wi-Fi", group: "Graphics" },
+  web: { icon: "globe", color: "#0a84ff", blurb: "A web page, YouTube or Vimeo video, Google Slides", group: "Live" },
   shape: { icon: "square", color: "#525252", blurb: "A colored shape", group: "Graphics" },
   empty: { icon: "layers", color: "#6b7280", blurb: "Empty: double-click to choose what it shows", group: "Graphics" },
 };

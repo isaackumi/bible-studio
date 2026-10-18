@@ -5,6 +5,7 @@
   import { openCamera, stopCameraStream } from "../../domain/camera";
   import { LOWER_THIRD_TEMPLATES } from "../../domain/composition";
   import type { SourceFields } from "../../domain/sources";
+  import { webTarget } from "../../domain/web";
   import type { TimerMode } from "../../domain/timer";
   import DeskDialog from "./DeskDialog.svelte";
   import Icon from "../Icon.svelte";
@@ -343,6 +344,43 @@
         <span>Subtitle</span>
         <input class="field" aria-label="Subtitle" value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
       </label>
+    {:else if fields.type === "web"}
+      {@const target = webTarget(fields.url)}
+      <label class="row">
+        <span>Link</span>
+        <input
+          class="field"
+          aria-label="Web address"
+          placeholder="yourchurch.org/live, a YouTube or Vimeo link, a Google Slides link"
+          value={fields.url}
+          oninput={(event) => fields.type === "web" && (fields = { ...fields, url: event.currentTarget.value })}
+        />
+      </label>
+      <p class="hint">
+        {#if !fields.url.trim()}Paste any link. YouTube, Vimeo and Google Slides links become a full-screen player.
+        {:else if !target}That does not look like a web address.
+        {:else if target.kind === "website"}Shows {target.label} live. Some sites refuse to be shown inside other apps; if the preview stays blank, that site does not allow it.
+        {:else}Plays as a {target.kind === "youtube" ? "YouTube" : target.kind === "vimeo" ? "Vimeo" : "Google Slides"} {target.kind === "slides" ? "slideshow" : "player"}.{/if}
+      </p>
+      {#if target && target.kind !== "slides"}
+        <div class="row">
+          <span>Sound</span>
+          <span class="inline" role="radiogroup" aria-label="Sound">
+            <button type="button" role="radio" class="choice" aria-checked={!fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: false })}>On the audience screen</button>
+            <button type="button" role="radio" class="choice" aria-checked={fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: true })}>Off</button>
+          </span>
+        </div>
+      {/if}
+      {#if target?.kind === "website"}
+        <div class="row">
+          <span>Page size</span>
+          <span class="inline" role="radiogroup" aria-label="Page size">
+            {#each [[0.75, "Smaller"], [1, "Normal"], [1.5, "Larger"], [2, "Largest"]] as [zoom, label] (zoom)}
+              <button type="button" role="radio" class="choice" aria-checked={fields.zoom === zoom} onclick={() => fields.type === "web" && (fields = { ...fields, zoom: Number(zoom) })}>{label}</button>
+            {/each}
+          </span>
+        </div>
+      {/if}
     {:else if fields.type === "qr"}
       <label class="row">
         <span>Link</span>
@@ -487,6 +525,7 @@
   }
   .area { height: 88px; padding: 8px 10px; resize: vertical; }
   .check { display: flex; align-items: center; gap: 8px; margin-left: 94px; }
+  .hint { margin: -6px 0 0 94px; font-size: 12px; line-height: 1.45; color: var(--muted); }
   .thumb {
     margin-left: 94px;
     aspect-ratio: 16 / 9;
