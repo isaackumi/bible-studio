@@ -38,6 +38,14 @@
     {:else}
       <span class="hint">Give each section a time (the clock on its heading) to see the whole morning here.</span>
     {/if}
+    <span class="countdown" role="group" aria-label="Countdown on the screen">
+      <span class="cd-label">Countdown</span>
+      <button type="button" class:on={session.countdownOverlayOn} aria-pressed={session.countdownOverlayOn} title="The time left in a corner of the screen (place and size it in Overlays)" onclick={() => session.toggleCountdownOverlay()}>On screen</button>
+      <button type="button" title="A big countdown on Preview; LIVE shows it" onclick={() => session.showCountdown()}>Full screen</button>
+      <select aria-label="Full-screen countdown size" value={String(session.workspace.countdownSize)} onchange={(event) => session.setCountdownSize(Number(event.currentTarget.value))}>
+        {#each [[160, "Medium"], [220, "Large"], [300, "Huge"], [400, "Giant"]] as [size, label] (size)}<option value={String(size)}>{label}</option>{/each}
+      </select>
+    </span>
     {#if status}
       <span class="live" class:over={status.left < 0}>
         <i class="pulse" aria-hidden="true"></i>
@@ -87,6 +95,12 @@
   .fact { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--muted); }
   .fact strong { color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
   .hint { font-size: 12px; color: var(--muted); }
+  .countdown { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; }
+  .cd-label { padding: 0 6px; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .countdown button, .countdown select { height: 26px; padding: 0 9px; border: 0; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; }
+  .countdown button:hover { background: var(--field); }
+  .countdown button.on { background: #30a46c; color: #fff; }
+  .countdown select { background: var(--field); }
   .live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; background: color-mix(in srgb, #30a46c 16%, transparent); color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
   .live.over { background: color-mix(in srgb, #e5484d 18%, transparent); }
   .live em { font-style: normal; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 10%, transparent); }

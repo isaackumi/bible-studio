@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { session } from "../app/session.svelte";
-  import { OVERLAY_KINDS, paintOverlays, type OverlayCorner, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
+  import { OVERLAY_KINDS, OVERLAY_SPOTS, paintOverlays, type OverlayCorner, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
   import type { PresentationModel } from "../domain/types";
   import { mediaUrl } from "../db/api";
   import DeskDialog from "./sources/DeskDialog.svelte";
@@ -22,7 +22,9 @@
   const preview = $derived.by((): PresentationModel => {
     const { overlays: _program, ...base } = session.live.program.model;
     const shown = overlays.map((overlay) => (overlay.id === selectedId ? { ...overlay, on: true } : overlay));
-    const painted = paintOverlays(shown, (id) => mediaUrl(session.media.find((asset) => asset.id === id) ?? null));
+    // A countdown shows the running section; before the service, an example so its look can be set.
+    const countdown = session.runningDeadline() ?? { name: "Preaching", endsAt: Date.now() + 12 * 60_000 + 30_000 };
+    const painted = paintOverlays(shown, (id) => mediaUrl(session.media.find((asset) => asset.id === id) ?? null), countdown);
     return painted.length ? { ...base, overlays: painted } : base;
   });
 
@@ -85,7 +87,7 @@
         <div class="ov-fields">
           {#if selected.kind !== "clock"}
             <label class="ov-field">
-              <span>{selected.kind === "lower-third" ? "Name" : selected.kind === "logo" ? "Words (when there is no picture)" : selected.kind === "badge" ? "Word" : "Words"}</span>
+              <span>{selected.kind === "lower-third" ? "Name" : selected.kind === "logo" ? "Words (when there is no picture)" : selected.kind === "badge" ? "Word" : selected.kind === "countdown" ? "Words above the time (empty: the section's name)" : "Words"}</span>
               {#if selected.kind === "ticker"}
                 <textarea rows="2" value={selected.text} onchange={(event) => set({ text: event.currentTarget.value })}></textarea>
               {:else}
@@ -126,6 +128,25 @@
                 <button type="button" class:on={selected.edge === "bottom"} onclick={() => set({ edge: "bottom" })}>Bottom</button>
               </div>
             </div>
+          {/if}
+          {#if selected.kind === "countdown"}
+            <div class="ov-field">
+              <span>Where on the screen</span>
+              <div class="ov-spots" role="radiogroup" aria-label="Where on the screen">
+                {#each OVERLAY_SPOTS as [spot, label] (spot)}
+                  <button type="button" role="radio" aria-checked={selected.spot === spot} class="spot-{spot}" class:on={selected.spot === spot} title={label} onclick={() => set({ spot })}><i></i><span>{label}</span></button>
+                {/each}
+              </div>
+            </div>
+            <div class="ov-field">
+              <span>Size</span>
+              <div class="ov-seg">
+                {#each [["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "Huge"]] as [size, label] (size)}
+                  <button type="button" class:on={selected.size === size} onclick={() => set({ size: size as ScreenOverlay["size"] })}>{label}</button>
+                {/each}
+              </div>
+            </div>
+            <p class="ov-note">It follows the part of the service running now (from its time on the Service page), and shows nothing until a timed part begins.</p>
           {/if}
           {#if selected.kind === "ticker"}
             <div class="ov-field">
@@ -192,4 +213,19 @@
     .ov-editor { grid-template-columns: 1fr; }
     .ov-side { position: static; }
   }
+  /* A small screen map to place the countdown. */
+  .ov-spots { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 34px); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: #000; aspect-ratio: 16 / 9; max-width: 260px; }
+  .ov-spots button { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, #fff 18%, transparent); border-radius: 6px; background: none; color: #fff; font: inherit; font-size: 10px; }
+  .ov-spots button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .ov-spots button i { width: 22px; height: 10px; border-radius: 3px; background: color-mix(in srgb, #fff 30%, transparent); }
+  .ov-spots button.on { border-style: solid; border-color: var(--accent); }
+  .ov-spots button.on i { background: var(--accent); }
+  .ov-spots .spot-top-left { grid-area: 1 / 1; }
+  .ov-spots .spot-top { grid-area: 1 / 2; }
+  .ov-spots .spot-top-right { grid-area: 1 / 3; }
+  .ov-spots .spot-center { grid-area: 2 / 2; }
+  .ov-spots .spot-bottom-left { grid-area: 3 / 1; }
+  .ov-spots .spot-bottom { grid-area: 3 / 2; }
+  .ov-spots .spot-bottom-right { grid-area: 3 / 3; }
+  .ov-spots button { position: relative; }
 </style>

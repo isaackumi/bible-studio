@@ -12,6 +12,7 @@
   import ItemEditor from "./ItemEditor.svelte";
   import ItemThumb from "./ItemThumb.svelte";
   import ServiceTimeline from "./ServiceTimeline.svelte";
+  import TemplatesDialog from "./TemplatesDialog.svelte";
   import SectionTime from "./SectionTime.svelte";
   import { planSchedule } from "../../domain/schedule";
 
@@ -23,6 +24,8 @@
   let newName = $state("");
   let sectionName = $state("");
   let adding = $state<Adding>(null);
+  /** The templates window, opened on a template (or the first). */
+  let templatesOpen = $state<{ id: string | null } | null>(null);
   let songQuery = $state("");
   let reference = $state("");
   let referenceNote = $state("");
@@ -144,6 +147,7 @@
 <section class="service-desk">
   <LibrarySidebar title="Services" icon="list" count={session.services.length} storageKey="services">
     {#snippet actions()}
+      <button type="button" class="desk-btn" title="Start a service from a template, or edit the templates" onclick={() => (templatesOpen = { id: null })}><Icon name="list" size={14} /> Templates</button>
       <button type="button" class="desk-btn" onclick={() => void session.createService(`Service ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`)}><Icon name="plus" size={14} /> New</button>
     {/snippet}
     <div class="list">
@@ -161,6 +165,7 @@
     {#if service}
       <header class="head">
         <input class="name" aria-label="Service name" value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
+        <button type="button" class="desk-btn ghost save-tpl" title="Keep this service's parts and times to start the next one from" onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> Save as template</button>
         <span class="muted">{count === 0 ? "Nothing added yet" : `${count} item${count === 1 ? "" : "s"} in ${service.sections.length} section${service.sections.length === 1 ? "" : "s"}`}</span>
       </header>
 
@@ -301,6 +306,19 @@
       <div class="blank">
         <Icon name="list" size={28} />
         <p>Plan the whole service in order: welcome, songs, the reading, the sermon, announcements.</p>
+        {#if session.workspace.serviceTemplates.length}
+          <p class="from-label">Start from a template, with its parts and times in place</p>
+          <div class="from-templates">
+            {#each session.workspace.serviceTemplates as template (template.id)}
+              <button type="button" class="tpl-card" onclick={() => void session.createServiceFromTemplate(template.id)}>
+                <strong>{template.name}</strong>
+                <span>{template.parts.map((part) => part.name).slice(0, 4).join(" · ")}{template.parts.length > 4 ? " …" : ""}</span>
+              </button>
+            {/each}
+            <button type="button" class="tpl-card edit" onclick={() => (templatesOpen = { id: null })}><strong>Edit templates</strong><span>Change the parts and times</span></button>
+          </div>
+          <p class="from-label">Or a blank one</p>
+        {/if}
         <form class="inline" onsubmit={(event) => { event.preventDefault(); void session.createService(newName.trim() || "Sunday Service"); newName = ""; }}>
           <input aria-label="Service name" placeholder="Sunday Service" bind:value={newName} />
           <button type="submit" class="desk-btn primary-soft">Start a service</button>
@@ -324,6 +342,10 @@
     </div>
   </aside>
 </section>
+
+{#if templatesOpen}
+  <TemplatesDialog initialId={templatesOpen.id} onclose={() => (templatesOpen = null)} />
+{/if}
 
 <style>
   .service-desk {
@@ -432,4 +454,12 @@
   @media (max-width: 1280px) {
     .service-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
   }
+  .save-tpl { flex: none; height: 30px; font-size: 12px; }
+  .from-label { margin: 6px 0 0; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .from-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: min(640px, 100%); }
+  .tpl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; }
+  .tpl-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .tpl-card strong { font-size: 14px; }
+  .tpl-card span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .tpl-card.edit { border-left-color: var(--line); border-style: dashed; background: none; }
 </style>

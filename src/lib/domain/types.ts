@@ -459,6 +459,10 @@ export type Workspace = {
   secondOutput: import("./second-output").SecondOutputSettings;
   /** Live captions on the screen and on phones. */
   captions: import("./captions").CaptionSettings;
+  /** Size of the full-screen countdown, in frame pixels. */
+  countdownSize: number;
+  /** Service templates: the usual parts of a service with their times. */
+  serviceTemplates: import("./service-templates").ServiceTemplate[];
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

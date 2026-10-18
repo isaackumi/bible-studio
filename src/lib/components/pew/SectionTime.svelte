@@ -78,6 +78,7 @@
       <div class="foot">
         <button type="button" class="ghost" onclick={() => { session.setSectionTiming(section.id, { minutes: null }); open = false; }}>No time</button>
         <button type="button" class="ghost start" title="Mark this section as begun now (also happens when something in it goes live)" onclick={() => { session.startSection(section.id); open = false; }}><Icon name="play" size={12} /> Starting now</button>
+        <button type="button" class="ghost" title="A big countdown to the end of this section on Preview; LIVE shows it" onclick={() => { session.showCountdown(section.id); open = false; }}><Icon name="timer" size={12} /> Countdown</button>
         <button type="button" class="done" onclick={() => (open = false)}>Done</button>
       </div>
     </div>

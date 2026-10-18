@@ -106,7 +106,8 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
-import { planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
+import { parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
+import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
@@ -155,7 +156,7 @@ import { styleModel } from "../domain/text-style";
 import { deckFromPageImages, deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
-import { controlTimers, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
+import { controlTimers, createTimer, presentTimer, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
 import {
   parseVoiceCommand,
   sanitizeVoiceSettings,
@@ -2200,6 +2201,8 @@ class Session {
       }),
     };
     this.persistSoon();
+    this.publishStage();
+    this.refreshCountdown();
   };
 
   /** When each section of the open service actually began today (epoch ms), by section id. */
@@ -2221,7 +2224,63 @@ class Session {
       // Storage blocked: the starts last until the app closes.
     }
     this.publishStage();
+    this.refreshCountdown();
   };
+
+  /** The countdown overlay on or off (made the first time). Where it sits and its size are set in Overlays. */
+  get countdownOverlayOn(): boolean {
+    return this.workspace.overlays.some((overlay) => overlay.kind === "countdown" && overlay.on);
+  }
+
+  toggleCountdownOverlay = () => {
+    const existing = this.workspace.overlays.find((overlay) => overlay.kind === "countdown");
+    if (existing) {
+      this.toggleOverlay(existing.id);
+      return;
+    }
+    const id = this.addOverlay("countdown");
+    this.toggleOverlay(id, true);
+  };
+
+  setCountdownSize = (size: number) => {
+    this.workspace = { ...this.workspace, countdownSize: Math.min(420, Math.max(96, Math.round(size))) };
+    this.persistSoon();
+  };
+
+  /**
+   * A full-screen countdown on Preview (LIVE shows it): to the end of the running section, or of
+   * `sectionId`; before the service begins, to its start time.
+   */
+  showCountdown = (sectionId: string | null = null) => {
+    const service = this.service;
+    if (!service) return;
+    const plan = planSchedule(service);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const running = sectionId ?? this.runningSectionId;
+    let target: { name: string; at: number } | null = null;
+    const deadline = running ? sectionDeadline(plan, running, this.sectionStarts[running] ?? null) : null;
+    if (deadline) target = { name: deadline.name, at: deadline.endsAt };
+    else if (running) {
+      const slot = plan.slots.find((entry) => entry.sectionId === running);
+      if (slot && !slot.untimed) target = { name: slot.name, at: today.getTime() + slot.end * 60_000 };
+    }
+    if (!target) {
+      const start = today.getTime() + (parseClock(service.startTime) ?? plan.start) * 60_000;
+      target = { name: "Service starts in", at: start };
+    }
+    const timer = { ...createTimer({ name: target.name, mode: "target", targetAt: target.at, label: target.name, warningMs: 5 * 60_000 }), running: true };
+    const theme = { ...this.theme(), fontSize: this.workspace.countdownSize };
+    this.previewModel(presentTimer(timer, theme, Date.now()), `countdown:${running ?? "start"}`);
+    this.message = `${target.name} countdown is on Preview. LIVE shows it full screen.`;
+  };
+
+  /** Repaint Program when the running section or its end changes, if a countdown overlay is on. */
+  private refreshCountdown() {
+    if (!this.workspace.overlays.some((overlay) => overlay.on && overlay.kind === "countdown")) return;
+    this.live = { ...this.live };
+    void this.pushProgram();
+  }
 
   /** The section running now and when it should end, for the stage screens. */
   runningDeadline = (): { name: string; endsAt: number } | null => {
@@ -2252,6 +2311,50 @@ class Session {
     entries.sort((a, b) => b[1] - a[1]);
     return entries[0]?.[0] ?? null;
   }
+
+  // Service templates: start a service with the usual parts and times already in place.
+  createServiceFromTemplate = async (templateId: string, date = new Date()) => {
+    const template = this.workspace.serviceTemplates.find((entry) => entry.id === templateId);
+    if (!template) return;
+    const service = serviceFromTemplate(template, serviceNameFor(template, date), uid, new Date());
+    this.service = service;
+    this.cursor = { sectionId: service.sections[0]?.id ?? null, itemId: null };
+    this.loadSectionStarts(service.id);
+    await this.persist();
+    this.services = await api.serviceList();
+    this.message = `${service.name} is ready with ${service.sections.length} parts. Add the songs and readings.`;
+  };
+
+  private saveTemplates(templates: ServiceTemplate[]) {
+    this.workspace = { ...this.workspace, serviceTemplates: templates };
+    this.persistSoon();
+  }
+
+  /** Keep the open service's parts and times as a template (or update one with them). */
+  saveServiceAsTemplate = (name: string, replaceId: string | null = null): ServiceTemplate | null => {
+    if (!this.service) return null;
+    const template = templateFromService(this.service, name, replaceId ?? uid());
+    const rest = this.workspace.serviceTemplates.filter((entry) => entry.id !== template.id);
+    const index = this.workspace.serviceTemplates.findIndex((entry) => entry.id === template.id);
+    const next = index >= 0 ? [...rest.slice(0, index), template, ...rest.slice(index)] : [...rest, template];
+    this.saveTemplates(next);
+    this.message = `${template.name} saved as a template.`;
+    return template;
+  };
+
+  updateTemplate = (template: ServiceTemplate) => {
+    this.saveTemplates(this.workspace.serviceTemplates.map((entry) => (entry.id === template.id ? template : entry)));
+  };
+
+  addTemplate = (): ServiceTemplate => {
+    const template: ServiceTemplate = { id: uid(), name: "New service", startTime: "09:00", parts: [{ name: "Welcome", minutes: 10 }, { name: "Worship", minutes: 30 }, { name: "Preaching", minutes: 40 }] };
+    this.saveTemplates([...this.workspace.serviceTemplates, template]);
+    return template;
+  };
+
+  removeTemplate = (id: string) => {
+    this.saveTemplates(this.workspace.serviceTemplates.filter((entry) => entry.id !== id));
+  };
 
   createService = async (name: string) => {
     const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString() };
@@ -3514,7 +3617,7 @@ class Session {
 
   /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
   private withScreenOverlays = (model: PresentationModel): PresentationModel => {
-    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id));
+    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.runningDeadline() : null);
     if (painted.length === 0) {
       if (!model.overlays) return model;
       const { overlays: _gone, ...rest } = model;

@@ -22,6 +22,7 @@ import { sanitizeGoneLive } from "../domain/gone-live";
 import { sanitizeAudioSettings, sanitizePlaylists } from "../domain/playlists";
 import { sanitizeSecondOutput } from "../domain/second-output";
 import { sanitizeCaptionSettings } from "../domain/captions";
+import { sanitizeTemplates } from "../domain/service-templates";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -130,6 +131,8 @@ export function normalizeWorkspace(input: unknown): Workspace {
     audio: sanitizeAudioSettings(value.audio),
     secondOutput: sanitizeSecondOutput(value.secondOutput),
     captions: sanitizeCaptionSettings(value.captions),
+    serviceTemplates: sanitizeTemplates(value.serviceTemplates),
+    countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],

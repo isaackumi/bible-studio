@@ -5,13 +5,24 @@
   let { overlays, still = false }: { overlays: PaintedOverlay[]; still?: boolean } = $props();
 
   let now = $state(new Date());
-  const hasClock = $derived(overlays.some((overlay) => overlay.kind === "clock"));
+  const hasClock = $derived(overlays.some((overlay) => overlay.kind === "clock" || overlay.kind === "countdown"));
   $effect(() => {
     if (!hasClock || still) return;
     const timer = setInterval(() => (now = new Date()), 1000);
     return () => clearInterval(timer);
   });
   const time = $derived(now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+
+  /** "12:04" left, or "+1:30" once over. */
+  function left(endsAt: number): { text: string; over: boolean; short: boolean } {
+    const ms = endsAt - now.getTime();
+    const whole = Math.floor(Math.abs(ms) / 1000);
+    const h = Math.floor(whole / 3600);
+    const m = Math.floor((whole % 3600) / 60);
+    const sec = String(whole % 60).padStart(2, "0");
+    const text = h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+    return { text: ms < 0 ? `+${text}` : text, over: ms < 0, short: ms >= 0 && ms <= 5 * 60_000 };
+  }
   const SPEED: Record<1 | 2 | 3, number> = { 1: 40, 2: 26, 3: 16 };
   // Corner overlays move clear of a ticker or banner on the same edge.
   const barTop = $derived(overlays.some((overlay) => (overlay.kind === "ticker" || overlay.kind === "banner") && overlay.edge === "top"));
@@ -35,6 +46,14 @@
       </div>
     {:else if overlay.kind === "banner"}
       <div class="ov-bar ov-banner {overlay.edge}" style:--accent-bar={overlay.color}><span>{overlay.text}</span></div>
+    {:else if overlay.kind === "countdown"}
+      {#if overlay.endsAt}
+        {@const view = left(overlay.endsAt)}
+        <div class="ov-count {overlay.spot} size-{overlay.size}" class:over={view.over} class:short={view.short} style:--accent-bar={overlay.color}>
+          <span class="ov-count-label">{overlay.text || overlay.section}</span>
+          <span class="ov-count-time">{view.text}</span>
+        </div>
+      {/if}
     {:else if overlay.kind === "lower-third"}
       <div class="ov-lower" style:--accent-bar={overlay.color}>
         <strong>{overlay.text}</strong>
@@ -69,6 +88,25 @@
   .ov-track { display: inline-flex; gap: 160px; padding-left: 100%; white-space: nowrap; animation: ov-scroll var(--dur, 26s) linear infinite; }
   .ov-track.still { animation: none; padding-left: 60px; }
   @keyframes ov-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+
+  .ov-count { position: absolute; display: grid; justify-items: center; gap: 2px; padding: 0.35em 0.7em 0.4em; border-radius: 0.3em; background: rgba(5, 5, 5, 0.72); border-bottom: 0.12em solid var(--accent-bar); color: #fff; font-size: 56px; line-height: 1; }
+  .ov-count.size-s { font-size: 40px; }
+  .ov-count.size-l { font-size: 84px; }
+  .ov-count.size-xl { font-size: 128px; }
+  .ov-count.top-left { top: 44px; left: 52px; }
+  .ov-count.top-right { top: 44px; right: 52px; }
+  .ov-count.bottom-left { bottom: 44px; left: 52px; }
+  .ov-count.bottom-right { bottom: 44px; right: 52px; }
+  .ov-count.top { top: 44px; left: 50%; transform: translateX(-50%); }
+  .ov-count.bottom { bottom: 44px; left: 50%; transform: translateX(-50%); }
+  .ov-count.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  .bar-top .ov-count.top, .bar-top .ov-count.top-left, .bar-top .ov-count.top-right { top: 124px; }
+  .bar-bottom .ov-count.bottom, .bar-bottom .ov-count.bottom-left, .bar-bottom .ov-count.bottom-right { bottom: 124px; }
+  .ov-count-label { font-size: 0.36em; font-weight: 650; opacity: 0.85; white-space: nowrap; max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
+  .ov-count-time { font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  .ov-count.short { border-bottom-color: #f5a524; }
+  .ov-count.short .ov-count-time { color: #ffd27a; }
+  .ov-count.over { border-bottom-color: #e5484d; background: rgba(120, 10, 20, 0.82); }
 
   .ov-lower { position: absolute; left: 96px; bottom: 120px; display: grid; gap: 4px; padding: 22px 40px 24px 34px; border-left: 12px solid var(--accent-bar); border-radius: 6px; background: rgba(5, 5, 5, 0.85); color: #fff; max-width: 60%; }
   .ov-lower strong { font-size: 46px; font-weight: 700; line-height: 1.1; }

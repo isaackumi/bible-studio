@@ -10,6 +10,7 @@ import { emptyFavorites } from "./favorites";
 import { defaultAudioSettings, defaultPlaylists } from "./playlists";
 import { defaultSecondOutput } from "./second-output";
 import { defaultCaptionSettings } from "./captions";
+import { defaultTemplates } from "./service-templates";
 import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
@@ -323,6 +324,8 @@ export function defaultWorkspace(): Workspace {
     audio: defaultAudioSettings(),
     secondOutput: defaultSecondOutput(),
     captions: defaultCaptionSettings(),
+    countdownSize: 220,
+    serviceTemplates: defaultTemplates(),
   };
 }
 
