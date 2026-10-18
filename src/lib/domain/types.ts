@@ -224,6 +224,10 @@ export type ServiceSection = {
   id: string;
   name: string;
   items: PresentationItem[];
+  /** Planned length in minutes. */
+  minutes?: number;
+  /** Or: runs until this clock time ("11:00"). */
+  until?: string;
 };
 
 export type Service = {
@@ -231,6 +235,8 @@ export type Service = {
   name: string;
   sections: ServiceSection[];
   updatedAt: string;
+  /** When the service starts ("08:00"). */
+  startTime?: string;
 };
 
 export type Cursor = {

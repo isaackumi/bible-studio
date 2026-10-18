@@ -11,6 +11,9 @@
   import MonitorPair from "./MonitorPair.svelte";
   import ItemEditor from "./ItemEditor.svelte";
   import ItemThumb from "./ItemThumb.svelte";
+  import ServiceTimeline from "./ServiceTimeline.svelte";
+  import SectionTime from "./SectionTime.svelte";
+  import { planSchedule } from "../../domain/schedule";
 
   // The running order for a whole service: sections in order, any kind of item, and a way to
   // move through it item by item. Nothing here changes Program; LIVE still does.
@@ -161,6 +164,8 @@
         <span class="muted">{count === 0 ? "Nothing added yet" : `${count} item${count === 1 ? "" : "s"} in ${service.sections.length} section${service.sections.length === 1 ? "" : "s"}`}</span>
       </header>
 
+      <div class="timeline-wrap"><ServiceTimeline {service} /></div>
+
       <div class="order">
         {#if count === 0 && service.sections.length === 0}
           <div class="start-guide">
@@ -171,9 +176,12 @@
           </div>
         {/if}
         {#each service.sections as section, sectionIndex (section.id)}
-          <section class="block" class:target={session.cursor.sectionId === section.id}>
+          {@const plan = planSchedule(service)}
+          {@const slot = plan.slots[sectionIndex]!}
+          <section class="block" class:target={session.cursor.sectionId === section.id} class:running={session.runningSectionId === section.id} style:--tone="var(--slot-{sectionIndex % 8})">
             <header class="block-head">
               <input class="section-name" aria-label="Section name" value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
+              <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
               <span class="tools">
                 <button type="button" class="row-tool" aria-label="Move section up" disabled={sectionIndex === 0} onclick={() => session.moveSection(section.id, -1)}><Icon name="chevron-up" size={14} /></button>
                 <button type="button" class="row-tool" aria-label="Move section down" disabled={sectionIndex === service.sections.length - 1} onclick={() => session.moveSection(section.id, 1)}><Icon name="chevron-down" size={14} /></button>
@@ -353,9 +361,14 @@
   .name { flex: 1; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; }
   .name:hover, .name:focus { border-color: var(--line); background: var(--field); }
 
+  .timeline-wrap { flex: none; padding: 12px 14px 0; }
   .order { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
   .order > :global(*) { flex: none; }
-  .block { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); overflow: hidden; }
+  .block { border: 1px solid var(--line); border-left: 3px solid var(--tone, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); }
+  .block.running { border-color: color-mix(in srgb, var(--tone) 60%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent); }
+  .block.running .section-name { color: var(--ink); }
+  /* The same colours as the timeline, by a section's place in the service. */
+  .service-desk { --slot-0: #5aa0d6; --slot-1: #b07cc6; --slot-2: #e0884e; --slot-3: #58b3a4; --slot-4: #d9677a; --slot-5: #c9a35b; --slot-6: #7d8fe0; --slot-7: #7fa36b; }
   .block.target { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .block-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border-bottom: 1px solid var(--line); }
   .section-name { flex: 1; height: 28px; border-color: transparent; background: none; font-size: 12px; font-weight: 750; letter-spacing: 0; color: var(--muted); }

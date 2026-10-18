@@ -106,6 +106,7 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
+import { sectionTiming } from "../domain/schedule";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
@@ -2166,6 +2167,53 @@ class Session {
     this.persistSoon();
   };
 
+  // Service timing: a start time, and a length or an end time for each section.
+  setServiceStart = (time: string) => {
+    if (!this.service) return;
+    this.service = { ...this.service, startTime: /^\d{2}:\d{2}$/.test(time) ? time : undefined };
+    this.persistSoon();
+  };
+
+  setSectionTiming = (id: string, change: { minutes?: number | null; until?: string | null }) => {
+    if (!this.service) return;
+    const timing = sectionTiming(change);
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => {
+        if (section.id !== id) return section;
+        const next = { ...section, ...timing };
+        if (next.minutes === undefined) delete next.minutes;
+        if (next.until === undefined) delete next.until;
+        return next;
+      }),
+    };
+    this.persistSoon();
+  };
+
+  /** When each section of the open service actually began today (epoch ms), by section id. */
+  sectionStarts = $state<Record<string, number>>({});
+  private sectionStartsDay = "";
+
+  /** Mark a section as begun now (or again). Also happens when something from it first goes live. */
+  startSection = (id: string, at = Date.now()) => {
+    const day = new Date(at).toDateString();
+    if (day !== this.sectionStartsDay) {
+      this.sectionStartsDay = day;
+      this.sectionStarts = {};
+    }
+    this.sectionStarts = { ...this.sectionStarts, [id]: at };
+  };
+
+  /** The section running now: the one most recently begun today. */
+  get runningSectionId(): string | null {
+    // Read the starts first, so whatever shows this follows every new start.
+    const starts = this.sectionStarts;
+    if (this.sectionStartsDay !== new Date().toDateString()) return null;
+    const entries = Object.entries(starts).filter(([id]) => this.service?.sections.some((section) => section.id === id));
+    entries.sort((a, b) => b[1] - a[1]);
+    return entries[0]?.[0] ?? null;
+  }
+
   createService = async (name: string) => {
     const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString() };
     this.service = service;
@@ -3668,6 +3716,12 @@ class Session {
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "video" && this.live.program.model.video) {
       const model = this.live.program.model;
       this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video!, control: { playing: true, at: 0, stamp: Date.now(), volume: 1 } } } } };
+    }
+    // The section of what went live has begun (the first time today).
+    if ((action === "take" || action === "cut") && this.service && this.cursor.itemId) {
+      const section = this.service.sections.find((entry) => entry.items.some((item) => item.id === this.cursor.itemId));
+      const today = new Date().toDateString();
+      if (section && (this.sectionStartsDay !== today || this.sectionStarts[section.id] === undefined)) this.startSection(section.id);
     }
     // Walk-in music (a looping playlist) fades out when the service goes live; a backing track plays on.
     if ((action === "take" || action === "cut") && this.workspace.audio.fadeOnLive && this.audio.playing && this.audio.loop) {
