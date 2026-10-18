@@ -50,11 +50,11 @@
 <div class="decks">
   <div class="bar">
     <button type="button" class="new-deck" onclick={createNew}>+ Create new</button>
-    <button type="button" class="new-deck ghost" title="Bring in a PowerPoint (.pptx) as an editable deck" onclick={() => pptxInput?.click()}>Import PowerPoint</button>
+    <button type="button" class="new-deck ghost" title="Bring in a PowerPoint (.pptx) as an editable deck, or a PDF as a deck of pages" onclick={() => pptxInput?.click()}>Import PowerPoint or PDF</button>
     <input
       bind:this={pptxInput}
       type="file"
-      accept=".pptx,.ppt,.key,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      accept=".pptx,.ppt,.key,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
       hidden
       aria-label="Import PowerPoint"
       onchange={async (event) => {
@@ -62,7 +62,7 @@
         const file = input.files?.[0];
         input.value = "";
         if (!file) return;
-        const id = await session.importPowerPoint(file);
+        const id = /\.pdf$/i.test(file.name) || file.type === "application/pdf" ? await session.importPdf(file, undefined, false) : await session.importPowerPoint(file);
         if (id) onedit(id);
       }}
     />

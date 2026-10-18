@@ -68,6 +68,22 @@ export function addQrElement(page: Composition, data: string, bounds: LayerBound
   });
 }
 
+/**
+ * A deck from pictures of pages (a PDF): one full-screen page per picture on black, kept whole
+ * so nothing is cropped off a page. Pages change with a cut, like turning a page.
+ */
+export function deckFromPageImages(name: string, pages: Array<{ id: string; name: string; url: string }>, now = new Date()): SlideDeck {
+  return {
+    id: uid("deck"),
+    name: name.trim() || "Document",
+    updatedAt: now.toISOString(),
+    pages: pages.map((asset, index) => {
+      const page = setCompositionBackground(createComposition(`Page ${index + 1}`), { ...DEFAULT_BACKGROUND, type: "color", color: "#000000" });
+      return { ...addImageElement(page, asset, { x: 0, y: 0, w: 100, h: 100 }), transition: { type: "cut", ms: 0 } };
+    }),
+  };
+}
+
 /** A fresh page: gradient background, a title and a subtitle ready to edit. */
 export function newPage(name = "Page"): Composition {
   let page = setCompositionBackground(createComposition(name), DEFAULT_BACKGROUND);

@@ -51,3 +51,20 @@ describe("slide decks", () => {
     expect(deckItem(deck)).toMatchObject({ kind: "deck", title: "D", deck: { deckId: deck.id } });
   });
 });
+
+describe("decks from PDF pages", () => {
+  it("makes one full-screen page per picture, on black, turning with a cut", async () => {
+    const { deckFromPageImages } = await import("./decks");
+    const deck = deckFromPageImages("Bulletin", [
+      { id: "a1", name: "Bulletin 1", url: "blob:a1" },
+      { id: "a2", name: "Bulletin 2", url: "blob:a2" },
+    ]);
+    expect(deck.name).toBe("Bulletin");
+    expect(deck.pages).toHaveLength(2);
+    const layer = deck.pages[1]!.layers[0]!;
+    expect(layer.bounds).toEqual({ x: 0, y: 0, w: 100, h: 100 });
+    expect(layer.source.payload.assetId).toBe("a2");
+    expect(deck.pages[0]!.transition.type).toBe("cut");
+    expect(deck.pages[0]!.background?.color).toBe("#000000");
+  });
+});

@@ -142,7 +142,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
-import { deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
+import { deckFromPageImages, deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
@@ -743,17 +743,15 @@ class Session {
     this.message = `Imported ${items.length} slide${items.length === 1 ? "" : "s"} to Preview. LIVE still sends Program.`;
   };
 
-  /** Each PDF page becomes an image slide in the service. Preview only; Program is untouched. */
-  importPdf = async (file: File, onProgress?: (done: number, total: number) => void) => {
+  /**
+   * A PDF becomes a slide deck: one page per PDF page, stepped with the arrows like any deck,
+   * usable on both desks. With `toService` (the default) it also joins the service being built.
+   * Preview only; Program is untouched. Returns the deck id, or null.
+   */
+  importPdf = async (file: File, onProgress?: (done: number, total: number) => void, toService = true): Promise<string | null> => {
     const { renderPdfPages } = await import("../import/pdf");
-    if (!this.service) await this.createService("Sunday Service");
-    if (!this.service?.sections.length) this.addSection("Slides");
-    const target = this.cursor.sectionId ?? this.service?.sections[0]?.id;
-    if (!target || !this.service) {
-      this.message = "Add a section, then import.";
-      return 0;
-    }
-    const items: PresentationItem[] = [];
+    const name = file.name.replace(/\.pdf$/i, "") || "Document";
+    const pages: Array<{ id: string; name: string; url: string }> = [];
     let total = 0;
     try {
       for await (const page of renderPdfPages(file)) {
@@ -762,21 +760,23 @@ class Session {
         onProgress?.(page.index, page.count);
         const asset = await api.importMediaBytes(page.name, page.blob);
         this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
-        const title = page.count === 1 ? file.name.replace(/\.pdf$/i, "") : `${file.name.replace(/\.pdf$/i, "")} · ${page.index + 1}`;
-        const item: PresentationItem = { id: uid(), kind: "image", title, image: { assetId: asset.id } };
-        this.insertItem(target, item);
-        items.push(item);
+        const url = mediaUrl(asset);
+        if (url) pages.push({ id: asset.id, name: asset.name, url });
       }
     } catch (error) {
       this.message = error instanceof Error ? error.message : `${file.name} could not be imported.`;
-      if (!items.length) return 0;
+      if (!pages.length) return null;
     }
-    this.persistSoon();
-    const first = items[0];
-    if (first) await this.selectItem(first.id);
-    const capped = total > items.length ? ` (first ${items.length} pages)` : "";
-    this.message = `Imported ${items.length} slide${items.length === 1 ? "" : "s"} from ${file.name}${capped}. Preview only; LIVE sends Program.`;
-    return items.length;
+    if (!pages.length) {
+      this.message = `${file.name} has no pages to show.`;
+      return null;
+    }
+    const deck = deckFromPageImages(name, pages);
+    this.saveDeck(deck);
+    if (toService) await this.addDeckToService(deck.id);
+    const capped = total > pages.length ? ` (first ${pages.length} pages)` : "";
+    this.message = `${file.name} is the slide deck “${deck.name}”, ${pages.length} page${pages.length === 1 ? "" : "s"}${capped}.${toService ? " It is in the service; arrows turn the pages." : ""}`;
+    return deck.id;
   };
 
   /** A PowerPoint file becomes an editable slide deck; its pictures go into the media library. */
