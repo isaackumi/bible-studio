@@ -364,7 +364,7 @@
             <input aria-label={t("Find a song")} placeholder={t("Title, author or lyrics")} bind:value={songQuery} />
             <div class="pick-list">
               {#each songs as song (song.id)}
-                <button type="button" onclick={() => session.addSongToService(song)}><Icon name="plus" size={13} /> <strong>{song.title || "Untitled song"}</strong><em>{song.author}</em></button>
+                <button type="button" onclick={() => session.addSongToService(song)}><Icon name="plus" size={13} /> <strong>{song.title || t("Untitled song")}</strong><em>{song.author}</em></button>
               {:else}
                 <p class="empty">{session.songs.length ? t("No songs match.") : t("No songs yet. Add them on the Songs page.")}</p>
               {/each}
@@ -429,7 +429,7 @@
           </div>
           <p class="from-label">{t("Or a blank one")}</p>
         {/if}
-        <form class="inline" onsubmit={(event) => { event.preventDefault(); void session.createService(newName.trim() || "Sunday Service"); newName = ""; }}>
+        <form class="inline" onsubmit={(event) => { event.preventDefault(); void session.createService(newName.trim() || t("Sunday Service")); newName = ""; }}>
           <input aria-label={t("Service name")} placeholder={t("Sunday Service")} bind:value={newName} />
           <button type="submit" class="desk-btn primary-soft">{t("Start a service")}</button>
         </form>

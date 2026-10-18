@@ -2,6 +2,7 @@
   import { capabilityReport } from "../platform/capability-report";
   import { detectOutputCapabilities, probeFromWindow } from "../platform/output-capabilities";
   import { isDesktop } from "../platform/runtime";
+  import { t } from "../i18n/core";
 
   // What this computer can do in this window, and why not — shown instead of dead buttons.
   const desktop = isDesktop();
@@ -22,7 +23,7 @@
         <strong>{row.label}</strong>
         <span>{row.detail}</span>
       </div>
-      <span class="pill" class:ok={row.available} class:muted={!row.available}>{row.available ? "Ready" : "Not here"}</span>
+      <span class="pill" class:ok={row.available} class:muted={!row.available}>{row.available ? t("Ready") : t("Not here")}</span>
     </div>
   {/each}
 </section>

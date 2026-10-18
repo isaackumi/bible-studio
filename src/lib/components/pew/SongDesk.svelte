@@ -607,7 +607,7 @@
           <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || t("this song")} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
           <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
             <strong>
-              {song.title || "Untitled song"}
+              {song.title || t("Untitled song")}
               {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">{t("Live")}</em>
               {:else if onPreview?.songId === song.id}<em class="badge">{t("Preview")}</em>{/if}
             </strong>

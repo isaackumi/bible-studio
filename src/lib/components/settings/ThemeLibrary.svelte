@@ -11,6 +11,7 @@
   import FavoriteStar from "../FavoriteStar.svelte";
   import { favoritesFirst } from "../../domain/favorites";
   import Screen from "../Screen.svelte";
+  import { msg, t } from "../../i18n/core";
 
   // Theme library: browse every look for the audience screen, preview it live, and (Premium)
   // edit or create one with color, gradient, animated, photo or video backgrounds.
@@ -57,10 +58,10 @@
 
   function badge(theme: Theme): string {
     const type = theme.background.type;
-    if (type === "motion") return "Animated";
-    if (type === "video") return "Video";
-    if (type === "image") return "Photo";
-    if (type === "gradient") return "Gradient";
+    if (type === "motion") return t("Animated");
+    if (type === "video") return t("Video");
+    if (type === "image") return t("Photo");
+    if (type === "gradient") return t("Gradient");
     return "";
   }
 
@@ -126,7 +127,7 @@
 
   async function useImported(added: Awaited<ReturnType<typeof session.importImage>>) {
     if (!added) {
-      note = session.message || "That file was not added.";
+      note = session.message || t("That file was not added.");
       return;
     }
     setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
@@ -163,7 +164,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       note = `${fileName} saved.`;
     } catch (error) {
-      note = error instanceof Error ? error.message : "The theme was not exported.";
+      note = error instanceof Error ? error.message : t("The theme was not exported.");
     }
   }
 
@@ -175,19 +176,19 @@
     try {
       await session.importTheme(await file.text());
       selectedId = session.workspace.themeId;
-      note = "Theme imported.";
+      note = t("Theme imported.");
     } catch (error) {
-      note = error instanceof Error ? error.message : "The theme was not imported.";
+      note = error instanceof Error ? error.message : t("The theme was not imported.");
     }
   }
 
   const BG_TYPES: { id: ThemeBackground["type"]; label: string }[] = [
-    { id: "color", label: "Color" },
-    { id: "gradient", label: "Gradient" },
-    { id: "wash", label: "Wash" },
-    { id: "motion", label: "Animated" },
-    { id: "image", label: "Photo" },
-    { id: "video", label: "Video" },
+    { id: "color", label: msg("Color") },
+    { id: "gradient", label: msg("Gradient") },
+    { id: "wash", label: msg("Wash") },
+    { id: "motion", label: msg("Animated") },
+    { id: "image", label: msg("Photo") },
+    { id: "video", label: msg("Video") },
   ];
 </script>
 
@@ -198,27 +199,27 @@
     <div class="hero-side">
       <input
         class="theme-name"
-        aria-label="Theme name"
+        aria-label={t("Theme name")}
         value={selected.name}
         disabled={!canEdit}
         onchange={(event) => patch({ name: event.currentTarget.value.trim() || selected.name })}
       />
       <p class="note">
-        {#if session.workspace.themeId === selected.id}In use on the audience screen.{:else}Not in use.{/if}
-        {#if badge(selected)} {badge(selected)} background.{/if}
+        {#if session.workspace.themeId === selected.id}{t("In use on the audience screen.")}{:else}{t("Not in use.")}{/if}
+        {#if badge(selected)} {t("{kind} background.", { kind: badge(selected) })}{/if}
       </p>
       <div class="hero-actions">
         {#if session.workspace.themeId !== selected.id}
-          <button type="button" class="btn primary" onclick={() => apply(selected)}>Use this theme</button>
+          <button type="button" class="btn primary" onclick={() => apply(selected)}>{t("Use this theme")}</button>
         {/if}
-        <button type="button" class="btn" onclick={newTheme}><Icon name="copy" size={14} /> Duplicate</button>
+        <button type="button" class="btn" onclick={newTheme}><Icon name="copy" size={14} /> {t("Duplicate")}</button>
         {#if isMine(selected)}
-          <button type="button" class="btn danger" onclick={() => void remove(selected)}><Icon name="trash" size={14} /> Delete</button>
+          <button type="button" class="btn danger" onclick={() => void remove(selected)}><Icon name="trash" size={14} /> {t("Delete")}</button>
         {/if}
       </div>
       {#if !canEdit}
         <button type="button" class="unlock" onclick={() => session.requireFeature("theme-library")}>
-          <Icon name="key" size={14} /> Edit colors, add photos, video and animation with Premium
+          <Icon name="key" size={14} /> {t("Edit colors, add photos, video and animation with Premium")}
         </button>
       {/if}
       {#if note}<p class="note" role="status">{note}</p>{/if}
@@ -227,8 +228,8 @@
 
   <!-- Gallery -->
   <div class="gallery-head">
-    <p class="section-label">Library <span>{shown.length}</span></p>
-    <div class="filters" role="radiogroup" aria-label="Show">
+    <p class="section-label">{t("Library")} <span>{shown.length}</span></p>
+    <div class="filters" role="radiogroup" aria-label={t("Show")}>
       {#each [["all", "All"], ["favorites", "Favorites"], ["broadcast", "Broadcast"], ["still", "Still"], ["animated", "Animated"], ["media", "Photo & video"], ["mine", "My themes"]] as [id, label] (id)}
         <button type="button" role="radio" aria-checked={filter === id} class:on={filter === id} onclick={() => (filter = id as Filter)}>{label}</button>
       {/each}
@@ -242,28 +243,28 @@
         <span class="thumb"><Screen model={sample(theme)} still aspect={16 / 9} /></span>
         <span class="card-meta">
           <strong>{theme.name}</strong>
-          {#if session.workspace.themeId === theme.id}<em class="pill ok">In use</em>
-          {:else if theme.premium && !canEdit}<em class="pill muted"><Icon name="key" size={10} /> Premium</em>
+          {#if session.workspace.themeId === theme.id}<em class="pill ok">{t("In use")}</em>
+          {:else if theme.premium && !canEdit}<em class="pill muted"><Icon name="key" size={10} /> {t("Premium")}</em>
           {:else if badge(theme)}<em class="pill muted">{badge(theme)}</em>{/if}
         </span>
       </button>
       </div>
     {:else}
-      <p class="note">{filter === "mine" ? "No themes of your own yet. Duplicate one to start." : filter === "favorites" ? "No favorite themes yet. Star a theme to keep it here." : "Nothing here yet."}</p>
+      <p class="note">{filter === "mine" ? t("No themes of your own yet. Duplicate one to start.") : filter === "favorites" ? t("No favorite themes yet. Star a theme to keep it here.") : t("Nothing here yet.")}</p>
     {/each}
   </div>
 
   <section class="rows">
     <div class="row">
-      <div class="row-copy"><strong>Calm backgrounds</strong><span>Hold animated backgrounds still on this computer and its audience screen. Turn on if motion stutters on an older projector computer.</span></div>
-      <input type="checkbox" class="switch" role="switch" aria-label="Calm backgrounds" checked={session.workspace.appearance.calm === true} onchange={(event) => session.setCalmBackgrounds(event.currentTarget.checked)} />
+      <div class="row-copy"><strong>{t("Calm backgrounds")}</strong><span>{t("Hold animated backgrounds still on this computer and its audience screen. Turn on if motion stutters on an older projector computer.")}</span></div>
+      <input type="checkbox" class="switch" role="switch" aria-label={t("Calm backgrounds")} checked={session.workspace.appearance.calm === true} onchange={(event) => session.setCalmBackgrounds(event.currentTarget.checked)} />
     </div>
   </section>
 
   <!-- Editor -->
   <div class="editor" class:locked={!canEdit}>
-    <p class="section-label">Customize {selected.name}</p>
-    <div class="tabs" role="tablist" aria-label="Theme settings">
+    <p class="section-label">{t("Customize {name}", { name: selected.name })}</p>
+    <div class="tabs" role="tablist" aria-label={t("Theme settings")}>
       {#each [["background", "Background"], ["text", "Text"], ["details", "Details"]] as [id, label] (id)}
         <button type="button" role="tab" aria-selected={tab === id} class:on={tab === id} onclick={() => (tab = id as Tab)}>{label}</button>
       {/each}
@@ -272,37 +273,37 @@
     {#if tab === "background"}
       <section class="rows">
         <div class="row stack">
-          <div class="row-copy"><strong>Background</strong><span>Behind every verse, song and slide that uses this theme.</span></div>
-          <div class="seg" role="radiogroup" aria-label="Background type">
+          <div class="row-copy"><strong>{t("Background")}</strong><span>{t("Behind every verse, song and slide that uses this theme.")}</span></div>
+          <div class="seg" role="radiogroup" aria-label={t("Background type")}>
             {#each BG_TYPES as entry (entry.id)}
-              <button type="button" role="radio" aria-checked={selected.background.type === entry.id} class:on={selected.background.type === entry.id} onclick={() => switchType(entry.id)}>{entry.label}</button>
+              <button type="button" role="radio" aria-checked={selected.background.type === entry.id} class:on={selected.background.type === entry.id} onclick={() => switchType(entry.id)}>{t(entry.label)}</button>
             {/each}
           </div>
         </div>
         {#if selected.background.type === "color"}
           {@const bg = selected.background}
           <div class="row">
-            <div class="row-copy"><strong>Color</strong></div>
-            <input type="color" class="swatch-input" aria-label="Background color" value={bg.color} onchange={(event) => setBackground({ type: "color", color: event.currentTarget.value })} />
+            <div class="row-copy"><strong>{t("Color")}</strong></div>
+            <input type="color" class="swatch-input" aria-label={t("Background color")} value={bg.color} onchange={(event) => setBackground({ type: "color", color: event.currentTarget.value })} />
           </div>
         {:else if selected.background.type === "gradient"}
           {@const bg = selected.background}
           <div class="row">
-            <div class="row-copy"><strong>Colors</strong><span>From one color to another.</span></div>
+            <div class="row-copy"><strong>{t("Colors")}</strong><span>{t("From one color to another.")}</span></div>
             <div class="row-end">
               <span class="gradient-chip" style:background={gradientCss(bg.from, bg.to, bg.angle)}></span>
-              <input type="color" class="swatch-input" aria-label="Gradient start" value={bg.from} onchange={(event) => setBackground({ ...bg, from: event.currentTarget.value })} />
-              <input type="color" class="swatch-input" aria-label="Gradient end" value={bg.to} onchange={(event) => setBackground({ ...bg, to: event.currentTarget.value })} />
+              <input type="color" class="swatch-input" aria-label={t("Gradient start")} value={bg.from} onchange={(event) => setBackground({ ...bg, from: event.currentTarget.value })} />
+              <input type="color" class="swatch-input" aria-label={t("Gradient end")} value={bg.to} onchange={(event) => setBackground({ ...bg, to: event.currentTarget.value })} />
             </div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Direction</strong><span>{bg.angle}°</span></div>
-            <input type="range" min="0" max="359" step="5" aria-label="Gradient angle" value={bg.angle} onchange={(event) => setBackground({ ...bg, angle: Number(event.currentTarget.value) })} />
+            <div class="row-copy"><strong>{t("Direction")}</strong><span>{bg.angle}°</span></div>
+            <input type="range" min="0" max="359" step="5" aria-label={t("Gradient angle")} value={bg.angle} onchange={(event) => setBackground({ ...bg, angle: Number(event.currentTarget.value) })} />
           </div>
         {:else if selected.background.type === "wash"}
           {@const bg = selected.background}
           <div class="row stack">
-            <div class="row-copy"><strong>Wash</strong><span>Soft, ready-made fills. Some drift slowly.</span></div>
+            <div class="row-copy"><strong>{t("Wash")}</strong><span>{t("Soft, ready-made fills. Some drift slowly.")}</span></div>
             <div class="chips">
               {#each DISPLAY_WASHES as wash (wash.id)}
                 <button type="button" class="chip-btn" class:on={bg.washId === wash.id} onclick={() => setBackground({ type: "wash", washId: wash.id })}>
@@ -314,7 +315,7 @@
         {:else if selected.background.type === "motion"}
           {@const bg = selected.background}
           <div class="row stack">
-            <div class="row-copy"><strong>Animation</strong><span>Drawn live on the screen; nothing to download.</span></div>
+            <div class="row-copy"><strong>{t("Animation")}</strong><span>{t("Drawn live on the screen; nothing to download.")}</span></div>
             <div class="chips">
               {#each MOTIONS as motion (motion.id)}
                 <button type="button" class="chip-btn" class:on={bg.motionId === motion.id} onclick={() => setBackground({ type: "motion", motionId: motion.id, tint: motion.tint, base: motion.base })}>
@@ -324,55 +325,55 @@
             </div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Colors</strong><span>Light color, and the sky behind it.</span></div>
+            <div class="row-copy"><strong>{t("Colors")}</strong><span>{t("Light color, and the sky behind it.")}</span></div>
             <div class="row-end">
-              <input type="color" class="swatch-input" aria-label="Animation color" value={bg.tint} onchange={(event) => setBackground({ ...bg, tint: event.currentTarget.value })} />
-              <input type="color" class="swatch-input" aria-label="Animation base color" value={bg.base} onchange={(event) => setBackground({ ...bg, base: event.currentTarget.value })} />
+              <input type="color" class="swatch-input" aria-label={t("Animation color")} value={bg.tint} onchange={(event) => setBackground({ ...bg, tint: event.currentTarget.value })} />
+              <input type="color" class="swatch-input" aria-label={t("Animation base color")} value={bg.base} onchange={(event) => setBackground({ ...bg, base: event.currentTarget.value })} />
             </div>
           </div>
         {:else}
           {@const bg = selected.background}
           {@const list = bg.type === "video" ? videos : images}
           <div class="row stack">
-            <div class="row-copy"><strong>{bg.type === "video" ? "Video" : "Photo"}</strong><span>{bg.type === "video" ? "Plays silently on a loop behind the words." : "Fills the screen behind the words."}</span></div>
+            <div class="row-copy"><strong>{bg.type === "video" ? t("Video") : t("Photo")}</strong><span>{bg.type === "video" ? t("Plays silently on a loop behind the words.") : t("Fills the screen behind the words.")}</span></div>
             <div class="chips">
               {#each list as asset (asset.id)}
                 <button type="button" class="chip-btn" class:on={"assetId" in bg && bg.assetId === asset.id} onclick={() => setBackground({ type: bg.type === "video" ? "video" : "image", assetId: asset.id })}>{asset.name}</button>
               {/each}
-              <button type="button" class="chip-btn add" onclick={() => chooseMedia(bg.type === "video" ? "video" : "image")}><Icon name="plus" size={12} /> Import</button>
+              <button type="button" class="chip-btn add" onclick={() => chooseMedia(bg.type === "video" ? "video" : "image")}><Icon name="plus" size={12} /> {t("Import")}</button>
             </div>
           </div>
         {/if}
         <div class="row">
-          <div class="row-copy"><strong>Darken</strong><span>{Math.round((selected.dim ?? 0) * 100)}%: helps words read over photos, video and animation.</span></div>
-          <input type="range" min="0" max="80" step="5" aria-label="Darken background" value={Math.round((selected.dim ?? 0) * 100)} onchange={(event) => patch({ dim: Number(event.currentTarget.value) / 100 })} />
+          <div class="row-copy"><strong>{t("Darken")}</strong><span>{t("{percent}%: helps words read over photos, video and animation.", { percent: Math.round((selected.dim ?? 0) * 100) })}</span></div>
+          <input type="range" min="0" max="80" step="5" aria-label={t("Darken background")} value={Math.round((selected.dim ?? 0) * 100)} onchange={(event) => patch({ dim: Number(event.currentTarget.value) / 100 })} />
         </div>
       </section>
     {:else if tab === "text"}
       <section class="rows">
         <div class="row">
-          <div class="row-copy"><strong>Font</strong></div>
-          <select class="field" aria-label="Font" value={selected.fontFamily} onchange={(event) => patch({ fontFamily: event.currentTarget.value })}>
+          <div class="row-copy"><strong>{t("Font")}</strong></div>
+          <select class="field" aria-label={t("Font")} value={selected.fontFamily} onchange={(event) => patch({ fontFamily: event.currentTarget.value })}>
             {#each SCREEN_FONTS as font (font.id)}<option value={font.family}>{font.name}</option>{/each}
           </select>
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Size</strong><span>{selected.fontSize} px on a 1080p screen</span></div>
-          <input type="range" min="32" max="120" step="2" aria-label="Text size" value={selected.fontSize} onchange={(event) => patch({ fontSize: Number(event.currentTarget.value) })} />
+          <div class="row-copy"><strong>{t("Size")}</strong><span>{t("{fontSize} px on a 1080p screen", { fontSize: selected.fontSize })}</span></div>
+          <input type="range" min="32" max="120" step="2" aria-label={t("Text size")} value={selected.fontSize} onchange={(event) => patch({ fontSize: Number(event.currentTarget.value) })} />
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Color</strong></div>
-          <input type="color" class="swatch-input" aria-label="Text color" value={selected.color} onchange={(event) => patch({ color: event.currentTarget.value })} />
+          <div class="row-copy"><strong>{t("Color")}</strong></div>
+          <input type="color" class="swatch-input" aria-label={t("Text color")} value={selected.color} onchange={(event) => patch({ color: event.currentTarget.value })} />
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Alignment</strong></div>
+          <div class="row-copy"><strong>{t("Alignment")}</strong></div>
           <div class="row-end">
-            <div class="seg small" role="radiogroup" aria-label="Horizontal alignment">
+            <div class="seg small" role="radiogroup" aria-label={t("Horizontal alignment")}>
               {#each [["left", "Left"], ["center", "Center"], ["right", "Right"]] as [id, label] (id)}
                 <button type="button" role="radio" aria-checked={selected.align === id} class:on={selected.align === id} onclick={() => patch({ align: id as Theme["align"] })}>{label}</button>
               {/each}
             </div>
-            <div class="seg small" role="radiogroup" aria-label="Vertical position">
+            <div class="seg small" role="radiogroup" aria-label={t("Vertical position")}>
               {#each [["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as [id, label] (id)}
                 <button type="button" role="radio" aria-checked={selected.vertical === id} class:on={selected.vertical === id} onclick={() => patch({ vertical: id as Theme["vertical"] })}>{label}</button>
               {/each}
@@ -380,23 +381,23 @@
           </div>
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Margin</strong><span>{selected.margin} px from the screen edges</span></div>
-          <input type="range" min="24" max="240" step="4" aria-label="Margin" value={selected.margin} onchange={(event) => patch({ margin: Number(event.currentTarget.value) })} />
+          <div class="row-copy"><strong>{t("Margin")}</strong><span>{t("{margin} px from the screen edges", { margin: selected.margin })}</span></div>
+          <input type="range" min="24" max="240" step="4" aria-label={t("Margin")} value={selected.margin} onchange={(event) => patch({ margin: Number(event.currentTarget.value) })} />
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Shadow</strong><span>A soft shadow behind the words.</span></div>
-          <input type="checkbox" class="switch" role="switch" aria-label="Text shadow" checked={!!selected.effects?.shadow} onchange={(event) => patch({ effects: { ...selected.effects, shadow: event.currentTarget.checked } })} />
+          <div class="row-copy"><strong>{t("Shadow")}</strong><span>{t("A soft shadow behind the words.")}</span></div>
+          <input type="checkbox" class="switch" role="switch" aria-label={t("Text shadow")} checked={!!selected.effects?.shadow} onchange={(event) => patch({ effects: { ...selected.effects, shadow: event.currentTarget.checked } })} />
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Capitals</strong><span>Show words in capitals.</span></div>
-          <input type="checkbox" class="switch" role="switch" aria-label="Capitals" checked={!!selected.effects?.uppercase} onchange={(event) => patch({ effects: { ...selected.effects, uppercase: event.currentTarget.checked } })} />
+          <div class="row-copy"><strong>{t("Capitals")}</strong><span>{t("Show words in capitals.")}</span></div>
+          <input type="checkbox" class="switch" role="switch" aria-label={t("Capitals")} checked={!!selected.effects?.uppercase} onchange={(event) => patch({ effects: { ...selected.effects, uppercase: event.currentTarget.checked } })} />
         </div>
       </section>
-      <p class="section-label">Text panel</p>
+      <p class="section-label">{t("Text panel")}</p>
       <section class="rows">
         <div class="row">
-          <div class="row-copy"><strong>Panel</strong><span>A shape behind the words, like TV graphics. Bar suits lower thirds.</span></div>
-          <div class="seg small" role="radiogroup" aria-label="Text panel">
+          <div class="row-copy"><strong>{t("Panel")}</strong><span>{t("A shape behind the words, like TV graphics. Bar suits lower thirds.")}</span></div>
+          <div class="seg small" role="radiogroup" aria-label={t("Text panel")}>
             {#each [["none", "None"], ["box", "Box"], ["glass", "Glass"], ["band", "Band"], ["bar", "Bar"]] as [id, label] (id)}
               <button
                 type="button"
@@ -411,56 +412,56 @@
         {#if selected.panel}
           {@const panel = selected.panel}
           <div class="row">
-            <div class="row-copy"><strong>Panel colors</strong><span>Fill, then the stripe and tag color.</span></div>
+            <div class="row-copy"><strong>{t("Panel colors")}</strong><span>{t("Fill, then the stripe and tag color.")}</span></div>
             <div class="row-end">
-              <input type="color" class="swatch-input" aria-label="Panel color" value={panel.color} onchange={(event) => patch({ panel: { ...panel, color: event.currentTarget.value } })} />
-              <input type="color" class="swatch-input" aria-label="Panel accent" value={panel.accent} onchange={(event) => patch({ panel: { ...panel, accent: event.currentTarget.value } })} />
+              <input type="color" class="swatch-input" aria-label={t("Panel color")} value={panel.color} onchange={(event) => patch({ panel: { ...panel, color: event.currentTarget.value } })} />
+              <input type="color" class="swatch-input" aria-label={t("Panel accent")} value={panel.accent} onchange={(event) => patch({ panel: { ...panel, accent: event.currentTarget.value } })} />
             </div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Panel strength</strong><span>{Math.round(panel.opacity * 100)}%</span></div>
-            <input type="range" min="0" max="100" step="5" aria-label="Panel strength" value={Math.round(panel.opacity * 100)} onchange={(event) => patch({ panel: { ...panel, opacity: Number(event.currentTarget.value) / 100 } })} />
+            <div class="row-copy"><strong>{t("Panel strength")}</strong><span>{Math.round(panel.opacity * 100)}%</span></div>
+            <input type="range" min="0" max="100" step="5" aria-label={t("Panel strength")} value={Math.round(panel.opacity * 100)} onchange={(event) => patch({ panel: { ...panel, opacity: Number(event.currentTarget.value) / 100 } })} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Reference tag</strong><span>Show the reference on a colored tag.</span></div>
-            <input type="checkbox" class="switch" role="switch" aria-label="Reference tag" checked={panel.tag} onchange={(event) => patch({ panel: { ...panel, tag: event.currentTarget.checked } })} />
+            <div class="row-copy"><strong>{t("Reference tag")}</strong><span>{t("Show the reference on a colored tag.")}</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Reference tag")} checked={panel.tag} onchange={(event) => patch({ panel: { ...panel, tag: event.currentTarget.checked } })} />
           </div>
         {/if}
       </section>
     {:else}
       <section class="rows">
         <div class="row">
-          <div class="row-copy"><strong>Reference</strong><span>“John 3:16” above the verse.</span></div>
+          <div class="row-copy"><strong>{t("Reference")}</strong><span>{t("“John 3:16” above the verse.")}</span></div>
           <div class="row-end">
-            <input type="color" class="swatch-input" aria-label="Reference color" value={selected.reference.color} onchange={(event) => patch({ reference: { ...selected.reference, color: event.currentTarget.value } })} />
-            <input type="checkbox" class="switch" role="switch" aria-label="Show reference" checked={selected.reference.show} onchange={(event) => patch({ reference: { ...selected.reference, show: event.currentTarget.checked } })} />
+            <input type="color" class="swatch-input" aria-label={t("Reference color")} value={selected.reference.color} onchange={(event) => patch({ reference: { ...selected.reference, color: event.currentTarget.value } })} />
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Show reference")} checked={selected.reference.show} onchange={(event) => patch({ reference: { ...selected.reference, show: event.currentTarget.checked } })} />
           </div>
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Reference size</strong><span>{selected.reference.size} px</span></div>
-          <input type="range" min="14" max="60" step="2" aria-label="Reference size" value={selected.reference.size} onchange={(event) => patch({ reference: { ...selected.reference, size: Number(event.currentTarget.value) } })} />
+          <div class="row-copy"><strong>{t("Reference size")}</strong><span>{t("{size} px", { size: selected.reference.size })}</span></div>
+          <input type="range" min="14" max="60" step="2" aria-label={t("Reference size")} value={selected.reference.size} onchange={(event) => patch({ reference: { ...selected.reference, size: Number(event.currentTarget.value) } })} />
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Translation name</strong><span>“King James Version” under the verse.</span></div>
+          <div class="row-copy"><strong>{t("Translation name")}</strong><span>{t("“King James Version” under the verse.")}</span></div>
           <div class="row-end">
-            <input type="color" class="swatch-input" aria-label="Translation name color" value={selected.attribution.color} onchange={(event) => patch({ attribution: { ...selected.attribution, color: event.currentTarget.value } })} />
-            <input type="checkbox" class="switch" role="switch" aria-label="Show translation name" checked={selected.attribution.show} onchange={(event) => patch({ attribution: { ...selected.attribution, show: event.currentTarget.checked } })} />
+            <input type="color" class="swatch-input" aria-label={t("Translation name color")} value={selected.attribution.color} onchange={(event) => patch({ attribution: { ...selected.attribution, color: event.currentTarget.value } })} />
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Show translation name")} checked={selected.attribution.show} onchange={(event) => patch({ attribution: { ...selected.attribution, show: event.currentTarget.checked } })} />
           </div>
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Change between slides</strong><span>{selected.transition.type === "cut" ? "Instant" : `Fade, ${selected.transition.ms} ms`}</span></div>
+          <div class="row-copy"><strong>{t("Change between slides")}</strong><span>{selected.transition.type === "cut" ? t("Instant") : t("Fade, {ms} ms", { ms: selected.transition.ms })}</span></div>
           <div class="row-end">
-            <div class="seg small" role="radiogroup" aria-label="Transition">
-              <button type="button" role="radio" aria-checked={selected.transition.type === "fade"} class:on={selected.transition.type === "fade"} onclick={() => patch({ transition: { ...selected.transition, type: "fade" } })}>Fade</button>
-              <button type="button" role="radio" aria-checked={selected.transition.type === "cut"} class:on={selected.transition.type === "cut"} onclick={() => patch({ transition: { ...selected.transition, type: "cut" } })}>Cut</button>
+            <div class="seg small" role="radiogroup" aria-label={t("Transition")}>
+              <button type="button" role="radio" aria-checked={selected.transition.type === "fade"} class:on={selected.transition.type === "fade"} onclick={() => patch({ transition: { ...selected.transition, type: "fade" } })}>{t("Fade")}</button>
+              <button type="button" role="radio" aria-checked={selected.transition.type === "cut"} class:on={selected.transition.type === "cut"} onclick={() => patch({ transition: { ...selected.transition, type: "cut" } })}>{t("Cut")}</button>
             </div>
           </div>
         </div>
         <div class="row">
-          <div class="row-copy"><strong>Share a theme</strong><span>Save this theme to a file, or add one from a file.</span></div>
+          <div class="row-copy"><strong>{t("Share a theme")}</strong><span>{t("Save this theme to a file, or add one from a file.")}</span></div>
           <div class="row-end">
-            <button type="button" class="btn" onclick={() => void exportTheme()}>Export</button>
-            <button type="button" class="btn" onclick={() => importInput?.click()}>Import…</button>
+            <button type="button" class="btn" onclick={() => void exportTheme()}>{t("Export")}</button>
+            <button type="button" class="btn" onclick={() => importInput?.click()}>{t("Import…")}</button>
           </div>
         </div>
       </section>

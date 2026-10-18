@@ -70,7 +70,7 @@
       <!-- Where the alert will sit on the screen. -->
       <div class="mock" aria-hidden="true">
         <span class="mock-slide">{t("Program stays underneath")}</span>
-        <span class="mock-bar {style} {position}"><span>{text.trim() || "Your message"}</span></span>
+        <span class="mock-bar {style} {position}"><span>{text.trim() || t("Your message")}</span></span>
       </div>
     </div>
     <p class="note">{t("Shows on Program and the audience screen right away, over whatever is live. Preview is not affected.")}</p>

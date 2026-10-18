@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bindLanguage, guessUiLanguage, sanitizeUiLanguage, t, tn, translate } from "./core";
@@ -34,6 +34,8 @@ const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((mat
 describe("interface language", () => {
   it("has a French line for every line the app shows", () => {
     const missing = [...usedKeys()].filter(([key]) => !(key in fr)).map(([key, file]) => `${file}: ${key}`);
+    // I18N_MISSING=path writes the whole list as JSON, for whoever is adding the translations.
+    if (process.env.I18N_MISSING) writeFileSync(process.env.I18N_MISSING, JSON.stringify([...usedKeys().keys()].filter((key) => !(key in fr)), null, 1));
     expect(missing).toEqual([]);
   });
 

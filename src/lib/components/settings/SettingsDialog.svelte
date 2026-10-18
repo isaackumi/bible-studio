@@ -26,7 +26,7 @@
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
-  import { msg, t, UI_LANGUAGES } from "../../i18n/core";
+  import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
 
   type SettingsSectionId =
     | "general"
@@ -59,7 +59,7 @@
   async function allowMicrophone() {
     audioNote = "macOS may ask for the microphone…";
     const blocked = await prepareListening();
-    audioNote = blocked ?? "Microphone and Speech Recognition are allowed for Church Studio.";
+    audioNote = blocked ?? t("Microphone and Speech Recognition are allowed for Church Studio.");
     if (blocked) void openPrivacySettings();
   }
 
@@ -147,10 +147,10 @@
         updateReady = update.version;
         updateNote = `Church Studio ${update.version} is ready.${update.body ? ` ${update.body.split("\n")[0]}` : ""} Install it after the service.`;
       } else {
-        updateNote = "You have the latest version.";
+        updateNote = t("You have the latest version.");
       }
     } catch (error) {
-      updateNote = `Updates could not be checked. ${error instanceof Error ? error.message : String(error)}`;
+      updateNote = `${t("Updates could not be checked.")} ${error instanceof Error ? error.message : String(error)}`;
     } finally {
       updateBusy = false;
     }
@@ -159,7 +159,7 @@
   async function installUpdate() {
     if (!pendingUpdate) return;
     if (session.output.online && session.live.program.model.layout !== "empty") {
-      updateNote = "Something is live on the audience screen. Clear it, then install, so the screen does not go dark mid-service.";
+      updateNote = t("Something is live on the audience screen. Clear it, then install, so the screen does not go dark mid-service.");
       return;
     }
     updateBusy = true;
@@ -168,7 +168,7 @@
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch (error) {
-      updateNote = `The update could not be installed. ${error instanceof Error ? error.message : String(error)}`;
+      updateNote = `${t("The update could not be installed.")} ${error instanceof Error ? error.message : String(error)}`;
       updateBusy = false;
     }
   }
@@ -176,10 +176,10 @@
 
   async function chooseBackupFolder() {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const picked = await open({ directory: true, multiple: false, title: "Choose the backup folder" });
+    const picked = await open({ directory: true, multiple: false, title: t("Choose the backup folder") });
     if (typeof picked === "string" && picked) {
       session.setBackupFolder(picked);
-      backupNote = (await session.backupNow()) ?? "Backed up. New backups go here every 30 minutes.";
+      backupNote = (await session.backupNow()) ?? t("Backed up. New backups go here every 30 minutes.");
     }
   }
 
@@ -226,7 +226,7 @@
       await loadPcoPlans();
     } catch (error) {
       pcoTypes = [];
-      pcoError = error instanceof Error ? error.message : "Planning Center could not be reached.";
+      pcoError = error instanceof Error ? error.message : t("Planning Center could not be reached.");
     } finally {
       pcoBusy = false;
     }
@@ -237,7 +237,7 @@
     try {
       pcoPlans = await session.pcoPlans(pcoType);
     } catch (error) {
-      pcoError = error instanceof Error ? error.message : "Plans could not be loaded.";
+      pcoError = error instanceof Error ? error.message : t("Plans could not be loaded.");
     }
   }
 
@@ -247,7 +247,7 @@
       await session.importPcoPlan(plan);
       pcoError = "";
     } catch (error) {
-      pcoError = error instanceof Error ? error.message : "That plan could not be imported.";
+      pcoError = error instanceof Error ? error.message : t("That plan could not be imported.");
     } finally {
       pcoBusy = false;
     }
@@ -287,7 +287,7 @@
       await session.setOnlineBibles(apiKey, session.workspace.onlineBibles.bibles);
     } catch (error) {
       apiList = [];
-      apiError = error instanceof Error ? error.message : "API.Bible could not be reached.";
+      apiError = error instanceof Error ? error.message : t("API.Bible could not be reached.");
     } finally {
       apiBusy = false;
     }
@@ -361,7 +361,7 @@
       return;
     }
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const picked = await open({ multiple: false, filters: [{ name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
+    const picked = await open({ multiple: false, filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
     if (typeof picked === "string") await session.importImage(picked);
   }
 
@@ -381,7 +381,7 @@
     link.download = "church-studio-library.json";
     link.click();
     URL.revokeObjectURL(url);
-    fileMessage = "Library exported.";
+    fileMessage = t("Library exported.");
   }
 
   async function importFile(event: Event) {
@@ -399,7 +399,7 @@
       }
       fileMessage = session.message;
     } catch (error) {
-      fileMessage = error instanceof Error ? error.message : "The file was not imported.";
+      fileMessage = error instanceof Error ? error.message : t("The file was not imported.");
     }
   }
 
@@ -431,7 +431,7 @@
         return;
       }
       if (!canAssign(event.code)) {
-        keyNote = "That key is kept for typing and moving around. Press another, or Esc.";
+        keyNote = t("That key is kept for typing and moving around. Press another, or Esc.");
         return;
       }
       const title = COMMANDS.find((command) => command.shortcut === action)?.title ?? action;
@@ -477,9 +477,9 @@
 </script>
 
 <div class="settings-layer">
-  <button type="button" class="settings-backdrop" aria-label="Close settings" onclick={close}></button>
+  <button type="button" class="settings-backdrop" aria-label={t("Close settings")} onclick={close}></button>
   <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="settings-title">
-    <nav class="settings-nav" aria-label="Settings">
+    <nav class="settings-nav" aria-label={t("Settings")}>
       <button type="button" class="account-card" class:active={section === "account"} onclick={() => (section = "account")}>
         {#if session.workspace.profile}
           <span class="set-brand-mark avatar-mark" style:background={planById(session.plan).color}>{initials(session.workspace.profile.name)}</span>
@@ -489,8 +489,8 @@
         <span class="account-copy">
           <strong id="settings-title">{session.workspace.profile?.name || session.workspace.churchName || "Church Studio"}</strong>
           <span>
-            <b class="plan-chip" style:color={planById(session.plan).color}>{planById(session.plan).name}{session.trialDays > 0 && session.workspace.entitlement.plan === "free" ? " trial" : ""}</b>
-            · {session.workspace.profile ? session.workspace.churchName || "Plan & account" : "Sign in"}
+            <b class="plan-chip" style:color={planById(session.plan).color}>{planById(session.plan).name}{session.trialDays > 0 && session.workspace.entitlement.plan === "free" ? ` ${t("trial")}` : ""}</b>
+            · {session.workspace.profile ? session.workspace.churchName || t("Plan & account") : t("Sign in")}
           </span>
         </span>
         <Icon name="chevron-right" size={14} />
@@ -527,23 +527,23 @@
       {#if section === "general"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Church name</strong><span>Shown in Settings and used for the logo slide.</span></div>
-            <input class="field" aria-label="Church name" placeholder="Grace Chapel" bind:value={churchName} onchange={() => session.setChurchName(churchName)} />
+            <div class="row-copy"><strong>{t("Church name")}</strong><span>{t("Shown in Settings and used for the logo slide.")}</span></div>
+            <input class="field" aria-label={t("Church name")} placeholder={t("Grace Chapel")} bind:value={churchName} onchange={() => session.setChurchName(churchName)} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Logo text</strong><span>The Logo button sends this to Program. Pick the picture in Media.</span></div>
-            <input class="field" aria-label="Logo text" bind:value={logoText} onchange={() => session.setLogoText(logoText)} />
+            <div class="row-copy"><strong>{t("Logo text")}</strong><span>{t("The Logo button sends this to Program. Pick the picture in Media.")}</span></div>
+            <input class="field" aria-label={t("Logo text")} bind:value={logoText} onchange={() => session.setLogoText(logoText)} />
           </div>
         </section>
-        <p class="section-label">Copyright</p>
+        <p class="section-label">{t("Copyright")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>CCLI license #</strong><span>Shown with each song's © line on its first and last slide, as the CCLI license asks.</span></div>
+            <div class="row-copy"><strong>{t("CCLI license #")}</strong><span>{t("Shown with each song's © line on its first and last slide, as the CCLI license asks.")}</span></div>
             <input
               class="field"
-              aria-label="CCLI license number"
+              aria-label={t("CCLI license number")}
               inputmode="numeric"
-              placeholder="Church Copyright License number"
+              placeholder={t("Church Copyright License number")}
               value={session.workspace.ccliLicense}
               onchange={(event) => session.setCcliLicense(event.currentTarget.value)}
             />
@@ -580,7 +580,7 @@
               <button type="button" class="theme-card" class:active={session.workspace.appearance.theme === theme.id} onclick={() => session.setAppearance({ theme: theme.id })}>
                 <span class="chip" style:background={theme.ground} style:color={theme.ink}>
                   <span class="chip-bar" style:background={session.workspace.appearance.accent}></span>
-                  Aa
+                  {t("Aa")}
                 </span>
                 <strong>{t(theme.name)}</strong>
                 <span>{t(theme.note)}</span>
@@ -629,28 +629,28 @@
       {:else if section === "workspace"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Current layout</strong><span>{layout.builtin ? "Built in. Rearrange it freely; Reset brings it back." : "Your own layout."}</span></div>
-            <select class="field" aria-label="Current layout" value={layout.id} onchange={(event) => session.useLayout(event.currentTarget.value)}>
+            <div class="row-copy"><strong>{t("Current layout")}</strong><span>{layout.builtin ? t("Built in. Rearrange it freely; Reset brings it back.") : t("Your own layout.")}</span></div>
+            <select class="field" aria-label={t("Current layout")} value={layout.id} onchange={(event) => session.useLayout(event.currentTarget.value)}>
               {#each session.workspace.layouts as item (item.id)}
-                <option value={item.id}>{item.name}{item.builtin ? " · built in" : ""}</option>
+                <option value={item.id}>{item.name}{item.builtin ? ` · ${t("built in")}` : ""}</option>
               {/each}
             </select>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Name</strong><span>Rename the layout you are using.</span></div>
-            <input class="field" aria-label="Layout name" bind:value={layoutName} onchange={() => session.renameActiveLayout(layoutName)} />
+            <div class="row-copy"><strong>{t("Name")}</strong><span>{t("Rename the layout you are using.")}</span></div>
+            <input class="field" aria-label={t("Layout name")} bind:value={layoutName} onchange={() => session.renameActiveLayout(layoutName)} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>This layout</strong><span>Save keeps panel sizes. Duplicate makes a personal copy.</span></div>
+            <div class="row-copy"><strong>{t("This layout")}</strong><span>{t("Save keeps panel sizes. Duplicate makes a personal copy.")}</span></div>
             <div class="row-end">
-              <button type="button" class="btn primary" onclick={() => session.saveLayout()}>Save</button>
-              <button type="button" class="btn" onclick={() => session.duplicateActiveLayout()}>Duplicate</button>
-              <button type="button" class="btn" onclick={() => session.resetActiveLayout()} disabled={!layout.builtin}>Reset</button>
-              <button type="button" class="btn danger" onclick={() => session.deleteLayoutById(layout.id)} disabled={layout.builtin}>Delete</button>
+              <button type="button" class="btn primary" onclick={() => session.saveLayout()}>{t("Save")}</button>
+              <button type="button" class="btn" onclick={() => session.duplicateActiveLayout()}>{t("Duplicate")}</button>
+              <button type="button" class="btn" onclick={() => session.resetActiveLayout()} disabled={!layout.builtin}>{t("Reset")}</button>
+              <button type="button" class="btn danger" onclick={() => session.deleteLayoutById(layout.id)} disabled={layout.builtin}>{t("Delete")}</button>
             </div>
           </div>
         </section>
-        <p class="section-label">New layout</p>
+        <p class="section-label">{t("New layout")}</p>
         <section class="rows">
           <form
             class="row"
@@ -660,15 +660,15 @@
               newLayout = "";
             }}
           >
-            <div class="row-copy"><strong>Save as</strong><span>Keep the current arrangement under a new name.</span></div>
+            <div class="row-copy"><strong>{t("Save as")}</strong><span>{t("Keep the current arrangement under a new name.")}</span></div>
             <div class="row-end">
-              <input class="field" placeholder="Layout name" bind:value={newLayout} aria-label="New layout name" />
-              <button type="submit" class="btn primary" disabled={!newLayout.trim()}>Save as</button>
+              <input class="field" placeholder={t("Layout name")} bind:value={newLayout} aria-label={t("New layout name")} />
+              <button type="submit" class="btn primary" disabled={!newLayout.trim()}>{t("Save as")}</button>
             </div>
           </form>
           <div class="row">
-            <div class="row-copy"><strong>Built-in layouts</strong><span>Put back any built-in layout that was deleted or changed.</span></div>
-            <button type="button" class="btn" onclick={() => session.restoreBuiltinWorkspaces()}>Restore</button>
+            <div class="row-copy"><strong>{t("Built-in layouts")}</strong><span>{t("Put back any built-in layout that was deleted or changed.")}</span></div>
+            <button type="button" class="btn" onclick={() => session.restoreBuiltinWorkspaces()}>{t("Restore")}</button>
           </div>
         </section>
       {:else if section === "themes"}
@@ -677,155 +677,155 @@
         <section class="status-card" class:on={session.output.online}>
           <span class="lamp" class:on={session.output.online}></span>
           <div class="head-copy">
-            <p class="eyebrow">{session.output.online ? "Showing" : status.detail.startsWith("External display detected") ? "Detected" : "Output"}</p>
+            <p class="eyebrow">{session.output.online ? t("Showing") : status.detail.startsWith("External display detected") ? t("Detected") : t("Output")}</p>
             <h3>{status.title}</h3>
             <p>{status.detail}</p>
           </div>
           <div class="row-end">
             {#if session.output.desired}
-              <button type="button" class="btn" onclick={() => session.closeAudience()}>Close</button>
+              <button type="button" class="btn" onclick={() => session.closeAudience()}>{t("Close")}</button>
             {:else}
-              <button type="button" class="btn primary" onclick={() => session.openAudience()}>Open output</button>
+              <button type="button" class="btn primary" onclick={() => session.openAudience()}>{t("Open output")}</button>
             {/if}
           </div>
         </section>
         <section class="rows">
           {#if session.output.desired && !session.output.online}
             <div class="row">
-              <div class="row-copy"><strong>Output was closed</strong><span>The audience window is not showing. Open it again.</span></div>
-              <button type="button" class="btn primary" onclick={() => session.openAudience()}>Reopen</button>
+              <div class="row-copy"><strong>{t("Output was closed")}</strong><span>{t("The audience window is not showing. Open it again.")}</span></div>
+              <button type="button" class="btn primary" onclick={() => session.openAudience()}>{t("Reopen")}</button>
             </div>
           {/if}
           <div class="row">
-            <div class="row-copy"><strong>Fullscreen</strong><span>Cover the whole audience screen. The desk stays on its own display.</span></div>
-            <input type="checkbox" class="switch" role="switch" aria-label="Fullscreen output" checked={profile.outputMode === "fullscreen"} onchange={(event) => setMode(event.currentTarget.checked ? "fullscreen" : "window")} />
+            <div class="row-copy"><strong>{t("Fullscreen")}</strong><span>{t("Cover the whole audience screen. The desk stays on its own display.")}</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Fullscreen output")} checked={profile.outputMode === "fullscreen"} onchange={(event) => setMode(event.currentTarget.checked ? "fullscreen" : "window")} />
           </div>
           <div class="row">
             <div class="row-copy">
-              <strong>Screen shape</strong>
+              <strong>{t("Screen shape")}</strong>
               <span>
                 {#if (session.workspace.appearance.screenShape ?? "auto") === "auto"}
-                  Fills any screen: TV, projector, LED wall or portrait.{session.workspace.appearance.measuredAspect ? ` The audience screen is ${describeAspect(session.workspace.appearance.measuredAspect)}; the monitors here show the same shape.` : " Open the output once so the desk learns its shape."}
+                  {t("Fills any screen: TV, projector, LED wall or portrait.")} {session.workspace.appearance.measuredAspect ? t("The audience screen is {shape}; the monitors here show the same shape.", { shape: describeAspect(session.workspace.appearance.measuredAspect) }) : t("Open the output once so the desk learns its shape.")}
                 {:else}
-                  Always {session.workspace.appearance.screenShape}. A screen of another shape shows bars at the sides or top.
+                  {t("Always {screenShape}. A screen of another shape shows bars at the sides or top.", { screenShape: session.workspace.appearance.screenShape })}
                 {/if}
               </span>
             </div>
-            <select class="field" aria-label="Screen shape" value={session.workspace.appearance.screenShape ?? "auto"} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
+            <select class="field" aria-label={t("Screen shape")} value={session.workspace.appearance.screenShape ?? "auto"} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
               {#each SCREEN_SHAPES as shape (shape.id)}<option value={shape.id}>{shape.label} · {shape.detail}</option>{/each}
             </select>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Test the output</strong><span>Flashes the audience window. Program does not change.</span></div>
-            <button type="button" class="btn" onclick={() => session.testOutput()}>Test</button>
+            <div class="row-copy"><strong>{t("Test the output")}</strong><span>{t("Flashes the audience window. Program does not change.")}</span></div>
+            <button type="button" class="btn" onclick={() => session.testOutput()}>{t("Test")}</button>
           </div>
           {#if !session.controlsAudience}
             <div class="row">
-              <div class="row-copy"><strong>Another window is in control</strong><span>Send to the audience from this window instead.</span></div>
-              <button type="button" class="btn" onclick={() => session.claimAudience()}>Take control</button>
+              <div class="row-copy"><strong>{t("Another window is in control")}</strong><span>{t("Send to the audience from this window instead.")}</span></div>
+              <button type="button" class="btn" onclick={() => session.claimAudience()}>{t("Take control")}</button>
             </div>
           {/if}
         </section>
-        <p class="section-label">Network video (NDI®)</p>
+        <p class="section-label">{t("Network video (NDI®)")}</p>
         <section class="rows">
           <div class="row">
             <div class="row-copy">
-              <strong>Send Program over NDI</strong>
+              <strong>{t("Send Program over NDI")}</strong>
               <span>
                 {#if session.ndi.status === "on"}
-                  {session.ndi.pattern ? "Sending a test pattern" : "Sending Program"} as “{session.ndi.name}”. {session.ndi.connections === 0 ? "Nothing is watching yet." : `${session.ndi.connections} receiver${session.ndi.connections === 1 ? "" : "s"} watching.`}
+                  {session.ndi.pattern ? t("Sending a test pattern as “{name}”.", { name: session.ndi.name }) : t("Sending Program as “{name}”.", { name: session.ndi.name })} {session.ndi.connections === 0 ? t("Nothing is watching yet.") : tn(session.ndi.connections, "{n} receiver watching.", "{n} receivers watching.")}
                 {:else if session.ndi.status === "starting"}{session.ndi.message}
                 {:else if session.ndi.status === "error"}<span class="form-error">{session.ndi.message}</span>
-                {:else if !isDesktop()}OBS, vMix or an NDI monitor can take what the audience sees, over the network. This works in the Church Studio app for Mac.
-                {:else}OBS, vMix, a streaming computer or an NDI monitor can take what the audience sees, over the network. It captures the audience window, which opens if it is closed.{/if}
+                {:else if !isDesktop()}{t("OBS, vMix or an NDI monitor can take what the audience sees, over the network. This works in the Church Studio app for Mac.")}
+                {:else}{t("OBS, vMix, a streaming computer or an NDI monitor can take what the audience sees, over the network. It captures the audience window, which opens if it is closed.")}{/if}
               </span>
             </div>
             <input
               type="checkbox"
               class="switch"
               role="switch"
-              aria-label="Send Program over NDI"
+              aria-label={t("Send Program over NDI")}
               disabled={!isDesktop()}
               checked={session.ndi.status === "on" || session.ndi.status === "starting"}
               onchange={(event) => (event.currentTarget.checked ? void session.startNdi() : void session.stopNdi())}
             />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Find it first</strong><span>Sends colour bars under the same name, so you can add the source in OBS or vMix before the service.</span></div>
+            <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends colour bars under the same name, so you can add the source in OBS or vMix before the service.")}</span></div>
             <button type="button" class="btn" disabled={!isDesktop() || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
-              {session.ndi.status === "on" && session.ndi.pattern ? "Stop test" : "Send test pattern"}
+              {session.ndi.status === "on" && session.ndi.pattern ? t("Stop test") : t("Send test pattern")}
             </button>
           </div>
           <div class="row">
             <div class="row-copy">
-              <strong>Send the words for keying</strong>
+              <strong>{t("Send the words for keying")}</strong>
               <span>
                 {#if session.ndiKey.status === "on"}
-                  Sending the scripture and lyrics on Program as “{session.ndiKey.name}”, on a transparent background. {session.ndiKey.connections === 0 ? "Nothing is watching yet." : `${session.ndiKey.connections} receiver${session.ndiKey.connections === 1 ? "" : "s"} watching.`}
+                  {t("Sending the scripture and lyrics on Program as “{name}”, on a transparent background.", { name: session.ndiKey.name })} {session.ndiKey.connections === 0 ? t("Nothing is watching yet.") : tn(session.ndiKey.connections, "{n} receiver watching.", "{n} receivers watching.")}
                 {:else if session.ndiKey.status === "starting"}{session.ndiKey.message}
                 {:else if session.ndiKey.status === "error"}<span class="form-error">{session.ndiKey.message}</span>
-                {:else}A second source with only the scripture or lyrics on Program, as a lower third on a transparent background. Lay it over a camera in OBS or vMix. It needs no screen recording permission.{/if}
+                {:else}{t("A second source with only the scripture or lyrics on Program, as a lower third on a transparent background. Lay it over a camera in OBS or vMix. It needs no screen recording permission.")}{/if}
               </span>
             </div>
             <input
               type="checkbox"
               class="switch"
               role="switch"
-              aria-label="Send the words for keying"
+              aria-label={t("Send the words for keying")}
               disabled={!isDesktop()}
               checked={session.ndiKey.status === "on" || session.ndiKey.status === "starting"}
               onchange={(event) => (event.currentTarget.checked ? void session.startNdiKey() : void session.stopNdiKey())}
             />
           </div>
         </section>
-        <p class="note stand">NDI needs the free NDI Tools or NDI Runtime on this computer: <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
-        <p class="section-label">Second screen</p>
+        <p class="note stand">{t("NDI needs the free NDI Tools or NDI Runtime on this computer:")} <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. {t("The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
+        <p class="section-label">{t("Second screen")}</p>
         {@const second = session.workspace.secondOutput}
         <section class="rows">
           <div class="row">
             <div class="row-copy">
-              <strong>{second.name} screen</strong>
-              <span>{session.secondOpen ? `Open. It follows Program${second.show === "words" ? ", words only" : ""}.` : "A lobby TV, an overflow room or a hallway screen with its own look. It follows Program; nothing you prepare reaches it until LIVE."}</span>
+              <strong>{t("{name} screen", { name: second.name })}</strong>
+              <span>{session.secondOpen ? `Open. It follows Program${second.show === "words" ? t(", words only") : ""}.` : t("A lobby TV, an overflow room or a hallway screen with its own look. It follows Program; nothing you prepare reaches it until LIVE.")}</span>
             </div>
             {#if session.secondOpen}
-              <button type="button" class="btn" onclick={() => void session.closeSecond()}>Close</button>
+              <button type="button" class="btn" onclick={() => void session.closeSecond()}>{t("Close")}</button>
             {:else}
-              <button type="button" class="btn primary" onclick={() => void session.openSecond()}>Open</button>
+              <button type="button" class="btn primary" onclick={() => void session.openSecond()}>{t("Open")}</button>
             {/if}
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Name</strong><span>What the desk calls this screen.</span></div>
-            <input class="field" aria-label="Second screen name" maxlength="40" value={second.name} onchange={(event) => session.setSecondOutput({ name: event.currentTarget.value.trim() || "Lobby" })} />
+            <div class="row-copy"><strong>{t("Name")}</strong><span>{t("What the desk calls this screen.")}</span></div>
+            <input class="field" aria-label={t("Second screen name")} maxlength="40" value={second.name} onchange={(event) => session.setSecondOutput({ name: event.currentTarget.value.trim() || t("Lobby") })} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Shows</strong><span>{second.show === "words" ? "Scripture and lyrics only. Pictures, videos and cameras show the church name instead." : "Everything the audience sees."}</span></div>
-            <select class="field" aria-label="What the second screen shows" value={second.show} onchange={(event) => session.setSecondOutput({ show: event.currentTarget.value === "same" ? "same" : "words" })}>
-              <option value="words">Words only</option>
-              <option value="same">Same as the audience</option>
+            <div class="row-copy"><strong>{t("Shows")}</strong><span>{second.show === "words" ? t("Scripture and lyrics only. Pictures, videos and cameras show the church name instead.") : t("Everything the audience sees.")}</span></div>
+            <select class="field" aria-label={t("What the second screen shows")} value={second.show} onchange={(event) => session.setSecondOutput({ show: event.currentTarget.value === "same" ? "same" : "words" })}>
+              <option value="words">{t("Words only")}</option>
+              <option value="same">{t("Same as the audience")}</option>
             </select>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Theme</strong><span>A plain, readable theme often suits a lobby TV.</span></div>
-            <select class="field" aria-label="Second screen theme" value={second.themeId ?? ""} onchange={(event) => session.setSecondOutput({ themeId: event.currentTarget.value || null })}>
-              <option value="">Same as the audience</option>
+            <div class="row-copy"><strong>{t("Theme")}</strong><span>{t("A plain, readable theme often suits a lobby TV.")}</span></div>
+            <select class="field" aria-label={t("Second screen theme")} value={second.themeId ?? ""} onchange={(event) => session.setSecondOutput({ themeId: event.currentTarget.value || null })}>
+              <option value="">{t("Same as the audience")}</option>
               {#each session.themes as theme (theme.id)}<option value={theme.id}>{theme.name}</option>{/each}
             </select>
           </div>
           {#if isDesktop() && session.output.displays.length > 1}
             <div class="row">
-              <div class="row-copy"><strong>Display</strong><span>Where it opens. Close and open it again after changing this.</span></div>
-              <select class="field" aria-label="Second screen display" value={second.displayKey ?? ""} onchange={(event) => session.setSecondOutput({ displayKey: event.currentTarget.value || null })}>
-                <option value="">A free display</option>
-                {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}{display.primary ? " (this screen)" : display.audience ? " (audience)" : ""}</option>{/each}
+              <div class="row-copy"><strong>{t("Display")}</strong><span>{t("Where it opens. Close and open it again after changing this.")}</span></div>
+              <select class="field" aria-label={t("Second screen display")} value={second.displayKey ?? ""} onchange={(event) => session.setSecondOutput({ displayKey: event.currentTarget.value || null })}>
+                <option value="">{t("A free display")}</option>
+                {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}{display.primary ? ` (${t("this screen")})` : display.audience ? ` (${t("audience")})` : ""}</option>{/each}
               </select>
             </div>
           {/if}
           <div class="row">
-            <div class="row-copy"><strong>Alerts here too</strong><span>Nursery calls and other alerts show on this screen as well.</span></div>
-            <input type="checkbox" class="switch" role="switch" aria-label="Alerts on the second screen" checked={second.alerts} onchange={(event) => session.setSecondOutput({ alerts: event.currentTarget.checked })} />
+            <div class="row-copy"><strong>{t("Alerts here too")}</strong><span>{t("Nursery calls and other alerts show on this screen as well.")}</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Alerts on the second screen")} checked={second.alerts} onchange={(event) => session.setSecondOutput({ alerts: event.currentTarget.checked })} />
           </div>
         </section>
-        <p class="section-label">Screen</p>
+        <p class="section-label">{t("Screen")}</p>
         {#if isDesktop() && session.output.displays.length > 0}
           <div class="monitor-list">
             {#each session.output.displays as display (display.key)}
@@ -835,10 +835,10 @@
                 class:on={profile.assignments.audience === display.key || (!profile.assignments.audience && display.audience)}
                 onclick={() => session.setAssignments(assignments("audience", display.key))}
               >
-                <span class="mini" aria-hidden="true"><span>Program</span></span>
+                <span class="mini" aria-hidden="true"><span>{t("Program")}</span></span>
                 <span class="monitor-copy">
                   <strong>{display.name}</strong>
-                  <span>{display.width} × {display.height}{display.primary ? " · Primary" : " · External"}</span>
+                  <span>{display.width} × {display.height} · {display.primary ? t("Primary") : t("External")}</span>
                 </span>
               </button>
             {/each}
@@ -847,88 +847,88 @@
           <section class="rows">
             <div class="row">
               <div class="row-copy">
-                <strong>{isDesktop() ? "No displays detected" : "Choose the screen yourself"}</strong>
-                <span>{isDesktop() ? "Connect a monitor, then refresh." : "This browser cannot list monitors. Open output, drag the window to the screen, then choose Fill this screen."}</span>
+                <strong>{isDesktop() ? t("No displays detected") : t("Choose the screen yourself")}</strong>
+                <span>{isDesktop() ? t("Connect a monitor, then refresh.") : t("This browser cannot list monitors. Open output, drag the window to the screen, then choose Fill this screen.")}</span>
               </div>
-              {#if isDesktop()}<button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh</button>{/if}
+              {#if isDesktop()}<button type="button" class="btn" onclick={() => session.refreshDisplays()}>{t("Refresh")}</button>{/if}
             </div>
           </section>
         {/if}
-        <p class="note stand">The audience window shows Program only. Preview, theme edits and Next stay on this desk until LIVE, Clear or Black. <button type="button" class="link" onclick={() => (section = "displays")}>Arrange desk and audience</button></p>
+        <p class="note stand">{t("The audience window shows Program only. Preview, theme edits and Next stay on this desk until LIVE, Clear or Black.")} <button type="button" class="link" onclick={() => (section = "displays")}>{t("Arrange desk and audience")}</button></p>
       {:else if section === "displays"}
         {#if !isDesktop()}
           <section class="rows">
             <div class="row">
-              <div class="row-copy"><strong>Browser window</strong><span>A browser cannot list monitors or move a window onto one. Open output, drag it to the external display, then choose Fill this screen.</span></div>
-              <button type="button" class="btn" onclick={() => (section = "audience")}>Audience output</button>
+              <div class="row-copy"><strong>{t("Browser window")}</strong><span>{t("A browser cannot list monitors or move a window onto one. Open output, drag it to the external display, then choose Fill this screen.")}</span></div>
+              <button type="button" class="btn" onclick={() => (section = "audience")}>{t("Audience output")}</button>
             </div>
           </section>
         {:else if session.output.displays.length === 0}
           <section class="rows">
             <div class="row">
-              <div class="row-copy"><strong>No displays detected</strong><span>Refresh after a monitor is connected. The operator window stays here.</span></div>
-              <button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh</button>
+              <div class="row-copy"><strong>{t("No displays detected")}</strong><span>{t("Refresh after a monitor is connected. The operator window stays here.")}</span></div>
+              <button type="button" class="btn" onclick={() => session.refreshDisplays()}>{t("Refresh")}</button>
             </div>
           </section>
         {:else}
           <div class="monitor-list">
             {#each session.output.displays as display (display.key)}
               <article class="monitor static">
-                <span class="mini" aria-hidden="true"><span>{display.primary ? "Desk" : "Screen"}</span></span>
+                <span class="mini" aria-hidden="true"><span>{display.primary ? t("Desk") : t("Screen")}</span></span>
                 <span class="monitor-copy">
                   <strong>{display.name}</strong>
-                  <span>{display.width} × {display.height} · {display.scale}×{display.primary ? " · Primary" : ""}{display.audience ? " · Audience" : ""}</span>
+                  <span>{display.width} × {display.height} · {display.scale}×{display.primary ? ` · ${t("Primary")}` : ""}{display.audience ? ` · ${t("Audience")}` : ""}</span>
                 </span>
                 <span class="monitor-actions">
-                  <button type="button" class:on={profile.assignments.operator === display.key} onclick={() => session.setAssignments(assignments("operator", display.key))}>Desk</button>
-                  <button type="button" class:on={profile.assignments.audience === display.key} onclick={() => session.setAssignments(assignments("audience", display.key))}>Audience</button>
+                  <button type="button" class:on={profile.assignments.operator === display.key} onclick={() => session.setAssignments(assignments("operator", display.key))}>{t("Desk")}</button>
+                  <button type="button" class:on={profile.assignments.audience === display.key} onclick={() => session.setAssignments(assignments("audience", display.key))}>{t("Audience")}</button>
                 </span>
               </article>
             {/each}
           </div>
-          <button type="button" class="btn" onclick={() => session.refreshDisplays()}>Refresh displays</button>
+          <button type="button" class="btn" onclick={() => session.refreshDisplays()}>{t("Refresh displays")}</button>
         {/if}
-        <p class="section-label">Profile</p>
+        <p class="section-label">{t("Profile")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Display profile</strong><span>Save a setup per room or per computer.</span></div>
-            <select class="field" aria-label="Display profile" value={profile.id} onchange={(event) => session.useDisplayProfile(event.currentTarget.value)}>
+            <div class="row-copy"><strong>{t("Display profile")}</strong><span>{t("Save a setup per room or per computer.")}</span></div>
+            <select class="field" aria-label={t("Display profile")} value={profile.id} onchange={(event) => session.useDisplayProfile(event.currentTarget.value)}>
               {#each session.workspace.displayProfiles as item (item.id)}
                 <option value={item.id}>{item.name}</option>
               {/each}
             </select>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Name</strong></div>
-            <input class="field" aria-label="Profile name" bind:value={profileName} onchange={() => session.renameDisplayProfile(profileName)} />
+            <div class="row-copy"><strong>{t("Name")}</strong></div>
+            <input class="field" aria-label={t("Profile name")} bind:value={profileName} onchange={() => session.renameDisplayProfile(profileName)} />
           </div>
         </section>
-        <p class="section-label">Screens</p>
+        <p class="section-label">{t("Screens")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>Desk</strong><span>Where you operate.</span></div></div>
-            <select class="field" aria-label="Desk display" value={profile.assignments.operator ?? ""} onchange={(event) => session.setAssignments(assignments("operator", event.currentTarget.value))}>
-              <option value="">Automatic · primary display</option>
+            <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{t("Desk")}</strong><span>{t("Where you operate.")}</span></div></div>
+            <select class="field" aria-label={t("Desk display")} value={profile.assignments.operator ?? ""} onchange={(event) => session.setAssignments(assignments("operator", event.currentTarget.value))}>
+              <option value="">{t("Automatic · primary display")}</option>
               {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
             </select>
           </div>
           <div class="row">
-            <div class="row-lead"><span class="row-icon"><Icon name="cast" size={16} /></span><div class="row-copy"><strong>Audience</strong><span>{audience.missing && audience.mode === "assigned" ? "Disconnected. Program is held until it returns." : audience.missing ? "Connect an external display, or assign this screen." : sameScreen(profile.assignments) ? "Same display as the desk." : "What the congregation sees."}</span></div></div>
-            <select class="field" aria-label="Audience display" value={profile.assignments.audience ?? ""} onchange={(event) => session.setAssignments(assignments("audience", event.currentTarget.value))}>
-              <option value="">Automatic · external display</option>
+            <div class="row-lead"><span class="row-icon"><Icon name="cast" size={16} /></span><div class="row-copy"><strong>{t("Audience")}</strong><span>{audience.missing && audience.mode === "assigned" ? t("Disconnected. Program is held until it returns.") : audience.missing ? t("Connect an external display, or assign this screen.") : sameScreen(profile.assignments) ? t("Same display as the desk.") : t("What the congregation sees.")}</span></div></div>
+            <select class="field" aria-label={t("Audience display")} value={profile.assignments.audience ?? ""} onchange={(event) => session.setAssignments(assignments("audience", event.currentTarget.value))}>
+              <option value="">{t("Automatic · external display")}</option>
               {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
-              {#if profile.assignments.audience && audience.missing}<option value={profile.assignments.audience}>Saved display is disconnected</option>{/if}
+              {#if profile.assignments.audience && audience.missing}<option value={profile.assignments.audience}>{t("Saved display is disconnected")}</option>{/if}
             </select>
           </div>
           <div class="row">
-            <div class="row-lead"><span class="row-icon"><Icon name="stage" size={16} /></span><div class="row-copy"><strong>Stage</strong><span>The confidence screen for the platform.</span></div></div>
-            <select class="field" aria-label="Stage display" value={profile.assignments.stage ?? ""} onchange={(event) => session.setAssignments(assignments("stage", event.currentTarget.value))}>
-              <option value="">Off</option>
+            <div class="row-lead"><span class="row-icon"><Icon name="stage" size={16} /></span><div class="row-copy"><strong>{t("Stage")}</strong><span>{t("The confidence screen for the platform.")}</span></div></div>
+            <select class="field" aria-label={t("Stage display")} value={profile.assignments.stage ?? ""} onchange={(event) => session.setAssignments(assignments("stage", event.currentTarget.value))}>
+              <option value="">{t("Off")}</option>
               {#each session.output.displays as display (display.key)}<option value={display.key}>{display.name}</option>{/each}
             </select>
           </div>
         </section>
-        <p class="section-label">Save</p>
+        <p class="section-label">{t("Save")}</p>
         <section class="rows">
           <form
             class="row"
@@ -938,15 +938,15 @@
               newProfile = "";
             }}
           >
-            <div class="row-copy"><strong>Save as a new profile</strong></div>
+            <div class="row-copy"><strong>{t("Save as a new profile")}</strong></div>
             <div class="row-end">
-              <input class="field" placeholder="Profile name" bind:value={newProfile} aria-label="New display profile" />
-              <button type="submit" class="btn primary" disabled={!newProfile.trim()}>Save</button>
+              <input class="field" placeholder={t("Profile name")} bind:value={newProfile} aria-label={t("New display profile")} />
+              <button type="submit" class="btn primary" disabled={!newProfile.trim()}>{t("Save")}</button>
             </div>
           </form>
           <div class="row">
-            <div class="row-copy"><strong>Delete this profile</strong><span>{profile.builtin ? "Built-in profiles stay." : "Removes the saved screen choices."}</span></div>
-            <button type="button" class="btn danger" onclick={() => session.deleteDisplayProfile(profile.id)} disabled={profile.builtin}>Delete</button>
+            <div class="row-copy"><strong>{t("Delete this profile")}</strong><span>{profile.builtin ? t("Built-in profiles stay.") : t("Removes the saved screen choices.")}</span></div>
+            <button type="button" class="btn danger" onclick={() => session.deleteDisplayProfile(profile.id)} disabled={profile.builtin}>{t("Delete")}</button>
           </div>
         </section>
       {:else if section === "keyboard"}
@@ -963,10 +963,10 @@
                       type="button"
                       class="key-btn"
                       class:listening={capturing === action}
-                      aria-label={capturing === action ? `Press the new key for ${command.title}` : `Change the key for ${command.title}`}
-                      title="Click, then press the new key"
+                      aria-label={capturing === action ? t("Press the new key for {title}", { title: command.title }) : t("Change the key for {title}", { title: command.title })}
+                      title={t("Click, then press the new key")}
                       onclick={() => { keyNote = ""; capturing = capturing === action ? null : action; }}
-                    >{capturing === action ? "Press a key…" : shortcutLabels(shortcuts, action)}</button>
+                    >{capturing === action ? t("Press a key…") : shortcutLabels(shortcuts, action)}</button>
                   {:else}
                     <kbd class="kbd">{command.id === "open-settings" ? "⌘," : "—"}</kbd>
                   {/if}
@@ -977,8 +977,8 @@
         {/each}
         {#if keyNote}<p class="note stand" role="status">{keyNote}</p>{/if}
         <div class="key-foot">
-          <p class="note">Click a key, then press the new one. Esc cancels. Tab and Enter stay for typing and moving around.</p>
-          {#if session.workspace.shortcuts}<button type="button" class="btn" onclick={() => { session.resetShortcuts(); keyNote = ""; }}>Reset to the usual keys</button>{/if}
+          <p class="note">{t("Click a key, then press the new one. Esc cancels. Tab and Enter stay for typing and moving around.")}</p>
+          {#if session.workspace.shortcuts}<button type="button" class="btn" onclick={() => { session.resetShortcuts(); keyNote = ""; }}>{t("Reset to the usual keys")}</button>{/if}
         </div>
       {:else if section === "remote"}
         {#if session.entitled("phone-remote")}
@@ -986,34 +986,34 @@
         {:else}
           <section class="rows">
             <div class="row">
-              <div class="row-copy"><strong>Phone remote is part of Premium</strong><span>Pair a phone to move through the service and go live from anywhere in the room.</span></div>
-              <button type="button" class="btn primary" onclick={() => session.requireFeature("phone-remote")}>Unlock</button>
+              <div class="row-copy"><strong>{t("Phone remote is part of Premium")}</strong><span>{t("Pair a phone to move through the service and go live from anywhere in the room.")}</span></div>
+              <button type="button" class="btn primary" onclick={() => session.requireFeature("phone-remote")}>{t("Unlock")}</button>
             </div>
           </section>
         {/if}
       {:else if section === "stage"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Stage display</strong><span>What is live now, what is next (Preview), the time and any timer. It never sends anything to the audience.</span></div>
-            <button type="button" class="btn primary" onclick={() => void session.openStage()}>Open</button>
+            <div class="row-copy"><strong>{t("Stage display")}</strong><span>{t("What is live now, what is next (Preview), the time and any timer. It never sends anything to the audience.")}</span></div>
+            <button type="button" class="btn primary" onclick={() => void session.openStage()}>{t("Open")}</button>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Which screen</strong><span>With three screens it opens on the one that is neither the desk nor the audience. Otherwise drag it to the platform screen.</span></div>
-            <button type="button" class="btn" onclick={() => (section = "displays")}>Displays</button>
+            <div class="row-copy"><strong>{t("Which screen")}</strong><span>{t("With three screens it opens on the one that is neither the desk nor the audience. Otherwise drag it to the platform screen.")}</span></div>
+            <button type="button" class="btn" onclick={() => (section = "displays")}>{t("Displays")}</button>
           </div>
         </section>
-        <p class="section-label">Message to the stage</p>
+        <p class="section-label">{t("Message to the stage")}</p>
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); session.sendStageMessage(stageText); }}>
-            <div class="row-copy"><strong>{session.stageMessage ? `Showing “${session.stageMessage}”` : "Send a message"}</strong><span>A bright banner on the stage screen until you clear it. The audience never sees it.</span></div>
+            <div class="row-copy"><strong>{session.stageMessage ? t("Showing “{stageMessage}”", { stageMessage: session.stageMessage }) : t("Send a message")}</strong><span>{t("A bright banner on the stage screen until you clear it. The audience never sees it.")}</span></div>
             <div class="row-end">
-              <input class="field" aria-label="Stage message" placeholder="5 minutes" maxlength="140" bind:value={stageText} />
-              <button type="submit" class="btn primary" disabled={!stageText.trim()}>Send</button>
-              {#if session.stageMessage}<button type="button" class="btn" onclick={() => session.sendStageMessage("")}>Clear</button>{/if}
+              <input class="field" aria-label={t("Stage message")} placeholder={t("5 minutes")} maxlength="140" bind:value={stageText} />
+              <button type="submit" class="btn primary" disabled={!stageText.trim()}>{t("Send")}</button>
+              {#if session.stageMessage}<button type="button" class="btn" onclick={() => session.sendStageMessage("")}>{t("Clear")}</button>{/if}
             </div>
           </form>
           <div class="row">
-            <div class="row-copy"><strong>Quick messages</strong></div>
+            <div class="row-copy"><strong>{t("Quick messages")}</strong></div>
             <div class="row-end wrap">
               {#each ["5 minutes", "2 minutes", "Wrap up", "Slow down", "Speak up", "Look at the screen"] as quick (quick)}
                 <button type="button" class="btn" onclick={() => session.sendStageMessage(quick)}>{quick}</button>
@@ -1021,9 +1021,9 @@
             </div>
           </div>
         </section>
-        <p class="section-label">On phones and tablets</p>
+        <p class="section-label">{t("On phones and tablets")}</p>
         <StageLinks />
-        <p class="section-label">What the stage screen shows</p>
+        <p class="section-label">{t("What the stage screen shows")}</p>
         <section class="rows">
           {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."]] as [key, title, detail] (key)}
             <div class="row">
@@ -1032,9 +1032,9 @@
             </div>
           {/each}
           <div class="row">
-            <div class="row-copy"><strong>Text size</strong><span>Larger for a stage screen far from the pulpit.</span></div>
-            <select class="field" aria-label="Stage text size" value={session.workspace.stageLayout.size} onchange={(event) => session.setStageLayout({ size: event.currentTarget.value as "s" | "m" | "l" })}>
-              <option value="s">Small</option><option value="m">Medium</option><option value="l">Large</option>
+            <div class="row-copy"><strong>{t("Text size")}</strong><span>{t("Larger for a stage screen far from the pulpit.")}</span></div>
+            <select class="field" aria-label={t("Stage text size")} value={session.workspace.stageLayout.size} onchange={(event) => session.setStageLayout({ size: event.currentTarget.value as "s" | "m" | "l" })}>
+              <option value="s">{t("Small")}</option><option value="m">{t("Medium")}</option><option value="l">{t("Large")}</option>
             </select>
           </div>
         </section>
@@ -1044,146 +1044,146 @@
         {@const ai = session.workspace.ai}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Service</strong><span>Claude (Anthropic), or anything that speaks the OpenAI API: OpenAI itself, or a model on this computer through Ollama or LM Studio.</span></div>
-            <select class="field" aria-label="AI service" value={ai.provider} onchange={(event) => { const provider = event.currentTarget.value === "openai" ? "openai" : "anthropic"; session.setAiSettings({ provider, model: AI_DEFAULTS[provider].model, baseUrl: "" }); aiNote = ""; }}>
-              <option value="anthropic">Claude (Anthropic)</option>
-              <option value="openai">OpenAI or compatible</option>
+            <div class="row-copy"><strong>{t("Service")}</strong><span>{t("Claude (Anthropic), or anything that speaks the OpenAI API: OpenAI itself, or a model on this computer through Ollama or LM Studio.")}</span></div>
+            <select class="field" aria-label={t("AI service")} value={ai.provider} onchange={(event) => { const provider = event.currentTarget.value === "openai" ? "openai" : "anthropic"; session.setAiSettings({ provider, model: AI_DEFAULTS[provider].model, baseUrl: "" }); aiNote = ""; }}>
+              <option value="anthropic">{t("Claude (Anthropic)")}</option>
+              <option value="openai">{t("OpenAI or compatible")}</option>
             </select>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Your key</strong><span>{ai.provider === "anthropic" ? "Make one at console.anthropic.com › API keys." : "From platform.openai.com › API keys. A model on this computer needs no key."} It stays on this computer and is only used when you ask for a summary.</span></div>
-            <input class="field" type="password" aria-label="AI key" placeholder="Paste your key" autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; }} />
+            <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("Make one at console.anthropic.com › API keys.") : t("From platform.openai.com › API keys. A model on this computer needs no key.")} {t("It stays on this computer and is only used when you ask for a summary.")}</span></div>
+            <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; }} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Model</strong><span>{ai.provider === "anthropic" ? "claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper." : "For example gpt-4o-mini, or llama3.1 on Ollama."}</span></div>
-            <input class="field" aria-label="AI model" value={ai.model} onchange={(event) => session.setAiSettings({ model: event.currentTarget.value })} />
+            <div class="row-copy"><strong>{t("Model")}</strong><span>{ai.provider === "anthropic" ? t("claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.") : t("For example gpt-4o-mini, or llama3.1 on Ollama.")}</span></div>
+            <input class="field" aria-label={t("AI model")} value={ai.model} onchange={(event) => session.setAiSettings({ model: event.currentTarget.value })} />
           </div>
           {#if ai.provider === "openai"}
             <div class="row">
-              <div class="row-copy"><strong>Address</strong><span>Leave empty for OpenAI. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1</span></div>
-              <input class="field" aria-label="AI address" placeholder="https://api.openai.com/v1" value={ai.baseUrl} onchange={(event) => session.setAiSettings({ baseUrl: event.currentTarget.value })} />
+              <div class="row-copy"><strong>{t("Address")}</strong><span>{t("Leave empty for OpenAI. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")}</span></div>
+              <input class="field" aria-label={t("AI address")} placeholder="https://api.openai.com/v1" value={ai.baseUrl} onchange={(event) => session.setAiSettings({ baseUrl: event.currentTarget.value })} />
             </div>
           {/if}
           <div class="row">
-            <div class="row-copy"><strong>Check it works</strong><span class:form-error={aiNote && !aiOk}>{aiNote || "Sends a two-line test to the service."}</span></div>
+            <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a two-line test to the service.")}</span></div>
             <button type="button" class="btn" disabled={!session.aiReady || aiBusy} onclick={async () => {
               aiBusy = true;
               try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
               aiBusy = false;
-            }}>{aiBusy ? "Checking…" : "Test"}</button>
+            }}>{aiBusy ? t("Checking…") : t("Test")}</button>
           </div>
         </section>
-        <p class="note stand">Used on the Sermon page: Summarize turns your notes into a short summary and sermon points you can show. Your notes go to the service you chose only when you press it; the service's own terms and charges apply.</p>
+        <p class="note stand">{t("Used on the Sermon page: Summarize turns your notes into a short summary and sermon points you can show. Your notes go to the service you chose only when you press it; the service's own terms and charges apply.")}</p>
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>
-            <div class="row-copy"><strong>Personal Access Token</strong><span class:form-error={!!pcoError}>{pcoError || "Make one at api.planningcenteronline.com › Personal Access Tokens, then paste the application id and secret. They stay on this computer."}</span></div>
+            <div class="row-copy"><strong>{t("Personal Access Token")}</strong><span class:form-error={!!pcoError}>{pcoError || t("Make one at api.planningcenteronline.com › Personal Access Tokens, then paste the application id and secret. They stay on this computer.")}</span></div>
             <div class="row-end">
-              <input class="field" aria-label="Planning Center application id" placeholder="Application id" autocomplete="off" bind:value={pcoApp} />
-              <input class="field" type="password" aria-label="Planning Center secret" placeholder="Secret" autocomplete="off" bind:value={pcoSecret} />
-              <button type="submit" class="btn primary" disabled={!pcoApp.trim() || !pcoSecret.trim() || pcoBusy || !isDesktop()}>{pcoBusy ? "Connecting…" : "Connect"}</button>
+              <input class="field" aria-label={t("Planning Center application id")} placeholder={t("Application id")} autocomplete="off" bind:value={pcoApp} />
+              <input class="field" type="password" aria-label={t("Planning Center secret")} placeholder={t("Secret")} autocomplete="off" bind:value={pcoSecret} />
+              <button type="submit" class="btn primary" disabled={!pcoApp.trim() || !pcoSecret.trim() || pcoBusy || !isDesktop()}>{pcoBusy ? t("Connecting…") : t("Connect")}</button>
             </div>
           </form>
-          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>Planning Center import works in the desktop app.</span></div></div>{/if}
+          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>{t("Planning Center import works in the desktop app.")}</span></div></div>{/if}
           {#if pcoTypes.length}
             <div class="row">
-              <div class="row-copy"><strong>Service type</strong></div>
-              <select class="field" aria-label="Service type" bind:value={pcoType} onchange={() => void loadPcoPlans()}>
+              <div class="row-copy"><strong>{t("Service type")}</strong></div>
+              <select class="field" aria-label={t("Service type")} bind:value={pcoType} onchange={() => void loadPcoPlans()}>
                 {#each pcoTypes as type (type.id)}<option value={type.id}>{type.name}</option>{/each}
               </select>
             </div>
             {#each pcoPlans as plan (plan.id)}
               <div class="row">
-                <div class="row-copy"><strong>{plan.title || plan.dates}</strong><span>{plan.dates} · {plan.items} item{plan.items === 1 ? "" : "s"}</span></div>
-                <button type="button" class="btn" disabled={pcoBusy} onclick={() => void importPco(plan)}>Import</button>
+                <div class="row-copy"><strong>{plan.title || plan.dates}</strong><span>{plan.dates} · {tn(plan.items, "{n} item", "{n} items")}</span></div>
+                <button type="button" class="btn" disabled={pcoBusy} onclick={() => void importPco(plan)}>{t("Import")}</button>
               </div>
             {:else}
-              <div class="row"><div class="row-copy"><span>No upcoming plans for this service type.</span></div></div>
+              <div class="row"><div class="row-copy"><span>{t("No upcoming plans for this service type.")}</span></div></div>
             {/each}
           {/if}
         </section>
-        <p class="note stand">Headers become sections, songs come with their lyrics (new ones go into a "Planning Center" folder), and other items become editable slides. Nothing goes live on its own.</p>
+        <p class="note stand">{t("Headers become sections, songs come with their lyrics (new ones go into a \"Planning Center\" folder), and other items become editable slides. Nothing goes live on its own.")}</p>
       {:else if section === "storage"}
-        <p class="section-label">Automatic backup and a second computer</p>
+        <p class="section-label">{t("Automatic backup and a second computer")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Backup folder</strong><span>{session.workspace.backup.folder || "Pick a folder your cloud drive keeps (Google Drive, OneDrive, Dropbox, iCloud). Church Studio saves there every 30 minutes and keeps the newest 20."}</span></div>
-            <button type="button" class="btn" disabled={!isDesktop()} onclick={() => void chooseBackupFolder()}>{session.workspace.backup.folder ? "Change" : "Choose folder"}</button>
+            <div class="row-copy"><strong>{t("Backup folder")}</strong><span>{session.workspace.backup.folder || t("Pick a folder your cloud drive keeps (Google Drive, OneDrive, Dropbox, iCloud). Church Studio saves there every 30 minutes and keeps the newest 20.")}</span></div>
+            <button type="button" class="btn" disabled={!isDesktop()} onclick={() => void chooseBackupFolder()}>{session.workspace.backup.folder ? t("Change") : t("Choose folder")}</button>
           </div>
           {#if session.workspace.backup.folder}
             <div class="row">
-              <div class="row-copy"><strong>{session.workspace.backup.lastAt ? `Last backup ${new Date(session.workspace.backup.lastAt).toLocaleString()}` : "Not backed up yet"}</strong><span>{backupNote || "On another computer, choose the same folder and restore: songs, services, sermons, slide decks, looks and layouts come across. Display settings stay per computer."}</span></div>
+              <div class="row-copy"><strong>{session.workspace.backup.lastAt ? t("Last backup {date}", { date: new Date(session.workspace.backup.lastAt).toLocaleString() }) : t("Not backed up yet")}</strong><span>{backupNote || t("On another computer, choose the same folder and restore: songs, services, sermons, slide decks, looks and layouts come across. Display settings stay per computer.")}</span></div>
               <div class="row-end">
-                <button type="button" class="btn primary" onclick={async () => (backupNote = (await session.backupNow()) ?? "Backed up.")}>Back up now</button>
-                <button type="button" class="btn" onclick={async () => (backupNote = await session.restoreLatestBackup().catch((error) => (error instanceof Error ? error.message : String(error))))}>Restore latest</button>
+                <button type="button" class="btn primary" onclick={async () => (backupNote = (await session.backupNow()) ?? t("Backed up."))}>{t("Back up now")}</button>
+                <button type="button" class="btn" onclick={async () => (backupNote = await session.restoreLatestBackup().catch((error) => (error instanceof Error ? error.message : String(error))))}>{t("Restore latest")}</button>
               </div>
             </div>
           {/if}
-          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>Folder backups work in the desktop app. Here, use Export below.</span></div></div>{/if}
+          {#if !isDesktop()}<div class="row"><div class="row-copy"><span>{t("Folder backups work in the desktop app. Here, use Export below.")}</span></div></div>{/if}
         </section>
-        <p class="section-label">Files</p>
+        <p class="section-label">{t("Files")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-lead"><span class="row-icon"><Icon name="files" size={16} /></span><div class="row-copy"><strong>Export library</strong><span>Songs, services and themes as one file. Program is not included.</span></div></div>
-            <button type="button" class="btn primary" onclick={() => downloadLibrary()}>Export</button>
+            <div class="row-lead"><span class="row-icon"><Icon name="files" size={16} /></span><div class="row-copy"><strong>{t("Export library")}</strong><span>{t("Songs, services and themes as one file. Program is not included.")}</span></div></div>
+            <button type="button" class="btn primary" onclick={() => downloadLibrary()}>{t("Export")}</button>
           </div>
           <div class="row">
-            <div class="row-lead"><span class="row-icon"><Icon name="refresh" size={16} /></span><div class="row-copy"><strong>Import</strong><span>A Church Studio library, or a text or Markdown file as slides. A record is replaced only when its id matches.</span></div></div>
-            <button type="button" class="btn" onclick={() => fileInput?.click()}>Choose file…</button>
+            <div class="row-lead"><span class="row-icon"><Icon name="refresh" size={16} /></span><div class="row-copy"><strong>{t("Import")}</strong><span>{t("A Church Studio library, or a text or Markdown file as slides. A record is replaced only when its id matches.")}</span></div></div>
+            <button type="button" class="btn" onclick={() => fileInput?.click()}>{t("Choose file…")}</button>
             <input bind:this={fileInput} type="file" accept={IMPORT_ACCEPT} hidden onchange={(event) => void importFile(event)} />
           </div>
         </section>
         {#if fileMessage}<p class="note stand">{fileMessage}</p>{/if}
-        <p class="note stand">Pictures and videos import in Media. Songs import and export in the Songs window.</p>
+        <p class="note stand">{t("Pictures and videos import in Media. Songs import and export in the Songs window.")}</p>
       {:else if section === "bible"}
         {@const installedIds = session.translations.map((entry) => entry.id)}
-        <p class="section-label">On this computer</p>
+        <p class="section-label">{t("On this computer")}</p>
         <section class="rows">
           {#each BIBLE_CATALOG.filter((entry) => installedIds.includes(entry.id)) as entry (entry.id)}
             <div class="row">
               <div class="row-lead">
                 <span class="bible-badge">{entry.abbreviation}</span>
-                <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? "Public domain"}{entry.default ? " · included" : ""}</span></div>
+                <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? t("Public domain")}{entry.default ? ` · ${t("included")}` : ""}</span></div>
               </div>
               <div class="row-end">
-                <span class="pill ok"><Icon name="check" size={11} /> Installed</span>
+                <span class="pill ok"><Icon name="check" size={11} /> {t("Installed")}</span>
                 {#if installedIds.length > 1}
-                  <button type="button" class="btn icon-btn" aria-label={`Remove ${entry.name}`} title="Remove from this computer" onclick={() => void session.removeBible(entry.id)}><Icon name="trash" size={14} /></button>
+                  <button type="button" class="btn icon-btn" aria-label={t("Remove {name}", { name: entry.name })} title={t("Remove from this computer")} onclick={() => void session.removeBible(entry.id)}><Icon name="trash" size={14} /></button>
                 {/if}
               </div>
             </div>
           {/each}
         </section>
         {#if BIBLE_CATALOG.some((entry) => !installedIds.includes(entry.id))}
-          <p class="section-label">Available to download</p>
+          <p class="section-label">{t("Available to download")}</p>
           <section class="rows">
             {#each BIBLE_CATALOG.filter((entry) => !installedIds.includes(entry.id)) as entry (entry.id)}
               {@const busy = session.bibleBusy.includes(entry.id)}
               <div class="row">
                 <div class="row-lead">
                   <span class="bible-badge muted">{entry.abbreviation}</span>
-                  <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? "Public domain"} · {entry.sizeMb} MB</span></div>
+                  <div class="row-copy"><strong>{entry.name}</strong><span>{entry.language} · {entry.licenseNote ?? t("Public domain")} · {entry.sizeMb} MB</span></div>
                 </div>
                 <button type="button" class="btn" class:primary={!busy} disabled={busy} onclick={() => void session.installBible(entry.id)}>
-                  {#if busy}<span class="spinner" aria-hidden="true"></span> Downloading…{:else}<Icon name="download" size={14} /> Download{/if}
+                  {#if busy}<span class="spinner" aria-hidden="true"></span> {t("Downloading…")}{:else}<Icon name="download" size={14} /> {t("Download")}{/if}
                 </button>
               </div>
             {/each}
           </section>
         {/if}
-        <p class="section-label">Licensed translations (online)</p>
+        <p class="section-label">{t("Licensed translations (online)")}</p>
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectApiBible(); }}>
-            <div class="row-copy"><strong>API.Bible key</strong><span class:form-error={!!apiError}>{apiError || "NIV, NKJV, ESV and others, where the publisher allows it. Get a free key at scripture.api.bible; text is fetched when shown and needs the internet."}</span></div>
+            <div class="row-copy"><strong>{t("API.Bible key")}</strong><span class:form-error={!!apiError}>{apiError || t("NIV, NKJV, ESV and others, where the publisher allows it. Get a free key at scripture.api.bible; text is fetched when shown and needs the internet.")}</span></div>
             <div class="row-end">
-              <input class="field license-field" type="password" autocomplete="off" spellcheck="false" aria-label="API.Bible key" placeholder="Paste your key" bind:value={apiKey} />
-              <button type="submit" class="btn primary" disabled={!apiKey.trim() || apiBusy}>{apiBusy ? "Checking…" : apiList.length ? "Refresh" : "Connect"}</button>
+              <input class="field license-field" type="password" autocomplete="off" spellcheck="false" aria-label={t("API.Bible key")} placeholder={t("Paste your key")} bind:value={apiKey} />
+              <button type="submit" class="btn primary" disabled={!apiKey.trim() || apiBusy}>{apiBusy ? t("Checking…") : apiList.length ? t("Refresh") : t("Connect")}</button>
             </div>
           </form>
           {#if apiList.length}
             <div class="row">
-              <div class="row-copy"><strong>Find a translation</strong><span>{apiList.length} available to your key. Tick the ones to show in the translation list.</span></div>
-              <input class="field" aria-label="Filter translations" placeholder="NIV, King James, Twi…" bind:value={apiFilter} />
+              <div class="row-copy"><strong>{t("Find a translation")}</strong><span>{t("{length} available to your key. Tick the ones to show in the translation list.", { length: apiList.length })}</span></div>
+              <input class="field" aria-label={t("Filter translations")} placeholder={t("NIV, King James, Twi…")} bind:value={apiFilter} />
             </div>
             {#each apiList.filter((bible) => !apiFilter.trim() || `${bible.abbreviation} ${bible.name} ${bible.language}`.toLowerCase().includes(apiFilter.trim().toLowerCase())).slice(0, 40) as bible (bible.id)}
               {@const on = session.workspace.onlineBibles.bibles.some((entry) => entry.id === bible.id)}
@@ -1192,76 +1192,76 @@
                   <span class="bible-badge" class:muted={!on}>{bible.abbreviation || "—"}</span>
                   <div class="row-copy"><strong>{bible.name}</strong><span>{bible.language}</span></div>
                 </div>
-                <input type="checkbox" class="switch" role="switch" aria-label={`Use ${bible.name}`} checked={on} onchange={(event) => toggleApiBible(bible, event.currentTarget.checked)} />
+                <input type="checkbox" class="switch" role="switch" aria-label={t("Use {name}", { name: bible.name })} checked={on} onchange={(event) => toggleApiBible(bible, event.currentTarget.checked)} />
               </label>
             {/each}
           {:else if session.workspace.onlineBibles.bibles.length}
             {#each session.workspace.onlineBibles.bibles as bible (bible.id)}
               <div class="row">
-                <div class="row-lead"><span class="bible-badge">{bible.abbreviation}</span><div class="row-copy"><strong>{bible.name}</strong><span>{bible.language} · online</span></div></div>
-                <button type="button" class="btn icon-btn" aria-label={`Remove ${bible.name}`} onclick={() => toggleApiBible(bible, false)}><Icon name="trash" size={14} /></button>
+                <div class="row-lead"><span class="bible-badge">{bible.abbreviation}</span><div class="row-copy"><strong>{bible.name}</strong><span>{t("{language} · online", { language: bible.language })}</span></div></div>
+                <button type="button" class="btn icon-btn" aria-label={t("Remove {name}", { name: bible.name })} onclick={() => toggleApiBible(bible, false)}><Icon name="trash" size={14} /></button>
               </div>
             {/each}
           {/if}
         </section>
-        <p class="note stand">King James and the World English Bible come with Church Studio. Download others when you need them; scripture stays on this computer, and Search, Listen and the next verse stay on Preview until LIVE.</p>
+        <p class="note stand">{t("King James and the World English Bible come with Church Studio. Download others when you need them; scripture stays on this computer, and Search, Listen and the next verse stay on Preview until LIVE.")}</p>
       {:else if section === "lyrics"}
         {@const report = usageReport(session.workspace.songUses, usageFrom, usageTo)}
-        <p class="section-label">CCLI usage report</p>
+        <p class="section-label">{t("CCLI usage report")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Songs shown live</strong><span>Each song counts once per day it went live. Enter these in your CCLI copy report.</span></div>
+            <div class="row-copy"><strong>{t("Songs shown live")}</strong><span>{t("Each song counts once per day it went live. Enter these in your CCLI copy report.")}</span></div>
             <div class="row-end">
-              <select class="field" aria-label="Report period" bind:value={usagePeriod}>
-                <option value="month">This month</option>
-                <option value="quarter">Last 3 months</option>
-                <option value="half">Last 6 months</option>
-                <option value="year">Last 12 months</option>
+              <select class="field" aria-label={t("Report period")} bind:value={usagePeriod}>
+                <option value="month">{t("This month")}</option>
+                <option value="quarter">{t("Last 3 months")}</option>
+                <option value="half">{t("Last 6 months")}</option>
+                <option value="year">{t("Last 12 months")}</option>
               </select>
-              <button type="button" class="btn" disabled={report.length === 0} onclick={() => exportUsage(report)}><Icon name="download" size={14} /> CSV</button>
+              <button type="button" class="btn" disabled={report.length === 0} onclick={() => exportUsage(report)}><Icon name="download" size={14} /> {t("CSV")}</button>
             </div>
           </div>
           {#each report.slice(0, 12) as row (row.songId)}
             <div class="row">
-              <div class="row-copy"><strong>{row.title}</strong><span>{row.ccli ? `CCLI ${row.ccli}` : "No CCLI number. Add it in the song's details."} · last {new Date(`${row.last}T12:00`).toLocaleDateString()}</span></div>
+              <div class="row-copy"><strong>{row.title}</strong><span>{row.ccli ? `CCLI ${row.ccli}` : t("No CCLI number. Add it in the song's details.")} · {t("last {date}", { date: new Date(`${row.last}T12:00`).toLocaleDateString() })}</span></div>
               <span class="pill">{row.times}×</span>
             </div>
           {:else}
-            <div class="row"><div class="row-copy"><span>No songs went live in this period.</span></div></div>
+            <div class="row"><div class="row-copy"><span>{t("No songs went live in this period.")}</span></div></div>
           {/each}
-          {#if report.length > 12}<div class="row"><div class="row-copy"><span>{report.length - 12} more in the CSV.</span></div></div>{/if}
+          {#if report.length > 12}<div class="row"><div class="row-copy"><span>{t("{count} more in the CSV.", { count: report.length - 12 })}</span></div></div>{/if}
         </section>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Song library</strong><span>{session.songs.length} song{session.songs.length === 1 ? "" : "s"} in {session.workspace.songFolders.length} folder{session.workspace.songFolders.length === 1 ? "" : "s"}. Write, import and organize them in the Songs window.</span></div>
+            <div class="row-copy"><strong>{t("Song library")}</strong><span>{tn(session.songs.length, "{n} song", "{n} songs")} · {tn(session.workspace.songFolders.length, "{n} folder", "{n} folders")}. {t("Write, import and organize them in the Songs window.")}</span></div>
             <span class="pill">{session.songs.length}</span>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Imports</strong><span>Plain text, ChordPro, SongSelect (.usr / .txt) and OpenLyrics (.xml / .zip).</span></div>
+            <div class="row-copy"><strong>{t("Imports")}</strong><span>{t("Plain text, ChordPro, SongSelect (.usr / .txt) and OpenLyrics (.xml / .zip).")}</span></div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>CCLI license #</strong><span>{session.workspace.ccliLicense ? `CCLI License # ${session.workspace.ccliLicense} is shown with song copyright.` : "Not set. Songs show their © line and CCLI song number only."}</span></div>
-            <button type="button" class="link" onclick={() => (section = "general")}>{session.workspace.ccliLicense ? "Change" : "Add"}</button>
+            <div class="row-copy"><strong>{t("CCLI license #")}</strong><span>{session.workspace.ccliLicense ? t("CCLI License # {ccliLicense} is shown with song copyright.", { ccliLicense: session.workspace.ccliLicense }) : t("Not set. Songs show their © line and CCLI song number only.")}</span></div>
+            <button type="button" class="link" onclick={() => (section = "general")}>{session.workspace.ccliLicense ? t("Change") : t("Add")}</button>
           </div>
         </section>
       {:else if section === "media"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Pictures and videos</strong><span>{session.media.length} item{session.media.length === 1 ? "" : "s"} on this computer. Use them as backgrounds, the logo, or sources in a scene.</span></div>
-            <button type="button" class="btn primary" onclick={() => void importMedia()}>Import…</button>
+            <div class="row-copy"><strong>{t("Pictures and videos")}</strong><span>{tn(session.media.length, "{n} item on this computer.", "{n} items on this computer.")} {t("Use them as backgrounds, the logo, or sources in a scene.")}</span></div>
+            <button type="button" class="btn primary" onclick={() => void importMedia()}>{t("Import…")}</button>
             <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
           </div>
           {#each [...session.media, ...session.audioTracks] as asset (asset.id)}
             <div class="row">
-              <div class="row-lead"><span class="row-icon"><Icon name={asset.kind === "audio" ? "audio" : "media"} size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? "Video" : asset.kind === "audio" ? "Audio" : "Image"}{session.workspace.logoAssetId === asset.id ? " · logo" : ""}</span></div></div>
+              <div class="row-lead"><span class="row-icon"><Icon name={asset.kind === "audio" ? "audio" : "media"} size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? t("Video") : asset.kind === "audio" ? t("Audio") : t("Picture")}{session.workspace.logoAssetId === asset.id ? ` · ${t("logo")}` : ""}</span></div></div>
               <div class="row-end">
                 {#if asset.kind === "image"}
-                  <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? "Logo" : "Use as logo"}</button>
+                  <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? t("Logo") : t("Use as logo")}</button>
                 {/if}
                 <button
                   type="button"
                   class="btn danger"
-                  aria-label={armedMedia === asset.id ? `Confirm delete ${asset.name}` : `Delete ${asset.name}`}
+                  aria-label={armedMedia === asset.id ? t("Confirm delete {name}", { name: asset.name }) : t("Delete {name}", { name: asset.name })}
                   onclick={() => {
                     if (armedMedia !== asset.id) {
                       armedMedia = asset.id;
@@ -1270,43 +1270,43 @@
                     armedMedia = null;
                     void session.deleteMedia(asset.id);
                   }}
-                >{armedMedia === asset.id ? "Delete? Click again" : "Delete"}</button>
+                >{armedMedia === asset.id ? t("Delete? Click again") : t("Delete")}</button>
               </div>
             </div>
           {/each}
         </section>
-        <p class="section-label">Cameras</p>
+        <p class="section-label">{t("Cameras")}</p>
         <section class="rows">
           {#each session.cameras as camera (camera.deviceId)}
             <div class="row">
               <div class="row-lead"><span class="row-icon"><Icon name="cast" size={16} /></span><div class="row-copy"><strong>{camera.label}</strong></div></div>
-              <button type="button" class="btn" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
+              <button type="button" class="btn" onclick={() => void session.previewCamera(camera.deviceId)}>{t("Preview")}</button>
             </div>
           {:else}
-            <div class="row"><div class="row-copy"><strong>No cameras listed</strong><span>{session.cameraNote || "Connect a camera, then refresh."}</span></div></div>
+            <div class="row"><div class="row-copy"><strong>{t("No cameras listed")}</strong><span>{session.cameraNote || t("Connect a camera, then refresh.")}</span></div></div>
           {/each}
           <div class="row">
-            <div class="row-copy"><span>Preview only. A camera reaches Program and the audience on LIVE.</span></div>
-            <button type="button" class="btn" onclick={() => void session.loadCameras()}>Refresh</button>
+            <div class="row-copy"><span>{t("Preview only. A camera reaches Program and the audience on LIVE.")}</span></div>
+            <button type="button" class="btn" onclick={() => void session.loadCameras()}>{t("Refresh")}</button>
           </div>
         </section>
       {:else if section === "audio"}
         <AudioSettings />
-        <p class="section-label">Verse detection</p>
+        <p class="section-label">{t("Verse detection")}</p>
         <section class="rows">
           <div class="row">
             <div class="row-copy">
-              <strong>{canUse("voice-detect") ? "Listen for scripture" : "Not in this release"}</strong>
-              <span>{canUse("voice-detect") ? "Press Listen on the Scriptures desk. A match goes to Preview only; LIVE still sends Program. Recognition stays on this computer." : "Audio recognition is not connected. Nothing here starts a microphone."}</span>
+              <strong>{canUse("voice-detect") ? t("Listen for scripture") : t("Not in this release")}</strong>
+              <span>{canUse("voice-detect") ? t("Press Listen on the Scriptures desk. A match goes to Preview only; LIVE still sends Program. Recognition stays on this computer.") : t("Audio recognition is not connected. Nothing here starts a microphone.")}</span>
             </div>
-            <span class="pill" class:ok={canUse("voice-detect")} class:muted={!canUse("voice-detect")}>{canUse("voice-detect") ? "On" : "Off"}</span>
+            <span class="pill" class:ok={canUse("voice-detect")} class:muted={!canUse("voice-detect")}>{canUse("voice-detect") ? t("On") : t("Off")}</span>
           </div>
           {#if canUse("voice-detect") && isDesktop()}
             <div class="row">
-              <div class="row-copy"><strong>Microphone permission</strong><span>{audioNote || "If macOS refused the mic, turn Church Studio on under Microphone and Speech Recognition."}</span></div>
+              <div class="row-copy"><strong>{t("Microphone permission")}</strong><span>{audioNote || t("If macOS refused the mic, turn Church Studio on under Microphone and Speech Recognition.")}</span></div>
               <div class="row-end">
-                <button type="button" class="btn primary" onclick={() => void allowMicrophone()}>Allow</button>
-                <button type="button" class="btn" onclick={() => void openPrivacySettings()}>Privacy settings</button>
+                <button type="button" class="btn primary" onclick={() => void allowMicrophone()}>{t("Allow")}</button>
+                <button type="button" class="btn" onclick={() => void openPrivacySettings()}>{t("Privacy settings")}</button>
               </div>
             </div>
           {/if}
@@ -1314,42 +1314,42 @@
       {:else if section === "performance"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Desk size</strong><span>Spacing and type size for the operator window. The audience window draws Program only.</span></div>
-            <button type="button" class="link" onclick={() => (section = "appearance")}>Open Appearance</button>
+            <div class="row-copy"><strong>{t("Desk size")}</strong><span>{t("Spacing and type size for the operator window. The audience window draws Program only.")}</span></div>
+            <button type="button" class="link" onclick={() => (section = "appearance")}>{t("Open Appearance")}</button>
           </div>
         </section>
       {:else if section === "updates"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Church Studio 0.1.0</strong><span>The copy you launched is the one that is running.</span></div>
-            <span class="pill">Current</span>
+            <div class="row-copy"><strong>{t("Church Studio 0.1.0")}</strong><span>{t("The copy you launched is the one that is running.")}</span></div>
+            <span class="pill">{t("Current")}</span>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Updates</strong><span>{updateNote || (isDesktop() ? "New versions are signed by Church Studio; only those install. Your library stays as it is." : "The browser version is always the latest.")}</span></div>
+            <div class="row-copy"><strong>{t("Updates")}</strong><span>{updateNote || (isDesktop() ? t("New versions are signed by Church Studio; only those install. Your library stays as it is.") : t("The browser version is always the latest."))}</span></div>
             <div class="row-end">
               {#if updateReady}
-                <button type="button" class="btn primary" disabled={updateBusy} onclick={() => void installUpdate()}>{updateBusy ? "Installing…" : `Install ${updateReady} and restart`}</button>
+                <button type="button" class="btn primary" disabled={updateBusy} onclick={() => void installUpdate()}>{updateBusy ? t("Installing…") : t("Install {updateReady} and restart", { updateReady })}</button>
               {:else}
-                <button type="button" class="btn" disabled={!isDesktop() || updateBusy} onclick={() => void checkUpdate()}>{updateBusy ? "Checking…" : "Check for updates"}</button>
+                <button type="button" class="btn" disabled={!isDesktop() || updateBusy} onclick={() => void checkUpdate()}>{updateBusy ? t("Checking…") : t("Check for updates")}</button>
               {/if}
             </div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>First-run setup</strong><span>Walk through church name, look, scripture and voice again.</span></div>
-            <button type="button" class="btn" onclick={() => session.restartOnboarding()}>Run setup again</button>
+            <div class="row-copy"><strong>{t("First-run setup")}</strong><span>{t("Walk through church name, look, scripture and voice again.")}</span></div>
+            <button type="button" class="btn" onclick={() => session.restartOnboarding()}>{t("Run setup again")}</button>
           </div>
         </section>
-        <p class="section-label">Problem reports</p>
+        <p class="section-label">{t("Problem reports")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} noted on this computer` : "No problems noted"}</strong><span>If something went wrong, save a report and send it to Church Studio support. It holds the errors and a few counts, never your songs, sermons or notes. Nothing is sent by itself.</span></div>
+            <div class="row-copy"><strong>{problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} noted on this computer` : t("No problems noted")}</strong><span>{t("If something went wrong, save a report and send it to Church Studio support. It holds the errors and a few counts, never your songs, sermons or notes. Nothing is sent by itself.")}</span></div>
             <div class="row-end">
-              <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> Save report</button>
-              {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>Clear</button>{/if}
+              <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> {t("Save report")}</button>
+              {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>{t("Clear")}</button>{/if}
             </div>
           </div>
         </section>
-        <p class="note stand">Church Studio can send video over NDI®. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
+        <p class="note stand">{t("Church Studio can send video over NDI®. NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
       {:else if section === "account"}
         {@const current = planById(session.plan)}
         {@const ent = session.workspace.entitlement}
@@ -1359,11 +1359,11 @@
             <div class="row">
               <div class="row-lead">
                 <span class="avatar" style:background={current.color}>{initials(profile.name)}</span>
-                <div class="row-copy"><strong>{profile.name}</strong><span>{profile.email} · signed in on this computer</span></div>
+                <div class="row-copy"><strong>{profile.name}</strong><span>{t("{email} · signed in on this computer", { email: profile.email })}</span></div>
               </div>
               <div class="row-end">
                 <span class="pill" style:background={`color-mix(in srgb, ${current.color} 20%, transparent)`} style:color={current.color}>{current.name}</span>
-                <button type="button" class="btn" onclick={() => session.signOut()}>Sign out</button>
+                <button type="button" class="btn" onclick={() => session.signOut()}>{t("Sign out")}</button>
               </div>
             </div>
           {:else}
@@ -1374,11 +1374,11 @@
                 signInError = session.signIn(signInName, signInEmail) ?? "";
               }}
             >
-              <div class="row-copy"><strong>Sign in</strong><span>Your name and email, kept on this computer. Online accounts arrive with purchasing and cloud sync.</span></div>
+              <div class="row-copy"><strong>{t("Sign in")}</strong><span>{t("Your name and email, kept on this computer. Online accounts arrive with purchasing and cloud sync.")}</span></div>
               <div class="sign-in">
-                <input class="field grow" aria-label="Your name" placeholder="Your name" autocomplete="name" bind:value={signInName} />
-                <input class="field grow" aria-label="Email" placeholder="you@church.org" type="email" autocomplete="email" bind:value={signInEmail} />
-                <button type="submit" class="btn primary" disabled={!signInEmail.trim()}>Sign in</button>
+                <input class="field grow" aria-label={t("Your name")} placeholder={t("Your name")} autocomplete="name" bind:value={signInName} />
+                <input class="field grow" aria-label={t("Email")} placeholder="you@church.org" type="email" autocomplete="email" bind:value={signInEmail} />
+                <button type="submit" class="btn primary" disabled={!signInEmail.trim()}>{t("Sign in")}</button>
               </div>
               {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
               {#if import.meta.env.DEV}
@@ -1389,7 +1389,7 @@
                     session.signIn("Test User", "test@churchstudio.app");
                     session.redeemCode("PREMIUM-TEST");
                   }}
-                >Development: sign in as a Premium test user</button>
+                >{t("Development: sign in as a Premium test user")}</button>
               {/if}
             </form>
           {/if}
@@ -1398,77 +1398,77 @@
         <section class="plan-hero" style:--plan={current.color}>
           <span class="plan-badge"><Icon name="key" size={20} /></span>
           <div class="head-copy">
-            <p class="eyebrow">Your plan</p>
+            <p class="eyebrow">{t("Your plan")}</p>
             <h3>
               {current.name}
-              {#if session.trialDays > 0 && ent.plan === "free"}<span class="pill">Trial · {session.trialDays} day{session.trialDays === 1 ? "" : "s"} left</span>
-              {:else if ent.source === "promo" && session.plan !== "free"}<span class="pill">Test code {ent.code}</span>
-              {:else if ent.source === "license" && session.plan !== "free"}<span class="pill">{ent.expiresAt ? `Until ${new Date(ent.expiresAt).toLocaleDateString()}` : "No end date"}</span>{/if}
+              {#if session.trialDays > 0 && ent.plan === "free"}<span class="pill">{tn(session.trialDays, "Trial · {n} day left", "Trial · {n} days left")}</span>
+              {:else if ent.source === "promo" && session.plan !== "free"}<span class="pill">{t("Test code {code}", { code: ent.code })}</span>
+              {:else if ent.source === "license" && session.plan !== "free"}<span class="pill">{ent.expiresAt ? t("Until {date}", { date: new Date(ent.expiresAt).toLocaleDateString() }) : t("No end date")}</span>{/if}
             </h3>
-            <p>{ent.source === "license" && ent.holder && session.plan !== "free" ? `Licensed to ${ent.holder}.` : current.tagline}</p>
+            <p>{ent.source === "license" && ent.holder && session.plan !== "free" ? t("Licensed to {holder}.", { holder: ent.holder }) : current.tagline}</p>
           </div>
           {#if ent.plan === "free" && !ent.trialUsed}
-            <button type="button" class="btn primary" onclick={() => session.startTrial()}>Try Premium free · {TRIAL_DAYS} days</button>
+            <button type="button" class="btn primary" onclick={() => session.startTrial()}>{t("Try Premium free · {TRIAL_DAYS} days", { TRIAL_DAYS })}</button>
           {:else if (ent.source === "promo" || ent.source === "license") && session.plan !== "free"}
-            <button type="button" class="btn" onclick={() => session.useFreePlan()}>{ent.source === "license" ? "Remove license" : "Return to Free"}</button>
+            <button type="button" class="btn" onclick={() => session.useFreePlan()}>{ent.source === "license" ? t("Remove license") : t("Return to Free")}</button>
           {/if}
         </section>
         {#if ent.trialUsed && session.trialDays === 0 && session.plan === "free"}
-          <p class="note stand">Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.</p>
+          <p class="note stand">{t("Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.")}</p>
         {/if}
 
         <div class="pricing-head">
-          <p class="section-label">Plans</p>
-          <div class="billing" role="radiogroup" aria-label="Billing">
-            <button type="button" role="radio" aria-checked={billing === "monthly"} class:on={billing === "monthly"} onclick={() => (billing = "monthly")}>Monthly</button>
-            <button type="button" role="radio" aria-checked={billing === "yearly"} class:on={billing === "yearly"} onclick={() => (billing = "yearly")}>Yearly <em>save {yearlyDeal(PLANS[1]!.price).savePercent}%</em></button>
+          <p class="section-label">{t("Plans")}</p>
+          <div class="billing" role="radiogroup" aria-label={t("Billing")}>
+            <button type="button" role="radio" aria-checked={billing === "monthly"} class:on={billing === "monthly"} onclick={() => (billing = "monthly")}>{t("Monthly")}</button>
+            <button type="button" role="radio" aria-checked={billing === "yearly"} class:on={billing === "yearly"} onclick={() => (billing = "yearly")}>{t("Yearly")} <em>{t("save {savePercent}%", { savePercent: yearlyDeal(PLANS[1]!.price).savePercent })}</em></button>
           </div>
         </div>
         <div class="plan-grid">
           {#each PLANS as plan, i (plan.id)}
             {@const deal = yearlyDeal(plan.price)}
             <article class="plan-card" class:current={plan.id === session.plan} class:popular={plan.popular} style:--plan={plan.color}>
-              {#if plan.popular}<span class="ribbon">Most popular</span>{/if}
+              {#if plan.popular}<span class="ribbon">{t("Most popular")}</span>{/if}
               <header>
                 <strong>{plan.name}</strong>
-                {#if plan.id === session.plan}<span class="pill ok">Current</span>{/if}
+                {#if plan.id === session.plan}<span class="pill ok">{t("Current")}</span>{/if}
               </header>
               <p class="price">
                 {#if plan.price.monthly === 0}
-                  <b>$0</b><span>forever</span>
+                  <b>$0</b><span>{t("forever")}</span>
                 {:else if billing === "monthly"}
-                  <b>${plan.price.monthly}</b><span>/ month</span>
+                  <b>${plan.price.monthly}</b><span>{t("/ month")}</span>
                 {:else}
-                  <b>${deal.perMonth}</b><span>/ month, billed ${plan.price.yearly} a year</span>
+                  <b>${deal.perMonth}</b><span>{t("/ month, billed ${yearly} a year", { yearly: plan.price.yearly })}</span>
                 {/if}
               </p>
               <p class="tag">{plan.tagline}</p>
-              {#if i > 0}<p class="plus">Everything in {PLANS[i - 1]!.name}, plus</p>{/if}
+              {#if i > 0}<p class="plus">{t("Everything in {name}, plus", { name: PLANS[i - 1]!.name })}</p>{/if}
               <ul>
                 {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
                   <li class:soon={FEATURE_LABELS[feature].soon}>
                     <Icon name="check" size={13} />
-                    <span>{FEATURE_LABELS[feature].label}{#if FEATURE_LABELS[feature].soon}<em>soon</em>{/if}</span>
+                    <span>{FEATURE_LABELS[feature].label}{#if FEATURE_LABELS[feature].soon}<em>{t("soon")}</em>{/if}</span>
                   </li>
                 {/each}
               </ul>
               {#if plan.id === session.plan}
-                <span class="plan-cta muted">Your plan</span>
+                <span class="plan-cta muted">{t("Your plan")}</span>
               {:else if plan.id === "free"}
-                <span class="plan-cta muted">Always free</span>
+                <span class="plan-cta muted">{t("Always free")}</span>
               {:else if plan.id === "premium" && ent.plan === "free" && !ent.trialUsed}
-                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => session.startTrial()}>Start free trial</button>
+                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => session.startTrial()}>{t("Start free trial")}</button>
               {:else if checkoutUrl(plan.id, billing)}
-                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => void openExternal(checkoutUrl(plan.id, billing, session.workspace.profile?.email)!)}>Buy {plan.name}</button>
+                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => void openExternal(checkoutUrl(plan.id, billing, session.workspace.profile?.email)!)}>{t("Buy {name}", { name: plan.name })}</button>
               {:else}
-                <button type="button" class="btn plan-cta" disabled title="Purchasing is coming soon">Upgrade · coming soon</button>
+                <button type="button" class="btn plan-cta" disabled title={t("Purchasing is coming soon")}>{t("Upgrade · coming soon")}</button>
               {/if}
             </article>
           {/each}
         </div>
-        <p class="note stand">Prices are placeholders while pricing is decided. Your songs, sermons and settings stay yours on every plan.</p>
+        <p class="note stand">{t("Prices are placeholders while pricing is decided. Your songs, sermons and settings stay yours on every plan.")}</p>
 
-        <p class="section-label">License key</p>
+        <p class="section-label">{t("License key")}</p>
         <section class="rows">
           <form
             class="row"
@@ -1478,22 +1478,22 @@
               if (!codeError) code = "";
             }}
           >
-            <div class="row-copy"><strong>Add a license key</strong><span class:form-error={!!codeError}>{codeError || "Paste the key from your purchase email. It starts with CS1 and is checked on this computer, no internet needed."}</span></div>
+            <div class="row-copy"><strong>{t("Add a license key")}</strong><span class:form-error={!!codeError}>{codeError || t("Paste the key from your purchase email. It starts with CS1 and is checked on this computer, no internet needed.")}</span></div>
             <div class="row-end">
-              <input class="field license-field" aria-label="License key" placeholder="CS1-…" autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
-              <button type="submit" class="btn primary" disabled={!code.trim()}>Add key</button>
+              <input class="field license-field" aria-label={t("License key")} placeholder={t("CS1-…")} autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
+              <button type="submit" class="btn primary" disabled={!code.trim()}>{t("Add key")}</button>
             </div>
           </form>
         </section>
       {:else}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{planById(session.plan).name}</strong><span>{session.trialDays > 0 ? `Premium trial on this computer · ${session.trialDays} day${session.trialDays === 1 ? "" : "s"} left.` : session.plan === "free" ? "Free forever. Presentation, the library and audience output run offline." : "Licensed on this computer."}</span></div>
-            <span class="pill" class:ok={session.plan !== "free"} class:muted={session.plan === "free"}>{session.plan === "free" ? "Free" : "Active"}</span>
+            <div class="row-copy"><strong>{planById(session.plan).name}</strong><span>{session.trialDays > 0 ? `Premium trial on this computer · ${session.trialDays} day${session.trialDays === 1 ? "" : "s"} left.` : session.plan === "free" ? t("Free forever. Presentation, the library and audience output run offline.") : t("Licensed on this computer.")}</span></div>
+            <span class="pill" class:ok={session.plan !== "free"} class:muted={session.plan === "free"}>{session.plan === "free" ? t("Free") : t("Active")}</span>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>Plans and features</strong><span>See what each plan includes.</span></div>
-            <button type="button" class="btn" onclick={() => (section = "account")}>Compare plans</button>
+            <div class="row-copy"><strong>{t("Plans and features")}</strong><span>{t("See what each plan includes.")}</span></div>
+            <button type="button" class="btn" onclick={() => (section = "account")}>{t("Compare plans")}</button>
           </div>
         </section>
       {/if}

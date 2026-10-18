@@ -184,7 +184,7 @@
               draft.title = next.title;
             }
           }}>
-            {#each session.songsByFavorite as entry (entry.id)}<option value={entry.id}>{entry.title || "Untitled song"}</option>{/each}
+            {#each session.songsByFavorite as entry (entry.id)}<option value={entry.id}>{entry.title || t("Untitled song")}</option>{/each}
           </select>
         </label>
         {#if song}

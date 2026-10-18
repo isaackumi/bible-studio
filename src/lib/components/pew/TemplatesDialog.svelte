@@ -97,7 +97,7 @@
       {/each}
       <button type="button" class="add" onclick={() => (selectedId = session.addTemplate().id)}><Icon name="plus" size={14} /> {t("New template")}</button>
       {#if session.service}
-        <button type="button" class="add" title={t("Its parts and times, not this week's songs")} onclick={() => { const made = session.saveServiceAsTemplate(session.service?.name ?? "Service"); if (made) selectedId = made.id; }}><Icon name="copy" size={14} /> {t("From this service")}</button>
+        <button type="button" class="add" title={t("Its parts and times, not this week's songs")} onclick={() => { const made = session.saveServiceAsTemplate(session.service?.name ?? t("Service")); if (made) selectedId = made.id; }}><Icon name="copy" size={14} /> {t("From this service")}</button>
       {/if}
     </nav>
 
@@ -169,7 +169,7 @@
           {/each}
         </ol>
         <div class="row-add">
-          <button type="button" class="ghost" onclick={() => save({ parts: [...selected.parts, { name: "New part", minutes: 15 }] })}><Icon name="plus" size={13} /> {t("Add a part")}</button>
+          <button type="button" class="ghost" onclick={() => save({ parts: [...selected.parts, { name: t("New part"), minutes: 15 }] })}><Icon name="plus" size={13} /> {t("Add a part")}</button>
           {#each ["Welcome", "Prayer", "Worship", "Bible reading", "Preaching", "Offering", "Announcements", "Benediction"].filter((name) => !selected.parts.some((part) => part.name === name)).slice(0, 5) as name (name)}
             <button type="button" class="chip" onclick={() => save({ parts: [...selected.parts, { name, minutes: 10 }] })}>{name}</button>
           {/each}

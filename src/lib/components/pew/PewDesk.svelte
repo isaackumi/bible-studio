@@ -899,7 +899,7 @@
                       data-tip={t("Font, color, and layout. Preview only until you press LIVE.")}
                       onclick={() => (sheet = sheet === "type" ? null : "type")}
                     >
-                      {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
+                      {themeName} · {session.theme().layout === "lower-third" ? t("Lower third") : t("Frame")}
                     </button>
                   </header>
                   <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>

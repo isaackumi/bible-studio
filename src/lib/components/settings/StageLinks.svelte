@@ -2,6 +2,7 @@
   import QRCode from "qrcode";
   import { session } from "../../app/session.svelte";
   import { isDesktop } from "../../platform/runtime";
+  import { t } from "../../i18n/core";
 
   // Stage on phones and tablets: a link (and QR code) that shows the stage view in any browser on
   // the church Wi-Fi. It reads the desk and presses nothing; each link can be removed.
@@ -44,42 +45,42 @@
   }
 
   function ago(at: number): string {
-    if (!at) return "Not opened yet";
+    if (!at) return t("Not opened yet");
     const minutes = Math.round((Date.now() - at) / 60_000);
-    return minutes < 1 ? "Open now" : minutes < 60 ? `Seen ${minutes} min ago` : `Seen ${new Date(at).toLocaleDateString([], { day: "numeric", month: "short" })}`;
+    return minutes < 1 ? t("Open now") : minutes < 60 ? t("Seen {minutes} min ago", { minutes }) : t("Seen {date}", { date: new Date(at).toLocaleDateString([], { day: "numeric", month: "short" }) });
   }
 </script>
 
 <section class="rows">
   <form class="row" onsubmit={make}>
     <div class="row-copy">
-      <strong>Make a stage link</strong>
-      <span>{isDesktop() ? "The band or the pastor see the stage on a phone or tablet on the church Wi-Fi: words now and next, the song part, messages, notes, clock and timer. It shows only; it presses nothing." : "Stage links work with the desktop app, which runs the network server."}</span>
+      <strong>{t("Make a stage link")}</strong>
+      <span>{isDesktop() ? t("The band or the pastor see the stage on a phone or tablet on the church Wi-Fi: words now and next, the song part, messages, notes, clock and timer. It shows only; it presses nothing.") : t("Stage links work with the desktop app, which runs the network server.")}</span>
     </div>
     <div class="row-end">
-      <input class="field" aria-label="Stage link name" placeholder="Band iPad" maxlength="40" bind:value={name} />
-      <button type="submit" class="btn primary" disabled={!isDesktop()}>Make link</button>
+      <input class="field" aria-label={t("Stage link name")} placeholder={t("Band iPad")} maxlength="40" bind:value={name} />
+      <button type="submit" class="btn primary" disabled={!isDesktop()}>{t("Make link")}</button>
     </div>
   </form>
   {#if link}
     <div class="row new-link">
-      <div class="qr" aria-label="Stage link QR code">{@html qr}</div>
+      <div class="qr" aria-label={t("Stage link QR code")}>{@html qr}</div>
       <div class="row-copy">
-        <strong>Scan with the phone or tablet</strong>
-        <span>Or open this link on it. Copy it now: it is not shown again. Add it to the home screen to open it like an app.</span>
+        <strong>{t("Scan with the phone or tablet")}</strong>
+        <span>{t("Or open this link on it. Copy it now: it is not shown again. Add it to the home screen to open it like an app.")}</span>
         <code>{link}</code>
         <span class="actions">
-          <button type="button" class="btn small" onclick={() => { void navigator.clipboard?.writeText(link); copied = true; }}>{copied ? "Copied" : "Copy link"}</button>
-          <button type="button" class="btn small" onclick={() => (token = null)}>Done</button>
+          <button type="button" class="btn small" onclick={() => { void navigator.clipboard?.writeText(link); copied = true; }}>{copied ? t("Copied") : t("Copy link")}</button>
+          <button type="button" class="btn small" onclick={() => (token = null)}>{t("Done")}</button>
         </span>
       </div>
     </div>
   {/if}
   {#each links as device (device.id)}
     <div class="row">
-      <div class="row-copy"><strong>{device.name}</strong><span>{ago(device.lastSeen)} · stage only · never signs out</span></div>
-      <button type="button" class="btn danger" aria-label={armed === device.id ? `Confirm remove ${device.name}` : `Remove ${device.name}`} onclick={() => remove(device.id)}>
-        {armed === device.id ? "Remove? Its screen stops" : "Remove"}
+      <div class="row-copy"><strong>{device.name}</strong><span>{t("{lastSeen} · stage only · never signs out", { lastSeen: ago(device.lastSeen) })}</span></div>
+      <button type="button" class="btn danger" aria-label={armed === device.id ? t("Confirm remove {name}", { name: device.name }) : t("Remove {name}", { name: device.name })} onclick={() => remove(device.id)}>
+        {armed === device.id ? t("Remove? Its screen stops") : t("Remove")}
       </button>
     </div>
   {/each}

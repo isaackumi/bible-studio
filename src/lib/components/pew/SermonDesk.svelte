@@ -375,7 +375,7 @@
           {#each group.items as doc (doc.id)}
             <button type="button" class="row" class:on={selectedId === doc.id && !draft} onclick={() => pick(doc.id)}>
               <strong>
-                {doc.title || "Untitled sermon"}
+                {doc.title || t("Untitled sermon")}
                 {#if programLive && programSource.startsWith(`sermon:${doc.id}:`)}<em class="badge live">{t("Live")}</em>
                 {:else if focus?.sermonId === doc.id}<em class="badge">{t("Preview")}</em>{/if}
               </strong>
@@ -499,7 +499,7 @@
         <div>
           <h2 class="title">{selected.title}</h2>
           <p class="meta">
-            <span>{selected.speaker || "No speaker"}</span>
+            <span>{selected.speaker || t("No speaker")}</span>
             <span>{tn(selected.sections.length, "{n} section", "{n} sections")}</span>
             {#if when(selected.updatedAt)}<span>{t("Updated {updatedAt}", { updatedAt: when(selected.updatedAt) })}</span>{/if}
           </p>
@@ -565,7 +565,7 @@
         <span class="kicker"><Icon name="lock" size={12} /> {t("Desk notes")}</span>
         <span class="muted">{focusSection?.name ?? ""}</span>
       </header>
-      <p class:empty-notes={!deskNotes}>{deskNotes || "Notes for the section on Preview show here. They never reach Preview or Program."}</p>
+      <p class:empty-notes={!deskNotes}>{deskNotes || t("Notes for the section on Preview show here. They never reach Preview or Program.")}</p>
     </section>
     <MonitorPair page="sermon" {place} onstep={(direction) => void session.stepSermon(direction)} />
   </aside>

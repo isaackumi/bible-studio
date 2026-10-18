@@ -14,7 +14,7 @@ export const UI_LANGUAGES: Array<{ id: UiLanguage; name: string; english: string
 
 const CATALOGS: Record<UiLanguage, Readonly<Record<string, string>> | null> = { en: null, fr };
 
-type Params = Record<string, string | number>;
+type Params = Record<string, string | number | null | undefined>;
 
 let read: () => UiLanguage = () => "en";
 
@@ -38,7 +38,7 @@ export function guessUiLanguage(languages: readonly string[]): UiLanguage {
 
 function fill(text: string, params?: Params): string {
   if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (whole, key: string) => (key in params ? String(params[key]) : whole));
+  return text.replace(/\{(\w+)\}/g, (whole, key: string) => (key in params ? String(params[key] ?? "") : whole));
 }
 
 export function translate(language: UiLanguage, text: string, params?: Params): string {

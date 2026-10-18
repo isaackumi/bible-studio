@@ -8,14 +8,15 @@
   import { isDesktop } from "../platform/runtime";
   import type { NoiseFilter } from "../domain/types";
   import { noiseCut } from "../voice/noise";
+  import { msg, t } from "../i18n/core";
 
   const bars = 16;
 
   // ---- Noise filter, with a check that shows the room and what listening hears after cleaning
   const FILTERS: Array<{ id: NoiseFilter; label: string; detail: string }> = [
-    { id: "off", label: "Off", detail: "Listening hears the microphone as it is." },
-    { id: "light", label: "Light", detail: "Turns down fans, hum and hiss, and keeps some of the room so quiet words are never lost." },
-    { id: "strong", label: "Strong", detail: "Removes as much background noise as it can. Best for noisy rooms; very soft speech can drop out." },
+    { id: "off", label: msg("Off"), detail: msg("Listening hears the microphone as it is.") },
+    { id: "light", label: msg("Light"), detail: msg("Turns down fans, hum and hiss, and keeps some of the room so quiet words are never lost.") },
+    { id: "strong", label: msg("Strong"), detail: msg("Removes as much background noise as it can. Best for noisy rooms; very soft speech can drop out.") },
   ];
   const filter = $derived(session.workspace.voice.noiseFilter ?? "off");
   const desktop = isDesktop();
@@ -87,7 +88,7 @@
     } catch (error) {
       const name = error && typeof error === "object" && "name" in error ? String((error as { name: string }).name) : "";
       testError =
-        name === "NotFoundError" ? "No microphone is connected." : "The microphone is blocked for this window. Allow it in the browser or System Settings → Privacy & Security.";
+        name === "NotFoundError" ? t("No microphone is connected.") : t("The microphone is blocked for this window. Allow it in the browser or System Settings → Privacy & Security.");
       return;
     }
     const context = new AudioContext();
@@ -150,73 +151,73 @@
 
   const prefix = $derived(settings.wake ? "studio " : "");
   const SAY = $derived([
-    { title: "Move", phrases: ["next", "next verse", "go to the next verse", "move on", "previous", "go back", "the verse before"] },
-    { title: "Find", phrases: ["turn to John 3:16", "go to Romans 8", "find the song Amazing Grace", "open songs", "open the bible"] },
+    { title: msg("Move"), phrases: ["next", "next verse", "go to the next verse", "move on", "previous", "go back", "the verse before"] },
+    { title: msg("Find"), phrases: ["turn to John 3:16", "go to Romans 8", "find the song Amazing Grace", "open songs", "open the bible"] },
     {
-      title: "Translation",
+      title: msg("Translation"),
       phrases: ["give me King James", "give me KJV", "read it in the American Standard", ...session.translations.slice(0, 4).map((translation) => `switch to ${translation.abbreviation}`)],
     },
-    { title: "Program", phrases: ["go live", "clear the screen", "black screen", "show the logo", "pause the timer"] },
+    { title: msg("Program"), phrases: ["go live", "clear the screen", "black screen", "show the logo", "pause the timer"] },
   ]);
   const actionLabel = (id: string) => VOICE_ACTIONS.find((entry) => entry.id === id)?.label ?? id;
 </script>
 
-<p class="section-label">Noise filter</p>
+<p class="section-label">{t("Noise filter")}</p>
 <section class="rows">
   <div class="row stack">
     <div class="row-copy">
-      <strong>Clean the microphone before listening</strong>
-      <span>{FILTERS.find((entry) => entry.id === filter)?.detail} It runs on this computer; no sound leaves it.</span>
+      <strong>{t("Clean the microphone before listening")}</strong>
+      <span>{t(FILTERS.find((entry) => entry.id === filter)?.detail ?? "")} {t("It runs on this computer; no sound leaves it.")}</span>
     </div>
-    <div class="filter-seg" role="radiogroup" aria-label="Noise filter">
+    <div class="filter-seg" role="radiogroup" aria-label={t("Noise filter")}>
       {#each FILTERS as entry (entry.id)}
-        <button type="button" role="radio" aria-checked={filter === entry.id} class:on={filter === entry.id} onclick={() => void chooseFilter(entry.id)}>{entry.label}</button>
+        <button type="button" role="radio" aria-checked={filter === entry.id} class:on={filter === entry.id} onclick={() => void chooseFilter(entry.id)}>{t(entry.label)}</button>
       {/each}
     </div>
   </div>
   {#if desktop}
     <div class="row">
-      <div class="row-copy"><strong>Check it in your room</strong><span>Play the room as it is on a Sunday (fans, music, the PA) and speak. Compare the two meters.</span></div>
-      <button type="button" class="btn" class:primary={!checking} onclick={() => (checking ? stopCheck?.() : void startCheck())}>{checking ? "Stop check" : "Start check"}</button>
+      <div class="row-copy"><strong>{t("Check it in your room")}</strong><span>{t("Play the room as it is on a Sunday (fans, music, the PA) and speak. Compare the two meters.")}</span></div>
+      <button type="button" class="btn" class:primary={!checking} onclick={() => (checking ? stopCheck?.() : void startCheck())}>{checking ? t("Stop check") : t("Start check")}</button>
     </div>
     <div class="row">
-      <div class="row-copy"><strong>Room</strong><span>What the microphone hears</span></div>
-      <div class="meter" role="meter" aria-label="Room level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(room * 100)}>
+      <div class="row-copy"><strong>{t("Room")}</strong><span>{t("What the microphone hears")}</span></div>
+      <div class="meter" role="meter" aria-label={t("Room level")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(room * 100)}>
         {#each Array.from({ length: bars }) as _, index (index)}<i class:on={checking && index < Math.round(room * bars)} class:loud={index >= bars - 3}></i>{/each}
       </div>
     </div>
     <div class="row">
-      <div class="row-copy"><strong>After the filter</strong><span>What listening hears</span></div>
-      <div class="meter" role="meter" aria-label="Level after the filter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(clean * 100)}>
+      <div class="row-copy"><strong>{t("After the filter")}</strong><span>{t("What listening hears")}</span></div>
+      <div class="meter" role="meter" aria-label={t("Level after the filter")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(clean * 100)}>
         {#each Array.from({ length: bars }) as _, index (index)}<i class:on={checking && index < Math.round(clean * bars)} class:loud={index >= bars - 3}></i>{/each}
       </div>
     </div>
     {#if cut !== null && filter !== "off"}
-      <div class="row"><p class="verdict" data-status="ok" role="status">Background noise is about {cut} dB quieter after the filter.{cut < 3 ? " Little to remove here: the room is quiet, or the noise sounds like speech (music, the PA)." : ""}</p></div>
+      <div class="row"><p class="verdict" data-status="ok" role="status">{t("Background noise is about {cut} dB quieter after the filter.", { cut })}{cut < 3 ? ` ${t("Little to remove here: the room is quiet, or the noise sounds like speech (music, the PA).")}` : ""}</p></div>
     {/if}
     {#if checkError}<div class="row"><p class="verdict" data-status="cut-out" role="alert">! {checkError}</p></div>{/if}
   {:else}
-    <div class="row"><div class="row-copy"><strong>In this browser</strong><span>Light and Strong turn on the browser's own noise suppression. The desktop app has the stronger filter and the room check.</span></div></div>
+    <div class="row"><div class="row-copy"><strong>{t("In this browser")}</strong><span>{t("Light and Strong turn on the browser's own noise suppression. The desktop app has the stronger filter and the room check.")}</span></div></div>
   {/if}
   <div class="row">
     <div class="row-copy">
-      <strong>Best results</strong>
-      <span>A filter removes steady noise, not the PA. If the preacher's voice comes back through the speakers mixed with music, take a feed from the sound desk (an aux send) or put a microphone near the pulpit. That helps detection more than any filter.</span>
+      <strong>{t("Best results")}</strong>
+      <span>{t("A filter removes steady noise, not the PA. If the preacher's voice comes back through the speakers mixed with music, take a feed from the sound desk (an aux send) or put a microphone near the pulpit. That helps detection more than any filter.")}</span>
     </div>
   </div>
 </section>
 
-<p class="section-label">Microphone</p>
+<p class="section-label">{t("Microphone")}</p>
 <section class="rows">
   <div class="row">
-    <div class="row-copy"><strong>Test microphone</strong><span>Listens for 20 seconds, long enough to catch a microphone that cuts out shortly after it starts.</span></div>
+    <div class="row-copy"><strong>{t("Test microphone")}</strong><span>{t("Listens for 20 seconds, long enough to catch a microphone that cuts out shortly after it starts.")}</span></div>
     <button type="button" class="btn" class:primary={!testing} onclick={() => (testing ? stopTest?.() : void startTest())}>
-      {testing ? `Stop (${remaining}s)` : "Start test"}
+      {testing ? t("Stop ({remaining}s)", { remaining }) : t("Start test")}
     </button>
   </div>
   <div class="row">
-    <div class="row-copy"><strong>Input level</strong>{#if testing && level < MIC_SIGNAL_LEVEL}<span>Speak now…</span>{/if}</div>
-    <div class="meter" role="meter" aria-label="Input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(level * 100)}>
+    <div class="row-copy"><strong>{t("Input level")}</strong>{#if testing && level < MIC_SIGNAL_LEVEL}<span>{t("Speak now…")}</span>{/if}</div>
+    <div class="meter" role="meter" aria-label={t("Input level")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(level * 100)}>
       {#each Array.from({ length: bars }) as _, index (index)}
         <i class:on={testing && index < lit} class:loud={index >= bars - 3}></i>
       {/each}
@@ -228,25 +229,25 @@
   {#if testError}<div class="row"><p class="verdict" data-status="cut-out" role="alert">! {testError}</p></div>{/if}
 </section>
 
-<p class="section-label">Voice commands</p>
+<p class="section-label">{t("Voice commands")}</p>
 <section class="rows">
   <div class="row">
-    <div class="row-copy"><strong>Voice commands</strong><span>Control the desk hands-free. Spoken verses still go to Preview either way.</span></div>
-    <input type="checkbox" class="switch" role="switch" aria-label="Voice commands" checked={settings.commands} onchange={(event) => session.saveVoiceSettings({ commands: event.currentTarget.checked })} />
+    <div class="row-copy"><strong>{t("Voice commands")}</strong><span>{t("Control the desk hands-free. Spoken verses still go to Preview either way.")}</span></div>
+    <input type="checkbox" class="switch" role="switch" aria-label={t("Voice commands")} checked={settings.commands} onchange={(event) => session.saveVoiceSettings({ commands: event.currentTarget.checked })} />
   </div>
   <div class="row" class:dim={!settings.commands}>
-    <div class="row-copy"><strong>Require “Studio” first</strong><span>Off: just say the words (“next verse”, “give me King James”). A command counts only when it is said on its own, so sermon sentences never act. On: every command starts with “Studio”.</span></div>
-    <input type="checkbox" class="switch" role="switch" aria-label="Require Studio wake word" disabled={!settings.commands} checked={settings.wake} onchange={(event) => session.saveVoiceSettings({ wake: event.currentTarget.checked, wakeChosen: true })} />
+    <div class="row-copy"><strong>{t("Require “Studio” first")}</strong><span>{t("Off: just say the words (“next verse”, “give me King James”). A command counts only when it is said on its own, so sermon sentences never act. On: every command starts with “Studio”.")}</span></div>
+    <input type="checkbox" class="switch" role="switch" aria-label={t("Require Studio wake word")} disabled={!settings.commands} checked={settings.wake} onchange={(event) => session.saveVoiceSettings({ wake: event.currentTarget.checked, wakeChosen: true })} />
   </div>
   <div class="row" class:dim={!settings.commands}>
-    <div class="row-copy"><strong>Live voice commands</strong><span>Let voice change Program (go live, cut, clear, black, logo, timer). Off every time Church Studio starts.</span></div>
-    <input type="checkbox" class="switch" role="switch" aria-label="Live voice commands" disabled={!settings.commands} checked={session.voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
+    <div class="row-copy"><strong>{t("Live voice commands")}</strong><span>{t("Let voice change Program (go live, cut, clear, black, logo, timer). Off every time Church Studio starts.")}</span></div>
+    <input type="checkbox" class="switch" role="switch" aria-label={t("Live voice commands")} disabled={!settings.commands} checked={session.voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
   </div>
   <div class="row stack">
-    <div class="row-copy"><strong>Just say</strong><span>Plain words work. These are examples; similar phrasings work too.</span></div>
+    <div class="row-copy"><strong>{t("Just say")}</strong><span>{t("Plain words work. These are examples; similar phrasings work too.")}</span></div>
     {#each SAY as group (group.title)}
       <div class="say">
-        <span class="say-title">{group.title}</span>
+        <span class="say-title">{t(group.title)}</span>
         <div class="chips">
           {#each group.phrases as example (example)}<code>{prefix}{example}</code>{/each}
         </div>
@@ -255,22 +256,22 @@
   </div>
 </section>
 
-<p class="section-label">Custom commands</p>
+<p class="section-label">{t("Custom commands")}</p>
 <section class="rows">
   {#each settings.custom as entry, index (entry.phrase)}
     <div class="row">
       <div class="row-copy"><strong><code>{prefix}{entry.phrase}</code></strong><span>{actionLabel(entry.action)}</span></div>
-      <button type="button" class="btn danger" aria-label={`Remove ${entry.phrase}`} onclick={() => removeCustom(index)}>Remove</button>
+      <button type="button" class="btn danger" aria-label={t("Remove {phrase}", { phrase: entry.phrase })} onclick={() => removeCustom(index)}>{t("Remove")}</button>
     </div>
   {/each}
   <form class="row" onsubmit={addCustom}>
-    <input class="field grow" aria-label="Custom phrase" placeholder="Phrase, e.g. next slide" maxlength="60" bind:value={phrase} disabled={!settings.commands} />
-    <select class="field" aria-label="Custom action" bind:value={action} disabled={!settings.commands}>
+    <input class="field grow" aria-label={t("Custom phrase")} placeholder={t("Phrase, e.g. next slide")} maxlength="60" bind:value={phrase} disabled={!settings.commands} />
+    <select class="field" aria-label={t("Custom action")} bind:value={action} disabled={!settings.commands}>
       {#each VOICE_ACTIONS as entry (entry.id)}
         <option value={entry.id}>{entry.label}</option>
       {/each}
     </select>
-    <button type="submit" class="btn primary" disabled={!settings.commands || !phrase.trim()}>Add</button>
+    <button type="submit" class="btn primary" disabled={!settings.commands || !phrase.trim()}>{t("Add")}</button>
   </form>
 </section>
 
