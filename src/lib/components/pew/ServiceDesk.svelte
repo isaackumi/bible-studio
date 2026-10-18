@@ -5,6 +5,7 @@
   import { searchSongHits } from "../../domain/song-search";
   import { restoreComposition } from "../../domain/composition";
   import type { PresentationItem } from "../../domain/types";
+  import { ANNOUNCEMENT_DESIGNS, type AnnouncementDesign } from "../../domain/announcement";
   import Icon from "../Icon.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import MonitorPair from "./MonitorPair.svelte";
@@ -24,6 +25,8 @@
   let referenceNote = $state("");
   let heading = $state("");
   let body = $state("");
+  let annLabel = $state("Announcement");
+  let annDesign = $state<AnnouncementDesign>("card");
   /** The item open in the editor. */
   let editing = $state<PresentationItem | null>(null);
 
@@ -111,7 +114,7 @@
   }
 
   function addAnnouncement() {
-    session.addAnnouncementToService(heading, body);
+    session.addAnnouncementToService(heading, body, { design: annDesign, label: annLabel });
     heading = "";
     body = "";
   }
@@ -267,8 +270,12 @@
             </div>
           {:else if adding === "announcement"}
             <form class="stack" onsubmit={(event) => { event.preventDefault(); addAnnouncement(); }}>
+              <input aria-label="Small line above the heading" placeholder="Small line above (optional)" bind:value={annLabel} />
               <input aria-label="Announcement heading" placeholder="Youth camp" bind:value={heading} />
               <textarea aria-label="Announcement text" rows="2" placeholder="Saturday, 9am at the church hall" bind:value={body}></textarea>
+              <select aria-label="Announcement design" bind:value={annDesign}>
+                {#each ANNOUNCEMENT_DESIGNS as design (design.id)}<option value={design.id}>{design.name}: {design.hint.toLowerCase()}</option>{/each}
+              </select>
               <button type="submit" class="desk-btn" disabled={!heading.trim()}>Add announcement</button>
             </form>
           {:else if adding === "look"}

@@ -34,7 +34,7 @@
     const next: PresentationItem = {
       ...item,
       title: heading.trim() || item.title,
-      ...(item.kind === "slide" ? { slide: { heading, body, imageId: item.slide?.imageId ?? null } } : { announcement: { heading, body } }),
+      ...(item.kind === "slide" ? { slide: { heading, body, imageId: item.slide?.imageId ?? null } } : { announcement: { ...item.announcement, heading, body } }),
       ...(style && Object.keys(style).length ? { style } : { style: undefined }),
     };
     session.updateItem(next);

@@ -8,6 +8,7 @@
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Screen from "../Screen.svelte";
   import TextStyleEditor from "../TextStyleEditor.svelte";
+  import { ACCENT_SWATCHES, ANNOUNCEMENT_DESIGNS, LABEL_SUGGESTIONS, presentAnnouncement, themeAccent, type AnnouncementDesign } from "../../domain/announcement";
 
   // Everything about one service item, with a live preview. Saving changes the running order;
   // if the item is on Preview it refreshes there. Program only changes with LIVE.
@@ -36,16 +37,31 @@
   });
 
   function setWords(change: Partial<{ heading: string; body: string; imageId: string | null }>) {
-    const current = { heading: words.heading, body: words.body, imageId: draft.slide?.imageId ?? null };
+    const current = { heading: words.heading, body: words.body, imageId: draft.slide?.imageId ?? draft.announcement?.imageId ?? null };
     const next = { ...current, ...change };
     // Announcements keep their kind; text with a picture is a slide.
-    if (draft.kind === "announcement" && next.imageId === null) draft.announcement = { heading: next.heading, body: next.body };
+    if (draft.kind === "announcement") draft.announcement = { ...draft.announcement, heading: next.heading, body: next.body, imageId: next.imageId };
     else {
       draft.kind = "slide";
       draft.slide = next;
       delete draft.announcement;
     }
   }
+
+  /** Announcement design, the small line above the heading, and the accent colour. */
+  function setAnnouncement(change: Partial<{ design: AnnouncementDesign; label: string; accent: string }>) {
+    if (draft.kind !== "announcement") return;
+    draft.announcement = { heading: words.heading, body: words.body, ...draft.announcement, ...change };
+  }
+  const announcement = $derived(draft.kind === "announcement" ? draft.announcement : undefined);
+  const designThumbs = $derived(
+    announcement
+      ? ANNOUNCEMENT_DESIGNS.map((design) => ({
+          ...design,
+          model: presentAnnouncement({ theme: session.theme(), words: { ...announcement, design: design.id } }),
+        }))
+      : [],
+  );
 
   /** Words over a picture: the picture item becomes a slide with that picture behind the text. */
   function addTextToPicture() {
@@ -95,9 +111,48 @@
           <span>Text</span>
           <textarea aria-label="Text" rows="5" value={words.body} oninput={(event) => setWords({ body: event.currentTarget.value })}></textarea>
         </label>
+        {#if announcement}
+          <label class="field-row">
+            <span>Small line above the heading</span>
+            <input aria-label="Small line above the heading" placeholder="Leave empty to hide it" value={announcement.label ?? ""} oninput={(event) => setAnnouncement({ label: event.currentTarget.value })} />
+          </label>
+          <div class="ann-chips" role="group" aria-label="Suggestions for the small line">
+            {#each LABEL_SUGGESTIONS as suggestion (suggestion)}
+              <button type="button" class="ann-chip" aria-pressed={(announcement.label ?? "") === suggestion} onclick={() => setAnnouncement({ label: suggestion })}>{suggestion}</button>
+            {/each}
+          </div>
+          <div class="field-row">
+            <span>Design</span>
+            <div class="ann-designs" role="radiogroup" aria-label="Announcement design">
+              {#each designThumbs as design (design.id)}
+                <button
+                  type="button"
+                  class="ann-design"
+                  role="radio"
+                  aria-checked={(announcement.design ?? "classic") === design.id}
+                  title={design.hint}
+                  onclick={() => setAnnouncement({ design: design.id })}
+                >
+                  <span class="ann-thumb"><Screen model={design.model} still /></span>
+                  <span class="ann-design-name">{design.name}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+          <div class="field-row">
+            <span>Accent colour</span>
+            <div class="ann-swatches" role="radiogroup" aria-label="Accent colour">
+              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title="The theme's colour" style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>Theme</button>
+              {#each ACCENT_SWATCHES as color (color)}
+                <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label="Accent {color}" style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
+              {/each}
+              <input type="color" aria-label="Pick any accent colour" value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
+            </div>
+          </div>
+        {/if}
         <label class="field-row">
           <span>Picture behind the words</span>
-          <select aria-label="Background picture" value={draft.slide?.imageId ?? ""} onchange={(event) => setWords({ imageId: event.currentTarget.value || null })}>
+          <select aria-label="Background picture" value={draft.slide?.imageId ?? draft.announcement?.imageId ?? ""} onchange={(event) => setWords({ imageId: event.currentTarget.value || null })}>
             <option value="">The theme's background</option>
             {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
@@ -203,6 +258,19 @@
   .preview { position: sticky; top: 0; margin: 0; display: grid; gap: 6px; }
   .preview figcaption { font-size: 12px; font-weight: 650; color: var(--muted); }
   .screen { container-type: inline-size; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; }
+  .ann-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+  .ann-chip { height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: 12px; }
+  .ann-chip[aria-pressed="true"] { border-color: var(--accent, #4f8cff); background: color-mix(in srgb, var(--accent, #4f8cff) 16%, var(--field)); }
+  .ann-designs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ann-design { display: grid; gap: 4px; padding: 4px; border-radius: 9px; border: 1px solid var(--line); background: var(--field); color: var(--ink); text-align: left; }
+  .ann-design[aria-checked="true"] { border-color: var(--accent, #4f8cff); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #4f8cff) 45%, transparent); }
+  .ann-thumb { display: block; border-radius: 6px; overflow: hidden; background: #000; pointer-events: none; }
+  .ann-design-name { font-size: 12px; font-weight: 600; padding: 0 2px 2px; }
+  .ann-swatches { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ann-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--swatch); }
+  .ann-swatch.theme { width: auto; border-radius: 14px; padding: 0 10px; font-size: 12px; color: var(--ink); background: linear-gradient(90deg, var(--swatch) 0 8px, var(--field) 8px); padding-left: 16px; }
+  .ann-swatch[aria-checked="true"] { border-color: var(--ink); }
+  .ann-swatches input[type="color"] { width: 36px; height: 30px; padding: 2px; }
   @media (max-width: 820px) {
     .editor { grid-template-columns: 1fr; }
     .preview { position: static; order: -1; }

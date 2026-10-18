@@ -217,6 +217,9 @@ button { cursor: pointer; }
   overflow: hidden;
   display: flex;
 }
+/* Announcements lay themselves out (AnnouncementView). */
+.frame .ann-wrap { position: absolute; inset: 0; container-type: size; }
+
 .frame .stack {
   position: relative;
   z-index: 1;

@@ -151,6 +151,8 @@ export type PresentationModel = {
   fill?: string;
   /** layout "shape": a filled rectangle or ellipse. */
   shape?: { kind: "rect" | "ellipse"; fill: string; radius: number };
+  /** An announcement laid out in one of its designs (layout "title"). */
+  announcement?: import("./announcement").AnnouncementPaint;
   /** Scripture in a second translation, shown beside the first. */
   parallel?: { attribution: string | null; lines: PresentationLine[] };
 };
@@ -211,7 +213,7 @@ export type PresentationItem = {
   slide?: { heading: string; body: string; imageId: string | null };
   image?: { assetId: string };
   video?: { assetId: string; loop: boolean; muted: boolean };
-  announcement?: { heading: string; body: string };
+  announcement?: import("./announcement").AnnouncementWords;
   deck?: { deckId: string };
   /** Text styling for slide and announcement items. */
   style?: TextStyle;

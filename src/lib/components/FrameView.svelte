@@ -11,6 +11,7 @@
   import QrView from "./QrView.svelte";
   import MotionBackground from "./MotionBackground.svelte";
   import OverlayLayer from "./OverlayLayer.svelte";
+  import AnnouncementView from "./AnnouncementView.svelte";
   import { mutedUrl } from "../domain/web";
 
   let {
@@ -253,6 +254,10 @@
         ></iframe>
       {/key}
     {/if}
+  {:else if model.layout === "title" && model.announcement}
+    <div class="ann-wrap" style:text-transform={effects["text-transform"]} style:text-shadow={effects["text-shadow"]} style:font-style={effects["font-style"]}>
+      <AnnouncementView paint={model.announcement} fontSize={model.theme.fontSize} align={model.theme.align} />
+    </div>
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}

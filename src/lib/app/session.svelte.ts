@@ -101,6 +101,7 @@ import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { controllerDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
+import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
@@ -1131,6 +1132,9 @@ class Session {
       if (!saved) return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
       return presentComposition(withMediaUrls(restoreComposition(saved), this.mediaSrc), { theme, now: Date.now() });
     }
+    if (item.kind === "announcement" && item.announcement) {
+      return presentAnnouncement({ theme, words: item.announcement, backgroundImageUrl: this.mediaSrc(item.announcement.imageId) ?? backgroundImageUrl });
+    }
     const heading = item.slide?.heading ?? item.announcement?.heading ?? item.title;
     const body = item.slide?.body ?? item.announcement?.body ?? "";
     const slideImage = this.mediaSrc(item.slide?.imageId);
@@ -1876,7 +1880,7 @@ class Session {
     }
     const item: PresentationItem =
       kind === "announcement"
-        ? { id: uid(), kind, title: "Announcement", announcement: { heading: "Announcement", body: "" } }
+        ? { id: uid(), kind, title: "Announcement", announcement: { heading: "Announcement", body: "", design: "card", label: "Announcement" } }
         : { id: uid(), kind, title: "Slide", slide: { heading: "Slide", body: "", imageId: null } };
     this.insertItem(sectionId, item);
     void this.selectItem(item.id);
@@ -1930,9 +1934,13 @@ class Session {
     );
   };
 
-  addAnnouncementToService = (heading: string, body: string) => {
+  addAnnouncementToService = (heading: string, body: string, options: { design?: AnnouncementDesign; label?: string } = {}) => {
     const title = heading.trim() || "Announcement";
-    void this.addToService({ kind: "announcement", title, announcement: { heading: title, body: body.trim() } });
+    void this.addToService({
+      kind: "announcement",
+      title,
+      announcement: { heading: title, body: body.trim(), design: options.design ?? "card", label: options.label ?? "Announcement" },
+    });
   };
 
   addPassageToService = (passage: BibleItem) => {
