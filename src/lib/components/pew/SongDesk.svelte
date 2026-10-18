@@ -434,7 +434,7 @@
       <Icon name="search" size={15} /><span>Find a song</span><kbd>/</kbd>
     </button>
 
-    <nav class="folders" aria-label="Song lists and folders">
+    <nav class="folders lists" aria-label="Song lists">
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
       </button>
@@ -443,7 +443,9 @@
           <Icon name={list.icon} size={16} /><span>{list.label}</span><small>{list.songs.length}</small>
         </button>
       {/each}
-      <p class="group sub-group">Folders</p>
+    </nav>
+    <p class="group sub-group">Folders</p>
+    <nav class="folders" aria-label="Song folders">
       {#if unfiled > 0 && folders.length > 0}
         <button type="button" class="folder" class:on={folder === ""} onclick={() => (folder = "")}>
           <Icon name="folder" size={16} /><span>Unfiled</span><small>{unfiled}</small>
@@ -786,7 +788,9 @@
     color: var(--muted);
   }
   .group span { margin-left: 4px; font-weight: 600; opacity: 0.8; }
-  .folders { display: flex; flex-direction: column; gap: 4px; padding: 0 10px 14px; max-height: 42%; overflow: auto; flex: none; }
+  .folders { display: flex; flex-direction: column; gap: 4px; padding: 0 10px 14px; max-height: 30%; overflow: auto; flex: none; }
+  /* The ready-made lists never scroll away; only the folders below them scroll. */
+  .folders.lists { max-height: none; overflow: visible; padding-bottom: 4px; }
   /* Rows keep their height; the list scrolls instead of squeezing them. */
   .folders > :global(*), .songs > li { flex: none; }
   .folder-row { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-control, 8px); }
@@ -1016,7 +1020,7 @@
   .find-song:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .find-song span { flex: 1; text-align: left; }
   .find-song kbd { padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 11px; }
-  .sub-group { margin: 8px 0 2px; padding: 0 4px; }
+  .sub-group { margin: 6px 0 0; padding-bottom: 4px; }
   @media (max-width: 1280px) {
     .song-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
     .fields { grid-template-columns: 1fr 1fr; }

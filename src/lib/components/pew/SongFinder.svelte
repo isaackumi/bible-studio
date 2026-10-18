@@ -142,7 +142,7 @@
 
   const scopes = $derived([
     ...lists.filter((list) => list.id === "all" || list.id === "favorites" || list.id === "recent" || list.songs.length > 0).map((list) => ({ id: list.id as string, label: list.label, icon: list.icon, count: list.songs.length })),
-    ...folders.map((entry) => ({ id: `folder:${entry.name}`, label: entry.name, icon: "folder", count: entry.count })),
+    ...folders.filter((entry) => entry.count > 0).map((entry) => ({ id: `folder:${entry.name}`, label: entry.name, icon: "folder", count: entry.count })),
   ]);
 </script>
 
@@ -180,8 +180,7 @@
               <strong>{row.song.title || "Untitled song"}</strong>
               <span>{row.line}</span>
             </button>
-            <span class="row-end">
-              <small>{row.song.sections.length}</small>
+            <span class="row-end" class:starred={session.isFavorite("songs", row.song.id)}>
               <FavoriteStar on={session.isFavorite("songs", row.song.id)} label={row.song.title} onclick={() => session.toggleFavorite("songs", row.song.id)} size={13} />
             </span>
           </li>
@@ -211,7 +210,6 @@
                     <em>{section.label}</em>
                     {section.lines.filter((line) => line.trim()).slice(0, 2).join(" / ")}
                   </span>
-                  <i>{clickLive ? "Live" : "Preview"}</i>
                 </button>
               </li>
             {/each}
@@ -228,70 +226,73 @@
     </div>
 
     <footer class="keys">
-      <span><kbd>↑</kbd><kbd>↓</kbd> choose</span>
-      <span><kbd>Enter</kbd> open</span>
-      <span><kbd>⇧</kbd><kbd>Enter</kbd> {clickLive ? "show it" : "start on Preview"}</span>
-      <span><kbd>esc</kbd> close</span>
+      <span><kbd>↑↓</kbd> choose</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>⇧↵</kbd> {clickLive ? "show it" : "start"}</span>
     </footer>
   </div>
 </div>
 
 <style>
-  .finder-layer { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 9vh 16px 16px; }
-  .finder-backdrop { position: absolute; inset: 0; border: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(3px); cursor: default; }
+  .finder-layer { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 10vh 16px 16px; }
+  .finder-backdrop { position: absolute; inset: 0; border: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); cursor: default; }
   .finder {
     position: relative;
     display: flex;
     flex-direction: column;
-    width: min(980px, 100%);
-    max-height: min(680px, 84vh);
-    border: 1px solid color-mix(in srgb, var(--ink) 14%, var(--line));
+    width: min(920px, 100%);
+    height: min(600px, 80vh);
+    border: 1px solid color-mix(in srgb, var(--ink) 12%, var(--line));
     border-radius: 16px;
     background: var(--panel);
-    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
     overflow: hidden;
   }
-  .finder-search { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); color: var(--muted); }
-  .finder-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 19px; font-weight: 500; outline: none; }
-  .finder-search input::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
-  .clear { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: var(--field); color: var(--muted); cursor: pointer; }
-  kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 11px; color: var(--muted); }
 
-  .scopes { display: flex; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-  .scopes button { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-  .scopes button:hover { color: var(--ink); }
-  .scopes button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); }
-  .scopes small { font-size: 11px; opacity: 0.7; }
+  /* Search and tabs stay put; only the results and the parts scroll. */
+  .finder-search { flex: none; display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--muted); }
+  .finder-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 18px; font-weight: 500; outline: none; }
+  .finder-search input::placeholder { color: color-mix(in srgb, var(--muted) 75%, transparent); }
+  .clear { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .clear:hover { background: var(--field); color: var(--ink); }
+  kbd { padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 11px; color: var(--muted); }
 
-  .finder-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
-  .results { margin: 0; padding: 8px; list-style: none; overflow: auto; border-right: 1px solid var(--line); }
-  .row { display: flex; align-items: center; gap: 4px; border-radius: 10px; }
-  .row.on { background: color-mix(in srgb, var(--accent) 14%, var(--field)); box-shadow: inset 3px 0 0 var(--accent); }
-  .row:hover:not(.on) { background: var(--field); }
-  .row-main { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 9px 10px 9px 14px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .row-main strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scopes { flex: none; display: flex; flex-wrap: wrap; gap: 4px; padding: 0 14px 12px; border-bottom: 1px solid var(--line); }
+  .scopes button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .scopes button:hover { background: var(--field); color: var(--ink); }
+  .scopes button.on { background: var(--field); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, var(--line)); }
+  .scopes button.on :global(svg) { color: var(--accent); }
+  .scopes small { font-size: 11px; font-weight: 500; opacity: 0.6; }
+
+  .finder-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .results { margin: 0; padding: 6px; list-style: none; overflow: auto; border-right: 1px solid var(--line); }
+  .row { display: flex; align-items: center; border-radius: 9px; }
+  .row:hover:not(.on) { background: color-mix(in srgb, var(--field) 70%, transparent); }
+  .row.on { background: var(--field); }
+  .row-main { flex: 1; min-width: 0; display: grid; gap: 1px; padding: 8px 10px 8px 12px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .row-main strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.on .row-main strong { color: var(--accent); }
   .row-main span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row-end { display: flex; align-items: center; gap: 2px; padding-right: 6px; color: var(--muted); font-size: 11px; }
-  .none { padding: 28px 16px; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }
+  .row-end { padding-right: 6px; opacity: 0; }
+  .row:hover .row-end, .row.on .row-end, .row-end.starred, .row-end:focus-within { opacity: 1; }
+  .none { padding: 32px 16px; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }
   .link { margin-left: 4px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 
-  .detail { display: flex; flex-direction: column; min-height: 0; padding: 16px 18px; gap: 12px; overflow: auto; }
-  .detail h3 { margin: 0; font-size: 18px; }
+  .detail { display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 10px; overflow: auto; }
+  .detail h3 { margin: 0; font-size: 17px; }
   .detail header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
-  .parts { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-  .parts button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .parts button:hover { border-color: color-mix(in srgb, var(--tone) 60%, var(--line)); border-left-color: var(--tone); }
-  .parts .match button { box-shadow: 0 0 0 1px var(--accent); }
-  .parts b { display: grid; place-items: center; min-width: 30px; height: 24px; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--tone) 24%, var(--panel)); font-size: 11px; }
-  .parts span { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .parts em { display: block; font-style: normal; font-size: 11px; font-weight: 650; color: var(--muted); }
-  .parts i { font-style: normal; font-size: 11px; font-weight: 650; color: var(--muted); opacity: 0; }
-  .parts button:hover i { opacity: 1; }
-  .detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 6px; }
+  .parts { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+  .parts button { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .parts button:hover { background: var(--field); }
+  .parts .match button { background: color-mix(in srgb, var(--accent) 10%, var(--field)); }
+  .parts b { display: grid; place-items: center; min-width: 28px; height: 22px; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--tone) 28%, var(--panel)); font-size: 11px; }
+  .parts span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .parts em { display: block; font-style: normal; font-size: 12px; font-weight: 650; color: var(--ink); }
+  .detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
   .detail-empty { margin: auto; color: var(--muted); font-size: 13px; }
 
-  .keys { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-  .keys kbd { margin-right: 2px; }
+  .keys { flex: none; display: flex; gap: 16px; padding: 8px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+  .keys kbd { margin-right: 4px; }
 
   @media (max-width: 760px) {
     .finder-body { grid-template-columns: 1fr; }
