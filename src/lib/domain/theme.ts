@@ -11,6 +11,7 @@ import { defaultAudioSettings, defaultPlaylists } from "./playlists";
 import { defaultSecondOutput } from "./second-output";
 import { defaultCaptionSettings } from "./captions";
 import { defaultTemplates } from "./service-templates";
+import { defaultMacros } from "./macros";
 import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
@@ -330,6 +331,7 @@ export function defaultWorkspace(): Workspace {
     recentAlerts: [],
     deskTranslationId: null,
     songLanguage: "both",
+    macros: defaultMacros(),
   };
 }
 

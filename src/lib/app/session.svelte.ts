@@ -106,6 +106,7 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
+import { describeStep, type Macro, type MacroStep } from "../domain/macros";
 import type { ShortcutAction } from "../domain/types";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
@@ -646,6 +647,87 @@ class Session {
     const focus = this.songFocus;
     const song = focus ? this.songs.find((entry) => entry.id === focus.songId) : undefined;
     if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot);
+  };
+
+  // Macros: one button, several steps in order.
+  macrosOpen = $state(false);
+  /** The macro running now and the step it is on (for the button's progress). */
+  runningMacro = $state<{ id: string; step: number } | null>(null);
+
+  saveMacros = (macros: Macro[]) => {
+    this.workspace = { ...this.workspace, macros };
+    this.persistSoon();
+  };
+
+  runMacro = async (id: string) => {
+    const macro = this.workspace.macros.find((entry) => entry.id === id);
+    if (!macro || this.runningMacro) return;
+    try {
+      for (let index = 0; index < macro.steps.length; index += 1) {
+        this.runningMacro = { id, step: index };
+        await this.runMacroStep(macro.steps[index]!);
+      }
+      this.message = `${macro.name}: done.`;
+    } catch (error) {
+      const step = macro.steps[this.runningMacro?.step ?? 0];
+      this.message = `${macro.name} stopped at “${step ? describeStep(step, { playlist: (playlistId) => this.workspace.playlists.find((list) => list.id === playlistId)?.name ?? "a playlist" }) : "a step"}”: ${error instanceof Error ? error.message : "it did not work"}`;
+    } finally {
+      this.runningMacro = null;
+    }
+  };
+
+  private runMacroStep = async (step: MacroStep) => {
+    const service = this.service;
+    switch (step.kind) {
+      case "fade-music":
+        this.audio.fadeOut(step.seconds);
+        return;
+      case "play-playlist":
+        await this.playPlaylist(step.playlistId);
+        return;
+      case "stop-music":
+        this.audio.stop();
+        return;
+      case "program":
+        if (step.action === "take") await this.take();
+        else if (step.action === "clear") await this.clear();
+        else if (step.action === "clear-words") await this.clearWords();
+        else if (step.action === "black") await this.black();
+        else await this.logo();
+        return;
+      case "start-part": {
+        if (!service?.sections.length) throw new Error("this service has no parts");
+        const running = service.sections.findIndex((section) => section.id === this.runningSectionId);
+        const target = step.which === "first" || running < 0 ? service.sections[0]! : service.sections[Math.min(service.sections.length - 1, running + 1)]!;
+        this.startSection(target.id);
+        this.cursor = { sectionId: target.id, itemId: this.cursor.itemId };
+        return;
+      }
+      case "show-item": {
+        if (step.which === "next") await this.stepItem(1);
+        else {
+          const part = service?.sections.find((section) => section.id === (this.runningSectionId ?? this.cursor.sectionId)) ?? service?.sections[0];
+          const first = part?.items[0];
+          if (!first) throw new Error(`${part?.name ?? "the part"} has nothing in it yet`);
+          await this.selectItem(first.id);
+        }
+        if (step.live) await this.take();
+        return;
+      }
+      case "countdown":
+        if (step.mode === "full") this.showCountdown();
+        else if (step.mode === "overlay-on" ? !this.countdownOverlayOn : this.countdownOverlayOn) this.toggleCountdownOverlay();
+        return;
+      case "captions":
+        await this.setCaptions(step.on);
+        return;
+      case "stage-message":
+        this.sendStageMessage(step.text);
+        return;
+      case "wait":
+        await new Promise((resolve) => setTimeout(resolve, step.seconds * 1000));
+        return;
+    }
   };
 
   /** Give a desk action a new key; a key another action had moves here. Returns that action, if any. */

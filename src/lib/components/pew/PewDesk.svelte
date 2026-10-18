@@ -5,6 +5,7 @@
   import AudioDialog from "../AudioDialog.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
+  import MacrosDialog from "../MacrosDialog.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
   import { findItem } from "../../domain/service";
@@ -654,6 +655,7 @@
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} Displays…</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} Themes…</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} Message to the stage…</button>
+          <button type="button" role="menuitem" onclick={() => { session.macrosOpen = true; close(); }}>{@render icon("play")} Macros…</button>
           <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} Tour this page</button>
           <button type="button" role="menuitem" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} All guided tours…</button>
           <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} Help</button>
@@ -991,6 +993,9 @@
 {/if}
 {#if alertsOpen}
   <AlertsDialog onclose={() => (alertsOpen = false)} />
+{/if}
+{#if session.macrosOpen}
+  <MacrosDialog onclose={() => (session.macrosOpen = false)} />
 {/if}
 
 

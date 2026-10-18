@@ -477,6 +477,8 @@ export type Workspace = {
   deskTranslationId: string | null;
   /** Songs with two languages: which to show on the screen. */
   songLanguage: import("./song").SongLanguage;
+  /** Macros: one button for several steps. */
+  macros: import("./macros").Macro[];
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

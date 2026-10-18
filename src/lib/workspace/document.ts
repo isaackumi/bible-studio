@@ -23,6 +23,7 @@ import { sanitizeAudioSettings, sanitizePlaylists } from "../domain/playlists";
 import { sanitizeSecondOutput } from "../domain/second-output";
 import { sanitizeCaptionSettings } from "../domain/captions";
 import { sanitizeTemplates } from "../domain/service-templates";
+import { sanitizeMacros } from "../domain/macros";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -138,6 +139,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
           .slice(0, 30)
       : [],
     recentAlerts: Array.isArray(value.recentAlerts) ? value.recentAlerts.filter((text): text is string => typeof text === "string" && text.trim().length > 0).map((text) => text.slice(0, 200)).slice(0, 12) : [],
+    macros: sanitizeMacros(value.macros),
     songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
