@@ -10,7 +10,8 @@
   import { resolveAudience, sameScreen } from "../../display/profiles";
   import type { DeskStyle, DisplayAssignment, OperatorTheme, OutputMode, OutputRole } from "../../domain/types";
   import { describeAspect, SCREEN_SHAPES, type ScreenShape } from "../../display/shape";
-  import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
+  import { canAssign, defaultShortcuts, shortcutLabel, shortcutLabels } from "../../keyboard/manager";
+  import type { ShortcutAction } from "../../domain/types";
   import { canUse } from "../../platform/capabilities";
   import { isDesktop, openExternal } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
@@ -413,6 +414,34 @@
   const status = $derived(audienceStatus(session.output, isDesktop()));
   const page = $derived(sections.find((item) => item.id === section));
   const shortcutGroups = $derived([...new Set(COMMANDS.map((command) => command.group))]);
+  /** The action waiting for its new key (Settings › Keyboard), and what changed last. */
+  let capturing = $state<ShortcutAction | null>(null);
+  let keyNote = $state("");
+  $effect(() => {
+    const action = capturing;
+    if (!action) return;
+    // Capture the next key before the desk sees it; Escape cancels.
+    const onKey = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.code === "Escape") {
+        capturing = null;
+        keyNote = "";
+        return;
+      }
+      if (!canAssign(event.code)) {
+        keyNote = "That key is kept for typing and moving around. Press another, or Esc.";
+        return;
+      }
+      const title = COMMANDS.find((command) => command.shortcut === action)?.title ?? action;
+      const taken = session.setShortcut(action, event.code);
+      const lost = taken ? COMMANDS.find((command) => command.shortcut === taken)?.title ?? taken : null;
+      keyNote = lost ? `${title} is now ${shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action)}. ${lost} has no key now; give it one below.` : `${title} is now ${shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action)}.`;
+      capturing = null;
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
 
   $effect(() => {
     churchName = session.workspace.churchName;
@@ -918,13 +947,29 @@
               {#each COMMANDS.filter((command) => command.group === group) as command (command.id)}
                 <li>
                   <span>{command.title}</span>
-                  <kbd class="kbd">{command.shortcut ? shortcutLabel(shortcuts, command.shortcut) : command.id === "open-settings" ? "⌘," : "—"}</kbd>
+                  {#if command.shortcut}
+                    {@const action = command.shortcut}
+                    <button
+                      type="button"
+                      class="key-btn"
+                      class:listening={capturing === action}
+                      aria-label={capturing === action ? `Press the new key for ${command.title}` : `Change the key for ${command.title}`}
+                      title="Click, then press the new key"
+                      onclick={() => { keyNote = ""; capturing = capturing === action ? null : action; }}
+                    >{capturing === action ? "Press a key…" : shortcutLabels(shortcuts, action)}</button>
+                  {:else}
+                    <kbd class="kbd">{command.id === "open-settings" ? "⌘," : "—"}</kbd>
+                  {/if}
                 </li>
               {/each}
             </ul>
           </section>
         {/each}
-        <p class="note stand">These keys call the command list. Remapping will use the same commands.</p>
+        {#if keyNote}<p class="note stand" role="status">{keyNote}</p>{/if}
+        <div class="key-foot">
+          <p class="note">Click a key, then press the new one. Esc cancels. Tab and Enter stay for typing and moving around.</p>
+          {#if session.workspace.shortcuts}<button type="button" class="btn" onclick={() => { session.resetShortcuts(); keyNote = ""; }}>Reset to the usual keys</button>{/if}
+        </div>
       {:else if section === "remote"}
         {#if session.entitled("phone-remote")}
           <RemotePanel />
@@ -1828,4 +1873,8 @@
     .row { flex-direction: column; align-items: stretch; }
     .row .field { width: 100%; }
   }
+  .key-btn { min-width: 64px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .key-btn:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .key-btn.listening { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
+  .key-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 </style>

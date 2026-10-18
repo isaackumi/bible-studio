@@ -94,3 +94,17 @@ describe("keyboard manager", () => {
     expect(slash.prevented()).toBe(false);
   });
 });
+
+describe("changing shortcuts", () => {
+  it("moves a key that another action had, and refuses reserved keys", async () => {
+    const { assignShortcut, canAssign, defaultShortcuts, shortcutLabels } = await import("./manager");
+    const { map, taken } = assignShortcut(defaultShortcuts, "black", "KeyL");
+    expect(map.black).toEqual(["KeyL"]);
+    expect(map.logo).toEqual([]);
+    expect(taken).toBe("logo");
+    expect(assignShortcut(defaultShortcuts, "take", "Tab").map).toBe(defaultShortcuts);
+    expect(canAssign("Enter")).toBe(false);
+    expect(shortcutLabels(defaultShortcuts, "previous")).toBe("← / ↑");
+    expect(shortcutLabels(map, "logo")).toBe("—");
+  });
+});

@@ -83,3 +83,35 @@ export function shortcutLabel(map: ShortcutMap, action: ShortcutAction): string 
   };
   return labels[code] ?? code.replace(/^Key/, "");
 }
+
+/** Keys a shortcut cannot take: typing, moving between controls, and bare modifiers. */
+const RESERVED = new Set(["Tab", "Enter", "NumpadEnter", "MetaLeft", "MetaRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "CapsLock", "Fn", "ContextMenu"]);
+
+export function canAssign(code: string): boolean {
+  return !!code && !RESERVED.has(code);
+}
+
+/**
+ * Give an action one key. A key already used by another action moves here (that action is left
+ * without it); `taken` names the action that lost it, if any.
+ */
+export function assignShortcut(map: ShortcutMap, action: ShortcutAction, code: string): { map: ShortcutMap; taken: ShortcutAction | null } {
+  if (!canAssign(code)) return { map, taken: null };
+  let taken: ShortcutAction | null = null;
+  const next = { ...map } as ShortcutMap;
+  for (const key of Object.keys(next) as ShortcutAction[]) {
+    if (key !== action && next[key]?.includes(code)) {
+      next[key] = next[key].filter((entry) => entry !== code);
+      taken = key;
+    }
+  }
+  next[action] = [code];
+  return { map: next, taken };
+}
+
+/** Every key of an action, for showing ("← / ↑"). */
+export function shortcutLabels(map: ShortcutMap, action: ShortcutAction): string {
+  const codes = map[action] ?? [];
+  if (!codes.length) return "—";
+  return codes.map((code) => shortcutLabel({ ...map, [action]: [code] } as ShortcutMap, action)).join(" / ");
+}

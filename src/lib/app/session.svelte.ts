@@ -105,6 +105,8 @@ import { presentAnnouncement, type AnnouncementDesign } from "../domain/announce
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
+import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
+import type { ShortcutAction } from "../domain/types";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
@@ -644,6 +646,20 @@ class Session {
     const focus = this.songFocus;
     const song = focus ? this.songs.find((entry) => entry.id === focus.songId) : undefined;
     if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot);
+  };
+
+  /** Give a desk action a new key; a key another action had moves here. Returns that action, if any. */
+  setShortcut = (action: ShortcutAction, code: string): ShortcutAction | null => {
+    const { map, taken } = assignShortcut(this.workspace.shortcuts ?? defaultShortcuts, action, code);
+    this.workspace = { ...this.workspace, shortcuts: map };
+    this.persistSoon();
+    return taken;
+  };
+
+  resetShortcuts = () => {
+    this.workspace = { ...this.workspace, shortcuts: null };
+    this.persistSoon();
+    this.message = "Keyboard shortcuts are back to the usual keys.";
   };
 
   /** The translation the Scriptures page is on, kept for next time. */
