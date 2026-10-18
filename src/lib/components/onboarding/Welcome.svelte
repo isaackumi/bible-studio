@@ -598,16 +598,16 @@
     pointer-events: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
-  .float { position: absolute; inset: 0; display: grid; place-items: center; padding: clamp(150px, 24%, 210px) clamp(28px, 5%, 64px) 80px; }
-  .settle { position: relative; z-index: 1; width: min(100%, 860px); animation: settle 900ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .float { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: clamp(150px, 24%, 210px) clamp(28px, 5%, 64px) 80px; }
+  .settle { position: relative; z-index: 1; width: min(100%, 860px); min-width: 0; animation: settle 900ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   @keyframes settle { from { transform: translateY(14px) scale(0.985); } }
   .settle :global(.window) { box-shadow: 0 50px 120px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 80px color-mix(in srgb, var(--accent) 18%, transparent); }
   .float > :global(*) { grid-area: 1 / 1; }
   .floor { align-self: end; justify-self: center; width: 70%; height: 60px; margin-bottom: -40px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 30%, transparent), transparent); filter: blur(10px); }
-  .art-foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; color: rgba(255, 255, 255, 0.82); font-size: 12px; }
+  .art-foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 18px 22px; color: rgba(255, 255, 255, 0.82); font-size: 12px; }
   .art-foot p { margin: 0; }
   .credit { display: inline-flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.6); }
-  .caption { padding: 7px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(12px); font-weight: 600; text-align: right; }
+  .caption { margin-left: auto !important; padding: 7px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(12px); font-weight: 600; text-align: right; }
 
   @media (max-width: 980px) {
     .first-run { place-items: stretch; padding: 0; }

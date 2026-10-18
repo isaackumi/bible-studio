@@ -59,6 +59,14 @@
     color: var(--ink);
     pointer-events: none;
     user-select: none;
+    container-type: inline-size;
+  }
+  /* A small panel keeps the parts that explain the desk: the pages, LIVE and the two monitors. */
+  @container (max-width: 560px) {
+    .aud, .plain.ghost, .desk-icons { display: none; }
+  }
+  @container (max-width: 420px) {
+    .plain, .modes span:not(.on) { display: none; }
   }
   .titlebar { position: relative; display: flex; align-items: center; height: 30px; padding: 0 12px; background: color-mix(in srgb, var(--panel) 80%, var(--desk)); border-bottom: 1px solid var(--line); }
   .lights { display: flex; gap: 6px; }
@@ -67,7 +75,7 @@
   .lights i:nth-child(3) { background: #28c840; }
   .wtitle { position: absolute; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: var(--muted); }
 
-  .bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 650; }
+  .bar { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 650; white-space: nowrap; overflow: hidden; }
   .desk-icons { display: flex; gap: 3px; }
   .ic { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--muted); }
   .ic.on { color: var(--accent); border-color: var(--accent); }
@@ -86,7 +94,7 @@
   .plain { border: 1px solid var(--line); background: var(--field); color: var(--ink); }
   .plain.ghost { border-color: var(--accent); background: transparent; color: var(--accent); }
 
-  .monitors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+  .monitors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 10px; }
   .mon { margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
   .mon figcaption { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-bottom: 1px solid var(--line); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .mon figcaption span { margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
