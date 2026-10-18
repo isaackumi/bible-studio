@@ -20,6 +20,8 @@
 
   onMount(() => {
     void session.init();
+    // Development builds only: a handle for the browser console and end-to-end checks.
+    if (import.meta.env.DEV) (window as unknown as { __churchStudio?: typeof session }).__churchStudio = session;
     // The audience window reports the shape of its screen; every monitor here follows it.
     let stopShape = () => {};
     if (isDesktop()) {

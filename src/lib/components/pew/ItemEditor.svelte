@@ -10,6 +10,7 @@
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import { ACCENT_SWATCHES, ANNOUNCEMENT_DESIGNS, LABEL_SUGGESTIONS, presentAnnouncement, themeAccent, type AnnouncementDesign } from "../../domain/announcement";
   import { t, tn } from "../../i18n/core";
+  import { cleanTrim, clockText, readClock, videoEnd, type VideoEnd } from "../../domain/video-play";
 
   // Everything about one service item, with a live preview. Saving changes the running order;
   // if the item is on Preview it refreshes there. Program only changes with LIVE.
@@ -211,7 +212,21 @@
             {#each videos as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
         </label>
-        <label class="check"><input type="checkbox" checked={draft.video.loop} onchange={(event) => draft.video && (draft.video = { ...draft.video, loop: event.currentTarget.checked })} /> {t("Play round and round (walk-in loops)")}</label>
+        <label class="field-row">
+          <span>{t("When it ends")}</span>
+          <select aria-label={t("When it ends")} value={videoEnd(draft.video)} onchange={(event) => draft.video && (draft.video = { ...draft.video, end: event.currentTarget.value as VideoEnd, loop: event.currentTarget.value === "loop" })}>
+            <option value="hold">{t("Stop on the last picture")}</option>
+            <option value="loop">{t("Play it again (loop)")}</option>
+            <option value="next">{t("Go to the next item")}</option>
+            <option value="loop-part">{t("Next video in this part, round and round")}</option>
+            <option value="clear">{t("Clear the screen")}</option>
+          </select>
+        </label>
+        <div class="trim">
+          <label><span>{t("Start at")}</span><input aria-label={t("Start at")} placeholder="0:00" value={clockText(draft.video.start)} onchange={(event) => draft.video && (draft.video = { ...draft.video, start: cleanTrim({ start: readClock(event.currentTarget.value) }).start })} /></label>
+          <label><span>{t("End at")}</span><input aria-label={t("End at")} placeholder={t("the end")} value={clockText(draft.video.stop)} onchange={(event) => draft.video && (draft.video = { ...draft.video, stop: cleanTrim({ start: draft.video.start, stop: readClock(event.currentTarget.value) }).stop })} /></label>
+          <p>{t("Trim it: play only part of the file, e.g. 0:12 to 2:30. Empty plays it all.")}</p>
+        </div>
         <label class="check"><input type="checkbox" checked={draft.video.muted} onchange={(event) => draft.video && (draft.video = { ...draft.video, muted: event.currentTarget.checked })} /> {t("No sound")}</label>
       {:else if draft.kind === "deck" && draft.deck}
         <label class="field-row">
@@ -276,4 +291,8 @@
     .editor { grid-template-columns: 1fr; }
     .preview { position: static; order: -1; }
   }
+  .trim { display: grid; grid-template-columns: repeat(2, minmax(0, 140px)) 1fr; gap: 6px 10px; align-items: end; }
+  .trim label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  .trim input { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
+  .trim p { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--muted); }
 </style>

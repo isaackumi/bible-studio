@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import { videoPosition } from "../domain/types";
+  import { playPosition } from "../domain/video-play";
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
 
@@ -30,11 +31,16 @@
   });
 
   const position = $derived.by(() => {
-    if (!control) return 0;
-    const at = videoPosition(control, now);
-    if (duration > 0) return video?.loop ? at % duration : Math.min(at, duration);
-    return at;
+    if (!control || !video) return 0;
+    return playPosition(videoPosition(control, now), { start: video.start, stop: video.stop, loop: video.loop, duration });
   });
+  /** The playable span: the trim points, or the whole file. */
+  const from = $derived(video?.start ?? 0);
+  const to = $derived(video?.stop ?? duration);
+
+  function skip(seconds: number) {
+    void session.controlVideo({ kind: "seek", at: Math.min(Math.max(from, position + seconds), to || position + seconds) });
+  }
 
   function clock(seconds: number): string {
     const whole = Math.max(0, Math.floor(seconds));
@@ -54,18 +60,21 @@
       {#if control?.playing === false}<Icon name="play" size={14} />{:else}<Icon name="square" size={12} />{/if}
     </button>
     <button type="button" class="vc" aria-label={t("From the start")} title={t("From the start")} onclick={() => void session.controlVideo({ kind: "restart" })}><Icon name="reset" size={13} /></button>
+    <button type="button" class="vc text" aria-label={t("Back 10 seconds")} title={t("Back 10 seconds")} onclick={() => skip(-10)}>−10</button>
+    <button type="button" class="vc text" aria-label={t("Forward 10 seconds")} title={t("Forward 10 seconds")} onclick={() => skip(10)}>+10</button>
     <span class="time">{clock(position)}</span>
     <input
       class="scrub"
       type="range"
-      min="0"
-      max={Math.max(1, duration)}
+      min={from}
+      max={Math.max(from + 1, to)}
       step="0.1"
       value={position}
       aria-label={t("Video position")}
       onchange={(event) => void session.controlVideo({ kind: "seek", at: Number(event.currentTarget.value) })}
     />
-    <span class="time">{duration ? clock(duration) : "–:––"}</span>
+    <span class="time">{to ? clock(to) : "–:––"}</span>
+    {#if video.end && video.end !== "hold" && video.end !== "loop"}<span class="then" title={t("What happens when this video ends")}>{video.end === "clear" ? t("then clear") : video.end === "next" ? t("then next item") : t("then next in part")}</span>{/if}
     <input class="volume" type="range" min="0" max="1" step="0.05" value={control?.volume ?? 1} aria-label={t("Volume")} title={t("Volume")} onchange={(event) => void session.controlVideo({ kind: "volume", volume: Number(event.currentTarget.value) })} />
     <button type="button" class="vc text" disabled={fading || control?.playing === false} title={t("Bring the sound down over 3 seconds, then pause")} onclick={() => void fade()}>{fading ? t("Fading…") : t("Fade out")}</button>
   </div>
@@ -79,4 +88,5 @@
   .time { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
   .scrub { flex: 1; min-width: 60px; accent-color: var(--live); }
   .volume { width: 64px; flex: none; accent-color: var(--accent); }
+  .then { flex: none; font-size: 11px; font-weight: 650; color: var(--accent); white-space: nowrap; }
 </style>

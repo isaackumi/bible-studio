@@ -13,6 +13,7 @@
   import OverlayLayer from "./OverlayLayer.svelte";
   import AnnouncementView from "./AnnouncementView.svelte";
   import { mutedUrl } from "../domain/web";
+  import { playPosition } from "../domain/video-play";
   import { t } from "../i18n/core";
 
   let {
@@ -106,7 +107,7 @@
   }
 
   /** Start playback; if sound is not allowed without a click, keep playing muted. */
-  function playClip(node: HTMLVideoElement, options: { muted: boolean; control?: VideoControl }) {
+  function playClip(node: HTMLVideoElement, options: { muted: boolean; control?: VideoControl; start?: number; stop?: number; loop?: boolean }) {
     const start = () => {
       void node.play().catch(() => {
         node.muted = true;
@@ -114,29 +115,35 @@
       });
     };
     // Follow the operator's controls: play or pause, jump when more than half a second off.
-    const apply = ({ muted, control }: { muted: boolean; control?: VideoControl }) => {
+    const apply = ({ muted, control, start: from, stop, loop }: { muted: boolean; control?: VideoControl; start?: number; stop?: number; loop?: boolean }) => {
       node.muted = muted;
       if (!control) {
         if (node.paused) start();
         return;
       }
       node.volume = Math.min(1, Math.max(0, control.volume));
-      const target = videoPosition(control);
-      const end = Number.isFinite(node.duration) ? node.duration : Infinity;
-      const wanted = node.loop && Number.isFinite(end) && end > 0 ? target % end : Math.min(target, end);
+      const duration = Number.isFinite(node.duration) ? node.duration : 0;
+      const wanted = playPosition(videoPosition(control), { start: from, stop, loop: loop ?? node.loop, duration });
       if (Math.abs(node.currentTime - wanted) > 0.5) node.currentTime = wanted;
-      if (control.playing && node.paused) start();
-      if (!control.playing && !node.paused) node.pause();
+      const atEnd = !(loop ?? node.loop) && stop !== undefined && wanted >= stop - 0.05;
+      if (control.playing && node.paused && !atEnd) start();
+      if ((!control.playing || atEnd) && !node.paused) node.pause();
     };
     apply(options);
     const onReady = () => apply(options);
     node.addEventListener("loadedmetadata", onReady);
+    // Trimmed videos: keep inside the stop point (wrap when looping, hold otherwise).
+    const onTime = () => {
+      if (options.stop !== undefined && node.currentTime >= options.stop) apply(options);
+    };
+    node.addEventListener("timeupdate", onTime);
     return {
-      update(next: { muted: boolean; control?: VideoControl }) {
+      update(next: { muted: boolean; control?: VideoControl; start?: number; stop?: number; loop?: boolean }) {
         options = next;
         apply(next);
       },
       destroy() {
+        node.removeEventListener("timeupdate", onTime);
         node.removeEventListener("loadedmetadata", onReady);
       },
     };
@@ -277,7 +284,7 @@
         <!-- Thumbnails: the first frame, silent and paused. -->
         <video class="cover" src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
       {:else}
-        <video class="cover" src={model.video.url} loop={model.video.loop} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control }}></video>
+        <video class="cover" src={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
       {/if}
     {/key}
   {:else if model.layout === "shape" && model.shape}

@@ -71,7 +71,7 @@ export function presentImageOrEmpty(theme: Theme, imageUrl: string | null | unde
 }
 
 /** A video frame. A missing file paints the empty frame instead of a broken player. */
-export function presentVideo(input: BuildBase & { videoUrl: string | null | undefined; loop?: boolean; muted?: boolean }): PresentationModel {
+export function presentVideo(input: BuildBase & { videoUrl: string | null | undefined; loop?: boolean; muted?: boolean; start?: number; stop?: number; end?: import("./video-play").VideoEnd }): PresentationModel {
   if (!input.videoUrl) return emptyModel(input.theme);
   return {
     layout: "video",
@@ -81,7 +81,14 @@ export function presentVideo(input: BuildBase & { videoUrl: string | null | unde
     lines: [],
     imageUrl: null,
     backgroundImageUrl: null,
-    video: { url: input.videoUrl, loop: input.loop ?? false, muted: input.muted ?? false },
+    video: {
+      url: input.videoUrl,
+      loop: input.loop ?? false,
+      muted: input.muted ?? false,
+      ...(input.start !== undefined ? { start: input.start } : {}),
+      ...(input.stop !== undefined ? { stop: input.stop } : {}),
+      ...(input.end ? { end: input.end } : {}),
+    },
   };
 }
 

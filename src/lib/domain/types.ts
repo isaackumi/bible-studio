@@ -140,7 +140,7 @@ export type PresentationModel = {
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */
   style?: TextStyle;
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
-  video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl };
+  video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
   /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
   qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
   /** A web page shown live: a website, a YouTube or Vimeo player, Google Slides. */
@@ -214,7 +214,8 @@ export type PresentationItem = {
   lyric?: { songId: string; sectionId: string };
   slide?: { heading: string; body: string; imageId: string | null };
   image?: { assetId: string };
-  video?: { assetId: string; loop: boolean; muted: boolean };
+  /** Trim (seconds) and what happens at the end; older items only have loop. */
+  video?: { assetId: string; loop: boolean; muted: boolean; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
   announcement?: import("./announcement").AnnouncementWords;
   deck?: { deckId: string };
   /** Text styling for slide and announcement items. */

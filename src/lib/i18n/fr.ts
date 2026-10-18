@@ -2373,4 +2373,21 @@ export const fr: Readonly<Record<string, string>> = {
   Warning: "Alerte",
   Tick: "Tic",
   End: "Fin",
+
+  // Video ends and trim
+  "Back 10 seconds": "Reculer de 10 secondes",
+  "Forward 10 seconds": "Avancer de 10 secondes",
+  "What happens when this video ends": "Ce qui se passe à la fin de cette vidéo",
+  "then clear": "puis effacer",
+  "then next item": "puis élément suivant",
+  "then next in part": "puis suivante de la partie",
+  "When it ends": "À la fin",
+  "Stop on the last picture": "S’arrêter sur la dernière image",
+  "Play it again (loop)": "La rejouer (boucle)",
+  "Go to the next item": "Passer à l’élément suivant",
+  "Next video in this part, round and round": "Vidéo suivante de cette partie, en boucle",
+  "Start at": "Commencer à",
+  "End at": "Finir à",
+  "the end": "la fin",
+  "Trim it: play only part of the file, e.g. 0:12 to 2:30. Empty plays it all.": "Découpez-la : ne jouez qu’une partie du fichier, ex. 0:12 à 2:30. Vide : tout le fichier.",
 };

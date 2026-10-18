@@ -2,6 +2,7 @@ import { noteSongUse } from "../domain/song-usage";
 import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
+import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
@@ -1609,7 +1610,9 @@ class Session {
       return presentImageOrEmpty(theme, this.mediaSrc(item.image.assetId));
     }
     if (item.kind === "video" && item.video) {
-      return presentVideo({ theme, videoUrl: this.mediaSrc(item.video.assetId), loop: item.video.loop, muted: item.video.muted });
+      const end = videoEnd(item.video);
+      const trim = cleanTrim(item.video);
+      return presentVideo({ theme, videoUrl: this.mediaSrc(item.video.assetId), loop: end === "loop", muted: item.video.muted, ...trim, end });
     }
     if (item.kind === "deck" && item.deck) {
       const deck = this.decks.find((entry) => entry.id === item.deck?.deckId);
@@ -2443,8 +2446,82 @@ class Session {
     return found;
   }
 
+  // Video ends: the length of each file (read once), and which take already ended.
+  private videoLengths = new Map<string, number>();
+  private videoEnded: string | null = null;
+
+  private videoLength(url: string): number {
+    const known = this.videoLengths.get(url);
+    if (known !== undefined) return known;
+    this.videoLengths.set(url, 0);
+    if (typeof document !== "undefined") {
+      const probe = document.createElement("video");
+      probe.preload = "metadata";
+      const done = () => {
+        this.videoLengths.set(url, probe.duration);
+        probe.removeAttribute("src");
+      };
+      probe.onloadedmetadata = () => {
+        if (Number.isFinite(probe.duration)) return done();
+        // Some files (screen and browser recordings) carry no length; seeking far ahead finds it.
+        probe.ondurationchange = () => {
+          if (Number.isFinite(probe.duration)) done();
+        };
+        probe.currentTime = 1e7;
+      };
+      probe.src = url;
+    }
+    return 0;
+  }
+
+  /** When the video on Program reaches its end: hold, clear, or hand over to the next item. */
+  private videoTick() {
+    if (!this.controlsAudience && !this.desktop()) return;
+    const model = this.live.program.model;
+    const video = model.layout === "video" ? model.video : undefined;
+    if (!video?.control?.playing) return;
+    const end = video.end ?? (video.loop ? "loop" : "hold");
+    if (end === "loop") return;
+    const stopAt = endPoint(video, this.videoLength(video.url));
+    if (stopAt === null) return;
+    const take = `${this.live.program.sourceId}:${video.control.stamp}`;
+    if (videoPosition(video.control) < stopAt - 0.15 || this.videoEnded === take) return;
+    this.videoEnded = take;
+    void this.afterVideo(end, stopAt);
+  }
+
+  private async afterVideo(end: VideoEnd, stopAt: number) {
+    if (end === "hold") {
+      await this.controlVideo({ kind: "seek", at: stopAt });
+      await this.controlVideo({ kind: "pause" });
+      return;
+    }
+    if (end === "clear") {
+      this.clear();
+      return;
+    }
+    const sourceId = this.live.program.sourceId;
+    const found = this.service && sourceId ? findItem(this.service, sourceId) : null;
+    if (!found || !this.service) return;
+    const items = found.section.items;
+    const index = items.findIndex((item) => item.id === found.item.id);
+    let nextId: string | null = null;
+    if (end === "loop-part") nextId = items[(index + 1) % items.length]?.id ?? null;
+    else {
+      const all = this.service.sections.flatMap((section) => section.items);
+      nextId = all[all.findIndex((item) => item.id === found.item.id) + 1]?.id ?? null;
+    }
+    if (!nextId) {
+      await this.controlVideo({ kind: "pause" });
+      return;
+    }
+    await this.selectItem(nextId);
+    this.take();
+  }
+
   /** Called a few times a second by the desk. Only the window sending to the audience beeps. */
   timerTick = () => {
+    this.videoTick();
     const sounds = this.workspace.timerSounds;
     const now = Date.now();
     const showing = this.countdownsShowing(now);
@@ -2836,10 +2913,12 @@ class Session {
         control = { ...current, playing: false, at, stamp: now };
         break;
       case "restart":
-        control = { ...current, playing: true, at: 0, stamp: now };
+        control = { ...current, playing: true, at: model.video.start ?? 0, stamp: now };
+        this.videoEnded = null;
         break;
       case "seek":
-        control = { ...current, at: Math.max(0, change.at), stamp: now };
+        control = { ...current, at: Math.max(model.video.start ?? 0, change.at), stamp: now };
+        this.videoEnded = null;
         break;
       default:
         control = { ...current, at, stamp: now, volume: Math.min(1, Math.max(0, change.volume)) };
@@ -4159,7 +4238,8 @@ class Session {
     // A video going live starts on a shared clock, so every screen plays it in step.
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "video" && this.live.program.model.video) {
       const model = this.live.program.model;
-      this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video!, control: { playing: true, at: 0, stamp: Date.now(), volume: 1 } } } } };
+      this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video!, control: { playing: true, at: model.video!.start ?? 0, stamp: Date.now(), volume: 1 } } } } };
+      this.videoEnded = null;
     }
     // The section of what went live has begun (the first time today).
     if ((action === "take" || action === "cut") && this.service && this.cursor.itemId) {
