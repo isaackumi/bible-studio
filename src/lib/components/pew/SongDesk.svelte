@@ -12,6 +12,7 @@
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SearchField from "./SearchField.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
+  import ToolMenu from "../ToolMenu.svelte";
 
   // Songs window: library in folders, the song's sections one click from Preview, and detection
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
@@ -31,6 +32,8 @@
   let armTimer: ReturnType<typeof setTimeout> | undefined;
   let fileInput = $state<HTMLInputElement | null>(null);
   let dirInput = $state<HTMLInputElement | null>(null);
+  /** Song packs show only when asked for, from the Import menu. */
+  let showPacks = $state(false);
 
   // Detection
   let follow = $state(false);
@@ -389,7 +392,19 @@
   <!-- Library -->
   <LibrarySidebar title="Songs" icon="note" count={session.songs.length} storageKey="songs">
     {#snippet actions()}
-      <button type="button" class="desk-btn" onclick={newSong}><Icon name="plus" size={14} /> New</button>
+      <ToolMenu label="Import songs" tip="Add songs from files" className="desk-btn" align="left">
+        {#snippet trigger()}<Icon name="download" size={14} /> Import{/snippet}
+        {#snippet children(close)}
+          <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> Lyric files…</button>
+          <p class="menu-note">Plain text, ChordPro, SongSelect, or OpenLyrics (.xml, .zip) from OpenLP, FreeShow and others.</p>
+          <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> A whole folder…</button>
+          {#if packs.length > 0}
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitem" onclick={() => { showPacks = true; close(); }}><Icon name="library" size={16} /> Song packs ({packs.length})</button>
+          {/if}
+        {/snippet}
+      </ToolMenu>
+      <button type="button" class="desk-btn primary-soft" onclick={newSong}><Icon name="plus" size={14} /> New song</button>
     {/snippet}
     <SearchField bind:value={query} label="Search songs" placeholder="Title, author or lyrics" onnavigate={navigate} />
 
@@ -463,9 +478,9 @@
       {/if}
     </nav>
 
-    {#if packs.length > 0}
+    {#if showPacks && packs.length > 0}
       <div class="packs" aria-label="Song packs">
-        <p class="group">Song packs</p>
+        <p class="group">Song packs <button type="button" class="packs-close" aria-label="Hide song packs" onclick={() => (showPacks = false)}><Icon name="close" size={12} /></button></p>
         {#each packs as pack (pack.id)}
           <div class="pack">
             <div>
@@ -481,18 +496,16 @@
 
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
-      <div class="imports">
-        <button type="button" class="import" title="Lyrics, ChordPro, SongSelect (.usr/.txt) or OpenLyrics (.xml/.zip), into the open folder" onclick={() => fileInput?.click()}>Import</button>
-        <button type="button" class="import" title="Every lyric file in a folder on this computer" onclick={() => dirInput?.click()}>Import folder</button>
-        <button type="button" class="import" disabled={visible.length === 0} title={`Save these ${visible.length} songs as OpenLyrics (.zip) — opens in OpenLP, FreeShow and others`} onclick={exportList}>Export</button>
-      </div>
+      <button type="button" class="export-list" disabled={visible.length === 0} data-tip={`Save these ${visible.length} songs as one OpenLyrics file (.zip), for backup or another computer`} onclick={exportList}>
+        <Icon name="files" size={13} /> Save these
+      </button>
       <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,.xml,.zip,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 
     <ul class="songs" aria-label="Songs">
       {#if visible.length === 0}
-        <li class="empty">{query.trim() ? "No songs match." : session.songs.length ? "This folder is empty." : "No songs yet. Create one or import lyric files."}</li>
+        <li class="empty">{query.trim() ? "No songs match." : session.songs.length ? "This folder is empty." : "No songs yet. Press New song to type or paste one, or Import to bring in files."}</li>
       {/if}
       {#each visible as song (song.id)}
         <li class="song-item">
@@ -587,28 +600,28 @@
           {/if}
         </div>
         <div class="row-actions">
-          <select
-            aria-label="Folder"
-            value={cleanFolder(selected.folder)}
-            onchange={(event) => void session.moveSongToFolder(selected, event.currentTarget.value)}
-          >
-            <option value="">No folder</option>
-            {#each folders as entry (entry.name)}<option value={entry.name}>{entry.name}</option>{/each}
-          </select>
-          <button type="button" class="desk-btn" onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> Queue</button>
+          <button type="button" class="desk-btn primary-soft" data-tip="Put the first part on Preview" onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> Start</button>
+          <button type="button" class="desk-btn" data-tip="Add to the queue for this service" onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> Add to service</button>
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> Edit</button>
-          <button type="button" class="desk-btn ghost" data-tip="Save as OpenLyrics (.xml)" onclick={() => exportSong(selected)}>Export</button>
-          <button
-            type="button"
-            class="desk-btn ghost icon"
-            class:armed={armed === `song:${selected.id}`}
-            aria-label={armed === `song:${selected.id}` ? "Confirm delete song" : "Delete song"}
-            data-tip={armed === `song:${selected.id}` ? "Click again to delete" : "Delete song"}
-            onclick={() => void deleteSelected(selected)}
-          ><Icon name="close" size={14} /></button>
+          <ToolMenu label="More for this song" tip="Folder, save as a file, delete">
+            {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
+            {#snippet children(close)}
+              <p class="menu-label">Folder</p>
+              <button type="button" role="menuitemcheckbox" aria-checked={!cleanFolder(selected.folder)} onclick={() => { void session.moveSongToFolder(selected, ""); close(); }}><Icon name="folder" size={16} /> No folder</button>
+              {#each folders as entry (entry.name)}
+                <button type="button" role="menuitemcheckbox" aria-checked={cleanFolder(selected.folder) === entry.name} onclick={() => { void session.moveSongToFolder(selected, entry.name); close(); }}><Icon name="folder" size={16} /> {entry.name}</button>
+              {/each}
+              <div class="menu-sep"></div>
+              <button type="button" role="menuitem" onclick={() => { exportSong(selected); close(); }}><Icon name="files" size={16} /> Save as OpenLyrics file</button>
+              <div class="menu-sep"></div>
+              <button type="button" role="menuitem" class="danger-item" onclick={() => void deleteSelected(selected)}>
+                <Icon name="close" size={16} /> {armed === `song:${selected.id}` ? "Click again to delete" : "Delete song"}
+              </button>
+            {/snippet}
+          </ToolMenu>
         </div>
       </header>
-      <p class="hint">Click a section for <b>Preview</b> · double-click sends it <b>LIVE</b> · <kbd>←</kbd> <kbd>→</kbd> step sections</p>
+      <p class="hint"><b>Click</b> a part to put it on Preview. <b>Double-click</b> to show it on the screen. <kbd>←</kbd> <kbd>→</kbd> move between parts.</p>
       <nav class="song-map" aria-label="Song map">
         {#each selected.sections as section (section.id)}
           <button
@@ -705,14 +718,14 @@
   }
   h2 { margin: 0; font-size: 16px; }
   .muted { margin: 0; color: var(--muted); font-size: 12px; }
-  input, select, textarea {
+  input, textarea {
     border: 1px solid var(--line);
     border-radius: var(--radius-control, 8px);
     background: var(--field);
     color: var(--ink);
     font: inherit;
   }
-  input, select { height: 32px; padding: 0 10px; min-width: 0; }
+  input { height: 32px; padding: 0 10px; min-width: 0; }
   textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
 
   /* Library */
@@ -785,9 +798,13 @@
   .pack strong { font-size: 13px; }
   .pack span, .pack small { font-size: 11px; color: var(--muted); }
   .pack .import { flex: none; padding: 0 12px; }
-  .list-head { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 8px; border-top: 1px solid var(--line); flex: none; }
+  .list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 10px 8px 0; border-top: 1px solid var(--line); flex: none; }
   .list-head .group { padding-bottom: 0; }
-  .imports { display: flex; gap: 6px; padding: 0 14px; }
+  .export-list { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .export-list:hover:not(:disabled) { color: var(--ink); background: var(--field); }
+  .export-list:disabled { opacity: 0.4; cursor: default; }
+  .packs-close { margin-left: 6px; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; vertical-align: middle; }
+  :global(.menu .danger-item) { color: var(--live) !important; }
   .import {
     flex: 1 1 auto;
     height: 30px;
@@ -853,7 +870,6 @@
   .song-head, .editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .song-head h2 { font-size: 20px; }
   .row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .song-head select { width: auto; max-width: 180px; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); }
   .hint b { color: var(--ink); font-weight: 600; }
   kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }

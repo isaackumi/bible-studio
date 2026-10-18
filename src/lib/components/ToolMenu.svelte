@@ -7,6 +7,7 @@
     tip = label,
     on = false,
     className = "desk-btn icon",
+    align = "right",
     trigger,
     children,
   }: {
@@ -14,6 +15,8 @@
     tip?: string;
     on?: boolean;
     className?: string;
+    /** Which edge of the button the menu lines up with ("left" for buttons near the left edge). */
+    align?: "left" | "right";
     trigger: Snippet;
     children: Snippet<[() => void]>;
   } = $props();
@@ -53,7 +56,7 @@
     onclick={() => (open = !open)}
   >{@render trigger()}</button>
   {#if open}
-    <div class="menu" role="menu" tabindex="-1" aria-label={label} onkeydown={onKey}>
+    <div class="menu" class:align-left={align === "left"} role="menu" tabindex="-1" aria-label={label} onkeydown={onKey}>
       {@render children(close)}
     </div>
   {/if}
@@ -75,6 +78,7 @@
     background: var(--panel);
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
   }
+  .menu.align-left { right: auto; left: 0; }
   .menu :global([role="menuitem"]),
   .menu :global([role="menuitemcheckbox"]) {
     display: flex;
