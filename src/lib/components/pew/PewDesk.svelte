@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { goneLiveKey, goneLiveView, type GoneLive } from "../../domain/gone-live";
+  import GoneLiveList from "./GoneLiveList.svelte";
+  import DeskDialog from "../sources/DeskDialog.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
@@ -44,14 +45,9 @@
 
   // Scriptures that have gone live: kept in order, one click sends one straight back to Program.
   let sideTab = $state<"live" | "detections">("live");
-  let goneQuery = $state("");
-  let showRemoved = $state(false);
-  const gone = $derived(goneLiveView(session.workspace.goneLive, goneQuery));
+  let goneWide = $state(false);
   const goneCount = $derived(session.workspace.goneLive.filter((entry) => !entry.removed).length);
-  const onAirKey = $derived.by(() => {
-    const model = session.live.program.model;
-    return model.layout === "scripture" && model.reference ? model.reference : null;
-  });
+  const pinnedCount = $derived(session.workspace.goneLive.filter((entry) => entry.pinned && !entry.removed).length);
   // A new detection shows its tab; the operator can switch back.
   let seenDetections = 0;
   $effect(() => {
@@ -59,12 +55,6 @@
     if (count > seenDetections) sideTab = "detections";
     seenDetections = count;
   });
-  function goneWhen(entry: GoneLive): string {
-    const at = new Date(entry.lastAt);
-    const today = new Date().toDateString() === at.toDateString();
-    return today ? at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : at.toLocaleDateString([], { day: "numeric", month: "short" });
-  }
-  const translationAbbr = (id: string) => session.translations.find((entry) => entry.id === id)?.abbreviation ?? id.toUpperCase();
   let note = $state("Loading scripture…");
   let sheet = $state<"help" | "lexicon" | "type" | null>(null);
   let wrapVerses = $state(false);
@@ -650,8 +640,13 @@
               </div>
               {#if sideTab === "detections"}
                 <button type="button" class="quiet" onclick={() => (detections = [])}><Icon name="close" size={14} /> Clear all</button>
-              {:else if goneCount > gone.pinned.length}
-                <button type="button" class="quiet" title="Empty the list; pinned passages stay" onclick={() => session.clearGoneLive()}><Icon name="close" size={14} /> Clear</button>
+              {:else}
+                <span class="side-actions">
+                  {#if goneCount > pinnedCount}
+                    <button type="button" class="quiet" aria-label="Clear the gone live list" title="Clear the list (pinned passages stay)" onclick={() => session.clearGoneLive()}><Icon name="trash" size={14} /></button>
+                  {/if}
+                  <button type="button" class="quiet" aria-label="Open the gone live list wide" title="Wider view: the words, every verse stepped through, keyboard" onclick={() => (goneWide = true)}><Icon name="expand" size={14} /></button>
+                </span>
               {/if}
             </header>
             {#if sideTab === "detections"}
@@ -666,57 +661,7 @@
                 {/each}
               </div>
             {:else}
-              <div class="pb-body gone">
-                {#if session.workspace.goneLive.length > 5}
-                  <label class="gone-search">
-                    <Icon name="search" size={13} />
-                    <input type="search" aria-label="Search scriptures that have gone live" placeholder="Search, e.g. John 3" bind:value={goneQuery} />
-                  </label>
-                {/if}
-                {#snippet goneRow(entry: GoneLive, order: number | null)}
-                  {@const key = goneLiveKey(entry.passage)}
-                  <div class="gone-row" class:pinned={entry.pinned} class:air={onAirKey === entry.passage.reference}>
-                    <button
-                      type="button"
-                      class="gone-go"
-                      title="Send straight to the screen"
-                      onclick={() => void session.goLivePassage(entry.passage)}
-                    >
-                      {#if order !== null}<span class="gone-n">{order}</span>{:else}<span class="gone-n"><Icon name="pin" size={12} /></span>{/if}
-                      <span class="gone-ref">
-                        <strong>{entry.passage.reference}</strong>
-                        <small>{translationAbbr(entry.passage.translationId)} · {goneWhen(entry)}{entry.times > 1 ? ` · ${entry.times}×` : ""}{onAirKey === entry.passage.reference ? " · on screen" : ""}</small>
-                      </span>
-                    </button>
-                    <button type="button" class="gone-act" class:on={entry.pinned} aria-label={entry.pinned ? `Unpin ${entry.passage.reference}` : `Pin ${entry.passage.reference}`} title={entry.pinned ? "Unpin" : "Pin to the top"} onclick={() => session.pinGoneLive(key, !entry.pinned)}>
-                      <Icon name={entry.pinned ? "pin-off" : "pin"} size={14} />
-                    </button>
-                    <button type="button" class="gone-act" aria-label="Remove {entry.passage.reference} from the list" title="Remove from the list" onclick={() => session.removeGoneLive(key, true)}>
-                      <Icon name="close" size={14} />
-                    </button>
-                  </div>
-                {/snippet}
-                {#each gone.pinned as entry (goneLiveKey(entry.passage))}{@render goneRow(entry, null)}{/each}
-                {#each gone.rest as entry, index (goneLiveKey(entry.passage))}{@render goneRow(entry, index + 1)}{/each}
-                {#if !gone.pinned.length && !gone.rest.length}
-                  <p class="side-empty">{goneQuery.trim() ? `Nothing that has gone live matches “${goneQuery.trim()}”.` : "Every scripture that goes live is kept here, in order. Click one to send it straight back to the screen."}</p>
-                {/if}
-                {#if gone.removed.length}
-                  <button type="button" class="gone-fold" aria-expanded={showRemoved} onclick={() => (showRemoved = !showRemoved)}>
-                    <Icon name={showRemoved ? "chevron-down" : "chevron-right"} size={13} /> Removed ({gone.removed.length})
-                  </button>
-                  {#if showRemoved}
-                    {#each gone.removed as entry (goneLiveKey(entry.passage))}
-                      <div class="gone-row removed">
-                        <span class="gone-ref"><strong>{entry.passage.reference}</strong><small>{translationAbbr(entry.passage.translationId)} · {goneWhen(entry)}</small></span>
-                        <button type="button" class="gone-act" aria-label="Add {entry.passage.reference} back" title="Add back to the list" onclick={() => session.removeGoneLive(goneLiveKey(entry.passage), false)}>
-                          <Icon name="plus" size={14} />
-                        </button>
-                      </div>
-                    {/each}
-                  {/if}
-                {/if}
-              </div>
+              <div class="pb-body gone"><GoneLiveList /></div>
             {/if}
           </section>
         </div>
@@ -940,6 +885,11 @@
   <Icon {name} size={16} />
 {/snippet}
 
+{#if goneWide}
+  <DeskDialog title="Scriptures that have gone live" wide onclose={() => (goneWide = false)}>
+    <GoneLiveList wide onpicked={() => (goneWide = false)} />
+  </DeskDialog>
+{/if}
 {#if overlaysOpen}
   <OverlaysDialog onclose={() => (overlaysOpen = false)} />
 {/if}
@@ -1235,30 +1185,13 @@
   .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
-  .side-tabs { display: flex; gap: 2px; }
-  .side-tabs button { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
+  .side-tabs { display: flex; gap: 2px; min-width: 0; }
+  .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
   .side-tabs button[aria-selected="true"] { background: var(--field); color: var(--ink); }
   .side-tabs em { font-style: normal; font-size: 11px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: color-mix(in srgb, var(--ink) 12%, transparent); text-align: center; }
   .side-empty { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-  .gone { overflow: auto; padding: var(--panel-pad); display: flex; flex-direction: column; gap: 6px; }
-  .gone-search { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); flex: none; }
-  .gone-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
-  .gone-row { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; background: var(--field); flex: none; }
-  .gone-row.pinned { border-color: color-mix(in srgb, var(--mustard, #f5b301) 45%, var(--line)); }
-  .gone-row.air { border-color: var(--live, #e5484d); box-shadow: inset 3px 0 0 var(--live, #e5484d); }
-  .gone-row.removed { align-items: center; padding-left: 10px; opacity: 0.75; }
-  .gone-go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; border-radius: 8px 0 0 8px; }
-  .gone-go:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
-  .gone-n { flex: none; width: 20px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; display: inline-flex; justify-content: flex-end; }
-  .gone-row.pinned .gone-n { color: var(--mustard, #f5b301); }
-  .gone-ref { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-  .gone-ref strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .gone-ref small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .gone-act { flex: none; width: 32px; border: 0; background: none; color: var(--muted); display: grid; place-items: center; }
-  .gone-act:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
-  .gone-act.on { color: var(--mustard, #f5b301); }
-  .gone-act:last-child { border-radius: 0 8px 8px 0; }
-  .gone-fold { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; padding: 4px 2px; }
+  .gone { overflow: hidden; padding: var(--panel-pad); display: flex; flex-direction: column; }
+  .side-actions { display: inline-flex; align-items: center; gap: 2px; }
   .detections button {
     border: 1px solid var(--line);
     background: var(--field);

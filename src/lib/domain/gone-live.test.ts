@@ -55,3 +55,41 @@ describe("scriptures that have gone live", () => {
     expect(sanitizeGoneLive("nope")).toEqual([]);
   });
 });
+
+describe("stepping and days", () => {
+  it("folds verse steps into the passage they started from", async () => {
+    const { goneLiveSpan } = await import("./gone-live");
+    const v = (n: number) => passage(`John 3:${n}`, 43, 3, n);
+    let list = recordGoneLive([], v(16), 1, { snippet: "For God so loved" });
+    list = recordGoneLive(list, v(17), 2, { previous: v(16) });
+    list = recordGoneLive(list, v(18), 3, { previous: v(17) });
+    expect(list).toHaveLength(1);
+    expect(goneLiveSpan(list[0]!)).toEqual({ startVerse: 16, endVerse: 18 });
+    expect(list[0]!.snippet).toBe("For God so loved");
+    // A jump elsewhere is a new passage; a step from it does not touch John.
+    list = recordGoneLive(list, romans, 4, { previous: v(18) });
+    list = recordGoneLive(list, passage("Romans 8:29", 45, 8, 29), 5, { previous: romans });
+    expect(list.map((entry) => entry.passage.reference)).toEqual(["John 3:16", "Romans 8:28"]);
+    expect(goneLiveSpan(list[1]!)).toEqual({ startVerse: 28, endVerse: 29 });
+  });
+
+  it("groups by day, newest first", async () => {
+    const { goneLiveDays } = await import("./gone-live");
+    const now = Date.parse("2026-10-18T12:00:00");
+    let list = recordGoneLive([], john, Date.parse("2026-10-11T10:00:00"));
+    list = recordGoneLive(list, psalm, Date.parse("2026-10-18T09:00:00"));
+    const days = goneLiveDays(list, now);
+    expect(days.map((day) => day.label)[0]).toBe("Today");
+    expect(days[1]!.entries[0]!.passage.reference).toBe("John 3:16");
+  });
+});
+
+describe("a verse of a passage", () => {
+  it("names one verse from the passage's book", async () => {
+    const { goneLiveVerse } = await import("./gone-live");
+    const [entry] = recordGoneLive([], psalm, 1);
+    expect(goneLiveVerse(entry!, 2)).toMatchObject({ reference: "Psalm 23:2", startVerse: 2, endVerse: 2, chapter: 23, bookOrd: 19 });
+    const [song] = recordGoneLive([], passage("1 John 4:8", 62, 4, 8), 1);
+    expect(goneLiveVerse(song!, 9).reference).toBe("1 John 4:9");
+  });
+});

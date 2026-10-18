@@ -2101,6 +2101,7 @@ class Session {
 
   /** The passage on Program now (goneLiveKey), so each passage is noted once per time it goes up. */
   private programPassageKey: string | null = null;
+  private programPassageNow: BibleItem | null = null;
 
   /** The scripture a Program frame shows: plain scripture, or a look's scripture region. */
   private programPassage(model: PresentationModel): BibleItem | null {
@@ -2135,9 +2136,13 @@ class Session {
     const passage = this.programPassage(model);
     const key = passage ? goneLiveKey(passage) : null;
     if (key === this.programPassageKey) return;
+    const previous = this.programPassageNow;
     this.programPassageKey = key;
+    this.programPassageNow = passage;
     if (!passage) return;
-    this.workspace = { ...this.workspace, goneLive: recordGoneLive(this.workspace.goneLive, passage, Date.now()) };
+    const words = model.layout === "scripture" ? model : model.layers?.find((layer) => layer.model.layout === "scripture")?.model;
+    const snippet = words?.lines.map((line) => line.text).join(" ") ?? "";
+    this.workspace = { ...this.workspace, goneLive: recordGoneLive(this.workspace.goneLive, passage, Date.now(), { previous, snippet }) };
     this.persistSoon();
   };
 
@@ -2157,6 +2162,14 @@ class Session {
     this.live = replaceProgramModel(this.live, model, "fade");
     await this.pushProgram();
     this.message = `${passage.reference} is live.`;
+  };
+
+  /** One verse of a passage that went live (a verse it stepped through), straight to Program. */
+  goLiveGoneVerse = async (passage: BibleItem) => {
+    // It belongs to its passage in the list already: no new entry.
+    this.programPassageKey = goneLiveKey(passage);
+    this.programPassageNow = passage;
+    await this.goLivePassage(passage);
   };
 
   pinGoneLive = (key: string, pinned: boolean) => {
