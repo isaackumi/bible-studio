@@ -1,5 +1,7 @@
 <script lang="ts">
   import GoneLiveList from "./GoneLiveList.svelte";
+  import ScriptureFinder from "./ScriptureFinder.svelte";
+  import { quickRead } from "../../bible/quick";
   import AudioDialog from "../AudioDialog.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
@@ -229,6 +231,16 @@
 
   async function lookup(event: Event) {
     event.preventDefault();
+    // Short ways first: "jn316", "ps23", "16" or "3:16" in the chapter open now.
+    const quick = quickRead(query, { bookOrd, chapter }, session.books).refs[0];
+    if (quick) {
+      bookOrd = quick.bookOrd;
+      chapter = quick.chapter;
+      anchor = quick.startVerse ?? 1;
+      await showPassage(quick.startVerse ?? 1, quick.endVerse ?? quick.startVerse ?? 1);
+      detections = [];
+      return;
+    }
     const parsed = parseReference(query, session.books);
     if (parsed?.startVerse) {
       bookOrd = parsed.bookOrd;
@@ -260,22 +272,37 @@
     await findPhrase(query);
   }
 
-  async function findPhrase(text: string) {
-    // Exact wording first, then verses with most of the words (spelling slips allowed).
+  /** Verses with these words: exact wording first, then most of the words (spelling slips allowed). */
+  async function searchWords(text: string): Promise<SearchHit[]> {
     const exact = await api.search(translationId, text);
     const ranked = quoteIndex ? searchQuotes(text, quoteIndex, 40) : [];
     const key = (hit: SearchHit) => `${hit.bookOrd}:${hit.chapter}:${hit.verse}`;
     const exactKeys = new Set(exact.map(key));
     const rankedKeys = new Set(ranked.map(key));
-    const hits = [
+    return [
       ...ranked.filter((hit) => exactKeys.has(key(hit))),
       ...exact.filter((hit) => !rankedKeys.has(key(hit))),
       ...ranked.filter((hit) => !exactKeys.has(key(hit))),
     ].slice(0, 40);
+  }
+
+  async function findPhrase(text: string) {
+    const hits = await searchWords(text);
     detections = hits;
     note = hits.length ? `${hits.length} matches for “${text.trim()}”.` : `No matches for “${text.trim()}”.`;
     const first = hits[0];
     if (first) openHit(first);
+  }
+
+  // The Find a verse window: short patterns, books, a chapter's verses and words, with a preview.
+  let finderOpen = $state(false);
+  let finderInitial = $state("");
+
+  function openFound(item: BibleItem, live: boolean) {
+    finderOpen = false;
+    takeAfterPreview = live;
+    openRecent(item);
+    detections = [];
   }
 
   /** Go back to a passage from the Recent row (Preview only). */
@@ -294,8 +321,8 @@
   $effect(() => {
     if (mode !== "scriptures" || !showLibrary) return;
     const focusBible = () => {
-      bibleInput?.focus();
-      bibleInput?.select();
+      finderInitial = "";
+      finderOpen = true;
     };
     session.localSearch = focusBible;
     return () => {
@@ -735,6 +762,7 @@
                 {@const current = passage()!}
                 <FavoriteStar on={session.isFavoritePassage(current)} label={current.reference} onclick={() => session.toggleFavoritePassage(current)} size={16} />
               {/if}
+              <button type="button" class="mini" aria-label="Find a verse" title="Find a verse: jn316, ps23, 3:16, words (/)" onclick={() => { finderInitial = query === passage()?.reference ? "" : query; finderOpen = true; }}><Icon name="expand" size={15} /></button>
               <button type="button" class="mini" aria-label="Previous chapter" onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
               <button type="button" class="mini" aria-label="Next chapter" onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
               <button type="button" class="mini" aria-label="Hide library" title="Hide library" onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
@@ -897,6 +925,16 @@
   <Icon {name} size={16} />
 {/snippet}
 
+{#if finderOpen}
+  <ScriptureFinder
+    {translationId}
+    here={{ bookOrd, chapter }}
+    initial={finderInitial}
+    {searchWords}
+    onopen={openFound}
+    onclose={() => (finderOpen = false)}
+  />
+{/if}
 {#if session.audioOpen}
   <AudioDialog onclose={() => (session.audioOpen = false)} />
 {/if}
