@@ -2,6 +2,7 @@
   import { session } from "../../app/session.svelte";
   import { formatReference, parseReference } from "../../bible/reference";
   import { searchSermonHits, sermonAudienceItem } from "../../domain/sermon";
+  import type { SermonSummary } from "../../ai/summarize";
   import type { PresentationItem, Sermon, SermonSection } from "../../domain/types";
   import Icon from "../Icon.svelte";
   import MonitorPair from "./MonitorPair.svelte";
@@ -175,6 +176,59 @@
 
   // Editing
 
+  // Summarize with the church's own AI service: notes in, a summary and points out.
+  let summarizing = $state(false);
+  let summary = $state<SermonSummary | null>(null);
+  let summaryError = $state("");
+
+  /** Everything written for this sermon, as the AI reads it. */
+  function notesFor(value: Draft): string {
+    const parts = [value.notes.trim()];
+    for (const section of value.sections) {
+      const lines = [section.name, section.heading, section.scripture, section.body, section.notes].map((line) => line.trim()).filter(Boolean);
+      if (lines.length) parts.push(lines.join("\n"));
+    }
+    return parts.filter(Boolean).join("\n\n");
+  }
+
+  async function summarize() {
+    if (!draft) return;
+    if (!session.aiReady) {
+      session.openSettings("ai");
+      return;
+    }
+    summarizing = true;
+    summaryError = "";
+    try {
+      summary = await session.summarizeSermon({ title: draft.title, notes: notesFor(draft) });
+    } catch (error) {
+      summaryError = error instanceof Error ? error.message : String(error);
+      summary = null;
+    } finally {
+      summarizing = false;
+    }
+  }
+
+  function usePoints() {
+    if (!draft || !summary) return;
+    const added = summary.points.map((point) => ({
+      ...blankSection(point.heading),
+      show: (point.scripture && parseReference(point.scripture, session.books)?.startVerse ? "scripture" : "slide") as Show,
+      heading: point.heading,
+      body: point.body,
+      scripture: point.scripture,
+    }));
+    draft.sections = [...draft.sections, ...added];
+    note = `${added.length} point${added.length === 1 ? "" : "s"} added as sections. Check them, then Save.`;
+    summary = null;
+  }
+
+  function useSummarySlide() {
+    if (!draft || !summary) return;
+    draft.sections = [...draft.sections, { ...blankSection("Summary"), heading: draft.title || "Summary", body: summary.summary }];
+    note = "The summary is a slide at the end. Save to keep it.";
+  }
+
   function blankSection(name: string): DraftSection {
     return { id: crypto.randomUUID(), name, notes: "", show: "slide", heading: "", body: "", scripture: "", imageId: "" };
   }
@@ -328,10 +382,32 @@
         <div class="head">
           <h2>{draft.isNew ? "New sermon" : "Edit sermon"}</h2>
           <div class="actions">
+            <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? "Make a summary and points from your notes" : "Set up your AI key first"} onclick={() => void summarize()}>
+              <Icon name="sparkles" size={14} /> {summarizing ? "Summarizing…" : "Summarize"}
+            </button>
             <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>Cancel</button>
             <button type="submit" class="desk-btn primary">Save</button>
           </div>
         </div>
+        {#if summaryError}<p class="ai-error" role="alert">{summaryError}</p>{/if}
+        {#if summary}
+          <section class="ai-card" aria-label="AI summary">
+            <header><span><Icon name="sparkles" size={14} /> Summary</span><button type="button" class="ai-close" aria-label="Close summary" onclick={() => (summary = null)}><Icon name="close" size={13} /></button></header>
+            {#if summary.summary}<p class="ai-summary">{summary.summary}</p>{/if}
+            {#if summary.points.length}
+              <ol class="ai-points">
+                {#each summary.points as point, n (n)}
+                  <li><strong>{point.heading}</strong>{#if point.scripture}<em>{point.scripture}</em>{/if}{#if point.body}<span>{point.body}</span>{/if}</li>
+                {/each}
+              </ol>
+            {/if}
+            <div class="ai-actions">
+              <button type="button" class="desk-btn" disabled={!summary.summary} onclick={useSummarySlide}>Add summary as a slide</button>
+              <button type="button" class="desk-btn primary-soft" disabled={!summary.points.length} onclick={usePoints}>Add points as sections</button>
+            </div>
+            <p class="ai-foot">Written by AI from your notes. Read it before it reaches the screen.</p>
+          </section>
+        {/if}
         <div class="fields">
           <input aria-label="Sermon title" placeholder="Title" bind:value={draft.title} />
           <input aria-label="Speaker" placeholder="Speaker" bind:value={draft.speaker} />
@@ -553,6 +629,20 @@
   .editor { display: flex; flex-direction: column; gap: 12px; }
   .fields { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
   .desk-only { display: flex; flex-direction: column; gap: 6px; }
+  .ai-btn :global(svg) { color: #7c3aed; }
+  .ai-error { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--live) 12%, var(--field)); color: var(--ink); font-size: 13px; }
+  .ai-card { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, #7c3aed 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #7c3aed 6%, var(--field)); }
+  .ai-card header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; }
+  .ai-card header span { display: inline-flex; align-items: center; gap: 6px; }
+  .ai-card header :global(svg) { color: #7c3aed; }
+  .ai-close { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .ai-summary { margin: 0; font-size: 14px; line-height: 1.5; }
+  .ai-points { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
+  .ai-points li strong { font-weight: 650; }
+  .ai-points li em { margin-left: 8px; font-style: normal; font-size: 12px; color: var(--accent); }
+  .ai-points li span { display: block; color: var(--muted); }
+  .ai-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .ai-foot { margin: 0; font-size: 11px; color: var(--muted); }
   .desk-only > span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .desk-only textarea { border-style: dashed; }
   .edit-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }

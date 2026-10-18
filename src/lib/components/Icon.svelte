@@ -57,6 +57,7 @@
   import Plus from "@lucide/svelte/icons/plus";
   import Presentation from "@lucide/svelte/icons/presentation";
   import Globe from "@lucide/svelte/icons/globe";
+  import Sparkles from "@lucide/svelte/icons/sparkles";
   import FileText from "@lucide/svelte/icons/file-text";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import Search from "@lucide/svelte/icons/search";
@@ -101,6 +102,7 @@
     screens: Monitor,
     stage: Presentation,
     globe: Globe,
+    sparkles: Sparkles,
     pdf: FileText,
     lyrics: Music,
     media: Image,

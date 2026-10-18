@@ -420,6 +420,8 @@ export type Workspace = {
   backup: { folder: string; lastAt: string };
   /** Planning Center Personal Access Token (kept on this computer). */
   pco: { appId: string; secret: string };
+  /** The church's own AI service for sermon summaries (bring your own key). Kept on this computer. */
+  ai: import("../ai/summarize").AiSettings;
   /** What the stage (confidence) screen shows. */
   stageLayout: import("../display/channel").StageLayout;
   /** A second translation shown beside the first on scripture slides, or null. */

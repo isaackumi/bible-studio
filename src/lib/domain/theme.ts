@@ -7,6 +7,7 @@ import { defaultPewDesk } from "../workspace/pew";
 import { defaultProductionLayout } from "../workspace/production";
 import type { AppearanceSettings, PresentationModel, Theme, Workspace } from "./types";
 import { emptyFavorites } from "./favorites";
+import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
 export const MIN_TRANSITION_MS = 0;
@@ -289,6 +290,7 @@ export function defaultWorkspace(): Workspace {
     parallelTranslationId: null,
     stageLayout: { next: true, clock: true, notes: true, size: "m" },
     pco: { appId: "", secret: "" },
+    ai: emptyAiSettings(),
     backup: { folder: "", lastAt: "" },
     entitlement: { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false },
     profile: null,

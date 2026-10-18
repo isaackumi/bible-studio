@@ -19,6 +19,7 @@ import { sanitizeStageLayout } from "../display/channel";
 import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 import { sanitizeFavorites } from "../domain/favorites";
 import { sanitizeOverlays } from "../domain/screen-overlays";
+import { sanitizeAiSettings } from "../ai/summarize";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -141,6 +142,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
       folder: typeof value.backup?.folder === "string" ? value.backup.folder.slice(0, 1000) : "",
       lastAt: typeof value.backup?.lastAt === "string" ? value.backup.lastAt : "",
     },
+    ai: sanitizeAiSettings(value.ai),
     pco: {
       appId: typeof value.pco?.appId === "string" ? value.pco.appId.trim().slice(0, 200) : "",
       secret: typeof value.pco?.secret === "string" ? value.pco.secret.trim().slice(0, 200) : "",

@@ -22,6 +22,7 @@
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
+  import { AI_DEFAULTS } from "../../ai/summarize";
 
   type SettingsSectionId =
     | "general"
@@ -40,6 +41,7 @@
     | "audio"
     | "storage"
     | "planning"
+    | "ai"
     | "performance"
     | "updates"
     | "account"
@@ -82,6 +84,7 @@
         { id: "bible", title: "Bible", icon: "bible", color: "#a07a52", about: "Scripture translations on this computer.", keywords: "translation kjv scripture" },
         { id: "lyrics", title: "Songs", icon: "lyrics", color: "#e93d82", about: "Songs, folders, imports and copyright.", keywords: "lyrics hymns ccli songselect openlyrics" },
         { id: "media", title: "Media", icon: "media", color: "#12a5b8", about: "Pictures and videos for backgrounds and the logo.", keywords: "images video background logo camera" },
+        { id: "ai", title: "AI assistant", icon: "sparkles", color: "#7c3aed", about: "Your own AI key, for sermon summaries.", keywords: "ai llm claude anthropic openai gpt ollama key summary sermon notes" },
         { id: "planning", title: "Planning Center", icon: "list", color: "#2266e3", about: "Bring upcoming plans in as services.", keywords: "planning center pco services plan import" },
         { id: "storage", title: "Backup", icon: "files", color: "#2f80ed", about: "Export or import the whole library.", keywords: "export import backup files library" },
       ],
@@ -197,6 +200,9 @@
   let pcoApp = $state(session.workspace.pco.appId);
   let pcoSecret = $state(session.workspace.pco.secret);
   let pcoBusy = $state(false);
+  let aiBusy = $state(false);
+  let aiNote = $state("");
+  let aiOk = $state(false);
   let pcoError = $state("");
   let pcoTypes = $state<Array<{ id: string; name: string }>>([]);
   let pcoType = $state("");
@@ -870,6 +876,40 @@
             </select>
           </div>
         </section>
+      {:else if section === "ai"}
+        {@const ai = session.workspace.ai}
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>Service</strong><span>Claude (Anthropic), or anything that speaks the OpenAI API: OpenAI itself, or a model on this computer through Ollama or LM Studio.</span></div>
+            <select class="field" aria-label="AI service" value={ai.provider} onchange={(event) => { const provider = event.currentTarget.value === "openai" ? "openai" : "anthropic"; session.setAiSettings({ provider, model: AI_DEFAULTS[provider].model, baseUrl: "" }); aiNote = ""; }}>
+              <option value="anthropic">Claude (Anthropic)</option>
+              <option value="openai">OpenAI or compatible</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Your key</strong><span>{ai.provider === "anthropic" ? "Make one at console.anthropic.com › API keys." : "From platform.openai.com › API keys. A model on this computer needs no key."} It stays on this computer and is only used when you ask for a summary.</span></div>
+            <input class="field" type="password" aria-label="AI key" placeholder="Paste your key" autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; }} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Model</strong><span>{ai.provider === "anthropic" ? "claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper." : "For example gpt-4o-mini, or llama3.1 on Ollama."}</span></div>
+            <input class="field" aria-label="AI model" value={ai.model} onchange={(event) => session.setAiSettings({ model: event.currentTarget.value })} />
+          </div>
+          {#if ai.provider === "openai"}
+            <div class="row">
+              <div class="row-copy"><strong>Address</strong><span>Leave empty for OpenAI. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1</span></div>
+              <input class="field" aria-label="AI address" placeholder="https://api.openai.com/v1" value={ai.baseUrl} onchange={(event) => session.setAiSettings({ baseUrl: event.currentTarget.value })} />
+            </div>
+          {/if}
+          <div class="row">
+            <div class="row-copy"><strong>Check it works</strong><span class:form-error={aiNote && !aiOk}>{aiNote || "Sends a two-line test to the service."}</span></div>
+            <button type="button" class="btn" disabled={!session.aiReady || aiBusy} onclick={async () => {
+              aiBusy = true;
+              try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
+              aiBusy = false;
+            }}>{aiBusy ? "Checking…" : "Test"}</button>
+          </div>
+        </section>
+        <p class="note stand">Used on the Sermon page: Summarize turns your notes into a short summary and sermon points you can show. Your notes go to the service you chose only when you press it; the service's own terms and charges apply.</p>
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>

@@ -182,6 +182,7 @@ import {
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
 import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
+import { aiReady, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -2035,6 +2036,34 @@ class Session {
   };
 
   // Planning Center Services import.
+  /** AI assistant settings (provider, the church's own key, model). */
+  setAiSettings = (patch: Partial<AiSettings>) => {
+    this.workspace = { ...this.workspace, ai: sanitizeAiSettings({ ...this.workspace.ai, ...patch }) };
+    this.persistSoon();
+  };
+
+  get aiReady() {
+    return aiReady(this.workspace.ai);
+  }
+
+  /**
+   * Summarize sermon notes into a short summary and screen-ready points with the church's own
+   * AI service. Nothing is sent anywhere until the operator asks.
+   */
+  summarizeSermon = async (input: { title: string; notes: string }): Promise<SermonSummary> => {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings)) throw new Error("Add your AI key in Settings › AI assistant first.");
+    if (!input.notes.trim()) throw new Error("Write some notes first; the summary is made from them.");
+    const reply = await api.aiPost(summaryRequest(settings, input));
+    return parseSummary(replyText(settings.provider, reply));
+  };
+
+  /** A tiny request to check the key and model work. */
+  testAi = async (): Promise<string> => {
+    const result = await this.summarizeSermon({ title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." });
+    return result.points.length ? `Connected. The test made ${result.points.length} point${result.points.length === 1 ? "" : "s"}.` : "Connected.";
+  };
+
   setPcoToken = (appId: string, secret: string) => {
     this.workspace = { ...this.workspace, pco: { appId: appId.trim(), secret: secret.trim() } };
     this.persistSoon();

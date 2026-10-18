@@ -462,6 +462,52 @@ async fn pco_get(url: String, authorization: String) -> Result<String, String> {
     .map_err(|error| error.to_string())?
 }
 
+/// True for an address the AI assistant may be sent to: any https service, or a model running
+/// on this computer (Ollama, LM Studio) over plain http.
+fn ai_url_allowed(url: &str) -> bool {
+    let Ok(uri) = url.parse::<ureq::http::Uri>() else { return false };
+    let Some(authority) = uri.authority() else { return false };
+    // No "user@host" tricks: the host must be exactly what it looks like.
+    if authority.as_str().contains('@') {
+        return false;
+    }
+    match uri.scheme_str() {
+        Some("https") => true,
+        Some("http") => matches!(authority.host(), "localhost" | "127.0.0.1" | "[::1]"),
+        _ => false,
+    }
+}
+
+/// POST a request to the church's own AI service (sermon summaries). The reply body comes back
+/// as text whatever the status, since the services explain errors in it. Long timeout: a summary
+/// can take a while on a local model.
+#[tauri::command]
+async fn ai_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
+    if !ai_url_allowed(&url) {
+        return Err("The AI address must start with https:// (or be a model on this computer).".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .timeout_global(Some(std::time::Duration::from_secs(120)))
+            .build()
+            .into();
+        let mut request = agent.post(&url);
+        for (name, value) in &headers {
+            request = request.header(name.as_str(), value.as_str());
+        }
+        let mut response = request
+            .send(body.as_bytes())
+            .map_err(|error| format!("The AI service could not be reached. {error}"))?;
+        response
+            .body_mut()
+            .read_to_string()
+            .map_err(|error| format!("The AI service sent an unreadable reply. {error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -484,6 +530,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             pco_get,
+            ai_post,
             crash_log,
             backup_write,
             backup_latest,
@@ -540,6 +587,16 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn ai_addresses() {
+        assert!(super::ai_url_allowed("https://api.anthropic.com/v1/messages"));
+        assert!(super::ai_url_allowed("http://localhost:11434/v1/chat/completions"));
+        assert!(!super::ai_url_allowed("http://example.com/v1"));
+        assert!(!super::ai_url_allowed("file:///etc/passwd"));
+        assert!(!super::ai_url_allowed("http://localhost:x@example.com/v1"));
+        assert!(super::ai_url_allowed("http://127.0.0.1:1234/v1/chat/completions"));
+    }
+
     use super::percent_decode;
 
     #[test]
