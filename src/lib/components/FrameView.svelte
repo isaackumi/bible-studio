@@ -23,6 +23,7 @@
     mirror = false,
     audio = false,
     still = false,
+    fit = $bindable(1),
   }: {
     model: PresentationModel;
     /** Live pixels for this frame's own camera source. */
@@ -35,7 +36,54 @@
     audio?: boolean;
     /** Hold animated backgrounds still (gallery thumbnails). */
     still?: boolean;
+    /** How much long words were shrunk to fit (1: not at all). Read by the desk monitors. */
+    fit?: number;
   } = $props();
+
+  /**
+   * Long passages and song parts shrink to fit the screen instead of running off it: the text
+   * keeps the theme's size when it fits, and otherwise takes the largest size that does (never
+   * below a third). Measured on the frame itself, so every screen shape and every copy agrees.
+   */
+  const FIT_MIN = 0.34;
+  function fitText(node: HTMLElement, _key: unknown) {
+    let raf = 0;
+    const frame = node.closest(".frame") as HTMLElement | null;
+    const measure = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const lower = frame?.classList.contains("lower") ?? false;
+        const limit = () => (lower && frame ? frame.clientHeight * 0.55 : node.clientHeight);
+        const over = () => node.scrollHeight > limit() + 1 || node.scrollWidth > node.clientWidth + 1;
+        node.style.setProperty("--fit", "1");
+        if (!over()) {
+          fit = 1;
+          return;
+        }
+        let lo = FIT_MIN;
+        let hi = 1;
+        for (let step = 0; step < 9; step += 1) {
+          const mid = (lo + hi) / 2;
+          node.style.setProperty("--fit", String(mid));
+          if (over()) hi = mid;
+          else lo = mid;
+        }
+        node.style.setProperty("--fit", String(lo));
+        fit = Math.round(lo * 100) / 100;
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    if (frame) observer.observe(frame);
+    measure();
+    void document.fonts?.ready.then(measure);
+    return {
+      update: measure,
+      destroy() {
+        observer.disconnect();
+        cancelAnimationFrame(raf);
+      },
+    };
+  }
 
   /** A layer that is hidden or leaves the scene plays its exit animation. */
   function leave(node: Element, animation: PaintedLayer["animation"]): TransitionConfig {
@@ -141,7 +189,7 @@
 
 {#snippet words()}
   {#if model.reference && model.theme.reference.show}
-    <p class="ref" style:font-size="{model.theme.reference.size}px" style:color={model.theme.reference.color}>{model.reference}</p>
+    <p class="ref" style:font-size="calc({model.theme.reference.size}px * var(--fit, 1))" style:color={model.theme.reference.color}>{model.reference}</p>
   {/if}
   {#if model.parallel && model.layout === "scripture"}
     <!-- Two translations side by side: one reference, each column with its own attribution. -->
@@ -149,21 +197,21 @@
       {#each [{ lines: displayLines, attribution: model.attribution }, { lines: model.parallel.lines, attribution: model.parallel.attribution }] as column, n (n)}
         <div class="parallel-col">
           {#each column.lines as line}
-            <p class="line" style:font-size="{Math.round(model.theme.fontSize * 0.74)}px">{#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}</p>
+            <p class="line" style:font-size="calc({Math.round(model.theme.fontSize * 0.74)}px * var(--fit, 1))">{#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}</p>
           {/each}
-          {#if column.attribution}<p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{column.attribution}</p>{/if}
+          {#if column.attribution}<p class="attr" style:font-size="calc({model.theme.attribution.size}px * var(--fit, 1))" style:color={model.theme.attribution.color}>{column.attribution}</p>{/if}
         </div>
       {/each}
     </div>
   {:else}
   {#each displayLines as line}
-    <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
+    <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size={model.layout === "logo" || model.layout === "timer" ? `${model.layout === "logo" ? 92 : model.theme.fontSize}px` : `calc(${model.theme.fontSize}px * var(--fit, 1))`}>
       {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
       {#if line.alt}<span class="alt-line">{line.alt}</span>{/if}
     </p>
   {/each}
   {#if model.attribution}
-    <p class="attr" style:font-size="{model.theme.attribution.size}px" style:color={model.theme.attribution.color}>{model.attribution}</p>
+    <p class="attr" style:font-size="calc({model.theme.attribution.size}px * var(--fit, 1))" style:color={model.theme.attribution.color}>{model.attribution}</p>
   {/if}
   {/if}
 {/snippet}
@@ -270,6 +318,7 @@
     <!-- A camera's name card is for the desk while the feed starts; it never sits on a live picture or reaches the audience. -->
     <div
       class="stack"
+      use:fitText={model}
       style:text-align={model.theme.align}
       style:justify-content={justify}
       style:padding="{nested ? 16 : model.theme.margin}px"

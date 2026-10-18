@@ -231,7 +231,7 @@ button { cursor: pointer; }
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: calc(28px * var(--fit, 1));
 }
 .frame .ref {
   font-family: var(--font-label);
@@ -841,10 +841,15 @@ button { cursor: pointer; }
 input.switch {
   appearance: none;
   position: relative;
+  box-sizing: border-box;
   width: 40px;
+  min-width: 40px;
   height: 24px;
+  min-height: 0;
   flex: none;
   margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ink) 18%, transparent);
   cursor: pointer;

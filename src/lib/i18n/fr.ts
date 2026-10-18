@@ -2350,4 +2350,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Screens and look": "Écrans et aspect",
   "Guided tours…": "Visites guidées…",
   "The guided tours are here any time, in this menu. Each page has its own.": "Les visites guidées sont ici à tout moment, dans ce menu. Chaque page a la sienne.",
+
+  // Shrink to fit
+  "Long text is shrunk to fit the screen. Split it for bigger words: fewer verses, or a song part in two.": "Le texte long est réduit pour tenir à l’écran. Découpez-le pour un texte plus grand : moins de versets, ou une partie de chant en deux.",
+  "Text at {percent}% to fit": "Texte à {percent} % pour tenir",
 };
