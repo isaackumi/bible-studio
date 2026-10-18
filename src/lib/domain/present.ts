@@ -1,5 +1,5 @@
 import { emptyModel } from "./theme";
-import type { PresentationModel, Theme, VerseText } from "./types";
+import type { PresentationLine, PresentationModel, Theme, VerseText } from "./types";
 
 type BuildBase = {
   theme: Theme;
@@ -31,14 +31,16 @@ export function presentScripture(
 }
 
 export function presentLyrics(
-  input: BuildBase & { label: string; lines: string[]; credit?: string | null },
+  input: BuildBase & { label: string; lines: Array<string | PresentationLine>; credit?: string | null },
 ): PresentationModel {
   return {
     layout: "lyrics",
     theme: input.theme,
     reference: input.label,
     attribution: input.credit?.trim() || null,
-    lines: input.lines.filter((line) => line.trim().length > 0).map((text) => ({ text })),
+    lines: input.lines
+      .map((line) => (typeof line === "string" ? { text: line } : line))
+      .filter((line) => line.text.trim().length > 0),
     imageUrl: null,
     backgroundImageUrl: input.backgroundImageUrl ?? null,
   };

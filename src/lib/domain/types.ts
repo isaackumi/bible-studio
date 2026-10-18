@@ -70,6 +70,8 @@ export type TextStyle = {
 export type PresentationLine = {
   text: string;
   marker?: string;
+  /** The same line in a second language, shown under it (songs in two languages). */
+  alt?: string;
 };
 
 export type PresentationLayout =
@@ -251,6 +253,8 @@ export type SongSection = {
   kind: SongSectionKind;
   label: string;
   lines: string[];
+  /** The section in the song's second language, line by line. */
+  second?: string[];
 };
 
 export type Song = {
@@ -266,6 +270,8 @@ export type Song = {
   copyright?: string;
   /** The order it is sung in, by section id, repeats allowed. Absent: the sections as written. */
   order?: string[];
+  /** The name of the song's second language ("Twi", "Français"), when it has one. */
+  secondLanguage?: string;
 };
 
 export type SermonSection = {
@@ -469,6 +475,8 @@ export type Workspace = {
   recentAlerts: string[];
   /** The translation the Scriptures page was last on. */
   deskTranslationId: string | null;
+  /** Songs with two languages: which to show on the screen. */
+  songLanguage: import("./song").SongLanguage;
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

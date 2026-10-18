@@ -156,8 +156,9 @@
     </div>
   {:else}
   {#each displayLines as line}
-    <p class="line" class:clock={model.layout === "timer"} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
+    <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size="{model.layout === 'logo' ? 92 : model.theme.fontSize}px">
       {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
+      {#if line.alt}<span class="alt-line">{line.alt}</span>{/if}
     </p>
   {/each}
   {#if model.attribution}

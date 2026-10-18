@@ -329,6 +329,7 @@ export function defaultWorkspace(): Workspace {
     recentSongs: [],
     recentAlerts: [],
     deskTranslationId: null,
+    songLanguage: "both",
   };
 }
 

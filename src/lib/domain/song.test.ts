@@ -83,9 +83,9 @@ describe("song sections", () => {
   it("describes a missing section without throwing", () => {
     expect(lyricsFor(undefined, "missing", "Morning light")).toEqual({
       label: "Morning light",
-      lines: ["This section is missing."],
+      lines: [{ text: "This section is missing." }],
     });
-    expect(lyricsFor(hymn, "gone", "Morning light").lines).toEqual(["This section is missing."]);
+    expect(lyricsFor(hymn, "gone", "Morning light").lines).toEqual([{ text: "This section is missing." }]);
   });
 });
 
@@ -275,5 +275,28 @@ describe("section colours and short names", () => {
     expect(sectionShort(at("bridge", "Bridge 2"))).toBe("B2");
     expect(sectionShort(at("tag", "Intro"))).toBe("I");
     expect(sectionShort(at("tag", "Tag"))).toBe("T");
+  });
+});
+
+describe("songs in two languages", () => {
+  it("shows the first, the second, or both line by line", async () => {
+    const { lyricsFor } = await import("./song");
+    const song = {
+      id: "s",
+      title: "Placeholder",
+      author: "",
+      secondLanguage: "Twi",
+      sections: [{ id: "v", kind: "verse" as const, label: "Verse 1", lines: ["first line one", "first line two"], second: ["second line one", "second line two", "second line three"] }],
+    };
+    expect(lyricsFor(song, "v", "", "first").lines).toEqual([{ text: "first line one" }, { text: "first line two" }]);
+    expect(lyricsFor(song, "v", "", "second").lines.map((line) => line.text)).toEqual(["second line one", "second line two", "second line three"]);
+    expect(lyricsFor(song, "v", "", "both").lines).toEqual([
+      { text: "first line one", alt: "second line one" },
+      { text: "first line two", alt: "second line two" },
+      { text: "second line three" },
+    ]);
+    // A section without the second language shows the first whatever is chosen.
+    const plain = { ...song, sections: [{ ...song.sections[0]!, second: [] }] };
+    expect(lyricsFor(plain, "v", "", "second").lines.map((line) => line.text)).toEqual(["first line one", "first line two"]);
   });
 });

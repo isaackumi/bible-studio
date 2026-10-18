@@ -217,6 +217,10 @@ button { cursor: pointer; }
   overflow: hidden;
   display: flex;
 }
+/* Songs in two languages: the second sits under each line, smaller and softer. */
+.frame .line.paired { margin-bottom: 0.45em; }
+.frame .alt-line { display: block; font-size: 0.7em; font-weight: 500; font-style: italic; opacity: 0.82; line-height: 1.2; margin-top: 0.08em; }
+
 /* Announcements lay themselves out (AnnouncementView). */
 .frame .ann-wrap { position: absolute; inset: 0; container-type: size; }
 

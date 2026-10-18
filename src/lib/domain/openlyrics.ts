@@ -5,7 +5,13 @@ import type { Song, SongSection, SongSectionKind } from "./types";
 // by OpenLP, FreeShow and others. This reads the parts a lyric projector needs (titles, authors,
 // copyright, CCLI number, verses) and writes the same back. No DOM: it runs in tests and workers.
 
-export type ParsedOpenLyrics = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[] };
+export type ParsedOpenLyrics = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[]; secondLanguage?: string };
+
+/** Language names for OpenLyrics lang codes a church is likely to meet. */
+const LANGUAGE_NAMES: Record<string, string> = {
+  tw: "Twi", ak: "Twi", aka: "Twi", twi: "Twi", ee: "Ewe", gaa: "Ga", ha: "Hausa", yo: "Yorùbá", ig: "Igbo", sw: "Kiswahili",
+  fr: "Français", es: "Español", pt: "Português", de: "Deutsch", en: "English", zh: "中文", ko: "한국어",
+};
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
@@ -79,19 +85,33 @@ export function parseOpenLyrics(xml: string, newId: () => string = () => crypto.
   const ccli = (texts(properties, "ccliNo")[0] ?? "").replace(/\D+/g, "");
   const lyrics = /<(?:\w+:)?lyrics\b[^>]*>([\s\S]*?)<\/(?:\w+:)?lyrics>/i.exec(xml)?.[1] ?? "";
 
-  // A song may carry each verse in several languages (lang="…"): keep the first one of each name.
-  const seen = new Set<string>();
+  // A song may carry each verse in several languages (lang="…"): the first language is the song's
+  // words, the next one its second language (shown under or instead of them).
   const sections: SongSection[] = [];
   const idByName = new Map<string, string>();
+  const sectionByName = new Map<string, SongSection>();
+  let firstLang: string | null = null;
+  let secondLang: string | null = null;
   for (const match of lyrics.matchAll(/<(?:\w+:)?verse\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?verse>/gi)) {
     const name = attr(match[1]!, "name") ?? `v${sections.length + 1}`;
-    if (seen.has(name)) continue;
-    seen.add(name);
+    const lang = (attr(match[1]!, "lang") ?? "").toLowerCase();
     const lines = [...match[2]!.matchAll(/<(?:\w+:)?lines\b[^>]*>([\s\S]*?)<\/(?:\w+:)?lines>/gi)].flatMap((block) => linesOf(block[1]!));
     if (lines.length === 0) continue;
+    const existing = sectionByName.get(name.toLowerCase());
+    if (existing) {
+      // The same verse again in another language: the second language, once.
+      if (lang && lang !== firstLang && (secondLang === null || lang === secondLang) && !existing.second) {
+        secondLang = lang;
+        existing.second = lines;
+      }
+      continue;
+    }
+    if (firstLang === null) firstLang = lang;
     const id = newId();
     idByName.set(name.toLowerCase(), id);
-    sections.push({ id, ...sectionName(name), lines });
+    const section: SongSection = { id, ...sectionName(name), lines };
+    sectionByName.set(name.toLowerCase(), section);
+    sections.push(section);
   }
   // verseOrder ("v1 c v2 c b c"): the order the song is sung in.
   const verseOrder = (texts(properties, "verseOrder")[0] ?? "").split(/\s+/).filter(Boolean);
@@ -103,6 +123,7 @@ export function parseOpenLyrics(xml: string, newId: () => string = () => crypto.
     ...(copyright ? { copyright } : {}),
     sections,
     ...(order ? { order } : {}),
+    ...(secondLang ? { secondLanguage: LANGUAGE_NAMES[secondLang] ?? secondLang } : {}),
   };
 }
 

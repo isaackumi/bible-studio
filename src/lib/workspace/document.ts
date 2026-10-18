@@ -138,6 +138,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
           .slice(0, 30)
       : [],
     recentAlerts: Array.isArray(value.recentAlerts) ? value.recentAlerts.filter((text): text is string => typeof text === "string" && text.trim().length > 0).map((text) => text.slice(0, 200)).slice(0, 12) : [],
+    songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)

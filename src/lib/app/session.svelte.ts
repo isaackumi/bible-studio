@@ -637,6 +637,15 @@ class Session {
     }
   };
 
+  /** Songs in two languages: first, second or both on the screen. Re-shows the part on Preview. */
+  setSongLanguage = (language: "first" | "second" | "both") => {
+    this.workspace = { ...this.workspace, songLanguage: language };
+    this.persistSoon();
+    const focus = this.songFocus;
+    const song = focus ? this.songs.find((entry) => entry.id === focus.songId) : undefined;
+    if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot);
+  };
+
   /** The translation the Scriptures page is on, kept for next time. */
   setDeskTranslation = (id: string) => {
     if (this.workspace.deskTranslationId === id) return;
@@ -1486,7 +1495,7 @@ class Session {
     }
     if (item.kind === "lyric" && item.lyric) {
       const song = this.songs.find((entry) => entry.id === item.lyric?.songId);
-      const lyrics = lyricsFor(song, item.lyric.sectionId, item.title);
+      const lyrics = lyricsFor(song, item.lyric.sectionId, item.title, this.workspace.songLanguage);
       const credit = song ? creditFor(song, item.lyric.sectionId, this.workspace.ccliLicense) : null;
       return presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit });
     }
@@ -3126,7 +3135,7 @@ class Session {
     this.library = "songs";
     const theme = this.theme();
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
-    const lyrics = lyricsFor(clean, section.id, clean.title);
+    const lyrics = lyricsFor(clean, section.id, clean.title, this.workspace.songLanguage);
     this.previewModel(
       this.withBackdrop(presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit: creditFor(clean, section.id, this.workspace.ccliLicense) })),
       `song:${clean.id}:${section.id}`,

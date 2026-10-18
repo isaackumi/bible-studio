@@ -19,7 +19,7 @@
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
 
   /** `order`: section ids as sung (repeats allowed); empty means the sections as written. */
-  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; order: string[]; isNew: boolean };
+  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; order: string[]; secondLanguage: string; isNew: boolean };
 
   /** The song search window. */
   let finding = $state(false);
@@ -354,6 +354,7 @@
       copyright: "",
       sections: [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }],
       order: [],
+      secondLanguage: "",
       isNew: true,
     };
     pasteText = "";
@@ -369,13 +370,24 @@
       copyright: song.copyright ?? "",
       sections: song.sections.map((section) => ({ ...section, lines: [...section.lines] })),
       order: [...(song.order ?? [])],
+      secondLanguage: song.secondLanguage ?? "",
       isNew: false,
     };
     pasteText = "";
   }
 
   function asSong(value: Draft): Song {
-    return { id: value.id, title: value.title, author: value.author, folder: value.folder, ccli: value.ccli, copyright: value.copyright, sections: value.sections, ...(value.order.length ? { order: value.order } : {}) };
+    return {
+      id: value.id,
+      title: value.title,
+      author: value.author,
+      folder: value.folder,
+      ccli: value.ccli,
+      copyright: value.copyright,
+      sections: value.sections,
+      ...(value.order.length ? { order: value.order } : {}),
+      ...(value.secondLanguage.trim() ? { secondLanguage: value.secondLanguage.trim() } : {}),
+    };
   }
 
   function applyPaste() {
@@ -626,6 +638,7 @@
           <input aria-label="Song folder" placeholder="Folder (optional)" list="song-folder-names" bind:value={draft.folder} />
           <input aria-label="CCLI song number" placeholder="CCLI song # (optional)" inputmode="numeric" bind:value={draft.ccli} />
           <input class="wide" aria-label="Copyright" placeholder="Copyright, e.g. 2015 Publisher (blank for public domain)" bind:value={draft.copyright} />
+          <input aria-label="Second language" placeholder="Second language, e.g. Twi (optional)" maxlength="40" bind:value={draft.secondLanguage} />
           <datalist id="song-folder-names">
             {#each folders as entry (entry.name)}<option value={entry.name}></option>{/each}
           </datalist>
@@ -711,13 +724,27 @@
               <input aria-label="Section label" bind:value={section.label} />
               <button type="button" class="desk-btn ghost icon del" aria-label={`Delete ${section.label}`} title="Delete this section" onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="trash" size={14} /></button>
             </div>
-            <textarea
-              aria-label="{section.label} lines"
-              rows={Math.max(3, section.lines.length)}
-              placeholder="One lyric line per row"
-              value={section.lines.join("\n")}
-              oninput={(event) => (section.lines = event.currentTarget.value.split("\n"))}
-            ></textarea>
+            <div class="langs" class:two={!!draft.secondLanguage.trim()}>
+              <textarea
+                aria-label="{section.label} lines"
+                rows={Math.max(3, section.lines.length, section.second?.length ?? 0)}
+                placeholder="One lyric line per row"
+                value={section.lines.join("\n")}
+                oninput={(event) => (section.lines = event.currentTarget.value.split("\n"))}
+              ></textarea>
+              {#if draft.secondLanguage.trim()}
+                <label class="second">
+                  <span>In {draft.secondLanguage.trim()}</span>
+                  <textarea
+                    aria-label="{section.label} in {draft.secondLanguage.trim()}"
+                    rows={Math.max(3, section.lines.length, section.second?.length ?? 0)}
+                    placeholder="The same lines in {draft.secondLanguage.trim()}, one per row, in the same order"
+                    value={(section.second ?? []).join("\n")}
+                    oninput={(event) => (section.second = event.currentTarget.value.split("\n"))}
+                  ></textarea>
+                </label>
+              {/if}
+            </div>
           </div>
         {/each}
         <div class="row-actions">
@@ -777,6 +804,14 @@
           >{sectionShort(section)}</button>
         {/each}
       </nav>
+      {#if selected.secondLanguage && selected.sections.some((section) => section.second?.some((line) => line.trim()))}
+        <div class="click-mode" role="radiogroup" aria-label="Language on the screen">
+          <span>Show</span>
+          {#each [["first", "Main"], ["second", selected.secondLanguage], ["both", "Both"]] as [value, label] (value)}
+            <button type="button" role="radio" aria-checked={session.workspace.songLanguage === value} class:on={session.workspace.songLanguage === value} onclick={() => session.setSongLanguage(value as "first" | "second" | "both")}>{label}</button>
+          {/each}
+        </div>
+      {/if}
       <div class="click-mode" role="radiogroup" aria-label="When you click a part">
         <span>Click</span>
         <button type="button" role="radio" aria-checked={!clickLive} class:on={!clickLive} data-tip="Click puts a part on Preview; double-click or LIVE shows it" onclick={() => setClickLive(false)}>Preview</button>
@@ -1111,7 +1146,15 @@
   .paste { display: flex; flex-direction: column; gap: 8px; }
   .paste summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .paste textarea { width: 100%; margin: 8px 0; }
-  .edit-section { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-left: 4px solid var(--tone, var(--line)); border-radius: var(--radius-control, 8px); }
+  .edit-section { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); }
+  .edit-section-head::before { content: ""; align-self: center; flex: none; width: 8px; height: 8px; margin: 0 2px 0 4px; border-radius: 50%; background: var(--tone, var(--muted)); order: 1; }
+  .edit-section-head > :global(.grip) { order: 0; }
+  .edit-section-head > :global(input) { order: 2; }
+  .edit-section-head > :global(.del) { order: 3; }
+  .langs { display: grid; gap: 8px; }
+  .langs.two { grid-template-columns: 1fr 1fr; }
+  .langs .second { display: grid; gap: 4px; }
+  .langs .second span { font-size: 11px; font-weight: 650; color: var(--muted); }
   .edit-section-head { display: flex; gap: 4px; }
   .edit-section-head input { flex: 1; }
 

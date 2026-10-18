@@ -1,7 +1,7 @@
 import { isOpenLyrics, parseOpenLyrics } from "./openlyrics";
 import { cleanOrder } from "./song-order";
 import { moveInList } from "./service";
-import type { Song, SongSection, SongSectionKind } from "./types";
+import type { PresentationLine, Song, SongSection, SongSectionKind } from "./types";
 
 const KINDS = new Set<SongSectionKind>(["verse", "chorus", "bridge", "tag"]);
 
@@ -19,12 +19,14 @@ export function sanitizeSong(song: Song): Song {
     const kind = KINDS.has(section.kind) ? section.kind : "verse";
     const lines = Array.isArray(section.lines) ? section.lines.map((line) => String(line)) : [];
     const label = section.label?.trim() || defaultLabel(kind, sections);
-    sections.push({ id: section.id, kind, label, lines });
+    const second = Array.isArray(section.second) ? section.second.map((line) => String(line)) : [];
+    sections.push({ id: section.id, kind, label, lines, ...(second.some((line) => line.trim()) ? { second } : {}) });
   }
   const folder = cleanFolder(song.folder);
   const ccli = cleanCcli(song.ccli);
   const copyright = cleanCopyright(song.copyright);
   const order = cleanOrder(song.order, sections);
+  const secondLanguage = typeof song.secondLanguage === "string" ? song.secondLanguage.trim().slice(0, 40) : "";
   return {
     id: song.id,
     title: song.title.trim(),
@@ -34,6 +36,7 @@ export function sanitizeSong(song: Song): Song {
     ...(ccli ? { ccli } : {}),
     ...(copyright ? { copyright } : {}),
     ...(order ? { order } : {}),
+    ...(secondLanguage ? { secondLanguage } : {}),
   };
 }
 
@@ -133,6 +136,7 @@ export function songFromFile(filename: string, text: string, folder: string, new
     ...(parsed.ccli ? { ccli: parsed.ccli } : {}),
     ...(parsed.copyright ? { copyright: parsed.copyright } : {}),
     ...(parsed.order ? { order: parsed.order } : {}),
+    ...(parsed.secondLanguage ? { secondLanguage: parsed.secondLanguage } : {}),
   });
 }
 
@@ -168,11 +172,35 @@ export function sectionPlace(song: Song, sectionId: string): { index: number; co
   return { index, count: song.sections.length, label: section.label };
 }
 
-export function lyricsFor(song: Song | undefined, sectionId: string, fallbackTitle: string): { label: string; lines: string[] } {
+/** Songs in two languages: show the first, the second, or both (the second under each line). */
+export type SongLanguage = "first" | "second" | "both";
+
+/**
+ * A section's words for the screen. With a second language, `language` picks what shows; "both"
+ * pairs the lines (the second under the first), and a missing second language falls back to the first.
+ */
+export function lyricsFor(
+  song: Song | undefined,
+  sectionId: string,
+  fallbackTitle: string,
+  language: SongLanguage = "first",
+): { label: string; lines: PresentationLine[] } {
   const section = song?.sections.find((entry) => entry.id === sectionId);
-  if (!song || !section) return { label: fallbackTitle || "Song", lines: ["This section is missing."] };
-  const lines = section.lines.filter((line) => line.trim());
-  return { label: section.label, lines: lines.length > 0 ? lines : ["This section is empty."] };
+  if (!song || !section) return { label: fallbackTitle || "Song", lines: [{ text: "This section is missing." }] };
+  const first = section.lines.filter((line) => line.trim());
+  const second = (section.second ?? []).filter((line) => line.trim());
+  if (!first.length && !second.length) return { label: section.label, lines: [{ text: "This section is empty." }] };
+  if (!second.length || language === "first") return { label: section.label, lines: (first.length ? first : second).map((text) => ({ text })) };
+  if (language === "second" || !first.length) return { label: section.label, lines: second.map((text) => ({ text })) };
+  const rows = Math.max(first.length, second.length);
+  const lines: PresentationLine[] = [];
+  for (let n = 0; n < rows; n += 1) {
+    const text = first[n];
+    const alt = second[n];
+    if (text) lines.push(alt ? { text, alt } : { text });
+    else if (alt) lines.push({ text: alt });
+  }
+  return { label: section.label, lines };
 }
 
 /** How a section is coloured and abbreviated on the desk. The label wins (people rename sections), then the kind. */
@@ -302,7 +330,7 @@ export function parseLyrics(
   return { ...(title ? { title } : {}), ...(author ? { author } : {}), ...(ccli ? { ccli } : {}), ...(copyright ? { copyright } : {}), sections };
 }
 
-type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[] };
+type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[]; secondLanguage?: string };
 
 /** Pick the reader by file name and content: OpenLyrics, SongSelect .usr, SongSelect text, else plain lyrics / ChordPro. */
 export function parseSongFile(filename: string, text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {

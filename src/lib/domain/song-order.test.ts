@@ -64,3 +64,21 @@ describe("OpenLyrics order", () => {
     expect(back).toContain("<verseOrder>v1 c v2 c</verseOrder>");
   });
 });
+
+describe("OpenLyrics in two languages", () => {
+  it("keeps the second language of each verse", async () => {
+    const { parseOpenLyrics } = await import("./openlyrics");
+    const xml = `<song xmlns="http://openlyrics.info/namespace/2009/song"><properties><titles><title>T</title></titles></properties><lyrics>
+      <verse name="v1" lang="en"><lines>placeholder one</lines></verse>
+      <verse name="v1" lang="tw"><lines>placeholder ɛ one</lines></verse>
+      <verse name="c" lang="en"><lines>placeholder chorus</lines></verse>
+      <verse name="c" lang="tw"><lines>placeholder ɛ chorus</lines></verse>
+    </lyrics></song>`;
+    const parsed = parseOpenLyrics(xml, (() => { let n = 0; return () => `id${++n}`; })());
+    expect(parsed.secondLanguage).toBe("Twi");
+    expect(parsed.sections.map((section) => [section.lines[0], section.second?.[0]])).toEqual([
+      ["placeholder one", "placeholder ɛ one"],
+      ["placeholder chorus", "placeholder ɛ chorus"],
+    ]);
+  });
+});
