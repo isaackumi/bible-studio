@@ -405,7 +405,7 @@
       {/if}
     </div>
     <nav class="prod-tools" aria-label="Workspace">
-      <ToolMenu label="View" tip="Panels and focus">
+      <ToolMenu label="View" tip="Panels and focus" tour="view">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitemcheckbox" aria-checked={scenesOpen} onclick={() => toggleDock("service")}><Icon name="studio" size={16} /> Scenes</button>
@@ -433,7 +433,7 @@
         data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
-      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
+      <button type="button" class="desk-btn icon" data-tour="tours" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}

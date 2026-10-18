@@ -17,6 +17,7 @@
   import MacroBar from "../MacroBar.svelte";
   import SectionTime from "./SectionTime.svelte";
   import { planSchedule } from "../../domain/schedule";
+  import { msg, t, tn } from "../../i18n/core";
 
   // The running order for a whole service: sections in order, any kind of item, and a way to
   // move through it item by item. Nothing here changes Program; LIVE still does.
@@ -74,7 +75,7 @@
   let referenceNote = $state("");
   let heading = $state("");
   let body = $state("");
-  let annLabel = $state("Announcement");
+  let annLabel = $state(t("Announcement"));
   let annDesign = $state<AnnouncementDesign>("card");
   /** The item open in the editor. */
   let editing = $state<PresentationItem | null>(null);
@@ -102,18 +103,19 @@
   const looks = $derived(session.looksByFavorite);
 
   const KIND: Record<string, { icon: string; label: string }> = {
-    lyric: { icon: "note", label: "Song" },
-    bible: { icon: "bible", label: "Scripture" },
-    deck: { icon: "stage", label: "Slides" },
-    slide: { icon: "pencil", label: "Text" },
-    image: { icon: "media", label: "Picture" },
-    video: { icon: "play", label: "Video" },
-    announcement: { icon: "alerts", label: "Announcement" },
-    composition: { icon: "studio", label: "Look" },
+    lyric: { icon: "note", label: msg("Song") },
+    bible: { icon: "bible", label: msg("Scripture") },
+    deck: { icon: "stage", label: msg("Slides") },
+    slide: { icon: "pencil", label: msg("Text") },
+    image: { icon: "media", label: msg("Picture") },
+    video: { icon: "play", label: msg("Video") },
+    announcement: { icon: "alerts", label: msg("Announcement") },
+    composition: { icon: "studio", label: msg("Look") },
   };
 
   function kindOf(item: PresentationItem) {
-    return KIND[item.kind] ?? { icon: "list", label: item.kind };
+    const kind = KIND[item.kind];
+    return kind ? { icon: kind.icon, label: t(kind.label) } : { icon: "list", label: item.kind };
   }
 
   const songOf = (item: PresentationItem) => (item.lyric ? session.songs.find((entry) => entry.id === item.lyric?.songId) : undefined);
@@ -121,11 +123,11 @@
   function detail(item: PresentationItem): string {
     if (item.kind === "lyric" && item.lyric) {
       const song = session.songs.find((entry) => entry.id === item.lyric?.songId);
-      return song ? `${song.sections.length} section${song.sections.length === 1 ? "" : "s"}${song.author ? ` · ${song.author}` : ""}` : "Song not found";
+      return song ? `${tn(song.sections.length, "{n} section", "{n} sections")}${song.author ? ` · ${song.author}` : ""}` : t("Song not found");
     }
     if (item.kind === "deck" && item.deck) {
       const deck = session.decks.find((entry) => entry.id === item.deck?.deckId);
-      return deck ? `${deck.pages.length} page${deck.pages.length === 1 ? "" : "s"}` : "Deck not found";
+      return deck ? tn(deck.pages.length, "{n} page", "{n} pages") : t("Deck not found");
     }
     if (item.kind === "bible" && item.bible) return session.translations.find((entry) => entry.id === item.bible?.translationId)?.abbreviation ?? "";
     if (item.kind === "announcement") return item.announcement?.body.split("\n")[0] ?? "";
@@ -144,7 +146,7 @@
     const parsed = parseReference(reference);
     const translation = session.translations[0];
     if (!parsed || !translation) {
-      referenceNote = "Type a reference like John 3:16 or Psalm 23.";
+      referenceNote = t("Type a reference like John 3:16 or Psalm 23.");
       return;
     }
     const book = session.books.find((entry) => entry.ord === parsed.bookOrd);
@@ -188,13 +190,13 @@
 {/if}
 
 <section class="service-desk">
-  <LibrarySidebar title="Services" icon="list" count={session.services.length} storageKey="services">
+  <LibrarySidebar title={t("Services")} icon="list" count={session.services.length} storageKey="services">
     {#snippet actions()}
-      <button type="button" class="desk-btn" title="Start a service from a template, or edit the templates" onclick={() => (templatesOpen = { id: null })}><Icon name="list" size={14} /> Templates</button>
-      <button type="button" class="desk-btn" onclick={() => void session.createService(`Service ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`)}><Icon name="plus" size={14} /> New</button>
+      <button type="button" class="desk-btn" title={t("Start a service from a template, or edit the templates")} onclick={() => (templatesOpen = { id: null })}><Icon name="list" size={14} /> {t("Templates")}</button>
+      <button type="button" class="desk-btn" onclick={() => void session.createService(`${t("Service")} ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`)}><Icon name="plus" size={14} /> {t("New")}</button>
     {/snippet}
     <div class="list">
-      {#if session.services.length === 0}<p class="empty">No services yet. Start one to plan the order.</p>{/if}
+      {#if session.services.length === 0}<p class="empty">{t("No services yet. Start one to plan the order.")}</p>{/if}
       {#each session.services as entry (entry.id)}
         <div class="svc" class:on={service?.id === entry.id}>
           <button type="button" class="row" class:on={service?.id === entry.id} onclick={() => void session.openService(entry.id)}>
@@ -202,12 +204,12 @@
             <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
           </button>
           <span class="svc-tools">
-            <button type="button" class="row-tool" aria-label="Duplicate {entry.name}" title="Duplicate" onclick={() => void session.duplicateService(entry.id)}><Icon name="copy" size={13} /></button>
+            <button type="button" class="row-tool" aria-label={t("Duplicate {name}", { name: entry.name })} title={t("Duplicate")} onclick={() => void session.duplicateService(entry.id)}><Icon name="copy" size={13} /></button>
             <button
               type="button"
               class="row-tool"
               class:armed={armedService === entry.id}
-              aria-label={armedService === entry.id ? `Confirm delete ${entry.name}` : `Delete ${entry.name}`}
+              aria-label={armedService === entry.id ? t("Confirm delete {name}", { name: entry.name }) : t("Delete {name}", { name: entry.name })}
               title={armedService === entry.id ? "Click again to delete" : "Delete"}
               onclick={() => {
                 if (armedService !== entry.id) {
@@ -218,7 +220,7 @@
                 armedService = null;
                 void session.deleteService(entry.id);
               }}
-            >{#if armedService === entry.id}Delete?{:else}<Icon name="trash" size={13} />{/if}</button>
+            >{#if armedService === entry.id}{t("Delete?")}{:else}<Icon name="trash" size={13} />{/if}</button>
           </span>
         </div>
       {/each}
@@ -228,10 +230,10 @@
   <div class="sheet">
     {#if service}
       <header class="head">
-        <input class="name" aria-label="Service name" value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
-        <button type="button" class="desk-btn ghost save-tpl" title="The service on one page: print, save as PDF or copy" onclick={() => (outlineOpen = true)}><Icon name="files" size={13} /> Outline</button>
-        <button type="button" class="desk-btn ghost save-tpl" title="Keep this service's parts and times to start the next one from" onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> Save as template</button>
-        <span class="muted">{count === 0 ? "Nothing added yet" : `${count} item${count === 1 ? "" : "s"} in ${service.sections.length} section${service.sections.length === 1 ? "" : "s"}`}</span>
+        <input class="name" aria-label={t("Service name")} value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
+        <button type="button" class="desk-btn ghost save-tpl" title={t("The service on one page: print, save as PDF or copy")} onclick={() => (outlineOpen = true)}><Icon name="files" size={13} /> {t("Outline")}</button>
+        <button type="button" class="desk-btn ghost save-tpl" title={t("Keep this service's parts and times to start the next one from")} onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> {t("Save as template")}</button>
+        <span class="muted">{count === 0 ? t("Nothing added yet") : `${tn(count, "{n} item", "{n} items")} · ${tn(service.sections.length, "{n} section", "{n} sections")}`}</span>
       </header>
 
       <div class="timeline-wrap"><ServiceTimeline {service} /></div>
@@ -240,9 +242,9 @@
         {#if count === 0 && service.sections.length === 0}
           <div class="start-guide">
             <Icon name="list" size={22} />
-            <strong>Build the running order</strong>
-            <p>Add songs, scripture, slides and announcements with the buttons below, in the order the service goes. On Sunday, Next item moves through them.</p>
-            <p class="soft">Sections like Welcome or Worship are optional; they group items under a heading.</p>
+            <strong>{t("Build the running order")}</strong>
+            <p>{t("Add songs, scripture, slides and announcements with the buttons below, in the order the service goes. On Sunday, Next item moves through them.")}</p>
+            <p class="soft">{t("Sections like Welcome or Worship are optional; they group items under a heading.")}</p>
           </div>
         {/if}
         {#each service.sections as section, sectionIndex (section.id)}
@@ -269,18 +271,18 @@
                 id="grip-section-{section.id}"
                 class="grip"
                 draggable="true"
-                aria-label="Move {section.name}: drag, or Alt+arrow keys"
-                title="Drag to move this part"
+                aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: section.name })}
+                title={t("Drag to move this part")}
                 ondragstart={(event) => { dragSection = section.id; event.dataTransfer?.setData("text/plain", section.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
                 ondragend={endDrag}
                 onkeydown={(event) => gripKey(event, (direction) => session.moveSection(section.id, direction))}
               ><Icon name="grip" size={14} /></button>
               <span class="dot" aria-hidden="true"></span>
-              <input class="section-name" aria-label="Section name" value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
-              {#if session.runningSectionId === section.id}<span class="now-tag">Now</span>{/if}
+              <input class="section-name" aria-label={t("Section name")} value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
+              {#if session.runningSectionId === section.id}<span class="now-tag">{t("Now")}</span>{/if}
               <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
               <span class="tools">
-                <button type="button" class="row-tool del" aria-label="Remove section" title="Delete this part" onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
+                <button type="button" class="row-tool del" aria-label={t("Remove section")} title={t("Delete this part")} onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
               </span>
             </header>
             {#if section.items.length === 0}
@@ -304,25 +306,25 @@
                     id="grip-item-{item.id}"
                     class="grip"
                     draggable="true"
-                    aria-label="Move {item.title}: drag, or Alt+arrow keys"
-                    title="Drag to move (into any part)"
+                    aria-label={t("Move {title}: drag, or Alt+arrow keys", { title: item.title })}
+                    title={t("Drag to move (into any part)")}
                     ondragstart={(event) => { dragItem = item.id; event.dataTransfer?.setData("text/plain", item.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
                     ondragend={endDrag}
                     onkeydown={(event) => gripKey(event, (direction) => session.moveItem(item.id, direction))}
                   ><Icon name="grip" size={14} /></button>
-                  <button type="button" class="item-main" onclick={(event) => open(item, event)} ondblclick={() => edit(item.id)} title="Click for Preview; double-click to edit">
+                  <button type="button" class="item-main" onclick={(event) => open(item, event)} ondblclick={() => edit(item.id)} title={t("Click for Preview; double-click to edit")}>
                     <ItemThumb {item} icon={kind.icon} label={kind.label} />
                     <span class="item-copy">
                       <strong>{item.title}</strong>
                       {#if item.kind === "lyric" && songOf(item)}
-                        <span class="mini-map" aria-label="Song map">
+                        <span class="mini-map" aria-label={t("Song map")}>
                           {#each songOf(item)!.sections as part (part.id)}<i style:--tone="var(--sec-{sectionTone(part)})" title={part.label}>{sectionShort(part)}</i>{/each}
                         </span>
                       {:else}
                         <em>{detail(item)}</em>
                       {/if}
                     </span>
-                    {#if live(item)}<span class="badge live-badge">Live</span>{:else if session.cursor.itemId === item.id}<span class="badge">Preview</span>{/if}
+                    {#if live(item)}<span class="badge live-badge">{t("Live")}</span>{:else if session.cursor.itemId === item.id}<span class="badge">{t("Preview")}</span>{/if}
                   </button>
                   <span class="tools">
                     {#if item.kind === "deck" && item.deck}
@@ -331,8 +333,8 @@
                         <Icon name="refresh" size={12} /> {looping ? "Stop loop" : "Loop"}
                       </button>
                     {/if}
-                    <button type="button" class="row-tool" aria-label={`Edit ${item.title}`} title="Edit" onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
-                    <button type="button" class="row-tool del" aria-label={`Remove ${item.title}`} title="Delete" onclick={() => session.removeItem(item.id)}><Icon name="trash" size={14} /></button>
+                    <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
+                    <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Delete")} onclick={() => session.removeItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>
                 </li>
               {/each}
@@ -341,7 +343,7 @@
         {/each}
 
         <form class="add-section" class:quiet={count === 0 && service.sections.length === 0} onsubmit={(event) => { event.preventDefault(); if (sectionName.trim()) session.addSection(sectionName.trim()); sectionName = ""; }}>
-          <input aria-label="New section" placeholder="Add a section" bind:value={sectionName} />
+          <input aria-label={t("New section")} placeholder={t("Add a section")} bind:value={sectionName} />
           {#each SUGGESTED.filter((name) => !service.sections.some((section) => section.name === name)).slice(0, 4) as name (name)}
             <button type="button" class="chip" onclick={() => session.addSection(name)}>{name}</button>
           {/each}
@@ -349,17 +351,17 @@
       </div>
 
       <footer class="add-bar">
-        <span class="add-label">Add to {service.sections.find((section) => section.id === session.cursor.sectionId)?.name ?? service.sections[0]?.name ?? "the service"}</span>
-        <button type="button" class="add" onclick={() => void addText()}><Icon name="pencil" size={14} /> Text</button>
-        {#each [["song", "Song", "note"], ["scripture", "Scripture", "bible"], ["slides", "Slides", "stage"], ["media", "Media", "media"], ["announcement", "Announcement", "alerts"], ["look", "Look", "studio"]] as [id, label, icon] (id)}
-          <button type="button" class="add" class:on={adding === id} aria-expanded={adding === id} onclick={() => (adding = adding === id ? null : (id as Adding))}><Icon name={icon} size={14} /> {label}</button>
+        <span class="add-label">{t("Add to {part}", { part: service.sections.find((section) => section.id === session.cursor.sectionId)?.name ?? service.sections[0]?.name ?? t("the service") })}</span>
+        <button type="button" class="add" onclick={() => void addText()}><Icon name="pencil" size={14} /> {t("Text")}</button>
+        {#each [["song", msg("Song"), "note"], ["scripture", msg("Scripture"), "bible"], ["slides", msg("Slides"), "stage"], ["media", msg("Media"), "media"], ["announcement", msg("Announcement"), "alerts"], ["look", msg("Look"), "studio"]] as [id, label, icon] (id)}
+          <button type="button" class="add" class:on={adding === id} aria-expanded={adding === id} onclick={() => (adding = adding === id ? null : (id as Adding))}><Icon name={icon} size={14} /> {t(label)}</button>
         {/each}
       </footer>
 
       {#if adding}
-        <div class="picker" role="region" aria-label="Add {adding}">
+        <div class="picker" role="region" aria-label={t("Add to the service")}>
           {#if adding === "song"}
-            <input aria-label="Find a song" placeholder="Title, author or lyrics" bind:value={songQuery} />
+            <input aria-label={t("Find a song")} placeholder={t("Title, author or lyrics")} bind:value={songQuery} />
             <div class="pick-list">
               {#each songs as song (song.id)}
                 <button type="button" onclick={() => session.addSongToService(song)}><Icon name="plus" size={13} /> <strong>{song.title || "Untitled song"}</strong><em>{song.author}</em></button>
@@ -369,16 +371,16 @@
             </div>
           {:else if adding === "scripture"}
             <form class="inline" onsubmit={(event) => { event.preventDefault(); addScripture(); }}>
-              <input aria-label="Scripture reference" placeholder="John 3:16-18, Psalm 23" bind:value={reference} />
-              <button type="submit" class="desk-btn">Add</button>
+              <input aria-label={t("Scripture reference")} placeholder={t("John 3:16-18, Psalm 23")} bind:value={reference} />
+              <button type="submit" class="desk-btn">{t("Add")}</button>
             </form>
             {#if referenceNote}<p class="empty">{referenceNote}</p>{/if}
           {:else if adding === "slides"}
             <div class="pick-list">
               {#each session.decks as deck (deck.id)}
-                <button type="button" onclick={() => void session.addDeckToService(deck.id)}><Icon name="plus" size={13} /> <strong>{deck.name}</strong><em>{deck.pages.length} pages</em></button>
+                <button type="button" onclick={() => void session.addDeckToService(deck.id)}><Icon name="plus" size={13} /> <strong>{deck.name}</strong><em>{tn(deck.pages.length, "{n} page", "{n} pages")}</em></button>
               {:else}
-                <p class="empty">No slide decks yet. Make or import one (PowerPoint too) on the Production Desk › Media › Slides.</p>
+                <p class="empty">{t("No slide decks yet. Make or import one (PowerPoint too) on the Production Desk › Media › Slides.")}</p>
               {/each}
             </div>
           {:else if adding === "media"}
@@ -386,25 +388,25 @@
               {#each session.mediaByFavorite as asset (asset.id)}
                 <button type="button" onclick={() => session.addMediaToService(asset)}><Icon name="plus" size={13} /> <strong>{asset.name}</strong><em>{asset.kind}</em></button>
               {:else}
-                <p class="empty">No pictures or videos yet. Import them in Settings › Media.</p>
+                <p class="empty">{t("No pictures or videos yet. Import them in Settings › Media.")}</p>
               {/each}
             </div>
           {:else if adding === "announcement"}
             <form class="stack" onsubmit={(event) => { event.preventDefault(); addAnnouncement(); }}>
-              <input aria-label="Small line above the heading" placeholder="Small line above (optional)" bind:value={annLabel} />
-              <input aria-label="Announcement heading" placeholder="Youth camp" bind:value={heading} />
-              <textarea aria-label="Announcement text" rows="2" placeholder="Saturday, 9am at the church hall" bind:value={body}></textarea>
-              <select aria-label="Announcement design" bind:value={annDesign}>
+              <input aria-label={t("Small line above the heading")} placeholder={t("Small line above (optional)")} bind:value={annLabel} />
+              <input aria-label={t("Announcement heading")} placeholder={t("Youth camp")} bind:value={heading} />
+              <textarea aria-label={t("Announcement text")} rows="2" placeholder={t("Saturday, 9am at the church hall")} bind:value={body}></textarea>
+              <select aria-label={t("Announcement design")} bind:value={annDesign}>
                 {#each ANNOUNCEMENT_DESIGNS as design (design.id)}<option value={design.id}>{design.name}: {design.hint.toLowerCase()}</option>{/each}
               </select>
-              <button type="submit" class="desk-btn" disabled={!heading.trim()}>Add announcement</button>
+              <button type="submit" class="desk-btn" disabled={!heading.trim()}>{t("Add announcement")}</button>
             </form>
           {:else if adding === "look"}
             <div class="pick-list">
               {#each looks as look (look.id)}
-                <button type="button" onclick={() => void session.addLookToService(restoreComposition(look))}><Icon name="plus" size={13} /> <strong>{look.name}</strong><em>Look</em></button>
+                <button type="button" onclick={() => void session.addLookToService(restoreComposition(look))}><Icon name="plus" size={13} /> <strong>{look.name}</strong><em>{t("Look")}</em></button>
               {:else}
-                <p class="empty">No saved looks yet. Design them on the Production Desk › Looks.</p>
+                <p class="empty">{t("No saved looks yet. Design them on the Production Desk › Looks.")}</p>
               {/each}
             </div>
           {/if}
@@ -413,9 +415,9 @@
     {:else}
       <div class="blank">
         <Icon name="list" size={28} />
-        <p>Plan the whole service in order: welcome, songs, the reading, the sermon, announcements.</p>
+        <p>{t("Plan the whole service in order: welcome, songs, the reading, the sermon, announcements.")}</p>
         {#if session.workspace.serviceTemplates.length}
-          <p class="from-label">Start from a template, with its parts and times in place</p>
+          <p class="from-label">{t("Start from a template, with its parts and times in place")}</p>
           <div class="from-templates">
             {#each session.workspace.serviceTemplates as template (template.id)}
               <button type="button" class="tpl-card" onclick={() => void session.createServiceFromTemplate(template.id)}>
@@ -423,13 +425,13 @@
                 <span>{template.parts.map((part) => part.name).slice(0, 4).join(" · ")}{template.parts.length > 4 ? " …" : ""}</span>
               </button>
             {/each}
-            <button type="button" class="tpl-card edit" onclick={() => (templatesOpen = { id: null })}><strong>Edit templates</strong><span>Change the parts and times</span></button>
+            <button type="button" class="tpl-card edit" onclick={() => (templatesOpen = { id: null })}><strong>{t("Edit templates")}</strong><span>{t("Change the parts and times")}</span></button>
           </div>
-          <p class="from-label">Or a blank one</p>
+          <p class="from-label">{t("Or a blank one")}</p>
         {/if}
         <form class="inline" onsubmit={(event) => { event.preventDefault(); void session.createService(newName.trim() || "Sunday Service"); newName = ""; }}>
-          <input aria-label="Service name" placeholder="Sunday Service" bind:value={newName} />
-          <button type="submit" class="desk-btn primary-soft">Start a service</button>
+          <input aria-label={t("Service name")} placeholder={t("Sunday Service")} bind:value={newName} />
+          <button type="submit" class="desk-btn primary-soft">{t("Start a service")}</button>
         </form>
       </div>
     {/if}
@@ -439,14 +441,14 @@
     <MonitorPair page="service" place={current?.title ?? ""} onstep={(direction) => void session.step(direction)} />
     <div class="next">
       <div class="next-copy">
-        <span class="kicker">Up next</span>
-        <strong>{upNext?.title ?? (!service || count === 0 ? "Nothing added yet" : "End of the service")}</strong>
+        <span class="kicker">{t("Up next")}</span>
+        <strong>{upNext?.title ?? (!service || count === 0 ? t("Nothing added yet") : t("End of the service"))}</strong>
       </div>
       <div class="item-steps">
-        <button type="button" class="desk-btn" disabled={!service} onclick={() => void session.stepItem(-1)} title="Previous item (Page Up)"><Icon name="chevron-left" size={15} /> Previous</button>
-        <button type="button" class="desk-btn primary-soft" disabled={!upNext} onclick={() => void session.stepItem(1)} title="Next item (Page Down)">Next item <Icon name="chevron-right" size={15} /></button>
+        <button type="button" class="desk-btn" disabled={!service} onclick={() => void session.stepItem(-1)} title={t("Previous item (Page Up)")}><Icon name="chevron-left" size={15} /> {t("Previous")}</button>
+        <button type="button" class="desk-btn primary-soft" disabled={!upNext} onclick={() => void session.stepItem(1)} title={t("Next item (Page Down)")}>{t("Next item")} <Icon name="chevron-right" size={15} /></button>
       </div>
-      <p class="muted">Arrows step inside an item (song sections, slide pages, verses); at the end they move on. Page Down jumps to the next item.</p>
+      <p class="muted">{t("Arrows step inside an item (song sections, slide pages, verses); at the end they move on. Page Down jumps to the next item.")}</p>
     </div>
     <MacroBar />
   </aside>

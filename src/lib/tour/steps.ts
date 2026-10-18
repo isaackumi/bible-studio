@@ -12,7 +12,7 @@ export type TourStep = {
 };
 
 const TOUR_BUTTON: TourStep = {
-  target: ['[aria-label="Show me around"]'],
+  target: ['[data-tour="tours"]'],
   title: "Lost? Come back here",
   body: "Press this button any time to take this tour again. Each page has its own.",
 };
@@ -80,7 +80,7 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
         body: "Turn on Listen and the desk follows the sermon: it finds the verse being read and puts it on Preview. Say “next verse” to move on.",
       },
       {
-        target: ['[aria-label="View"]'],
+        target: ['[data-tour="view"]'],
         title: "Make room",
         body: "Show or hide the library, the queue and the monitors. Each page remembers its own choice.",
       },

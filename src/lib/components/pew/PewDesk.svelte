@@ -34,6 +34,7 @@
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
+  import { t } from "../../i18n/core";
 
   type Mode = "scriptures" | "songs" | "sermon" | "service";
   let mode = $state<Mode>("scriptures");
@@ -68,7 +69,7 @@
     if (count > seenDetections) sideTab = "detections";
     seenDetections = count;
   });
-  let note = $state("Loading scripture…");
+  let note = $state(t("Loading scripture…"));
   let sheet = $state<"help" | "lexicon" | "type" | null>(null);
   let wrapVerses = $state(false);
   let chapterToken = 0;
@@ -194,7 +195,7 @@
     const ord = bookOrd;
     const ch = chapter;
     const token = ++chapterToken;
-    note = "Loading scripture…";
+    note = t("Loading scripture…");
     void api
       .verses(id, ord, ch)
       .then((rows) => {
@@ -202,7 +203,7 @@
         verses = rows;
         const from = start ?? 1;
         const to = end ?? from;
-        note = rows.length ? "" : "This chapter has no verses.";
+        note = rows.length ? "" : t("This chapter has no verses.");
         if (rows.some((row) => row.verse === from)) {
           const layout = session.live.preview.model.layout;
           const skipSeed = !seededChapterPreview && layout !== "black" && layout !== "empty";
@@ -214,7 +215,7 @@
       .catch(() => {
         if (token !== chapterToken) return;
         verses = [];
-        note = "Scripture could not be loaded.";
+        note = t("Scripture could not be loaded.");
       });
   });
 
@@ -419,7 +420,7 @@
   }
 
   async function ensureService(sectionName: string) {
-    if (!session.service) await session.createService("Sunday Service");
+    if (!session.service) await session.createService(t("Sunday Service"));
     if (!session.service?.sections.length) session.addSection(sectionName);
   }
 
@@ -437,10 +438,10 @@
 
   // Presenter Desk is the words desk. Slides, media and Looks live on the Production Desk.
   const modes = $derived<{ id: Mode; label: string }[]>([
-    { id: "scriptures", label: "Scriptures" },
-    { id: "songs", label: "Songs" },
-    ...(canUse("sermon") ? [{ id: "sermon" as const, label: "Sermon" }] : []),
-    { id: "service", label: "Service" },
+    { id: "scriptures", label: t("Scriptures") },
+    { id: "songs", label: t("Songs") },
+    ...(canUse("sermon") ? [{ id: "sermon" as const, label: t("Sermon") }] : []),
+    { id: "service", label: t("Service") },
   ]);
 
   // A tour started from the hub can ask for another page.
@@ -487,7 +488,7 @@
     const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
     const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
     if (!match) {
-      if (!lastSpokenRef) session.voice.message = quoteIndex ? "Hearing you. Keep reading the verse." : "Loading the Bible so a verse can be found…";
+      if (!lastSpokenRef) session.voice.message = quoteIndex ? t("Hearing you. Keep reading the verse.") : t("Loading the Bible so a verse can be found…");
       return;
     }
     const hit = match.item;
@@ -553,7 +554,7 @@
   <header class="pb-bar">
     <div class="pb-left">
       <DeskSwitcher compact />
-      <nav class="pb-modes" aria-label="Library">
+      <nav class="pb-modes" aria-label={t("Library")}>
         {#each modes as entry, index (entry.id)}
           <button
             type="button"
@@ -568,7 +569,7 @@
     </div>
     <div class="pb-actions">
       {#if !session.controlsAudience}
-        <button type="button" class="desk-btn" data-tip="Send to the audience from this window" onclick={() => session.claimAudience()}>Take control</button>
+        <button type="button" class="desk-btn" data-tip={t("Send to the audience from this window")} onclick={() => session.claimAudience()}>{t("Take control")}</button>
       {/if}
       <OutputMenu />
       <button
@@ -579,36 +580,36 @@
         data-tip={displayLive ? "On air: the audience sees Program" : programSet ? "Program is set, but the audience window is closed" : "Send Preview to Program"}
         onclick={() => session.take()}
       ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
-      <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
+      <button type="button" class="desk-btn danger" data-tip={t("Black program")} onclick={() => session.black()}>{t("BLACK")}</button>
       <span class="clear-pair">
-        <button type="button" class="desk-btn ghost" data-tip="Clear the words; the background, camera or video stays (W)" aria-label="Clear words" onclick={() => void session.clearWords()}><span class="wide-only">CLEAR </span>WORDS</button>
-        <button type="button" class="desk-btn ghost" data-tip="Clear everything back to the theme (Backspace)" onclick={() => session.clear()}>CLEAR</button>
+        <button type="button" class="desk-btn ghost" data-tip={t("Clear the words; the background, camera or video stays (W)")} aria-label={t("Clear words")} onclick={() => void session.clearWords()}><span class="wide-only">{t("CLEAR")} </span>{t("WORDS")}</button>
+        <button type="button" class="desk-btn ghost" data-tip={t("Clear everything back to the theme (Backspace)")} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
     </div>
-    <nav class="pb-tools" aria-label="Tools">
-      <ToolMenu label="View" tip="Panels, monitors and focus">
+    <nav class="pb-tools" aria-label={t("Tools")}>
+      <ToolMenu label={t("View")} tip={t("Panels, monitors and focus")} tour="view">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitemcheckbox" aria-checked={libraryVisible} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
-            <Icon name="library" size={16} /> Library
+            <Icon name="library" size={16} /> {t("Library")}
           </button>
           <button type="button" role="menuitemcheckbox" aria-checked={queueVisible} onclick={() => session.togglePanel(QUEUE_PANEL)}>
-            <Icon name="queue" size={16} /> Queue
+            <Icon name="queue" size={16} /> {t("Queue")}
           </button>
           <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}>
-            <Icon name="focus" size={16} /> Focus Preview and Program
+            <Icon name="focus" size={16} /> {t("Focus Preview and Program")}
           </button>
           <div class="menu-sep"></div>
-          <p class="menu-label">On {mode === "scriptures" ? "Scripture" : mode === "songs" ? "Songs" : "Sermon"}</p>
+          <p class="menu-label">{mode === "scriptures" ? t("On Scripture") : mode === "songs" ? t("On Songs") : t("On Sermon")}</p>
           <button type="button" role="menuitemcheckbox" aria-checked={monitors.preview} onclick={() => session.setMonitors(mode, { preview: !monitors.preview })}>
-            <Icon name="eye" size={16} /> Preview monitor
+            <Icon name="eye" size={16} /> {t("Preview monitor")}
           </button>
           <button type="button" role="menuitemcheckbox" aria-checked={monitors.program} onclick={() => session.setMonitors(mode, { program: !monitors.program })}>
-            <Icon name="cast" size={16} /> Program monitor
+            <Icon name="cast" size={16} /> {t("Program monitor")}
           </button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.resetActiveLayout(); close(); }}>
-            <Icon name="reset" size={16} /> Reset workspace
+            <Icon name="reset" size={16} /> {t("Reset workspace")}
           </button>
         {/snippet}
       </ToolMenu>
@@ -618,25 +619,25 @@
         class:on={!!session.alert}
         aria-pressed={!!session.alert}
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
-        aria-label="Alerts"
+        aria-label={t("Alerts")}
         onclick={() => (alertsOpen = true)}
       >
         {@render icon("alerts")}
       </button>
       {#if session.audio.current && (session.audio.playing || session.audio.fading)}
         <span class="now-audio">
-          <button type="button" class="now-audio-name" aria-label="Audio: {session.audio.current.name}" data-tip="Audio: playlists and the player" onclick={() => (session.audioOpen = true)}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
-          <button type="button" class="now-audio-btn" aria-label="Pause the music" data-tip="Pause" onclick={() => void session.audio.toggle()}><Icon name="square" size={12} /></button>
+          <button type="button" class="now-audio-name" aria-label={t("Audio: {name}", { name: session.audio.current.name })} data-tip={t("Audio: playlists and the player")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
+          <button type="button" class="now-audio-btn" aria-label={t("Pause the music")} data-tip={t("Pause")} onclick={() => void session.audio.toggle()}><Icon name="square" size={12} /></button>
         </span>
       {:else}
-        <button type="button" class="desk-btn icon" aria-label="Audio" data-tip="Audio: walk-in music, backing tracks, playlists" onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
+        <button type="button" class="desk-btn icon" aria-label={t("Audio")} data-tip={t("Audio: walk-in music, backing tracks, playlists")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
       {/if}
       <button
         type="button"
         class="desk-btn icon"
         class:on={session.captionsOn}
         aria-pressed={session.captionsOn}
-        aria-label="Live captions"
+        aria-label={t("Live captions")}
         data-tip={session.captionsOn ? "Captions on: click to stop. Settings › Captions for phones and languages" : "Live captions on the screen and phones"}
         onclick={() => void session.setCaptions(!session.captionsOn)}
       ><Icon name="captions" size={16} /></button>
@@ -644,23 +645,23 @@
         type="button"
         class="desk-btn icon"
         class:on={session.workspace.overlays.some((overlay) => overlay.on)}
-        aria-label="Overlays"
+        aria-label={t("Overlays")}
         data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
-      <button type="button" class="desk-btn icon help-tool" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
-      <ToolMenu label="More" tip="Displays, look, help and settings">
+      <button type="button" class="desk-btn icon help-tool" data-tour="tours" aria-label={t("Show me around")} data-tip={t("Lost? Guided tours of every page")} onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
+      <ToolMenu label={t("More")} tip={t("Displays, look, help and settings")}>
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} Displays…</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} Themes…</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} Message to the stage…</button>
-          <button type="button" role="menuitem" onclick={() => { session.macrosOpen = true; close(); }}>{@render icon("play")} Macros…</button>
-          <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} Tour this page</button>
-          <button type="button" role="menuitem" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} All guided tours…</button>
-          <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} Help</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} {t("Displays…")}</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} {t("Themes…")}</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} {t("Message to the stage…")}</button>
+          <button type="button" role="menuitem" onclick={() => { session.macrosOpen = true; close(); }}>{@render icon("play")} {t("Macros…")}</button>
+          <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} {t("Tour this page")}</button>
+          <button type="button" role="menuitem" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} {t("All guided tours…")}</button>
+          <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} {t("Help")}</button>
           <div class="menu-sep"></div>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} Settings… <span class="menu-key">⌘,</span></button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} {t("Settings…")} <span class="menu-key">⌘,</span></button>
         {/snippet}
       </ToolMenu>
     </nav>
@@ -676,7 +677,7 @@
     {#key epoch}
     <div class="pb-grid">
       {#if !libraryVisible && !focus}
-        <button type="button" class="lib-rail" aria-label="Show library" title="Show library" onclick={() => session.togglePanel(LIBRARY_PANEL)}>
+        <button type="button" class="lib-rail" aria-label={t("Show library")} title={t("Show library")} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
           <Icon name="library" size={16} />
           <span>{mode === "scriptures" ? "Scripture" : "Library"}</span>
         </button>
@@ -691,9 +692,9 @@
                   <div class="pb-split">
           <section class="pb-panel">
             <header class="pb-head">
-              <span>Live transcript</span>
+              <span>{t("Live transcript")}</span>
               {#if session.captions.lines.length}
-                <button type="button" class="quiet" title="Clear what was heard" onclick={() => session.clearCaptions()}><Icon name="close" size={14} /> Clear</button>
+                <button type="button" class="quiet" title={t("Clear what was heard")} onclick={() => session.clearCaptions()}><Icon name="close" size={14} /> {t("Clear")}</button>
               {/if}
             </header>
             <!-- What the microphone heard (never the verses on screen: those are under Scripture reading). -->
@@ -713,23 +714,23 @@
                 {@render icon(voiceActive ? "mic-off" : "mic")}
                 {session.voice.status === "starting" ? "Starting…" : voiceActive ? "Stop listening" : "Listen"}
               </button>
-              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} Find</button>
+              <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} {t("Find")}</button>
             </footer>
           </section>
           <section class="pb-panel">
             <header class="pb-head">
-              <div class="side-tabs" role="tablist" aria-label="Scripture lists">
-                <button type="button" role="tab" aria-selected={sideTab === "live"} onclick={() => (sideTab = "live")}>Gone live{#if goneCount}<em>{goneCount}</em>{/if}</button>
-                <button type="button" role="tab" aria-selected={sideTab === "detections"} onclick={() => (sideTab = "detections")}>Detections{#if detections.length}<em>{detections.length}</em>{/if}</button>
+              <div class="side-tabs" role="tablist" aria-label={t("Scripture lists")}>
+                <button type="button" role="tab" aria-selected={sideTab === "live"} onclick={() => (sideTab = "live")}>{t("Gone live")}{#if goneCount}<em>{goneCount}</em>{/if}</button>
+                <button type="button" role="tab" aria-selected={sideTab === "detections"} onclick={() => (sideTab = "detections")}>{t("Detections")}{#if detections.length}<em>{detections.length}</em>{/if}</button>
               </div>
               {#if sideTab === "detections"}
-                <button type="button" class="quiet" onclick={() => (detections = [])}><Icon name="close" size={14} /> Clear all</button>
+                <button type="button" class="quiet" onclick={() => (detections = [])}><Icon name="close" size={14} /> {t("Clear all")}</button>
               {:else}
                 <span class="side-actions">
                   {#if goneCount > pinnedCount}
-                    <button type="button" class="quiet" aria-label="Clear the gone live list" title="Clear the list (pinned passages stay)" onclick={() => session.clearGoneLive()}><Icon name="trash" size={14} /></button>
+                    <button type="button" class="quiet" aria-label={t("Clear the gone live list")} title={t("Clear the list (pinned passages stay)")} onclick={() => session.clearGoneLive()}><Icon name="trash" size={14} /></button>
                   {/if}
-                  <button type="button" class="quiet" aria-label="Open the gone live list wide" title="Wider view: the words, every verse stepped through, keyboard" onclick={() => (goneWide = true)}><Icon name="expand" size={14} /></button>
+                  <button type="button" class="quiet" aria-label={t("Open the gone live list wide")} title={t("Wider view: the words, every verse stepped through, keyboard")} onclick={() => (goneWide = true)}><Icon name="expand" size={14} /></button>
                 </span>
               {/if}
             </header>
@@ -741,7 +742,7 @@
                     <span>{hit.text}</span>
                   </button>
                 {:else}
-                  <p class="side-empty">Verses heard while listening, or found with Find, show here.</p>
+                  <p class="side-empty">{t("Verses heard while listening, or found with Find, show here.")}</p>
                 {/each}
               </div>
             {:else}
@@ -757,7 +758,7 @@
             <form class="script-bar" onsubmit={lookup}>
               <select
                 value={translationId}
-                aria-label="Translation"
+                aria-label={t("Translation")}
                 onchange={(event) => {
                   const value = event.currentTarget.value;
                   if (value === "__more") {
@@ -769,36 +770,36 @@
                 }}
               >
                 {#if session.translations.length === 0}
-                  <option value="kjv">KJV</option>
+                  <option value="kjv">{t("KJV")}</option>
                 {:else}
                   {#each session.translations as translation (translation.id)}
                     <option value={translation.id}>{translation.abbreviation}</option>
                   {/each}
                 {/if}
-                <option value="__more">More translations…</option>
+                <option value="__more">{t("More translations…")}</option>
               </select>
               {#if session.translations.length > 1}
                 <select
                   class="parallel-pick"
                   class:on={!!session.workspace.parallelTranslationId}
                   value={session.workspace.parallelTranslationId ?? ""}
-                  aria-label="Side-by-side translation"
-                  title="Show a second translation beside the first"
+                  aria-label={t("Side-by-side translation")}
+                  title={t("Show a second translation beside the first")}
                   onchange={(event) => void session.setParallelTranslation(event.currentTarget.value || null)}
                 >
-                  <option value="">One</option>
+                  <option value="">{t("One")}</option>
                   {#each session.translations.filter((entry) => entry.id !== translationId) as translation (translation.id)}
                     <option value={translation.id}>+ {translation.abbreviation}</option>
                   {/each}
                 </select>
               {/if}
-              <button type="button" class="mini" aria-label="Edit reference" onclick={() => document.querySelector<HTMLInputElement>('[aria-label="Bible search"]')?.select()}>{@render icon("book")}</button>
-              <button type="button" class="mini" class:on={wrapVerses} aria-label="Verse layout" onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
+              <button type="button" class="mini" aria-label={t("Edit reference")} onclick={() => bibleInput?.select()}>{@render icon("book")}</button>
+              <button type="button" class="mini" class:on={wrapVerses} aria-label={t("Verse layout")} onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
               <label class="bible-search">
                 <Icon name="search" size={14} />
-                <input bind:this={bibleInput} type="search" aria-label="Bible search" placeholder="John 3:16, or a book" bind:value={query} onkeydown={bibleKey} />
+                <input bind:this={bibleInput} type="search" aria-label={t("Bible search")} placeholder={t("John 3:16, or a book")} bind:value={query} onkeydown={bibleKey} />
                 {#if query}
-                  <button type="button" class="clear" aria-label="Clear Bible search" onclick={() => { query = ""; bibleInput?.focus(); }}><Icon name="close" size={12} /></button>
+                  <button type="button" class="clear" aria-label={t("Clear Bible search")} onclick={() => { query = ""; bibleInput?.focus(); }}><Icon name="close" size={12} /></button>
                 {:else}
                   <kbd aria-hidden="true">/</kbd>
                 {/if}
@@ -807,22 +808,22 @@
                 {@const current = passage()!}
                 <FavoriteStar on={session.isFavoritePassage(current)} label={current.reference} onclick={() => session.toggleFavoritePassage(current)} size={16} />
               {/if}
-              <button type="button" class="mini" aria-label="Find a verse" title="Find a verse: jn316, ps23, 3:16, words (/)" onclick={() => { finderInitial = query === passage()?.reference ? "" : query; finderOpen = true; }}><Icon name="expand" size={15} /></button>
-              <button type="button" class="mini" aria-label="Previous chapter" onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
-              <button type="button" class="mini" aria-label="Next chapter" onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
-              <button type="button" class="mini" aria-label="Hide library" title="Hide library" onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
+              <button type="button" class="mini" aria-label={t("Find a verse")} title={t("Find a verse: jn316, ps23, 3:16, words (/)")} onclick={() => { finderInitial = query === passage()?.reference ? "" : query; finderOpen = true; }}><Icon name="expand" size={15} /></button>
+              <button type="button" class="mini" aria-label={t("Previous chapter")} onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
+              <button type="button" class="mini" aria-label={t("Next chapter")} onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
+              <button type="button" class="mini" aria-label={t("Hide library")} title={t("Hide library")} onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
             </form>
             {#if session.workspace.favorites.passages.length > 0}
-              <div class="recent favorites" aria-label="Favorite passages">
-                <span><Icon name="star" size={12} /> Favorites</span>
+              <div class="recent favorites" aria-label={t("Favorite passages")}>
+                <span><Icon name="star" size={12} /> {t("Favorites")}</span>
                 {#each session.workspace.favorites.passages.slice(0, 12) as item (`${item.bookOrd}:${item.chapter}:${item.startVerse}-${item.endVerse}`)}
                   <button type="button" class:on={passage()?.reference === item.reference} onclick={() => openRecent(item)}>{item.reference}</button>
                 {/each}
               </div>
             {/if}
             {#if session.workspace.recent.length > 0}
-              <div class="recent" aria-label="Recent passages">
-                <span>Recent</span>
+              <div class="recent" aria-label={t("Recent passages")}>
+                <span>{t("Recent")}</span>
                 {#each session.workspace.recent.slice(0, 6) as item (`${item.translationId}:${item.reference}`)}
                   <button type="button" class:on={passage()?.reference === item.reference} onclick={() => openRecent(item)}>{item.reference}</button>
                 {/each}
@@ -856,7 +857,7 @@
               {#if showReading}
                 <Pane defaultSize={showPreview ? frozen.stageSplit : 100} minSize={20} order={1}>
                   <section class="pb-panel">
-                    <header class="pb-head"><span class="kicker plain">Scripture reading</span></header>
+                    <header class="pb-head"><span class="kicker plain">{t("Scripture reading")}</span></header>
           <div class="pb-body display">
             {#if mode === "scriptures"}
               <article class="reading">
@@ -874,7 +875,7 @@
               {#if showPreview}
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
-                  <header class="pb-head"><span class="kicker">Preview</span></header>
+                  <header class="pb-head"><span class="kicker">{t("Preview")}</span></header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
                 </section>
               </Pane>
@@ -891,11 +892,11 @@
               <Pane defaultSize={showQueue ? frozen.programSplit : 100} minSize={showQueue ? 28 : 20} order={1}>
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head">
-                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}Program</span>
+                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
                     <button
                       type="button"
                       class="style-name"
-                      data-tip="Font, color, and layout. Preview only until you press LIVE."
+                      data-tip={t("Font, color, and layout. Preview only until you press LIVE.")}
                       onclick={() => (sheet = sheet === "type" ? null : "type")}
                     >
                       {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
@@ -905,10 +906,10 @@
                   <TimerControls compact />
                   <VideoControls />
                   <footer class="output-tools">
-                    <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} Lexicon</button>
+                    <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} {t("Lexicon")}</button>
                     <span class="steppers">
-                      <button type="button" aria-label="Previous" onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
-                      <button type="button" aria-label="Next" onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
+                      <button type="button" aria-label={t("Previous")} onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
+                      <button type="button" aria-label={t("Next")} onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
                     </span>
                   </footer>
                 </section>
@@ -919,10 +920,10 @@
                 <Pane defaultSize={showProgram ? 100 - frozen.programSplit : 100} minSize={18} order={2}>
                   <section class="pb-panel">
                     <header class="pb-head">
-                      <span>Queue</span>
+                      <span>{t("Queue")}</span>
                       <span class="queue-actions">
-                        <button type="button" class="quiet" onclick={() => void queuePassage()}><Icon name="plus" size={14} /> Add</button>
-                        <button type="button" class="quiet" onclick={() => session.clearQueue()}><Icon name="close" size={14} /> Clear all</button>
+                        <button type="button" class="quiet" onclick={() => void queuePassage()}><Icon name="plus" size={14} /> {t("Add")}</button>
+                        <button type="button" class="quiet" onclick={() => session.clearQueue()}><Icon name="close" size={14} /> {t("Clear all")}</button>
                       </span>
                     </header>
                     <div class="pb-body queue">
@@ -946,14 +947,14 @@
     <div class="sheet" role="dialog" aria-label={sheet}>
       <header>
         <strong>{sheet === "help" ? "How this desk works" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
-        <button type="button" aria-label="Close" onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
+        <button type="button" aria-label={t("Close")} onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
       </header>
       {#if sheet === "help"}
-        <p>Click a verse to put it on Preview. Shift-click a second verse to select a range.</p>
-        <p>LIVE copies Preview onto Program. BLACK and CLEAR change Program only.</p>
-        <p>Search a reference such as John 3:16, or a phrase such as “in the beginning”.</p>
-        <p>Listen matches spoken scripture on Preview. It never takes Program by itself.</p>
-        <p>F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.</p>
+        <p>{t("Click a verse to put it on Preview. Shift-click a second verse to select a range.")}</p>
+        <p>{t("LIVE copies Preview onto Program. BLACK and CLEAR change Program only.")}</p>
+        <p>{t("Search a reference such as John 3:16, or a phrase such as “in the beginning”.")}</p>
+        <p>{t("Listen matches spoken scripture on Preview. It never takes Program by itself.")}</p>
+        <p>{t("F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.")}</p>
       {:else if sheet === "type"}
         <OutputType />
       {:else}
@@ -984,7 +985,7 @@
   <AudioDialog onclose={() => (session.audioOpen = false)} />
 {/if}
 {#if goneWide}
-  <DeskDialog title="Scriptures that have gone live" wide onclose={() => (goneWide = false)}>
+  <DeskDialog title={t("Scriptures that have gone live")} wide onclose={() => (goneWide = false)}>
     <GoneLiveList wide onpicked={() => (goneWide = false)} />
   </DeskDialog>
 {/if}

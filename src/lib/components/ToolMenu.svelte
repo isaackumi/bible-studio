@@ -8,6 +8,7 @@
     on = false,
     className = "desk-btn icon",
     align = "right",
+    tour,
     trigger,
     children,
   }: {
@@ -17,6 +18,8 @@
     className?: string;
     /** Which edge of the button the menu lines up with ("left" for buttons near the left edge). */
     align?: "left" | "right";
+    /** A fixed name for guided tours to find this button by, whatever the language. */
+    tour?: string;
     trigger: Snippet;
     children: Snippet<[() => void]>;
   } = $props();
@@ -52,6 +55,7 @@
     aria-label={label}
     aria-haspopup="menu"
     aria-expanded={open}
+    data-tour={tour}
     data-tip={open ? undefined : tip}
     onclick={() => (open = !open)}
   >{@render trigger()}</button>

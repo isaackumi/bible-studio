@@ -6,7 +6,7 @@ describe("screen tour", () => {
     for (const tour of Object.values(TOURS)) {
       expect(tour.steps.length).toBeGreaterThan(4);
       expect(tour.steps[0]!.target).toBeUndefined();
-      expect(tour.steps.at(-1)!.target).toEqual(['[aria-label="Show me around"]']);
+      expect(tour.steps.at(-1)!.target).toEqual(['[data-tour="tours"]']);
       for (const step of tour.steps) expect(step.body.length).toBeLessThan(200);
     }
   });
