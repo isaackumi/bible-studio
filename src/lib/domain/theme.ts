@@ -301,6 +301,7 @@ export function defaultWorkspace(): Workspace {
     themeId: DEFAULT_THEME_ID,
     lastServiceId: null,
     recent: [],
+    goneLive: [],
     cursor: emptyCursor(),
     shortcuts: null,
     appearance: defaultAppearance(),

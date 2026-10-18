@@ -407,6 +407,8 @@ export type Workspace = {
   themeId: string;
   lastServiceId: string | null;
   recent: RecentPassage[];
+  /** Scriptures that have gone live, in order, to send back with one click. */
+  goneLive: import("./gone-live").GoneLive[];
   cursor: Cursor;
   shortcuts: ShortcutMap | null;
   appearance: AppearanceSettings;

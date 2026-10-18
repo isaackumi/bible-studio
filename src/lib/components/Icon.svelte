@@ -55,6 +55,8 @@
   import Palette from "@lucide/svelte/icons/palette";
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import Plus from "@lucide/svelte/icons/plus";
+  import Pin from "@lucide/svelte/icons/pin";
+  import PinOff from "@lucide/svelte/icons/pin-off";
   import Presentation from "@lucide/svelte/icons/presentation";
   import Globe from "@lucide/svelte/icons/globe";
   import Sparkles from "@lucide/svelte/icons/sparkles";
@@ -115,6 +117,8 @@
     key: KeyRound,
     close: X,
     plus: Plus,
+    pin: Pin,
+    "pin-off": PinOff,
     minus: Minus,
     play: Play,
     scissors: Scissors,

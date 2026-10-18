@@ -27,7 +27,7 @@ function ids(value: unknown): string[] {
   return [...new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length < 300))].slice(0, LIMIT);
 }
 
-function passage(value: unknown): BibleItem | null {
+export function sanitizePassage(value: unknown): BibleItem | null {
   const record = value && typeof value === "object" ? (value as Partial<BibleItem>) : null;
   if (!record || typeof record.translationId !== "string" || typeof record.reference !== "string") return null;
   const numbers = [record.bookOrd, record.chapter, record.startVerse, record.endVerse].map(Number);
@@ -42,7 +42,7 @@ export function sanitizeFavorites(value: unknown): Favorites {
   for (const kind of ID_KINDS) result[kind] = ids(record[kind]);
   const seen = new Set<string>();
   result.passages = (Array.isArray(record.passages) ? record.passages : [])
-    .map(passage)
+    .map(sanitizePassage)
     .filter((entry): entry is BibleItem => entry !== null && !seen.has(passageKey(entry)) && !!seen.add(passageKey(entry)))
     .slice(0, LIMIT);
   return result;

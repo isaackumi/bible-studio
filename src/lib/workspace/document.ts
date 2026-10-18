@@ -18,6 +18,7 @@ import { sanitizeSongUses } from "../domain/song-usage";
 import { sanitizeStageLayout } from "../display/channel";
 import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 import { sanitizeFavorites } from "../domain/favorites";
+import { sanitizeGoneLive } from "../domain/gone-live";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -90,6 +91,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     themeId: typeof value.themeId === "string" ? value.themeId : base.themeId,
     lastServiceId: typeof value.lastServiceId === "string" ? value.lastServiceId : null,
     recent: Array.isArray(value.recent) ? value.recent : [],
+    goneLive: sanitizeGoneLive(value.goneLive),
     cursor: cursor(value.cursor, base.cursor),
     shortcuts: shortcuts(value.shortcuts),
     appearance: appearance(value.appearance, base.appearance),

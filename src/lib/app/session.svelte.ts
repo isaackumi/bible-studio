@@ -102,6 +102,7 @@ import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { controllerDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
+import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
@@ -296,6 +297,7 @@ class Session {
     // An active alert, and the overlays that are on, ride on every Program frame.
     const model = this.withScreenOverlays(withAlert(next.program.model, this.alert));
     this.#live = model === next.program.model ? next : { ...next, program: { ...next.program, model } };
+    this.noteGoneLive(next.program.model);
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
@@ -2095,6 +2097,83 @@ class Session {
     else if (message.kind === "stats") this.ndi = { ...this.ndi, connections: Number(message.connections) || 0 };
     else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? "NDI stopped." };
     else if (message.kind === "end" && this.ndi.status !== "error") this.ndi = { ...this.ndi, status: "off", connections: 0 };
+  };
+
+  /** The passage on Program now (goneLiveKey), so each passage is noted once per time it goes up. */
+  private programPassageKey: string | null = null;
+
+  /** The scripture a Program frame shows: plain scripture, or a look's scripture region. */
+  private programPassage(model: PresentationModel): BibleItem | null {
+    const words =
+      model.layout === "scripture"
+        ? model
+        : model.layout === "composition"
+          ? model.layers?.find((layer) => layer.opacity > 0 && layer.model.layout === "scripture")?.model
+          : undefined;
+    if (!words?.reference) return null;
+    const preview = this.previewBible;
+    if (preview && preview.reference === words.reference) return preview;
+    const parsed = parseReference(words.reference);
+    if (!parsed?.startVerse) return null;
+    const translation =
+      this.translations.find((entry) => entry.name === words.attribution || entry.abbreviation === words.attribution)?.id ??
+      preview?.translationId ??
+      this.workspace.recent[0]?.translationId ??
+      "kjv";
+    return {
+      translationId: translation,
+      bookOrd: parsed.bookOrd,
+      chapter: parsed.chapter,
+      startVerse: parsed.startVerse,
+      endVerse: parsed.endVerse ?? parsed.startVerse,
+      reference: words.reference,
+    };
+  }
+
+  /** Keep every scripture that reaches Program (GO LIVE, cut, verse steps, voice, the phone). */
+  private noteGoneLive = (model: PresentationModel) => {
+    const passage = this.programPassage(model);
+    const key = passage ? goneLiveKey(passage) : null;
+    if (key === this.programPassageKey) return;
+    this.programPassageKey = key;
+    if (!passage) return;
+    this.workspace = { ...this.workspace, goneLive: recordGoneLive(this.workspace.goneLive, passage, Date.now()) };
+    this.persistSoon();
+  };
+
+  /** Send a passage straight to Program (no Preview step): the pastor went back to it. */
+  goLivePassage = async (passage: BibleItem) => {
+    if (!this.desktop() && !this.controlsAudience) {
+      this.message = "This window is not sending to the audience.";
+      return;
+    }
+    const model = await this.modelFor({ id: "gone-live", kind: "bible", title: passage.reference, bible: passage });
+    if (model.lines.length === 0) {
+      this.message = `${passage.reference} could not be found in this translation.`;
+      return;
+    }
+    if (this.deckLoop) this.stopDeckLoop();
+    this.lookOnProgram = null;
+    this.live = replaceProgramModel(this.live, model, "fade");
+    await this.pushProgram();
+    this.message = `${passage.reference} is live.`;
+  };
+
+  pinGoneLive = (key: string, pinned: boolean) => {
+    this.workspace = { ...this.workspace, goneLive: pinGoneLive(this.workspace.goneLive, key, pinned) };
+    this.persistSoon();
+  };
+
+  removeGoneLive = (key: string, removed: boolean) => {
+    this.workspace = { ...this.workspace, goneLive: removeGoneLive(this.workspace.goneLive, key, removed) };
+    this.persistSoon();
+  };
+
+  /** Empty the list; pinned passages stay. */
+  clearGoneLive = () => {
+    this.workspace = { ...this.workspace, goneLive: clearGoneLive(this.workspace.goneLive) };
+    this.persistSoon();
+    this.message = "Gone live list cleared. Pinned passages stay.";
   };
 
   /** NDI key output: only the words on Program, on a transparent picture, to key over cameras. */
