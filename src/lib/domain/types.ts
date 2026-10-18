@@ -472,6 +472,8 @@ export type Workspace = {
   countdownSize: number;
   /** NDI Program carries the audience window's sound (videos, music) as well as the picture. */
   ndiAudio: boolean;
+  /** OBS or vMix on this computer or the network, driven from the desk. */
+  switcher: import("../integrations/switcher").SwitcherSettings;
   /** Beeps as a countdown runs out, on the operator's computer only. */
   timerSounds: import("./timer-cues").TimerSounds;
   /** Service templates: the usual parts of a service with their times. */

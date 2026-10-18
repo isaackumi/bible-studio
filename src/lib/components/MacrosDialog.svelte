@@ -123,6 +123,20 @@
                   </select>
                 {:else if step.kind === "stage-message"}
                   <input class="text" aria-label={t("Stage message")} maxlength="140" placeholder={t("Empty clears it")} value={step.text} onchange={(event) => setStep(index, { kind: "stage-message", text: event.currentTarget.value })} />
+                {:else if step.kind === "switcher"}
+                  <select aria-label={t("Production app action")} value={step.action} onchange={(event) => setStep(index, { ...step, action: event.currentTarget.value as typeof step.action })}>
+                    <option value="scene">{t("Scene on air")}</option><option value="stream-start">{t("Start streaming")}</option><option value="stream-stop">{t("Stop streaming")}</option><option value="record-start">{t("Start recording")}</option><option value="record-stop">{t("Stop recording")}</option>
+                  </select>
+                  {#if step.action === "scene"}
+                    {#if session.switcherState.scenes.length}
+                      <select aria-label={t("Scene")} value={step.scene} onchange={(event) => setStep(index, { ...step, scene: event.currentTarget.value })}>
+                        {#if !session.switcherState.scenes.includes(step.scene)}<option value={step.scene}>{step.scene || t("Pick a scene")}</option>{/if}
+                        {#each session.switcherState.scenes as scene (scene)}<option value={scene}>{scene}</option>{/each}
+                      </select>
+                    {:else}
+                      <input class="text" aria-label={t("Scene")} placeholder={t("Scene name, as in the app")} value={step.scene} onchange={(event) => setStep(index, { ...step, scene: event.currentTarget.value })} />
+                    {/if}
+                  {/if}
                 {/if}
               </span>
               <button type="button" class="del" aria-label={t("Delete step {n}", { n: index + 1 })} title={t("Delete this step")} onclick={() => save({ steps: selected.steps.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>

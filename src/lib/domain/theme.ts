@@ -1,4 +1,5 @@
 import { defaultTimerSounds } from "./timer-cues";
+import { defaultSwitcher } from "../integrations/switcher";
 import { emptyTourProgress } from "../tour/steps";
 import { displayWash, motionById } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
@@ -328,6 +329,7 @@ export function defaultWorkspace(): Workspace {
     captions: defaultCaptionSettings(),
     countdownSize: 220,
     ndiAudio: true,
+    switcher: defaultSwitcher(),
     timerSounds: defaultTimerSounds(),
     serviceTemplates: defaultTemplates(),
     recentSongs: [],

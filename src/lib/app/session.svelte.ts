@@ -3,6 +3,7 @@ import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
+import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
@@ -456,6 +457,7 @@ class Session {
       }
       this.ready = true;
       this.booted = true;
+      if (this.workspace.switcher.kind !== "none" && this.workspace.switcher.autoConnect) void this.connectSwitcher();
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
@@ -733,6 +735,16 @@ class Session {
       case "stage-message":
         this.sendStageMessage(step.text);
         return;
+      case "switcher": {
+        const done =
+          step.action === "scene"
+            ? await this.switchScene(step.scene)
+            : step.action.startsWith("stream")
+              ? await this.setSwitcherStreaming(step.action === "stream-start")
+              : await this.setSwitcherRecording(step.action === "record-start");
+        if (!done) throw new Error(this.message);
+        return;
+      }
       case "wait":
         await new Promise((resolve) => setTimeout(resolve, step.seconds * 1000));
         return;
@@ -2973,6 +2985,67 @@ class Session {
       this.ndi = { ...this.ndi, status: "error", message: error instanceof Error ? error.message : String(error) };
     }
   };
+
+  // Production apps (OBS, vMix): connect, follow their state, and press their buttons.
+  switcherState = $state<SwitcherState>(idleSwitcher());
+  private switcherClient: Switcher | null = null;
+
+  connectSwitcher = async (settings?: Partial<SwitcherSettings>) => {
+    if (settings) {
+      this.workspace = { ...this.workspace, switcher: sanitizeSwitcher({ ...this.workspace.switcher, ...settings }) };
+      this.persistSoon();
+    }
+    this.switcherClient?.close();
+    this.switcherClient = null;
+    const config = this.workspace.switcher;
+    if (config.kind === "none") {
+      this.switcherState = idleSwitcher();
+      return;
+    }
+    const onState = (patch: Partial<SwitcherState>) => (this.switcherState = { ...this.switcherState, ...patch });
+    const client: Switcher =
+      config.kind === "obs"
+        ? new ObsSwitcher(config, onState)
+        : new VmixSwitcher(config, onState, (host, port, query) =>
+            this.desktop() ? invoke<string>("vmix_get", { host, port, query }) : Promise.reject(new Error(t("vMix control works in the desktop app."))),
+          );
+    this.switcherClient = client;
+    try {
+      await client.connect();
+    } catch {
+      // The state already says what went wrong.
+    }
+  };
+
+  setSwitcherAutoConnect = (on: boolean) => {
+    this.workspace = { ...this.workspace, switcher: { ...this.workspace.switcher, autoConnect: on } };
+    this.persistSoon();
+  };
+
+  disconnectSwitcher = () => {
+    this.switcherClient?.close();
+    this.switcherClient = null;
+    this.switcherState = idleSwitcher();
+  };
+
+  private switcherDo = async (run: (client: Switcher) => Promise<void>) => {
+    const client = this.switcherClient;
+    if (!client || this.switcherState.status !== "on") {
+      this.message = t("Connect OBS or vMix first: Settings › Production apps.");
+      return false;
+    }
+    try {
+      await run(client);
+      return true;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : String(error);
+      return false;
+    }
+  };
+
+  switchScene = (name: string) => this.switcherDo((client) => client.setProgram(name));
+  setSwitcherStreaming = (on: boolean) => this.switcherDo((client) => client.setStreaming(on));
+  setSwitcherRecording = (on: boolean) => this.switcherDo((client) => client.setRecording(on));
 
   /** Sound with the NDI picture; a running sender restarts to take the change. */
   setNdiAudio = async (on: boolean) => {

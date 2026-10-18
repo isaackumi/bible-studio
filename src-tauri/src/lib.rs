@@ -547,6 +547,50 @@ async fn ai_post(url: String, headers: std::collections::HashMap<String, String>
     .map_err(|error| error.to_string())?
 }
 
+/// True for a vMix address the desk may call: this computer or the church's own network
+/// (10.x, 172.16–31.x, 192.168.x, *.local, a bare machine name). Never the internet.
+fn lan_host_allowed(host: &str) -> bool {
+    let host = host.trim().trim_start_matches('[').trim_end_matches(']').to_ascii_lowercase();
+    if host == "::1" || host == "localhost" {
+        return true;
+    }
+    if host.is_empty() || host.contains(['/', '@', ':', '?', '#', ' ', '\\']) {
+        return false;
+    }
+    if host.ends_with(".local") {
+        return true;
+    }
+    if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+        return ip.is_private() || ip.is_loopback() || ip.is_link_local();
+    }
+    // A plain machine name on the network ("vmix-pc"), not a domain on the internet.
+    !host.contains('.') && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Ask vMix's Web API (it allows no browser pages, so the desk asks through here). `query` is
+/// empty for the state XML, or "Function=…&Input=…" for an action. The reply comes back as text.
+#[tauri::command]
+async fn vmix_get(host: String, port: u16, query: String) -> Result<String, String> {
+    if !lan_host_allowed(&host) {
+        return Err("vMix must be on this computer or the church network.".into());
+    }
+    if query.chars().any(|c| c.is_control() || c == '#') || query.len() > 300 {
+        return Err("That vMix request is not allowed.".into());
+    }
+    let url = if query.is_empty() { format!("http://{host}:{port}/api/") } else { format!("http://{host}:{port}/api/?{query}") };
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .timeout_global(Some(std::time::Duration::from_secs(3)))
+            .build()
+            .into();
+        let mut response = agent.get(&url).call().map_err(|error| format!("vMix could not be reached. {error}"))?;
+        response.body_mut().read_to_string().map_err(|error| format!("vMix sent an unreadable reply. {error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -619,6 +663,7 @@ pub fn run() {
             start_noise_test,
             start_ndi,
             stop_ndi,
+            vmix_get,
             start_ndi_key,
             stop_ndi_key,
             ndi_key_words,
@@ -674,5 +719,20 @@ mod backup_tests {
         assert_eq!(contents, "{\"day\":23}");
         assert!(backup_write(folder.clone(), "../escape.json".into(), "x".into()).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod vmix_tests {
+    use super::lan_host_allowed;
+
+    #[test]
+    fn vmix_stays_on_the_church_network() {
+        for host in ["localhost", "127.0.0.1", "::1", "[::1]", "192.168.1.20", "10.0.0.5", "172.20.1.2", "vmix-pc", "VMIX.local"] {
+            assert!(lan_host_allowed(host), "{host} should be allowed");
+        }
+        for host in ["", "8.8.8.8", "example.com", "evil.com/x", "user@192.168.1.2", "192.168.1.2:80", "172.40.1.1"] {
+            assert!(!lan_host_allowed(host), "{host} should be refused");
+        }
     }
 }

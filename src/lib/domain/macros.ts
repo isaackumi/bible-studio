@@ -14,7 +14,12 @@ export type MacroStep =
   | { kind: "countdown"; mode: "full" | "overlay-on" | "overlay-off" }
   | { kind: "captions"; on: boolean }
   | { kind: "stage-message"; text: string }
-  | { kind: "wait"; seconds: number };
+  | { kind: "wait"; seconds: number }
+  /** The production app (OBS, vMix): a scene or input on air, or its stream and recording. */
+  | { kind: "switcher"; action: SwitcherAction; scene: string };
+
+export type SwitcherAction = "scene" | "stream-start" | "stream-stop" | "record-start" | "record-stop";
+const SWITCHER_ACTIONS: SwitcherAction[] = ["scene", "stream-start", "stream-stop", "record-start", "record-stop"];
 
 export type Macro = { id: string; name: string; steps: MacroStep[] };
 
@@ -29,6 +34,7 @@ export const STEP_KINDS: Array<{ kind: MacroStep["kind"]; label: string; make: (
   { kind: "captions", label: msg("Captions on or off"), make: () => ({ kind: "captions", on: true }) },
   { kind: "stage-message", label: msg("Message to the stage"), make: () => ({ kind: "stage-message", text: "You're on" }) },
   { kind: "wait", label: msg("Wait"), make: () => ({ kind: "wait", seconds: 2 }) },
+  { kind: "switcher", label: msg("OBS or vMix: scene, stream, record"), make: () => ({ kind: "switcher", action: "scene", scene: "" }) },
 ];
 
 // The screen actions, named for the scanner that checks every line has its translation.
@@ -86,6 +92,12 @@ function cleanStep(value: unknown): MacroStep | null {
       return { kind: "stage-message", text: typeof step.text === "string" ? step.text.slice(0, 140) : "" };
     case "wait":
       return { kind: "wait", seconds: seconds(step.seconds, 2) };
+    case "switcher":
+      return {
+        kind: "switcher",
+        action: SWITCHER_ACTIONS.includes(step.action as SwitcherAction) ? (step.action as SwitcherAction) : "scene",
+        scene: typeof step.scene === "string" ? step.scene.slice(0, 120) : "",
+      };
     default:
       return null;
   }
@@ -129,5 +141,9 @@ export function describeStep(step: MacroStep, names: { playlist: (id: string) =>
       return step.text ? t("Stage: “{text}”", { text: step.text }) : t("Clear the stage message");
     case "wait":
       return t("Wait {seconds} s", { seconds: step.seconds });
+    case "switcher":
+      return step.action === "scene"
+        ? t("Production app: put “{scene}” on air", { scene: step.scene || "…" })
+        : { "stream-start": t("Production app: start streaming"), "stream-stop": t("Production app: stop streaming"), "record-start": t("Production app: start recording"), "record-stop": t("Production app: stop recording") }[step.action];
   }
 }

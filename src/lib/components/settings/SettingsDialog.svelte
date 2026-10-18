@@ -1,5 +1,6 @@
 <script lang="ts">
   import StageLinks from "./StageLinks.svelte";
+  import SwitcherSettings from "./SwitcherSettings.svelte";
   import CaptionsSettings from "./CaptionsSettings.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
@@ -41,6 +42,7 @@
     | "stage"
     | "captions"
     | "remote"
+    | "switcher"
     | "bible"
     | "lyrics"
     | "media"
@@ -100,6 +102,7 @@
       label: msg("Devices"),
       items: [
         { id: "audio", title: msg("Sound & voice"), icon: "audio", color: "#3e63dd", about: msg("Microphone, listening and voice commands."), keywords: "microphone voice speech listen detection" },
+        { id: "switcher", title: msg("Production apps"), icon: "obs", color: "#c2410c", about: msg("Drive OBS or vMix from the desk: scenes, streaming, recording."), keywords: "obs vmix websocket stream record scene switcher live production youtube facebook" },
         { id: "remote", title: msg("Phone remote"), icon: "phone", color: "#30a46c", about: msg("Pair a phone as a controller. It is never a display."), keywords: "phone tablet pair qr lan" },
       ],
     },
@@ -988,6 +991,8 @@
           <p class="note">{t("Click a key, then press the new one. Esc cancels. Tab and Enter stay for typing and moving around.")}</p>
           {#if session.workspace.shortcuts}<button type="button" class="btn" onclick={() => { session.resetShortcuts(); keyNote = ""; }}>{t("Reset to the usual keys")}</button>{/if}
         </div>
+      {:else if section === "switcher"}
+        <SwitcherSettings />
       {:else if section === "remote"}
         {#if session.entitled("phone-remote")}
           <RemotePanel />

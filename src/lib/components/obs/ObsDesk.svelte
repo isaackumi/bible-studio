@@ -36,6 +36,7 @@
   import Icon from "../Icon.svelte";
   import OutputMenu from "../OutputMenu.svelte";
   import ToolMenu from "../ToolMenu.svelte";
+  import SwitcherMenu from "../SwitcherMenu.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { dockShare, mergeProductionDocks, mergeProductionRows, mergeProductionStage } from "../../workspace/production";
@@ -435,6 +436,7 @@
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
       <button type="button" class="desk-btn icon" data-tour="tours" aria-label={t("Show me around")} data-tip={t("Lost? Guided tours of every page")} onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
+      <SwitcherMenu />
       <ToolMenu label={t("More")} tip={t("Displays, look and settings")}>
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
