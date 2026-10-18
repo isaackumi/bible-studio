@@ -56,3 +56,27 @@ export function sanitizeSongUses(value: unknown): SongUse[] {
     .slice(0, MAX_USES)
     .map((entry) => ({ songId: entry.songId, title: String(entry.title ?? ""), author: String(entry.author ?? ""), ccli: String(entry.ccli ?? "").replace(/\D/g, ""), date: entry.date }));
 }
+
+/** Songs most recently shown to the congregation, newest first (each song once). */
+export function recentlyUsedIds(uses: SongUse[], limit = 30): string[] {
+  const seen = new Set<string>();
+  const ordered = [...uses].sort((a, b) => b.date.localeCompare(a.date));
+  for (const use of ordered) {
+    seen.add(use.songId);
+    if (seen.size >= limit) break;
+  }
+  return [...seen];
+}
+
+/** Songs sung on the most days since `from` (YYYY-MM-DD), with how many. Ties: the more recent first. */
+export function mostUsed(uses: SongUse[], from: string, limit = 20): Array<{ songId: string; times: number }> {
+  return usageReport(uses, from, "9999-12-31")
+    .sort((a, b) => b.times - a.times || b.last.localeCompare(a.last))
+    .slice(0, limit)
+    .map((row) => ({ songId: row.songId, times: row.times }));
+}
+
+/** The day `days` before `now`, as YYYY-MM-DD. */
+export function daysAgo(days: number, now = new Date()): string {
+  return day(new Date(now.getTime() - days * 86_400_000));
+}

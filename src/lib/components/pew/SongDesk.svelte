@@ -10,7 +10,7 @@
   import { favoritesFirst } from "../../domain/favorites";
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
-  import SearchField from "./SearchField.svelte";
+  import SongFinder from "./SongFinder.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import ToolMenu from "../ToolMenu.svelte";
 
@@ -19,7 +19,8 @@
 
   type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; isNew: boolean };
 
-  let query = $state("");
+  /** The song search window. */
+  let finding = $state(false);
   /** null: All songs. "": Unfiled. Otherwise a folder name. */
   let folder = $state<string | null>(null);
   let selectedId = $state<string | null>(null);
@@ -57,52 +58,38 @@
     if (ok) folder = pack.folder;
   }
   const unfiled = $derived(session.songs.filter((song) => !cleanFolder(song.folder)).length);
-  /** The "Recent" view: songs put on Preview this session, newest first. */
-  const RECENT = "\u0000recent";
-  /** The "Favorites" view: starred songs. */
-  const FAVORITES = "\u0000favorites";
-  const starred = $derived(session.songs.filter((song) => session.isFavorite("songs", song.id)));
-  const recent = $derived(
-    [...new Set(session.recentSongs.map((entry) => entry.songId))]
-      .map((id) => session.songs.find((song) => song.id === id))
-      .filter((song): song is Song => !!song),
-  );
+  /** Ready-made lists (favorites, recently used, most sung, in this service) are "\u0000list:<id>". */
+  const LIST = "\u0000list:";
+  const lists = $derived(session.songLists);
+  /** Favorites and Recently used always show; the others once they have songs. */
+  const shownLists = $derived(lists.filter((list) => list.id !== "all" && (list.id === "favorites" || list.id === "recent" || list.songs.length > 0)));
+  const openList = $derived(folder?.startsWith(LIST) ? lists.find((list) => `${LIST}${list.id}` === folder) ?? null : null);
   const visible = $derived(
-    favoritesFirst(
-      folder === RECENT
-        ? recent.filter((song) => filterSongs([song], null, query).length > 0)
-        : folder === FAVORITES
-          ? filterSongs(starred, null, query)
-          : folder === ""
-            ? filterSongs(session.songs.filter((song) => !cleanFolder(song.folder)), null, query)
-            : filterSongs(session.songs, folder, query),
-      (song) => session.isFavorite("songs", song.id),
-    ),
+    openList
+      ? openList.id === "recent" || openList.id === "most" || openList.id === "service"
+        ? openList.songs
+        : favoritesFirst(openList.songs, (song) => session.isFavorite("songs", song.id))
+      : favoritesFirst(
+          folder === "" ? session.songs.filter((song) => !cleanFolder(song.folder)) : filterSongs(session.songs, folder, ""),
+          (song) => session.isFavorite("songs", song.id),
+        ),
   );
   /** Where new songs and imports go: the open folder, or none. */
-  const targetFolder = $derived(folder && folder !== RECENT && folder !== FAVORITES ? folder : "");
+  const targetFolder = $derived(folder && !folder.startsWith(LIST) ? folder : "");
 
-  /** First lyric line, or the line that matches the search. */
+  /** First lyric line. */
   function snippet(song: Song): string {
-    const needle = query.trim().toLowerCase();
-    const lines = song.sections.flatMap((section) => section.lines).map((line) => line.trim()).filter(Boolean);
-    return (needle ? lines.find((line) => line.toLowerCase().includes(needle)) : null) ?? lines[0] ?? "";
+    return song.sections.flatMap((section) => section.lines).map((line) => line.trim()).find(Boolean) ?? "";
   }
 
-  function navigate(key: "up" | "down" | "enter") {
-    if (visible.length === 0) return;
-    const at = visible.findIndex((song) => song.id === selectedId);
-    if (key === "enter") {
-      const song = at >= 0 ? visible[at]! : visible[0]!;
-      pick(song);
-      previewOnly = true;
-      if (song.sections[0]) show(song, song.sections[0].id);
-      return;
-    }
-    const next = at < 0 ? 0 : Math.min(visible.length - 1, Math.max(0, at + (key === "down" ? 1 : -1)));
-    pick(visible[next]!);
-    requestAnimationFrame(() => document.querySelector(".songs .song.on")?.scrollIntoView({ block: "nearest" }));
-  }
+  // While Songs is open, the desk's Find key ("/") opens the song search.
+  $effect(() => {
+    const open = () => (finding = true);
+    session.localSearch = open;
+    return () => {
+      if (session.localSearch === open) session.localSearch = null;
+    };
+  });
   const selected = $derived(session.songs.find((song) => song.id === selectedId) ?? null);
   const onPreview = $derived(session.songFocus);
   const index = $derived(buildSongIndex(session.songs));
@@ -145,7 +132,7 @@
     void session.take();
   });
 
-  const listTitle = $derived(folder === null ? "All songs" : folder === RECENT ? "Recent" : folder === FAVORITES ? "Favorites" : folder === "" ? "Unfiled" : folder);
+  const listTitle = $derived(folder === null ? "All songs" : openList ? openList.label : folder === "" ? "Unfiled" : folder);
 
   // Messages fade after a few seconds so they never crowd the song.
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -319,7 +306,7 @@
     const encoder = new TextEncoder();
     const used = new Set<string>();
     // Exporting more than one folder keeps each song in a sub-folder named after its library folder.
-    const nested = folder === null || folder === RECENT;
+    const nested = folder === null || !!openList;
     const safe = (text: string) => text.replace(/[^\w\s-]+/g, "").replace(/\s+/g, " ").trim();
     const entries = visible.map((song) => {
       const dir = nested && cleanFolder(song.folder) ? `${safe(cleanFolder(song.folder))}/` : "";
@@ -443,23 +430,20 @@
       </ToolMenu>
       <button type="button" class="desk-btn primary-soft" onclick={newSong}><Icon name="plus" size={14} /> New song</button>
     {/snippet}
-    <SearchField bind:value={query} label="Search songs" placeholder="Title, author or lyrics" onnavigate={navigate} />
+    <button type="button" class="find-song" onclick={() => (finding = true)}>
+      <Icon name="search" size={15} /><span>Find a song</span><kbd>/</kbd>
+    </button>
 
-    <p class="group">Folders</p>
-    <nav class="folders" aria-label="Song folders">
+    <nav class="folders" aria-label="Song lists and folders">
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
       </button>
-      {#if starred.length > 0}
-        <button type="button" class="folder" class:on={folder === FAVORITES} onclick={() => (folder = FAVORITES)}>
-          <Icon name="star" size={16} /><span>Favorites</span><small>{starred.length}</small>
+      {#each shownLists as list (list.id)}
+        <button type="button" class="folder" class:on={folder === `${LIST}${list.id}`} onclick={() => (folder = `${LIST}${list.id}`)}>
+          <Icon name={list.icon} size={16} /><span>{list.label}</span><small>{list.songs.length}</small>
         </button>
-      {/if}
-      {#if recent.length > 0}
-        <button type="button" class="folder" class:on={folder === RECENT} onclick={() => (folder = RECENT)}>
-          <Icon name="reset" size={16} /><span>Recent</span><small>{recent.length}</small>
-        </button>
-      {/if}
+      {/each}
+      <p class="group sub-group">Folders</p>
       {#if unfiled > 0 && folders.length > 0}
         <button type="button" class="folder" class:on={folder === ""} onclick={() => (folder = "")}>
           <Icon name="folder" size={16} /><span>Unfiled</span><small>{unfiled}</small>
@@ -542,7 +526,7 @@
 
     <ul class="songs" aria-label="Songs">
       {#if visible.length === 0}
-        <li class="empty">{query.trim() ? "No songs match." : session.songs.length ? "This folder is empty." : "No songs yet. Press New song to type or paste one, or Import to bring in files."}</li>
+        <li class="empty">{openList ? openList.empty : session.songs.length ? "This folder is empty." : "No songs yet. Press New song to type or paste one, or Import to bring in files."}</li>
       {/if}
       {#each visible as song (song.id)}
         <li class="song-item">
@@ -713,29 +697,51 @@
   </div>
 
   <!-- Monitors and detection -->
+  {#if finding}
+    <SongFinder {clickLive} onclose={() => (finding = false)} onopen={(id) => { draft = null; selectedId = id; }} />
+  {/if}
+
   <aside class="stage">
     <MonitorPair page="songs" place={session.songPlace()} onstep={(direction) => session.stepSong(direction)} />
 
-    <section class="detect" aria-label="Song detection">
+    <section class="listen-card" class:on={listening} aria-label="Listen for songs">
       <header>
-        <span class="kicker">{#if listening}<span class="dot listen"></span>{/if}Song detection</span>
-        <button type="button" class="desk-btn" class:on={listening} aria-pressed={listening} onclick={() => void session.toggleVoice()}>
-          <Icon name={listening ? "mic-off" : "mic"} size={14} />{listening ? "Stop" : "Listen"}
-        </button>
+        <span class="lc-title"><Icon name="mic" size={15} /> Listen for songs</span>
+        <span class="lc-state" class:on={listening}>{session.voice.status === "starting" ? "Starting…" : listening ? "Listening" : "Off"}</span>
       </header>
-      <label class="follow">
-        <input type="checkbox" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
-        <span>Follow singing <small>Put the section being sung on Preview</small></span>
-      </label>
-      {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}
-      {#if detected}
-        <button type="button" class="match" onclick={showDetected}>
-          <small>Heard</small><strong>{detected.label}</strong>
-        </button>
+      {#if !listening}
+        <p class="lc-lede">Church Studio listens to the singing and finds the song and part in your library. Nothing reaches the screen unless you choose.</p>
+        <button type="button" class="desk-btn primary-soft lc-start" onclick={() => void session.toggleVoice()}><Icon name="mic" size={15} /> Start listening</button>
       {:else}
-        <p class="muted">{listening ? "Listening for a song you have saved…" : "Listen to match singing to your saved songs."}</p>
+        <div class="lc-level" aria-hidden="true">
+          {#each Array.from({ length: 18 }) as _, bar (bar)}<i class:lit={bar < Math.round(session.voice.level * 18)}></i>{/each}
+        </div>
+        <p class="lc-heard">{heard ? `“${heard}”` : "Sing or say a line from a song…"}</p>
+        {#if detected}
+          {@const song = session.songs.find((entry) => entry.id === detected?.songId)}
+          {@const part = song?.sections.find((section) => section.id === detected?.sectionId)}
+          {#if song && part}
+            <div class="lc-match" style:--tone="var(--sec-{sectionTone(part)})">
+              <small>Sounds like</small>
+              <strong>{song.title}</strong>
+              <span class="lc-part"><b>{sectionShort(part)}</b>{part.label}</span>
+              <div class="lc-actions">
+                <button type="button" class="desk-btn" onclick={() => { selectedId = song.id; }}>Open</button>
+                <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={showDetected}>{clickLive ? "Show it" : "Preview"}</button>
+              </div>
+            </div>
+          {/if}
+        {/if}
+        <button type="button" class="desk-btn ghost lc-stop" onclick={() => void session.toggleVoice()}><Icon name="mic-off" size={14} /> Stop listening</button>
       {/if}
-      {#if heard}<p class="heard-text">“{heard}”</p>{/if}
+      <label class="lc-follow">
+        <input type="checkbox" class="switch" role="switch" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
+        <span>
+          Follow the singing
+          <small>{follow && clickLive ? "Each part heard goes straight to the screen (Live mode)." : "Each part heard goes to Preview by itself."}</small>
+        </span>
+      </label>
+      {#if session.voice.status !== "idle" && session.voice.error}<VoiceStatus compact />{/if}
     </section>
   </aside>
 </section>
@@ -980,17 +986,37 @@
 
   /* Stage */
   .stage { padding: 12px; gap: 12px; overflow: auto; }
-  .detect > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
-  .dot.listen { width: 7px; height: 7px; border-radius: 50%; background: var(--presence, #3fb950); box-shadow: 0 0 6px var(--presence, #3fb950); }
-  .detect { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
-  .follow { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
-  .follow input { height: auto; margin-top: 3px; }
-  .follow small { display: block; color: var(--muted); font-size: 11px; }
-  .match { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--presence, #3fb950); border-radius: var(--radius-control, 8px); background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
-  .match small { font-size: 11px; color: var(--presence, #3fb950); text-transform: uppercase; letter-spacing: 0.08em; }
-  .heard-text { margin: 0; font-size: 12px; color: var(--muted); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
 
+  /* Listening */
+  .listen-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
+  .listen-card.on { border-color: color-mix(in srgb, var(--presence, #3fb950) 55%, var(--line)); }
+  .listen-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .lc-title { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+  .lc-state { padding: 2px 8px; border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 11px; font-weight: 700; }
+  .lc-state.on { background: color-mix(in srgb, var(--presence, #3fb950) 20%, transparent); color: var(--presence, #3fb950); }
+  .lc-lede { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+  .lc-start { justify-content: center; height: 38px; }
+  .lc-level { display: flex; align-items: flex-end; gap: 3px; height: 22px; }
+  .lc-level i { flex: 1; height: 100%; border-radius: 2px; background: var(--line); }
+  .lc-level i.lit { background: var(--presence, #3fb950); }
+  .lc-heard { margin: 0; min-height: 2.8em; font-size: 13px; line-height: 1.4; color: var(--muted); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+  .lc-match { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: 10px; background: var(--panel); }
+  .lc-match small { font-size: 11px; font-weight: 650; color: var(--presence, #3fb950); }
+  .lc-match strong { font-size: 14px; }
+  .lc-part { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .lc-part b { padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-size: 11px; }
+  .lc-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+  .lc-stop { align-self: flex-start; }
+  .lc-follow { display: flex; align-items: flex-start; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .lc-follow small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--muted); }
+  .lc-follow input { flex: none; margin-top: 2px; }
+
+  /* Find a song */
+  .find-song { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 14px 10px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; flex: none; }
+  .find-song:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
+  .find-song span { flex: 1; text-align: left; }
+  .find-song kbd { padding: 0 6px; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 11px; }
+  .sub-group { margin: 8px 0 2px; padding: 0 4px; }
   @media (max-width: 1280px) {
     .song-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
     .fields { grid-template-columns: 1fr 1fr; }

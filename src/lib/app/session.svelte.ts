@@ -180,6 +180,7 @@ import {
   showPanel,
 } from "../workspace/layout";
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
+import { songLists } from "../domain/song-lists";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -3390,6 +3391,18 @@ class Session {
   /** Saved looks with starred ones first. */
   get looksByFavorite() {
     return favoritesFirst(this.workspace.compositions, (look) => isFavorite(this.workspace.favorites, "looks", look.id));
+  }
+
+  /** Ready-made song lists (favorites, recently used, most sung, in this service). */
+  get songLists() {
+    const serviceSongIds = (this.service?.sections ?? []).flatMap((section) => section.items).flatMap((item) => (item.lyric ? [item.lyric.songId] : []));
+    return songLists({
+      songs: this.songs,
+      favoriteIds: this.workspace.favorites.songs,
+      sessionRecentIds: this.recentSongs.map((entry) => entry.songId),
+      uses: this.workspace.songUses,
+      serviceSongIds,
+    });
   }
 
   /** Songs with starred ones first, for pickers outside the Songs page. */

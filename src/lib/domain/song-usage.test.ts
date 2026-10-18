@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { noteSongUse, sanitizeSongUses, usageCsv, usageReport } from "./song-usage";
+import { daysAgo, mostUsed, noteSongUse, recentlyUsedIds, sanitizeSongUses, usageCsv, usageReport } from "./song-usage";
 import type { Song } from "./types";
 
 const grace: Song = { id: "s1", title: "Amazing Grace", author: "John Newton", ccli: "22025", sections: [] };
@@ -32,5 +32,24 @@ describe("CCLI song usage", () => {
     expect(sanitizeSongUses([{ songId: "a", title: "A", date: "2026-10-18", ccli: "12-34" }, { songId: "b", date: "yesterday" }, 5])).toEqual([
       { songId: "a", title: "A", author: "", ccli: "1234", date: "2026-10-18" },
     ]);
+  });
+});
+
+describe("song lists from use", () => {
+  const use = (songId: string, date: string) => ({ songId, title: songId, author: "", ccli: "", date });
+  const uses = [use("a", "2026-09-01"), use("b", "2026-10-11"), use("a", "2026-10-04"), use("c", "2026-10-11"), use("a", "2026-10-11")];
+
+  it("lists recently used songs newest first, each once", () => {
+    expect(recentlyUsedIds(uses).slice(0, 3).sort()).toEqual(["a", "b", "c"]);
+    expect(recentlyUsedIds([use("x", "2026-01-01"), use("y", "2026-02-01")])).toEqual(["y", "x"]);
+  });
+
+  it("counts the most sung songs since a date", () => {
+    expect(mostUsed(uses, "2026-10-01")).toEqual([{ songId: "a", times: 2 }, { songId: "b", times: 1 }, { songId: "c", times: 1 }]);
+    expect(mostUsed(uses, "2026-10-01", 1)).toHaveLength(1);
+  });
+
+  it("finds the day some days back", () => {
+    expect(daysAgo(10, new Date("2026-10-18T12:00:00"))).toBe("2026-10-08");
   });
 });
