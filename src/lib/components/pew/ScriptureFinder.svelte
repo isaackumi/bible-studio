@@ -329,14 +329,24 @@
   }
 </script>
 
-{#snippet chips(label: string, icon: string, items: BibleItem[])}
+{#snippet chips(label: string, icon: string, items: BibleItem[], removable = false)}
   {#if items.length}
     <div class="chip-row" aria-label={label}>
       <span class="chip-label"><Icon name={icon} size={12} />{label}</span>
       <div class="chip-scroll">
         {#each items as item (keyOf(item))}
-          <button type="button" class="chip" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)} title="Click to look · double-click for Preview · Shift-click to show now" onclick={(event) => chip(item, event)}>{item.reference}</button>
+          {#if removable}
+            <span class="chip-pair" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)}>
+              <button type="button" class="chip in-pair" title="Click to look · double-click for Preview · Shift-click to show now" onclick={(event) => chip(item, event)}>{item.reference}</button>
+              <button type="button" class="chip-x" aria-label="Remove {item.reference} from Recent" title="Remove from Recent" onclick={() => session.removeRecent(item)}><Icon name="close" size={11} /></button>
+            </span>
+          {:else}
+            <button type="button" class="chip" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)} title="Click to look · double-click for Preview · Shift-click to show now" onclick={(event) => chip(item, event)}>{item.reference}</button>
+          {/if}
         {/each}
+        {#if removable && items.length > 1}
+          <button type="button" class="chip-clear" title="Empty the Recent list" onclick={() => session.clearRecent()}>Clear</button>
+        {/if}
       </div>
     </div>
   {/if}
@@ -370,7 +380,7 @@
     <div class="shortcuts">
       {@render chips("Gone live today", "check", goneToday)}
       {@render chips("Favorites", "star", favorites)}
-      {@render chips("Recent", "reset", recent)}
+      {@render chips("Recent", "reset", recent, true)}
       <p class="patterns">
         <span><b>jn316</b> John 3:16</span>
         <span><b>rom828-30</b> range</span>
@@ -521,6 +531,14 @@
   .chip { flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 14px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; }
   .chip:hover { background: var(--field); }
   .chip.on { border-color: var(--accent); color: var(--accent); }
+  .chip-pair { flex: none; display: inline-flex; align-items: center; height: 28px; border: 1px solid var(--line); border-radius: 14px; }
+  .chip-pair.on { border-color: var(--accent); }
+  .chip-pair.on .chip { color: var(--accent); }
+  .chip.in-pair { border: 0; height: 26px; padding-right: 4px; border-radius: 14px 0 0 14px; }
+  .chip-x { width: 24px; height: 26px; border: 0; border-radius: 0 14px 14px 0; background: none; color: var(--muted); display: grid; place-items: center; }
+  .chip-x:hover { color: var(--ink); background: var(--field); }
+  .chip-clear { flex: none; height: 28px; padding: 0 10px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+  .chip-clear:hover { color: var(--ink); }
   .patterns { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; padding-left: 138px; font-size: 12px; color: var(--muted); }
   .patterns b { color: var(--ink); font-weight: 650; margin-right: 4px; font-variant-numeric: tabular-nums; }
 

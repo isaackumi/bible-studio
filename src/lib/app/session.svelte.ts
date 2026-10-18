@@ -2034,6 +2034,20 @@ class Session {
     this.message = `${passage.reference} added to the service. Preview only.`;
   };
 
+  /** Take a passage off the Recent list (in every translation). */
+  removeRecent = (passage: Pick<BibleItem, "bookOrd" | "chapter" | "startVerse" | "endVerse">) => {
+    const recent = this.workspace.recent.filter(
+      (entry) => !(entry.bookOrd === passage.bookOrd && entry.chapter === passage.chapter && entry.startVerse === passage.startVerse && entry.endVerse === passage.endVerse),
+    );
+    this.workspace = { ...this.workspace, recent };
+    this.persistSoon();
+  };
+
+  clearRecent = () => {
+    this.workspace = { ...this.workspace, recent: [] };
+    this.persistSoon();
+  };
+
   private remember(passage: BibleItem) {
     const recent = [passage, ...this.workspace.recent.filter((entry) => entry.reference !== passage.reference || entry.translationId !== passage.translationId)].slice(0, 8);
     this.workspace = { ...this.workspace, recent };
