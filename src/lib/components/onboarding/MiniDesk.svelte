@@ -12,7 +12,18 @@
     mode = "Scriptures",
     reference = "",
     heard = "",
-  }: { preview: PresentationModel; program: PresentationModel; onAir?: boolean; mode?: string; reference?: string; heard?: string } = $props();
+    desk = "pewbeam",
+  }: {
+    preview: PresentationModel;
+    program: PresentationModel;
+    onAir?: boolean;
+    mode?: string;
+    reference?: string;
+    heard?: string;
+    /** Which desk the miniature is: the Presenter Desk, or the Production Desk once cameras are in. */
+    desk?: "pewbeam" | "obs";
+  } = $props();
+  const production = $derived(desk === "obs");
 </script>
 
 <div class="window" aria-hidden="true">
@@ -21,13 +32,13 @@
     <span class="wtitle">Church Studio</span>
   </div>
   <div class="bar">
-    <span class="desk-icons"><span class="ic on"><Icon name="pew" size={13} /></span><span class="ic"><Icon name="obs" size={13} /></span></span>
+    <span class="desk-icons"><span class="ic" class:on={!production}><Icon name="pew" size={13} /></span><span class="ic" class:on={production}><Icon name="obs" size={13} /></span></span>
     <span class="modes">
-      {#each ["Scriptures", "Songs", "Sermon"] as name (name)}<span class:on={mode === name}>{name}</span>{/each}
+      {#each production ? ["Studio", "Looks"] : ["Scriptures", "Songs", "Sermon"] as name (name)}<span class:on={production ? name === "Studio" : mode === name}>{name}</span>{/each}
     </span>
     <span class="grow"></span>
     <span class="aud"><i class:on={onAir}></i>Audience</span>
-    <span class="live" class:on-air={onAir}><i></i>{onAir ? "ON AIR" : "LIVE"}</span>
+    <span class="live" class:on-air={onAir}><i></i>{onAir ? "ON AIR" : production ? "GO LIVE" : "LIVE"}</span>
     <span class="plain">BLACK</span>
     <span class="plain ghost">CLEAR</span>
   </div>
