@@ -2,6 +2,8 @@
 // walk-in music, begin the first part, show its first item) or handing over to the preacher. Steps run
 // in order; a wait holds the next step for a few seconds.
 
+import { msg, t } from "../i18n/core";
+
 export type MacroStep =
   | { kind: "fade-music"; seconds: number }
   | { kind: "play-playlist"; playlistId: string }
@@ -17,17 +19,20 @@ export type MacroStep =
 export type Macro = { id: string; name: string; steps: MacroStep[] };
 
 export const STEP_KINDS: Array<{ kind: MacroStep["kind"]; label: string; make: () => MacroStep }> = [
-  { kind: "fade-music", label: "Fade the music out", make: () => ({ kind: "fade-music", seconds: 4 }) },
-  { kind: "play-playlist", label: "Play a playlist", make: () => ({ kind: "play-playlist", playlistId: "walk-in" }) },
-  { kind: "stop-music", label: "Stop the music", make: () => ({ kind: "stop-music" }) },
-  { kind: "start-part", label: "Begin a part of the service", make: () => ({ kind: "start-part", which: "next" }) },
-  { kind: "show-item", label: "Show an item", make: () => ({ kind: "show-item", which: "first-of-part", live: true }) },
-  { kind: "program", label: "Screen: live, clear, black, logo", make: () => ({ kind: "program", action: "take" }) },
-  { kind: "countdown", label: "Countdown", make: () => ({ kind: "countdown", mode: "overlay-on" }) },
-  { kind: "captions", label: "Captions on or off", make: () => ({ kind: "captions", on: true }) },
-  { kind: "stage-message", label: "Message to the stage", make: () => ({ kind: "stage-message", text: "You're on" }) },
-  { kind: "wait", label: "Wait", make: () => ({ kind: "wait", seconds: 2 }) },
+  { kind: "fade-music", label: msg("Fade the music out"), make: () => ({ kind: "fade-music", seconds: 4 }) },
+  { kind: "play-playlist", label: msg("Play a playlist"), make: () => ({ kind: "play-playlist", playlistId: "walk-in" }) },
+  { kind: "stop-music", label: msg("Stop the music"), make: () => ({ kind: "stop-music" }) },
+  { kind: "start-part", label: msg("Begin a part of the service"), make: () => ({ kind: "start-part", which: "next" }) },
+  { kind: "show-item", label: msg("Show an item"), make: () => ({ kind: "show-item", which: "first-of-part", live: true }) },
+  { kind: "program", label: msg("Screen: live, clear, black, logo"), make: () => ({ kind: "program", action: "take" }) },
+  { kind: "countdown", label: msg("Countdown"), make: () => ({ kind: "countdown", mode: "overlay-on" }) },
+  { kind: "captions", label: msg("Captions on or off"), make: () => ({ kind: "captions", on: true }) },
+  { kind: "stage-message", label: msg("Message to the stage"), make: () => ({ kind: "stage-message", text: "You're on" }) },
+  { kind: "wait", label: msg("Wait"), make: () => ({ kind: "wait", seconds: 2 }) },
 ];
+
+// The screen actions, named for the scanner that checks every line has its translation.
+msg("Go live (Preview to the screen)"); msg("Clear the screen"); msg("Clear the words"); msg("Black"); msg("Logo");
 
 const MAX_MACROS = 24;
 const MAX_STEPS = 20;
@@ -104,24 +109,25 @@ export function sanitizeMacros(value: unknown): Macro[] {
 export function describeStep(step: MacroStep, names: { playlist: (id: string) => string }): string {
   switch (step.kind) {
     case "fade-music":
-      return `Fade the music out (${step.seconds} s)`;
+      return t("Fade the music out ({seconds} s)", { seconds: step.seconds });
     case "play-playlist":
-      return `Play ${names.playlist(step.playlistId)}`;
+      return t("Play {name}", { name: names.playlist(step.playlistId) });
     case "stop-music":
-      return "Stop the music";
+      return t("Stop the music");
     case "program":
-      return { take: "Go live (Preview to the screen)", clear: "Clear the screen", "clear-words": "Clear the words", black: "Black", logo: "Logo" }[step.action];
+      return t({ take: "Go live (Preview to the screen)", clear: "Clear the screen", "clear-words": "Clear the words", black: "Black", logo: "Logo" }[step.action]);
     case "show-item":
-      return `${step.which === "next" ? "Next item" : "First item of the part"}${step.live ? ", on the screen" : ", on Preview"}`;
+      if (step.which === "next") return step.live ? t("Next item, on the screen") : t("Next item, on Preview");
+      return step.live ? t("First item of the part, on the screen") : t("First item of the part, on Preview");
     case "start-part":
-      return step.which === "first" ? "Begin the first part" : "Begin the next part";
+      return step.which === "first" ? t("Begin the first part") : t("Begin the next part");
     case "countdown":
-      return step.mode === "full" ? "Countdown, full screen on Preview" : step.mode === "overlay-on" ? "Countdown on the screen" : "Countdown off";
+      return step.mode === "full" ? t("Countdown, full screen on Preview") : step.mode === "overlay-on" ? t("Countdown on the screen") : t("Countdown off");
     case "captions":
-      return step.on ? "Captions on" : "Captions off";
+      return step.on ? t("Captions on") : t("Captions off");
     case "stage-message":
-      return step.text ? `Stage: “${step.text}”` : "Clear the stage message";
+      return step.text ? t("Stage: “{text}”", { text: step.text }) : t("Clear the stage message");
     case "wait":
-      return `Wait ${step.seconds} s`;
+      return t("Wait {seconds} s", { seconds: step.seconds });
   }
 }

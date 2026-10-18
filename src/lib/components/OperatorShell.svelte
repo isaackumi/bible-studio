@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { session } from "../app/session.svelte";
+  import { uiLanguage } from "../i18n/i18n.svelte";
   import { outputShape } from "../display/output-shape.svelte";
   import { AUDIENCE_ASPECT_KEY, aspectFor, sanitizeScreenShape } from "../display/shape";
   import { isDesktop } from "../platform/runtime";
@@ -67,6 +68,8 @@
     root.style.setProperty("--ui-scale", String(appearance.scale));
     root.style.setProperty("zoom", String(appearance.scale));
     root.dataset.desk = appearance.desk;
+    uiLanguage.current = appearance.language ?? "en";
+    root.lang = uiLanguage.current;
     root.toggleAttribute("data-calm", appearance.calm === true);
     root.style.setProperty("--accent", appearance.accent);
     root.style.setProperty("--on-accent", readableOn(appearance.accent));

@@ -26,6 +26,7 @@
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
+  import { msg, t, UI_LANGUAGES } from "../../i18n/core";
 
   type SettingsSectionId =
     | "general"
@@ -65,47 +66,47 @@
   // Each page: a colored icon tile (System Settings style), a one-line description and search words.
   const groups: SettingsGroup[] = [
     {
-      label: "General",
+      label: msg("General"),
       items: [
-        { id: "general", title: "Church", icon: "church", color: "#f08a24", about: "Your church's name, logo text and CCLI license.", keywords: "name logo ccli license copyright" },
-        { id: "appearance", title: "Appearance", icon: "look", color: "#a259e6", about: "Desk, theme, accent color and type size on this computer.", keywords: "theme dark light accent color size spacing desk verse font performance density" },
-        { id: "workspace", title: "Layouts", icon: "layout", color: "#5b5bd6", about: "How the operator desk is arranged.", keywords: "workspace panels arrange reset" },
-        { id: "keyboard", title: "Keyboard", icon: "keys", color: "#636366", about: "Keys that drive the desk.", keywords: "shortcuts keys hotkeys" },
+        { id: "general", title: msg("Church"), icon: "church", color: "#f08a24", about: msg("Your church's name, logo text and CCLI license."), keywords: "name logo ccli license copyright" },
+        { id: "appearance", title: msg("Appearance"), icon: "look", color: "#a259e6", about: msg("Desk, theme, accent color and type size on this computer."), keywords: "theme dark light accent color size spacing desk verse font performance density" },
+        { id: "workspace", title: msg("Layouts"), icon: "layout", color: "#5b5bd6", about: msg("How the operator desk is arranged."), keywords: "workspace panels arrange reset" },
+        { id: "keyboard", title: msg("Keyboard"), icon: "keys", color: "#636366", about: msg("Keys that drive the desk."), keywords: "shortcuts keys hotkeys" },
       ],
     },
     {
-      label: "Presenting",
+      label: msg("Presenting"),
       items: [
-        { id: "themes", title: "Themes", icon: "themes", color: "#c2410c", about: "How verses, songs and slides look on the screen.", keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
-        { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
-        { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
-        { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
-        { id: "captions", title: "Captions", icon: "captions", color: "#0f9d8a", about: "Live captions on the screen and on phones, translated.", keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
+        { id: "themes", title: msg("Themes"), icon: "themes", color: "#c2410c", about: msg("How verses, songs and slides look on the screen."), keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
+        { id: "audience", title: msg("Audience output"), icon: "cast", color: "#e5484d", about: msg("What the congregation sees, and on which screen."), keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
+        { id: "displays", title: msg("Displays"), icon: "screens", color: "#0a84ff", about: msg("Which screen is the desk, and which is the audience."), keywords: "monitor screen profile second assign" },
+        { id: "stage", title: msg("Stage display"), icon: "stage", color: "#ff9f0a", about: msg("A private confidence screen for the people on stage."), keywords: "confidence platform next clock" },
+        { id: "captions", title: msg("Captions"), icon: "captions", color: "#0f9d8a", about: msg("Live captions on the screen and on phones, translated."), keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
       ],
     },
     {
-      label: "Library",
+      label: msg("Library"),
       items: [
-        { id: "bible", title: "Bible", icon: "bible", color: "#a07a52", about: "Scripture translations on this computer.", keywords: "translation kjv scripture" },
-        { id: "lyrics", title: "Songs", icon: "lyrics", color: "#e93d82", about: "Songs, folders, imports and copyright.", keywords: "lyrics hymns ccli songselect openlyrics" },
-        { id: "media", title: "Media", icon: "media", color: "#12a5b8", about: "Pictures and videos for backgrounds and the logo.", keywords: "images video background logo camera" },
-        { id: "ai", title: "AI assistant", icon: "sparkles", color: "#7c3aed", about: "Your own AI key, for sermon summaries.", keywords: "ai llm claude anthropic openai gpt ollama key summary sermon notes" },
-        { id: "planning", title: "Planning Center", icon: "list", color: "#2266e3", about: "Bring upcoming plans in as services.", keywords: "planning center pco services plan import" },
-        { id: "storage", title: "Backup", icon: "files", color: "#2f80ed", about: "Export or import the whole library.", keywords: "export import backup files library" },
+        { id: "bible", title: msg("Bible"), icon: "bible", color: "#a07a52", about: msg("Scripture translations on this computer."), keywords: "translation kjv scripture" },
+        { id: "lyrics", title: msg("Songs"), icon: "lyrics", color: "#e93d82", about: msg("Songs, folders, imports and copyright."), keywords: "lyrics hymns ccli songselect openlyrics" },
+        { id: "media", title: msg("Media"), icon: "media", color: "#12a5b8", about: msg("Pictures and videos for backgrounds and the logo."), keywords: "images video background logo camera" },
+        { id: "ai", title: msg("AI assistant"), icon: "sparkles", color: "#7c3aed", about: msg("Your own AI key, for sermon summaries."), keywords: "ai llm claude anthropic openai gpt ollama key summary sermon notes" },
+        { id: "planning", title: msg("Planning Center"), icon: "list", color: "#2266e3", about: msg("Bring upcoming plans in as services."), keywords: "planning center pco services plan import" },
+        { id: "storage", title: msg("Backup"), icon: "files", color: "#2f80ed", about: msg("Export or import the whole library."), keywords: "export import backup files library" },
       ],
     },
     {
-      label: "Devices",
+      label: msg("Devices"),
       items: [
-        { id: "audio", title: "Sound & voice", icon: "audio", color: "#3e63dd", about: "Microphone, listening and voice commands.", keywords: "microphone voice speech listen detection" },
-        { id: "remote", title: "Phone remote", icon: "phone", color: "#30a46c", about: "Pair a phone as a controller. It is never a display.", keywords: "phone tablet pair qr lan" },
+        { id: "audio", title: msg("Sound & voice"), icon: "audio", color: "#3e63dd", about: msg("Microphone, listening and voice commands."), keywords: "microphone voice speech listen detection" },
+        { id: "remote", title: msg("Phone remote"), icon: "phone", color: "#30a46c", about: msg("Pair a phone as a controller. It is never a display."), keywords: "phone tablet pair qr lan" },
       ],
     },
     {
-      label: "About",
+      label: msg("About"),
       items: [
-        { id: "system", title: "This computer", icon: "laptop", color: "#8e8e93", about: "What works in this window, and why some things do not.", keywords: "capabilities browser desktop features" },
-        { id: "updates", title: "Updates", icon: "refresh", color: "#0a84ff", about: "Which version is running.", keywords: "version update release" },
+        { id: "system", title: msg("This computer"), icon: "laptop", color: "#8e8e93", about: msg("What works in this window, and why some things do not."), keywords: "capabilities browser desktop features" },
+        { id: "updates", title: msg("Updates"), icon: "refresh", color: "#0a84ff", about: msg("Which version is running."), keywords: "version update release" },
       ],
     },
   ];
@@ -113,10 +114,10 @@
   /** Opened from the account card at the top of the sidebar, like the profile in System Settings. */
   const ACCOUNT: SettingsEntry = {
     id: "account",
-    title: "Plan & account",
+    title: msg("Plan & account"),
     icon: "user",
     color: "#8e8e93",
-    about: "Your plan, the Premium trial, and what each plan includes.",
+    about: msg("Your plan, the Premium trial, and what each plan includes."),
     keywords: "sign in user cloud plan premium free church trial upgrade billing license",
   };
   /** Older links: these pages were folded into others. */
@@ -310,7 +311,7 @@
         items: group.items.filter(
           (item) =>
             (item.id !== "remote" || canUse("remote-control")) &&
-            (!needle || `${item.title} ${item.about} ${item.keywords} ${group.label}`.toLowerCase().includes(needle)),
+            (!needle || `${item.title} ${item.about} ${t(item.title)} ${t(item.about)} ${item.keywords} ${group.label}`.toLowerCase().includes(needle)),
         ),
       }))
       .filter((group) => group.items.length > 0);
@@ -318,16 +319,16 @@
 
   const sections: SettingsEntry[] = [...groups.flatMap((group) => group.items), ACCOUNT];
   const themes: { id: OperatorTheme; name: string; note: string; ground: string; ink: string }[] = [
-    { id: "dark", name: "Night", note: "Black desk, white type", ground: "#050505", ink: "#f5f5f5" },
-    { id: "vespers", name: "Vespers", note: "Warm black, bone type", ground: "#0c0a09", ink: "#f6f1e7" },
-    { id: "nave", name: "Nave", note: "Blue black, paper white", ground: "#070b12", ink: "#f4f7fb" },
-    { id: "light", name: "Day", note: "White desk, black type", ground: "#f7f5f3", ink: "#050505" },
+    { id: "dark", name: msg("Night"), note: msg("Black desk, white type"), ground: "#050505", ink: "#f5f5f5" },
+    { id: "vespers", name: msg("Vespers"), note: msg("Warm black, bone type"), ground: "#0c0a09", ink: "#f6f1e7" },
+    { id: "nave", name: msg("Nave"), note: msg("Blue black, paper white"), ground: "#070b12", ink: "#f4f7fb" },
+    { id: "light", name: msg("Day"), note: msg("White desk, black type"), ground: "#f7f5f3", ink: "#050505" },
   ];
   const accents = [
-    { name: "Signal", value: "#fa4f00" },
-    { name: "Mustard", value: "#e2cc9d" },
-    { name: "Ember", value: "#ff8f55" },
-    { name: "Crimson", value: "#be2119" },
+    { name: msg("Signal"), value: "#fa4f00" },
+    { name: msg("Mustard"), value: "#e2cc9d" },
+    { name: msg("Ember"), value: "#ff8f55" },
+    { name: msg("Crimson"), value: "#be2119" },
   ];
 
   function isSettingsSection(value: string): value is SettingsSectionId {
@@ -496,19 +497,19 @@
       </button>
       <label class="nav-search">
         <Icon name="search" size={14} />
-        <input type="search" placeholder="Search settings" aria-label="Search settings" bind:value={search} />
+        <input type="search" placeholder={t("Search settings")} aria-label={t("Search settings")} bind:value={search} />
       </label>
       <div class="nav-list">
         {#each visibleGroups as group (group.label)}
-          <p class="nav-group">{group.label}</p>
+          <p class="nav-group">{t(group.label)}</p>
           {#each group.items as item (item.id)}
             <button type="button" class="nav-item" class:active={section === item.id} aria-current={section === item.id ? "page" : undefined} onclick={() => (section = item.id)}>
               <span class="tile" style:background={item.color}><Icon name={item.icon} size={14} /></span>
-              <span class="nav-title">{item.title}</span>
+              <span class="nav-title">{t(item.title)}</span>
             </button>
           {/each}
         {:else}
-          <p class="nav-empty">No settings match “{search}”.</p>
+          <p class="nav-empty">{t("No settings match “{search}”.", { search })}</p>
         {/each}
       </div>
     </nav>
@@ -517,10 +518,10 @@
       <header class="set-head">
         <span class="tile big" style:background={page?.color}><Icon name={page?.icon ?? "settings"} size={22} /></span>
         <div class="head-copy">
-          <h2>{page?.title}</h2>
-          <p>{page?.about}</p>
+          <h2>{page ? t(page.title) : ""}</h2>
+          <p>{page ? t(page.about) : ""}</p>
         </div>
-        <button type="button" class="icon-close" aria-label="Close settings" title="Close (Esc)" onclick={close}><Icon name="close" size={16} /></button>
+        <button type="button" class="icon-close" aria-label={t("Close settings")} title={t("Close (Esc)")} onclick={close}><Icon name="close" size={16} /></button>
       </header>
 
       {#if section === "general"}
@@ -552,58 +553,67 @@
         <CapabilityList />
       {:else if section === "appearance"}
         <section class="card">
-          <h3>Desk</h3>
-          <div class="choice-row" role="group" aria-label="Desk">
-            {#each [{ id: "pewbeam", name: "Presenter Desk", icon: "pew", note: "Scripture, songs and service presentation." }, { id: "obs", name: "Production Desk", icon: "obs", note: "Live production, cameras, compositions and output control." }] as style (style.id)}
+          <h3>{t("Language")}</h3>
+          <p class="card-note">{t("The words on the desk: menus, buttons and settings. Scripture and songs keep their own language.")}</p>
+          <div class="segment" role="radiogroup" aria-label={t("Language")}>
+            {#each UI_LANGUAGES as language (language.id)}
+              <button type="button" role="radio" aria-checked={(session.workspace.appearance.language ?? "en") === language.id} class:active={(session.workspace.appearance.language ?? "en") === language.id} lang={language.id} onclick={() => session.setAppearance({ language: language.id })}>{language.name}</button>
+            {/each}
+          </div>
+        </section>
+        <section class="card">
+          <h3>{t("Desk")}</h3>
+          <div class="choice-row" role="group" aria-label={t("Desk")}>
+            {#each [{ id: "pewbeam", name: msg("Presenter Desk"), icon: "pew", note: msg("Scripture, songs and service presentation.") }, { id: "obs", name: msg("Production Desk"), icon: "obs", note: msg("Live production, cameras, compositions and output control.") }] as style (style.id)}
               <button type="button" class="choice" class:active={session.workspace.appearance.desk === style.id} onclick={() => session.setAppearance({ desk: style.id as DeskStyle })}>
                 <Icon name={style.icon} size={18} />
-                <strong>{style.name}</strong>
-                <span>{style.note}</span>
+                <strong>{t(style.name)}</strong>
+                <span>{t(style.note)}</span>
               </button>
             {/each}
           </div>
         </section>
         <section class="card">
-          <h3>Theme</h3>
-          <div class="theme-row" role="group" aria-label="Theme">
+          <h3>{t("Desk colors")}</h3>
+          <div class="theme-row" role="group" aria-label={t("Desk colors")}>
             {#each themes as theme (theme.id)}
               <button type="button" class="theme-card" class:active={session.workspace.appearance.theme === theme.id} onclick={() => session.setAppearance({ theme: theme.id })}>
                 <span class="chip" style:background={theme.ground} style:color={theme.ink}>
                   <span class="chip-bar" style:background={session.workspace.appearance.accent}></span>
                   Aa
                 </span>
-                <strong>{theme.name}</strong>
-                <span>{theme.note}</span>
+                <strong>{t(theme.name)}</strong>
+                <span>{t(theme.note)}</span>
               </button>
             {/each}
           </div>
         </section>
         <section class="card">
-          <h3>Accent</h3>
-          <div class="accent-row" role="group" aria-label="Accent">
+          <h3>{t("Accent")}</h3>
+          <div class="accent-row" role="group" aria-label={t("Accent")}>
             {#each accents as accent (accent.value)}
-              <button type="button" class="swatch" class:active={session.workspace.appearance.accent === accent.value} aria-label={accent.name} onclick={() => session.setAppearance({ accent: accent.value })}>
+              <button type="button" class="swatch" class:active={session.workspace.appearance.accent === accent.value} aria-label={t(accent.name)} onclick={() => session.setAppearance({ accent: accent.value })}>
                 <span class="dot" style:background={accent.value}></span>
-                <span>{accent.name}</span>
+                <span>{t(accent.name)}</span>
               </button>
             {/each}
             <label class="custom-accent">
-              Custom
-              <input type="color" aria-label="Custom accent" value={session.workspace.appearance.accent} oninput={(event) => session.setAppearance({ accent: event.currentTarget.value })} />
+              {t("Custom")}
+              <input type="color" aria-label={t("Custom accent")} value={session.workspace.appearance.accent} oninput={(event) => session.setAppearance({ accent: event.currentTarget.value })} />
             </label>
           </div>
         </section>
         <section class="card split">
           <div>
-            <h3>Spacing</h3>
-            <div class="segment" role="group" aria-label="Spacing">
-              <button type="button" class:active={session.workspace.appearance.density === "comfortable"} onclick={() => session.setAppearance({ density: "comfortable" })}>Comfortable</button>
-              <button type="button" class:active={session.workspace.appearance.density === "compact"} onclick={() => session.setAppearance({ density: "compact" })}>Compact</button>
+            <h3>{t("Spacing")}</h3>
+            <div class="segment" role="group" aria-label={t("Spacing")}>
+              <button type="button" class:active={session.workspace.appearance.density === "comfortable"} onclick={() => session.setAppearance({ density: "comfortable" })}>{t("Comfortable")}</button>
+              <button type="button" class:active={session.workspace.appearance.density === "compact"} onclick={() => session.setAppearance({ density: "compact" })}>{t("Compact")}</button>
             </div>
           </div>
           <div>
-            <h3>Size</h3>
-            <div class="segment" role="group" aria-label="Size">
+            <h3>{t("Size")}</h3>
+            <div class="segment" role="group" aria-label={t("Size")}>
               {#each [["0.9", "90%"], ["1", "100%"], ["1.1", "110%"], ["1.25", "125%"]] as [value, label] (value)}
                 <button type="button" class:active={String(session.workspace.appearance.scale) === value} onclick={() => session.setAppearance({ scale: Number(value) })}>{label}</button>
               {/each}
@@ -612,8 +622,8 @@
         </section>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>Screen theme</strong><span>{session.theme().name}. Colors, fonts and backgrounds for the audience screen live in Themes.</span></div>
-            <button type="button" class="btn" onclick={() => (section = "themes")}>Open Themes</button>
+            <div class="row-copy"><strong>{t("Screen theme")}</strong><span>{t("{name}. Colors, fonts and backgrounds for the audience screen live in Themes.", { name: session.theme().name })}</span></div>
+            <button type="button" class="btn" onclick={() => (section = "themes")}>{t("Open Themes")}</button>
           </div>
         </section>
       {:else if section === "workspace"}
@@ -1696,6 +1706,7 @@
   /* Cards */
   .settings-body :global(.card) { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); flex: none; }
   .settings-body :global(.card h3) { margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); }
+  .card-note { margin: -4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
   .status-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .status-card.on { border-color: color-mix(in srgb, var(--presence, #3fb950) 60%, var(--line)); }
   .status-card .eyebrow { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }

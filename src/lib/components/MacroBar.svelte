@@ -2,15 +2,16 @@
   import { session } from "../app/session.svelte";
   import { describeStep } from "../domain/macros";
   import Icon from "./Icon.svelte";
+  import { t } from "../i18n/core";
 
   // The macro buttons: one click runs the steps in order; the button shows its progress.
-  const playlistName = (id: string) => session.workspace.playlists.find((list) => list.id === id)?.name ?? "a playlist";
+  const playlistName = (id: string) => session.workspace.playlists.find((list) => list.id === id)?.name ?? t("a playlist");
 </script>
 
-<section class="macro-bar" aria-label="Macros">
+<section class="macro-bar" aria-label={t("Macros")}>
   <header>
-    <span>Macros</span>
-    <button type="button" class="edit" title="Make and change macros" onclick={() => (session.macrosOpen = true)}><Icon name="pencil" size={12} /> Edit</button>
+    <span>{t("Macros")}</span>
+    <button type="button" class="edit" title={t("Make and change macros")} onclick={() => (session.macrosOpen = true)}><Icon name="pencil" size={12} /> {t("Edit")}</button>
   </header>
   <div class="buttons">
     {#each session.workspace.macros as macro (macro.id)}
@@ -20,7 +21,7 @@
         class="macro"
         class:running
         disabled={!!session.runningMacro && !running}
-        title={macro.steps.map((step, n) => `${n + 1}. ${describeStep(step, { playlist: playlistName })}`).join("\n") || "No steps yet"}
+        title={macro.steps.map((step, n) => `${n + 1}. ${describeStep(step, { playlist: playlistName })}`).join("\n") || t("No steps yet")}
         onclick={() => void session.runMacro(macro.id)}
       >
         <Icon name="play" size={12} />
@@ -28,7 +29,7 @@
         {#if running}<em>{(session.runningMacro?.step ?? 0) + 1}/{macro.steps.length}</em>{/if}
       </button>
     {:else}
-      <button type="button" class="macro empty" onclick={() => (session.macrosOpen = true)}><Icon name="plus" size={12} /> Make a macro</button>
+      <button type="button" class="macro empty" onclick={() => (session.macrosOpen = true)}><Icon name="plus" size={12} /> {t("Make a macro")}</button>
     {/each}
   </div>
 </section>

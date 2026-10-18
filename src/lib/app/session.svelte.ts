@@ -1,4 +1,5 @@
 import { noteSongUse } from "../domain/song-usage";
+import { guessUiLanguage } from "../i18n/core";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
@@ -444,6 +445,11 @@ class Session {
       }
       if (!this.desktop() && !this.browserWatch) {
         this.browserWatch = setInterval(() => this.noteBrowserAudience(), 1000);
+      }
+      // A first run speaks the computer's language when the desk has it.
+      if (!this.workspace.onboarded && !this.workspace.appearance.language && typeof navigator !== "undefined") {
+        const guess = guessUiLanguage(navigator.languages ?? [navigator.language]);
+        if (guess !== "en") this.workspace = { ...this.workspace, appearance: { ...this.workspace.appearance, language: guess } };
       }
       this.ready = true;
       this.booted = true;

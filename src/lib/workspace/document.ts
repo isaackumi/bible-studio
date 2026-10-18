@@ -1,4 +1,5 @@
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
+import { sanitizeUiLanguage } from "../i18n/core";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition, sanitizeLayouts } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
@@ -54,6 +55,7 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
     calm: value?.calm === true,
     screenShape: sanitizeScreenShape(value?.screenShape),
     ...(value?.measuredAspect ? { measuredAspect: cleanAspect(value.measuredAspect) } : {}),
+    ...(value?.language ? { language: sanitizeUiLanguage(value.language) } : {}),
   };
 }
 

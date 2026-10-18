@@ -4,6 +4,7 @@
   import { describeStep, STEP_KINDS, type Macro, type MacroStep } from "../domain/macros";
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
+  import { t, tn } from "../i18n/core";
 
   // Macros: a button for a run of steps (fade the music, begin the part, show its first item).
   // Build them here; run them from the Service page or here.
@@ -17,7 +18,7 @@
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
 
-  const playlistName = (id: string) => session.workspace.playlists.find((list) => list.id === id)?.name ?? "a playlist";
+  const playlistName = (id: string) => session.workspace.playlists.find((list) => list.id === id)?.name ?? t("a playlist");
 
   function save(change: Partial<Macro>) {
     if (!selected) return;
@@ -38,7 +39,7 @@
   }
 
   function newMacro() {
-    const macro: Macro = { id: crypto.randomUUID(), name: "New macro", steps: [] };
+    const macro: Macro = { id: crypto.randomUUID(), name: t("New macro"), steps: [] };
     session.saveMacros([...macros, macro]);
     selectedId = macro.id;
   }
@@ -54,21 +55,21 @@
   }
 </script>
 
-<DeskDialog title="Macros" wide {onclose}>
+<DeskDialog title={t("Macros")} wide {onclose}>
   <div class="macros">
-    <nav class="list" aria-label="Macros">
+    <nav class="list" aria-label={t("Macros")}>
       {#each macros as macro (macro.id)}
         <button type="button" class="pick" class:on={macro.id === selectedId} onclick={() => (selectedId = macro.id)}>
           <strong>{macro.name}</strong>
-          <span>{macro.steps.length} step{macro.steps.length === 1 ? "" : "s"}</span>
+          <span>{tn(macro.steps.length, "{n} step", "{n} steps")}</span>
         </button>
       {/each}
-      <button type="button" class="add" onclick={newMacro}><Icon name="plus" size={14} /> New macro</button>
+      <button type="button" class="add" onclick={newMacro}><Icon name="plus" size={14} /> {t("New macro")}</button>
     </nav>
 
     {#if selected}
       <section class="edit">
-        <input class="name" aria-label="Macro name" value={selected.name} onchange={(event) => save({ name: event.currentTarget.value.trim() || selected.name })} />
+        <input class="name" aria-label={t("Macro name")} value={selected.name} onchange={(event) => save({ name: event.currentTarget.value.trim() || selected.name })} />
         <ol class="steps">
           {#each selected.steps as step, index (index)}
             <li
@@ -83,8 +84,8 @@
                 type="button"
                 class="grip"
                 draggable="true"
-                aria-label="Move step {index + 1}: drag, or Alt+arrow keys"
-                title="Drag to move"
+                aria-label={t("Move step {n}: drag, or Alt+arrow keys", { n: index + 1 })}
+                title={t("Drag to move")}
                 ondragstart={(event) => { dragFrom = index; event.dataTransfer?.setData("text/plain", String(index)); }}
                 ondragend={() => { dragFrom = null; dragOver = null; }}
                 onkeydown={(event) => { if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) { event.preventDefault(); moveStep(index, index + (event.key === "ArrowUp" ? -1 : 1)); } }}
@@ -93,49 +94,49 @@
               <span class="what">{describeStep(step, { playlist: playlistName })}</span>
               <span class="opts">
                 {#if step.kind === "fade-music" || step.kind === "wait"}
-                  <input type="number" min="0" max="60" step="0.5" aria-label="Seconds" value={step.seconds} onchange={(event) => setStep(index, { ...step, seconds: Number(event.currentTarget.value) || 0 })} />
+                  <input type="number" min="0" max="60" step="0.5" aria-label={t("Seconds")} value={step.seconds} onchange={(event) => setStep(index, { ...step, seconds: Number(event.currentTarget.value) || 0 })} />
                   <span class="unit">s</span>
                 {:else if step.kind === "play-playlist"}
-                  <select aria-label="Playlist" value={step.playlistId} onchange={(event) => setStep(index, { kind: "play-playlist", playlistId: event.currentTarget.value })}>
+                  <select aria-label={t("Playlist")} value={step.playlistId} onchange={(event) => setStep(index, { kind: "play-playlist", playlistId: event.currentTarget.value })}>
                     {#each session.workspace.playlists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
                   </select>
                 {:else if step.kind === "program"}
-                  <select aria-label="Screen" value={step.action} onchange={(event) => setStep(index, { kind: "program", action: event.currentTarget.value as typeof step.action })}>
-                    <option value="take">Go live</option><option value="clear-words">Clear words</option><option value="clear">Clear</option><option value="black">Black</option><option value="logo">Logo</option>
+                  <select aria-label={t("Screen")} value={step.action} onchange={(event) => setStep(index, { kind: "program", action: event.currentTarget.value as typeof step.action })}>
+                    <option value="take">{t("Go live")}</option><option value="clear-words">{t("Clear words")}</option><option value="clear">{t("Clear")}</option><option value="black">{t("Black")}</option><option value="logo">{t("Logo")}</option>
                   </select>
                 {:else if step.kind === "show-item"}
-                  <select aria-label="Which item" value={step.which} onchange={(event) => setStep(index, { ...step, which: event.currentTarget.value === "next" ? "next" : "first-of-part" })}>
-                    <option value="first-of-part">First item of the part</option><option value="next">Next item</option>
+                  <select aria-label={t("Which item")} value={step.which} onchange={(event) => setStep(index, { ...step, which: event.currentTarget.value === "next" ? "next" : "first-of-part" })}>
+                    <option value="first-of-part">{t("First item of the part")}</option><option value="next">{t("Next item")}</option>
                   </select>
-                  <label class="check"><input type="checkbox" checked={step.live} onchange={(event) => setStep(index, { ...step, live: event.currentTarget.checked })} /> On the screen</label>
+                  <label class="check"><input type="checkbox" checked={step.live} onchange={(event) => setStep(index, { ...step, live: event.currentTarget.checked })} /> {t("On the screen")}</label>
                 {:else if step.kind === "start-part"}
-                  <select aria-label="Which part" value={step.which} onchange={(event) => setStep(index, { kind: "start-part", which: event.currentTarget.value === "first" ? "first" : "next" })}>
-                    <option value="next">The next part</option><option value="first">The first part</option>
+                  <select aria-label={t("Which part")} value={step.which} onchange={(event) => setStep(index, { kind: "start-part", which: event.currentTarget.value === "first" ? "first" : "next" })}>
+                    <option value="next">{t("The next part")}</option><option value="first">{t("The first part")}</option>
                   </select>
                 {:else if step.kind === "countdown"}
-                  <select aria-label="Countdown" value={step.mode} onchange={(event) => setStep(index, { kind: "countdown", mode: event.currentTarget.value as typeof step.mode })}>
-                    <option value="overlay-on">On the screen</option><option value="overlay-off">Off</option><option value="full">Full screen on Preview</option>
+                  <select aria-label={t("Countdown")} value={step.mode} onchange={(event) => setStep(index, { kind: "countdown", mode: event.currentTarget.value as typeof step.mode })}>
+                    <option value="overlay-on">{t("On the screen")}</option><option value="overlay-off">{t("Off")}</option><option value="full">{t("Full screen on Preview")}</option>
                   </select>
                 {:else if step.kind === "captions"}
-                  <select aria-label="Captions" value={step.on ? "on" : "off"} onchange={(event) => setStep(index, { kind: "captions", on: event.currentTarget.value === "on" })}>
-                    <option value="on">On</option><option value="off">Off</option>
+                  <select aria-label={t("Captions")} value={step.on ? "on" : "off"} onchange={(event) => setStep(index, { kind: "captions", on: event.currentTarget.value === "on" })}>
+                    <option value="on">{t("On")}</option><option value="off">{t("Off")}</option>
                   </select>
                 {:else if step.kind === "stage-message"}
-                  <input class="text" aria-label="Stage message" maxlength="140" placeholder="Empty clears it" value={step.text} onchange={(event) => setStep(index, { kind: "stage-message", text: event.currentTarget.value })} />
+                  <input class="text" aria-label={t("Stage message")} maxlength="140" placeholder={t("Empty clears it")} value={step.text} onchange={(event) => setStep(index, { kind: "stage-message", text: event.currentTarget.value })} />
                 {/if}
               </span>
-              <button type="button" class="del" aria-label="Delete step {index + 1}" title="Delete this step" onclick={() => save({ steps: selected.steps.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>
+              <button type="button" class="del" aria-label={t("Delete step {n}", { n: index + 1 })} title={t("Delete this step")} onclick={() => save({ steps: selected.steps.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>
             </li>
           {:else}
-            <li class="empty">No steps yet. Add the first one below.</li>
+            <li class="empty">{t("No steps yet. Add the first one below.")}</li>
           {/each}
         </ol>
         <div class="adder">
-          <button type="button" class="ghost" aria-expanded={adding} onclick={() => (adding = !adding)}><Icon name="plus" size={13} /> Add a step</button>
+          <button type="button" class="ghost" aria-expanded={adding} onclick={() => (adding = !adding)}><Icon name="plus" size={13} /> {t("Add a step")}</button>
           {#if adding}
             <div class="kinds">
               {#each STEP_KINDS as entry (entry.kind)}
-                <button type="button" class="chip" onclick={() => { save({ steps: [...selected.steps, entry.make()] }); adding = false; }}>{entry.label}</button>
+                <button type="button" class="chip" onclick={() => { save({ steps: [...selected.steps, entry.make()] }); adding = false; }}>{t(entry.label)}</button>
               {/each}
             </div>
           {/if}
@@ -146,10 +147,10 @@
 
   {#snippet footer()}
     {#if selected}
-      <button type="button" class="btn danger" onclick={() => remove(selected.id)}>{armed === selected.id ? "Delete? Click again" : "Delete macro"}</button>
+      <button type="button" class="btn danger" onclick={() => remove(selected.id)}>{armed === selected.id ? t("Delete? Click again") : t("Delete macro")}</button>
       <span class="grow"></span>
-      <button type="button" class="btn" onclick={onclose}>Close</button>
-      <button type="button" class="btn primary" disabled={!!session.runningMacro || !selected.steps.length} onclick={() => void session.runMacro(selected.id)}><Icon name="play" size={13} /> Run now</button>
+      <button type="button" class="btn" onclick={onclose}>{t("Close")}</button>
+      <button type="button" class="btn primary" disabled={!!session.runningMacro || !selected.steps.length} onclick={() => void session.runMacro(selected.id)}><Icon name="play" size={13} /> {t("Run now")}</button>
     {/if}
   {/snippet}
 </DeskDialog>

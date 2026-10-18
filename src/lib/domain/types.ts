@@ -411,6 +411,8 @@ export type AppearanceSettings = {
   screenShape?: "auto" | "16:9" | "16:10" | "4:3" | "21:9" | "9:16";
   /** Width ÷ height the audience window last measured, so the desk matches it before it opens. */
   measuredAspect?: number;
+  /** The desk's own words (menus, buttons, settings) on this computer. Unset: English, or the computer's language on a first run. */
+  language?: import("../i18n/core").UiLanguage;
 };
 
 export type Workspace = {
