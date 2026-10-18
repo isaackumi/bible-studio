@@ -1,3 +1,4 @@
+import { defaultTimerSounds } from "./timer-cues";
 import { emptyTourProgress } from "../tour/steps";
 import { displayWash, motionById } from "./backgrounds";
 import { factoryProfiles } from "../display/profiles";
@@ -326,6 +327,7 @@ export function defaultWorkspace(): Workspace {
     secondOutput: defaultSecondOutput(),
     captions: defaultCaptionSettings(),
     countdownSize: 220,
+    timerSounds: defaultTimerSounds(),
     serviceTemplates: defaultTemplates(),
     recentSongs: [],
     recentAlerts: [],

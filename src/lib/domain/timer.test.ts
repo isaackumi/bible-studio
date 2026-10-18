@@ -22,31 +22,31 @@ const theme = defaultTheme();
 describe("timer source", () => {
   it("counts down, pauses, resumes, resets, and completes", () => {
     let timer = createTimer({ name: "Service", mode: "countdown", durationMs: 10_000, label: "Service starts in" });
-    expect(timerDisplay(timer, 0).text).toBe("00:10");
+    expect(timerDisplay(timer, 0).text).toBe("00:00:10");
     expect(timerDisplay(timer, 0).complete).toBe(false);
     timer = startTimer(timer, 1_000);
-    expect(timerDisplay(timer, 3_000).text).toBe("00:08");
+    expect(timerDisplay(timer, 3_000).text).toBe("00:00:08");
     timer = pauseTimer(timer, 3_000);
-    expect(timerDisplay(timer, 9_000).text).toBe("00:08");
+    expect(timerDisplay(timer, 9_000).text).toBe("00:00:08");
     timer = resumeTimer(timer, 9_000);
-    expect(timerDisplay(timer, 11_000).text).toBe("00:06");
+    expect(timerDisplay(timer, 11_000).text).toBe("00:00:06");
     timer = resetTimer(timer);
-    expect(timerDisplay(timer, 20_000).text).toBe("00:10");
+    expect(timerDisplay(timer, 20_000).text).toBe("00:00:10");
     timer = startTimer(timer, 0);
     expect(timerDisplay(timer, 10_000).complete).toBe(true);
-    expect(timerDisplay(timer, 10_000).text).toBe("00:00");
+    expect(timerDisplay(timer, 10_000).text).toBe("00:00:00");
   });
 
   it("counts up, shows a clock, and warns before a target time", () => {
     const up = startTimer(createTimer({ name: "Up", mode: "countup", durationMs: 5_000 }), 0);
-    expect(timerDisplay(up, 2_500).text).toBe("00:02");
+    expect(timerDisplay(up, 2_500).text).toBe("00:00:02");
     expect(formatClock(new Date("2026-10-15T10:42:31Z").getTime(), true)).toMatch(/10:42:31/);
     const target = startTimer(
       createTimer({ name: "Go", mode: "target", durationMs: 0, targetAt: 60_000, warningMs: 15_000, label: "Go" }),
       0,
     );
     expect(timerDisplay(target, 50_000).warning).toBe(true);
-    expect(timerDisplay(target, 50_000).text).toBe("00:10");
+    expect(timerDisplay(target, 50_000).text).toBe("00:00:10");
     expect(timerDisplay(target, 60_000).complete).toBe(true);
     const morning = new Date("2026-10-16T09:00:00").getTime();
     expect(targetAtFromClock("10:30", morning) - morning).toBe(90 * 60_000);
@@ -78,7 +78,7 @@ describe("timer source", () => {
     expect(taken.program.model.layout).toBe("composition");
     expect(taken.program.model.layers?.[0]?.model.layout).toBe("timer");
     const snapshot = taken.program.model.layers?.[0]?.model.timer;
-    expect(timerDisplay(timerFromPaint(snapshot!), 60_000).text).toBe("07:00");
+    expect(timerDisplay(timerFromPaint(snapshot!), 60_000).text).toBe("00:07:00");
     expect(taken.program.model.layers?.[0]?.model.timer?.elapsedMs).toBe(0);
   });
 });
@@ -90,10 +90,10 @@ describe("timer controls on a painted frame", () => {
   it("pauses, resumes and resets a countdown without losing time", () => {
     const paused = controlTimers(running(), "pause", 61_000)!;
     expect(paused.timer).toMatchObject({ running: false, elapsedMs: 60_000, startedAt: null });
-    expect(timerDisplay(timerFromPaint(paused.timer!), 500_000).text).toBe("09:00");
+    expect(timerDisplay(timerFromPaint(paused.timer!), 500_000).text).toBe("00:09:00");
     const resumed = controlTimers(paused, "resume", 100_000)!;
     expect(resumed.timer).toMatchObject({ running: true, startedAt: 100_000, elapsedMs: 60_000 });
-    expect(timerDisplay(timerFromPaint(resumed.timer!), 130_000).text).toBe("08:30");
+    expect(timerDisplay(timerFromPaint(resumed.timer!), 130_000).text).toBe("00:08:30");
     expect(controlTimers(resumed, "reset", 200_000)!.timer).toMatchObject({ running: false, elapsedMs: 0, startedAt: null });
   });
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PaintedOverlay } from "../domain/screen-overlays";
+  import { formatCountdown } from "../domain/timer";
 
   // Overlays painted over Program, in frame pixels (1080 tall), so they scale with every screen.
   let { overlays, still = false }: { overlays: PaintedOverlay[]; still?: boolean } = $props();
@@ -13,15 +14,10 @@
   });
   const time = $derived(now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
 
-  /** "12:04" left, or "+1:30" once over. */
+  /** Time left as 00:12:04; it stops at 00:00:00 and flashes there. */
   function left(endsAt: number): { text: string; over: boolean; short: boolean } {
     const ms = endsAt - now.getTime();
-    const whole = Math.floor(Math.abs(ms) / 1000);
-    const h = Math.floor(whole / 3600);
-    const m = Math.floor((whole % 3600) / 60);
-    const sec = String(whole % 60).padStart(2, "0");
-    const text = h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
-    return { text: ms < 0 ? `+${text}` : text, over: ms < 0, short: ms >= 0 && ms <= 5 * 60_000 };
+    return { text: formatCountdown(ms), over: ms <= 0, short: ms > 0 && ms <= 5 * 60_000 };
   }
   const SPEED: Record<1 | 2 | 3, number> = { 1: 40, 2: 26, 3: 16 };
   // Corner overlays move clear of a ticker or banner on the same edge.
@@ -107,6 +103,9 @@
   .ov-count.short { border-bottom-color: #f5a524; }
   .ov-count.short .ov-count-time { color: #ffd27a; }
   .ov-count.over { border-bottom-color: #e5484d; background: rgba(120, 10, 20, 0.82); }
+  .ov-count.over .ov-count-time { animation: ov-done 1s steps(2, jump-none) infinite; }
+  @keyframes ov-done { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .ov-count.over .ov-count-time { animation: none; } }
 
   .ov-lower { position: absolute; left: 96px; bottom: 120px; display: grid; gap: 4px; padding: 22px 40px 24px 34px; border-left: 12px solid var(--accent-bar); border-radius: 6px; background: rgba(5, 5, 5, 0.85); color: #fff; max-width: 60%; }
   .ov-lower strong { font-size: 46px; font-weight: 700; line-height: 1.1; }

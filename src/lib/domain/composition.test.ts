@@ -376,14 +376,14 @@ describe("composition Preview/Program safety", () => {
     const painted = presentComposition(look, { theme, now: 0 });
     expect(painted.layers?.[1]?.model.layout).toBe("timer");
     expect(painted.layers?.[1]?.model.reference).toBe("Service starts in");
-    expect(painted.layers?.[1]?.model.lines[0]?.text).toBe("10:00");
+    expect(painted.layers?.[1]?.model.lines[0]?.text).toBe("00:10:00");
     expect(painted.layers?.[1]?.zIndex).toBeGreaterThan(painted.layers![0]!.zIndex);
 
     let live = previewComposition(createLiveState(theme), painted, look.id);
     expect(live.program.model.layout).not.toBe("composition");
     const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
     expect(taken.program.model.layers?.map((layer) => layer.model.layout)).toEqual(["title", "timer"]);
-    expect(taken.program.model.layers?.[1]?.model.lines[0]?.text).toBe("10:00");
+    expect(taken.program.model.layers?.[1]?.model.lines[0]?.text).toBe("00:10:00");
     expect(taken.program.model).not.toHaveProperty("stream");
 
     const onAir = taken.program;
@@ -601,13 +601,13 @@ describe("composition Preview/Program safety", () => {
     const painted = presentComposition(look, { theme, now: 0 });
     expect(painted.layers?.map((layer) => layer.model.layout)).toEqual(["timer"]);
     expect(painted.layers?.[0]?.model.reference).toBe("Service starts in");
-    expect(painted.layers?.[0]?.model.lines[0]?.text).toBe("10:00");
+    expect(painted.layers?.[0]?.model.lines[0]?.text).toBe("00:10:00");
 
     let live = previewComposition(createLiveState(theme), painted, look.id);
     expect(live.program.model.layout).not.toBe("composition");
     const taken = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
     expect(taken.program.model.layers?.map((layer) => layer.model.layout)).toEqual(["timer"]);
-    expect(taken.program.model.layers?.[0]?.model.lines[0]?.text).toBe("10:00");
+    expect(taken.program.model.layers?.[0]?.model.lines[0]?.text).toBe("00:10:00");
     expect(taken.program.model).not.toHaveProperty("stream");
   });
 
@@ -617,13 +617,13 @@ describe("composition Preview/Program safety", () => {
     const paintedUp = presentComposition(up, { theme, now: 0 });
     expect(paintedUp.layers?.[0]?.model.timer?.mode).toBe("countup");
     expect(paintedUp.layers?.[0]?.model.reference).toBe("Elapsed");
-    expect(paintedUp.layers?.[0]?.model.lines[0]?.text).toBe("00:00");
+    expect(paintedUp.layers?.[0]?.model.lines[0]?.text).toBe("00:00:00");
 
     let live = previewComposition(createLiveState(theme), paintedUp, up.id);
     expect(live.program.model.layout).not.toBe("composition");
     const takenUp = applyProgramAction(live, "take", theme, { title: "Logo", imageUrl: null });
     expect(takenUp.program.model.layers?.[0]?.model.timer?.mode).toBe("countup");
-    expect(takenUp.program.model.layers?.[0]?.model.lines[0]?.text).toBe("00:00");
+    expect(takenUp.program.model.layers?.[0]?.model.lines[0]?.text).toBe("00:00:00");
     expect(takenUp.program.model).not.toHaveProperty("stream");
 
     const clock = lookCountdown({ label: "Now", mode: "clock" });
@@ -645,7 +645,7 @@ describe("composition Preview/Program safety", () => {
     const painted = presentComposition(look, { theme, now: 50_000 });
     expect(painted.layers?.[0]?.model.timer?.mode).toBe("target");
     expect(painted.layers?.[0]?.model.timer?.targetAt).toBe(60_000);
-    expect(painted.layers?.[0]?.model.lines[0]?.text).toBe("00:10");
+    expect(painted.layers?.[0]?.model.lines[0]?.text).toBe("00:00:10");
 
     let live = previewComposition(createLiveState(theme), painted, look.id);
     expect(live.program.model.layout).not.toBe("composition");

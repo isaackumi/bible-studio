@@ -2,7 +2,8 @@
   import { session } from "../../app/session.svelte";
   import { clockLabel, DEFAULT_START, leftLabel, lengthLabel, minutesOfDay, planSchedule, slotNow } from "../../domain/schedule";
   import type { Service } from "../../domain/types";
-  import { t } from "../../i18n/core";
+  import { msg, t } from "../../i18n/core";
+  import Icon from "../Icon.svelte";
 
   // The service at a glance: when it starts and ends, each section as a block in proportion to
   // its time, the time now, and on the day how much of the running section is left.
@@ -44,8 +45,9 @@
       <button type="button" class:on={session.countdownOverlayOn} aria-pressed={session.countdownOverlayOn} title={t("The time left in a corner of the screen (place and size it in Overlays)")} onclick={() => session.toggleCountdownOverlay()}>{t("On screen")}</button>
       <button type="button" title={t("A big countdown on Preview; LIVE shows it")} onclick={() => session.showCountdown()}>{t("Full screen")}</button>
       <select aria-label={t("Full-screen countdown size")} value={String(session.workspace.countdownSize)} onchange={(event) => session.setCountdownSize(Number(event.currentTarget.value))}>
-        {#each [[160, "Medium"], [220, "Large"], [300, "Huge"], [400, "Giant"]] as [size, label] (size)}<option value={String(size)}>{label}</option>{/each}
+        {#each [[160, msg("Medium")], [220, msg("Large")], [300, msg("Huge")], [400, msg("Giant")]] as [size, label] (size)}<option value={String(size)}>{t(String(label))}</option>{/each}
       </select>
+      <button type="button" class="sound" class:on={session.workspace.timerSounds.on} aria-pressed={session.workspace.timerSounds.on} aria-label={t("Timer sounds")} title={session.workspace.timerSounds.on ? t("Beeps at the warning times and at 00:00:00. Click to mute (Settings › Sound & voice for more).") : t("Timer sounds are off. Click to turn them on.")} onclick={() => session.setTimerSounds({ on: !session.workspace.timerSounds.on })}><Icon name={session.workspace.timerSounds.on ? "bell" : "bell-off"} size={13} /></button>
     </span>
     {#if status}
       <span class="live" class:over={status.left < 0}>
@@ -122,4 +124,6 @@
   .now { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #e5484d; border-radius: 1px; pointer-events: none; }
   .now span { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); padding: 0 5px; border-radius: 4px; background: #e5484d; color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .ticks { display: flex; justify-content: space-between; min-height: 14px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .countdown .sound { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: var(--muted); }
+  .countdown .sound.on { color: var(--ink); }
 </style>

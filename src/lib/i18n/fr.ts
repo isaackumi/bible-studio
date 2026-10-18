@@ -2354,4 +2354,23 @@ export const fr: Readonly<Record<string, string>> = {
   // Shrink to fit
   "Long text is shrunk to fit the screen. Split it for bigger words: fewer verses, or a song part in two.": "Le texte long est réduit pour tenir à l’écran. Découpez-le pour un texte plus grand : moins de versets, ou une partie de chant en deux.",
   "Text at {percent}% to fit": "Texte à {percent} % pour tenir",
+
+  // Timer sounds
+  Huge: "Très grand",
+  Giant: "Géant",
+  "Timer sounds": "Sons du minuteur",
+  "Beeps at the warning times and at 00:00:00. Click to mute (Settings › Sound & voice for more).": "Bips aux moments d’alerte et à 00:00:00. Cliquez pour couper (Réglages › Son et voix pour plus).",
+  "Timer sounds are off. Click to turn them on.": "Les sons du minuteur sont coupés. Cliquez pour les activer.",
+  "Beep as countdowns run out": "Biper quand un compte à rebours se termine",
+  "On this computer only, never on the audience screen. If this computer's sound goes to the speakers in the room, keep it low or turn it off.": "Sur cet ordinateur seulement, jamais sur l’écran de l’assemblée. Si le son de cet ordinateur passe dans les haut-parleurs de la salle, gardez-le bas ou coupez-le.",
+  "Warn when this much is left": "Alerter quand il reste",
+  "A double beep at each mark.": "Un double bip à chaque repère.",
+  "{n} min": "{n} min",
+  "Count the last 10 seconds": "Compter les 10 dernières secondes",
+  "A soft tick each second, then a chime at 00:00:00.": "Un léger tic chaque seconde, puis un carillon à 00:00:00.",
+  "Try each sound.": "Essayez chaque son.",
+  "Timer sound volume": "Volume des sons du minuteur",
+  Warning: "Alerte",
+  Tick: "Tic",
+  End: "Fin",
 };

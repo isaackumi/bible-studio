@@ -26,6 +26,7 @@
   import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
+  import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
 
   type SettingsSectionId =
@@ -1292,6 +1293,36 @@
         </section>
       {:else if section === "audio"}
         <AudioSettings />
+        <p class="section-label">{t("Timer sounds")}</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>{t("Beep as countdowns run out")}</strong><span>{t("On this computer only, never on the audience screen. If this computer's sound goes to the speakers in the room, keep it low or turn it off.")}</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Timer sounds")} checked={session.workspace.timerSounds.on} onchange={(event) => session.setTimerSounds({ on: event.currentTarget.checked })} />
+          </div>
+          {#if session.workspace.timerSounds.on}
+            <div class="row">
+              <div class="row-copy"><strong>{t("Warn when this much is left")}</strong><span>{t("A double beep at each mark.")}</span></div>
+              <div class="row-end">
+                {#each WARN_CHOICES as minutes (minutes)}
+                  <label class="check"><input type="checkbox" checked={session.workspace.timerSounds.warnAt.includes(minutes)} onchange={(event) => session.setTimerSounds({ warnAt: event.currentTarget.checked ? [...session.workspace.timerSounds.warnAt, minutes] : session.workspace.timerSounds.warnAt.filter((entry) => entry !== minutes) })} /> {t("{n} min", { n: minutes })}</label>
+                {/each}
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-copy"><strong>{t("Count the last 10 seconds")}</strong><span>{t("A soft tick each second, then a chime at 00:00:00.")}</span></div>
+              <input type="checkbox" class="switch" role="switch" aria-label={t("Count the last 10 seconds")} checked={session.workspace.timerSounds.ticks} onchange={(event) => session.setTimerSounds({ ticks: event.currentTarget.checked })} />
+            </div>
+            <div class="row">
+              <div class="row-copy"><strong>{t("Volume")}</strong><span>{t("Try each sound.")}</span></div>
+              <div class="row-end">
+                <input type="range" min="0.05" max="1" step="0.05" aria-label={t("Timer sound volume")} value={session.workspace.timerSounds.volume} oninput={(event) => session.setTimerSounds({ volume: Number(event.currentTarget.value) })} />
+                <button type="button" class="btn" onclick={() => session.testTimerSound("warn")}>{t("Warning")}</button>
+                <button type="button" class="btn" onclick={() => session.testTimerSound("tick")}>{t("Tick")}</button>
+                <button type="button" class="btn" onclick={() => session.testTimerSound("end")}>{t("End")}</button>
+              </div>
+            </div>
+          {/if}
+        </section>
         <p class="section-label">{t("Verse detection")}</p>
         <section class="rows">
           <div class="row">
@@ -1706,6 +1737,7 @@
   /* Cards */
   .settings-body :global(.card) { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); flex: none; }
   .settings-body :global(.card h3) { margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); }
+  .check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
   .card-note { margin: -4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
   .status-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .status-card.on { border-color: color-mix(in srgb, var(--presence, #3fb950) 60%, var(--line)); }

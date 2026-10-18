@@ -1,5 +1,6 @@
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { sanitizeUiLanguage } from "../i18n/core";
+import { sanitizeTimerSounds } from "../domain/timer-cues";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition, sanitizeLayouts } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
@@ -144,6 +145,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     macros: sanitizeMacros(value.macros),
     songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
+    timerSounds: sanitizeTimerSounds(value.timerSounds),
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)

@@ -50,6 +50,15 @@ export function formatDuration(ms: number) {
   return `${pad(minutes)}:${pad(seconds)}`;
 }
 
+/**
+ * A countdown on the screen: always hours, minutes and seconds ("00:04:59"), counting whole
+ * seconds up, so it reads 00:00:01 until the very end and stops at 00:00:00.
+ */
+export function formatCountdown(ms: number, roundUp = true) {
+  const total = Math.max(0, roundUp ? Math.ceil(ms / 1000 - 1e-6) : Math.floor(ms / 1000));
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+}
+
 export function targetAtFromClock(clock: string, now: number): number {
   const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(clock.trim());
   if (!match) return now;
@@ -103,7 +112,7 @@ export function timerDisplay(timer: TimerSpec, now: number): TimerView {
   if (timer.mode === "target") {
     const remaining = Math.max(0, (timer.targetAt ?? 0) - now);
     return {
-      text: formatDuration(remaining),
+      text: formatCountdown(remaining),
       remainingMs: remaining,
       elapsedMs: 0,
       complete: remaining <= 0,
@@ -114,7 +123,7 @@ export function timerDisplay(timer: TimerSpec, now: number): TimerView {
   if (timer.mode === "countup") {
     const capped = Math.min(elapsed, timer.durationMs || elapsed);
     return {
-      text: formatDuration(capped),
+      text: formatCountdown(capped, false),
       remainingMs: Math.max(0, (timer.durationMs || 0) - capped),
       elapsedMs: capped,
       complete: timer.durationMs > 0 && capped >= timer.durationMs,
@@ -123,7 +132,7 @@ export function timerDisplay(timer: TimerSpec, now: number): TimerView {
   }
   const remaining = Math.max(0, timer.durationMs - elapsed);
   return {
-    text: formatDuration(remaining),
+    text: formatCountdown(remaining),
     remainingMs: remaining,
     elapsedMs: elapsed,
     complete: remaining <= 0,

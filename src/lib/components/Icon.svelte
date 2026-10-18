@@ -2,6 +2,7 @@
   import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
   import AudioLines from "@lucide/svelte/icons/audio-lines";
   import Bell from "@lucide/svelte/icons/bell";
+  import BellOff from "@lucide/svelte/icons/bell-off";
   import Book from "@lucide/svelte/icons/book";
   import BookOpen from "@lucide/svelte/icons/book-open";
   import Cast from "@lucide/svelte/icons/cast";
@@ -82,6 +83,8 @@
     look: Palette,
     star: Star,
     alerts: Bell,
+    bell: Bell,
+    "bell-off": BellOff,
     help: CircleQuestionMark,
     settings: Settings,
     note: Music,

@@ -1,5 +1,7 @@
 import { noteSongUse } from "../domain/song-usage";
 import { guessUiLanguage, t, tn } from "../i18n/core";
+import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
+import { playCue } from "../audio/beeper";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
@@ -2407,7 +2409,7 @@ class Session {
     }
     if (!target) {
       const start = today.getTime() + (parseClock(service.startTime) ?? plan.start) * 60_000;
-      target = { name: "Service starts in", at: start };
+      target = { name: t("Service starts in"), at: start };
     }
     const timer = { ...createTimer({ name: target.name, mode: "target", targetAt: target.at, label: target.name, warningMs: 5 * 60_000 }), running: true };
     const theme = { ...this.theme(), fontSize: this.workspace.countdownSize };
@@ -2421,6 +2423,51 @@ class Session {
     this.live = { ...this.live };
     void this.pushProgram();
   }
+
+  // Timer sounds: each tick reads the time left on every countdown that is showing (a full-screen
+  // timer on Program, timers inside a look, the countdown overlay) and beeps as marks are crossed.
+  private timerLeft = new Map<string, number>();
+
+  private countdownsShowing(now: number): Array<{ key: string; left: number }> {
+    const found: Array<{ key: string; left: number }> = [];
+    const program = this.live.program.model;
+    const paints = [program.timer, ...(program.layers ?? []).map((layer) => layer.model.timer)];
+    paints.forEach((paint, index) => {
+      if (!paint || !paint.running || (paint.mode !== "countdown" && paint.mode !== "target")) return;
+      found.push({ key: `timer:${index}:${paint.label}:${paint.mode === "target" ? paint.targetAt : paint.durationMs}`, left: timerDisplay(timerFromPaint(paint), now).remainingMs });
+    });
+    if (this.countdownOverlayOn) {
+      const deadline = this.runningDeadline();
+      if (deadline) found.push({ key: `overlay:${deadline.name}:${deadline.endsAt}`, left: deadline.endsAt - now });
+    }
+    return found;
+  }
+
+  /** Called a few times a second by the desk. Only the window sending to the audience beeps. */
+  timerTick = () => {
+    const sounds = this.workspace.timerSounds;
+    const now = Date.now();
+    const showing = this.countdownsShowing(now);
+    const due = new Set<TimerCue>();
+    const next = new Map<string, number>();
+    for (const entry of showing) {
+      const before = this.timerLeft.get(entry.key);
+      if (before !== undefined) for (const cue of cuesBetween(before, entry.left, sounds)) due.add(cue);
+      next.set(entry.key, entry.left);
+    }
+    this.timerLeft = next;
+    if (!this.controlsAudience && !this.desktop()) return;
+    const cue: TimerCue | null = due.has("end") ? "end" : due.has("warn") ? "warn" : due.has("tick") ? "tick" : null;
+    if (cue) playCue(cue, sounds.volume);
+  };
+
+  setTimerSounds = (patch: Partial<TimerSounds>) => {
+    this.workspace = { ...this.workspace, timerSounds: sanitizeTimerSounds({ ...this.workspace.timerSounds, ...patch }) };
+    this.persistSoon();
+  };
+
+  /** Hear what the timer sounds are like. */
+  testTimerSound = (cue: TimerCue) => playCue(cue, this.workspace.timerSounds.volume || 0.5);
 
   /** The section running now and when it should end, for the stage screens. */
   runningDeadline = (): { name: string; endsAt: number } | null => {

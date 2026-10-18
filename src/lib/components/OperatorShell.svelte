@@ -46,7 +46,10 @@
           .then((stop) => (stopClose = stop)),
       );
     }
+    // Countdown beeps: a few readings a second so each mark sounds on time.
+    const timerWatch = setInterval(() => session.timerTick(), 200);
     return () => {
+      clearInterval(timerWatch);
       stopShape();
       stopClose();
       window.removeEventListener("storage", onStorage);
