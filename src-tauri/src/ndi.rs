@@ -83,3 +83,44 @@ pub fn stop() {
         }
     }
 }
+
+/// The port the NDI hub serves on (this computer only). The app's screens show an NDI source as
+/// http://127.0.0.1:47129/ndi/<name>.mjpg; keep in step with NDI_HUB in src/lib/domain/ndi.ts.
+pub const HUB_PORT: u16 = 47129;
+
+/// Start the NDI hub (receiving NDI sources for scenes) when the app opens. Quiet when NDI is not
+/// installed: the helper exits and NDI sources simply show as unavailable. It ends with the app,
+/// when its stdin closes.
+pub fn start_hub() {
+    #[cfg(target_os = "macos")]
+    {
+        let Some(helper) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-ndi"))).filter(|path| path.exists()) else {
+            return;
+        };
+        let spawned = std::process::Command::new(helper)
+            .args(["--hub", "--port", &HUB_PORT.to_string()])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+        match spawned {
+            Ok(mut child) => {
+                if let Some(stdout) = child.stdout.take() {
+                    std::thread::spawn(move || {
+                        for line in std::io::BufRead::lines(std::io::BufReader::new(stdout)).map_while(Result::ok) {
+                            log::info!("ndi hub: {line}");
+                        }
+                    });
+                }
+                // Holding stdin keeps the hub alive; it closes when the app exits.
+                *hub::HUB.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(child);
+            }
+            Err(error) => log::warn!("NDI hub did not start: {error}"),
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod hub {
+    pub static HUB: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
+}

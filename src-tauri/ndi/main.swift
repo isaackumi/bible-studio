@@ -1,7 +1,10 @@
 import AVFoundation
 import CoreMedia
 import Foundation
+import ImageIO
+import Network
 import ScreenCaptureKit
+import UniformTypeIdentifiers
 
 // Church Studio NDI sender: watches the audience window with ScreenCaptureKit and sends what it
 // shows as an NDI source, so OBS, vMix, a streaming computer or an NDI monitor can take Program.
@@ -33,6 +36,9 @@ private struct Options {
     var height = 1080
     /** Send colour bars instead of the audience window (find the source in OBS before a service). */
     var pattern = false
+    /** Hub: receive NDI sources and serve them to the app's screens on this computer only. */
+    var hub = false
+    var port: UInt16 = 47129
 
     init(_ args: [String]) {
         var index = 1
@@ -49,6 +55,8 @@ private struct Options {
             case "--width": width = max(320, min(3840, Int(next() ?? "") ?? width))
             case "--height": height = max(180, min(2160, Int(next() ?? "") ?? height))
             case "--pattern": pattern = true
+            case "--hub": hub = true
+            case "--port": port = UInt16(next() ?? "") ?? port
             default: break
             }
             index += 1
@@ -58,12 +66,18 @@ private struct Options {
 
 /// The NDI library's send functions, found with dlopen/dlsym.
 private struct NDI {
+    let handle: UnsafeMutableRawPointer
     let destroy: NDIlib_destroy_fn
     let sendCreate: NDIlib_send_create_fn
     let sendDestroy: NDIlib_send_destroy_fn
     let sendVideo: NDIlib_send_send_video_v2_fn
     let connections: NDIlib_send_get_no_connections_fn
     let version: String
+
+    func symbol<T>(_ name: String, _ type: T.Type) -> T? {
+        guard let pointer = dlsym(handle, name) else { return nil }
+        return unsafeBitCast(pointer, to: type)
+    }
 
     static func load() -> NDI? {
         var candidates: [String] = []
@@ -95,7 +109,7 @@ private struct NDI {
         else { return nil }
         guard initialize() else { return nil }
         let version = symbol("NDIlib_version", NDIlib_version_fn.self).flatMap { fn in fn().map { String(cString: $0) } } ?? "NDI"
-        return NDI(destroy: destroy, sendCreate: sendCreate, sendDestroy: sendDestroy, sendVideo: sendVideo, connections: connections, version: version)
+        return NDI(handle: handle, destroy: destroy, sendCreate: sendCreate, sendDestroy: sendDestroy, sendVideo: sendVideo, connections: connections, version: version)
     }
 }
 
@@ -291,6 +305,253 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     }
 }
 
+// MARK: Hub: NDI in
+
+/// Receives NDI sources and serves them on 127.0.0.1 only, for the app's own screens:
+///   GET /sources            → ["MACHINE (Name)", …]
+///   GET /ndi/<name>.mjpg    → the source as a motion-JPEG stream (any <img> can show it)
+/// A source is received while something shows it, and let go 10 seconds after the last viewer.
+private final class Hub: @unchecked Sendable {
+    private let ndi: NDI
+    private let port: UInt16
+    private let findCreate: NDIlib_find_create_v2_fn
+    private let findSources: NDIlib_find_get_current_sources_fn
+    let recvCreate: NDIlib_recv_create_v3_fn
+    let recvDestroy: NDIlib_recv_destroy_fn
+    let capture: NDIlib_recv_capture_v2_fn
+    let freeVideo: NDIlib_recv_free_video_v2_fn
+    private var finder: UnsafeMutableRawPointer?
+    private var listener: NWListener?
+    private let queue = DispatchQueue(label: "ndi.hub")
+    private var feeds: [String: Feed] = [:]
+
+    init?(ndi: NDI, port: UInt16) {
+        guard let findCreate = ndi.symbol("NDIlib_find_create_v2", NDIlib_find_create_v2_fn.self),
+              let findSources = ndi.symbol("NDIlib_find_get_current_sources", NDIlib_find_get_current_sources_fn.self),
+              let recvCreate = ndi.symbol("NDIlib_recv_create_v3", NDIlib_recv_create_v3_fn.self),
+              let recvDestroy = ndi.symbol("NDIlib_recv_destroy", NDIlib_recv_destroy_fn.self),
+              let capture = ndi.symbol("NDIlib_recv_capture_v2", NDIlib_recv_capture_v2_fn.self),
+              let freeVideo = ndi.symbol("NDIlib_recv_free_video_v2", NDIlib_recv_free_video_v2_fn.self)
+        else { return nil }
+        self.ndi = ndi
+        self.port = port
+        self.findCreate = findCreate
+        self.findSources = findSources
+        self.recvCreate = recvCreate
+        self.recvDestroy = recvDestroy
+        self.capture = capture
+        self.freeVideo = freeVideo
+    }
+
+    func start() {
+        var settings = NDIlib_find_create_t(show_local_sources: true, p_groups: nil, p_extra_ips: nil)
+        finder = findCreate(&settings)
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!)
+        parameters.allowLocalEndpointReuse = true
+        guard let listener = try? NWListener(using: parameters) else { fail("port", "Port \(port) on this computer is in use; NDI sources cannot be shown.") }
+        listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
+        listener.stateUpdateHandler = { state in
+            if case .failed(let error) = state { fail("port", "The NDI hub stopped: \(error.localizedDescription)") }
+            if case .ready = state { emit(["kind": "hub", "port": Int(self.port), "message": "Receiving NDI on this computer (\(self.ndi.version))."]) }
+        }
+        listener.start(queue: queue)
+        self.listener = listener
+    }
+
+    /// Sources on the network now, with their full NDI names.
+    func sources() -> [String: NDIlib_source_t] {
+        guard let finder else { return [:] }
+        var count: UInt32 = 0
+        guard let list = findSources(finder, &count) else { return [:] }
+        var result: [String: NDIlib_source_t] = [:]
+        for index in 0..<Int(count) {
+            let source = list[index]
+            if let name = source.p_ndi_name { result[String(cString: name)] = source }
+        }
+        return result
+    }
+
+    private func accept(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, _ in
+            guard let self, let data, let request = String(data: data, encoding: .utf8),
+                  let line = request.split(separator: "\r\n").first else {
+                connection.cancel()
+                return
+            }
+            let parts = line.split(separator: " ")
+            let path = parts.count > 1 ? String(parts[1]) : "/"
+            self.route(path, connection)
+        }
+    }
+
+    private func route(_ path: String, _ connection: NWConnection) {
+        if path == "/sources" {
+            let names = sources().keys.sorted()
+            let body = (try? JSONSerialization.data(withJSONObject: names)) ?? Data("[]".utf8)
+            respond(connection, status: "200 OK", type: "application/json", body: body)
+            return
+        }
+        if path.hasPrefix("/ndi/"), path.hasSuffix(".mjpg") {
+            let encoded = String(path.dropFirst(5).dropLast(5))
+            let name = encoded.removingPercentEncoding ?? encoded
+            if let feed = feeds[name] {
+                feed.add(connection)
+                return
+            }
+            guard let source = sources()[name] else {
+                respond(connection, status: "404 Not Found", type: "text/plain", body: Data("No NDI source called \(name) is on the network.".utf8))
+                return
+            }
+            let feed = Feed(name: name, source: source, hub: self) { [weak self] in
+                self?.queue.async { self?.feeds[name] = nil }
+            }
+            feeds[name] = feed
+            feed.add(connection)
+            return
+        }
+        respond(connection, status: "404 Not Found", type: "text/plain", body: Data())
+    }
+
+    private func respond(_ connection: NWConnection, status: String, type: String, body: Data) {
+        let head = "HTTP/1.1 \(status)\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(head.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
+    }
+}
+
+/// One NDI source being received, with every screen showing it.
+private final class Feed: @unchecked Sendable {
+    private let name: String
+    private weak var hub: Hub?
+    private var receiver: UnsafeMutableRawPointer?
+    private var clients: [ObjectIdentifier: (connection: NWConnection, inFlight: Int)] = [:]
+    private let lock = NSLock()
+    private var running = true
+    private var idleSince: Date?
+    private let onEnd: () -> Void
+    private var nameCopy: UnsafeMutablePointer<CChar>?
+    private var urlCopy: UnsafeMutablePointer<CChar>?
+
+    init(name: String, source: NDIlib_source_t, hub: Hub, onEnd: @escaping () -> Void) {
+        self.name = name
+        self.hub = hub
+        self.onEnd = onEnd
+        // The receiver copies what it needs, but keep the strings alive while it is created.
+        nameCopy = source.p_ndi_name.map { strdup($0) }
+        urlCopy = source.p_url_address.map { strdup($0) }
+        var settings = NDIlib_recv_create_v3_t(
+            source_to_connect_to: NDIlib_source_t(p_ndi_name: nameCopy, p_url_address: urlCopy),
+            color_format: Int32(NDI_RECV_BGRX_BGRA),
+            bandwidth: Int32(NDI_RECV_BANDWIDTH_HIGHEST),
+            allow_video_fields: false,
+            p_ndi_recv_name: nil
+        )
+        receiver = hub.recvCreate(&settings)
+        let thread = Thread { [weak self] in self?.loop() }
+        thread.name = "ndi.feed"
+        thread.start()
+    }
+
+    func add(_ connection: NWConnection) {
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nCache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
+        lock.lock()
+        clients[ObjectIdentifier(connection)] = (connection, 0)
+        idleSince = nil
+        lock.unlock()
+        connection.stateUpdateHandler = { [weak self, weak connection] state in
+            guard let self, let connection else { return }
+            switch state {
+            case .failed, .cancelled: self.drop(connection)
+            default: break
+            }
+        }
+    }
+
+    private func drop(_ connection: NWConnection) {
+        lock.lock()
+        clients[ObjectIdentifier(connection)] = nil
+        if clients.isEmpty { idleSince = Date() }
+        lock.unlock()
+    }
+
+    private func loop() {
+        guard let hub, let receiver else { finish(); return }
+        var frame = NDIlib_video_frame_v2_t()
+        var lastSent = Date.distantPast
+        while running {
+            let type = hub.capture(receiver, &frame, nil, nil, 200)
+            if type == Int32(NDI_FRAME_TYPE_VIDEO) {
+                // About 25 pictures a second is plenty for a monitor and keeps the processor calm.
+                if Date().timeIntervalSince(lastSent) >= 0.038, let jpeg = encode(frame) {
+                    lastSent = Date()
+                    broadcast(jpeg)
+                }
+                hub.freeVideo(receiver, &frame)
+            }
+            lock.lock()
+            let idle = idleSince.map { Date().timeIntervalSince($0) > 10 } ?? false
+            lock.unlock()
+            if idle { running = false }
+        }
+        finish()
+    }
+
+    private func finish() {
+        if let receiver, let hub { hub.recvDestroy(receiver) }
+        receiver = nil
+        free(nameCopy)
+        free(urlCopy)
+        nameCopy = nil
+        urlCopy = nil
+        lock.lock()
+        let open = clients.values.map(\.connection)
+        clients.removeAll()
+        lock.unlock()
+        open.forEach { $0.cancel() }
+        onEnd()
+    }
+
+    private func encode(_ frame: NDIlib_video_frame_v2_t) -> Data? {
+        guard let pixels = frame.p_data, frame.xres > 0, frame.yres > 0 else { return nil }
+        let stride = Int(frame.line_stride_in_bytes)
+        let bytes = Data(bytes: pixels, count: stride * Int(frame.yres))
+        guard let provider = CGDataProvider(data: bytes as CFData),
+              let image = CGImage(
+                width: Int(frame.xres), height: Int(frame.yres), bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: stride,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.noneSkipFirst.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+              ) else { return nil }
+        let out = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.72] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return out as Data
+    }
+
+    private func broadcast(_ jpeg: Data) {
+        let part = Data("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: \(jpeg.count)\r\n\r\n".utf8) + jpeg + Data("\r\n".utf8)
+        lock.lock()
+        let targets = clients
+        lock.unlock()
+        for (key, client) in targets where client.inFlight < 2 {
+            // A slow screen skips pictures rather than falling behind.
+            lock.lock()
+            clients[key]?.inFlight += 1
+            lock.unlock()
+            client.connection.send(content: part, completion: .contentProcessed { [weak self] error in
+                guard let self else { return }
+                self.lock.lock()
+                self.clients[key]?.inFlight -= 1
+                self.lock.unlock()
+                if error != nil { self.drop(client.connection) }
+            })
+        }
+    }
+}
+
 /// Keeps the sender alive for the life of the process.
 nonisolated(unsafe) private var retained: AnyObject?
 
@@ -301,6 +562,16 @@ enum ChurchNDI {
         guard #available(macOS 12.3, *) else { fail("macos", "NDI output needs macOS 12.3 or later.") }
         guard let ndi = NDI.load() else {
             fail("no-runtime", "NDI is not installed on this Mac. Install the free NDI Tools from ndi.video/tools, then try again.")
+        }
+        if options.hub {
+            guard let hub = Hub(ndi: ndi, port: options.port) else { fail("no-runtime", "This NDI library cannot receive.") }
+            retained = hub
+            hub.start()
+            Thread {
+                while readLine() != nil {}
+                exit(0)
+            }.start()
+            dispatchMain()
         }
         let sender = Sender(options: options, ndi: ndi)
         retained = sender

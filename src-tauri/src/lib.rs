@@ -538,6 +538,7 @@ pub fn run() {
             displays::reconcile(app.handle()).map_err(|message| std::io::Error::other(message))?;
             displays::start(app.handle().clone());
             app.manage(Arc::new(remote::LanRemote::default()));
+            ndi::start_hub();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

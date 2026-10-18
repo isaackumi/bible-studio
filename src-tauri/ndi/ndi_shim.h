@@ -41,3 +41,38 @@ static const uint32_t NDI_FOURCC_BGRA = (uint32_t)'B' | ((uint32_t)'G' << 8) | (
 static const int NDI_FRAME_PROGRESSIVE = 1;
 /** NDIlib_send_timecode_synthesize: let NDI stamp the frame. */
 static const int64_t NDI_TIMECODE_SYNTHESIZE = INT64_MAX;
+
+// Receiving (hub mode): find sources on the network and take their video.
+
+typedef struct NDIlib_find_create_t {
+  bool show_local_sources;
+  const char *p_groups;
+  const char *p_extra_ips;
+} NDIlib_find_create_t;
+
+typedef struct NDIlib_source_t {
+  const char *p_ndi_name;
+  /** p_url_address / p_ip_address (a union in the SDK). */
+  const char *p_url_address;
+} NDIlib_source_t;
+
+typedef struct NDIlib_recv_create_v3_t {
+  NDIlib_source_t source_to_connect_to;
+  int color_format;
+  int bandwidth;
+  bool allow_video_fields;
+  const char *p_ndi_recv_name;
+} NDIlib_recv_create_v3_t;
+
+typedef void *(*NDIlib_find_create_v2_fn)(const NDIlib_find_create_t *settings);
+typedef void (*NDIlib_find_destroy_fn)(void *instance);
+typedef const NDIlib_source_t *(*NDIlib_find_get_current_sources_fn)(void *instance, uint32_t *count);
+typedef void *(*NDIlib_recv_create_v3_fn)(const NDIlib_recv_create_v3_t *settings);
+typedef void (*NDIlib_recv_destroy_fn)(void *instance);
+typedef int (*NDIlib_recv_capture_v2_fn)(void *instance, NDIlib_video_frame_v2_t *video, void *audio, void *metadata, uint32_t timeout_ms);
+typedef void (*NDIlib_recv_free_video_v2_fn)(void *instance, const NDIlib_video_frame_v2_t *video);
+
+/** NDIlib_recv_color_format_BGRX_BGRA, NDIlib_recv_bandwidth_highest, NDIlib_frame_type_video. */
+static const int NDI_RECV_BGRX_BGRA = 0;
+static const int NDI_RECV_BANDWIDTH_HIGHEST = 100;
+static const int NDI_FRAME_TYPE_VIDEO = 1;

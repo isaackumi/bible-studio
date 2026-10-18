@@ -6,6 +6,7 @@
   import { LOWER_THIRD_TEMPLATES } from "../../domain/composition";
   import type { SourceFields } from "../../domain/sources";
   import { webTarget } from "../../domain/web";
+  import { listNdiSources, ndiShortName } from "../../domain/ndi";
   import type { TimerMode } from "../../domain/timer";
   import DeskDialog from "./DeskDialog.svelte";
   import Icon from "../Icon.svelte";
@@ -162,6 +163,15 @@
     if (readonly || !valid) return;
     onsave(name.trim(), $state.snapshot(fields) as SourceFields);
   }
+
+  // NDI: the sources the hub on this computer sees (null when NDI is not available here).
+  let ndiSources = $state<string[] | null>([]);
+  async function refreshNdi() {
+    ndiSources = await listNdiSources();
+  }
+  $effect(() => {
+    if (fields.type === "ndi") void refreshNdi();
+  });
 </script>
 
 <DeskDialog title={`Properties for “${initialName}”`} {onclose} {returnTo} wide>
@@ -344,6 +354,34 @@
         <span>Subtitle</span>
         <input class="field" aria-label="Subtitle" value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
       </label>
+    {:else if fields.type === "ndi"}
+      <div class="row">
+        <span>Source</span>
+        <span class="inline ndi-pick">
+          <select
+            class="field"
+            aria-label="NDI source"
+            value={fields.name}
+            onchange={(event) => {
+              if (fields.type !== "ndi") return;
+              const chosen = event.currentTarget.value;
+              // A source still called by its kind takes the camera's own name.
+              if (chosen && (!name.trim() || /^NDI source( \d+)?$/.test(name.trim()))) name = ndiShortName(chosen);
+              fields = { ...fields, name: chosen };
+            }}
+          >
+            <option value="">{ndiSources === null ? "NDI is not available here" : ndiSources.length ? "Choose a source…" : "Looking for sources…"}</option>
+            {#if fields.name && !(ndiSources ?? []).includes(fields.name)}<option value={fields.name}>{fields.name} (not seen now)</option>{/if}
+            {#each ndiSources ?? [] as name (name)}<option value={name}>{name}</option>{/each}
+          </select>
+          <button type="button" class="choice" onclick={() => void refreshNdi()}>Refresh</button>
+        </span>
+      </div>
+      <p class="hint">
+        {#if ndiSources === null}NDI sources show in the Church Studio app for Mac, with the free NDI Tools installed (<a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>).
+        {:else if ndiSources.length === 0}No NDI sources found yet. Check the camera or computer sending NDI is on the same network, then Refresh.
+        {:else}Cameras, OBS or vMix outputs and other computers sending NDI on this network. NDI® is a registered trademark of Vizrt NDI AB.{/if}
+      </p>
     {:else if fields.type === "web"}
       {@const target = webTarget(fields.url)}
       <label class="row">

@@ -7,6 +7,7 @@ import { presentQr } from "./overlays";
 import { emptyModel } from "./theme";
 import type { CompositionDocument, LiveState, PresentationItem, PresentationModel, TextStyle, Theme } from "./types";
 import { webTarget } from "./web";
+import { ndiStreamUrl } from "./ndi";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -1585,6 +1586,10 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
   }
   if (source.type === "video" && payload.videoUrl) {
     return presentVideo({ theme: ctx.theme, videoUrl: payload.videoUrl, loop: payload.loop === "true", muted: payload.muted === "true" });
+  }
+  // An NDI source shows the hub's picture stream; without a chosen source it is a camera card.
+  if (source.type === "ndi" && payload.name) {
+    return presentImage({ theme: ctx.theme, imageUrl: ndiStreamUrl(payload.name) });
   }
   if (source.type === "camera" || source.type === "video" || source.type === "ndi") {
     return presentCamera({ theme: ctx.theme, label: payload.label || source.title });
