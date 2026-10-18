@@ -7,6 +7,9 @@ export const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
+const ALLOWED_AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/aac", "audio/wav", "audio/x-wav", "audio/wave", "audio/ogg", "audio/flac", "audio/x-flac"]);
+/** Music for walk-in and backing tracks. */
+export const MAX_AUDIO_BYTES = 300 * 1024 * 1024;
 
 const EXT_TYPES: Record<string, string> = {
   png: "image/png",
@@ -18,6 +21,13 @@ const EXT_TYPES: Record<string, string> = {
   m4v: "video/x-m4v",
   mov: "video/quicktime",
   webm: "video/webm",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  flac: "audio/flac",
 };
 
 export type StoredMedia = MediaAsset & {
@@ -42,10 +52,10 @@ export function imageTypeOf(file: { name: string; type: string }): string | null
   return type?.startsWith("image/") ? type : null;
 }
 
-/** Image or video MIME type from the file type, then the extension. */
+/** Image, video or audio MIME type from the file type, then the extension. */
 export function mediaTypeOf(file: { name: string; type: string }): string | null {
   const type = file.type.trim().toLowerCase();
-  if (ALLOWED_IMAGE_TYPES.has(type) || ALLOWED_VIDEO_TYPES.has(type)) return type;
+  if (ALLOWED_IMAGE_TYPES.has(type) || ALLOWED_VIDEO_TYPES.has(type) || ALLOWED_AUDIO_TYPES.has(type)) return type;
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   return EXT_TYPES[ext] ?? null;
 }
@@ -57,7 +67,7 @@ export function isQuotaExceeded(error: unknown): boolean {
 }
 
 function asAsset(row: StoredMedia): MediaAsset {
-  return { id: row.id, name: row.name, path: "", kind: row.kind === "video" ? "video" : "image", createdAt: row.createdAt };
+  return { id: row.id, name: row.name, path: "", kind: row.kind === "video" || row.kind === "audio" ? row.kind : "image", createdAt: row.createdAt };
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -142,10 +152,11 @@ export function createMediaAdapter(
     },
     async importFile(file) {
       const type = mediaTypeOf(file);
-      if (!type) throw new Error("Use a PNG, JPEG, WebP or GIF image, or an MP4, MOV, M4V or WebM video.");
-      const kind = type.startsWith("video/") ? "video" : "image";
+      if (!type) throw new Error("Use a PNG, JPEG, WebP or GIF image, an MP4, MOV, M4V or WebM video, or MP3, M4A, AAC, WAV, OGG or FLAC audio.");
+      const kind = type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : "image";
       if (kind === "image" && file.size > MAX_IMAGE_BYTES) throw new Error("That image is larger than 25 MB. It was not saved.");
       if (kind === "video" && file.size > MAX_VIDEO_BYTES) throw new Error("That video is larger than 1 GB. It was not saved.");
+      if (kind === "audio" && file.size > MAX_AUDIO_BYTES) throw new Error("That audio file is larger than 300 MB. It was not saved.");
       const record: StoredMedia = {
         id: nextId(),
         name: file.name || kind,

@@ -19,6 +19,7 @@ import { sanitizeStageLayout } from "../display/channel";
 import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 import { sanitizeFavorites } from "../domain/favorites";
 import { sanitizeGoneLive } from "../domain/gone-live";
+import { sanitizeAudioSettings, sanitizePlaylists } from "../domain/playlists";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -123,6 +124,8 @@ export function normalizeWorkspace(input: unknown): Workspace {
       : [],
     remoteDevices: sanitizeRemoteDevices(value.remoteDevices),
     voice: sanitizeVoiceSettings(value.voice),
+    playlists: sanitizePlaylists(value.playlists),
+    audio: sanitizeAudioSettings(value.audio),
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],

@@ -1,5 +1,6 @@
 <script lang="ts">
   import GoneLiveList from "./GoneLiveList.svelte";
+  import AudioDialog from "../AudioDialog.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
@@ -525,7 +526,7 @@
       ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
       <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
       <span class="clear-pair">
-        <button type="button" class="desk-btn ghost" data-tip="Clear the words; the background, camera or video stays (W)" onclick={() => void session.clearWords()}>CLEAR WORDS</button>
+        <button type="button" class="desk-btn ghost" data-tip="Clear the words; the background, camera or video stays (W)" aria-label="Clear words" onclick={() => void session.clearWords()}><span class="wide-only">CLEAR </span>WORDS</button>
         <button type="button" class="desk-btn ghost" data-tip="Clear everything back to the theme (Backspace)" onclick={() => session.clear()}>CLEAR</button>
       </span>
     </div>
@@ -567,6 +568,14 @@
       >
         {@render icon("alerts")}
       </button>
+      {#if session.audio.current && (session.audio.playing || session.audio.fading)}
+        <span class="now-audio">
+          <button type="button" class="now-audio-name" aria-label="Audio: {session.audio.current.name}" data-tip="Audio: playlists and the player" onclick={() => (session.audioOpen = true)}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
+          <button type="button" class="now-audio-btn" aria-label="Pause the music" data-tip="Pause" onclick={() => void session.audio.toggle()}><Icon name="square" size={12} /></button>
+        </span>
+      {:else}
+        <button type="button" class="desk-btn icon" aria-label="Audio" data-tip="Audio: walk-in music, backing tracks, playlists" onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
+      {/if}
       <button
         type="button"
         class="desk-btn icon"
@@ -888,6 +897,9 @@
   <Icon {name} size={16} />
 {/snippet}
 
+{#if session.audioOpen}
+  <AudioDialog onclose={() => (session.audioOpen = false)} />
+{/if}
 {#if goneWide}
   <DeskDialog title="Scriptures that have gone live" wide onclose={() => (goneWide = false)}>
     <GoneLiveList wide onpicked={() => (goneWide = false)} />
@@ -1276,4 +1288,32 @@
   .sheet header button { border: 0; background: transparent; color: var(--accent); }
   .sheet p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
   .pb { position: relative; }
+  .now-audio { display: inline-flex; align-items: center; height: 32px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--field)); overflow: hidden; }
+  .now-audio-name { display: inline-flex; align-items: center; gap: 6px; max-width: 160px; height: 100%; padding: 0 8px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
+  .now-audio-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+  @media (max-width: 1560px) { .chip-name { display: none; } }
+  .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }
+  .now-audio-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  /* Narrower desks: shorter labels so the tools on the right stay in reach. */
+  @media (max-width: 1320px) {
+    .pb-bar :global(.wide-only) { display: none; }
+    .now-audio-name { padding: 0 7px; }
+  }
+  @media (max-width: 1180px) {
+    .pb-bar { gap: 6px; }
+    .pb-left { gap: 6px; }
+    .clear-pair .desk-btn { padding-inline: 8px; }
+    .pb-modes button { padding-inline: 9px; }
+    .pb-bar :global(.output-trigger) { max-width: 128px; }
+  }
+  @media (max-width: 1100px) {
+    .pb-bar { padding-inline: 6px; gap: 4px; }
+    .pb-tools { padding-left: 8px; margin-left: 2px; }
+    .pb-modes button { padding-inline: 6px; font-size: 13px; }
+    .pb-bar :global(.output-trigger) { max-width: 96px; }
+    .pb-tools { gap: 2px; }
+    .desk-btn.live, .desk-btn.danger { padding-inline: 10px; }
+    .now-audio-name { padding: 0 5px; }
+    .now-audio-btn { width: 24px; }
+  }
 </style>

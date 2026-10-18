@@ -4,6 +4,7 @@
   import { session } from "../app/session.svelte";
   import { mediaUrl } from "../db/api";
   import { presentImage, presentVideo } from "../domain/present";
+  import type { MediaAsset } from "../domain/types";
   import { isDesktop } from "../platform/runtime";
   import FavoriteStar from "./FavoriteStar.svelte";
 
@@ -44,7 +45,7 @@
     );
   }
 
-  function add(assetId: string, name: string, kind: "image" | "video") {
+  function add(assetId: string, name: string, kind: MediaAsset["kind"]) {
     if (kind === "video") session.addVideo(assetId, name, { loop });
     else session.addImage(assetId, name);
   }

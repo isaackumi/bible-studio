@@ -82,7 +82,7 @@ export const api = {
       // are too large for that and come by path from the system picker.
       if (typeof source !== "string") {
         if (source.type.startsWith("image/")) return api.importMediaBytes(source.name, source);
-        return Promise.reject(new Error("Use Import… to choose the video from this Mac."));
+        return Promise.reject(new Error("Use Import… to choose the file from this computer."));
       }
       return invoke<MediaAsset>("import_media", { path: source });
     }

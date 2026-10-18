@@ -282,7 +282,7 @@ export type MediaAsset = {
   id: string;
   name: string;
   path: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
   createdAt: string;
 };
 
@@ -446,6 +446,9 @@ export type Workspace = {
   remoteDevices: RemoteDeviceDocument[];
   /** Slide decks: named, multi-page, each page a canvas of layers. */
   decks: SlideDeckDocument[];
+  /** Audio playlists (walk-in music, backing tracks). */
+  playlists: import("./playlists").Playlist[];
+  audio: import("./playlists").AudioSettings;
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

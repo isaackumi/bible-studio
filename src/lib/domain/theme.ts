@@ -7,6 +7,7 @@ import { defaultPewDesk } from "../workspace/pew";
 import { defaultProductionLayout } from "../workspace/production";
 import type { AppearanceSettings, PresentationModel, Theme, Workspace } from "./types";
 import { emptyFavorites } from "./favorites";
+import { defaultAudioSettings, defaultPlaylists } from "./playlists";
 import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
@@ -316,6 +317,8 @@ export function defaultWorkspace(): Workspace {
     remoteDevices: [],
     voice: { commands: true, wake: true, custom: [] },
     decks: [],
+    playlists: defaultPlaylists(),
+    audio: defaultAudioSettings(),
   };
 }
 

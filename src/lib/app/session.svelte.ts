@@ -103,6 +103,8 @@ import { controllerDevice, stageDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
+import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
+import { AudioDeck } from "../audio/deck.svelte";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
@@ -260,7 +262,22 @@ class Session {
   recentSongs = $state<SongRecent[]>([]);
   sermons = $state<Sermon[]>([]);
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
-  media = $state<MediaAsset[]>([]);
+  /** Every stored file: pictures, videos and audio. */
+  #allMedia = $state<MediaAsset[]>([]);
+  #visualMedia = $derived(this.#allMedia.filter((asset) => asset.kind !== "audio"));
+  #audioMedia = $derived(this.#allMedia.filter((asset) => asset.kind === "audio"));
+  /** Pictures and videos (what screens show). Assigning keeps the audio files. */
+  get media(): MediaAsset[] {
+    return this.#visualMedia;
+  }
+  set media(list: MediaAsset[]) {
+    const ids = new Set(list.map((asset) => asset.id));
+    this.#allMedia = [...list, ...this.#allMedia.filter((asset) => asset.kind === "audio" && !ids.has(asset.id))];
+  }
+  /** Music and backing tracks. */
+  get audioTracks(): MediaAsset[] {
+    return this.#audioMedia;
+  }
   cameras = $state<CameraDevice[]>([]);
   voice = $state<VoiceState>({ ...IDLE_VOICE });
   private stopVoiceEngine: (() => void) | null = null;
@@ -370,6 +387,7 @@ class Session {
         this.services = await api.serviceList();
       }
       this.workspace = await this.loadWorkspace();
+      this.audio.setVolume(this.workspace.audio.volume);
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
@@ -890,6 +908,77 @@ class Session {
     return token;
   };
 
+  // Audio: walk-in music, backing tracks and playlists, played on this computer.
+  audio = new AudioDeck();
+  audioOpen = $state(false);
+
+  private savePlaylists(playlists: Playlist[]) {
+    this.workspace = { ...this.workspace, playlists };
+    this.persistSoon();
+  }
+
+  private updatePlaylist(id: string, change: (list: Playlist) => Playlist) {
+    this.savePlaylists(this.workspace.playlists.map((list) => (list.id === id ? change(list) : list)));
+  }
+
+  createPlaylist = (name: string): Playlist => {
+    const list: Playlist = { id: uid(), name: name.trim().slice(0, 60) || "New playlist", trackIds: [], loop: false };
+    this.savePlaylists([...this.workspace.playlists, list]);
+    return list;
+  };
+
+  renamePlaylist = (id: string, name: string) => this.updatePlaylist(id, (list) => ({ ...list, name: name.trim().slice(0, 60) || list.name }));
+  setPlaylistLoop = (id: string, loop: boolean) => {
+    this.updatePlaylist(id, (list) => ({ ...list, loop }));
+    if (this.audio.playlistId === id) this.audio.setLoop(loop);
+  };
+  removePlaylist = (id: string) => this.savePlaylists(this.workspace.playlists.filter((list) => list.id !== id));
+  addToPlaylist = (id: string, trackIds: string[]) => this.updatePlaylist(id, (list) => addTracks(list, trackIds));
+  removeFromPlaylist = (id: string, index: number) => this.updatePlaylist(id, (list) => removeTrackAt(list, index));
+  moveInPlaylist = (id: string, from: number, to: number) => this.updatePlaylist(id, (list) => moveTrack(list, from, to));
+
+  /** The audio files of a playlist, in order (missing files are skipped). */
+  playlistTracks = (id: string): MediaAsset[] => {
+    const list = this.workspace.playlists.find((entry) => entry.id === id);
+    if (!list) return [];
+    const byId = new Map(this.audioTracks.map((track) => [track.id, track]));
+    return list.trackIds.map((trackId) => byId.get(trackId)).filter((track): track is MediaAsset => !!track);
+  };
+
+  playPlaylist = async (id: string, index = 0) => {
+    const list = this.workspace.playlists.find((entry) => entry.id === id);
+    const tracks = this.playlistTracks(id);
+    if (!list || !tracks.length) {
+      this.message = "Add music to this playlist first.";
+      return;
+    }
+    await this.audio.play(tracks, index, { playlistId: id, loop: list.loop });
+  };
+
+  /** Add audio files (paths from the desktop picker, or browser files), optionally to a playlist. */
+  importAudio = async (sources: Array<string | File>, playlistId: string | null): Promise<number> => {
+    const added: string[] = [];
+    for (const source of sources) {
+      const asset = await this.importImage(source);
+      if (asset?.kind === "audio") added.push(asset.id);
+      else if (asset) this.message = `${asset.name} is not an audio file; it went to the media library.`;
+    }
+    if (playlistId && added.length) this.addToPlaylist(playlistId, added);
+    if (added.length) this.message = `${added.length} track${added.length === 1 ? "" : "s"} added.`;
+    return added.length;
+  };
+
+  setAudioVolume = (volume: number) => {
+    this.audio.setVolume(volume);
+    this.workspace = { ...this.workspace, audio: { ...this.workspace.audio, volume: this.audio.volume } };
+    this.persistSoon();
+  };
+
+  setFadeOnLive = (fadeOnLive: boolean) => {
+    this.workspace = { ...this.workspace, audio: { ...this.workspace.audio, fadeOnLive } };
+    this.persistSoon();
+  };
+
   /** A stage link for a phone or tablet on the platform: it shows the stage and presses nothing. */
   createStageLink = async (name: string): Promise<string | null> => {
     if (!this.requireFeature("stage-display")) return null;
@@ -1098,7 +1187,7 @@ class Session {
     return true;
   };
 
-  private mediaSrc = (id: string | null | undefined) => mediaUrl(this.media.find((asset) => asset.id === id) ?? null);
+  private mediaSrc = (id: string | null | undefined) => mediaUrl(this.#allMedia.find((asset) => asset.id === id) ?? null);
 
   /** An item's own text style (slides, announcements) applies on top of the theme. */
   /** What an item looks like on screen (the item editor's live preview). */
@@ -3368,6 +3457,10 @@ class Session {
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "video" && this.live.program.model.video) {
       const model = this.live.program.model;
       this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video!, control: { playing: true, at: 0, stamp: Date.now(), volume: 1 } } } } };
+    }
+    // Walk-in music (a looping playlist) fades out when the service goes live; a backing track plays on.
+    if ((action === "take" || action === "cut") && this.workspace.audio.fadeOnLive && this.audio.playing && this.audio.loop) {
+      this.audio.fadeOut(4);
     }
     // A song the congregation now sees counts for CCLI reporting (once per day).
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "lyrics" && this.songFocus) {

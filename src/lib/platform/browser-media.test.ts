@@ -45,12 +45,19 @@ describe("browser media adapter", () => {
     expect(media.url("missing")).toBeNull();
   });
 
-  it("rejects a file that is not an image or video", async () => {
+  it("rejects a file that is not an image, video or audio", async () => {
     const media = createMediaAdapter(async () => memoryMediaStore());
     await expect(media.importFile(new File([new Uint8Array(8)], "notes.docx", { type: "application/msword" }))).rejects.toThrow(
-      /PNG, JPEG, WebP or GIF image, or an MP4/,
+      /PNG, JPEG, WebP or GIF image, an MP4.*or MP3/,
     );
     expect(await media.list()).toEqual([]);
+  });
+
+  it("imports music as kind audio", async () => {
+    const media = createMediaAdapter(async () => memoryMediaStore(), { id: () => "song-1", now: () => "2026-10-18T00:00:00.000Z" });
+    const asset = await media.importFile(new File([new Uint8Array(8)], "walk-in.mp3", { type: "" }));
+    expect(asset).toMatchObject({ id: "song-1", kind: "audio", name: "walk-in.mp3" });
+    expect((await media.list())[0]?.kind).toBe("audio");
   });
 
   it("imports a video as kind video and caps videos at 1 GB", async () => {
