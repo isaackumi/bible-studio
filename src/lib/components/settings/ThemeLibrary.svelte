@@ -174,7 +174,7 @@
 <section class="lib">
   <!-- Selected theme, large and live -->
   <div class="hero">
-    <div class="hero-screen"><Screen model={sample(selected)} /></div>
+    <div class="hero-screen"><Screen model={sample(selected)} aspect={16 / 9} /></div>
     <div class="hero-side">
       <input
         class="theme-name"
@@ -218,8 +218,8 @@
     {#each shown as theme (theme.id)}
       <div class="card-wrap">
       <span class="card-star"><FavoriteStar on={starred(theme)} label={theme.name} onclick={() => session.toggleFavorite("themes", theme.id)} /></span>
-      <button type="button" class="card" class:on={selectedId === theme.id} class:current={session.workspace.themeId === theme.id} onclick={() => (selectedId = theme.id)} ondblclick={() => apply(theme)}>
-        <span class="thumb"><Screen model={sample(theme)} still /></span>
+      <button type="button" class="theme-card" class:on={selectedId === theme.id} class:current={session.workspace.themeId === theme.id} onclick={() => (selectedId = theme.id)} ondblclick={() => apply(theme)}>
+        <span class="thumb"><Screen model={sample(theme)} still aspect={16 / 9} /></span>
         <span class="card-meta">
           <strong>{theme.name}</strong>
           {#if session.workspace.themeId === theme.id}<em class="pill ok">In use</em>
@@ -485,15 +485,14 @@
   .filters button { border-radius: 999px; }
   .filters button.on { background: var(--ink); color: var(--panel); }
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-  .card-wrap { position: relative; display: flex; min-width: 0; }
-  .card-wrap > .card { flex: 1; min-width: 0; }
+  .card-wrap { position: relative; display: grid; min-width: 0; }
   .card-star { position: absolute; top: 10px; right: 10px; z-index: 2; border-radius: 7px; background: rgba(0, 0, 0, 0.55); opacity: 0; transition: opacity 120ms; }
   .card-star :global(.fav-star) { color: #fff; }
   .card-star :global(.fav-star.on) { color: #f5b301; }
   .card-wrap:hover .card-star, .card-star:focus-within, .card-star:has(:global(.fav-star.on)) { opacity: 1; }
-  .card { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
-  .card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .theme-card { display: flex; flex-direction: column; min-width: 0; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .theme-card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .theme-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .thumb { display: block; border-radius: 7px; overflow: hidden; background: #000; container-type: inline-size; pointer-events: none; }
   .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 2px 2px; }
   .card-meta strong { font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
