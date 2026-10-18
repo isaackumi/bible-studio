@@ -33,7 +33,18 @@
   [hidden] { display: none !important; }
   .card { background: var(--pew); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
   .kicker { margin: 0 0 4px; color: var(--mist); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; display: flex; justify-content: space-between; }
-  .kicker b { color: var(--ember); letter-spacing: 0.1em; }
+  .kicker b { color: var(--ember); letter-spacing: 0.1em; display: inline-flex; align-items: center; gap: 6px; }
+  /* Program and Preview framed like the desk's monitors: red for what the audience sees, green for what is next. */
+  .program { border: 2px solid color-mix(in srgb, var(--ember) 55%, var(--line)); }
+  .program.live { border-color: var(--ember); box-shadow: 0 0 0 1px rgba(226, 61, 46, 0.25), 0 0 22px rgba(226, 61, 46, 0.28); }
+  .program .kicker span { color: #ff8a7e; }
+  .preview { border: 2px solid color-mix(in srgb, var(--ok) 45%, var(--line)); }
+  .preview .kicker span { color: #7fe3a2; }
+  /* The on-air light: a red lamp that pulses while Program is live. */
+  .lamp { position: relative; width: 9px; height: 9px; border-radius: 50%; background: var(--ember); box-shadow: 0 0 8px var(--ember); }
+  .lamp::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ember); opacity: 0; animation: beacon 1.6s ease-out infinite; }
+  @keyframes beacon { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.8); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .lamp::after { animation: none; } }
   .cue { margin: 0; font-size: 19px; font-weight: 650; }
   .body { margin: 6px 0 0; color: #d9d2c4; white-space: pre-line; max-height: 6.2em; overflow: hidden; }
   .preview .cue { font-size: 16px; }
@@ -114,7 +125,7 @@
 <main id="pad" hidden>
   <div class="pad-grid">
     <section class="card program" aria-live="polite">
-      <p class="kicker"><span>Program</span><b id="onair" hidden>ON AIR</b></p>
+      <p class="kicker"><span>Program</span><b id="onair" hidden><i class="lamp" aria-hidden="true"></i>ON AIR</b></p>
       <p class="cue" id="pCue">—</p>
       <p class="body" id="pBody"></p>
     </section>
@@ -300,7 +311,9 @@
     $("pBody").textContent = payload.programBody || "";
     $("vCue").textContent = payload.previewCue || "—";
     $("vBody").textContent = payload.previewBody || "";
-    $("onair").hidden = payload.output !== "on";
+    const onAir = payload.output === "on" && payload.programLayout !== "empty" && payload.programLayout !== "black";
+    $("onair").hidden = !onAir;
+    document.querySelector(".program").classList.toggle("live", onAir);
     $("timerRow").hidden = !payload.timer;
     const toggle = $("timerToggle");
     toggle.dataset.timer = payload.timer === "running" ? "timer-pause" : "timer-resume";
