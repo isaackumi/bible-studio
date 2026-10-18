@@ -486,6 +486,8 @@ export type Workspace = {
   countdownSize: number;
   /** NDI Program carries the audience window's sound (videos, music) as well as the picture. */
   ndiAudio: boolean;
+  /** Free plan: listening used this month (on this computer). */
+  listenUsage?: import("./plans").ListenUsage;
   /** OBS or vMix on this computer or the network, driven from the desk. */
   switcher: import("../integrations/switcher").SwitcherSettings;
   /** Going live and recording from the app itself. The stream key stays on this computer. */

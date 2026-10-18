@@ -28,12 +28,23 @@ export type PlanFeature =
   | "cloud-sync"
   | "ndi"
   | "streaming"
-  | "recording";
+  | "recording"
+  | "priority-support";
 
 /** Prices in US dollars. PLACEHOLDERS until pricing is decided; the pricing page reads them from here. */
 export type PlanPrice = { monthly: number; yearly: number };
 
-export type Plan = { id: PlanId; name: string; tagline: string; color: string; features: PlanFeature[]; price: PlanPrice; popular?: boolean };
+export type Plan = {
+  id: PlanId;
+  name: string;
+  tagline: string;
+  color: string;
+  features: PlanFeature[];
+  price: PlanPrice;
+  popular?: boolean;
+  /** How many computers one license runs on at the same time. */
+  computers: number;
+};
 
 export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean }> = {
   presenter: { label: msg("Presenter Desk") },
@@ -51,22 +62,39 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   "song-packs": { label: msg("Song packs") },
   "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
   "cloud-sync": { label: msg("Cloud sync across computers"), soon: true },
-  ndi: { label: msg("NDI in and out"), soon: true },
-  streaming: { label: msg("Streaming"), soon: true },
-  recording: { label: msg("Recording"), soon: true },
+  ndi: { label: msg("NDI out with sound, and NDI cameras in") },
+  streaming: { label: msg("Stream to YouTube and Facebook") },
+  recording: { label: msg("Record the service") },
+  "priority-support": { label: msg("Priority support") },
 };
 
 const FREE: PlanFeature[] = ["presenter", "scripture", "songs", "sermon", "slides", "media", "audience-output"];
 const PREMIUM: PlanFeature[] = [...FREE, "production", "voice", "song-detection", "phone-remote", "stage-display", "song-packs", "theme-library"];
-const CHURCH: PlanFeature[] = [...PREMIUM, "cloud-sync", "ndi", "streaming", "recording"];
+const CHURCH: PlanFeature[] = [...PREMIUM, "ndi", "streaming", "recording", "priority-support", "cloud-sync"];
 
 export const PLANS: Plan[] = [
-  { id: "free", name: msg("Free"), tagline: msg("Everything to put scripture, songs and sermons on screen."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 } },
-  { id: "premium", name: msg("Premium"), tagline: msg("Production, voice and remote control for a full service."), color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true },
-  { id: "church", name: msg("Church"), tagline: msg("Several computers and broadcast for larger teams."), color: "#7c5cff", features: CHURCH, price: { monthly: 29, yearly: 290 } },
+  { id: "free", name: msg("Free"), tagline: msg("Everything to put scripture, songs and sermons on screen."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 }, computers: 1 },
+  { id: "premium", name: msg("Premium"), tagline: msg("Production, voice and remote control for a full service."), color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true, computers: 1 },
+  { id: "church", name: msg("Church"), tagline: msg("Broadcast, NDI and three computers at once, for larger and multi-campus teams."), color: "#7c5cff", features: CHURCH, price: { monthly: 29, yearly: 290 }, computers: 3 },
 ];
 
 export const TRIAL_DAYS = 14;
+
+/** Free plan: minutes of listening (verse detection, voice, captions) each calendar month. */
+export const FREE_LISTEN_MINUTES = 60;
+
+export type ListenUsage = { month: string; seconds: number };
+
+export function monthKey(at = new Date()): string {
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** This month's free listening: used seconds (a new month starts again at 0) and what is left. */
+export function listenAllowance(usage: ListenUsage | undefined, at = new Date()): { usage: ListenUsage; leftSeconds: number } {
+  const month = monthKey(at);
+  const used = usage && usage.month === month ? Math.max(0, usage.seconds) : 0;
+  return { usage: { month, seconds: used }, leftSeconds: Math.max(0, FREE_LISTEN_MINUTES * 60 - used) };
+}
 
 export type Billing = "monthly" | "yearly";
 

@@ -2578,4 +2578,18 @@ export const fr: Readonly<Record<string, string>> = {
   "Make with AI": "Créer avec l’IA",
   "From notes, a passage or a topic": "Depuis des notes, un passage ou un sujet",
   "Make a slide deck from these notes with your AI service": "Créer une présentation depuis ces notes avec votre service IA",
+
+  // Plans: computers, free listening, Church features
+  "This month's {minutes} free minutes of listening are used. Premium listens without a limit.": "Les {minutes} minutes d’écoute gratuites de ce mois sont utilisées. Premium écoute sans limite.",
+  "The Free plan listens for {minutes} minutes a month; Premium has no limit.": "La formule Gratuit écoute {minutes} minutes par mois ; Premium n’a pas de limite.",
+  "{n} min free": "{n} min gratuites",
+  "{minutes} min of listening a month": "{minutes} min d’écoute par mois",
+  "Unlimited listening": "Écoute illimitée",
+  "{n} computer": "{n} ordinateur",
+  "{n} computers at once": "{n} ordinateurs en même temps",
+  "NDI out with sound, and NDI cameras in": "Sortie NDI avec le son, et caméras NDI en entrée",
+  "Stream to YouTube and Facebook": "Diffusion sur YouTube et Facebook",
+  "Record the service": "Enregistrer le culte",
+  "Priority support": "Assistance prioritaire",
+  "Broadcast, NDI and three computers at once, for larger and multi-campus teams.": "Diffusion, NDI et trois ordinateurs en même temps, pour les grandes équipes et les églises à plusieurs sites.",
 };

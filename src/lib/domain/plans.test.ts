@@ -95,3 +95,14 @@ describe("license keys, test codes and prices", () => {
     expect(yearlyDeal({ monthly: 0, yearly: 0 })).toEqual({ perMonth: 0, savePercent: 0 });
   });
 });
+
+describe("free listening", () => {
+  it("gives an hour a month and starts again each month", async () => {
+    const { listenAllowance } = await import("./plans");
+    const october = new Date(2026, 9, 18);
+    expect(listenAllowance(undefined, october)).toEqual({ usage: { month: "2026-10", seconds: 0 }, leftSeconds: 3600 });
+    expect(listenAllowance({ month: "2026-10", seconds: 3000 }, october).leftSeconds).toBe(600);
+    expect(listenAllowance({ month: "2026-10", seconds: 4000 }, october).leftSeconds).toBe(0);
+    expect(listenAllowance({ month: "2026-09", seconds: 4000 }, october).leftSeconds).toBe(3600);
+  });
+});

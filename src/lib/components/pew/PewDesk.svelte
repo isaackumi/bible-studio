@@ -709,6 +709,7 @@
                 {@render icon(voiceActive ? "mic-off" : "mic")}
                 {session.voice.status === "starting" ? t("Starting…") : voiceActive ? t("Stop listening") : t("Listen")}
               </button>
+              {#if session.freeListenMinutes !== null}<span class="free-left" title={t("The Free plan listens for {minutes} minutes a month; Premium has no limit.", { minutes: 60 })}>{t("{n} min free", { n: session.freeListenMinutes })}</span>{/if}
               <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} {t("Find")}</button>
             </footer>
           </section>
@@ -1405,4 +1406,5 @@
   .transcript .heard.interim { color: var(--muted); font-style: italic; }
   .transcript-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
   .transcript-empty { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .free-left { align-self: center; font-size: 11px; font-weight: 650; color: var(--muted); white-space: nowrap; }
 </style>

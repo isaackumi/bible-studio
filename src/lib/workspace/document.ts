@@ -149,6 +149,9 @@ export function normalizeWorkspace(input: unknown): Workspace {
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     timerSounds: sanitizeTimerSounds(value.timerSounds),
     ndiAudio: value.ndiAudio !== false,
+    ...(value.listenUsage && typeof value.listenUsage.month === "string" && typeof value.listenUsage.seconds === "number"
+      ? { listenUsage: { month: value.listenUsage.month.slice(0, 7), seconds: Math.max(0, Math.round(value.listenUsage.seconds)) } }
+      : {}),
     switcher: sanitizeSwitcher(value.switcher),
     broadcast: sanitizeBroadcast(value.broadcast),
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,

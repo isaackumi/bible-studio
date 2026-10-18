@@ -125,7 +125,7 @@ import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive
 import { findItem, moveInList, sectionIdForInsert, stepCursor, moveTo, moveItemTo } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
-import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
+import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
@@ -1249,7 +1249,7 @@ class Session {
 
   /** Start or stop captions. Starting also starts listening if it is off. */
   setCaptions = async (on: boolean) => {
-    if (on && !this.requireFeature("voice")) return;
+    if (on && !this.voiceAllowed()) return;
     this.captionsOn = on;
     if (on && this.voice.status !== "listening" && this.voice.status !== "starting") await this.startVoice();
     this.message = on ? "Captions on. What is said shows as it is heard." : "Captions off.";
@@ -1317,7 +1317,7 @@ class Session {
 
   /** The captions link for congregants' phones (a new link replaces the old one). */
   createCaptionsLink = async (): Promise<string | null> => {
-    if (!this.requireFeature("voice")) return null;
+    if (!this.voiceAllowed()) return null;
     if (!this.desktop()) {
       this.message = t("Captions on phones work with the desktop app, which runs the network server.");
       return null;
@@ -2046,7 +2046,7 @@ class Session {
       this.stopVoice("Listening stopped. Preview and Program were left as they were.");
       return;
     }
-    if (!this.requireFeature("voice")) return;
+    if (!this.voiceAllowed()) return;
     await this.startVoice();
   };
 
@@ -2606,6 +2606,7 @@ class Session {
   /** Called a few times a second by the desk. Only the window sending to the audience beeps. */
   timerTick = () => {
     this.videoTick();
+    this.countListening();
     const sounds = this.workspace.timerSounds;
     const now = Date.now();
     const showing = this.countdownsShowing(now);
@@ -3040,6 +3041,7 @@ class Session {
    * `pattern` sends colour bars instead, to find the source in OBS or vMix before a service.
    */
   startNdi = async (options: { pattern?: boolean; fps?: number } = {}) => {
+    if (!this.requireFeature("ndi")) return;
     if (!this.desktop()) {
       this.ndi = { ...this.ndi, status: "error", message: t("NDI output works in the desktop app.") };
       return;
@@ -3140,6 +3142,7 @@ class Session {
 
   /** Start streaming, recording or both. With `pattern`, colour bars and a beep test the stream key. */
   startBroadcast = async (options: { stream: boolean; record: boolean; pattern?: boolean }) => {
+    if (!this.requireFeature(options.stream ? "streaming" : "recording")) return false;
     if (!this.desktop()) {
       this.broadcastState = { ...this.broadcastState, status: "error", message: t("Streaming and recording work in the Church Studio app for Mac.") };
       return false;
@@ -3322,6 +3325,7 @@ class Session {
   private keySent = "";
 
   startNdiKey = async () => {
+    if (!this.requireFeature("ndi")) return;
     if (!this.desktop()) {
       this.ndiKey = { ...this.ndiKey, status: "error", message: t("NDI output works in the desktop app.") };
       return;
@@ -3830,6 +3834,40 @@ class Session {
   entitled = (feature: PlanFeature): boolean => planIncludes(this.plan, feature);
 
   /** True when the plan includes the feature; otherwise opens the upgrade prompt and returns false. */
+  /** Listening on Premium, or within the Free plan's minutes this month; otherwise the upgrade prompt. */
+  voiceAllowed = (): boolean => {
+    if (this.entitled("voice")) return true;
+    if (listenAllowance(this.workspace.listenUsage).leftSeconds > 0) return true;
+    this.upgradeFor = "voice";
+    return false;
+  };
+
+  /** Free listening left this month in minutes, or null on a plan with voice. */
+  get freeListenMinutes(): number | null {
+    return this.entitled("voice") ? null : Math.ceil(listenAllowance(this.workspace.listenUsage).leftSeconds / 60);
+  }
+
+  private listenTick = { at: 0, pending: 0 };
+
+  /** Count Free-plan listening; at the end of the month's minutes, listening stops with a note. */
+  private countListening() {
+    const now = Date.now();
+    const last = this.listenTick.at;
+    this.listenTick.at = now;
+    if (this.voice.status !== "listening" || this.entitled("voice") || !last) return;
+    this.listenTick.pending += Math.min(1000, now - last);
+    if (this.listenTick.pending < 10_000) return;
+    const { usage } = listenAllowance(this.workspace.listenUsage);
+    const next = { month: usage.month, seconds: usage.seconds + Math.round(this.listenTick.pending / 1000) };
+    this.listenTick.pending = 0;
+    this.workspace = { ...this.workspace, listenUsage: next };
+    this.persistSoon();
+    if (listenAllowance(next).leftSeconds <= 0) {
+      this.stopVoice(t("This month's {minutes} free minutes of listening are used. Premium listens without a limit.", { minutes: FREE_LISTEN_MINUTES }));
+      this.upgradeFor = "voice";
+    }
+  }
+
   requireFeature = (feature: PlanFeature): boolean => {
     if (this.entitled(feature)) return true;
     this.upgradeFor = feature;

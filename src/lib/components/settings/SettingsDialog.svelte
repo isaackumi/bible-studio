@@ -25,7 +25,7 @@
   import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
-  import { checkoutUrl, FEATURE_LABELS, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
+  import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
@@ -1501,6 +1501,10 @@
                 {/if}
               </p>
               <p class="tag">{t(plan.tagline)}</p>
+              <p class="facts">
+                <span><Icon name="laptop" size={12} /> {tn(plan.computers, "{n} computer", "{n} computers at once")}</span>
+                {#if plan.id === "free"}<span><Icon name="mic" size={12} /> {t("{minutes} min of listening a month", { minutes: FREE_LISTEN_MINUTES })}</span>{:else}<span><Icon name="mic" size={12} /> {t("Unlimited listening")}</span>{/if}
+              </p>
               {#if i > 0}<p class="plus">{t("Everything in {name}, plus", { name: t(PLANS[i - 1]!.name) })}</p>{/if}
               <ul>
                 {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
@@ -1835,6 +1839,8 @@
   .plan-card li { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.35; }
   .plan-card li :global(svg) { flex: none; margin-top: 1px; color: var(--plan); }
   .plan-card li.soon { color: var(--muted); }
+  .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; color: var(--muted); }
+  .facts span { display: inline-flex; align-items: center; gap: 5px; }
   .plan-card li em { margin-left: 6px; font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   .plan-card :global(.btn.plan-cta) { width: 100%; }
   span.plan-cta { display: block; padding: 7px 0; text-align: center; font-size: 12px; font-weight: 600; }
