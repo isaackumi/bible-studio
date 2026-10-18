@@ -4,6 +4,7 @@
   import type { Service } from "../../domain/types";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // The service on one page: a run sheet for the team or an order of service for the
   // congregation. What is shown here is exactly what prints (or saves as a PDF).
@@ -27,15 +28,15 @@
     if (!win) return;
     win.focus();
     win.print();
-    note = "In the print window, choose Save as PDF to keep a file, or a printer for paper.";
+    note = t("In the print window, choose Save as PDF to keep a file, or a printer for paper.");
   }
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
-      note = "Copied. Paste it into a message or an email.";
+      note = t("Copied. Paste it into a message or an email.");
     } catch {
-      note = "This window could not copy. Select the text in the page and copy it.";
+      note = t("This window could not copy. Select the text in the page and copy it.");
     }
   }
 
@@ -47,38 +48,38 @@
     link.download = `${service.name.replace(/[^\w\- ]+/g, "").trim() || "service"}.html`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    note = "Saved as a page you can open in any browser, print or send.";
+    note = t("Saved as a page you can open in any browser, print or send.");
   }
 </script>
 
-<DeskDialog title="Programme outline" huge {onclose}>
+<DeskDialog title={t("Programme outline")} huge {onclose}>
   <div class="outline">
     <aside class="controls">
       <div class="group">
-        <p class="label">For</p>
-        <div class="seg" role="radiogroup" aria-label="Outline style">
+        <p class="label">{t("For")}</p>
+        <div class="seg" role="radiogroup" aria-label={t("Outline style")}>
           <button type="button" role="radio" aria-checked={options.style === "run-sheet"} onclick={() => setStyle("run-sheet")}>
-            <strong>The team</strong><span>Run sheet: times, lengths, every item</span>
+            <strong>{t("The team")}</strong><span>{t("Run sheet: times, lengths, every item")}</span>
           </button>
           <button type="button" role="radio" aria-checked={options.style === "order"} onclick={() => setStyle("order")}>
-            <strong>The congregation</strong><span>Order of service: parts, songs, readings</span>
+            <strong>{t("The congregation")}</strong><span>{t("Order of service: parts, songs, readings")}</span>
           </button>
         </div>
       </div>
       <div class="group">
-        <p class="label">Show</p>
-        <label class="check"><input type="checkbox" bind:checked={options.times} /> Times</label>
-        <label class="check"><input type="checkbox" bind:checked={options.items} /> Songs and readings</label>
+        <p class="label">{t("Show")}</p>
+        <label class="check"><input type="checkbox" bind:checked={options.times} /> {t("Times")}</label>
+        <label class="check"><input type="checkbox" bind:checked={options.items} /> {t("Songs and readings")}</label>
       </div>
       <div class="group actions">
-        <button type="button" class="btn primary" onclick={print}><Icon name="download" size={14} /> Print or save as PDF</button>
-        <button type="button" class="btn" onclick={() => void copy()}><Icon name="copy" size={14} /> Copy as text</button>
-        <button type="button" class="btn ghost" onclick={download}><Icon name="files" size={14} /> Save as a web page</button>
+        <button type="button" class="btn primary" onclick={print}><Icon name="download" size={14} /> {t("Print or save as PDF")}</button>
+        <button type="button" class="btn" onclick={() => void copy()}><Icon name="copy" size={14} /> {t("Copy as text")}</button>
+        <button type="button" class="btn ghost" onclick={download}><Icon name="files" size={14} /> {t("Save as a web page")}</button>
         {#if note}<p class="note" role="status">{note}</p>{/if}
       </div>
     </aside>
     <div class="paper-wrap">
-      <iframe bind:this={frame} class="paper" title="Programme outline" srcdoc={html}></iframe>
+      <iframe bind:this={frame} class="paper" title={t("Programme outline")} srcdoc={html}></iframe>
     </div>
   </div>
 </DeskDialog>

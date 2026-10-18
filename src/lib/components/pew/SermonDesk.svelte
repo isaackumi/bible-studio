@@ -8,6 +8,7 @@
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SearchField from "./SearchField.svelte";
+  import { t, tn } from "../../i18n/core";
 
   // Sermon window: a library of sermons, the outline as cards (what the audience sees, and the
   // notes that stay on this desk), and the speaker's notes beside Preview and Program.
@@ -39,9 +40,9 @@
     const now = Date.now();
     const day = 86_400_000;
     const buckets: { label: string; items: Sermon[] }[] = [
-      { label: "This week", items: [] },
-      { label: "This month", items: [] },
-      { label: "Earlier", items: [] },
+      { label: t("This week"), items: [] },
+      { label: t("This month"), items: [] },
+      { label: t("Earlier"), items: [] },
     ];
     for (const doc of sermons) {
       const age = now - new Date(doc.updatedAt).getTime();
@@ -121,12 +122,12 @@
   /** What the audience sees for a saved section, in a few words. */
   function audience(section: SermonSection): { icon: string; kind: string; title: string; body: string } {
     const item = sermonAudienceItem(section);
-    if (item.kind === "bible") return { icon: "bible", kind: "Scripture", title: item.bible?.reference ?? item.title, body: "" };
+    if (item.kind === "bible") return { icon: "bible", kind: t("Scripture"), title: item.bible?.reference ?? item.title, body: "" };
     if (item.kind === "image") {
       const asset = session.media.find((entry) => entry.id === item.image?.assetId);
-      return { icon: "media", kind: "Image", title: asset?.name ?? item.title, body: "" };
+      return { icon: "media", kind: t("Picture"), title: asset?.name ?? item.title, body: "" };
     }
-    return { icon: "stage", kind: "Slide", title: item.slide?.heading || item.title, body: item.slide?.body ?? "" };
+    return { icon: "stage", kind: t("Slide"), title: item.slide?.heading || item.title, body: item.slide?.body ?? "" };
   }
 
   function pick(id: string) {
@@ -151,8 +152,8 @@
   }
 
   async function ensureService() {
-    if (!session.service) await session.createService("Sunday Service");
-    if (!session.service?.sections.length) session.addSection("Sermon");
+    if (!session.service) await session.createService(t("Sunday Service"));
+    if (!session.service?.sections.length) session.addSection(t("Sermon"));
   }
 
   async function queueAll(doc: Sermon) {
@@ -225,8 +226,8 @@
 
   function useSummarySlide() {
     if (!draft || !summary) return;
-    draft.sections = [...draft.sections, { ...blankSection("Summary"), heading: draft.title || "Summary", body: summary.summary }];
-    note = "The summary is a slide at the end. Save to keep it.";
+    draft.sections = [...draft.sections, { ...blankSection(t("Summary")), heading: draft.title || t("Summary"), body: summary.summary }];
+    note = t("The summary is a slide at the end. Save to keep it.");
   }
 
   function blankSection(name: string): DraftSection {
@@ -234,7 +235,7 @@
   }
 
   function newSermon() {
-    draft = { id: crypto.randomUUID(), title: "", speaker: "", notes: "", sections: [blankSection("Opening")], isNew: true };
+    draft = { id: crypto.randomUUID(), title: "", speaker: "", notes: "", sections: [blankSection(t("Opening"))], isNew: true };
   }
 
   function edit(doc: Sermon) {
@@ -265,12 +266,12 @@
   function build(value: Draft): { sermon: Sermon; problems: string[] } {
     const problems: string[] = [];
     const sections: SermonSection[] = value.sections.map((section) => {
-      const heading = section.heading.trim() || section.name.trim() || "Sermon";
+      const heading = section.heading.trim() || section.name.trim() || t("Sermon");
       const slide: PresentationItem = { id: `${section.id}-slide`, kind: "slide", title: heading, slide: { heading, body: section.body, imageId: null } };
       let attached: PresentationItem | null = null;
       if (section.show === "scripture") {
         const parsed = parseReference(section.scripture);
-        if (!parsed) problems.push(`${section.name || "A section"}: “${section.scripture || "no reference"}” is not a reference.`);
+        if (!parsed) problems.push(t("{name}: “{reference}” is not a reference.", { name: section.name || t("A section"), reference: section.scripture || t("no reference") }));
         else {
           const start = parsed.startVerse ?? 1;
           const end = parsed.endVerse ?? start;
@@ -285,7 +286,7 @@
         }
       } else if (section.show === "image") {
         const asset = session.media.find((entry) => entry.id === section.imageId);
-        if (!asset) problems.push(`${section.name || "A section"}: pick an image.`);
+        if (!asset) problems.push(t("{name}: pick an image.", { name: section.name || t("A section") }));
         else attached = { id: `${section.id}-image`, kind: "image", title: asset.name, image: { assetId: asset.id } };
       }
       return { id: section.id, name: section.name, notes: section.notes, items: attached ? [attached, slide] : [slide] };
@@ -351,15 +352,15 @@
 
 <section class="sermon-desk">
   <!-- Library -->
-  <LibrarySidebar title="Sermons" icon="book" count={sermons.length} storageKey="sermons">
+  <LibrarySidebar title={t("Sermons")} icon="book" count={sermons.length} storageKey="sermons">
     {#snippet actions()}
-      <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> New</button>
+      <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> {t("New")}</button>
     {/snippet}
-    <SearchField bind:value={query} label="Search sermons" placeholder="Title, speaker, notes or scripture" onnavigate={navigate} />
+    <SearchField bind:value={query} label={t("Search sermons")} placeholder={t("Title, speaker, notes or scripture")} onnavigate={navigate} />
     <div class="list">
       {#if query.trim()}
-        <p class="group">Matches <span>{hits.length}</span></p>
-        {#if hits.length === 0}<p class="empty">No sermons match.</p>{/if}
+        <p class="group">{t("Matches")} <span>{hits.length}</span></p>
+        {#if hits.length === 0}<p class="empty">{t("No sermons match.")}</p>{/if}
         {#each hits as hit, h (`${hit.sermonId}:${hit.sectionId}`)}
           <button type="button" class="row" class:on={h === hitIndex} onclick={() => openHit(hit.sermonId, hit.sectionId)}>
             <strong>{hit.title}</strong>
@@ -368,15 +369,15 @@
           </button>
         {/each}
       {:else}
-        {#if sermons.length === 0}<p class="empty">No sermons yet. Create one to plan the message and its notes.</p>{/if}
+        {#if sermons.length === 0}<p class="empty">{t("No sermons yet. Create one to plan the message and its notes.")}</p>{/if}
         {#each groups as group (group.label)}
           <p class="group">{group.label} <span>{group.items.length}</span></p>
           {#each group.items as doc (doc.id)}
             <button type="button" class="row" class:on={selectedId === doc.id && !draft} onclick={() => pick(doc.id)}>
               <strong>
                 {doc.title || "Untitled sermon"}
-                {#if programLive && programSource.startsWith(`sermon:${doc.id}:`)}<em class="badge live">Live</em>
-                {:else if focus?.sermonId === doc.id}<em class="badge">Preview</em>{/if}
+                {#if programLive && programSource.startsWith(`sermon:${doc.id}:`)}<em class="badge live">{t("Live")}</em>
+                {:else if focus?.sermonId === doc.id}<em class="badge">{t("Preview")}</em>{/if}
               </strong>
               {#if doc.sections[0]}<span class="snippet">{doc.sections.map((section) => section.name).join(" → ")}</span>{/if}
               <span>{[doc.speaker, `${doc.sections.length} section${doc.sections.length === 1 ? "" : "s"}`, when(doc.updatedAt)].filter(Boolean).join(" · ")}</span>
@@ -390,24 +391,24 @@
   <!-- Outline -->
   <div class="sheet">
     {#if note}
-      <p class="note" role="status"><span>{note}</span><button type="button" aria-label="Dismiss" onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
+      <p class="note" role="status"><span>{note}</span><button type="button" aria-label={t("Dismiss")} onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
     {/if}
     {#if draft}
       <form class="editor" onsubmit={(event) => { event.preventDefault(); void saveDraft(); }}>
         <div class="head">
-          <h2>{draft.isNew ? "New sermon" : "Edit sermon"}</h2>
+          <h2>{draft.isNew ? t("New sermon") : t("Edit sermon")}</h2>
           <div class="actions">
-            <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? "Make a summary and points from your notes" : "Set up your AI key first"} onclick={() => void summarize()}>
-              <Icon name="sparkles" size={14} /> {summarizing ? "Summarizing…" : "Summarize"}
+            <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? t("Make a summary and points from your notes") : t("Set up your AI key first")} onclick={() => void summarize()}>
+              <Icon name="sparkles" size={14} /> {summarizing ? t("Summarizing…") : t("Summarize")}
             </button>
-            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>Cancel</button>
-            <button type="submit" class="desk-btn primary">Save</button>
+            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>{t("Cancel")}</button>
+            <button type="submit" class="desk-btn primary">{t("Save")}</button>
           </div>
         </div>
         {#if summaryError}<p class="ai-error" role="alert">{summaryError}</p>{/if}
         {#if summary}
-          <section class="ai-card" aria-label="AI summary">
-            <header><span><Icon name="sparkles" size={14} /> Summary</span><button type="button" class="ai-close" aria-label="Close summary" onclick={() => (summary = null)}><Icon name="close" size={13} /></button></header>
+          <section class="ai-card" aria-label={t("AI summary")}>
+            <header><span><Icon name="sparkles" size={14} /> {t("Summary")}</span><button type="button" class="ai-close" aria-label={t("Close summary")} onclick={() => (summary = null)}><Icon name="close" size={13} /></button></header>
             {#if summary.summary}<p class="ai-summary">{summary.summary}</p>{/if}
             {#if summary.points.length}
               <ol class="ai-points">
@@ -417,19 +418,19 @@
               </ol>
             {/if}
             <div class="ai-actions">
-              <button type="button" class="desk-btn" disabled={!summary.summary} onclick={useSummarySlide}>Add summary as a slide</button>
-              <button type="button" class="desk-btn primary-soft" disabled={!summary.points.length} onclick={usePoints}>Add points as sections</button>
+              <button type="button" class="desk-btn" disabled={!summary.summary} onclick={useSummarySlide}>{t("Add summary as a slide")}</button>
+              <button type="button" class="desk-btn primary-soft" disabled={!summary.points.length} onclick={usePoints}>{t("Add points as sections")}</button>
             </div>
-            <p class="ai-foot">Written by AI from your notes. Read it before it reaches the screen.</p>
+            <p class="ai-foot">{t("Written by AI from your notes. Read it before it reaches the screen.")}</p>
           </section>
         {/if}
         <div class="fields">
-          <input aria-label="Sermon title" placeholder="Title" bind:value={draft.title} />
-          <input aria-label="Speaker" placeholder="Speaker" bind:value={draft.speaker} />
+          <input aria-label={t("Sermon title")} placeholder={t("Title")} bind:value={draft.title} />
+          <input aria-label={t("Speaker")} placeholder={t("Speaker")} bind:value={draft.speaker} />
         </div>
         <label class="desk-only">
-          <span><Icon name="lock" size={12} /> Notes for the whole sermon · desk only</span>
-          <textarea aria-label="Operator notes" rows="2" placeholder="Reminders for the operator. Never shown to the audience." bind:value={draft.notes}></textarea>
+          <span><Icon name="lock" size={12} /> {t("Notes for the whole sermon · desk only")}</span>
+          <textarea aria-label={t("Operator notes")} rows="2" placeholder={t("Reminders for the operator. Never shown to the audience.")} bind:value={draft.notes}></textarea>
         </label>
 
         {#each draft.sections as section, i (section.id)}
@@ -447,50 +448,50 @@
                 type="button"
                 class="grip"
                 draggable="true"
-                aria-label="Move {section.name || 'this section'}: drag, or Alt+arrow keys"
-                title="Drag to move"
+                aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: section.name || t("this section") })}
+                title={t("Drag to move")}
                 ondragstart={(event) => { cardDrag = i; event.dataTransfer?.setData("text/plain", String(i)); }}
                 ondragend={() => { cardDrag = null; cardDrop = null; }}
                 onkeydown={(event) => { if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) { event.preventDefault(); moveDraft(section.id, event.key === "ArrowUp" ? -1 : 1); } }}
               ><Icon name="grip" size={14} /></button>
               <i>{i + 1}</i>
-              <input aria-label="Section name" placeholder="Section name" bind:value={section.name} />
-              <button type="button" class="row-tool" aria-label={`Preview ${section.name}`} title="Preview" onclick={() => previewDraftSection(section.id)}><Icon name="play" size={14} /></button>
-              <button type="button" class="row-tool del" aria-label={`Delete ${section.name}`} title="Delete this section" onclick={() => removeDraft(section.id)}><Icon name="trash" size={14} /></button>
+              <input aria-label={t("Section name")} placeholder={t("Section name")} bind:value={section.name} />
+              <button type="button" class="row-tool" aria-label={t("Preview {name}", { name: section.name })} title={t("Preview")} onclick={() => previewDraftSection(section.id)}><Icon name="play" size={14} /></button>
+              <button type="button" class="row-tool del" aria-label={t("Delete {name}", { name: section.name })} title={t("Delete this section")} onclick={() => removeDraft(section.id)}><Icon name="trash" size={14} /></button>
             </div>
             <div class="two">
               <div class="audience-edit">
-                <div class="seg" role="radiogroup" aria-label="Audience sees">
+                <div class="seg" role="radiogroup" aria-label={t("Audience sees")}>
                   {#each [["slide", "Slide"], ["scripture", "Scripture"], ["image", "Image"]] as [id, label] (id)}
                     <button type="button" role="radio" aria-checked={section.show === id} class:on={section.show === id} onclick={() => (section.show = id as Show)}>{label}</button>
                   {/each}
                 </div>
                 {#if section.show === "scripture"}
-                  <input aria-label="Attach scripture" placeholder="John 3:16-17" bind:value={section.scripture} />
+                  <input aria-label={t("Attach scripture")} placeholder={t("John 3:16-17")} bind:value={section.scripture} />
                 {:else if section.show === "image"}
                   {#if images.length}
-                    <select aria-label="Attach image" bind:value={section.imageId}>
-                      <option value="">Pick an image</option>
+                    <select aria-label={t("Attach image")} bind:value={section.imageId}>
+                      <option value="">{t("Pick an image")}</option>
                       {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
                     </select>
                   {:else}
-                    <p class="muted">Import images in the Production Desk's Media panel first.</p>
+                    <p class="muted">{t("Import images in the Production Desk's Media panel first.")}</p>
                   {/if}
                 {/if}
-                <input aria-label="Audience heading" placeholder={section.show === "slide" ? "Heading on screen" : "Heading (when shown as a slide)"} bind:value={section.heading} />
+                <input aria-label={t("Audience heading")} placeholder={section.show === "slide" ? t("Heading on screen") : t("Heading (when shown as a slide)")} bind:value={section.heading} />
                 {#if section.show === "slide"}
-                  <textarea aria-label="Audience body" rows="3" placeholder="Text on screen" bind:value={section.body}></textarea>
+                  <textarea aria-label={t("Audience body")} rows="3" placeholder={t("Text on screen")} bind:value={section.body}></textarea>
                 {/if}
               </div>
               <label class="desk-only">
-                <span><Icon name="lock" size={12} /> Desk notes</span>
-                <textarea aria-label="Section notes" rows="5" placeholder="What to say, cues, timing. Desk only." bind:value={section.notes}></textarea>
+                <span><Icon name="lock" size={12} /> {t("Desk notes")}</span>
+                <textarea aria-label={t("Section notes")} rows="5" placeholder={t("What to say, cues, timing. Desk only.")} bind:value={section.notes}></textarea>
               </label>
             </div>
           </div>
         {/each}
         <button type="button" class="add" onclick={() => draft && (draft.sections = [...draft.sections, blankSection(`Section ${draft.sections.length + 1}`)])}>
-          <Icon name="plus" size={14} /> Add section
+          <Icon name="plus" size={14} /> {t("Add section")}
         </button>
       </form>
     {:else if selected}
@@ -499,19 +500,19 @@
           <h2 class="title">{selected.title}</h2>
           <p class="meta">
             <span>{selected.speaker || "No speaker"}</span>
-            <span>{selected.sections.length} section{selected.sections.length === 1 ? "" : "s"}</span>
-            {#if when(selected.updatedAt)}<span>Updated {when(selected.updatedAt)}</span>{/if}
+            <span>{tn(selected.sections.length, "{n} section", "{n} sections")}</span>
+            {#if when(selected.updatedAt)}<span>{t("Updated {updatedAt}", { updatedAt: when(selected.updatedAt) })}</span>{/if}
           </p>
         </div>
         <div class="actions">
-          <button type="button" class="desk-btn" onclick={() => void queueAll(selected)}><Icon name="queue" size={14} /> Queue all</button>
-          <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> Edit</button>
+          <button type="button" class="desk-btn" onclick={() => void queueAll(selected)}><Icon name="queue" size={14} /> {t("Queue all")}</button>
+          <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
           <button
             type="button"
             class="desk-btn ghost icon"
             class:armed={armed === `sermon:${selected.id}`}
-            aria-label={armed === `sermon:${selected.id}` ? "Confirm delete sermon" : "Delete sermon"}
-            data-tip={armed === `sermon:${selected.id}` ? "Click again to delete" : "Delete sermon"}
+            aria-label={armed === `sermon:${selected.id}` ? t("Confirm delete sermon") : t("Delete sermon")}
+            data-tip={armed === `sermon:${selected.id}` ? t("Click again to delete") : t("Delete sermon")}
             onclick={() => void remove(selected)}
           ><Icon name="close" size={14} /></button>
         </div>
@@ -519,7 +520,7 @@
       {#if selected.notes.trim()}
         <p class="sermon-notes"><Icon name="lock" size={12} /> {selected.notes}</p>
       {/if}
-      <p class="hint">Click a section for <b>Preview</b> · double-click sends it <b>LIVE</b> · <kbd>←</kbd> <kbd>→</kbd> step sections · notes never leave this desk</p>
+      <p class="hint">{t("Click a section for Preview · double-click sends it LIVE")} · <kbd>←</kbd> <kbd>→</kbd> {t("step sections")} · {t("notes never leave this desk")}</p>
       <ol class="outline">
         {#each selected.sections as section, n (section.id)}
           {@const seen = audience(section)}
@@ -531,8 +532,8 @@
                 <i>{n + 1}</i>
                 <strong>{section.name}</strong>
                 <span class="tags">
-                  {#if isLive}<em class="badge live">Live</em>{/if}
-                  {#if onPreview}<em class="badge">Preview</em>{/if}
+                  {#if isLive}<em class="badge live">{t("Live")}</em>{/if}
+                  {#if onPreview}<em class="badge">{t("Preview")}</em>{/if}
                 </span>
               </span>
               <span class="seen">
@@ -544,24 +545,24 @@
                 <span class="notes"><Icon name="lock" size={12} /><span>{section.notes}</span></span>
               {/if}
             </button>
-            <button type="button" class="row-tool queue" aria-label={`Queue ${section.name}`} title="Add to queue" onclick={() => void queueOne(selected, section)}><Icon name="queue" size={14} /></button>
+            <button type="button" class="row-tool queue" aria-label={t("Queue {name}", { name: section.name })} title={t("Add to queue")} onclick={() => void queueOne(selected, section)}><Icon name="queue" size={14} /></button>
           </li>
         {/each}
       </ol>
     {:else}
       <div class="blank">
         <Icon name="book" size={28} />
-        <p>Pick a sermon from the library, or create one.</p>
-        <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> New sermon</button>
+        <p>{t("Pick a sermon from the library, or create one.")}</p>
+        <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> {t("New sermon")}</button>
       </div>
     {/if}
   </div>
 
   <!-- Speaker notes and monitors -->
   <aside class="stage">
-    <section class="speaker" aria-label="Desk notes">
+    <section class="speaker" aria-label={t("Desk notes")}>
       <header>
-        <span class="kicker"><Icon name="lock" size={12} /> Desk notes</span>
+        <span class="kicker"><Icon name="lock" size={12} /> {t("Desk notes")}</span>
         <span class="muted">{focusSection?.name ?? ""}</span>
       </header>
       <p class:empty-notes={!deskNotes}>{deskNotes || "Notes for the section on Preview show here. They never reach Preview or Program."}</p>
@@ -634,7 +635,6 @@
   .sermon-notes, .notes { display: flex; gap: 6px; align-items: flex-start; color: var(--muted); font-size: 12px; white-space: pre-wrap; }
   .sermon-notes { margin: 0; padding: 8px 10px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); flex: none; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); flex: none; }
-  .hint b { color: var(--ink); font-weight: 600; }
   kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }
   .outline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .card { position: relative; display: flex; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: var(--radius-control, 8px); background: var(--field); }

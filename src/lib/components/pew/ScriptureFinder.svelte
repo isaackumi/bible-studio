@@ -8,6 +8,7 @@
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Screen from "../Screen.svelte";
   import Icon from "../Icon.svelte";
+  import { msg, t, tn } from "../../i18n/core";
 
   // Find a verse, fast. Short typing goes a long way: "jn316", "1co13", "ps23", "3:16" or "16" in
   // the chapter that is open, "c5" for a chapter, "jo" for the books it could be, or a few words.
@@ -60,16 +61,16 @@
 
   /** The sections of the Bible, so the book list can be scanned by kind. */
   const SECTIONS: Array<{ name: string; from: number; to: number; tone: string }> = [
-    { name: "Law", from: 1, to: 5, tone: "#c9a35b" },
-    { name: "History", from: 6, to: 17, tone: "#7fa36b" },
-    { name: "Poetry & Wisdom", from: 18, to: 22, tone: "#b07cc6" },
-    { name: "Major Prophets", from: 23, to: 27, tone: "#d07a5a" },
-    { name: "Minor Prophets", from: 28, to: 39, tone: "#c98a4b" },
-    { name: "Gospels", from: 40, to: 43, tone: "#5aa0d6" },
-    { name: "Acts", from: 44, to: 44, tone: "#58b3a4" },
-    { name: "Paul's Letters", from: 45, to: 57, tone: "#7d8fe0" },
-    { name: "General Letters", from: 58, to: 65, tone: "#9a8fd0" },
-    { name: "Revelation", from: 66, to: 66, tone: "#d9677a" },
+    { name: msg("Law"), from: 1, to: 5, tone: "#c9a35b" },
+    { name: msg("History"), from: 6, to: 17, tone: "#7fa36b" },
+    { name: msg("Poetry & Wisdom"), from: 18, to: 22, tone: "#b07cc6" },
+    { name: msg("Major Prophets"), from: 23, to: 27, tone: "#d07a5a" },
+    { name: msg("Minor Prophets"), from: 28, to: 39, tone: "#c98a4b" },
+    { name: msg("Gospels"), from: 40, to: 43, tone: "#5aa0d6" },
+    { name: msg("Acts"), from: 44, to: 44, tone: "#58b3a4" },
+    { name: msg("Paul's Letters"), from: 45, to: 57, tone: "#7d8fe0" },
+    { name: msg("General Letters"), from: 58, to: 65, tone: "#9a8fd0" },
+    { name: msg("Revelation"), from: 66, to: 66, tone: "#d9677a" },
   ];
   const sectionFor = (ord: number) => SECTIONS.find((section) => ord >= section.from && ord <= section.to) ?? SECTIONS[0]!;
 
@@ -134,9 +135,9 @@
       seen.add(keyOf(item));
       rows.push({ kind: "saved", item, tag });
     };
-    goneToday.forEach((item) => add(item, "Gone live today"));
-    favorites.forEach((item) => add(item, "Favorites"));
-    recent.forEach((item) => add(item, "Recent"));
+    goneToday.forEach((item) => add(item, t("Gone live today")));
+    favorites.forEach((item) => add(item, t("Favorites")));
+    recent.forEach((item) => add(item, t("Recent")));
     return rows;
   });
 
@@ -378,22 +379,22 @@
         {#each items as item (keyOf(item))}
           {#if removable}
             <span class="chip-pair" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)}>
-              <button type="button" class="chip in-pair" title="Click to look · double-click for Preview · Shift-click to show now" onclick={(event) => chip(item, event)}>{item.reference}</button>
-              <button type="button" class="chip-x" aria-label="Remove {item.reference} from Recent" title="Remove from Recent" onclick={() => session.removeRecent(item)}><Icon name="close" size={11} /></button>
+              <button type="button" class="chip in-pair" title={t("Click to look · double-click for Preview · Shift-click to show now")} onclick={(event) => chip(item, event)}>{item.reference}</button>
+              <button type="button" class="chip-x" aria-label={t("Remove {reference} from Recent", { reference: item.reference })} title={t("Remove from Recent")} onclick={() => session.removeRecent(item)}><Icon name="close" size={11} /></button>
             </span>
           {:else}
-            <button type="button" class="chip" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)} title="Click to look · double-click for Preview · Shift-click to show now" onclick={(event) => chip(item, event)}>{item.reference}</button>
+            <button type="button" class="chip" class:on={selectedItem && keyOf(selectedItem) === keyOf(item)} title={t("Click to look · double-click for Preview · Shift-click to show now")} onclick={(event) => chip(item, event)}>{item.reference}</button>
           {/if}
         {/each}
         {#if removable && items.length > 1}
-          <button type="button" class="chip-clear" title="Empty the Recent list" onclick={() => session.clearRecent()}>Clear</button>
+          <button type="button" class="chip-clear" title={t("Empty the Recent list")} onclick={() => session.clearRecent()}>{t("Clear")}</button>
         {/if}
       </div>
     </div>
   {/if}
 {/snippet}
 
-<DeskDialog title="Find a verse" huge {onclose}>
+<DeskDialog title={t("Find a verse")} huge {onclose}>
   <!-- svelte-ignore a11y_no_static_element_interactions -- keyboard control for the list inside -->
   <div class="finder" onkeydown={keys}>
     <div class="top">
@@ -402,20 +403,20 @@
         <input
           bind:this={input}
           type="search"
-          aria-label="Find a verse"
-          placeholder="jn316 · 1co13 · ps23 · 3:16 · 16 · c5 · or a few words"
+          aria-label={t("Find a verse")}
+          placeholder={t("jn316 · 1co13 · ps23 · 3:16 · 16 · c5 · or a few words")}
           autocomplete="off"
           spellcheck="false"
           bind:value={query}
         />
         {#if understood}<span class="understood" aria-live="polite"><span>→</span>{understood}</span>{/if}
-        {#if searching}<span class="busy">Searching…</span>{/if}
+        {#if searching}<span class="busy">{t("Searching…")}</span>{/if}
       </label>
-      <div class="translations" role="radiogroup" aria-label="Translation">
+      <div class="translations" role="radiogroup" aria-label={t("Translation")}>
         {#each translations as translation, index (translation.id)}
           <button type="button" role="radio" aria-checked={tid === translation.id} title="{translation.name}{index < 9 ? ` (Alt+${index + 1})` : ''}" onclick={() => { tid = translation.id; input?.focus(); }}>{translation.abbreviation}</button>
         {/each}
-        <button type="button" class="more" title="Add translations" aria-label="Add translations" onclick={() => { onclose(); session.openSettings("bible"); }}><Icon name="plus" size={13} /></button>
+        <button type="button" class="more" title={t("Add translations")} aria-label={t("Add translations")} onclick={() => { onclose(); session.openSettings("bible"); }}><Icon name="plus" size={13} /></button>
       </div>
     </div>
 
@@ -424,29 +425,29 @@
       {@render chips("Favorites", "star", favorites)}
       {@render chips("Recent", "reset", recent, true)}
       <p class="patterns">
-        <span><b>jn316</b> John 3:16</span>
-        <span><b>rom828-30</b> range</span>
-        <span><b>16</b> verse here</span>
-        <span><b>c5</b> chapter here</span>
-        <span><b>jo</b> Tab: book</span>
-        <span><b>words</b> search</span>
+        <span><b>jn316</b> {t("John 3:16")}</span>
+        <span><b>rom828-30</b> {t("range")}</span>
+        <span><b>16</b> {t("verse here")}</span>
+        <span><b>c5</b> {t("chapter here")}</span>
+        <span><b>jo</b> {t("Tab: book")}</span>
+        <span><b>{t("words")}</b> {t("search")}</span>
       </p>
     </div>
 
     <div class="panes">
-      <nav class="browse" aria-label="Books">
-        <div class="testaments" role="tablist" aria-label="Testament">
-          <button type="button" role="tab" aria-selected={testament === "old"} onclick={() => { testament = "old"; browseOrd = null; input?.focus(); }}>Old Testament</button>
-          <button type="button" role="tab" aria-selected={testament === "new"} onclick={() => { testament = "new"; browseOrd = null; input?.focus(); }}>New Testament</button>
+      <nav class="browse" aria-label={t("Books")}>
+        <div class="testaments" role="tablist" aria-label={t("Testament")}>
+          <button type="button" role="tab" aria-selected={testament === "old"} onclick={() => { testament = "old"; browseOrd = null; input?.focus(); }}>{t("Old Testament")}</button>
+          <button type="button" role="tab" aria-selected={testament === "new"} onclick={() => { testament = "new"; browseOrd = null; input?.focus(); }}>{t("New Testament")}</button>
         </div>
         {#if browsing !== null && bookOf(browsing)}
           {@const book = bookOf(browsing)!}
           <div class="chapters-head" style:--tone={sectionFor(book.ord).tone}>
-            <button type="button" class="back" aria-label="All books" onclick={() => { browseOrd = null; testament = book.ord >= 40 ? "new" : "old"; query = ""; input?.focus(); }}><Icon name="chevron-left" size={14} /></button>
+            <button type="button" class="back" aria-label={t("All books")} onclick={() => { browseOrd = null; testament = book.ord >= 40 ? "new" : "old"; query = ""; input?.focus(); }}><Icon name="chevron-left" size={14} /></button>
             <span class="tone-dot" aria-hidden="true"></span>
             <span class="book-title">
               <strong>{book.name}</strong>
-              <span>{sectionFor(book.ord).name} · {book.chapters} chapter{book.chapters === 1 ? "" : "s"}</span>
+              <span>{t(sectionFor(book.ord).name)} · {tn(book.chapters, "{n} chapter", "{n} chapters")}</span>
             </span>
           </div>
           <div class="chapter-grid">
@@ -459,7 +460,7 @@
             {#each books as book, index (book.ord)}
               {@const group = sectionFor(book.ord)}
               {#if index === 0 || sectionFor(books[index - 1]!.ord) !== group}
-                <p class="book-group" style:--tone={group.tone}>{group.name}</p>
+                <p class="book-group" style:--tone={group.tone}>{t(group.name)}</p>
               {/if}
               <button type="button" class:here={book.ord === here.bookOrd} style:--tone={group.tone} title={book.name} onclick={() => pickBook(book.ord)}>{book.name}</button>
             {/each}
@@ -467,7 +468,7 @@
         {/if}
       </nav>
 
-      <div class="results" bind:this={listEl} role="listbox" aria-label="Results">
+      <div class="results" bind:this={listEl} role="listbox" aria-label={t("Results")}>
         {#each rows as row, index (index)}
           {@const section = sectionOf(row)}
           {#if index === 0 || sectionOf(rows[index - 1]!) !== section}
@@ -498,19 +499,19 @@
             {:else if row.kind === "hit"}
               <span class="text">{#each marked(row.hit.text, read.phrase) as part, n (n)}{#if part.hit}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}</span>
             {:else if row.kind === "book"}
-              <span class="text">{row.chapters} chapter{row.chapters === 1 ? "" : "s"} · Tab to choose a chapter</span>
+              <span class="text">{tn(row.chapters, "{n} chapter", "{n} chapters")} · {t("Tab to choose a chapter")}</span>
             {:else if row.kind === "ref" && row.ref.startVerse === null}
-              <span class="text">Whole chapter · Enter to pick a verse</span>
+              <span class="text">{t("Whole chapter · Enter to pick a verse")}</span>
             {/if}
           </button>
         {:else}
           <div class="empty">
             {#if query.trim()}
-              <p>{searching ? "Searching the words…" : `Nothing for “${query.trim()}”.`}</p>
-              {#if !searching}<p class="muted">Try jn316, ps23, or a few words from the verse. Or pick a book on the left.</p>{/if}
+              <p>{searching ? t("Searching the words…") : t("Nothing for “{query}”.", { query: query.trim() })}</p>
+              {#if !searching}<p class="muted">{t("Try jn316, ps23, or a few words from the verse. Or pick a book on the left.")}</p>{/if}
             {:else}
-              <p>Type a reference the short way, or a few words.</p>
-              <p class="muted">Or pick a book on the left, then a chapter. Scriptures you use show above.</p>
+              <p>{t("Type a reference the short way, or a few words.")}</p>
+              <p class="muted">{t("Or pick a book on the left, then a chapter. Scriptures you use show above.")}</p>
             {/if}
           </div>
         {/each}
@@ -527,12 +528,12 @@
               type="button"
               class="star"
               class:on={session.isFavoritePassage(selectedItem)}
-              aria-label={session.isFavoritePassage(selectedItem) ? `Remove ${selectedItem.reference} from favorites` : `Add ${selectedItem.reference} to favorites`}
+              aria-label={session.isFavoritePassage(selectedItem) ? t("Remove {reference} from favorites", { reference: selectedItem.reference }) : t("Add {reference} to favorites", { reference: selectedItem.reference })}
               onclick={() => selectedItem && session.toggleFavoritePassage(selectedItem)}
             ><Icon name="star" size={16} /></button>
           </div>
           {#if screenModel}
-            <div class="screen-preview" aria-label="How it looks on the screen"><Screen model={screenModel} still /></div>
+            <div class="screen-preview" aria-label={t("How it looks on the screen")}><Screen model={screenModel} still /></div>
           {/if}
           <div class="words">
             {#each previewText as verse (verse.verse)}
@@ -542,24 +543,24 @@
           </div>
           {#if note}<p class="note" role="status">{note}</p>{/if}
           <div class="go">
-            <button type="button" class="btn" onclick={() => choose(selected, false)}>Preview <kbd>Enter</kbd></button>
-            <button type="button" class="btn live" onclick={() => choose(selected, true)}>Show now <kbd>⇧ Enter</kbd></button>
-            <button type="button" class="btn ghost" title="Add to the service running order" onclick={addToService}><Icon name="queue" size={14} /> Add to service</button>
+            <button type="button" class="btn" onclick={() => choose(selected, false)}>{t("Preview")} <kbd>Enter</kbd></button>
+            <button type="button" class="btn live" onclick={() => choose(selected, true)}>{t("Show now")} <kbd>⇧ Enter</kbd></button>
+            <button type="button" class="btn ghost" title={t("Add to the service running order")} onclick={addToService}><Icon name="queue" size={14} /> {t("Add to service")}</button>
           </div>
         {:else if selected?.kind === "book"}
           <p class="ref">{selected.name}</p>
-          <p class="hint">{selected.chapters} chapters. Press Tab, then type the chapter and verse, or pick a chapter on the left.</p>
+          <p class="hint">{t("{chapters} chapters. Press Tab, then type the chapter and verse, or pick a chapter on the left.", { chapters: selected.chapters })}</p>
         {:else if selected?.kind === "ref"}
           <p class="ref">{quickLabel(selected.ref, session.books)}</p>
-          <p class="hint">Press Enter to list its verses, then pick one. Shift+↓ selects several.</p>
+          <p class="hint">{t("Press Enter to list its verses, then pick one. Shift+↓ selects several.")}</p>
         {:else}
-          <p class="ref muted">Nothing picked</p>
-          <p class="hint">The words of what you pick show here, with the verse before and after.</p>
+          <p class="ref muted">{t("Nothing picked")}</p>
+          <p class="hint">{t("The words of what you pick show here, with the verse before and after.")}</p>
         {/if}
       </aside>
     </div>
 
-    <p class="keys"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>⇧↓</kbd> several verses · <kbd>Enter</kbd> Preview · <kbd>⇧ Enter</kbd> show now · <kbd>Tab</kbd> finish a book · <kbd>Alt 1–9</kbd> translation · <kbd>Esc</kbd> close</p>
+    <p class="keys"><kbd>↑</kbd><kbd>↓</kbd> {t("move")} · <kbd>⇧↓</kbd> {t("several verses")} · <kbd>Enter</kbd> {t("Preview")} · <kbd>⇧ Enter</kbd> {t("show now")} · <kbd>Tab</kbd> {t("finish a book")} · <kbd>Alt 1–9</kbd> {t("translation")} · <kbd>Esc</kbd> {t("close")}</p>
   </div>
 </DeskDialog>
 

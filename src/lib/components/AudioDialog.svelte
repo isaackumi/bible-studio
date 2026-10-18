@@ -4,6 +4,7 @@
   import { isDesktop } from "../platform/runtime";
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
+  import { t } from "../i18n/core";
 
   // Audio: playlists of walk-in music and backing tracks, played on this computer. The player
   // keeps going on every page; this window chooses, orders and controls what plays.
@@ -61,9 +62,9 @@
   }
 </script>
 
-<DeskDialog title="Audio" wide {onclose}>
+<DeskDialog title={t("Audio")} wide {onclose}>
   <div class="audio">
-    <nav class="lists" aria-label="Playlists">
+    <nav class="lists" aria-label={t("Playlists")}>
       {#each playlists as list (list.id)}
         <button type="button" class="list" class:on={selected?.id === list.id} onclick={() => (selectedId = list.id)}>
           <span class="list-name">{list.name}</span>
@@ -74,24 +75,24 @@
         </button>
       {/each}
       <form class="new-list" onsubmit={newPlaylist}>
-        <input aria-label="New playlist name" placeholder="New playlist" maxlength="60" bind:value={newName} />
-        <button type="submit" aria-label="Add playlist"><Icon name="plus" size={14} /></button>
+        <input aria-label={t("New playlist name")} placeholder={t("New playlist")} maxlength="60" bind:value={newName} />
+        <button type="submit" aria-label={t("Add playlist")}><Icon name="plus" size={14} /></button>
       </form>
     </nav>
 
     <section class="tracks">
       {#if selected}
         <header class="tracks-head">
-          <input class="list-title" aria-label="Playlist name" value={selected.name} onchange={(event) => session.renamePlaylist(selected.id, event.currentTarget.value)} />
+          <input class="list-title" aria-label={t("Playlist name")} value={selected.name} onchange={(event) => session.renamePlaylist(selected.id, event.currentTarget.value)} />
           <label class="loop">
             <input type="checkbox" class="switch" role="switch" checked={selected.loop} onchange={(event) => session.setPlaylistLoop(selected.id, event.currentTarget.checked)} />
-            Loop
+            {t("Loop")}
           </label>
-          <button type="button" class="btn" onclick={() => void addMusic()}><Icon name="plus" size={14} /> Add music</button>
-          <button type="button" class="btn primary" disabled={!tracks.length} onclick={() => void session.playPlaylist(selected.id, 0)}><Icon name="play" size={14} /> Play</button>
+          <button type="button" class="btn" onclick={() => void addMusic()}><Icon name="plus" size={14} /> {t("Add music")}</button>
+          <button type="button" class="btn primary" disabled={!tracks.length} onclick={() => void session.playPlaylist(selected.id, 0)}><Icon name="play" size={14} /> {t("Play")}</button>
           {#if playlists.length > 1}
-            <button type="button" class="btn ghost danger" aria-label={armed === selected.id ? `Confirm delete ${selected.name}` : `Delete ${selected.name}`} onclick={() => removeList(selected.id)}>
-              {armed === selected.id ? "Delete?" : ""}<Icon name="trash" size={14} />
+            <button type="button" class="btn ghost danger" aria-label={armed === selected.id ? t("Confirm delete {name}", { name: selected.name }) : t("Delete {name}", { name: selected.name })} onclick={() => removeList(selected.id)}>
+              {armed === selected.id ? t("Delete?") : ""}<Icon name="trash" size={14} />
             </button>
           {/if}
         </header>
@@ -112,8 +113,8 @@
                 id="track-grip-{index}"
                 class="grip"
                 draggable="true"
-                aria-label="Move {track.name}: drag, or Alt+arrow keys"
-                title="Drag to move"
+                aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: track.name })}
+                title={t("Drag to move")}
                 ondragstart={(event) => { trackDrag = index; event.dataTransfer?.setData("text/plain", String(index)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
                 ondragend={() => { trackDrag = null; trackDrop = null; }}
                 onkeydown={(event) => {
@@ -125,19 +126,19 @@
                   queueMicrotask(() => document.getElementById(`track-grip-${to}`)?.focus());
                 }}
               ><Icon name="grip" size={14} /></button>
-              <button type="button" class="track-play" aria-label={now && deck.playing ? `Pause ${track.name}` : `Play ${track.name}`} onclick={() => (now ? void deck.toggle() : void session.playPlaylist(selected.id, index))}>
+              <button type="button" class="track-play" aria-label={now && deck.playing ? t("Pause {name}", { name: track.name }) : t("Play {name}", { name: track.name })} onclick={() => (now ? void deck.toggle() : void session.playPlaylist(selected.id, index))}>
                 {#if now && deck.playing}<Icon name="square" size={12} />{:else}<Icon name="play" size={12} />{/if}
               </button>
               <span class="track-n">{index + 1}</span>
               <span class="track-name">{track.name.replace(/\.[a-z0-9]+$/i, "")}</span>
               {#if now}<span class="track-time">{formatDuration(deck.time)} / {formatDuration(deck.duration)}</span>{/if}
-              <button type="button" class="mini del" aria-label="Remove {track.name} from {selected.name}" title="Remove from this playlist" onclick={() => session.removeFromPlaylist(selected.id, index)}><Icon name="trash" size={14} /></button>
+              <button type="button" class="mini del" aria-label={t("Remove {name} from {playlist}", { name: track.name, playlist: selected.name })} title={t("Remove from this playlist")} onclick={() => session.removeFromPlaylist(selected.id, index)}><Icon name="trash" size={14} /></button>
             </li>
           {:else}
             <li class="empty">
-              <strong>No music yet</strong>
-              <span>Add MP3, M4A, WAV, AAC, OGG or FLAC files: walk-in music, an offering song, backing tracks. Loop keeps walk-in music going until you fade it out.</span>
-              <button type="button" class="btn primary" onclick={() => void addMusic()}><Icon name="plus" size={14} /> Add music</button>
+              <strong>{t("No music yet")}</strong>
+              <span>{t("Add MP3, M4A, WAV, AAC, OGG or FLAC files: walk-in music, an offering song, backing tracks. Loop keeps walk-in music going until you fade it out.")}</span>
+              <button type="button" class="btn primary" onclick={() => void addMusic()}><Icon name="plus" size={14} /> {t("Add music")}</button>
             </li>
           {/each}
         </ol>
@@ -146,31 +147,31 @@
   </div>
 
   {#snippet footer()}
-    <div class="transport" aria-label="Player">
+    <div class="transport" aria-label={t("Player")}>
       <div class="now-playing">
-        <strong>{deck.current ? deck.current.name.replace(/\.[a-z0-9]+$/i, "") : "Nothing playing"}</strong>
-        <span>{deck.error || (deck.fading ? "Fading out…" : deck.current ? `${playlists.find((list) => list.id === deck.playlistId)?.name ?? ""}${deck.loop ? " · loops" : ""}` : "Pick a playlist and press Play.")}</span>
+        <strong>{deck.current ? deck.current.name.replace(/\.[a-z0-9]+$/i, "") : t("Nothing playing")}</strong>
+        <span>{deck.error || (deck.fading ? t("Fading out…") : deck.current ? `${playlists.find((list) => list.id === deck.playlistId)?.name ?? ""}${deck.loop ? ` · ${t("loops")}` : ""}` : t("Pick a playlist and press Play."))}</span>
       </div>
       <div class="controls">
-        <button type="button" class="round" aria-label="Previous track" disabled={!deck.current} onclick={() => void deck.step(-1)}><Icon name="chevron-left" size={16} /></button>
-        <button type="button" class="round big" aria-label={deck.playing ? "Pause" : "Play"} disabled={!deck.current} onclick={() => void deck.toggle()}>
+        <button type="button" class="round" aria-label={t("Previous track")} disabled={!deck.current} onclick={() => void deck.step(-1)}><Icon name="chevron-left" size={16} /></button>
+        <button type="button" class="round big" aria-label={deck.playing ? t("Pause") : t("Play")} disabled={!deck.current} onclick={() => void deck.toggle()}>
           {#if deck.playing}<Icon name="square" size={14} />{:else}<Icon name="play" size={16} />{/if}
         </button>
-        <button type="button" class="round" aria-label="Next track" disabled={!deck.current} onclick={() => void deck.step(1)}><Icon name="chevron-right" size={16} /></button>
+        <button type="button" class="round" aria-label={t("Next track")} disabled={!deck.current} onclick={() => void deck.step(1)}><Icon name="chevron-right" size={16} /></button>
       </div>
       <label class="scrub">
         <span>{formatDuration(deck.time)}</span>
-        <input type="range" min="0" max={Math.max(1, deck.duration)} step="1" value={deck.time} aria-label="Position in the track" disabled={!deck.current} oninput={(event) => deck.seek(Number(event.currentTarget.value))} />
+        <input type="range" min="0" max={Math.max(1, deck.duration)} step="1" value={deck.time} aria-label={t("Position in the track")} disabled={!deck.current} oninput={(event) => deck.seek(Number(event.currentTarget.value))} />
         <span>{formatDuration(deck.duration)}</span>
       </label>
-      <label class="volume" title="Volume">
+      <label class="volume" title={t("Volume")}>
         <Icon name="audio" size={14} />
-        <input type="range" min="0" max="1" step="0.05" value={deck.volume} aria-label="Volume" oninput={(event) => session.setAudioVolume(Number(event.currentTarget.value))} />
+        <input type="range" min="0" max="1" step="0.05" value={deck.volume} aria-label={t("Volume")} oninput={(event) => session.setAudioVolume(Number(event.currentTarget.value))} />
       </label>
-      <button type="button" class="btn" disabled={!deck.playing || deck.fading} onclick={() => deck.fadeOut(4)}>Fade out</button>
-      <label class="fade-live" title="Looping music (walk-in) fades out when you press LIVE; backing tracks play on">
+      <button type="button" class="btn" disabled={!deck.playing || deck.fading} onclick={() => deck.fadeOut(4)}>{t("Fade out")}</button>
+      <label class="fade-live" title={t("Looping music (walk-in) fades out when you press LIVE; backing tracks play on")}>
         <input type="checkbox" class="switch" role="switch" checked={session.workspace.audio.fadeOnLive} onchange={(event) => session.setFadeOnLive(event.currentTarget.checked)} />
-        Fade walk-in music at LIVE
+        {t("Fade walk-in music at LIVE")}
       </label>
     </div>
   {/snippet}

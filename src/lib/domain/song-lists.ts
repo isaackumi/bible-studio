@@ -2,6 +2,7 @@
 // is sung most, and what is in the service being built. The Songs page and the song search both
 // use these, so they always agree.
 
+import { t } from "../i18n/core";
 import { daysAgo, mostUsed, recentlyUsedIds, type SongUse } from "./song-usage";
 import type { Song } from "./types";
 
@@ -44,33 +45,33 @@ export function songLists(input: SongListInput): SongList[] {
   const byId = new Map(input.songs.map((song) => [song.id, song]));
   const most = mostUsed(input.uses, daysAgo(90, input.now ?? new Date()));
   return [
-    { id: "all", label: "All songs", icon: "library", empty: "No songs yet. Add one with New song or Import.", songs: input.songs },
+    { id: "all", label: t("All songs"), icon: "library", empty: t("No songs yet. Add one with New song or Import."), songs: input.songs },
     {
       id: "favorites",
-      label: "Favorites",
+      label: t("Favorites"),
       icon: "star",
-      empty: "Star the songs you sing most and they wait here.",
+      empty: t("Star the songs you sing most and they wait here."),
       songs: pick(byId, input.favoriteIds),
     },
     {
       id: "recent",
-      label: "Recently used",
+      label: t("Recently used"),
       icon: "reset",
-      empty: "Songs you show appear here, newest first.",
+      empty: t("Songs you show appear here, newest first."),
       songs: pick(byId, [...input.sessionRecentIds, ...recentlyUsedIds(input.uses)]),
     },
     {
       id: "most",
-      label: "Most sung",
+      label: t("Most sung"),
       icon: "note",
-      empty: "After a few Sundays, the songs sung most in the last three months appear here.",
+      empty: t("After a few Sundays, the songs sung most in the last three months appear here."),
       songs: pick(byId, most.map((entry) => entry.songId)),
     },
     {
       id: "service",
-      label: "In this service",
+      label: t("In this service"),
       icon: "list",
-      empty: "Songs added to the service you are building appear here.",
+      empty: t("Songs added to the service you are building appear here."),
       songs: pick(byId, input.serviceSongIds),
     },
   ];

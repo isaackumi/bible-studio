@@ -9,6 +9,7 @@
   import Screen from "../Screen.svelte";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import { ACCENT_SWATCHES, ANNOUNCEMENT_DESIGNS, LABEL_SUGGESTIONS, presentAnnouncement, themeAccent, type AnnouncementDesign } from "../../domain/announcement";
+  import { t, tn } from "../../i18n/core";
 
   // Everything about one service item, with a live preview. Saving changes the running order;
   // if the item is on Preview it refreshes there. Program only changes with LIVE.
@@ -74,7 +75,7 @@
   function applyReference() {
     const parsed = parseReference(reference);
     if (!parsed?.startVerse || !draft.bible) {
-      referenceNote = "Type a reference like John 3:16-18.";
+      referenceNote = t("Type a reference like John 3:16-18.");
       return;
     }
     const book = session.books.find((entry) => entry.ord === parsed.bookOrd);
@@ -94,36 +95,36 @@
   }
 </script>
 
-<DeskDialog title="Edit {draft.title}" {onclose} wide>
+<DeskDialog title={t("Edit {title}", { title: draft.title })} {onclose} wide>
   <div class="editor">
     <div class="fields">
       <label class="field-row">
-        <span>Name in the running order</span>
-        <input aria-label="Item name" bind:value={draft.title} />
+        <span>{t("Name in the running order")}</span>
+        <input aria-label={t("Item name")} bind:value={draft.title} />
       </label>
 
       {#if wordy}
         <label class="field-row">
-          <span>Heading</span>
-          <input aria-label="Heading" value={words.heading} oninput={(event) => setWords({ heading: event.currentTarget.value })} />
+          <span>{t("Heading")}</span>
+          <input aria-label={t("Heading")} value={words.heading} oninput={(event) => setWords({ heading: event.currentTarget.value })} />
         </label>
         <label class="field-row">
-          <span>Text</span>
-          <textarea aria-label="Text" rows="5" value={words.body} oninput={(event) => setWords({ body: event.currentTarget.value })}></textarea>
+          <span>{t("Text")}</span>
+          <textarea aria-label={t("Text")} rows="5" value={words.body} oninput={(event) => setWords({ body: event.currentTarget.value })}></textarea>
         </label>
         {#if announcement}
           <label class="field-row">
-            <span>Small line above the heading</span>
-            <input aria-label="Small line above the heading" placeholder="Leave empty to hide it" value={announcement.label ?? ""} oninput={(event) => setAnnouncement({ label: event.currentTarget.value })} />
+            <span>{t("Small line above the heading")}</span>
+            <input aria-label={t("Small line above the heading")} placeholder={t("Leave empty to hide it")} value={announcement.label ?? ""} oninput={(event) => setAnnouncement({ label: event.currentTarget.value })} />
           </label>
-          <div class="ann-chips" role="group" aria-label="Suggestions for the small line">
+          <div class="ann-chips" role="group" aria-label={t("Suggestions for the small line")}>
             {#each LABEL_SUGGESTIONS as suggestion (suggestion)}
               <button type="button" class="ann-chip" aria-pressed={(announcement.label ?? "") === suggestion} onclick={() => setAnnouncement({ label: suggestion })}>{suggestion}</button>
             {/each}
           </div>
           <div class="field-row">
-            <span>Design</span>
-            <div class="ann-designs" role="radiogroup" aria-label="Announcement design">
+            <span>{t("Design")}</span>
+            <div class="ann-designs" role="radiogroup" aria-label={t("Announcement design")}>
               {#each designThumbs as design (design.id)}
                 <button
                   type="button"
@@ -140,43 +141,43 @@
             </div>
           </div>
           <div class="field-row">
-            <span>Accent colour</span>
-            <div class="ann-swatches" role="radiogroup" aria-label="Accent colour">
-              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title="The theme's colour" style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>Theme</button>
+            <span>{t("Accent colour")}</span>
+            <div class="ann-swatches" role="radiogroup" aria-label={t("Accent colour")}>
+              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title={t("The theme's colour")} style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>{t("Theme")}</button>
               {#each ACCENT_SWATCHES as color (color)}
-                <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label="Accent {color}" style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
+                <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label={t("Accent {color}", { color })} style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
               {/each}
-              <input type="color" aria-label="Pick any accent colour" value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
+              <input type="color" aria-label={t("Pick any accent colour")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
             </div>
           </div>
         {/if}
         <label class="field-row">
-          <span>Picture behind the words</span>
-          <select aria-label="Background picture" value={draft.slide?.imageId ?? draft.announcement?.imageId ?? ""} onchange={(event) => setWords({ imageId: event.currentTarget.value || null })}>
-            <option value="">The theme's background</option>
+          <span>{t("Picture behind the words")}</span>
+          <select aria-label={t("Background picture")} value={draft.slide?.imageId ?? draft.announcement?.imageId ?? ""} onchange={(event) => setWords({ imageId: event.currentTarget.value || null })}>
+            <option value="">{t("The theme's background")}</option>
             {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
         </label>
-        <TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label="Text style for this item" />
+        <TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label={t("Text style for this item")} />
       {:else if draft.kind === "bible" && draft.bible}
         <form class="field-row" onsubmit={(event) => { event.preventDefault(); applyReference(); }}>
-          <span>Reference</span>
+          <span>{t("Reference")}</span>
           <div class="inline">
-            <input aria-label="Reference" bind:value={reference} placeholder="John 3:16-18" />
-            <button type="submit" class="desk-btn">Use</button>
+            <input aria-label={t("Reference")} bind:value={reference} placeholder={t("John 3:16-18")} />
+            <button type="submit" class="desk-btn">{t("Use")}</button>
           </div>
           {#if referenceNote}<em class="note">{referenceNote}</em>{/if}
         </form>
         <label class="field-row">
-          <span>Translation</span>
-          <select aria-label="Translation" value={draft.bible.translationId} onchange={(event) => draft.bible && (draft.bible = { ...draft.bible, translationId: event.currentTarget.value })}>
+          <span>{t("Translation")}</span>
+          <select aria-label={t("Translation")} value={draft.bible.translationId} onchange={(event) => draft.bible && (draft.bible = { ...draft.bible, translationId: event.currentTarget.value })}>
             {#each session.translations as translation (translation.id)}<option value={translation.id}>{translation.abbreviation} · {translation.name}</option>{/each}
           </select>
         </label>
       {:else if draft.kind === "lyric" && draft.lyric}
         <label class="field-row">
-          <span>Song</span>
-          <select aria-label="Song" value={draft.lyric.songId} onchange={(event) => {
+          <span>{t("Song")}</span>
+          <select aria-label={t("Song")} value={draft.lyric.songId} onchange={(event) => {
             const next = session.songs.find((entry) => entry.id === event.currentTarget.value);
             if (next?.sections[0]) {
               draft.lyric = { songId: next.id, sectionId: next.sections[0].id };
@@ -188,42 +189,42 @@
         </label>
         {#if song}
           <label class="field-row">
-            <span>Start on</span>
-            <select aria-label="First section" value={draft.lyric.sectionId} onchange={(event) => draft.lyric && (draft.lyric = { ...draft.lyric, sectionId: event.currentTarget.value })}>
+            <span>{t("Start on")}</span>
+            <select aria-label={t("First section")} value={draft.lyric.sectionId} onchange={(event) => draft.lyric && (draft.lyric = { ...draft.lyric, sectionId: event.currentTarget.value })}>
               {#each song.sections as section (section.id)}<option value={section.id}>{section.label}</option>{/each}
             </select>
           </label>
-          <p class="note">To change the words, open the song on the Songs page.</p>
+          <p class="note">{t("To change the words, open the song on the Songs page.")}</p>
         {/if}
       {:else if draft.kind === "image"}
         <label class="field-row">
-          <span>Picture</span>
-          <select aria-label="Picture" value={draft.image?.assetId ?? ""} onchange={(event) => (draft.image = { assetId: event.currentTarget.value })}>
+          <span>{t("Picture")}</span>
+          <select aria-label={t("Picture")} value={draft.image?.assetId ?? ""} onchange={(event) => (draft.image = { assetId: event.currentTarget.value })}>
             {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
         </label>
-        <button type="button" class="desk-btn" onclick={addTextToPicture}>Add words over the picture</button>
+        <button type="button" class="desk-btn" onclick={addTextToPicture}>{t("Add words over the picture")}</button>
       {:else if draft.kind === "video" && draft.video}
         <label class="field-row">
-          <span>Video</span>
-          <select aria-label="Video" value={draft.video.assetId} onchange={(event) => draft.video && (draft.video = { ...draft.video, assetId: event.currentTarget.value })}>
+          <span>{t("Video")}</span>
+          <select aria-label={t("Video")} value={draft.video.assetId} onchange={(event) => draft.video && (draft.video = { ...draft.video, assetId: event.currentTarget.value })}>
             {#each videos as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
         </label>
-        <label class="check"><input type="checkbox" checked={draft.video.loop} onchange={(event) => draft.video && (draft.video = { ...draft.video, loop: event.currentTarget.checked })} /> Play round and round (walk-in loops)</label>
-        <label class="check"><input type="checkbox" checked={draft.video.muted} onchange={(event) => draft.video && (draft.video = { ...draft.video, muted: event.currentTarget.checked })} /> No sound</label>
+        <label class="check"><input type="checkbox" checked={draft.video.loop} onchange={(event) => draft.video && (draft.video = { ...draft.video, loop: event.currentTarget.checked })} /> {t("Play round and round (walk-in loops)")}</label>
+        <label class="check"><input type="checkbox" checked={draft.video.muted} onchange={(event) => draft.video && (draft.video = { ...draft.video, muted: event.currentTarget.checked })} /> {t("No sound")}</label>
       {:else if draft.kind === "deck" && draft.deck}
         <label class="field-row">
-          <span>Slide deck</span>
-          <select aria-label="Slide deck" value={draft.deck.deckId} onchange={(event) => (draft.deck = { deckId: event.currentTarget.value })}>
-            {#each session.decks as deck (deck.id)}<option value={deck.id}>{deck.name} · {deck.pages.length} pages</option>{/each}
+          <span>{t("Slide deck")}</span>
+          <select aria-label={t("Slide deck")} value={draft.deck.deckId} onchange={(event) => (draft.deck = { deckId: event.currentTarget.value })}>
+            {#each session.decks as deck (deck.id)}<option value={deck.id}>{deck.name} · {tn(deck.pages.length, "{n} page", "{n} pages")}</option>{/each}
           </select>
         </label>
-        <p class="note">Edit the pages themselves on the Production Desk › Media › Slides.</p>
+        <p class="note">{t("Edit the pages themselves on the Production Desk › Media › Slides.")}</p>
       {:else if draft.kind === "composition" && draft.composition}
         <label class="field-row">
-          <span>Look</span>
-          <select aria-label="Look" value={draft.composition.compositionId} onchange={(event) => (draft.composition = { compositionId: event.currentTarget.value })}>
+          <span>{t("Look")}</span>
+          <select aria-label={t("Look")} value={draft.composition.compositionId} onchange={(event) => (draft.composition = { compositionId: event.currentTarget.value })}>
             {#each session.looksByFavorite as look (look.id)}<option value={look.id}>{restoreComposition(look).name}</option>{/each}
           </select>
         </label>
@@ -231,14 +232,14 @@
     </div>
 
     <figure class="preview">
-      <figcaption>Preview of this item</figcaption>
+      <figcaption>{t("Preview of this item")}</figcaption>
       <div class="screen"><Screen model={preview} /></div>
     </figure>
   </div>
 
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn primary-soft" onclick={save}>Save</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{t("Cancel")}</button>
+    <button type="button" class="desk-btn primary-soft" onclick={save}>{t("Save")}</button>
   {/snippet}
 </DeskDialog>
 

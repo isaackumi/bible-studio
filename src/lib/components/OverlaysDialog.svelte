@@ -7,6 +7,7 @@
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
   import Screen from "./Screen.svelte";
+  import { msg, t } from "../i18n/core";
 
   // Overlays: set them up once, switch them on and off during the service. They sit above
   // whatever is on Program, on the audience screen and the Program monitor.
@@ -23,7 +24,7 @@
     const { overlays: _program, ...base } = session.live.program.model;
     const shown = overlays.map((overlay) => (overlay.id === selectedId ? { ...overlay, on: true } : overlay));
     // A countdown shows the running section; before the service, an example so its look can be set.
-    const countdown = session.runningDeadline() ?? { name: "Preaching", endsAt: Date.now() + 12 * 60_000 + 30_000 };
+    const countdown = session.runningDeadline() ?? { name: t("Preaching"), endsAt: Date.now() + 12 * 60_000 + 30_000 };
     const painted = paintOverlays(shown, (id) => mediaUrl(session.media.find((asset) => asset.id === id) ?? null), countdown);
     return painted.length ? { ...base, overlays: painted } : base;
   });
@@ -36,37 +37,37 @@
     if (selected) session.updateOverlay(selected.id, patch);
   }
 
-  const CORNERS: Array<[OverlayCorner, string]> = [["top-left", "Top left"], ["top-right", "Top right"], ["bottom-left", "Bottom left"], ["bottom-right", "Bottom right"]];
+  const CORNERS: Array<[OverlayCorner, string]> = [["top-left", msg("Top left")], ["top-right", msg("Top right")], ["bottom-left", msg("Bottom left")], ["bottom-right", msg("Bottom right")]];
   const usesCorner = (kind: OverlayKind) => kind === "logo" || kind === "clock" || kind === "badge";
   const usesEdge = (kind: OverlayKind) => kind === "ticker" || kind === "banner";
 </script>
 
-<DeskDialog title="Overlays" {onclose} wide>
+<DeskDialog title={t("Overlays")} {onclose} wide>
   <div class="ov-editor">
-    <section class="ov-list" aria-label="Your overlays">
+    <section class="ov-list" aria-label={t("Your overlays")}>
       {#each overlays as overlay (overlay.id)}
         <div class="ov-row" class:on={overlay.id === selectedId}>
           <button type="button" class="ov-pick" onclick={() => (selectedId = overlay.id)}>
             <span class="ov-icon"><Icon name={kindOf(overlay.kind).icon} size={15} /></span>
             <span class="ov-copy">
               <strong>{kindOf(overlay.kind).label}</strong>
-              <em>{overlay.kind === "clock" ? "The time" : overlay.text || kindOf(overlay.kind).detail}</em>
+              <em>{overlay.kind === "clock" ? t("The time") : overlay.text || kindOf(overlay.kind).detail}</em>
             </span>
           </button>
           <input
             type="checkbox"
             class="switch"
             role="switch"
-            aria-label={`${kindOf(overlay.kind).label} on the screen`}
+            aria-label={t("{label} on the screen", { label: kindOf(overlay.kind).label })}
             checked={overlay.on}
             onchange={(event) => session.toggleOverlay(overlay.id, event.currentTarget.checked)}
           />
         </div>
       {:else}
-        <p class="ov-empty">No overlays yet. Add one below; it stays off until you switch it on.</p>
+        <p class="ov-empty">{t("No overlays yet. Add one below; it stays off until you switch it on.")}</p>
       {/each}
 
-      <p class="ov-label">Add an overlay</p>
+      <p class="ov-label">{t("Add an overlay")}</p>
       <div class="ov-kinds">
         {#each OVERLAY_KINDS as entry (entry.kind)}
           <button type="button" class="ov-kind" onclick={() => add(entry.kind)}>
@@ -80,14 +81,14 @@
     <section class="ov-side">
       <figure class="ov-preview">
         <div class="ov-screen"><Screen model={preview} /></div>
-        <figcaption>{selected && !selected.on ? "Preview of this overlay (it is off on the screen)" : "What the audience sees"}</figcaption>
+        <figcaption>{selected && !selected.on ? t("Preview of this overlay (it is off on the screen)") : t("What the audience sees")}</figcaption>
       </figure>
 
       {#if selected}
         <div class="ov-fields">
           {#if selected.kind !== "clock"}
             <label class="ov-field">
-              <span>{selected.kind === "lower-third" ? "Name" : selected.kind === "logo" ? "Words (when there is no picture)" : selected.kind === "badge" ? "Word" : selected.kind === "countdown" ? "Words above the time (empty: the section's name)" : "Words"}</span>
+              <span>{selected.kind === "lower-third" ? t("Name") : selected.kind === "logo" ? t("Words (when there is no picture)") : selected.kind === "badge" ? t("Word") : selected.kind === "countdown" ? t("Words above the time (empty: the section's name)") : t("Words")}</span>
               {#if selected.kind === "ticker"}
                 <textarea rows="2" value={selected.text} onchange={(event) => set({ text: event.currentTarget.value })}></textarea>
               {:else}
@@ -96,73 +97,73 @@
             </label>
           {/if}
           {#if selected.kind === "lower-third"}
-            <label class="ov-field"><span>Title</span><input value={selected.subtitle} onchange={(event) => set({ subtitle: event.currentTarget.value })} /></label>
+            <label class="ov-field"><span>{t("Title")}</span><input value={selected.subtitle} onchange={(event) => set({ subtitle: event.currentTarget.value })} /></label>
           {/if}
           {#if selected.kind === "logo"}
             <label class="ov-field">
-              <span>Picture</span>
+              <span>{t("Picture")}</span>
               <select value={selected.assetId ?? ""} onchange={(event) => set({ assetId: event.currentTarget.value || null })}>
-                <option value="">None: show the words</option>
+                <option value="">{t("None: show the words")}</option>
                 {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
               </select>
             </label>
           {/if}
           {#if usesCorner(selected.kind)}
             <div class="ov-field">
-              <span>Corner</span>
+              <span>{t("Corner")}</span>
               <div class="ov-seg">
                 {#each CORNERS as [corner, label] (corner)}
-                  <button type="button" class:on={selected.corner === corner} onclick={() => set({ corner })}>{label}</button>
+                  <button type="button" class:on={selected.corner === corner} onclick={() => set({ corner })}>{t(label)}</button>
                 {/each}
               </div>
             </div>
           {/if}
           {#if usesCorner(selected.kind) && overlays.some((other) => other.id !== selected.id && usesCorner(other.kind) && other.corner === selected.corner)}
-            <p class="ov-note">Another overlay uses this corner. When both are on, only the one lower in the list shows.</p>
+            <p class="ov-note">{t("Another overlay uses this corner. When both are on, only the one lower in the list shows.")}</p>
           {/if}
           {#if usesEdge(selected.kind)}
             <div class="ov-field">
-              <span>Where</span>
+              <span>{t("Where")}</span>
               <div class="ov-seg">
-                <button type="button" class:on={selected.edge === "top"} onclick={() => set({ edge: "top" })}>Top</button>
-                <button type="button" class:on={selected.edge === "bottom"} onclick={() => set({ edge: "bottom" })}>Bottom</button>
+                <button type="button" class:on={selected.edge === "top"} onclick={() => set({ edge: "top" })}>{t("Top")}</button>
+                <button type="button" class:on={selected.edge === "bottom"} onclick={() => set({ edge: "bottom" })}>{t("Bottom")}</button>
               </div>
             </div>
           {/if}
           {#if selected.kind === "countdown"}
             <div class="ov-field">
-              <span>Where on the screen</span>
-              <div class="ov-spots" role="radiogroup" aria-label="Where on the screen">
+              <span>{t("Where on the screen")}</span>
+              <div class="ov-spots" role="radiogroup" aria-label={t("Where on the screen")}>
                 {#each OVERLAY_SPOTS as [spot, label] (spot)}
                   <button type="button" role="radio" aria-checked={selected.spot === spot} class="spot-{spot}" class:on={selected.spot === spot} title={label} onclick={() => set({ spot })}><i></i><span>{label}</span></button>
                 {/each}
               </div>
             </div>
             <div class="ov-field">
-              <span>Size</span>
+              <span>{t("Size")}</span>
               <div class="ov-seg">
                 {#each [["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "Huge"]] as [size, label] (size)}
                   <button type="button" class:on={selected.size === size} onclick={() => set({ size: size as ScreenOverlay["size"] })}>{label}</button>
                 {/each}
               </div>
             </div>
-            <p class="ov-note">It follows the part of the service running now (from its time on the Service page), and shows nothing until a timed part begins.</p>
+            <p class="ov-note">{t("It follows the part of the service running now (from its time on the Service page), and shows nothing until a timed part begins.")}</p>
           {/if}
           {#if selected.kind === "ticker"}
             <div class="ov-field">
-              <span>Speed</span>
+              <span>{t("Speed")}</span>
               <div class="ov-seg">
-                <button type="button" class:on={selected.speed === 1} onclick={() => set({ speed: 1 })}>Slow</button>
-                <button type="button" class:on={selected.speed === 2} onclick={() => set({ speed: 2 })}>Steady</button>
-                <button type="button" class:on={selected.speed === 3} onclick={() => set({ speed: 3 })}>Quick</button>
+                <button type="button" class:on={selected.speed === 1} onclick={() => set({ speed: 1 })}>{t("Slow")}</button>
+                <button type="button" class:on={selected.speed === 2} onclick={() => set({ speed: 2 })}>{t("Steady")}</button>
+                <button type="button" class:on={selected.speed === 3} onclick={() => set({ speed: 3 })}>{t("Quick")}</button>
               </div>
             </div>
           {/if}
           {#if selected.kind !== "logo" && selected.kind !== "clock"}
-            <label class="ov-field ov-color"><span>Color</span><input type="color" value={selected.color} onchange={(event) => set({ color: event.currentTarget.value })} /></label>
+            <label class="ov-field ov-color"><span>{t("Color")}</span><input type="color" value={selected.color} onchange={(event) => set({ color: event.currentTarget.value })} /></label>
           {/if}
           <button type="button" class="desk-btn ghost ov-remove" onclick={() => { session.removeOverlay(selected.id); selectedId = overlays.find((overlay) => overlay.id !== selected.id)?.id ?? null; }}>
-            <Icon name="trash" size={14} /> Remove this overlay
+            <Icon name="trash" size={14} /> {t("Remove this overlay")}
           </button>
         </div>
       {/if}
@@ -170,8 +171,8 @@
   </div>
 
   {#snippet footer()}
-    <button type="button" class="desk-btn ghost" disabled={!overlays.some((overlay) => overlay.on)} onclick={() => session.clearOverlays()}>All off</button>
-    <button type="button" class="desk-btn primary-soft" onclick={onclose}>Done</button>
+    <button type="button" class="desk-btn ghost" disabled={!overlays.some((overlay) => overlay.on)} onclick={() => session.clearOverlays()}>{t("All off")}</button>
+    <button type="button" class="desk-btn primary-soft" onclick={onclose}>{t("Done")}</button>
   {/snippet}
 </DeskDialog>
 

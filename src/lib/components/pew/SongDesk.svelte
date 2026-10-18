@@ -14,6 +14,7 @@
   import SongFinder from "./SongFinder.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import ToolMenu from "../ToolMenu.svelte";
+  import { t, tn } from "../../i18n/core";
 
   // Songs window: library in folders, the song's sections one click from Preview, and detection
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
@@ -138,7 +139,7 @@
     void session.take();
   });
 
-  const listTitle = $derived(folder === null ? "All songs" : openList ? openList.label : folder === "" ? "Unfiled" : folder);
+  const listTitle = $derived(folder === null ? t("All songs") : openList ? openList.label : folder === "" ? t("Unfiled") : folder);
 
   // Messages fade after a few seconds so they never crowd the song.
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -208,8 +209,8 @@
   async function queueSong(song: Song) {
     const first = song.sections[0];
     if (!first) return;
-    if (!session.service) await session.createService("Sunday Service");
-    if (!session.service?.sections.length) session.addSection("Songs");
+    if (!session.service) await session.createService(t("Sunday Service"));
+    if (!session.service?.sections.length) session.addSection(t("Songs"));
     session.addLyric(song.id, first.id, song.title);
     note = `${song.title} added to the queue.`;
   }
@@ -271,7 +272,7 @@
   async function importFiles(list: FileList | null, into: string) {
     const { files, zipName } = await readLyricFiles([...(list ?? [])]);
     if (files.length === 0) {
-      note ||= "No lyric files found. Use .txt, ChordPro, SongSelect (.usr) or OpenLyrics (.xml / .zip) files.";
+      note ||= t("No lyric files found. Use .txt, ChordPro, SongSelect (.usr) or OpenLyrics (.xml / .zip) files.");
       return;
     }
     // The open folder wins; otherwise a zip's own sub-folders, then the zip's name (a "Songs" export has none).
@@ -352,7 +353,7 @@
       folder: targetFolder,
       ccli: "",
       copyright: "",
-      sections: [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }],
+      sections: [{ id: crypto.randomUUID(), kind: "verse", label: t("Verse 1"), lines: [""] }],
       order: [],
       secondLanguage: "",
       isNew: true,
@@ -394,7 +395,7 @@
     if (!draft) return;
     const parsed = parseSongFile("pasted.txt", pasteText);
     if (parsed.sections.length === 0) {
-      note = "No lyrics found. Paste lines of a song, with a blank line between sections.";
+      note = t("No lyrics found. Paste lines of a song, with a blank line between sections.");
       return;
     }
     draft.sections = parsed.sections;
@@ -485,29 +486,29 @@
 
 <section class="song-desk">
   <!-- Library -->
-  <LibrarySidebar title="Songs" icon="note" count={session.songs.length} storageKey="songs">
+  <LibrarySidebar title={t("Songs")} icon="note" count={session.songs.length} storageKey="songs">
     {#snippet actions()}
-      <ToolMenu label="Import songs" tip="Add songs from files" className="desk-btn" align="left">
-        {#snippet trigger()}<Icon name="download" size={14} /> Import{/snippet}
+      <ToolMenu label={t("Import songs")} tip={t("Add songs from files")} className="desk-btn" align="left">
+        {#snippet trigger()}<Icon name="download" size={14} /> {t("Import")}{/snippet}
         {#snippet children(close)}
-          <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> Lyric files…</button>
-          <p class="menu-note">Plain text, ChordPro, SongSelect, or OpenLyrics (.xml, .zip) from OpenLP, FreeShow and others.</p>
-          <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> A whole folder…</button>
+          <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> {t("Lyric files…")}</button>
+          <p class="menu-note">{t("Plain text, ChordPro, SongSelect, or OpenLyrics (.xml, .zip) from OpenLP, FreeShow and others.")}</p>
+          <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> {t("A whole folder…")}</button>
           {#if packs.length > 0}
             <div class="menu-sep"></div>
-            <button type="button" role="menuitem" onclick={() => { showPacks = true; close(); }}><Icon name="library" size={16} /> Song packs ({packs.length})</button>
+            <button type="button" role="menuitem" onclick={() => { showPacks = true; close(); }}><Icon name="library" size={16} /> {t("Song packs ({length})", { length: packs.length })}</button>
           {/if}
         {/snippet}
       </ToolMenu>
-      <button type="button" class="desk-btn primary-soft" onclick={newSong}><Icon name="plus" size={14} /> New song</button>
+      <button type="button" class="desk-btn primary-soft" onclick={newSong}><Icon name="plus" size={14} /> {t("New song")}</button>
     {/snippet}
     <button type="button" class="find-song" onclick={() => (finding = true)}>
-      <Icon name="search" size={15} /><span>Find a song</span><kbd>/</kbd>
+      <Icon name="search" size={15} /><span>{t("Find a song")}</span><kbd>/</kbd>
     </button>
 
-    <nav class="folders lists" aria-label="Song lists">
+    <nav class="folders lists" aria-label={t("Song lists")}>
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
-        <Icon name="library" size={16} /><span>All songs</span><small>{session.songs.length}</small>
+        <Icon name="library" size={16} /><span>{t("All songs")}</span><small>{session.songs.length}</small>
       </button>
       {#each shownLists as list (list.id)}
         <button type="button" class="folder" class:on={folder === `${LIST}${list.id}`} onclick={() => (folder = `${LIST}${list.id}`)}>
@@ -515,18 +516,18 @@
         </button>
       {/each}
     </nav>
-    <p class="group sub-group">Folders</p>
-    <nav class="folders" aria-label="Song folders">
+    <p class="group sub-group">{t("Folders")}</p>
+    <nav class="folders" aria-label={t("Song folders")}>
       {#if unfiled > 0 && folders.length > 0}
         <button type="button" class="folder" class:on={folder === ""} onclick={() => (folder = "")}>
-          <Icon name="folder" size={16} /><span>Unfiled</span><small>{unfiled}</small>
+          <Icon name="folder" size={16} /><span>{t("Unfiled")}</span><small>{unfiled}</small>
         </button>
       {/if}
       {#each folders as entry (entry.name)}
         {#if renaming === entry.name}
           <input
             class="folder-input"
-            aria-label={`Rename ${entry.name}`}
+            aria-label={t("Rename {name}", { name: entry.name })}
             value={entry.name}
             onkeydown={(event) => {
               if (event.key === "Enter") void commitRename(entry.name, event.currentTarget.value);
@@ -540,13 +541,13 @@
               <Icon name={folder === entry.name ? "folder-open" : "folder"} size={16} /><span>{entry.name}</span><small>{entry.count}</small>
             </button>
             {#if folder === entry.name}
-              <button type="button" class="row-tool" aria-label={`Rename ${entry.name}`} title="Rename" onclick={() => (renaming = entry.name)}><Icon name="pencil" size={14} /></button>
+              <button type="button" class="row-tool" aria-label={t("Rename {name}", { name: entry.name })} title={t("Rename")} onclick={() => (renaming = entry.name)}><Icon name="pencil" size={14} /></button>
               <button
                 type="button"
                 class="row-tool"
                 class:armed={armed === `folder:${entry.name}`}
-                aria-label={armed === `folder:${entry.name}` ? `Confirm remove ${entry.name}` : `Remove folder ${entry.name}`}
-                title={armed === `folder:${entry.name}` ? "Click again — songs stay, unfiled" : "Remove folder"}
+                aria-label={armed === `folder:${entry.name}` ? t("Confirm remove {name}", { name: entry.name }) : t("Remove folder {name}", { name: entry.name })}
+                title={armed === `folder:${entry.name}` ? t("Click again — songs stay, unfiled") : t("Remove folder")}
                 onclick={() => void removeFolder(entry.name)}
               ><Icon name="close" size={14} /></button>
             {/if}
@@ -557,8 +558,8 @@
         <!-- svelte-ignore a11y_autofocus -->
         <input
           class="folder-input"
-          aria-label="New folder name"
-          placeholder="Folder name"
+          aria-label={t("New folder name")}
+          placeholder={t("Folder name")}
           autofocus
           bind:value={newFolder}
           onkeydown={(event) => {
@@ -568,13 +569,13 @@
           onblur={commitFolder}
         />
       {:else}
-        <button type="button" class="folder add" onclick={startFolder}><Icon name="plus" size={16} /><span>New folder</span></button>
+        <button type="button" class="folder add" onclick={startFolder}><Icon name="plus" size={16} /><span>{t("New folder")}</span></button>
       {/if}
     </nav>
 
     {#if showPacks && packs.length > 0}
-      <div class="packs" aria-label="Song packs">
-        <p class="group">Song packs <button type="button" class="packs-close" aria-label="Hide song packs" onclick={() => (showPacks = false)}><Icon name="close" size={12} /></button></p>
+      <div class="packs" aria-label={t("Song packs")}>
+        <p class="group">{t("Song packs")} <button type="button" class="packs-close" aria-label={t("Hide song packs")} onclick={() => (showPacks = false)}><Icon name="close" size={12} /></button></p>
         {#each packs as pack (pack.id)}
           <div class="pack">
             <div>
@@ -582,7 +583,7 @@
               {#if pack.description}<span>{pack.description}</span>{/if}
               {#if pack.license}<small>{pack.license}</small>{/if}
             </div>
-            <button type="button" class="import" disabled={installing !== null} onclick={() => void install(pack)}>{installing === pack.id ? "Adding…" : "Add"}</button>
+            <button type="button" class="import" disabled={installing !== null} onclick={() => void install(pack)}>{installing === pack.id ? t("Adding…") : t("Add")}</button>
           </div>
         {/each}
       </div>
@@ -590,25 +591,25 @@
 
     <div class="list-head">
       <p class="group">{listTitle} <span>{visible.length}</span></p>
-      <button type="button" class="export-list" disabled={visible.length === 0} data-tip={`Save these ${visible.length} songs as one OpenLyrics file (.zip), for backup or another computer`} onclick={exportList}>
-        <Icon name="files" size={13} /> Save these
+      <button type="button" class="export-list" disabled={visible.length === 0} data-tip={tn(visible.length, "Save this song as an OpenLyrics file (.zip), for backup or another computer", "Save these {n} songs as one OpenLyrics file (.zip), for backup or another computer")} onclick={exportList}>
+        <Icon name="files" size={13} /> {t("Save these")}
       </button>
       <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,.xml,.zip,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 
-    <ul class="songs" aria-label="Songs">
+    <ul class="songs" aria-label={t("Songs")}>
       {#if visible.length === 0}
-        <li class="empty">{openList ? openList.empty : session.songs.length ? "This folder is empty." : "No songs yet. Press New song to type or paste one, or Import to bring in files."}</li>
+        <li class="empty">{openList ? openList.empty : session.songs.length ? t("This folder is empty.") : t("No songs yet. Press New song to type or paste one, or Import to bring in files.")}</li>
       {/if}
       {#each visible as song (song.id)}
         <li class="song-item">
-          <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || "this song"} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
+          <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || t("this song")} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
           <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
             <strong>
               {song.title || "Untitled song"}
-              {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">Live</em>
-              {:else if onPreview?.songId === song.id}<em class="badge">Preview</em>{/if}
+              {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">{t("Live")}</em>
+              {:else if onPreview?.songId === song.id}<em class="badge">{t("Preview")}</em>{/if}
             </strong>
             <span class="sub">{snippet(song) || song.author}<em>{song.sections.length}</em></span>
           </button>
@@ -620,48 +621,48 @@
   <!-- Song -->
   <div class="sheet">
     {#if note}
-      <p class="note" role="status"><span>{note}</span><button type="button" aria-label="Dismiss" onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
+      <p class="note" role="status"><span>{note}</span><button type="button" aria-label={t("Dismiss")} onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
     {/if}
     {#if draft}
       <form class="editor" onsubmit={(event) => { event.preventDefault(); void saveDraft(); }}>
         <div class="editor-head">
-          <h2>{draft.isNew ? "New song" : "Edit song"}</h2>
+          <h2>{draft.isNew ? t("New song") : t("Edit song")}</h2>
           <div class="row-actions">
-            <button type="button" class="desk-btn" onclick={() => draft && session.previewSongSection(asSong(draft), draft.sections[0]?.id ?? null)}>Preview</button>
-            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>Cancel</button>
-            <button type="submit" class="desk-btn primary">Save</button>
+            <button type="button" class="desk-btn" onclick={() => draft && session.previewSongSection(asSong(draft), draft.sections[0]?.id ?? null)}>{t("Preview")}</button>
+            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>{t("Cancel")}</button>
+            <button type="submit" class="desk-btn primary">{t("Save")}</button>
           </div>
         </div>
         <div class="fields">
-          <input aria-label="Song title" placeholder="Title" bind:value={draft.title} />
-          <input aria-label="Song author" placeholder="Author" bind:value={draft.author} />
-          <input aria-label="Song folder" placeholder="Folder (optional)" list="song-folder-names" bind:value={draft.folder} />
-          <input aria-label="CCLI song number" placeholder="CCLI song # (optional)" inputmode="numeric" bind:value={draft.ccli} />
-          <input class="wide" aria-label="Copyright" placeholder="Copyright, e.g. 2015 Publisher (blank for public domain)" bind:value={draft.copyright} />
-          <input aria-label="Second language" placeholder="Second language, e.g. Twi (optional)" maxlength="40" bind:value={draft.secondLanguage} />
+          <input aria-label={t("Song title")} placeholder={t("Title")} bind:value={draft.title} />
+          <input aria-label={t("Song author")} placeholder={t("Author")} bind:value={draft.author} />
+          <input aria-label={t("Song folder")} placeholder={t("Folder (optional)")} list="song-folder-names" bind:value={draft.folder} />
+          <input aria-label={t("CCLI song number")} placeholder={t("CCLI song # (optional)")} inputmode="numeric" bind:value={draft.ccli} />
+          <input class="wide" aria-label={t("Copyright")} placeholder={t("Copyright, e.g. 2015 Publisher (blank for public domain)")} bind:value={draft.copyright} />
+          <input aria-label={t("Second language")} placeholder={t("Second language, e.g. Twi (optional)")} maxlength="40" bind:value={draft.secondLanguage} />
           <datalist id="song-folder-names">
             {#each folders as entry (entry.name)}<option value={entry.name}></option>{/each}
           </datalist>
         </div>
         <details class="paste" open={draft.isNew}>
-          <summary>Paste the whole song</summary>
+          <summary>{t("Paste the whole song")}</summary>
           <textarea
-            aria-label="Paste lyrics"
+            aria-label={t("Paste lyrics")}
             rows="6"
-            placeholder="Blank lines split sections. “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro and SongSelect lyrics (with their CCLI footer) work too."
+            placeholder={t("Blank lines split sections. “Verse 1”, “[Chorus]”, “Bridge:” name them. ChordPro and SongSelect lyrics (with their CCLI footer) work too.")}
             bind:value={pasteText}
           ></textarea>
-          <button type="button" class="desk-btn" disabled={!pasteText.trim()} onclick={applyPaste}>Split into sections</button>
+          <button type="button" class="desk-btn" disabled={!pasteText.trim()} onclick={applyPaste}>{t("Split into sections")}</button>
         </details>
-        <div class="order-edit" aria-label="Order the song is sung in">
+        <div class="order-edit" aria-label={t("Order the song is sung in")}>
           <div class="order-head">
-            <strong>Order</strong>
-            <span class="muted">{hasOwnOrder(asSong(draft)) ? "Arrows and the song map follow this order." : "As written. Click a part below to add it again, e.g. the chorus after each verse."}</span>
+            <strong>{t("Order")}</strong>
+            <span class="muted">{hasOwnOrder(asSong(draft)) ? t("Arrows and the song map follow this order.") : t("As written. Click a part below to add it again, e.g. the chorus after each verse.")}</span>
             <span class="order-tools">
               {#if draft.sections.some((section) => section.kind === "chorus") && draft.sections.some((section) => section.kind === "verse")}
-                <button type="button" class="desk-btn ghost" onclick={() => draft && setOrder(chorusAfterVerses(asSong(draft)))}>Chorus after each verse</button>
+                <button type="button" class="desk-btn ghost" onclick={() => draft && setOrder(chorusAfterVerses(asSong(draft)))}>{t("Chorus after each verse")}</button>
               {/if}
-              {#if hasOwnOrder(asSong(draft))}<button type="button" class="desk-btn ghost" onclick={() => setOrder([])}>As written</button>{/if}
+              {#if hasOwnOrder(asSong(draft))}<button type="button" class="desk-btn ghost" onclick={() => setOrder([])}>{t("As written")}</button>{/if}
             </span>
           </div>
           <div class="order-chips" role="list">
@@ -679,16 +680,16 @@
                   ondragover={(event) => event.preventDefault()}
                   ondrop={(event) => { event.preventDefault(); if (dragFrom !== null) moveInOrder(dragFrom, n); dragFrom = null; }}
                 >
-                  <button type="button" id="order-{n}" class="order-name" title="{section.label}. Drag to move, or Alt+← →; Delete removes" onkeydown={(event) => orderKey(event, n)}>{sectionShort(section)}</button>
-                  <button type="button" class="order-x" aria-label="Remove {section.label} at place {n + 1}" onclick={() => removeFromOrder(n)}><Icon name="close" size={11} /></button>
+                  <button type="button" id="order-{n}" class="order-name" title={t("{label}. Drag to move, or Alt+← →; Delete removes", { label: section.label })} onkeydown={(event) => orderKey(event, n)}>{sectionShort(section)}</button>
+                  <button type="button" class="order-x" aria-label={t("Remove {label} at place {n}", { label: section.label, n: n + 1 })} onclick={() => removeFromOrder(n)}><Icon name="close" size={11} /></button>
                 </span>
               {/if}
             {/each}
           </div>
           <div class="order-add">
-            <span class="muted">Add</span>
+            <span class="muted">{t("Add")}</span>
             {#each draft.sections as section (section.id)}
-              <button type="button" class="order-add-btn" style:--tone="var(--sec-{sectionTone(section)})" title="Add {section.label} to the end" onclick={() => addToOrder(section.id)}>+ {sectionShort(section)}</button>
+              <button type="button" class="order-add-btn" style:--tone="var(--sec-{sectionTone(section)})" title={t("Add {label} to the end", { label: section.label })} onclick={() => addToOrder(section.id)}>+ {sectionShort(section)}</button>
             {/each}
           </div>
         </div>
@@ -709,8 +710,8 @@
                 id="song-grip-{i}"
                 class="grip"
                 draggable="true"
-                aria-label="Move {section.label}: drag, or Alt+arrow keys"
-                title="Drag to move this section"
+                aria-label={t("Move {label}: drag, or Alt+arrow keys", { label: section.label })}
+                title={t("Drag to move this section")}
                 ondragstart={(event) => { sectionDrag = i; event.dataTransfer?.setData("text/plain", String(i)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
                 ondragend={() => { sectionDrag = null; sectionDrop = null; }}
                 onkeydown={(event) => {
@@ -721,24 +722,24 @@
                   queueMicrotask(() => document.getElementById(`song-grip-${i + step}`)?.focus());
                 }}
               ><Icon name="grip" size={14} /></button>
-              <input aria-label="Section label" bind:value={section.label} />
-              <button type="button" class="desk-btn ghost icon del" aria-label={`Delete ${section.label}`} title="Delete this section" onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="trash" size={14} /></button>
+              <input aria-label={t("Section label")} bind:value={section.label} />
+              <button type="button" class="desk-btn ghost icon del" aria-label={t("Delete {label}", { label: section.label })} title={t("Delete this section")} onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="trash" size={14} /></button>
             </div>
             <div class="langs" class:two={!!draft.secondLanguage.trim()}>
               <textarea
-                aria-label="{section.label} lines"
+                aria-label={t("{label} lines", { label: section.label })}
                 rows={Math.max(3, section.lines.length, section.second?.length ?? 0)}
-                placeholder="One lyric line per row"
+                placeholder={t("One lyric line per row")}
                 value={section.lines.join("\n")}
                 oninput={(event) => (section.lines = event.currentTarget.value.split("\n"))}
               ></textarea>
               {#if draft.secondLanguage.trim()}
                 <label class="second">
-                  <span>In {draft.secondLanguage.trim()}</span>
+                  <span>{t("In {language}", { language: draft.secondLanguage.trim() })}</span>
                   <textarea
-                    aria-label="{section.label} in {draft.secondLanguage.trim()}"
+                    aria-label={t("{label} in {language}", { label: section.label, language: draft.secondLanguage.trim() })}
                     rows={Math.max(3, section.lines.length, section.second?.length ?? 0)}
-                    placeholder="The same lines in {draft.secondLanguage.trim()}, one per row, in the same order"
+                    placeholder={t("The same lines in {language}, one per row, in the same order", { language: draft.secondLanguage.trim() })}
                     value={(section.second ?? []).join("\n")}
                     oninput={(event) => (section.second = event.currentTarget.value.split("\n"))}
                   ></textarea>
@@ -748,11 +749,11 @@
           </div>
         {/each}
         <div class="row-actions">
-          <span class="muted">Add</span>
-          <button type="button" class="desk-btn" onclick={() => addSection("verse")}>Verse</button>
-          <button type="button" class="desk-btn" onclick={() => addSection("chorus")}>Chorus</button>
-          <button type="button" class="desk-btn" onclick={() => addSection("bridge")}>Bridge</button>
-          <button type="button" class="desk-btn" onclick={() => addSection("tag")}>Tag</button>
+          <span class="muted">{t("Add")}</span>
+          <button type="button" class="desk-btn" onclick={() => addSection("verse")}>{t("Verse")}</button>
+          <button type="button" class="desk-btn" onclick={() => addSection("chorus")}>{t("Chorus")}</button>
+          <button type="button" class="desk-btn" onclick={() => addSection("bridge")}>{t("Bridge")}</button>
+          <button type="button" class="desk-btn" onclick={() => addSection("tag")}>{t("Tag")}</button>
         </div>
       </form>
     {:else if selected}
@@ -761,35 +762,35 @@
           <h2>{selected.title}</h2>
           <p class="meta">
             {#if selected.author}<span>{selected.author}</span>{/if}
-            <span>{selected.sections.length} part{selected.sections.length === 1 ? "" : "s"}</span>
+            <span>{tn(selected.sections.length, "{n} part", "{n} parts")}</span>
             {#if selected.folder}<span class="chip"><Icon name="folder" size={12} />{selected.folder}</span>{/if}
             {#if songCredit(selected, session.workspace.ccliLicense)}<span class="credit">{songCredit(selected, session.workspace.ccliLicense)}</span>{/if}
           </p>
         </div>
         <div class="row-actions">
-          <button type="button" class="desk-btn primary-soft" data-tip="Put the first part on Preview" onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> Start</button>
-          <button type="button" class="desk-btn" data-tip="Add to the queue for this service" onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> Add to service</button>
-          <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> Edit</button>
-          <ToolMenu label="More for this song" tip="Folder, save as a file, delete">
+          <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> {t("Start")}</button>
+          <button type="button" class="desk-btn" data-tip={t("Add to the queue for this service")} onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> {t("Add to service")}</button>
+          <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
+          <ToolMenu label={t("More for this song")} tip={t("Folder, save as a file, delete")}>
             {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
             {#snippet children(close)}
-              <p class="menu-label">Folder</p>
-              <button type="button" role="menuitemcheckbox" aria-checked={!cleanFolder(selected.folder)} onclick={() => { void session.moveSongToFolder(selected, ""); close(); }}><Icon name="folder" size={16} /> No folder</button>
+              <p class="menu-label">{t("Folder")}</p>
+              <button type="button" role="menuitemcheckbox" aria-checked={!cleanFolder(selected.folder)} onclick={() => { void session.moveSongToFolder(selected, ""); close(); }}><Icon name="folder" size={16} /> {t("No folder")}</button>
               {#each folders as entry (entry.name)}
                 <button type="button" role="menuitemcheckbox" aria-checked={cleanFolder(selected.folder) === entry.name} onclick={() => { void session.moveSongToFolder(selected, entry.name); close(); }}><Icon name="folder" size={16} /> {entry.name}</button>
               {/each}
               <div class="menu-sep"></div>
-              <button type="button" role="menuitem" onclick={() => { exportSong(selected); close(); }}><Icon name="files" size={16} /> Save as OpenLyrics file</button>
+              <button type="button" role="menuitem" onclick={() => { exportSong(selected); close(); }}><Icon name="files" size={16} /> {t("Save as OpenLyrics file")}</button>
               <div class="menu-sep"></div>
               <button type="button" role="menuitem" class="danger-item" onclick={() => void deleteSelected(selected)}>
-                <Icon name="close" size={16} /> {armed === `song:${selected.id}` ? "Click again to delete" : "Delete song"}
+                <Icon name="close" size={16} /> {armed === `song:${selected.id}` ? t("Click again to delete") : t("Delete song")}
               </button>
             {/snippet}
           </ToolMenu>
         </div>
       </header>
       <div class="song-bar">
-      <nav class="song-map" aria-label="Song map">
+      <nav class="song-map" aria-label={t("Song map")}>
         {#each songSlots(selected) as section, slot (slot)}
           {@const here = onPreview?.songId === selected.id && onPreview.sectionId === section.id && (onPreview.slot === undefined || onPreview.slot === slot)}
           <button
@@ -797,31 +798,31 @@
             style:--tone="var(--sec-{sectionTone(section)})"
             class:on={here}
             class:live={here && programLive && programSource === `song:${selected.id}:${section.id}`}
-            title="{section.label} · {slot + 1} of {songOrder(selected).length}"
-            aria-label="{section.label}, part {slot + 1}"
+            title={t("{label} · {n} of {total}", { label: section.label, n: slot + 1, total: songOrder(selected).length })}
+            aria-label={t("{label}, part {n}", { label: section.label, n: slot + 1 })}
             onclick={(event) => show(selected, section.id, event, slot)}
             ondblclick={() => void showAndTake(selected, section.id, slot)}
           >{sectionShort(section)}</button>
         {/each}
       </nav>
       {#if selected.secondLanguage && selected.sections.some((section) => section.second?.some((line) => line.trim()))}
-        <div class="click-mode" role="radiogroup" aria-label="Language on the screen">
-          <span>Show</span>
-          {#each [["first", "Main"], ["second", selected.secondLanguage], ["both", "Both"]] as [value, label] (value)}
+        <div class="click-mode" role="radiogroup" aria-label={t("Language on the screen")}>
+          <span>{t("Show")}</span>
+          {#each [["first", t("Main")], ["second", selected.secondLanguage], ["both", t("Both")]] as [value, label] (value)}
             <button type="button" role="radio" aria-checked={session.workspace.songLanguage === value} class:on={session.workspace.songLanguage === value} onclick={() => session.setSongLanguage(value as "first" | "second" | "both")}>{label}</button>
           {/each}
         </div>
       {/if}
-      <div class="click-mode" role="radiogroup" aria-label="When you click a part">
-        <span>Click</span>
-        <button type="button" role="radio" aria-checked={!clickLive} class:on={!clickLive} data-tip="Click puts a part on Preview; double-click or LIVE shows it" onclick={() => setClickLive(false)}>Preview</button>
-        <button type="button" role="radio" aria-checked={clickLive} class:on={clickLive} class:live-on={clickLive} data-tip="Click shows a part on the screen at once; arrows too" onclick={() => setClickLive(true)}>Live</button>
+      <div class="click-mode" role="radiogroup" aria-label={t("When you click a part")}>
+        <span>{t("Click")}</span>
+        <button type="button" role="radio" aria-checked={!clickLive} class:on={!clickLive} data-tip={t("Click puts a part on Preview; double-click or LIVE shows it")} onclick={() => setClickLive(false)}>{t("Preview")}</button>
+        <button type="button" role="radio" aria-checked={clickLive} class:on={clickLive} class:live-on={clickLive} data-tip={t("Click shows a part on the screen at once; arrows too")} onclick={() => setClickLive(true)}>{t("Live")}</button>
       </div>
       </div>
       <p class="hint" class:on-screen={!clickLive && programLive && programSource.startsWith(`song:${selected.id}:`)}>
-        {#if clickLive}<b>Live:</b> a part you click, or reach with <kbd>←</kbd> <kbd>→</kbd>, shows on the screen at once.
-        {:else if programLive && programSource.startsWith(`song:${selected.id}:`)}<span class="dot"></span><b>On the screen.</b> Click a part, or <kbd>←</kbd> <kbd>→</kbd>, to change it. Option-click to preview only.
-        {:else}<b>Click</b> a part for Preview, <b>double-click</b> to show it. Once it is on the screen, the next click changes the screen.{/if}
+        {#if clickLive}<b>{t("Live:")}</b> {t("a part you click, or reach with the arrow keys, shows on the screen at once.")}
+        {:else if programLive && programSource.startsWith(`song:${selected.id}:`)}<span class="dot"></span><b>{t("On the screen.")}</b> {t("Click a part, or use the arrow keys, to change it. Option-click to preview only.")}
+        {:else}{t("Click a part for Preview, double-click to show it. Once it is on the screen, the next click changes the screen.")}{/if}
       </p>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
@@ -839,9 +840,9 @@
             <span class="label">
               <i>{n + 1}</i>{section.label}
               <span class="tags">
-                {#if detected?.songId === selected.id && detected.sectionId === section.id}<em class="badge heard">Heard</em>{/if}
-                {#if isLive}<em class="badge live">Live</em>{/if}
-                {#if onPreview?.songId === selected.id && onPreview.sectionId === section.id}<em class="badge">Preview</em>{/if}
+                {#if detected?.songId === selected.id && detected.sectionId === section.id}<em class="badge heard">{t("Heard")}</em>{/if}
+                {#if isLive}<em class="badge live">{t("Live")}</em>{/if}
+                {#if onPreview?.songId === selected.id && onPreview.sectionId === section.id}<em class="badge">{t("Preview")}</em>{/if}
               </span>
             </span>
             {#each section.lines.filter((line) => line.trim()) as line, l (l)}<span class="line">{line}</span>{/each}
@@ -851,8 +852,8 @@
     {:else}
       <div class="blank">
         <Icon name="note" size={28} />
-        <p>Pick a song from the library, or create one.</p>
-        <button type="button" class="desk-btn" onclick={newSong}><Icon name="plus" size={14} /> New song</button>
+        <p>{t("Pick a song from the library, or create one.")}</p>
+        <button type="button" class="desk-btn" onclick={newSong}><Icon name="plus" size={14} /> {t("New song")}</button>
       </div>
     {/if}
   </div>
@@ -865,41 +866,41 @@
   <aside class="stage">
     <MonitorPair page="songs" place={session.songPlace()} onstep={(direction) => session.stepSong(direction)} />
 
-    <section class="listen-card" class:on={listening} aria-label="Listen for songs">
+    <section class="listen-card" class:on={listening} aria-label={t("Listen for songs")}>
       <header>
-        <span class="lc-title"><Icon name="mic" size={15} /> Listen for songs</span>
-        <span class="lc-state" class:on={listening}>{session.voice.status === "starting" ? "Starting…" : listening ? "Listening" : "Off"}</span>
+        <span class="lc-title"><Icon name="mic" size={15} /> {t("Listen for songs")}</span>
+        <span class="lc-state" class:on={listening}>{session.voice.status === "starting" ? t("Starting…") : listening ? t("Listening") : t("Off")}</span>
       </header>
       {#if !listening}
-        <p class="lc-lede">Church Studio listens to the singing and finds the song and part in your library. Nothing reaches the screen unless you choose.</p>
-        <button type="button" class="desk-btn primary-soft lc-start" onclick={() => void session.toggleVoice()}><Icon name="mic" size={15} /> Start listening</button>
+        <p class="lc-lede">{t("Church Studio listens to the singing and finds the song and part in your library. Nothing reaches the screen unless you choose.")}</p>
+        <button type="button" class="desk-btn primary-soft lc-start" onclick={() => void session.toggleVoice()}><Icon name="mic" size={15} /> {t("Start listening")}</button>
       {:else}
         <div class="lc-level" aria-hidden="true">
           {#each Array.from({ length: 18 }) as _, bar (bar)}<i class:lit={bar < Math.round(session.voice.level * 18)}></i>{/each}
         </div>
-        <p class="lc-heard">{heard ? `“${heard}”` : "Sing or say a line from a song…"}</p>
+        <p class="lc-heard">{heard ? `“${heard}”` : t("Sing or say a line from a song…")}</p>
         {#if detected}
           {@const song = session.songs.find((entry) => entry.id === detected?.songId)}
           {@const part = song?.sections.find((section) => section.id === detected?.sectionId)}
           {#if song && part}
             <div class="lc-match" style:--tone="var(--sec-{sectionTone(part)})">
-              <small>Sounds like</small>
+              <small>{t("Sounds like")}</small>
               <strong>{song.title}</strong>
               <span class="lc-part"><b>{sectionShort(part)}</b>{part.label}</span>
               <div class="lc-actions">
-                <button type="button" class="desk-btn" onclick={() => { selectedId = song.id; }}>Open</button>
-                <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={showDetected}>{clickLive ? "Show it" : "Preview"}</button>
+                <button type="button" class="desk-btn" onclick={() => { selectedId = song.id; }}>{t("Open")}</button>
+                <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={showDetected}>{clickLive ? t("Show it") : t("Preview")}</button>
               </div>
             </div>
           {/if}
         {/if}
-        <button type="button" class="desk-btn ghost lc-stop" onclick={() => void session.toggleVoice()}><Icon name="mic-off" size={14} /> Stop listening</button>
+        <button type="button" class="desk-btn ghost lc-stop" onclick={() => void session.toggleVoice()}><Icon name="mic-off" size={14} /> {t("Stop listening")}</button>
       {/if}
       <label class="lc-follow">
         <input type="checkbox" class="switch" role="switch" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
         <span>
-          Follow the singing
-          <small>{follow && clickLive ? "Each part heard goes straight to the screen (Live mode)." : "Each part heard goes to Preview by itself."}</small>
+          {t("Follow the singing")}
+          <small>{follow && clickLive ? t("Each part heard goes straight to the screen (Live mode).") : t("Each part heard goes to Preview by itself.")}</small>
         </span>
       </label>
       {#if session.voice.status !== "idle" && session.voice.error}<VoiceStatus compact />{/if}

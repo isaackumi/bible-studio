@@ -5,6 +5,7 @@
   import type { ServiceTemplate, TemplatePart } from "../../domain/service-templates";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Icon from "../Icon.svelte";
+  import { t, tn } from "../../i18n/core";
 
   // Service templates: the usual parts of a service with their times. Edit them here; a new
   // service starts from one in a click and keeps its own copy to change that week.
@@ -83,30 +84,30 @@
   const TONES = ["#5aa0d6", "#b07cc6", "#e0884e", "#58b3a4", "#d9677a", "#c9a35b", "#7d8fe0", "#7fa36b"];
 </script>
 
-<DeskDialog title="Service templates" wide {onclose}>
+<DeskDialog title={t("Service templates")} wide {onclose}>
   <div class="tpl">
-    <nav class="list" aria-label="Templates">
+    <nav class="list" aria-label={t("Templates")}>
       {#each templates as template (template.id)}
         <button type="button" class="pick" class:on={template.id === selectedId} onclick={() => (selectedId = template.id)}>
           <strong>{template.name}</strong>
-          <span>{template.parts.length} parts · starts {clockLabel(planSchedule({ startTime: template.startTime, sections: [] }).start)}</span>
+          <span>{tn(template.parts.length, "{n} part", "{n} parts")} · {t("starts {time}", { time: clockLabel(planSchedule({ startTime: template.startTime, sections: [] }).start) })}</span>
         </button>
       {:else}
-        <p class="empty">No templates yet.</p>
+        <p class="empty">{t("No templates yet.")}</p>
       {/each}
-      <button type="button" class="add" onclick={() => (selectedId = session.addTemplate().id)}><Icon name="plus" size={14} /> New template</button>
+      <button type="button" class="add" onclick={() => (selectedId = session.addTemplate().id)}><Icon name="plus" size={14} /> {t("New template")}</button>
       {#if session.service}
-        <button type="button" class="add" title="Its parts and times, not this week's songs" onclick={() => { const made = session.saveServiceAsTemplate(session.service?.name ?? "Service"); if (made) selectedId = made.id; }}><Icon name="copy" size={14} /> From this service</button>
+        <button type="button" class="add" title={t("Its parts and times, not this week's songs")} onclick={() => { const made = session.saveServiceAsTemplate(session.service?.name ?? "Service"); if (made) selectedId = made.id; }}><Icon name="copy" size={14} /> {t("From this service")}</button>
       {/if}
     </nav>
 
     {#if selected && plan}
       <section class="edit">
         <div class="head">
-          <input class="name" aria-label="Template name" value={selected.name} onchange={(event) => save({ name: event.currentTarget.value.trim() || selected.name })} />
+          <input class="name" aria-label={t("Template name")} value={selected.name} onchange={(event) => save({ name: event.currentTarget.value.trim() || selected.name })} />
           <label class="start">
-            <span>Starts</span>
-            <input type="time" aria-label="Starts at" value={selected.startTime} onchange={(event) => event.currentTarget.value && save({ startTime: event.currentTarget.value })} />
+            <span>{t("Starts")}</span>
+            <input type="time" aria-label={t("Starts at")} value={selected.startTime} onchange={(event) => event.currentTarget.value && save({ startTime: event.currentTarget.value })} />
           </label>
         </div>
 
@@ -134,16 +135,16 @@
                 id="tpl-grip-{index}"
                 class="grip"
                 draggable="true"
-                aria-label="Move {part.name}: drag, or Alt+arrow keys"
-                title="Drag to move"
+                aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: part.name })}
+                title={t("Drag to move")}
                 ondragstart={(event) => { dragFrom = index; event.dataTransfer?.setData("text/plain", String(index)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
                 ondragend={() => { dragFrom = null; dragOver = null; }}
                 onkeydown={(event) => handleKey(event, index)}
               ><Icon name="grip" size={14} /></button>
               <span class="when"><i class="p-dot" aria-hidden="true"></i>{clockLabel(slot.start)}</span>
-              <input class="part-name" aria-label="Part name" value={part.name} onchange={(event) => setPart(index, { ...part, name: event.currentTarget.value.trim() || part.name })} />
+              <input class="part-name" aria-label={t("Part name")} value={part.name} onchange={(event) => setPart(index, { ...part, name: event.currentTarget.value.trim() || part.name })} />
               <select
-                aria-label="How long"
+                aria-label={t("How long")}
                 value={part.until ? "until" : part.minutes === undefined ? "none" : LENGTH_PRESETS.includes(part.minutes) ? String(part.minutes) : "custom"}
                 onchange={(event) => {
                   const value = event.currentTarget.value;
@@ -154,21 +155,21 @@
                 }}
               >
                 {#each LENGTH_PRESETS as minutes (minutes)}<option value={String(minutes)}>{lengthLabel(minutes)}</option>{/each}
-                <option value="custom">Other length…</option>
-                <option value="until">Until a time…</option>
-                <option value="none">No time</option>
+                <option value="custom">{t("Other length…")}</option>
+                <option value="until">{t("Until a time…")}</option>
+                <option value="none">{t("No time")}</option>
               </select>
               {#if part.until}
-                <input type="time" class="small" aria-label="Until" value={part.until} onchange={(event) => event.currentTarget.value && setPart(index, { name: part.name, until: event.currentTarget.value })} />
+                <input type="time" class="small" aria-label={t("Until")} value={part.until} onchange={(event) => event.currentTarget.value && setPart(index, { name: part.name, until: event.currentTarget.value })} />
               {:else if part.minutes !== undefined && !LENGTH_PRESETS.includes(part.minutes)}
-                <input type="number" class="small" min="0" max="600" aria-label="Minutes" value={part.minutes} onchange={(event) => setPart(index, { name: part.name, minutes: Number(event.currentTarget.value) || 0 })} />
+                <input type="number" class="small" min="0" max="600" aria-label={t("Minutes")} value={part.minutes} onchange={(event) => setPart(index, { name: part.name, minutes: Number(event.currentTarget.value) || 0 })} />
               {/if}
-              <button type="button" class="del" aria-label="Delete {part.name}" title="Delete this part" onclick={() => save({ parts: selected.parts.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>
+              <button type="button" class="del" aria-label={t("Delete {name}", { name: part.name })} title={t("Delete this part")} onclick={() => save({ parts: selected.parts.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>
             </li>
           {/each}
         </ol>
         <div class="row-add">
-          <button type="button" class="ghost" onclick={() => save({ parts: [...selected.parts, { name: "New part", minutes: 15 }] })}><Icon name="plus" size={13} /> Add a part</button>
+          <button type="button" class="ghost" onclick={() => save({ parts: [...selected.parts, { name: "New part", minutes: 15 }] })}><Icon name="plus" size={13} /> {t("Add a part")}</button>
           {#each ["Welcome", "Prayer", "Worship", "Bible reading", "Preaching", "Offering", "Announcements", "Benediction"].filter((name) => !selected.parts.some((part) => part.name === name)).slice(0, 5) as name (name)}
             <button type="button" class="chip" onclick={() => save({ parts: [...selected.parts, { name, minutes: 10 }] })}>{name}</button>
           {/each}
@@ -179,10 +180,10 @@
 
   {#snippet footer()}
     {#if selected}
-      <button type="button" class="btn danger" onclick={() => remove(selected.id)}>{armed === selected.id ? "Delete? Click again" : "Delete template"}</button>
+      <button type="button" class="btn danger" onclick={() => remove(selected.id)}>{armed === selected.id ? t("Delete? Click again") : t("Delete template")}</button>
       <span class="grow"></span>
-      <button type="button" class="btn" onclick={onclose}>Close</button>
-      <button type="button" class="btn primary" onclick={() => void start()}>Start a service from this</button>
+      <button type="button" class="btn" onclick={onclose}>{t("Close")}</button>
+      <button type="button" class="btn primary" onclick={() => void start()}>{t("Start a service from this")}</button>
     {/if}
   {/snippet}
 </DeskDialog>

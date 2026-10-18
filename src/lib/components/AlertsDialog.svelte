@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import DeskDialog from "./sources/DeskDialog.svelte";
+  import { msg, t } from "../i18n/core";
 
   // Put a message on top of Program (nursery calls, car lights) without replacing the slide.
   let { onclose }: { onclose: () => void } = $props();
@@ -9,7 +10,7 @@
   let style = $state<"banner" | "ticker">("banner");
   let position = $state<"top" | "bottom">("bottom");
   let seconds = $state<number | null>(60);
-  const durations: Array<[number | null, string]> = [[30, "30 s"], [60, "1 min"], [120, "2 min"], [300, "5 min"], [null, "Until cleared"]];
+  const durations: Array<[number | null, string]> = [[30, "30 s"], [60, "1 min"], [120, "2 min"], [300, "5 min"], [null, msg("Until cleared")]];
 
   async function show(event?: Event) {
     event?.preventDefault();
@@ -19,21 +20,21 @@
   }
 </script>
 
-<DeskDialog title="Alert on Program" {onclose}>
+<DeskDialog title={t("Alert on Program")} {onclose}>
   {#if session.alert}
     <div class="current" role="status">
-      <span><strong>On Program now:</strong> {session.alert.text}</span>
-      <button type="button" class="desk-btn" onclick={() => void session.clearAlert()}>Clear alert</button>
+      <span><strong>{t("On Program now:")}</strong> {session.alert.text}</span>
+      <button type="button" class="desk-btn" onclick={() => void session.clearAlert()}>{t("Clear alert")}</button>
     </div>
   {/if}
   <form class="alert-form" onsubmit={show}>
     <label class="stack">
-      <span>Message</span>
+      <span>{t("Message")}</span>
       <!-- svelte-ignore a11y_autofocus -->
-      <input class="field" aria-label="Alert message" placeholder="Parent of child #34, please come to the nursery" maxlength="160" bind:value={text} autofocus />
+      <input class="field" aria-label={t("Alert message")} placeholder={t("Parent of child #34, please come to the nursery")} maxlength="160" bind:value={text} autofocus />
     </label>
     {#if session.recentAlerts.length}
-      <div class="recent" aria-label="Recent alerts">
+      <div class="recent" aria-label={t("Recent alerts")}>
         {#each session.recentAlerts as recent (recent)}
           <button type="button" class="chip" onclick={() => (text = recent)}>{recent}</button>
         {/each}
@@ -41,42 +42,42 @@
     {/if}
     <div class="options">
       <div class="choices">
-        <div class="group" role="radiogroup" aria-label="Look">
-          <span>Look</span>
+        <div class="group" role="radiogroup" aria-label={t("Look")}>
+          <span>{t("Look")}</span>
           <div class="seg">
             {#each [["banner", "Banner"], ["ticker", "Scrolling ticker"]] as [id, label] (id)}
               <button type="button" role="radio" aria-checked={style === id} class:on={style === id} onclick={() => (style = id as "banner" | "ticker")}>{label}</button>
             {/each}
           </div>
         </div>
-        <div class="group" role="radiogroup" aria-label="Where">
-          <span>Where</span>
+        <div class="group" role="radiogroup" aria-label={t("Where")}>
+          <span>{t("Where")}</span>
           <div class="seg">
             {#each [["bottom", "Bottom"], ["top", "Top"]] as [id, label] (id)}
               <button type="button" role="radio" aria-checked={position === id} class:on={position === id} onclick={() => (position = id as "top" | "bottom")}>{label}</button>
             {/each}
           </div>
         </div>
-        <div class="group" role="radiogroup" aria-label="How long">
-          <span>How long</span>
+        <div class="group" role="radiogroup" aria-label={t("How long")}>
+          <span>{t("How long")}</span>
           <div class="seg wrap">
             {#each durations as [value, label] (label)}
-              <button type="button" role="radio" aria-checked={seconds === value} class:on={seconds === value} onclick={() => (seconds = value)}>{label}</button>
+              <button type="button" role="radio" aria-checked={seconds === value} class:on={seconds === value} onclick={() => (seconds = value)}>{t(label)}</button>
             {/each}
           </div>
         </div>
       </div>
       <!-- Where the alert will sit on the screen. -->
       <div class="mock" aria-hidden="true">
-        <span class="mock-slide">Program stays underneath</span>
+        <span class="mock-slide">{t("Program stays underneath")}</span>
         <span class="mock-bar {style} {position}"><span>{text.trim() || "Your message"}</span></span>
       </div>
     </div>
-    <p class="note">Shows on Program and the audience screen right away, over whatever is live. Preview is not affected.</p>
+    <p class="note">{t("Shows on Program and the audience screen right away, over whatever is live. Preview is not affected.")}</p>
   </form>
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn live" disabled={!text.trim()} onclick={() => void show()}>Show alert</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{t("Cancel")}</button>
+    <button type="button" class="desk-btn live" disabled={!text.trim()} onclick={() => void show()}>{t("Show alert")}</button>
   {/snippet}
 </DeskDialog>
 
