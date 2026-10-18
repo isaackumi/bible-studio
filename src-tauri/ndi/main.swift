@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 //
 // Arguments: --pid <app pid> --title <window title> --name <NDI source name> [--fps 30]
 //            [--width 1920 --height 1080]
+//            --audio: send the audience window's sound too (videos, music)
 //            --key: send only the words, as a lower third on a transparent picture, for keying
 //            over cameras. The app writes the words as JSON lines on stdin: {"cue","body"}.
 // Prints one JSON line per event: status, stats (connections), error. Closing stdin stops it.
@@ -41,6 +42,8 @@ private struct Options {
     var pattern = false
     /** Key: draw the words the app sends on a transparent picture instead of capturing a window. */
     var key = false
+    /** Send the audience window's sound (videos, music) with the picture; with --pattern, a test beep. */
+    var audio = false
     /** Hub: receive NDI sources and serve them to the app's screens on this computer only. */
     var hub = false
     var port: UInt16 = 47129
@@ -61,6 +64,7 @@ private struct Options {
             case "--height": height = max(180, min(2160, Int(next() ?? "") ?? height))
             case "--pattern": pattern = true
             case "--key": key = true
+            case "--audio": audio = true
             case "--hub": hub = true
             case "--port": port = UInt16(next() ?? "") ?? port
             default: break
@@ -77,6 +81,8 @@ private struct NDI {
     let sendCreate: NDIlib_send_create_fn
     let sendDestroy: NDIlib_send_destroy_fn
     let sendVideo: NDIlib_send_send_video_v2_fn
+    /** Absent in very old runtimes: then the source is picture only. */
+    let sendAudio: NDIlib_send_send_audio_v2_fn?
     let connections: NDIlib_send_get_no_connections_fn
     let version: String
 
@@ -115,7 +121,8 @@ private struct NDI {
         else { return nil }
         guard initialize() else { return nil }
         let version = symbol("NDIlib_version", NDIlib_version_fn.self).flatMap { fn in fn().map { String(cString: $0) } } ?? "NDI"
-        return NDI(handle: handle, destroy: destroy, sendCreate: sendCreate, sendDestroy: sendDestroy, sendVideo: sendVideo, connections: connections, version: version)
+        let sendAudio = symbol("NDIlib_send_send_audio_v2", NDIlib_send_send_audio_v2_fn.self)
+        return NDI(handle: handle, destroy: destroy, sendCreate: sendCreate, sendDestroy: sendDestroy, sendVideo: sendVideo, sendAudio: sendAudio, connections: connections, version: version)
     }
 }
 
@@ -154,7 +161,8 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         if options.pattern {
             latest = makePattern()
             startSending()
-            emit(["kind": "status", "message": "Sending a test pattern as “\(options.name)” (\(ndi.version)).", "name": options.name])
+            if options.audio { startTestTone() }
+            emit(["kind": "status", "message": "Sending a test pattern\(options.audio ? " and a beep each second" : "") as “\(options.name)” (\(ndi.version)).", "name": options.name, "audio": options.audio && ndi.sendAudio != nil])
             return
         }
 
@@ -177,17 +185,97 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         if #available(macOS 14.0, *) {
             config.ignoreShadowsSingleWindow = true
         }
+        let withSound = options.audio && ndi.sendAudio != nil
+        if withSound, #available(macOS 13.0, *) {
+            config.capturesAudio = true
+            config.sampleRate = 48_000
+            config.channelCount = 2
+            config.excludesCurrentProcessAudio = true
+        }
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         do {
             try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+            if withSound, #available(macOS 13.0, *) {
+                try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
+            }
             try await stream.startCapture()
         } catch {
             fail("capture", "The audience window could not be captured. \(error.localizedDescription)")
         }
         self.stream = stream
         startSending()
-        emit(["kind": "status", "message": "Sending “\(options.name)” on the network (\(ndi.version)).", "name": options.name])
+        emit(["kind": "status", "message": "Sending “\(options.name)”\(withSound ? " with sound" : "") on the network (\(ndi.version)).", "name": options.name, "audio": withSound])
+    }
+
+    // MARK: Sound
+
+    private let audioQueue = DispatchQueue(label: "ndi.audio")
+    private var audioSent = 0
+    private var toneTimer: DispatchSourceTimer?
+    private var tonePhase: Double = 0
+    private var toneClock = 0
+
+    /// A short 1 kHz beep each second with the colour bars, to check sound in a receiver.
+    private func startTestTone() {
+        let rate = 48_000
+        let chunk = 960 // 20 ms
+        let timer = DispatchSource.makeTimerSource(queue: audioQueue)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(20))
+        timer.setEventHandler { [weak self] in
+            guard let self, let instance = self.instance, let send = self.ndi.sendAudio else { return }
+            var samples = [Float](repeating: 0, count: chunk * 2)
+            let audible = self.toneClock % 50 < 10 // 200 ms of each second
+            for i in 0..<chunk {
+                let value = audible ? Float(sin(self.tonePhase) * 0.25) : 0
+                self.tonePhase += 2 * Double.pi * 1000 / Double(rate)
+                samples[i] = value
+                samples[chunk + i] = value
+            }
+            self.toneClock += 1
+            samples.withUnsafeMutableBufferPointer { pointer in
+                var frame = NDIlib_audio_frame_v2_t(sample_rate: Int32(rate), no_channels: 2, no_samples: Int32(chunk), timecode: NDI_TIMECODE_SYNTHESIZE, p_data: pointer.baseAddress, channel_stride_in_bytes: Int32(chunk * 4), p_metadata: nil, timestamp: 0)
+                send(instance, &frame)
+            }
+            self.audioSent += 1
+        }
+        timer.resume()
+        toneTimer = timer
+    }
+
+    /// The window's sound as ScreenCaptureKit hands it over, re-laid out as NDI's planar floats.
+    private func sendAudio(_ sampleBuffer: CMSampleBuffer) {
+        guard let instance, let send = ndi.sendAudio,
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let description = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
+              description.mFormatFlags & kAudioFormatFlagIsFloat != 0, description.mBitsPerChannel == 32 else { return }
+        let frames = CMSampleBufferGetNumSamples(sampleBuffer)
+        let channels = Int(description.mChannelsPerFrame)
+        guard frames > 0, channels > 0 else { return }
+        var needed = 0
+        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: &needed, bufferListOut: nil, bufferListSize: 0, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: 0, blockBufferOut: nil)
+        let raw = UnsafeMutableRawPointer.allocate(byteCount: max(needed, MemoryLayout<AudioBufferList>.size), alignment: 16)
+        defer { raw.deallocate() }
+        let list = raw.bindMemory(to: AudioBufferList.self, capacity: 1)
+        var block: CMBlockBuffer?
+        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: list, bufferListSize: needed, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: &block) == noErr else { return }
+        let buffers = UnsafeMutableAudioBufferListPointer(list)
+        var planar = [Float](repeating: 0, count: channels * frames)
+        if description.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0 {
+            for channel in 0..<min(channels, buffers.count) {
+                guard let data = buffers[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
+                for i in 0..<frames { planar[channel * frames + i] = data[i] }
+            }
+        } else if let data = buffers.first?.mData?.assumingMemoryBound(to: Float.self) {
+            for i in 0..<frames {
+                for channel in 0..<channels { planar[channel * frames + i] = data[i * channels + channel] }
+            }
+        }
+        planar.withUnsafeMutableBufferPointer { pointer in
+            var frame = NDIlib_audio_frame_v2_t(sample_rate: Int32(description.mSampleRate), no_channels: Int32(channels), no_samples: Int32(frames), timecode: NDI_TIMECODE_SYNTHESIZE, p_data: pointer.baseAddress, channel_stride_in_bytes: Int32(frames * 4), p_metadata: nil, timestamp: 0)
+            send(instance, &frame)
+        }
+        audioSent += 1
     }
 
     private struct SenderError: Error {
@@ -220,7 +308,7 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         stats.setEventHandler { [weak self] in
             guard let self, let instance = self.instance else { return }
             let viewers = Int(self.ndi.connections(instance, 0))
-            emit(["kind": "stats", "connections": viewers, "frames": self.sent])
+            emit(["kind": "stats", "connections": viewers, "frames": self.sent, "audio": self.audioSent])
         }
         stats.resume()
         statsTimer = stats
@@ -383,6 +471,10 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        if #available(macOS 13.0, *), type == .audio {
+            if sampleBuffer.isValid { sendAudio(sampleBuffer) }
+            return
+        }
         guard type == .screen, sampleBuffer.isValid, let buffer = sampleBuffer.imageBuffer else { return }
         // Only complete frames carry a picture (idle and blank frames are skipped).
         if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
@@ -402,6 +494,7 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
 
     func stop(code: Int32 = 0) {
         timer?.cancel()
+        toneTimer?.cancel()
         statsTimer?.cancel()
         let finished = DispatchSemaphore(value: 0)
         if let stream {
@@ -640,7 +733,7 @@ private final class Feed: @unchecked Sendable {
               ) else { return nil }
         let out = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.72] as CFDictionary)
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.86] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return out as Data
     }

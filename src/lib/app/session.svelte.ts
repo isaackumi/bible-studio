@@ -2942,7 +2942,7 @@ class Session {
 
   // Planning Center Services import.
   /** NDI output (desktop, macOS): Program as a network video source. */
-  ndi = $state<{ status: "off" | "starting" | "on" | "error"; message: string; connections: number; pattern: boolean; name: string }>({
+  ndi = $state<{ status: "off" | "starting" | "on" | "error"; message: string; connections: number; pattern: boolean; name: string; audio?: boolean }>({
     status: "off",
     message: "",
     connections: 0,
@@ -2968,10 +2968,17 @@ class Session {
     }
     try {
       if (!pattern && !this.output.online) await this.openAudience();
-      await invoke("start_ndi", { name, fps: options.fps ?? 30, pattern });
+      await invoke("start_ndi", { name, fps: options.fps ?? 30, pattern, audio: this.workspace.ndiAudio });
     } catch (error) {
       this.ndi = { ...this.ndi, status: "error", message: error instanceof Error ? error.message : String(error) };
     }
+  };
+
+  /** Sound with the NDI picture; a running sender restarts to take the change. */
+  setNdiAudio = async (on: boolean) => {
+    this.workspace = { ...this.workspace, ndiAudio: on };
+    this.persistSoon();
+    if (this.ndi.status === "on" || this.ndi.status === "starting") await this.startNdi({ pattern: this.ndi.pattern });
   };
 
   stopNdi = async () => {
@@ -2980,13 +2987,13 @@ class Session {
   };
 
   private onNdiLine = (line: string) => {
-    let message: { kind?: string; message?: string; connections?: number; code?: string };
+    let message: { kind?: string; message?: string; connections?: number; code?: string; audio?: boolean };
     try {
       message = JSON.parse(line);
     } catch {
       return;
     }
-    if (message.kind === "status") this.ndi = { ...this.ndi, status: "on", message: message.message ?? "Sending." };
+    if (message.kind === "status") this.ndi = { ...this.ndi, status: "on", message: message.message ?? "Sending.", audio: message.audio === true };
     else if (message.kind === "stats") this.ndi = { ...this.ndi, connections: Number(message.connections) || 0 };
     else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? "NDI stopped." };
     else if (message.kind === "end" && this.ndi.status !== "error") this.ndi = { ...this.ndi, status: "off", connections: 0 };

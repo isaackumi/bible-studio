@@ -738,7 +738,7 @@
                 {:else if session.ndi.status === "starting"}{session.ndi.message}
                 {:else if session.ndi.status === "error"}<span class="form-error">{session.ndi.message}</span>
                 {:else if !isDesktop()}{t("OBS, vMix or an NDI monitor can take what the audience sees, over the network. This works in the Church Studio app for Mac.")}
-                {:else}{t("OBS, vMix, a streaming computer or an NDI monitor can take what the audience sees, over the network. It captures the audience window, which opens if it is closed.")}{/if}
+                {:else}{t("Any app that takes NDI can show what the audience sees, over the network: vMix, OBS (with its NDI plugin), Wirecast, Resolume, TriCaster, NDI Studio Monitor, a streaming computer. It captures the audience window, which opens if it is closed.")}{/if}
               </span>
             </div>
             <input
@@ -752,7 +752,14 @@
             />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends colour bars under the same name, so you can add the source in OBS or vMix before the service.")}</span></div>
+            <div class="row-copy">
+              <strong>{t("Send sound with the picture")}</strong>
+              <span>{session.ndi.status === "on" && session.workspace.ndiAudio ? (session.ndi.audio ? t("On: videos and music on Program go out over NDI.") : t("This NDI or macOS version cannot send sound; the picture still goes out.")) : t("Videos and music on Program go out with the picture, so the sound desk or the stream gets them over the network too. Needs macOS 13 or later.")}</span>
+            </div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Send sound with the picture")} disabled={!isDesktop()} checked={session.workspace.ndiAudio} onchange={(event) => void session.setNdiAudio(event.currentTarget.checked)} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends colour bars, and a beep each second when sound is on, under the same name, so you can add the source in vMix, OBS or any NDI app and check the sound before the service.")}</span></div>
             <button type="button" class="btn" disabled={!isDesktop() || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
               {session.ndi.status === "on" && session.ndi.pattern ? t("Stop test") : t("Send test pattern")}
             </button>

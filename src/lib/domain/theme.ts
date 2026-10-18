@@ -327,6 +327,7 @@ export function defaultWorkspace(): Workspace {
     secondOutput: defaultSecondOutput(),
     captions: defaultCaptionSettings(),
     countdownSize: 220,
+    ndiAudio: true,
     timerSounds: defaultTimerSounds(),
     serviceTemplates: defaultTemplates(),
     recentSongs: [],

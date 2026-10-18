@@ -27,6 +27,20 @@ typedef struct NDIlib_video_frame_v2_t {
   int64_t timestamp;
 } NDIlib_video_frame_v2_t;
 
+/** Audio as 32-bit float, one channel after another (planar), as NDI sends it. */
+typedef struct NDIlib_audio_frame_v2_t {
+  int sample_rate;
+  int no_channels;
+  int no_samples;
+  int64_t timecode;
+  float *p_data;
+  int channel_stride_in_bytes;
+  const char *p_metadata;
+  int64_t timestamp;
+} NDIlib_audio_frame_v2_t;
+
+typedef void (*NDIlib_send_send_audio_v2_fn)(void *instance, const NDIlib_audio_frame_v2_t *frame);
+
 typedef bool (*NDIlib_initialize_fn)(void);
 typedef void (*NDIlib_destroy_fn)(void);
 typedef const char *(*NDIlib_version_fn)(void);

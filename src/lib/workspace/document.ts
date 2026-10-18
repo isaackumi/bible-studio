@@ -146,6 +146,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     timerSounds: sanitizeTimerSounds(value.timerSounds),
+    ndiAudio: value.ndiAudio !== false,
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)

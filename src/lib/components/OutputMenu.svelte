@@ -4,7 +4,7 @@
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
   import ToolMenu from "./ToolMenu.svelte";
-  import { t } from "../i18n/core";
+  import { t, tn } from "../i18n/core";
 
   // One toolbar control for the audience output: its status on the button, the output actions in the menu.
   const profile = $derived(
@@ -16,6 +16,9 @@
   const external = $derived(session.output.displays.find((display) => !display.primary));
   const fullscreen = $derived(profile?.outputMode === "fullscreen");
   /** Program has content the audience cannot see yet: ask for attention. */
+  /** NDI on the network: sending, starting or stopped with an error. */
+  const ndiOn = $derived(session.ndi.status === "on" || session.ndi.status === "starting");
+  const ndiWatchers = $derived(session.ndi.connections + (session.ndiKey.status === "on" ? session.ndiKey.connections : 0));
   const unseen = $derived(!session.output.online && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
 </script>
 
@@ -27,6 +30,9 @@
   {#snippet trigger()}
     <span class="lamp" class:on={chip.on} class:warn={unseen}></span>
     <span class="name">{unseen ? t("Not showing · Open") : chip.label}</span>
+    {#if ndiOn || session.ndi.status === "error" || session.ndiKey.status === "on"}
+      <span class="ndi" class:live={ndiWatchers > 0} class:bad={session.ndi.status === "error"} title={session.ndi.status === "error" ? session.ndi.message : tn(ndiWatchers, "NDI: {n} receiver watching", "NDI: {n} receivers watching")}>NDI{#if ndiWatchers}<b>{ndiWatchers}</b>{/if}</span>
+    {/if}
     <Icon name="chevron-down" size={14} />
   {/snippet}
   {#snippet children(close)}
@@ -45,6 +51,12 @@
       {t("Fullscreen")}
     </button>
     <button type="button" role="menuitem" onclick={() => { void session.openStage(); close(); }}>{t("Stage display")}</button>
+    {#if isDesktop()}
+      <div class="menu-sep"></div>
+      <button type="button" role="menuitemcheckbox" aria-checked={ndiOn} onclick={() => { void (ndiOn ? session.stopNdi() : session.startNdi()); close(); }}>
+        {t("Send over NDI")}{#if ndiOn}<span class="menu-note-inline">{tn(session.ndi.connections, "{n} watching", "{n} watching")}{session.ndi.audio ? ` · ${t("with sound")}` : ""}</span>{/if}
+      </button>
+    {/if}
     <div class="menu-sep"></div>
     <button type="button" role="menuitem" onclick={() => { session.testOutput(); close(); }}>{t("Test output")}</button>
     <button type="button" role="menuitem" onclick={() => { session.openSettings("audience"); close(); }}>{t("Output settings…")}</button>
@@ -59,5 +71,10 @@
   :global(.output-trigger.unseen) { border-color: #f5a524 !important; color: #f5a524 !important; background: color-mix(in srgb, #f5a524 12%, var(--field)) !important; }
   @keyframes warn-blink { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .lamp.warn { animation: none; } }
+  .ndi { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
+  .ndi.live { border-color: color-mix(in srgb, var(--presence) 60%, var(--line)); color: var(--presence); }
+  .ndi.bad { border-color: #e5484d; color: #e5484d; }
+  .ndi b { font-weight: 800; }
+  .menu-note-inline { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--muted); }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 </style>

@@ -47,8 +47,9 @@ mod running {
 }
 
 /// Start sending. `pattern` sends colour bars instead of Program (to find the source first).
+/// `audio` sends the audience window's sound too (with the pattern, a beep each second).
 /// The key output draws the words it is given (`key_words`) on a transparent picture.
-pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, pattern: bool) -> Result<(), String> {
+pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, pattern: bool, audio: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use tauri::Emitter;
@@ -73,6 +74,9 @@ pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, patter
             }
             Output::Program => {}
         }
+        if audio && matches!(output, Output::Program) {
+            command.arg("--audio");
+        }
         let mut child = command
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -95,7 +99,7 @@ pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, patter
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, output, name, fps, pattern);
+        let _ = (app, output, name, fps, pattern, audio);
         Err("NDI output works on macOS for now. On Windows, NDI Tools' Screen Capture can send the audience screen meanwhile.".into())
     }
 }

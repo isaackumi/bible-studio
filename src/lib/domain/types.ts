@@ -470,6 +470,8 @@ export type Workspace = {
   captions: import("./captions").CaptionSettings;
   /** Size of the full-screen countdown, in frame pixels. */
   countdownSize: number;
+  /** NDI Program carries the audience window's sound (videos, music) as well as the picture. */
+  ndiAudio: boolean;
   /** Beeps as a countdown runs out, on the operator's computer only. */
   timerSounds: import("./timer-cues").TimerSounds;
   /** Service templates: the usual parts of a service with their times. */

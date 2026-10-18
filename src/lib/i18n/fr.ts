@@ -2390,4 +2390,17 @@ export const fr: Readonly<Record<string, string>> = {
   "End at": "Finir à",
   "the end": "la fin",
   "Trim it: play only part of the file, e.g. 0:12 to 2:30. Empty plays it all.": "Découpez-la : ne jouez qu’une partie du fichier, ex. 0:12 à 2:30. Vide : tout le fichier.",
+
+  // NDI sound and status
+  "Send over NDI": "Envoyer en NDI",
+  "with sound": "avec le son",
+  "NDI: {n} receiver watching": "NDI : {n} récepteur connecté",
+  "NDI: {n} receivers watching": "NDI : {n} récepteurs connectés",
+  "{n} watching": "{n} connecté(s)",
+  "Any app that takes NDI can show what the audience sees, over the network: vMix, OBS (with its NDI plugin), Wirecast, Resolume, TriCaster, NDI Studio Monitor, a streaming computer. It captures the audience window, which opens if it is closed.": "Toute app qui reçoit le NDI peut afficher ce que voit l’assemblée, par le réseau : vMix, OBS (avec son extension NDI), Wirecast, Resolume, TriCaster, NDI Studio Monitor, un ordinateur de diffusion. La fenêtre de l’assemblée est capturée, et s’ouvre si elle est fermée.",
+  "Send sound with the picture": "Envoyer le son avec l’image",
+  "On: videos and music on Program go out over NDI.": "Activé : les vidéos et la musique du direct partent en NDI.",
+  "This NDI or macOS version cannot send sound; the picture still goes out.": "Cette version de NDI ou de macOS ne peut pas envoyer le son ; l’image part quand même.",
+  "Videos and music on Program go out with the picture, so the sound desk or the stream gets them over the network too. Needs macOS 13 or later.": "Les vidéos et la musique du direct partent avec l’image, pour que la régie son ou la diffusion les reçoivent aussi par le réseau. Nécessite macOS 13 ou plus récent.",
+  "Sends colour bars, and a beep each second when sound is on, under the same name, so you can add the source in vMix, OBS or any NDI app and check the sound before the service.": "Envoie des barres de couleur, et un bip chaque seconde quand le son est activé, sous le même nom, pour ajouter la source dans vMix, OBS ou toute app NDI et vérifier le son avant le culte.",
 };
