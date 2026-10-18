@@ -96,6 +96,10 @@
   const showQueue = $derived(queueVisible && !focus);
   /** This page's monitor choice; Focus always shows both. */
   const monitors = $derived(session.workspace.pew.monitors[mode]);
+  // The "On the screen" menu: what sits over the live picture right now.
+  const overlaysOn = $derived(session.workspace.overlays.filter((overlay) => overlay.on).length);
+  const onScreenCount = $derived((session.alert ? 1 : 0) + (session.captionsOn ? 1 : 0) + overlaysOn);
+  const onScreenTip = $derived(onScreenCount ? t("On the screen now: alerts, captions, overlays ({n})", { n: onScreenCount }) : t("Alerts, live captions, overlays and stage messages"));
   const showPreview = $derived(focus || session.workspace.pew.monitors.scriptures.preview);
   const showProgram = $derived(focus || session.workspace.pew.monitors.scriptures.program);
   const showRight = $derived(showProgram || showQueue);
@@ -613,17 +617,6 @@
           </button>
         {/snippet}
       </ToolMenu>
-      <button
-        type="button"
-        class="desk-btn icon alerts-btn"
-        class:on={!!session.alert}
-        aria-pressed={!!session.alert}
-        data-tip={session.alert ? t("Alert on Program: {text}", { text: session.alert.text }) : t("Alert on Program (nursery, car lights…)")}
-        aria-label={t("Alerts")}
-        onclick={() => (alertsOpen = true)}
-      >
-        {@render icon("alerts")}
-      </button>
       {#if session.audio.current && (session.audio.playing || session.audio.fading)}
         <span class="now-audio">
           <button type="button" class="now-audio-name" aria-label={t("Audio: {name}", { name: session.audio.current.name })} data-tip={t("Audio: playlists and the player")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
@@ -632,34 +625,32 @@
       {:else}
         <button type="button" class="desk-btn icon" aria-label={t("Audio")} data-tip={t("Audio: walk-in music, backing tracks, playlists")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
       {/if}
-      <button
-        type="button"
-        class="desk-btn icon"
-        class:on={session.captionsOn}
-        aria-pressed={session.captionsOn}
-        aria-label={t("Live captions")}
-        data-tip={session.captionsOn ? t("Captions on: click to stop. Settings › Captions for phones and languages") : t("Live captions on the screen and phones")}
-        onclick={() => void session.setCaptions(!session.captionsOn)}
-      ><Icon name="captions" size={16} /></button>
-      <button
-        type="button"
-        class="desk-btn icon"
-        class:on={session.workspace.overlays.some((overlay) => overlay.on)}
-        aria-label={t("Overlays")}
-        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? t("Overlays on the screen") : t("Overlays: logo, ticker, clock, lower third")}
-        onclick={() => (overlaysOpen = true)}
-      ><Icon name="layers" size={16} /></button>
-      <button type="button" class="desk-btn icon help-tool" data-tour="tours" aria-label={t("Show me around")} data-tip={t("Lost? Guided tours of every page")} onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
-      <ToolMenu label={t("More")} tip={t("Displays, look, help and settings")}>
+      <ToolMenu label={t("On the screen")} tip={onScreenTip} on={onScreenCount > 0}>
+        {#snippet trigger()}<Icon name="layers" size={16} />{#if onScreenCount}<span class="tool-dot">{onScreenCount}</span>{/if}{/snippet}
+        {#snippet children(close)}
+          <p class="menu-label">{t("Over what is live")}</p>
+          <button type="button" role="menuitem" onclick={() => { alertsOpen = true; close(); }}>{@render icon("alerts")} {t("Alert…")}{#if session.alert}<span class="menu-state on">{t("On")}</span>{/if}</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={session.captionsOn} onclick={() => { void session.setCaptions(!session.captionsOn); close(); }}>{@render icon("captions")} {t("Live captions")}</button>
+          <button type="button" role="menuitem" onclick={() => { overlaysOpen = true; close(); }}>{@render icon("layers")} {t("Overlays…")}{#if overlaysOn}<span class="menu-state on">{overlaysOn}</span>{/if}</button>
+          <div class="menu-sep"></div>
+          <p class="menu-label">{t("For the people on stage")}</p>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} {t("Message to the stage…")}</button>
+        {/snippet}
+      </ToolMenu>
+      <ToolMenu label={t("More")} tip={t("Displays, look, help and settings")} tour="more">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
+          <p class="menu-label">{t("Screens and look")}</p>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}>{@render icon("outputs")} {t("Displays…")}</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}>{@render icon("themes")} {t("Themes…")}</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} {t("Message to the stage…")}</button>
+          <div class="menu-sep"></div>
+          <p class="menu-label">{t("Service")}</p>
           <button type="button" role="menuitem" onclick={() => { session.macrosOpen = true; close(); }}>{@render icon("play")} {t("Macros…")}</button>
+          <div class="menu-sep"></div>
+          <p class="menu-label">{t("Help")}</p>
+          <button type="button" role="menuitem" data-tour="tours" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} {t("Guided tours…")}</button>
           <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} {t("Tour this page")}</button>
-          <button type="button" role="menuitem" onclick={() => { close(); session.tourHubOpen = true; }}>{@render icon("help")} {t("All guided tours…")}</button>
-          <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} {t("Help")}</button>
+          <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} {t("How this desk works")}</button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} {t("Settings…")} <span class="menu-key">⌘,</span></button>
         {/snippet}
@@ -1001,7 +992,6 @@
 
 
 <style>
-  .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
   .pb {
     height: 100%;
     min-height: 0;
@@ -1113,7 +1103,6 @@
     padding: 0;
   }
   .pb-tools > button:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
-  .pb-tools > button.on { color: var(--accent); border-color: var(--accent); }
   .pb button:active { opacity: 0.84; }
   .pb-grid {
     flex: 1;
@@ -1380,7 +1369,10 @@
   .now-audio-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
   @media (max-width: 1560px) { .chip-name { display: none; } }
   /* Guided tours are also in the More menu; narrower desks keep the bar for live tools. */
-  @media (max-width: 1500px) { .pb-tools > .help-tool { display: none; } }
+  .pb-tools :global(.tool-menu > button) { position: relative; }
+  .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
+  .menu-state { margin-left: auto; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--field); color: var(--muted); }
+  .menu-state.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }
   .now-audio-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   /* Narrower desks: shorter labels so the tools on the right stay in reach. */

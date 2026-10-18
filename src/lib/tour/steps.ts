@@ -14,9 +14,9 @@ export type TourStep = {
 };
 
 const TOUR_BUTTON: TourStep = {
-  target: ['[data-tour="tours"]'],
+  target: ['[data-tour="more"]', '[data-tour="tours"]'],
   title: msg("Lost? Come back here"),
-  body: msg("Press this button any time to take this tour again. Each page has its own."),
+  body: msg("The guided tours are here any time, in this menu. Each page has its own."),
 };
 
 const LIVE_STEPS: TourStep[] = [

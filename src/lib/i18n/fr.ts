@@ -2339,4 +2339,15 @@ export const fr: Readonly<Record<string, string>> = {
 
   // Service toolbar
   Monitors: "Moniteurs",
+
+  // Grouped top bar menus
+  "On the screen now: alerts, captions, overlays ({n})": "À l’écran maintenant : alertes, sous-titres, superpositions ({n})",
+  "Alerts, live captions, overlays and stage messages": "Alertes, sous-titres en direct, superpositions et messages de scène",
+  "Over what is live": "Par-dessus le direct",
+  "Alert…": "Alerte…",
+  "Overlays…": "Superpositions…",
+  "For the people on stage": "Pour les personnes sur scène",
+  "Screens and look": "Écrans et aspect",
+  "Guided tours…": "Visites guidées…",
+  "The guided tours are here any time, in this menu. Each page has its own.": "Les visites guidées sont ici à tout moment, dans ce menu. Chaque page a la sienne.",
 };
