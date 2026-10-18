@@ -1,0 +1,21 @@
+// The license server on Cloudflare Workers: run `wrangler deploy` from this folder.
+// Secrets are not kept here; set them once with `wrangler secret put` (see README.md).
+{
+  "name": "church-studio-keys",
+  "main": "paddle.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  "vars": {
+    // "sandbox" while testing with Paddle's sandbox; "live" when selling for real.
+    "PADDLE_ENV": "sandbox",
+    // Which Paddle price grants which plan. PLACEHOLDER: put your price ids here.
+    "PADDLE_PRICES": "pri_premium_monthly:premium,pri_premium_yearly:premium,pri_church_monthly:church,pri_church_yearly:church",
+    // The sender of the key email; the domain must be verified in Resend. PLACEHOLDER.
+    "MAIL_FROM": "Church Studio <keys@example.com>",
+    "GRACE_DAYS": "7"
+  },
+  "kv_namespaces": [
+    // Device activations. PLACEHOLDER: `wrangler kv namespace create ACTIVATIONS` prints the id.
+    { "binding": "ACTIVATIONS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+  ]
+}

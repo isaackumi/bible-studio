@@ -29,19 +29,22 @@ buyer. The app checks the key offline, so the server is needed only at the momen
    - Developer tools › Notifications: add a destination `https://<your-worker>/paddle/webhook`
      for `transaction.completed`, and copy its secret key.
 2. **Resend** (resend.com): verify your sending domain and create an API key.
-3. **Cloudflare**: `npm i -g wrangler`, then from this folder:
+3. **Cloudflare**: the Worker's settings are in `wrangler.jsonc` here. From this folder:
 
    ```
-   wrangler init --from-dash   # or create a Worker named church-studio-keys
-   wrangler secret put PADDLE_WEBHOOK_SECRET
-   wrangler secret put PADDLE_API_KEY
-   wrangler secret put CHURCH_STUDIO_SIGNING_KEY   # contents of ~/.church-studio/license-signing.key
-   wrangler secret put RESEND_API_KEY
-   wrangler deploy paddle.ts --name church-studio-keys \
-     --var PADDLE_ENV:sandbox \
-     --var PADDLE_PRICES:pri_xxx:premium,pri_yyy:premium,pri_zzz:church \
-     --var "MAIL_FROM:Church Studio <keys@yourdomain>"
+   npx wrangler login
+   npx wrangler kv namespace create ACTIVATIONS   # paste the id into wrangler.jsonc
+   npx wrangler secret put PADDLE_WEBHOOK_SECRET
+   npx wrangler secret put PADDLE_API_KEY
+   npx wrangler secret put CHURCH_STUDIO_SIGNING_KEY   # contents of ~/.church-studio/license-signing.key
+   npx wrangler secret put RESEND_API_KEY
+   npx wrangler deploy
    ```
+
+   Before deploying, fill the placeholders in `wrangler.jsonc`: `PADDLE_PRICES` (your price ids)
+   and `MAIL_FROM` (an address on your Resend domain). `npx wrangler deploy --dry-run` checks the
+   bundle without touching your account. The Worker's address is printed at the end
+   (`https://church-studio-keys.<you>.workers.dev`).
 
 4. Buy with a Paddle sandbox test card and check the email arrives. Then switch Paddle to live,
    set `PADDLE_ENV` to `live`, and replace the sandbox checkout links and price ids.
@@ -61,9 +64,8 @@ The same Worker counts the computers each key runs on: Premium 1, Church 3 at on
 in when a key is added and then about once a week; a computer not seen for 60 days drops off by
 itself, and Settings › Plan & account can release one.
 
-1. Create a KV namespace: `wrangler kv namespace create ACTIVATIONS`, and bind it to the Worker as
-   `ACTIVATIONS` (in wrangler.toml: `[[kv_namespaces]] binding = "ACTIVATIONS" id = "…"`).
-2. Deploy again. The endpoints are `POST /v1/activate`, `/v1/release` and `/v1/devices`.
+1. The KV namespace `ACTIVATIONS` from step 3 above holds the list (its id goes in `wrangler.jsonc`).
+2. The endpoints are `POST /v1/activate`, `/v1/release` and `/v1/devices` on the same Worker.
 3. Put the Worker's address in `ACTIVATION_URL` in `src/lib/domain/activation.ts`. Until it is set,
    the app does not check activations (a key simply works on any computer).
 
