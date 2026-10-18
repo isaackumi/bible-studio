@@ -127,8 +127,12 @@
     const quiet = previewOnly;
     previewOnly = false;
     // Never while editing: the editor's Preview button is for checking, not for the room.
-    if (quiet || draft || !clickLive || !now || was === undefined || now === was) return;
+    if (quiet || draft || !now || was === undefined || now === was) return;
     if (programSource === `song:${now}`) return;
+    // The song on the screen follows the operator: once it is live, choosing another of its
+    // parts changes the screen in either mode. A different song waits on Preview (Preview mode).
+    const sameSongLive = programLive && programSource.startsWith(`song:${onPreview?.songId}:`);
+    if (!clickLive && !sameSongLive) return;
     void session.take();
   });
 
@@ -182,7 +186,9 @@
     selectedId = song.id;
   }
 
-  function show(song: Song, sectionId: string) {
+  /** Option-click (Alt-click) puts a part on Preview only, even when its song is on the screen. */
+  function show(song: Song, sectionId: string, event?: MouseEvent) {
+    if (event?.altKey) previewOnly = true;
     session.previewSongSection(song, sectionId);
   }
 
@@ -649,7 +655,7 @@
             class:live={programLive && programSource === `song:${selected.id}:${section.id}`}
             title={section.label}
             aria-label={section.label}
-            onclick={() => show(selected, section.id)}
+            onclick={(event) => show(selected, section.id, event)}
             ondblclick={() => void showAndTake(selected, section.id)}
           >{sectionShort(section)}</button>
         {/each}
@@ -660,9 +666,10 @@
         <button type="button" role="radio" aria-checked={clickLive} class:on={clickLive} class:live-on={clickLive} data-tip="Click shows a part on the screen at once; arrows too" onclick={() => setClickLive(true)}>Live</button>
       </div>
       </div>
-      <p class="hint">
+      <p class="hint" class:on-screen={!clickLive && programLive && programSource.startsWith(`song:${selected.id}:`)}>
         {#if clickLive}<b>Live:</b> a part you click, or reach with <kbd>←</kbd> <kbd>→</kbd>, shows on the screen at once.
-        {:else}<b>Click</b> a part for Preview, <b>double-click</b> to show it. <kbd>←</kbd> <kbd>→</kbd> move between parts.{/if}
+        {:else if programLive && programSource.startsWith(`song:${selected.id}:`)}<span class="dot"></span><b>On the screen.</b> Click a part, or <kbd>←</kbd> <kbd>→</kbd>, to change it. Option-click to preview only.
+        {:else}<b>Click</b> a part for Preview, <b>double-click</b> to show it. Once it is on the screen, the next click changes the screen.{/if}
       </p>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
@@ -674,7 +681,7 @@
             class:live={isLive}
             class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
             class:heard={detected?.songId === selected.id && detected.sectionId === section.id}
-            onclick={() => show(selected, section.id)}
+            onclick={(event) => show(selected, section.id, event)}
             ondblclick={() => void showAndTake(selected, section.id)}
           >
             <span class="label">
@@ -925,6 +932,9 @@
   .row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); }
   .hint b { color: var(--ink); font-weight: 600; }
+  .hint.on-screen { color: var(--ink); }
+  .hint.on-screen b { color: var(--live); }
+  .hint .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 1px; }
   kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }
   .sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
   .section {
