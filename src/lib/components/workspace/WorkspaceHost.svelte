@@ -12,6 +12,7 @@
   import ThemePane from "../ThemePane.svelte";
   import Transport from "../Transport.svelte";
   import PanelFrame from "./PanelFrame.svelte";
+  import { t } from "../../i18n/core";
 
   let width = $state(1440);
   let host = $state<HTMLDivElement | null>(null);
@@ -128,10 +129,10 @@
 
 <div class="workspace" bind:this={host}>
   {#if presented.mode === "compact"}
-    <div class="compact-bar" aria-label="Collapsed panels">
+    <div class="compact-bar" aria-label={t("Collapsed panels")}>
       {#each presented.overflow as panel (panel.panelId)}
         <button type="button" class:active={drawer === panel.panelId} onclick={() => (drawer = drawer === panel.panelId ? null : panel.panelId)}>
-          {PANEL_TITLES[panel.panelId]}
+          {t(PANEL_TITLES[panel.panelId])}
         </button>
       {/each}
     </div>
@@ -142,7 +143,7 @@
       <div
         class="cell"
         role="region"
-        aria-label="Left dock"
+        aria-label={t("Left dock")}
         class:drop={over === "left"}
         style:grid-column={plan.left}
         style:grid-row="1"
@@ -158,7 +159,7 @@
     <div
       class="cell center-cell"
       role="region"
-      aria-label="Preview and program"
+      aria-label={t("Preview and program")}
       class:drop={over === "center"}
       style:grid-column={plan.center}
       style:grid-row="1"
@@ -176,8 +177,8 @@
         {@render framed(primary)}
       {:else}
         <div class="workspace-empty">
-          <p>Preview is hidden.</p>
-          <button type="button" class="primary" onclick={() => session.showPanelById("preview")}>Show preview</button>
+          <p>{t("Preview is hidden.")}</p>
+          <button type="button" class="primary" onclick={() => session.showPanelById("preview")}>{t("Show preview")}</button>
         </div>
       {/if}
     </div>
@@ -187,7 +188,7 @@
       <div
         class="cell"
         role="region"
-        aria-label="Right dock"
+        aria-label={t("Right dock")}
         class:drop={over === "right"}
         style:grid-column={plan.right}
         style:grid-row="1"
@@ -204,7 +205,7 @@
       <div
         class="cell bottom-cell"
         role="region"
-        aria-label="Bottom dock"
+        aria-label={t("Bottom dock")}
         class:row={presented.bottomAxis === "row"}
         class:drop={over === "bottom"}
         style:grid-column="1 / -1"
@@ -248,7 +249,7 @@
       >
         {@render body(panel.panelId)}
       </PanelFrame>
-      <button type="button" class="float-resize" aria-label="Resize {PANEL_TITLES[panel.panelId]}" onpointerdown={(event) => resizeFloat(panel, event)}></button>
+      <button type="button" class="float-resize" aria-label={t("Resize {title}", { title: t(PANEL_TITLES[panel.panelId]) })} onpointerdown={(event) => resizeFloat(panel, event)}></button>
     </div>
   {/each}
 </div>
@@ -256,7 +257,7 @@
 {#snippet region(id: RegionId, panels: PanelPlacement[], active: PanelId | null)}
   <div class="region">
     {#if panels.length > 1}
-      <div class="panel-tabs" role="tablist" aria-label="{id} panels">
+      <div class="panel-tabs" role="tablist" aria-label={t("{id} panels", { id })}>
         {#each panels as panel (panel.panelId)}
           <button
             type="button"
@@ -267,7 +268,7 @@
             ondragstart={(event) => startDrag(panel.panelId, event)}
             onclick={() => session.activateTab(id, panel.panelId)}
           >
-            {PANEL_TITLES[panel.panelId]}
+            {t(PANEL_TITLES[panel.panelId])}
           </button>
         {/each}
       </div>

@@ -1,3 +1,4 @@
+import { msg } from "../i18n/core";
 import { COMMANDS, type CommandId } from "../commands/registry";
 
 /**
@@ -25,18 +26,18 @@ export type VoiceParseOptions = {
 };
 
 export const VOICE_ACTIONS: Array<{ id: VoiceAction; label: string }> = [
-  { id: "next", label: "Next" },
-  { id: "previous", label: "Previous" },
-  { id: "take", label: "Go live" },
-  { id: "cut", label: "Cut (Program)" },
-  { id: "clear", label: "Clear (Program)" },
-  { id: "black", label: "Black (Program)" },
-  { id: "logo", label: "Logo (Program)" },
-  { id: "timer-pause", label: "Pause timer (Program)" },
-  { id: "timer-resume", label: "Start timer (Program)" },
-  { id: "timer-reset", label: "Reset timer (Program)" },
-  { id: "open-scripture", label: "Open scripture" },
-  { id: "open-songs", label: "Open songs" },
+  { id: "next", label: msg("Next") },
+  { id: "previous", label: msg("Previous") },
+  { id: "take", label: msg("Go live") },
+  { id: "cut", label: msg("Cut (Program)") },
+  { id: "clear", label: msg("Clear (Program)") },
+  { id: "black", label: msg("Black (Program)") },
+  { id: "logo", label: msg("Logo (Program)") },
+  { id: "timer-pause", label: msg("Pause timer (Program)") },
+  { id: "timer-resume", label: msg("Start timer (Program)") },
+  { id: "timer-reset", label: msg("Reset timer (Program)") },
+  { id: "open-scripture", label: msg("Open scripture") },
+  { id: "open-songs", label: msg("Open songs") },
 ];
 
 const WAKE = /^(?:hey\s+)?(?:church\s+)?studios?\b[\s,.:!-]*/;

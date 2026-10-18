@@ -2,6 +2,8 @@
 // screen (the first selector that is on screen wins) and says what it is for in plain words.
 // Steps whose target is not showing (a hidden panel, a closed menu) are skipped.
 
+import { msg } from "../i18n/core";
+
 export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production";
 
 export type TourStep = {
@@ -13,219 +15,219 @@ export type TourStep = {
 
 const TOUR_BUTTON: TourStep = {
   target: ['[data-tour="tours"]'],
-  title: "Lost? Come back here",
-  body: "Press this button any time to take this tour again. Each page has its own.",
+  title: msg("Lost? Come back here"),
+  body: msg("Press this button any time to take this tour again. Each page has its own."),
 };
 
 const LIVE_STEPS: TourStep[] = [
   {
     target: [".pb-actions .live"],
-    title: "LIVE sends it to the screen",
-    body: "Nothing reaches the congregation until you press LIVE (or the Space bar). Then Preview becomes Program.",
+    title: msg("LIVE sends it to the screen"),
+    body: msg("Nothing reaches the congregation until you press LIVE (or the Space bar). Then Preview becomes Program."),
   },
   {
     target: [".pb-actions"],
-    title: "BLACK and CLEAR",
-    body: "BLACK turns the screen black at once. CLEAR takes the words off. Neither changes what is on Preview.",
+    title: msg("BLACK and CLEAR"),
+    body: msg("BLACK turns the screen black at once. CLEAR takes the words off. Neither changes what is on Preview."),
   },
   {
     target: [".output-trigger"],
-    title: "The audience screen",
-    body: "Open the audience window here and put it on the projector or TV. The button turns amber when Program is set but nobody can see it.",
+    title: msg("The audience screen"),
+    body: msg("Open the audience window here and put it on the projector or TV. The button turns amber when Program is set but nobody can see it."),
   },
 ];
 
 export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
   scriptures: {
-    name: "Scripture",
+    name: msg("Scripture"),
     steps: [
       {
-        title: "A quick look around",
-        body: "This takes about a minute. Use the arrow keys or the buttons, and press Esc to stop at any time.",
+        title: msg("A quick look around"),
+        body: msg("This takes about a minute. Use the arrow keys or the buttons, and press Esc to stop at any time."),
       },
       {
         target: [".desk-switch"],
-        title: "Two desks",
-        body: "The Presenter Desk is for scripture, songs and sermons. The Production Desk is for cameras, scenes and video.",
+        title: msg("Two desks"),
+        body: msg("The Presenter Desk is for scripture, songs and sermons. The Production Desk is for cameras, scenes and video."),
       },
       {
         target: [".pb-modes"],
-        title: "Scripture, Songs and Sermon",
-        body: "Switch pages here. Each page keeps its own Preview and panels, and what is live stays live while you move.",
+        title: msg("Scripture, Songs and Sermon"),
+        body: msg("Switch pages here. Each page keeps its own Preview and panels, and what is live stays live while you move."),
       },
       {
         target: ["label.bible-search"],
-        title: "Find any verse",
-        body: "Type a reference like John 3:16, or a few words you remember. Press / to jump here from anywhere.",
+        title: msg("Find any verse"),
+        body: msg("Type a reference like John 3:16, or a few words you remember. Press / to jump here from anywhere."),
       },
       {
         target: [".verse-list"],
-        title: "Pick the verses",
-        body: "Click a verse to put it on Preview. Shift-click another to show a range.",
+        title: msg("Pick the verses"),
+        body: msg("Click a verse to put it on Preview. Shift-click another to show a range."),
       },
       {
         target: [".pb-panel.preview"],
-        title: "Preview is only for you",
-        body: "Get the next thing ready here. The congregation does not see Preview.",
+        title: msg("Preview is only for you"),
+        body: msg("Get the next thing ready here. The congregation does not see Preview."),
       },
       {
         target: [".pb-panel.output"],
-        title: "Program is what they see",
-        body: "Program shows exactly what is on the audience screen. A red edge means you are on air.",
+        title: msg("Program is what they see"),
+        body: msg("Program shows exactly what is on the audience screen. A red edge means you are on air."),
       },
       ...LIVE_STEPS,
       {
         target: [".pb-foot .go"],
-        title: "Let it listen",
-        body: "Turn on Listen and the desk follows the sermon: it finds the verse being read and puts it on Preview. Say “next verse” to move on.",
+        title: msg("Let it listen"),
+        body: msg("Turn on Listen and the desk follows the sermon: it finds the verse being read and puts it on Preview. Say “next verse” to move on."),
       },
       {
         target: ['[data-tour="view"]'],
-        title: "Make room",
-        body: "Show or hide the library, the queue and the monitors. Each page remembers its own choice.",
+        title: msg("Make room"),
+        body: msg("Show or hide the library, the queue and the monitors. Each page remembers its own choice."),
       },
       TOUR_BUTTON,
     ],
   },
   songs: {
-    name: "Songs",
+    name: msg("Songs"),
     steps: [
       {
-        title: "Songs in a minute",
-        body: "Find a song, open it, and step through its sections. Press Esc to stop at any time.",
+        title: msg("Songs in a minute"),
+        body: msg("Find a song, open it, and step through its sections. Press Esc to stop at any time."),
       },
       {
         target: [".song-desk .sidebar", ".song-desk .rail"],
-        title: "Your song library",
-        body: "Search by title, author or a line of the lyrics. Folders keep hymns, worship and seasonal songs apart.",
+        title: msg("Your song library"),
+        body: msg("Search by title, author or a line of the lyrics. Folders keep hymns, worship and seasonal songs apart."),
       },
       {
         target: [".song-desk .imports"],
-        title: "Bring songs in",
-        body: "Import lyric files, a whole folder, SongSelect or OpenLyrics files. Export saves them for other apps.",
+        title: msg("Bring songs in"),
+        body: msg("Import lyric files, a whole folder, SongSelect or OpenLyrics files. Export saves them for other apps."),
       },
       {
         target: [".song-desk .sheet"],
-        title: "The song",
-        body: "Open a song to see its sections. Click a section to put it on Preview; edit the words here too.",
+        title: msg("The song"),
+        body: msg("Open a song to see its sections. Click a section to put it on Preview; edit the words here too."),
       },
       {
         target: [".song-desk .stage .screen.preview", ".song-desk .stage"],
-        title: "Preview and Program",
-        body: "Preview is yours; Program is what the congregation sees. Use the arrows or Space to move through the song.",
+        title: msg("Preview and Program"),
+        body: msg("Preview is yours; Program is what the congregation sees. Use the arrows or Space to move through the song."),
       },
       {
         target: [".song-desk .detect"],
-        title: "Follow the singing",
-        body: "Turn on Listen and Follow singing, and the next section comes up on Preview as the room sings.",
+        title: msg("Follow the singing"),
+        body: msg("Turn on Listen and Follow singing, and the next section comes up on Preview as the room sings."),
       },
       ...LIVE_STEPS,
       TOUR_BUTTON,
     ],
   },
   sermon: {
-    name: "Sermon",
+    name: msg("Sermon"),
     steps: [
       {
-        title: "Sermons in a minute",
-        body: "Plan the message, keep private notes, and show each point when it comes. Press Esc to stop at any time.",
+        title: msg("Sermons in a minute"),
+        body: msg("Plan the message, keep private notes, and show each point when it comes. Press Esc to stop at any time."),
       },
       {
         target: [".sermon-desk .sidebar", ".sermon-desk .rail"],
-        title: "Your sermons",
-        body: "Every sermon you write is kept here. Search finds a title, a speaker, a note or a verse.",
+        title: msg("Your sermons"),
+        body: msg("Every sermon you write is kept here. Search finds a title, a speaker, a note or a verse."),
       },
       {
         target: [".sermon-desk .sheet"],
-        title: "The outline",
-        body: "Write the points and the verses. Click a point to put it on Preview.",
+        title: msg("The outline"),
+        body: msg("Write the points and the verses. Click a point to put it on Preview."),
       },
       {
         target: [".sermon-desk .speaker"],
-        title: "Desk notes stay private",
-        body: "Notes for the point on Preview show here. They never reach the screen.",
+        title: msg("Desk notes stay private"),
+        body: msg("Notes for the point on Preview show here. They never reach the screen."),
       },
       ...LIVE_STEPS,
       TOUR_BUTTON,
     ],
   },
   service: {
-    name: "Service",
+    name: msg("Service"),
     steps: [
       {
-        title: "Run the whole service",
-        body: "Plan everything in order, then move through it item by item on Sunday. Press Esc to stop at any time.",
+        title: msg("Run the whole service"),
+        body: msg("Plan everything in order, then move through it item by item on Sunday. Press Esc to stop at any time."),
       },
       {
         target: [".service-desk .sidebar", ".service-desk .rail"],
-        title: "Your services",
-        body: "Each Sunday or event is its own service. Open last week's to reuse it.",
+        title: msg("Your services"),
+        body: msg("Each Sunday or event is its own service. Open last week's to reuse it."),
       },
       {
         target: [".service-desk .order", ".service-desk .blank"],
-        title: "The running order",
-        body: "Sections in order, like Welcome, Worship, Word and Closing. Click an item to put it on Preview; the arrows reorder it.",
+        title: msg("The running order"),
+        body: msg("Sections in order, like Welcome, Worship, Word and Closing. Click an item to put it on Preview; the arrows reorder it."),
       },
       {
         target: [".service-desk .add-bar"],
-        title: "Add anything",
-        body: "Songs, scripture, slide decks (PowerPoint too), pictures and videos, announcements and looks go into the selected section.",
+        title: msg("Add anything"),
+        body: msg("Songs, scripture, slide decks (PowerPoint too), pictures and videos, announcements and looks go into the selected section."),
       },
       {
         target: [".service-desk .next"],
-        title: "Up next",
-        body: "Next item moves Preview on through the service. The arrows step inside an item first, like a song's sections.",
+        title: msg("Up next"),
+        body: msg("Next item moves Preview on through the service. The arrows step inside an item first, like a song's sections."),
       },
       ...LIVE_STEPS,
       TOUR_BUTTON,
     ],
   },
   production: {
-    name: "Production",
+    name: msg("Production"),
     steps: [
       {
-        title: "The Production Desk",
-        body: "Scenes, cameras and video, the way a broadcast switcher works. Press Esc to stop at any time.",
+        title: msg("The Production Desk"),
+        body: msg("Scenes, cameras and video, the way a broadcast switcher works. Press Esc to stop at any time."),
       },
       {
         target: [".prod-modes"],
-        title: "Studio and Looks",
-        body: "Studio runs the service with scenes. Looks is where you design layouts like scripture over a camera.",
+        title: msg("Studio and Looks"),
+        body: msg("Studio runs the service with scenes. Looks is where you design layouts like scripture over a camera."),
       },
       {
         target: [".pane.preview"],
-        title: "Preview",
-        body: "The next scene waits here. Nobody else sees it.",
+        title: msg("Preview"),
+        body: msg("The next scene waits here. Nobody else sees it."),
       },
       {
         target: [".bridge"],
-        title: "GO LIVE, CUT and FADE",
-        body: "GO LIVE shows Preview with the chosen transition. CUT switches instantly. FADE fades over the set time.",
+        title: msg("GO LIVE, CUT and FADE"),
+        body: msg("GO LIVE shows Preview with the chosen transition. CUT switches instantly. FADE fades over the set time."),
       },
       {
         target: [".pane.program"],
-        title: "Program",
-        body: "What the audience screen shows right now.",
+        title: msg("Program"),
+        body: msg("What the audience screen shows right now."),
       },
       {
         target: ['[data-tour="scenes"]'],
-        title: "Scenes",
-        body: "A scene is a saved screen: a camera, a verse, a countdown. Click one to put it on Preview.",
+        title: msg("Scenes"),
+        body: msg("A scene is a saved screen: a camera, a verse, a countdown. Click one to put it on Preview."),
       },
       {
         target: ['[data-tour="sources"]'],
-        title: "Sources",
-        body: "The layers inside the selected scene. Add a camera, text, a timer or a picture.",
+        title: msg("Sources"),
+        body: msg("The layers inside the selected scene. Add a camera, text, a timer or a picture."),
       },
       {
         target: ['[data-tour="media"]'],
-        title: "Media",
-        body: "Pictures, videos, cameras and slides ready to drop into a scene.",
+        title: msg("Media"),
+        body: msg("Pictures, videos, cameras and slides ready to drop into a scene."),
       },
       {
         target: [".output-trigger"],
-        title: "The audience screen",
-        body: "Open the audience window here and put it on the projector, TV or stream.",
+        title: msg("The audience screen"),
+        body: msg("Open the audience window here and put it on the projector, TV or stream."),
       },
       TOUR_BUTTON,
     ],
@@ -258,8 +260,8 @@ export function placeCard(target: Rect | null, card: { width: number; height: nu
 
 /** Tours grouped by desk, in the order the hub lists them. */
 export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
-  { name: "Presenter Desk", tours: ["scriptures", "songs", "sermon", "service"] },
-  { name: "Production Desk", tours: ["production"] },
+  { name: msg("Presenter Desk"), tours: ["scriptures", "songs", "sermon", "service"] },
+  { name: msg("Production Desk"), tours: ["production"] },
 ];
 
 /** How far someone got in each tour: the furthest step seen (index into the full list), and done. */
@@ -287,7 +289,7 @@ export type TourStatus = { label: string; state: "done" | "partial" | "new"; see
 export function tourStatus(progress: TourProgress, id: TourId): TourStatus {
   const total = TOURS[id].steps.length;
   const { seen, done } = progress[id];
-  if (done) return { label: "Done", state: "done", seen: total, total };
-  if (seen < 0) return { label: "Not started", state: "new", seen: 0, total };
+  if (done) return { label: msg("Done"), state: "done", seen: total, total };
+  if (seen < 0) return { label: msg("Not started"), state: "new", seen: 0, total };
   return { label: `${seen + 1} of ${total}`, state: "partial", seen: seen + 1, total };
 }

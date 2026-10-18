@@ -17,6 +17,7 @@
   import { emptyModel } from "../../domain/theme";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import type { TextStyle } from "../../domain/types";
+  import { msg, t } from "../../i18n/core";
 
   let {
     name: initialName,
@@ -53,10 +54,10 @@
   let lookingUp = $state(false);
 
   const modes: { id: TimerMode; label: string }[] = [
-    { id: "countdown", label: "Countdown" },
-    { id: "countup", label: "Count up" },
-    { id: "clock", label: "Clock" },
-    { id: "target", label: "Target time" },
+    { id: "countdown", label: msg("Countdown") },
+    { id: "countup", label: msg("Count up") },
+    { id: "clock", label: msg("Clock") },
+    { id: "target", label: msg("Target time") },
   ];
 
   const deviceId = $derived(fields.type === "camera" ? fields.deviceId : null);
@@ -92,7 +93,7 @@
         node.srcObject = stream;
       })
       .catch((reason: unknown) => {
-        if (!cancelled) error = reason instanceof Error ? reason.message : "Church Studio cannot open that camera.";
+        if (!cancelled) error = reason instanceof Error ? reason.message : t("Church Studio cannot open that camera.");
       });
     return () => {
       cancelled = true;
@@ -114,7 +115,7 @@
     const found = await session.scriptureFields(fields.reference);
     lookingUp = false;
     if (!found) {
-      error = "Reference not found.";
+      error = t("Reference not found.");
       return;
     }
     // Keep the style the operator already chose.
@@ -174,7 +175,7 @@
   });
 </script>
 
-<DeskDialog title={`Properties for “${initialName}”`} {onclose} {returnTo} wide>
+<DeskDialog title={t("Properties for “{initialName}”", { initialName })} {onclose} {returnTo} wide>
   {#if notice}
     <p class="notice" role="status">{notice}</p>
   {/if}
@@ -182,48 +183,48 @@
   <div class="form">
   <div class="intro">
     <span class="type-icon"><Icon name={meta.icon} size={18} /></span>
-    <span><strong>{sourceKindLabel(fields.type)}</strong><em>{meta.blurb}</em></span>
+    <span><strong>{sourceKindLabel(fields.type)}</strong><em>{t(meta.blurb)}</em></span>
   </div>
   <fieldset disabled={readonly}>
     <label class="row">
-      <span>Name</span>
-      <input class="field" aria-label="Name" bind:value={name} />
+      <span>{t("Name")}</span>
+      <input class="field" aria-label={t("Name")} bind:value={name} />
     </label>
 
     {#if fields.type === "camera"}
       <label class="row">
-        <span>Device</span>
+        <span>{t("Device")}</span>
         <span class="inline">
-          <select class="field" aria-label="Device" value={fields.deviceId} onchange={(event) => pickCamera(event.currentTarget.value)}>
+          <select class="field" aria-label={t("Device")} value={fields.deviceId} onchange={(event) => pickCamera(event.currentTarget.value)}>
             {#if session.cameras.length === 0}
-              <option value="">No camera found</option>
+              <option value="">{t("No camera found")}</option>
             {/if}
             {#each session.cameras as camera (camera.deviceId)}
               <option value={camera.deviceId}>{camera.label}</option>
             {/each}
           </select>
-          <button type="button" class="desk-btn" onclick={() => void session.loadCameras()}>Refresh</button>
+          <button type="button" class="desk-btn" onclick={() => void session.loadCameras()}>{t("Refresh")}</button>
         </span>
       </label>
       <label class="check">
         <input type="checkbox" checked={fields.mirror} onchange={(event) => fields.type === "camera" && (fields = { ...fields, mirror: event.currentTarget.checked })} />
-        Mirror
+        {t("Mirror")}
       </label>
       <div class="thumb">
         {#if fields.deviceId}
           <video bind:this={video} class:mirror={fields.mirror} autoplay muted playsinline></video>
         {:else}
-          <p class="note">No camera found. Connect one, then Refresh.</p>
+          <p class="note">{t("No camera found. Connect one, then Refresh.")}</p>
         {/if}
       </div>
     {:else if fields.type === "scripture"}
       <label class="row">
-        <span>Reference</span>
+        <span>{t("Reference")}</span>
         <span class="inline">
           <input
             class="field"
-            aria-label="Reference"
-            placeholder="John 3:16"
+            aria-label={t("Reference")}
+            placeholder={t("John 3:16")}
             value={fields.reference}
             oninput={(event) => fields.type === "scripture" && (fields = { ...fields, reference: event.currentTarget.value, body: "" })}
             onkeydown={(event) => {
@@ -233,7 +234,7 @@
               }
             }}
           />
-          <button type="button" class="desk-btn" disabled={lookingUp} onclick={() => void lookUp()}>Look up</button>
+          <button type="button" class="desk-btn" disabled={lookingUp} onclick={() => void lookUp()}>{t("Look up")}</button>
         </span>
       </label>
       {#if fields.body}
@@ -241,9 +242,9 @@
       {/if}
     {:else if fields.type === "song"}
       <label class="row">
-        <span>Song</span>
-        <select class="field" aria-label="Song" value={fields.songId} onchange={(event) => pickSong(event.currentTarget.value)}>
-          <option value="" disabled>Choose a song</option>
+        <span>{t("Song")}</span>
+        <select class="field" aria-label={t("Song")} value={fields.songId} onchange={(event) => pickSong(event.currentTarget.value)}>
+          <option value="" disabled>{t("Choose a song")}</option>
           {#each session.songs as entry (entry.id)}
             <option value={entry.id}>{entry.title}</option>
           {/each}
@@ -251,8 +252,8 @@
       </label>
       {#if song}
         <label class="row">
-          <span>Section</span>
-          <select class="field" aria-label="Section" value={fields.sectionId} onchange={(event) => pickSection(event.currentTarget.value)}>
+          <span>{t("Section")}</span>
+          <select class="field" aria-label={t("Section")} value={fields.sectionId} onchange={(event) => pickSection(event.currentTarget.value)}>
             {#each song.sections as section (section.id)}
               <option value={section.id}>{section.label}</option>
             {/each}
@@ -260,49 +261,49 @@
         </label>
       {/if}
       {#if session.songs.length === 0}
-        <p class="note">No songs yet. Add songs on Presenter Desk.</p>
+        <p class="note">{t("No songs yet. Add songs on Presenter Desk.")}</p>
       {/if}
       {#if fields.body}
         <pre class="preview">{fields.body}</pre>
       {/if}
     {:else if fields.type === "text"}
       <label class="row">
-        <span>Heading</span>
-        <input class="field" aria-label="Heading" value={fields.heading} oninput={(event) => fields.type === "text" && (fields = { ...fields, heading: event.currentTarget.value })} />
+        <span>{t("Heading")}</span>
+        <input class="field" aria-label={t("Heading")} value={fields.heading} oninput={(event) => fields.type === "text" && (fields = { ...fields, heading: event.currentTarget.value })} />
       </label>
       <label class="row">
-        <span>Body</span>
-        <textarea class="field area" aria-label="Body" value={fields.body} oninput={(event) => fields.type === "text" && (fields = { ...fields, body: event.currentTarget.value })}></textarea>
+        <span>{t("Body")}</span>
+        <textarea class="field area" aria-label={t("Body")} value={fields.body} oninput={(event) => fields.type === "text" && (fields = { ...fields, body: event.currentTarget.value })}></textarea>
       </label>
     {:else if fields.type === "timer"}
       <label class="row">
-        <span>Mode</span>
-        <select class="field" aria-label="Mode" value={fields.mode} onchange={(event) => fields.type === "timer" && (fields = { ...fields, mode: event.currentTarget.value as TimerMode })}>
+        <span>{t("Mode")}</span>
+        <select class="field" aria-label={t("Mode")} value={fields.mode} onchange={(event) => fields.type === "timer" && (fields = { ...fields, mode: event.currentTarget.value as TimerMode })}>
           {#each modes as mode (mode.id)}
-            <option value={mode.id}>{mode.label}</option>
+            <option value={mode.id}>{t(mode.label)}</option>
           {/each}
         </select>
       </label>
       {#if fields.mode === "countdown" || fields.mode === "countup"}
         <label class="row">
-          <span>Minutes</span>
+          <span>{t("Minutes")}</span>
           <input
             class="field"
             type="number"
             min="0"
             max="600"
-            aria-label="Minutes"
+            aria-label={t("Minutes")}
             value={Math.round(fields.durationMs / 60_000)}
             oninput={(event) => fields.type === "timer" && (fields = { ...fields, durationMs: Math.max(0, Number(event.currentTarget.value) || 0) * 60_000 })}
           />
         </label>
       {:else if fields.mode === "target"}
         <label class="row">
-          <span>Target</span>
+          <span>{t("Target")}</span>
           <input
             class="field"
             type="datetime-local"
-            aria-label="Target time"
+            aria-label={t("Target time")}
             value={targetValue(fields.targetAt)}
             oninput={(event) => {
               const at = Date.parse(event.currentTarget.value);
@@ -312,55 +313,55 @@
         </label>
       {/if}
       <label class="row">
-        <span>Label</span>
-        <input class="field" aria-label="Label" value={fields.label} oninput={(event) => fields.type === "timer" && (fields = { ...fields, label: event.currentTarget.value })} />
+        <span>{t("Label")}</span>
+        <input class="field" aria-label={t("Label")} value={fields.label} oninput={(event) => fields.type === "timer" && (fields = { ...fields, label: event.currentTarget.value })} />
       </label>
       {#if fields.mode !== "clock"}
         <label class="row">
-          <span>Red at</span>
+          <span>{t("Red at")}</span>
           <span class="inline">
             <input
               class="field"
               type="number"
               min="0"
               max="3600"
-              aria-label="Warning seconds"
+              aria-label={t("Warning seconds")}
               value={Math.round(fields.warningMs / 1000)}
               oninput={(event) => fields.type === "timer" && (fields = { ...fields, warningMs: Math.max(0, Number(event.currentTarget.value) || 0) * 1000 })}
             />
-            <span class="unit">seconds left (turns red and pulses)</span>
+            <span class="unit">{t("seconds left (turns red and pulses)")}</span>
           </span>
         </label>
       {/if}
     {:else if fields.type === "clock"}
       <label class="row">
-        <span>Label</span>
-        <input class="field" aria-label="Label" placeholder="Optional, e.g. Local time" value={fields.label} oninput={(event) => fields.type === "clock" && (fields = { ...fields, label: event.currentTarget.value })} />
+        <span>{t("Label")}</span>
+        <input class="field" aria-label={t("Label")} placeholder={t("Optional, e.g. Local time")} value={fields.label} oninput={(event) => fields.type === "clock" && (fields = { ...fields, label: event.currentTarget.value })} />
       </label>
     {:else if fields.type === "lower-third"}
       <label class="row">
-        <span>Template</span>
-        <select class="field" aria-label="Template" value={fields.templateId} onchange={(event) => fields.type === "lower-third" && (fields = { ...fields, templateId: event.currentTarget.value })}>
+        <span>{t("Template")}</span>
+        <select class="field" aria-label={t("Template")} value={fields.templateId} onchange={(event) => fields.type === "lower-third" && (fields = { ...fields, templateId: event.currentTarget.value })}>
           {#each LOWER_THIRD_TEMPLATES as template (template.id)}
             <option value={template.id}>{template.name}</option>
           {/each}
         </select>
       </label>
       <label class="row">
-        <span>Title</span>
-        <input class="field" aria-label="Title" value={fields.title} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, title: event.currentTarget.value })} />
+        <span>{t("Title")}</span>
+        <input class="field" aria-label={t("Title")} value={fields.title} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, title: event.currentTarget.value })} />
       </label>
       <label class="row">
-        <span>Subtitle</span>
-        <input class="field" aria-label="Subtitle" value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
+        <span>{t("Subtitle")}</span>
+        <input class="field" aria-label={t("Subtitle")} value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
       </label>
     {:else if fields.type === "ndi"}
       <div class="row">
-        <span>Source</span>
+        <span>{t("Source")}</span>
         <span class="inline ndi-pick">
           <select
             class="field"
-            aria-label="NDI source"
+            aria-label={t("NDI source")}
             value={fields.name}
             onchange={(event) => {
               if (fields.type !== "ndi") return;
@@ -370,49 +371,49 @@
               fields = { ...fields, name: chosen };
             }}
           >
-            <option value="">{ndiSources === null ? "NDI is not available here" : ndiSources.length ? "Choose a source…" : "Looking for sources…"}</option>
-            {#if fields.name && !(ndiSources ?? []).includes(fields.name)}<option value={fields.name}>{fields.name} (not seen now)</option>{/if}
+            <option value="">{ndiSources === null ? t("NDI is not available here") : ndiSources.length ? t("Choose a source…") : t("Looking for sources…")}</option>
+            {#if fields.name && !(ndiSources ?? []).includes(fields.name)}<option value={fields.name}>{t("{name} (not seen now)", { name: fields.name })}</option>{/if}
             {#each ndiSources ?? [] as name (name)}<option value={name}>{name}</option>{/each}
           </select>
-          <button type="button" class="choice" onclick={() => void refreshNdi()}>Refresh</button>
+          <button type="button" class="choice" onclick={() => void refreshNdi()}>{t("Refresh")}</button>
         </span>
       </div>
       <p class="hint">
-        {#if ndiSources === null}NDI sources show in the Church Studio app for Mac, with the free NDI Tools installed (<a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>).
-        {:else if ndiSources.length === 0}No NDI sources found yet. Check the camera or computer sending NDI is on the same network, then Refresh.
-        {:else}Cameras, OBS or vMix outputs and other computers sending NDI on this network. NDI® is a registered trademark of Vizrt NDI AB.{/if}
+        {#if ndiSources === null}{t("NDI sources show in the Church Studio app for Mac, with the free NDI Tools installed")} (<a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>).
+        {:else if ndiSources.length === 0}{t("No NDI sources found yet. Check the camera or computer sending NDI is on the same network, then Refresh.")}
+        {:else}{t("Cameras, OBS or vMix outputs and other computers sending NDI on this network. NDI® is a registered trademark of Vizrt NDI AB.")}{/if}
       </p>
     {:else if fields.type === "web"}
       {@const target = webTarget(fields.url)}
       <label class="row">
-        <span>Link</span>
+        <span>{t("Link")}</span>
         <input
           class="field"
-          aria-label="Web address"
-          placeholder="yourchurch.org/live, a YouTube or Vimeo link, a Google Slides link"
+          aria-label={t("Web address")}
+          placeholder={t("yourchurch.org/live, a YouTube or Vimeo link, a Google Slides link")}
           value={fields.url}
           oninput={(event) => fields.type === "web" && (fields = { ...fields, url: event.currentTarget.value })}
         />
       </label>
       <p class="hint">
-        {#if !fields.url.trim()}Paste any link. YouTube, Vimeo and Google Slides links become a full-screen player.
-        {:else if !target}That does not look like a web address.
-        {:else if target.kind === "website"}Shows {target.label} live. Some sites refuse to be shown inside other apps; if the preview stays blank, that site does not allow it.
-        {:else}Plays as a {target.kind === "youtube" ? "YouTube" : target.kind === "vimeo" ? "Vimeo" : "Google Slides"} {target.kind === "slides" ? "slideshow" : "player"}.{/if}
+        {#if !fields.url.trim()}{t("Paste any link. YouTube, Vimeo and Google Slides links become a full-screen player.")}
+        {:else if !target}{t("That does not look like a web address.")}
+        {:else if target.kind === "website"}{t("Shows {label} live. Some sites refuse to be shown inside other apps; if the preview stays blank, that site does not allow it.", { label: target.label })}
+        {:else}{target.kind === "youtube" ? t("Plays as a YouTube player.") : target.kind === "vimeo" ? t("Plays as a Vimeo player.") : t("Plays as a Google Slides slideshow.")}{/if}
       </p>
       {#if target && target.kind !== "slides"}
         <div class="row">
-          <span>Sound</span>
-          <span class="inline" role="radiogroup" aria-label="Sound">
-            <button type="button" role="radio" class="choice" aria-checked={!fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: false })}>On the audience screen</button>
-            <button type="button" role="radio" class="choice" aria-checked={fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: true })}>Off</button>
+          <span>{t("Sound")}</span>
+          <span class="inline" role="radiogroup" aria-label={t("Sound")}>
+            <button type="button" role="radio" class="choice" aria-checked={!fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: false })}>{t("On the audience screen")}</button>
+            <button type="button" role="radio" class="choice" aria-checked={fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: true })}>{t("Off")}</button>
           </span>
         </div>
       {/if}
       {#if target?.kind === "website"}
         <div class="row">
-          <span>Page size</span>
-          <span class="inline" role="radiogroup" aria-label="Page size">
+          <span>{t("Page size")}</span>
+          <span class="inline" role="radiogroup" aria-label={t("Page size")}>
             {#each [[0.75, "Smaller"], [1, "Normal"], [1.5, "Larger"], [2, "Largest"]] as [zoom, label] (zoom)}
               <button type="button" role="radio" class="choice" aria-checked={fields.zoom === zoom} onclick={() => fields.type === "web" && (fields = { ...fields, zoom: Number(zoom) })}>{label}</button>
             {/each}
@@ -421,18 +422,18 @@
       {/if}
     {:else if fields.type === "qr"}
       <label class="row">
-        <span>Link</span>
+        <span>{t("Link")}</span>
         <input
           class="field"
-          aria-label="QR link"
+          aria-label={t("QR link")}
           placeholder="https://yourchurch.org/give"
           value={fields.data}
           oninput={(event) => fields.type === "qr" && (fields = { ...fields, data: event.currentTarget.value })}
         />
       </label>
       <div class="row">
-        <span>Style</span>
-        <span class="inline" role="radiogroup" aria-label="QR style">
+        <span>{t("Style")}</span>
+        <span class="inline" role="radiogroup" aria-label={t("QR style")}>
           {#each ["rounded", "dots", "square"] as style (style)}
             <button
               type="button"
@@ -445,22 +446,22 @@
         </span>
       </div>
       <div class="row">
-        <span>Colors</span>
+        <span>{t("Colors")}</span>
         <span class="inline">
-          <label class="swatch">Code <input type="color" aria-label="QR code color" value={fields.dark} oninput={(event) => fields.type === "qr" && (fields = { ...fields, dark: event.currentTarget.value })} /></label>
-          <label class="swatch">Background <input type="color" aria-label="QR background color" value={fields.light} oninput={(event) => fields.type === "qr" && (fields = { ...fields, light: event.currentTarget.value })} /></label>
+          <label class="swatch">{t("Code")} <input type="color" aria-label={t("QR code color")} value={fields.dark} oninput={(event) => fields.type === "qr" && (fields = { ...fields, dark: event.currentTarget.value })} /></label>
+          <label class="swatch">{t("Background")} <input type="color" aria-label={t("QR background color")} value={fields.light} oninput={(event) => fields.type === "qr" && (fields = { ...fields, light: event.currentTarget.value })} /></label>
         </span>
       </div>
       <label class="row">
-        <span>Caption</span>
-        <input class="field" aria-label="QR caption" placeholder="Scan to give" maxlength="80" value={fields.caption} oninput={(event) => fields.type === "qr" && (fields = { ...fields, caption: event.currentTarget.value })} />
+        <span>{t("Caption")}</span>
+        <input class="field" aria-label={t("QR caption")} placeholder={t("Scan to give")} maxlength="80" value={fields.caption} oninput={(event) => fields.type === "qr" && (fields = { ...fields, caption: event.currentTarget.value })} />
       </label>
-      <p class="note">Keep strong contrast (dark code on a light background) so every phone can scan it.</p>
+      <p class="note">{t("Keep strong contrast (dark code on a light background) so every phone can scan it.")}</p>
     {:else if fields.type === "video"}
       {#if !session.media.some((asset) => asset.kind === "video")}
-        <p class="note">No videos yet. Import one in Media.</p>
+        <p class="note">{t("No videos yet. Import one in Media.")}</p>
       {:else}
-        <div class="media" role="listbox" aria-label="Videos">
+        <div class="media" role="listbox" aria-label={t("Videos")}>
           {#each session.media.filter((asset) => asset.kind === "video") as asset (asset.id)}
             <button
               type="button"
@@ -476,17 +477,17 @@
       {/if}
       <label class="check">
         <input type="checkbox" checked={fields.loop} onchange={(event) => fields.type === "video" && (fields = { ...fields, loop: event.currentTarget.checked })} />
-        Loop
+        {t("Loop")}
       </label>
       <label class="check">
         <input type="checkbox" checked={fields.muted} onchange={(event) => fields.type === "video" && (fields = { ...fields, muted: event.currentTarget.checked })} />
-        No sound on the audience screen
+        {t("No sound on the audience screen")}
       </label>
     {:else if fields.type === "image"}
       {#if !session.media.some((asset) => asset.kind === "image")}
-        <p class="note">No images yet. Import images in Settings → Media.</p>
+        <p class="note">{t("No images yet. Import images in Settings → Media.")}</p>
       {:else}
-        <div class="media" role="listbox" aria-label="Images">
+        <div class="media" role="listbox" aria-label={t("Images")}>
           {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}
             <button
               type="button"
@@ -504,7 +505,7 @@
     {#if "style" in fields}
       <TextStyleEditor
         style={fields.style}
-        label={fields.type === "timer" || fields.type === "clock" ? "Look and position" : "Text style"}
+        label={fields.type === "timer" || fields.type === "clock" ? t("Look and position") : t("Text style")}
         onchange={(style: TextStyle) => {
           if ("style" in fields) fields = { ...fields, style } as SourceFields;
         }}
@@ -516,15 +517,15 @@
   {/if}
   </div>
   <figure class="live-preview">
-    <figcaption>How it looks</figcaption>
+    <figcaption>{t("How it looks")}</figcaption>
     <div class="screen-box"><Screen model={previewModel} /></div>
-    <p class="note">Changes show on Preview. Program updates when you go live.</p>
+    <p class="note">{t("Changes show on Preview. Program updates when you go live.")}</p>
   </figure>
   </div>
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>{readonly ? "Close" : "Cancel"}</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{readonly ? t("Close") : t("Cancel")}</button>
     {#if !readonly}
-      <button type="button" class="desk-btn primary" disabled={!valid} onclick={save}>OK</button>
+      <button type="button" class="desk-btn primary" disabled={!valid} onclick={save}>{t("OK")}</button>
     {/if}
   {/snippet}
 </DeskDialog>

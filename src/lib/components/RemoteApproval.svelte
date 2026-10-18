@@ -1,17 +1,18 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
+  import { t } from "../i18n/core";
 
   const waiting = $derived(session.remotePending.filter((entry) => entry.status === "waiting"));
 </script>
 
 {#if waiting.length}
-  <div class="approval" role="alertdialog" aria-label="Phone pairing request">
+  <div class="approval" role="alertdialog" aria-label={t("Phone pairing request")}>
     {#each waiting as request (request.id)}
       <div class="request">
-        <p><strong>{request.name}</strong> wants to control this desk.</p>
+        <p><strong>{request.name}</strong> {t("wants to control this desk.")}</p>
         <div class="buttons">
-          <button type="button" class="desk-btn primary" onclick={() => void session.approveRemote(request.id)}>Allow</button>
-          <button type="button" class="desk-btn" onclick={() => session.declineRemote(request.id)}>Decline</button>
+          <button type="button" class="desk-btn primary" onclick={() => void session.approveRemote(request.id)}>{t("Allow")}</button>
+          <button type="button" class="desk-btn" onclick={() => session.declineRemote(request.id)}>{t("Decline")}</button>
         </div>
       </div>
     {/each}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // Library search: icon, clear button, and the desk's Find key ("/") focuses it.
   // ↑ ↓ and Enter go to the parent so it can move through its list.
@@ -44,7 +45,7 @@
   <Icon name="search" size={14} />
   <input bind:this={input} type="search" aria-label={label} {placeholder} bind:value onkeydown={onKey} />
   {#if value}
-    <button type="button" aria-label="Clear search" onclick={() => { value = ""; input?.focus(); }}><Icon name="close" size={12} /></button>
+    <button type="button" aria-label={t("Clear search")} onclick={() => { value = ""; input?.focus(); }}><Icon name="close" size={12} /></button>
   {:else}
     <kbd aria-hidden="true">/</kbd>
   {/if}

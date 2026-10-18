@@ -3,6 +3,7 @@
   import { session } from "../../app/session.svelte";
   import { TOUR_GROUPS, TOURS, tourStatus, type TourId } from "../../tour/steps";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // Guided tours, grouped by desk: what is done, what is left, and a way back into any step.
   let open = $state<TourId | null>(null);
@@ -26,14 +27,14 @@
 
 <svelte:window onkeydown={onKey} />
 
-<button type="button" class="hub-scrim" aria-label="Close tours" tabindex="-1" onclick={close}></button>
+<button type="button" class="hub-scrim" aria-label={t("Close tours")} tabindex="-1" onclick={close}></button>
 <div class="hub" role="dialog" aria-modal="true" aria-labelledby="hub-title" transition:fly={{ y: -8, duration: 160 }}>
   <header>
     <div>
-      <h2 id="hub-title">Guided tours</h2>
-      <p>{doneCount} of {all.length} complete. Start any tour from any step.</p>
+      <h2 id="hub-title">{t("Guided tours")}</h2>
+      <p>{t("{doneCount} of {length} complete. Start any tour from any step.", { doneCount, length: all.length })}</p>
     </div>
-    <button type="button" class="icon-btn" aria-label="Close" onclick={close}><Icon name="close" size={16} /></button>
+    <button type="button" class="icon-btn" aria-label={t("Close")} onclick={close}><Icon name="close" size={16} /></button>
   </header>
   <div class="meter" aria-hidden="true"><i style:width="{(doneCount / all.length) * 100}%"></i></div>
 
@@ -47,28 +48,28 @@
           {@const locked = id === "production" && !session.entitled("production")}
           <div class="tour" class:expanded={open === id}>
             <div class="tour-row">
-              <button type="button" class="expand" aria-expanded={open === id} aria-label="{open === id ? 'Hide' : 'Show'} steps of the {tour.name} tour" onclick={() => (open = open === id ? null : id)}>
+              <button type="button" class="expand" aria-expanded={open === id} aria-label={open === id ? t("Hide steps of the {name} tour", { name: t(tour.name) }) : t("Show steps of the {name} tour", { name: t(tour.name) })} onclick={() => (open = open === id ? null : id)}>
                 <span class="state {status.state}">
                   {#if status.state === "done"}<Icon name="check" size={13} />{:else}<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" /><circle class="arc" cx="10" cy="10" r="8" style:stroke-dasharray="{(status.seen / status.total) * 50.3} 50.3" /></svg>{/if}
                 </span>
                 <span class="name">
-                  <strong>{tour.name}</strong>
-                  <em>{locked ? `${status.label} · Premium` : status.label}</em>
+                  <strong>{t(tour.name)}</strong>
+                  <em>{locked ? t("{label} · Premium", { label: status.label }) : status.label}</em>
                 </span>
                 <Icon name={open === id ? "chevron-up" : "chevron-down"} size={14} />
               </button>
               <button type="button" class="go" class:primary={status.state !== "done"} onclick={() => session.startTour(id, status.state === "partial" ? status.seen : 0)}>
-                {status.state === "done" ? "Restart" : status.state === "partial" ? "Resume" : "Start"}
+                {status.state === "done" ? t("Restart") : status.state === "partial" ? t("Resume") : t("Start")}
               </button>
             </div>
             {#if open === id}
               <ol class="steps">
                 {#each tour.steps as step, n (n)}
                   <li>
-                    <button type="button" class:seen={progress[id].done || n <= progress[id].seen} onclick={() => session.startTour(id, n)} title="Start the tour here">
+                    <button type="button" class:seen={progress[id].done || n <= progress[id].seen} onclick={() => session.startTour(id, n)} title={t("Start the tour here")}>
                       <span class="dot"></span>
-                      <span class="step-title">{step.title}</span>
-                      <span class="here">Start here</span>
+                      <span class="step-title">{t(step.title)}</span>
+                      <span class="here">{t("Start here")}</span>
                     </button>
                   </li>
                 {/each}
@@ -82,11 +83,11 @@
 
   <footer>
     {#if confirmReset}
-      <span>Mark every tour as not started?</span>
-      <button type="button" class="link" onclick={() => (confirmReset = false)}>Keep</button>
-      <button type="button" class="link danger" onclick={() => { session.resetTours(); confirmReset = false; }}>Reset</button>
+      <span>{t("Mark every tour as not started?")}</span>
+      <button type="button" class="link" onclick={() => (confirmReset = false)}>{t("Keep")}</button>
+      <button type="button" class="link danger" onclick={() => { session.resetTours(); confirmReset = false; }}>{t("Reset")}</button>
     {:else}
-      <button type="button" class="link" onclick={() => (confirmReset = true)}>Reset progress</button>
+      <button type="button" class="link" onclick={() => (confirmReset = true)}>{t("Reset progress")}</button>
     {/if}
   </footer>
 </div>

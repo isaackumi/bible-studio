@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "../i18n/core";
   // The one star used everywhere: hollow until starred, filled gold after. It never steals the
   // click from the row it sits on.
   let { on, label, onclick, size = 14 }: { on: boolean; label: string; onclick: () => void; size?: number } = $props();
@@ -9,8 +10,8 @@
   class="fav-star"
   class:on
   aria-pressed={on}
-  aria-label={on ? `Remove ${label} from favorites` : `Add ${label} to favorites`}
-  title={on ? "Favorite. Click to remove" : "Add to favorites"}
+  aria-label={on ? t("Remove {label} from favorites", { label }) : t("Add {label} to favorites", { label })}
+  title={on ? t("Favorite. Click to remove") : t("Add to favorites")}
   onclick={(event) => {
     event.stopPropagation();
     onclick();

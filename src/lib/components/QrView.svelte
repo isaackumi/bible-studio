@@ -1,5 +1,6 @@
 <script lang="ts">
   import QRCode from "qrcode";
+  import { t } from "../i18n/core";
 
   // A crisp, scalable QR code drawn as SVG from the code's modules (no image file).
   let { qr }: { qr: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string } } = $props();
@@ -20,7 +21,7 @@
 
 <div class="qr-frame">
   {#if code}
-    <svg viewBox="{-margin} {-margin} {code.size + margin * 2} {code.size + margin * 2}" role="img" aria-label={qr.caption || "QR code"}>
+    <svg viewBox="{-margin} {-margin} {code.size + margin * 2} {code.size + margin * 2}" role="img" aria-label={qr.caption || t("QR code")}>
       <rect x={-margin} y={-margin} width={code.size + margin * 2} height={code.size + margin * 2} rx={qr.style === "square" ? 0 : 2} fill={qr.light} stroke="none" />
       {#each code.cells as [x, y] (`${x},${y}`)}
         {#if qr.style === "dots"}

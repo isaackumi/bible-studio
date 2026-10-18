@@ -1,3 +1,4 @@
+import { msg } from "../i18n/core";
 import type { PresentationModel, TextStyle, Theme } from "./types";
 
 export type TextPosition =
@@ -6,15 +7,15 @@ export type TextPosition =
   | "bottom-left" | "bottom-center" | "bottom-right";
 
 export const TEXT_POSITIONS: Array<{ id: TextPosition; label: string; align: "left" | "center" | "right"; vertical: "top" | "middle" | "bottom" }> = [
-  { id: "top-left", label: "Top left", align: "left", vertical: "top" },
-  { id: "top-center", label: "Top center", align: "center", vertical: "top" },
-  { id: "top-right", label: "Top right", align: "right", vertical: "top" },
-  { id: "middle-left", label: "Left", align: "left", vertical: "middle" },
-  { id: "center", label: "Center", align: "center", vertical: "middle" },
-  { id: "middle-right", label: "Right", align: "right", vertical: "middle" },
-  { id: "bottom-left", label: "Bottom left", align: "left", vertical: "bottom" },
-  { id: "bottom-center", label: "Bottom center", align: "center", vertical: "bottom" },
-  { id: "bottom-right", label: "Bottom right", align: "right", vertical: "bottom" },
+  { id: "top-left", label: msg("Top left"), align: "left", vertical: "top" },
+  { id: "top-center", label: msg("Top center"), align: "center", vertical: "top" },
+  { id: "top-right", label: msg("Top right"), align: "right", vertical: "top" },
+  { id: "middle-left", label: msg("Left"), align: "left", vertical: "middle" },
+  { id: "center", label: msg("Center"), align: "center", vertical: "middle" },
+  { id: "middle-right", label: msg("Right"), align: "right", vertical: "middle" },
+  { id: "bottom-left", label: msg("Bottom left"), align: "left", vertical: "bottom" },
+  { id: "bottom-center", label: msg("Bottom center"), align: "center", vertical: "bottom" },
+  { id: "bottom-right", label: msg("Bottom right"), align: "right", vertical: "bottom" },
 ];
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

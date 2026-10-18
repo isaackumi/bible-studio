@@ -3,6 +3,7 @@
   import { formatReference, parseReference } from "../bible/reference";
   import { api } from "../db/api";
   import type { BibleItem, SearchHit, VerseText } from "../domain/types";
+  import { t } from "../i18n/core";
 
   let translationId = $state("kjv");
   let bookOrd = $state(43);
@@ -85,9 +86,9 @@
 
 <div class="pane">
   <form onsubmit={lookup}>
-    <input class="field" placeholder="John 3:16 or a phrase" bind:value={query} aria-label="Bible search" />
+    <input class="field" placeholder={t("John 3:16 or a phrase")} bind:value={query} aria-label={t("Bible search")} />
   </form>
-  <select bind:value={translationId} aria-label="Translation">
+  <select bind:value={translationId} aria-label={t("Translation")}>
     {#each session.translations as translation}
       <option value={translation.id}>{translation.abbreviation} — {translation.name}</option>
     {/each}
@@ -105,8 +106,8 @@
     </div>
   {/if}
   <div class="actions">
-    <button type="button" class="primary" onclick={() => { const passage = currentPassage(); if (passage) void session.previewPassage(passage); }}>Preview</button>
-    <button type="button" class="primary" onclick={() => { const passage = currentPassage(); if (passage) void session.addPassage(passage); }}>Add to section</button>
+    <button type="button" class="primary" onclick={() => { const passage = currentPassage(); if (passage) void session.previewPassage(passage); }}>{t("Preview")}</button>
+    <button type="button" class="primary" onclick={() => { const passage = currentPassage(); if (passage) void session.addPassage(passage); }}>{t("Add to section")}</button>
   </div>
   {#if hits.length > 0}
     {#each hits as hit}
@@ -140,7 +141,7 @@
     {/each}
   {/if}
   {#if session.workspace.recent.length > 0}
-    <p class="hint">Recent</p>
+    <p class="hint">{t("Recent")}</p>
     {#each session.workspace.recent as recent}
       <button type="button" class="hit" onclick={() => session.previewPassage(recent)}>{recent.reference}</button>
     {/each}

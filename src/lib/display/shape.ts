@@ -5,15 +5,17 @@
 // The frame is painted on a canvas 1080 pixels on its short side (1920×1080 for 16:9, 1440×1080
 // for 4:3, 1080×1920 for portrait), so words keep the same size relative to the screen.
 
+import { msg } from "../i18n/core";
+
 export type ScreenShape = "auto" | "16:9" | "16:10" | "4:3" | "21:9" | "9:16";
 
 export const SCREEN_SHAPES: Array<{ id: ScreenShape; label: string; detail: string }> = [
-  { id: "auto", label: "Match the screen", detail: "Fills whatever screen the output is on" },
-  { id: "16:9", label: "16:9", detail: "TVs and most projectors" },
-  { id: "16:10", label: "16:10", detail: "WUXGA projectors (1920×1200)" },
-  { id: "4:3", label: "4:3", detail: "Older projectors" },
-  { id: "21:9", label: "21:9", detail: "Ultra-wide and LED walls" },
-  { id: "9:16", label: "9:16", detail: "Portrait screens" },
+  { id: "auto", label: msg("Match the screen"), detail: msg("Fills whatever screen the output is on") },
+  { id: "16:9", label: "16:9", detail: msg("TVs and most projectors") },
+  { id: "16:10", label: "16:10", detail: msg("WUXGA projectors (1920×1200)") },
+  { id: "4:3", label: "4:3", detail: msg("Older projectors") },
+  { id: "21:9", label: "21:9", detail: msg("Ultra-wide and LED walls") },
+  { id: "9:16", label: "9:16", detail: msg("Portrait screens") },
 ];
 
 export const WIDE = 16 / 9;

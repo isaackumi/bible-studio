@@ -2,6 +2,7 @@
   import type { PresentationModel } from "../../domain/types";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
+  import { msg, t } from "../../i18n/core";
 
   // A working miniature of the Presenter Desk: the real top bar styles and the real slide
   // renderer for Preview and Program, so setup shows the app it is setting up.
@@ -24,31 +25,33 @@
     desk?: "pewbeam" | "obs";
   } = $props();
   const production = $derived(desk === "obs");
+  msg("Studio");
+  msg("Looks");
 </script>
 
 <div class="window" aria-hidden="true">
   <div class="titlebar">
     <span class="lights"><i></i><i></i><i></i></span>
-    <span class="wtitle">Church Studio</span>
+    <span class="wtitle">{t("Church Studio")}</span>
   </div>
   <div class="bar">
     <span class="desk-icons"><span class="ic" class:on={!production}><Icon name="pew" size={13} /></span><span class="ic" class:on={production}><Icon name="obs" size={13} /></span></span>
     <span class="modes">
-      {#each production ? ["Studio", "Looks"] : ["Scriptures", "Songs", "Sermon"] as name (name)}<span class:on={production ? name === "Studio" : mode === name}>{name}</span>{/each}
+      {#each production ? ["Studio", "Looks"] : ["Scriptures", "Songs", "Sermon"] as name (name)}<span class:on={production ? name === "Studio" : mode === name}>{t(name)}</span>{/each}
     </span>
     <span class="grow"></span>
-    <span class="aud"><i class:on={onAir}></i>Audience</span>
-    <span class="live" class:on-air={onAir}><i></i>{onAir ? "ON AIR" : production ? "GO LIVE" : "LIVE"}</span>
-    <span class="plain">BLACK</span>
-    <span class="plain ghost">CLEAR</span>
+    <span class="aud"><i class:on={onAir}></i>{t("Audience")}</span>
+    <span class="live" class:on-air={onAir}><i></i>{onAir ? t("ON AIR") : production ? t("GO LIVE") : t("LIVE")}</span>
+    <span class="plain">{t("BLACK")}</span>
+    <span class="plain ghost">{t("CLEAR")}</span>
   </div>
   <div class="monitors">
     <figure class="mon preview">
-      <figcaption>Preview{#if reference}<span>{reference}</span>{/if}</figcaption>
+      <figcaption>{t("Preview")}{#if reference}<span>{reference}</span>{/if}</figcaption>
       <div class="glass"><Screen model={preview} /></div>
     </figure>
     <figure class="mon program" class:on-air={onAir}>
-      <figcaption>{#if onAir}<b class="md-dot"></b>{/if}Program<span>{onAir ? "Audience sees this" : "Nothing live"}</span></figcaption>
+      <figcaption>{#if onAir}<b class="md-dot"></b>{/if}{t("Program")}<span>{onAir ? t("Audience sees this") : t("Nothing live")}</span></figcaption>
       <div class="glass"><Screen model={program} /></div>
     </figure>
   </div>

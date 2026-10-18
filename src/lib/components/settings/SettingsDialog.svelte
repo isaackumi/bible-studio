@@ -712,7 +712,7 @@
               </span>
             </div>
             <select class="field" aria-label={t("Screen shape")} value={session.workspace.appearance.screenShape ?? "auto"} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
-              {#each SCREEN_SHAPES as shape (shape.id)}<option value={shape.id}>{shape.label} · {shape.detail}</option>{/each}
+              {#each SCREEN_SHAPES as shape (shape.id)}<option value={shape.id}>{t(shape.label)} · {t(shape.detail)}</option>{/each}
             </select>
           </div>
           <div class="row">
@@ -952,18 +952,18 @@
       {:else if section === "keyboard"}
         {#each shortcutGroups as group (group)}
           <section class="card">
-            <h3>{group}</h3>
+            <h3>{t(group)}</h3>
             <ul class="keys">
               {#each COMMANDS.filter((command) => command.group === group) as command (command.id)}
                 <li>
-                  <span>{command.title}</span>
+                  <span>{t(command.title)}</span>
                   {#if command.shortcut}
                     {@const action = command.shortcut}
                     <button
                       type="button"
                       class="key-btn"
                       class:listening={capturing === action}
-                      aria-label={capturing === action ? t("Press the new key for {title}", { title: command.title }) : t("Change the key for {title}", { title: command.title })}
+                      aria-label={capturing === action ? t("Press the new key for {title}", { title: t(command.title) }) : t("Change the key for {title}", { title: t(command.title) })}
                       title={t("Click, then press the new key")}
                       onclick={() => { keyNote = ""; capturing = capturing === action ? null : action; }}
                     >{capturing === action ? t("Press a key…") : shortcutLabels(shortcuts, action)}</button>
@@ -1430,7 +1430,7 @@
             <article class="plan-card" class:current={plan.id === session.plan} class:popular={plan.popular} style:--plan={plan.color}>
               {#if plan.popular}<span class="ribbon">{t("Most popular")}</span>{/if}
               <header>
-                <strong>{plan.name}</strong>
+                <strong>{t(plan.name)}</strong>
                 {#if plan.id === session.plan}<span class="pill ok">{t("Current")}</span>{/if}
               </header>
               <p class="price">
@@ -1442,13 +1442,13 @@
                   <b>${deal.perMonth}</b><span>{t("/ month, billed ${yearly} a year", { yearly: plan.price.yearly })}</span>
                 {/if}
               </p>
-              <p class="tag">{plan.tagline}</p>
-              {#if i > 0}<p class="plus">{t("Everything in {name}, plus", { name: PLANS[i - 1]!.name })}</p>{/if}
+              <p class="tag">{t(plan.tagline)}</p>
+              {#if i > 0}<p class="plus">{t("Everything in {name}, plus", { name: t(PLANS[i - 1]!.name) })}</p>{/if}
               <ul>
                 {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
                   <li class:soon={FEATURE_LABELS[feature].soon}>
                     <Icon name="check" size={13} />
-                    <span>{FEATURE_LABELS[feature].label}{#if FEATURE_LABELS[feature].soon}<em>{t("soon")}</em>{/if}</span>
+                    <span>{t(FEATURE_LABELS[feature].label)}{#if FEATURE_LABELS[feature].soon}<em>{t("soon")}</em>{/if}</span>
                   </li>
                 {/each}
               </ul>

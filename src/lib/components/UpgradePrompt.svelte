@@ -5,6 +5,7 @@
   import MiniDesk from "./onboarding/MiniDesk.svelte";
   import { presentCamera } from "../domain/camera";
   import { presentScripture } from "../domain/present";
+  import { t } from "../i18n/core";
 
   // Shown when a feature is outside the current plan. Offers the one-time trial, or the plans page.
   const feature = $derived(session.upgradeFor);
@@ -47,30 +48,30 @@
 
 {#if feature && plan}
   <div class="layer">
-    <button type="button" class="backdrop" aria-label="Close" onclick={close}></button>
+    <button type="button" class="backdrop" aria-label={t("Close")} onclick={close}></button>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
       {#if glimpse}
         <div class="glimpse"><MiniDesk preview={glimpse.preview} program={glimpse.program} onAir reference="Camera 1" desk="obs" /></div>
       {/if}
       <span class="badge" style:background={plan.color}><Icon name="key" size={20} /></span>
-      <p class="eyebrow">{plan.name} feature</p>
-      <h2 id="upgrade-title">{FEATURE_LABELS[feature].label}</h2>
-      <p class="lede">Part of {plan.name}. {plan.tagline}</p>
+      <p class="eyebrow">{t("{name} feature", { name: t(plan.name) })}</p>
+      <h2 id="upgrade-title">{t(FEATURE_LABELS[feature].label)}</h2>
+      <p class="lede">{t("Part of {name}. {tagline}", { name: t(plan.name), tagline: t(plan.tagline) })}</p>
       {#if highlights.length}
         <ul>
           {#each highlights as entry (entry)}
-            <li class:this={entry === feature}><Icon name="check" size={14} />{FEATURE_LABELS[entry].label}</li>
+            <li class:this={entry === feature}><Icon name="check" size={14} />{t(FEATURE_LABELS[entry].label)}</li>
           {/each}
         </ul>
       {/if}
       <div class="buttons">
         {#if canTrial}
-          <button type="button" class="primary" style:background={plan.color} onclick={trial}>Start {TRIAL_DAYS}-day free trial</button>
+          <button type="button" class="primary" style:background={plan.color} onclick={trial}>{t("Start {TRIAL_DAYS}-day free trial", { TRIAL_DAYS })}</button>
         {/if}
-        <button type="button" onclick={plans}>See plans</button>
-        <button type="button" class="quiet" onclick={close}>Not now</button>
+        <button type="button" onclick={plans}>{t("See plans")}</button>
+        <button type="button" class="quiet" onclick={close}>{t("Not now")}</button>
       </div>
-      {#if canTrial}<p class="fine">Runs on this computer. No card needed. Your library stays yours on every plan.</p>{/if}
+      {#if canTrial}<p class="fine">{t("Runs on this computer. No card needed. Your library stays yours on every plan.")}</p>{/if}
     </div>
   </div>
 {/if}

@@ -15,6 +15,7 @@
   import MotionBackground from "../MotionBackground.svelte";
   import Screen from "../Screen.svelte";
   import MiniDesk from "./MiniDesk.svelte";
+  import { UI_LANGUAGES, msg, t } from "../../i18n/core";
 
   // First run, in the app's own colors, laid out as one composed stage: questions on the left,
   // and on the right a living sky from the theme library with a working miniature of the desk.
@@ -26,36 +27,36 @@
   // when they know what it is for.
   type Step = "welcome" | "church" | "wall" | "look" | "scripture" | "screen" | "ready";
   const STEPS: { id: Step; label: string }[] = [
-    { id: "welcome", label: "Welcome" },
-    { id: "church", label: "Church" },
-    { id: "wall", label: "On the wall" },
-    { id: "look", label: "Desk colors" },
-    { id: "scripture", label: "Bible" },
-    { id: "screen", label: "Big screen" },
-    { id: "ready", label: "Ready" },
+    { id: "welcome", label: msg("Welcome") },
+    { id: "church", label: msg("Church") },
+    { id: "wall", label: msg("On the wall") },
+    { id: "look", label: msg("Desk colors") },
+    { id: "scripture", label: msg("Bible") },
+    { id: "screen", label: msg("Big screen") },
+    { id: "ready", label: msg("Ready") },
   ];
   /** What the church puts on screen. It picks the desk, so nobody has to know the desks yet. */
   type Use = "scripture" | "songs" | "sermon" | "cameras";
   const USES: { id: Use; label: string; icon: string }[] = [
-    { id: "scripture", label: "Scripture", icon: "bible" },
-    { id: "songs", label: "Song lyrics", icon: "note" },
-    { id: "sermon", label: "Sermon points", icon: "book" },
-    { id: "cameras", label: "Cameras and video", icon: "obs" },
+    { id: "scripture", label: msg("Scripture"), icon: "bible" },
+    { id: "songs", label: msg("Song lyrics"), icon: "note" },
+    { id: "sermon", label: msg("Sermon points"), icon: "book" },
+    { id: "cameras", label: msg("Cameras and video"), icon: "obs" },
   ];
   /** Screen themes offered in setup: free ones with different moods. The library has the rest. */
   const WALL_THEMES = ["theme-manuscript", "theme-dawn", "theme-sea", "theme-ember", "theme-manuscript-page", "theme-caption"];
   const THEMES: { id: OperatorTheme; name: string; note: string; ground: string; panel: string; ink: string }[] = [
-    { id: "dark", name: "Night", note: "Black desk", ground: "#050505", panel: "#141414", ink: "#f5f5f5" },
-    { id: "vespers", name: "Vespers", note: "Warm black", ground: "#0c0a09", panel: "#161311", ink: "#f6f1e7" },
-    { id: "nave", name: "Nave", note: "Blue black", ground: "#070b12", panel: "#0f1520", ink: "#f4f7fb" },
-    { id: "light", name: "Day", note: "White desk", ground: "#f7f5f3", panel: "#ffffff", ink: "#050505" },
+    { id: "dark", name: msg("Night"), note: msg("Black desk"), ground: "#050505", panel: "#141414", ink: "#f5f5f5" },
+    { id: "vespers", name: msg("Vespers"), note: msg("Warm black"), ground: "#0c0a09", panel: "#161311", ink: "#f6f1e7" },
+    { id: "nave", name: msg("Nave"), note: msg("Blue black"), ground: "#070b12", panel: "#0f1520", ink: "#f4f7fb" },
+    { id: "light", name: msg("Day"), note: msg("White desk"), ground: "#f7f5f3", panel: "#ffffff", ink: "#050505" },
   ];
   const ACCENTS = [
-    { name: "Orange", value: "#fa4f00" },
-    { name: "Gold", value: "#e2cc9d" },
-    { name: "Peach", value: "#ff8f55" },
-    { name: "Red", value: "#be2119" },
-    { name: "Blue", value: "#3e7bfa" },
+    { name: msg("Orange"), value: "#fa4f00" },
+    { name: msg("Gold"), value: "#e2cc9d" },
+    { name: msg("Peach"), value: "#ff8f55" },
+    { name: msg("Red"), value: "#be2119" },
+    { name: msg("Blue"), value: "#3e7bfa" },
   ];
   const GENESIS: VerseText[] = [{ verse: 3, text: "And God said, Let there be light: and there was light." }];
 
@@ -96,7 +97,7 @@
   const appearance = $derived(session.workspace.appearance);
   const installedIds = $derived(session.translations.map((entry) => entry.id));
   const chosen = $derived(BIBLE_CATALOG.find((entry) => entry.id === translation) ?? BIBLE_CATALOG[0]!);
-  const name = $derived(churchName.trim() || "Your church");
+  const name = $derived(churchName.trim() || t("Your church"));
   const wallThemes = $derived(WALL_THEMES.map((id) => session.themes.find((theme) => theme.id === id)).filter((theme): theme is Theme => !!theme));
   const screenTheme = $derived(session.theme());
   const shape = $derived<ScreenShape>(appearance.screenShape ?? "auto");
@@ -195,7 +196,7 @@
     if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
   }
 
-  const themeName = $derived(THEMES.find((entry) => entry.id === appearance.theme)?.name ?? "Night");
+  const themeName = $derived(THEMES.find((entry) => entry.id === appearance.theme)?.name ?? msg("Night"));
   const accentName = $derived(ACCENTS.find((entry) => entry.value === appearance.accent)?.name.toLowerCase() ?? "custom");
 
   function onKey(event: KeyboardEvent) {
@@ -216,61 +217,66 @@
   {#if booting}
     <div class="ob-boot" role="status" aria-live="polite">
       <span class="mark halo"><Icon name="church" size={30} /></span>
-      <p class="wordmark">Church Studio</p>
+      <p class="wordmark">{t("Church Studio")}</p>
       <span class="loader"><i></i></span>
-      <p class="boot-note">{session.ready ? "Opening your library" : "Starting up"}</p>
+      <p class="boot-note">{session.ready ? t("Opening your library") : t("Starting up")}</p>
     </div>
   {:else}
     <main class="stage-card">
       <section class="ask" aria-labelledby="step-title">
         <header class="ob-top">
-          <span class="ob-brand"><span class="mark small"><Icon name="church" size={16} /></span>Church Studio</span>
-          <button type="button" class="skip" onclick={() => finish()}>Skip setup</button>
+          <span class="ob-brand"><span class="mark small"><Icon name="church" size={16} /></span>{t("Church Studio")}</span>
+          <button type="button" class="skip" onclick={() => finish()}>{t("Skip setup")}</button>
         </header>
 
         <div class="where">
-          <div class="progress" aria-label="Setup steps">
+          <div class="progress" aria-label={t("Setup steps")}>
             {#each STEPS as entry, i (entry.id)}
-              <button type="button" class="tick" class:done={i < index} class:here={i === index} aria-label={entry.label} aria-current={i === index ? "step" : undefined} title={entry.label} onclick={() => go(i)}></button>
+              <button type="button" class="tick" class:done={i < index} class:here={i === index} aria-label={t(entry.label)} aria-current={i === index ? "step" : undefined} title={t(entry.label)} onclick={() => go(i)}></button>
             {/each}
           </div>
-          <span class="count">Step {index + 1} of {STEPS.length}</span>
+          <span class="count">{t("Step {index} of {length}", { index: index + 1, length: STEPS.length })}</span>
         </div>
 
         <div class="step-wrap">
           {#key step}
             <div class="step" in:fade={{ duration: 240 }}>
               {#if step === "welcome"}
-                <h1 id="step-title">Let’s get your church on screen</h1>
-                <p class="lede">About a minute. The preview beside you changes as you answer, so you see your Sunday before it starts.</p>
+                <h1 id="step-title">{t("Let’s get your church on screen")}</h1>
+                <p class="lede">{t("About a minute. The preview beside you changes as you answer, so you see your Sunday before it starts.")}</p>
                 <ul class="promises">
-                  <li><span class="pi"><Icon name="bible" size={15} /></span><span>Scripture, songs and sermons, ready offline</span></li>
-                  <li><span class="pi"><Icon name="mic" size={15} /></span><span>Say “next verse” and the desk follows</span></li>
-                  <li><span class="pi"><Icon name="cast" size={15} /></span><span>Nothing reaches the screen until you press LIVE</span></li>
+                  <li><span class="pi"><Icon name="bible" size={15} /></span><span>{t("Scripture, songs and sermons, ready offline")}</span></li>
+                  <li><span class="pi"><Icon name="mic" size={15} /></span><span>{t("Say “next verse” and the desk follows")}</span></li>
+                  <li><span class="pi"><Icon name="cast" size={15} /></span><span>{t("Nothing reaches the screen until you press LIVE")}</span></li>
                 </ul>
+                <div class="ob-lang" role="radiogroup" aria-label={t("Language")}>
+                  {#each UI_LANGUAGES as language (language.id)}
+                    <button type="button" role="radio" lang={language.id} aria-checked={(session.workspace.appearance.language ?? "en") === language.id} onclick={() => session.setAppearance({ language: language.id })}>{language.name}</button>
+                  {/each}
+                </div>
               {:else if step === "church"}
-                <h1 id="step-title">Tell us about your church</h1>
-                <p class="lede">The name becomes your logo slide. Tick what you show and the preview shows it.</p>
+                <h1 id="step-title">{t("Tell us about your church")}</h1>
+                <p class="lede">{t("The name becomes your logo slide. Tick what you show and the preview shows it.")}</p>
                 <label class="field-wrap">
-                  <span>Church name</span>
-                  <input use:focusOnShow placeholder="Grace Chapel" maxlength="80" bind:value={churchName} oninput={() => (showing = "name")} />
+                  <span>{t("Church name")}</span>
+                  <input use:focusOnShow placeholder={t("Grace Chapel")} maxlength="80" bind:value={churchName} oninput={() => (showing = "name")} />
                 </label>
-                <div class="uses" role="group" aria-label="What you put on screen">
-                  <span class="ob-label">On Sunday we show</span>
+                <div class="uses" role="group" aria-label={t("What you put on screen")}>
+                  <span class="ob-label">{t("On Sunday we show")}</span>
                   <div class="use-grid">
                     {#each USES as entry (entry.id)}
                       <button type="button" class="use" class:on={uses.includes(entry.id)} aria-pressed={uses.includes(entry.id)} onclick={() => toggleUse(entry.id)}>
                         <Icon name={entry.icon} size={16} />
-                        <span>{entry.label}</span>
+                        <span>{t(entry.label)}</span>
                         {#if uses.includes(entry.id)}<Icon name="check" size={14} />{/if}
                       </button>
                     {/each}
                   </div>
                 </div>
               {:else if step === "wall"}
-                <h1 id="step-title">How it looks on the wall</h1>
-                <p class="lede">Pick the look for verses, songs and your logo slide. Preview and Program change as you pick; the theme library has many more.</p>
-                <div class="walls" role="radiogroup" aria-label="Screen theme">
+                <h1 id="step-title">{t("How it looks on the wall")}</h1>
+                <p class="lede">{t("Pick the look for verses, songs and your logo slide. Preview and Program change as you pick; the theme library has many more.")}</p>
+                <div class="walls" role="radiogroup" aria-label={t("Screen theme")}>
                   {#each wallThemes as theme (theme.id)}
                     <button type="button" role="radio" aria-checked={screenTheme.id === theme.id} class="wall" class:on={screenTheme.id === theme.id} onclick={() => session.useTheme(theme.id)}>
                       <span class="wall-shot"><Screen model={sample(theme)} still aspect={16 / 9} /></span>
@@ -279,30 +285,30 @@
                   {/each}
                 </div>
               {:else if step === "look"}
-                <h1 id="step-title">Colors for your desk</h1>
-                <p class="lede">This is the desk you work at. The congregation never sees it, so pick what is easy on your eyes in your room.</p>
-                <div class="themes" role="radiogroup" aria-label="Theme">
+                <h1 id="step-title">{t("Colors for your desk")}</h1>
+                <p class="lede">{t("This is the desk you work at. The congregation never sees it, so pick what is easy on your eyes in your room.")}</p>
+                <div class="themes" role="radiogroup" aria-label={t("Theme")}>
                   {#each THEMES as entry (entry.id)}
                     <button type="button" role="radio" aria-checked={appearance.theme === entry.id} class="theme" class:on={appearance.theme === entry.id} onclick={() => session.setAppearance({ theme: entry.id })}>
                       <span class="swatch" style:background={entry.ground}>
                         <i style:background={entry.panel}></i>
                         <b style:background={appearance.accent}></b>
-                        <em style:color={entry.ink}>Aa</em>
+                        <em style:color={entry.ink}>{t("Aa")}</em>
                       </span>
-                      <strong>{entry.name}</strong>
-                      <span>{entry.note}</span>
+                      <strong>{t(entry.name)}</strong>
+                      <span>{t(entry.note)}</span>
                     </button>
                   {/each}
                 </div>
-                <div class="accents" role="radiogroup" aria-label="Accent">
-                  <span class="ob-label">Accent</span>
+                <div class="accents" role="radiogroup" aria-label={t("Accent")}>
+                  <span class="ob-label">{t("Accent")}</span>
                   {#each ACCENTS as entry (entry.value)}
-                    <button type="button" role="radio" aria-checked={appearance.accent === entry.value} aria-label={entry.name} title={entry.name} class="accent" class:on={appearance.accent === entry.value} style:background={entry.value} onclick={() => session.setAppearance({ accent: entry.value })}></button>
+                    <button type="button" role="radio" aria-checked={appearance.accent === entry.value} aria-label={t(entry.name)} title={t(entry.name)} class="accent" class:on={appearance.accent === entry.value} style:background={entry.value} onclick={() => session.setAppearance({ accent: entry.value })}></button>
                   {/each}
                 </div>
               {:else if step === "scripture"}
-                <h1 id="step-title">Choose your Bible</h1>
-                <p class="lede">King James and the World English Bible are installed. Add others now or any time from Settings.</p>
+                <h1 id="step-title">{t("Choose your Bible")}</h1>
+                <p class="lede">{t("King James and the World English Bible are installed. Add others now or any time from Settings.")}</p>
                 <div class="bibles">
                   {#each BIBLE_CATALOG as entry (entry.id)}
                     {@const installed = installedIds.includes(entry.id)}
@@ -321,72 +327,72 @@
                       <span class="abbr">{entry.abbreviation}</span>
                       <span class="bname">{entry.name}</span>
                       <span class="state">
-                        {#if busy}Downloading…{:else if installed}{translation === entry.id ? "Showing" : "Installed"}{:else}<Icon name="download" size={12} /> {entry.sizeMb} MB{/if}
+                        {#if busy}{t("Downloading…")}{:else if installed}{translation === entry.id ? t("Showing") : t("Installed")}{:else}<Icon name="download" size={12} /> {t("{sizeMb} MB", { sizeMb: entry.sizeMb })}{/if}
                       </span>
                     </button>
                   {/each}
                 </div>
               {:else if step === "screen"}
-                <h1 id="step-title">Put it on the big screen</h1>
-                <p class="lede">Plug in the projector or TV first. The audience window opens there, full screen, and shows only what you send live.</p>
+                <h1 id="step-title">{t("Put it on the big screen")}</h1>
+                <p class="lede">{t("Plug in the projector or TV first. The audience window opens there, full screen, and shows only what you send live.")}</p>
                 <div class="screen-steps">
                   <div class="screen-row" class:done={session.output.online}>
                     <span class="num">{#if session.output.online}<Icon name="check" size={14} />{:else}1{/if}</span>
-                    <div class="screen-copy"><strong>Open the audience window</strong><span>{session.output.online ? "It is open. Move it to the projector if it opened here." : "It opens on the second screen when there is one."}</span></div>
-                    {#if !session.output.online}<button type="button" class="btn" onclick={() => void openScreen()}><Icon name="cast" size={15} /> Open</button>{/if}
+                    <div class="screen-copy"><strong>{t("Open the audience window")}</strong><span>{session.output.online ? t("It is open. Move it to the projector if it opened here.") : t("It opens on the second screen when there is one.")}</span></div>
+                    {#if !session.output.online}<button type="button" class="btn" onclick={() => void openScreen()}><Icon name="cast" size={15} /> {t("Open")}</button>{/if}
                   </div>
                   <div class="screen-row" class:done={tested} class:off={!session.output.online}>
                     <span class="num">{#if tested}<Icon name="check" size={14} />{:else}2{/if}</span>
-                    <div class="screen-copy"><strong>Check it from the back row</strong><span>A test pattern flashes on the audience screen. Nothing live changes.</span></div>
-                    <button type="button" class="btn" disabled={!session.output.online} onclick={() => void sendTest()}>Test</button>
+                    <div class="screen-copy"><strong>{t("Check it from the back row")}</strong><span>{t("A test pattern flashes on the audience screen. Nothing live changes.")}</span></div>
+                    <button type="button" class="btn" disabled={!session.output.online} onclick={() => void sendTest()}>{t("Test")}</button>
                   </div>
                 </div>
                 <label class="shape-line">
-                  <span>Screen shape</span>
-                  <select aria-label="Screen shape" value={shape} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
-                    {#each SCREEN_SHAPES as entry (entry.id)}<option value={entry.id}>{entry.id === "auto" ? "Fit any screen" : entry.label}</option>{/each}
+                  <span>{t("Screen shape")}</span>
+                  <select aria-label={t("Screen shape")} value={shape} onchange={(event) => session.setScreenShape(event.currentTarget.value as ScreenShape)}>
+                    {#each SCREEN_SHAPES as entry (entry.id)}<option value={entry.id}>{entry.id === "auto" ? t("Fit any screen") : t(entry.label)}</option>{/each}
                   </select>
-                  <em>{shape !== "auto" ? `Always ${shape}.` : measured ? `Found: ${describeAspect(measured)}.` : "Found when the window opens."}</em>
+                  <em>{shape !== "auto" ? `Always ${shape}.` : measured ? `Found: ${describeAspect(measured)}.` : t("Found when the window opens.")}</em>
                 </label>
-                <p class="hint">No projector here yet? Continue. The Audience button at the top of the desk does this any time.</p>
+                <p class="hint">{t("No projector here yet? Continue. The Audience button at the top of the desk does this any time.")}</p>
               {:else}
-                <h1 id="step-title">{name} is ready</h1>
-                <p class="lede">Here is what is set up. Change any of it later in Settings.</p>
+                <h1 id="step-title">{t("{name} is ready", { name })}</h1>
+                <p class="lede">{t("Here is what is set up. Change any of it later in Settings.")}</p>
                 <ul class="summary">
-                  <li><Icon name="church" size={15} /><span><strong>{name}</strong> on the logo slide</span></li>
-                  <li><Icon name="themes" size={15} /><span><strong>{screenTheme.name}</strong> on the screen</span></li>
-                  <li><Icon name="look" size={15} /><span><strong>{themeName}</strong> desk, {accentName} accent</span></li>
-                  <li><Icon name="bible" size={15} /><span><strong>{chosen.name}</strong> on screen</span></li>
-                  <li class:pending={!session.output.online}><Icon name="cast" size={15} /><span>{session.output.online ? "Audience window open" : "Audience screen: open it from the desk when the projector is on"}</span></li>
-                  <li class="pending"><Icon name="mic" size={15} /><span>Voice: press Listen on the desk when you want it</span></li>
+                  <li><Icon name="church" size={15} /><span><strong>{name}</strong> {t("on the logo slide")}</span></li>
+                  <li><Icon name="themes" size={15} /><span><strong>{screenTheme.name}</strong> {t("on the screen")}</span></li>
+                  <li><Icon name="look" size={15} /><span><strong>{themeName}</strong> {t("desk, {accentName} accent", { accentName })}</span></li>
+                  <li><Icon name="bible" size={15} /><span><strong>{chosen.name}</strong> {t("on screen")}</span></li>
+                  <li class:pending={!session.output.online}><Icon name="cast" size={15} /><span>{session.output.online ? t("Audience window open") : t("Audience screen: open it from the desk when the projector is on")}</span></li>
+                  <li class="pending"><Icon name="mic" size={15} /><span>{t("Voice: press Listen on the desk when you want it")}</span></li>
                 </ul>
-                <div class="desk-pick" role="radiogroup" aria-label="Desk">
+                <div class="desk-pick" role="radiogroup" aria-label={t("Desk")}>
                   <button type="button" role="radio" aria-checked={desk === "pewbeam"} class:on={desk === "pewbeam"} onclick={() => (deskChoice = "pewbeam")}>
-                    <Icon name="pew" size={16} /><span><strong>Presenter Desk</strong><em>Scripture, songs and sermons</em></span>
+                    <Icon name="pew" size={16} /><span><strong>{t("Presenter Desk")}</strong><em>{t("Scripture, songs and sermons")}</em></span>
                   </button>
                   <button type="button" role="radio" aria-checked={desk === "obs"} class:on={desk === "obs"} onclick={() => (deskChoice = "obs")}>
-                    <Icon name="obs" size={16} /><span><strong>Production Desk</strong><em>{session.entitled("production") ? "Cameras, scenes and video" : `Premium, free for ${TRIAL_DAYS} days`}</em></span>
+                    <Icon name="obs" size={16} /><span><strong>{t("Production Desk")}</strong><em>{session.entitled("production") ? t("Cameras, scenes and video") : `Premium, free for ${TRIAL_DAYS} days`}</em></span>
                   </button>
                 </div>
-                <button type="button" class="tour-link" onclick={() => finish(true)}>New to this? Show me around first</button>
+                <button type="button" class="tour-link" onclick={() => finish(true)}>{t("New to this? Show me around first")}</button>
               {/if}
             </div>
           {/key}
         </div>
 
         <footer class="nav">
-          {#if index > 0}<button type="button" class="btn quiet" onclick={() => go(index - 1)}>Back</button>{:else}<span></span>{/if}
+          {#if index > 0}<button type="button" class="btn quiet" onclick={() => go(index - 1)}>{t("Back")}</button>{:else}<span></span>{/if}
           {#if step === "ready"}
             <span class="ready-buttons">
-              <button type="button" class="btn primary" onclick={() => finish(false)}>Open my desk</button>
+              <button type="button" class="btn primary" onclick={() => finish(false)}>{t("Open my desk")}</button>
             </span>
           {:else}
-            <button type="button" class="btn primary" onclick={() => go(index + 1)}>{step === "welcome" ? "Get started" : "Continue"}</button>
+            <button type="button" class="btn primary" onclick={() => go(index + 1)}>{step === "welcome" ? t("Get started") : t("Continue")}</button>
           {/if}
         </footer>
       </section>
 
-      <section class="art" aria-label="Preview of the desk" bind:clientWidth={artWidth} bind:clientHeight={artHeight}>
+      <section class="art" aria-label={t("Preview of the desk")} bind:clientWidth={artWidth} bind:clientHeight={artHeight}>
         {#key step}
           <div class="sky" transition:fade={{ duration: 900 }} style:transform="translate(-50%, -50%) scale({skyScale})">
             <MotionBackground motion={sky.id} tint={appearance.accent} base={sky.base} />
@@ -411,11 +417,11 @@
         </div>
 
         <div class="art-foot">
-          <p class="credit"><Icon name="media" size={12} /> {sky.name} background, from the theme library</p>
+          <p class="credit"><Icon name="media" size={12} /> {t("{name} background, from the theme library", { name: sky.name })}</p>
           {#if step === "welcome" || step === "screen" || step === "ready"}
             <p class="caption">
-              {#if step === "ready"}On air: Program is what the congregation sees
-              {:else}Preview is yours. Program is what the congregation sees.{/if}
+              {#if step === "ready"}{t("On air: Program is what the congregation sees")}
+              {:else}{t("Preview is yours. Program is what the congregation sees.")}{/if}
             </p>
           {/if}
         </div>
@@ -649,4 +655,7 @@
     .tick { transition: none; }
     .mark.halo, .settle { animation: none; }
   }
+  .ob-lang { display: inline-flex; align-self: flex-start; width: max-content; gap: 4px; margin-top: 18px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; }
+  .ob-lang button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
+  .ob-lang button[aria-checked="true"] { background: var(--field); color: var(--ink); }
 </style>

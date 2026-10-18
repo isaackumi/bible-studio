@@ -1,5 +1,6 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
+  import { t } from "../i18n/core";
 
   // Pause, start and reset the timer that is on Program. Hidden when Program has no timer.
   let { compact = false }: { compact?: boolean } = $props();
@@ -7,14 +8,14 @@
 </script>
 
 {#if state}
-  <div class="timer-controls" class:compact role="group" aria-label="Program timer">
-    <span class="label">Timer {state === "running" ? "running" : "paused"}</span>
+  <div class="timer-controls" class:compact role="group" aria-label={t("Program timer")}>
+    <span class="label">{state === "running" ? t("Timer running") : t("Timer paused")}</span>
     {#if state === "running"}
-      <button type="button" class="desk-btn" onclick={() => void session.run("timer-pause")}>Pause</button>
+      <button type="button" class="desk-btn" onclick={() => void session.run("timer-pause")}>{t("Pause")}</button>
     {:else}
-      <button type="button" class="desk-btn" onclick={() => void session.run("timer-resume")}>Start</button>
+      <button type="button" class="desk-btn" onclick={() => void session.run("timer-resume")}>{t("Start")}</button>
     {/if}
-    <button type="button" class="desk-btn" onclick={() => void session.run("timer-reset")}>Reset</button>
+    <button type="button" class="desk-btn" onclick={() => void session.run("timer-reset")}>{t("Reset")}</button>
   </div>
 {/if}
 

@@ -1,3 +1,4 @@
+import { msg } from "../i18n/core";
 import type { FloatGeometry, PanelId, PanelPlacement, RegionId, RegionSizes, WorkspaceKind, WorkspaceLayout } from "../domain/types";
 
 export const PANEL_IDS: PanelId[] = [
@@ -13,15 +14,15 @@ export const PANEL_IDS: PanelId[] = [
 ];
 
 export const PANEL_TITLES: Record<PanelId, string> = {
-  service: "Service",
-  preview: "Preview",
-  program: "Program",
-  bible: "Bible",
-  lyrics: "Lyrics",
-  slides: "Slides",
-  media: "Media",
-  theme: "Theme",
-  controls: "Controls",
+  service: msg("Service"),
+  preview: msg("Preview"),
+  program: msg("Program"),
+  bible: msg("Bible"),
+  lyrics: msg("Lyrics"),
+  slides: msg("Slides"),
+  media: msg("Media"),
+  theme: msg("Theme"),
+  controls: msg("Controls"),
 };
 
 export const LIBRARY_PANELS: PanelId[] = ["bible", "lyrics", "slides", "media", "theme"];

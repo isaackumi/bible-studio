@@ -1,3 +1,4 @@
+import { msg, t } from "../i18n/core";
 import {
   addLayer,
   LOWER_THIRD_TEMPLATES,
@@ -19,18 +20,18 @@ export type SharedSource = { id: string; name: string; source: SourceRef };
 export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video" | "qr" | "web" | "ndi";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
-  { type: "camera", label: "Camera" },
-  { type: "scripture", label: "Scripture" },
-  { type: "song", label: "Lyrics" },
-  { type: "text", label: "Text" },
-  { type: "timer", label: "Timer" },
-  { type: "clock", label: "Clock" },
-  { type: "lower-third", label: "Lower third" },
-  { type: "image", label: "Image" },
-  { type: "video", label: "Video" },
-  { type: "qr", label: "QR code" },
-  { type: "web", label: "Website" },
-  { type: "ndi", label: "NDI source" },
+  { type: "camera", label: msg("Camera") },
+  { type: "scripture", label: msg("Scripture") },
+  { type: "song", label: msg("Lyrics") },
+  { type: "text", label: msg("Text") },
+  { type: "timer", label: msg("Timer") },
+  { type: "clock", label: msg("Clock") },
+  { type: "lower-third", label: msg("Lower third") },
+  { type: "image", label: msg("Image") },
+  { type: "video", label: msg("Video") },
+  { type: "qr", label: msg("QR code") },
+  { type: "web", label: msg("Website") },
+  { type: "ndi", label: msg("NDI source") },
 ];
 
 export type SourceFields =
@@ -57,7 +58,7 @@ const KINDS = new Set<string>(SOURCE_KINDS.map((kind) => kind.type));
 const TIMER_MODES: TimerMode[] = ["countdown", "countup", "clock", "target"];
 
 export function sourceKindLabel(type: SourceKind): string {
-  return SOURCE_KINDS.find((kind) => kind.type === type)?.label ?? "Source";
+  return t(SOURCE_KINDS.find((kind) => kind.type === type)?.label ?? "Source");
 }
 
 export function isSourceKind(type: string): type is SourceKind {
@@ -65,7 +66,7 @@ export function isSourceKind(type: string): type is SourceKind {
 }
 
 export function createSharedSource(name: string, source: SourceRef): SharedSource {
-  const kind = isSourceKind(source.type) ? sourceKindLabel(source.type) : "Source";
+  const kind = isSourceKind(source.type) ? sourceKindLabel(source.type) : t("Source");
   return { id: `src:${Math.random().toString(36).slice(2, 10)}`, name: name.trim() || kind, source };
 }
 
@@ -343,7 +344,7 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
     case "text":
       return { type: "text", heading: "", body: "", style: {} };
     case "timer":
-      return { type: "timer", mode: "countdown", durationMs: 10 * 60_000, targetAt: null, label: "Service starts in", warningMs: DEFAULT_TIMER_WARNING_MS, style: {} };
+      return { type: "timer", mode: "countdown", durationMs: 10 * 60_000, targetAt: null, label: msg("Service starts in"), warningMs: DEFAULT_TIMER_WARNING_MS, style: {} };
     case "clock":
       return { type: "clock", label: "", style: {} };
     case "lower-third":

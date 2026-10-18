@@ -4,6 +4,7 @@
   import DeskDialog from "./DeskDialog.svelte";
   import Icon from "../Icon.svelte";
   import { sourceMeta } from "../obs/source-meta";
+  import { t } from "../../i18n/core";
 
   let {
     type,
@@ -37,31 +38,31 @@
   }
 </script>
 
-<DeskDialog title={`Add ${sourceKindLabel(type)}`} {onclose} {returnTo}>
+<DeskDialog title={t("Add {type}", { type: sourceKindLabel(type) })} {onclose} {returnTo}>
   <form class="add" onsubmit={submit} style:--tint={meta.color}>
     <div class="intro">
       <span class="type-icon"><Icon name={meta.icon} size={20} /></span>
-      <p>{meta.blurb}. Name it, then set it up in the next step.</p>
+      <p>{t("{blurb}. Name it, then set it up in the next step.", { blurb: t(meta.blurb) })}</p>
     </div>
 
-    <div class="options" role="radiogroup" aria-label="New or saved">
+    <div class="options" role="radiogroup" aria-label={t("New or saved")}>
       <label class="option" class:on={mode === "new"}>
         <input type="radio" name="add-mode" value="new" bind:group={mode} />
         <span class="option-copy">
-          <strong>A new {sourceKindLabel(type).toLowerCase()}</strong>
+          <strong>{t("A new {type}", { type: sourceKindLabel(type).toLowerCase() })}</strong>
           <!-- svelte-ignore a11y_autofocus -->
-          <input class="field" aria-label="Source name" bind:value={name} autofocus onfocus={() => (mode = "new")} />
+          <input class="field" aria-label={t("Source name")} bind:value={name} autofocus onfocus={() => (mode = "new")} />
         </span>
       </label>
 
       <label class="option" class:on={mode === "existing"} class:disabled={existing.length === 0}>
         <input type="radio" name="add-mode" value="existing" bind:group={mode} disabled={existing.length === 0} />
         <span class="option-copy">
-          <strong>One you already made</strong>
+          <strong>{t("One you already made")}</strong>
           {#if existing.length === 0}
-            <em>None yet. Saved {sourceKindLabel(type).toLowerCase()} sources can be shared by many scenes; edit one and every scene follows.</em>
+            <em>{t("None yet. Saved {type} sources can be shared by many scenes; edit one and every scene follows.", { type: sourceKindLabel(type).toLowerCase() })}</em>
           {:else}
-            <span class="existing" role="listbox" aria-label="Existing sources">
+            <span class="existing" role="listbox" aria-label={t("Existing sources")}>
               {#each existing as entry (entry.id)}
                 <button
                   type="button"
@@ -82,8 +83,8 @@
     </div>
   </form>
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn primary-soft" disabled={!ready} onclick={() => submit()}>{mode === "new" ? "Next: set it up" : "Add to scene"}</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{t("Cancel")}</button>
+    <button type="button" class="desk-btn primary-soft" disabled={!ready} onclick={() => submit()}>{mode === "new" ? t("Next: set it up") : t("Add to scene")}</button>
   {/snippet}
 </DeskDialog>
 

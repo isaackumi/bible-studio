@@ -70,6 +70,7 @@
   import FavoriteStar from "./FavoriteStar.svelte";
   import { favoritesFirst } from "../domain/favorites";
   import LibrarySidebar from "./pew/LibrarySidebar.svelte";
+  import { msg, t, tn } from "../i18n/core";
 
   let draft = $state<Composition | null>(null);
   let selectedId = $state<string | null>(null);
@@ -90,13 +91,13 @@
   let drag = $state<{ layerId: string; handle: LayerDragHandle; startX: number; startY: number; origin: Composition } | null>(null);
   const dragHandles: LayerDragHandle[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
   const ANIMATIONS: [LayerAnimationKind, string][] = [
-    ["none", "None"],
-    ["fade", "Fade"],
-    ["dissolve", "Dissolve"],
-    ["slide-up", "Slide up"],
-    ["slide-down", "Slide down"],
-    ["slide-left", "Slide left"],
-    ["slide-right", "Slide right"],
+    ["none", msg("None")],
+    ["fade", msg("Fade")],
+    ["dissolve", msg("Dissolve")],
+    ["slide-up", msg("Slide up")],
+    ["slide-down", msg("Slide down")],
+    ["slide-left", msg("Slide left")],
+    ["slide-right", msg("Slide right")],
   ];
 
   const saved = $derived(
@@ -107,7 +108,7 @@
   );
 
   type LayoutGroup = "all" | "favorites" | "scripture" | "lyrics" | "camera" | "timer";
-  const LAYOUT_GROUPS: [LayoutGroup, string][] = [["all", "All"], ["favorites", "Favorites"], ["scripture", "Scripture"], ["lyrics", "Lyrics"], ["camera", "Cameras"], ["timer", "Timers"]];
+  const LAYOUT_GROUPS: [LayoutGroup, string][] = [["all", msg("All")], ["favorites", msg("Favorites")], ["scripture", msg("Scripture")], ["lyrics", msg("Lyrics")], ["camera", msg("Cameras")], ["timer", msg("Timers")]];
   let layoutGroup = $state<LayoutGroup>("all");
   /** Which filter chips a layout belongs to, from its slot roles or its name. */
   function groupsOf(template: CompositionTemplate): Set<LayoutGroup> {
@@ -189,7 +190,7 @@
     try {
       const fields = await session.scriptureFields(reference, translationId);
       if (!fields || fields.type !== "scripture" || !draft || !selected) {
-        verseNote = `Nothing found for “${reference.trim()}”. Try a reference like John 3:16 or Psalm 23:1-3.`;
+        verseNote = t("Nothing found for “{reference}”. Try a reference like John 3:16 or Psalm 23:1-3.", { reference: reference.trim() });
         return false;
       }
       scriptureRef = fields.reference;
@@ -200,7 +201,7 @@
       touch(assignScripture(draft, selected.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse, translationId }));
       return true;
     } catch (error) {
-      verseNote = error instanceof Error ? error.message : "That verse could not be loaded.";
+      verseNote = error instanceof Error ? error.message : t("That verse could not be loaded.");
       return false;
     } finally {
       finding = false;
@@ -211,19 +212,19 @@
   async function stepVerse(direction: 1 | -1) {
     const parsed = parseReference(scriptureRef, session.books);
     if (!parsed?.startVerse) {
-      verseNote = "Find a verse first.";
+      verseNote = t("Find a verse first.");
       return;
     }
     const length = (parsed.endVerse ?? parsed.startVerse) - parsed.startVerse + 1;
     const from = parsed.startVerse + direction * length;
     if (from < 1) {
-      verseNote = "That is the first verse of the chapter.";
+      verseNote = t("That is the first verse of the chapter.");
       return;
     }
     const to = from + length - 1;
     const range = length > 1 ? `${from}-${to}` : `${from}`;
     const found = await findVerse(`${parsed.bookName} ${parsed.chapter}:${range}`);
-    if (found === false && direction === 1) verseNote = "That is the end of the chapter.";
+    if (found === false && direction === 1) verseNote = t("That is the end of the chapter.");
   }
 
   // Lyrics regions: pick a song and a section from the library.
@@ -701,10 +702,10 @@
 
 <section class="looks-desk">
   <!-- Library: templates and saved looks -->
-  <LibrarySidebar title="Looks" icon="layout" count={saved.length} storageKey="looks">
+  <LibrarySidebar title={t("Looks")} icon="layout" count={saved.length} storageKey="looks">
     <div class="lib-scroll">
       {#if customLayouts.length > 0}
-        <p class="group">Your layouts <span>{customLayouts.length}</span></p>
+        <p class="group">{t("Your layouts")} <span>{customLayouts.length}</span></p>
         <div class="tiles">
           {#each customLayouts as template (template.id)}
             <div class="tile-wrap">
@@ -721,8 +722,8 @@
                 type="button"
                 class="tile-delete"
                 class:armed={armedDelete === template.id}
-                aria-label={armedDelete === template.id ? `Confirm delete ${template.name}` : `Delete ${template.name}`}
-                title={armedDelete === template.id ? "Click again to delete" : "Delete layout"}
+                aria-label={armedDelete === template.id ? t("Confirm delete {name}", { name: template.name }) : t("Delete {name}", { name: template.name })}
+                title={armedDelete === template.id ? t("Click again to delete") : t("Delete layout")}
                 onclick={() => {
                   if (armedDelete !== template.id) {
                     armedDelete = template.id;
@@ -739,10 +740,10 @@
         </div>
       {/if}
 
-      <p class="group">Start from a layout</p>
-      <div class="layout-chips" role="radiogroup" aria-label="Show layouts">
+      <p class="group">{t("Start from a layout")}</p>
+      <div class="layout-chips" role="radiogroup" aria-label={t("Show layouts")}>
         {#each LAYOUT_GROUPS as [id, label] (id)}
-          <button type="button" role="radio" aria-checked={layoutGroup === id} class:on={layoutGroup === id} onclick={() => (layoutGroup = id)}>{label}</button>
+          <button type="button" role="radio" aria-checked={layoutGroup === id} class:on={layoutGroup === id} onclick={() => (layoutGroup = id)}>{t(label)}</button>
         {/each}
       </div>
       <div class="tiles">
@@ -765,28 +766,28 @@
           </button>
           </div>
         {:else}
-          <p class="empty">No favorite layouts yet. Star a layout to keep it here.</p>
+          <p class="empty">{t("No favorite layouts yet. Star a layout to keep it here.")}</p>
         {/each}
       </div>
 
-      <p class="group">Saved <span>{saved.length}</span></p>
-      {#if saved.length === 0}<p class="empty">Save a look to reuse it in any service.</p>{/if}
+      <p class="group">{t("Saved")} <span>{saved.length}</span></p>
+      {#if saved.length === 0}<p class="empty">{t("Save a look to reuse it in any service.")}</p>{/if}
       <ul class="saved">
         {#each saved as look (look.id)}
           <li class:on={draft?.id === look.id}>
             <FavoriteStar on={session.isFavorite("looks", look.id)} label={look.name} onclick={() => session.toggleFavorite("looks", look.id)} size={13} />
             <button type="button" class="saved-main" onclick={() => openSaved(look)}>
               <strong>{look.name}</strong>
-              <span>{look.layers.length} layer{look.layers.length === 1 ? "" : "s"}{look.locked ? " · locked" : ""}</span>
+              <span>{tn(look.layers.length, "{n} layer", "{n} layers")}{look.locked ? ` · ${t("locked")}` : ""}</span>
             </button>
-            <button type="button" class="tool" title="Duplicate" aria-label={`Duplicate ${look.name}`} onclick={() => { const copy = duplicateLook(look); session.saveLook(copy); openSaved(copy); }}><Icon name="copy" size={14} /></button>
-            <button type="button" class="tool" title="Add to queue" aria-label={`Queue ${look.name}`} onclick={() => void session.addLookToService(look)}><Icon name="queue" size={14} /></button>
+            <button type="button" class="tool" title={t("Duplicate")} aria-label={t("Duplicate {name}", { name: look.name })} onclick={() => { const copy = duplicateLook(look); session.saveLook(copy); openSaved(copy); }}><Icon name="copy" size={14} /></button>
+            <button type="button" class="tool" title={t("Add to queue")} aria-label={t("Queue {name}", { name: look.name })} onclick={() => void session.addLookToService(look)}><Icon name="queue" size={14} /></button>
             <button
               type="button"
               class="tool"
               class:armed={armedDelete === look.id}
-              title={armedDelete === look.id ? "Click again to delete" : "Delete"}
-              aria-label={armedDelete === look.id ? `Confirm delete ${look.name}` : `Delete ${look.name}`}
+              title={armedDelete === look.id ? t("Click again to delete") : t("Delete")}
+              aria-label={armedDelete === look.id ? t("Confirm delete {name}", { name: look.name }) : t("Delete {name}", { name: look.name })}
               onclick={() => deleteSaved(look)}
             ><Icon name="close" size={14} /></button>
           </li>
@@ -799,16 +800,16 @@
   <div class="editor">
     {#if draft}
       <header class="look-head">
-        <input class="look-name" aria-label="Look name" value={draft.name} onchange={(event) => touch(renameComposition(draft!, event.currentTarget.value))} />
+        <input class="look-name" aria-label={t("Look name")} value={draft.name} onchange={(event) => touch(renameComposition(draft!, event.currentTarget.value))} />
         <label class="inline">
-          <span>Transition</span>
+          <span>{t("Transition")}</span>
           <select
-            aria-label="Look transition"
+            aria-label={t("Look transition")}
             value={draft.transition.type}
             onchange={(event) => draft && touch(setCompositionTransition(draft, { type: event.currentTarget.value === "cut" ? "cut" : "fade", ms: draft.transition.ms }))}
           >
-            <option value="fade">Fade</option>
-            <option value="cut">Cut</option>
+            <option value="fade">{t("Fade")}</option>
+            <option value="cut">{t("Cut")}</option>
           </select>
         </label>
         {#if draft.transition.type === "fade"}
@@ -819,35 +820,35 @@
               min="0"
               max="2000"
               step="50"
-              aria-label="Look transition duration"
+              aria-label={t("Look transition duration")}
               value={draft.transition.ms}
               oninput={(event) => draft && touch(setCompositionTransition(draft, { type: "fade", ms: Number(event.currentTarget.value) }))}
             />
-            <span>ms</span>
+            <span>{t("ms")}</span>
           </label>
         {/if}
-        <div class="edges" role="radiogroup" aria-label="Where regions meet">
-          <span>Edges</span>
-          {#each [["touch", "Touching"], ["line", "Line"], ["framed", "Framed"]] as [value, label] (value)}
+        <div class="edges" role="radiogroup" aria-label={t("Where regions meet")}>
+          <span>{t("Edges")}</span>
+          {#each [["touch", msg("Touching")], ["line", msg("Line")], ["framed", msg("Framed")]] as [value, label] (value)}
             <button
               type="button"
               role="radio"
               aria-checked={(draft.edges ?? DEFAULT_EDGES) === value}
               class:on={(draft.edges ?? DEFAULT_EDGES) === value}
-              title={value === "touch" ? "Regions meet with no line" : value === "line" ? "A clear line around each region" : "Each region on its own panel, with a gap"}
+              title={value === "touch" ? t("Regions meet with no line") : value === "line" ? t("A clear line around each region") : t("Each region on its own panel, with a gap")}
               onclick={() => draft && touch(setCompositionEdges(draft, value as "touch" | "line" | "framed"))}
-            >{label}</button>
+            >{t(label)}</button>
           {/each}
         </div>
         <div class="head-actions">
-          <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> Preview</button>
-          <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>Save look</button>
-          <button type="button" class="desk-btn" title="Save this arrangement as a layout to start from again" onclick={() => draft && session.saveLookLayout(draft)}>Save as layout</button>
+          <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> {t("Preview")}</button>
+          <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>{t("Save look")}</button>
+          <button type="button" class="desk-btn" title={t("Save this arrangement as a layout to start from again")} onclick={() => draft && session.saveLookLayout(draft)}>{t("Save as layout")}</button>
           <button
             type="button"
             class="desk-btn ghost icon"
-            title="Duplicate look"
-            aria-label="Duplicate look"
+            title={t("Duplicate look")}
+            aria-label={t("Duplicate look")}
             onclick={() => {
               if (!draft) return;
               const copy = duplicateLook(draft);
@@ -857,33 +858,33 @@
               session.previewLook(copy);
             }}
           ><Icon name="copy" size={14} /></button>
-          <button type="button" class="desk-btn ghost icon" title="Add to queue" aria-label="Queue" onclick={() => draft && void session.addLookToService(draft)}><Icon name="queue" size={14} /></button>
+          <button type="button" class="desk-btn ghost icon" title={t("Add to queue")} aria-label={t("Queue")} onclick={() => draft && void session.addLookToService(draft)}><Icon name="queue" size={14} /></button>
         </div>
       </header>
     {:else}
       <header class="look-head empty-head">
-        <p>Pick a layout or a saved look. It goes to <b>Preview</b> to arrange; <b>Go live</b> shows it to the audience.</p>
+        <p>{t("Pick a layout or a saved look. It goes to")} <b>{t("Preview")}</b> {t("to arrange;")} <b>{t("Go live")}</b> {t("shows it to the audience.")}</p>
       </header>
     {/if}
 
     <figure class="edit-frame">
       <figcaption>
-        <span class="kicker">Preview</span>
-        <span class="hint">{draft ? "Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)" : "Nothing to arrange yet"}</span>
+        <span class="kicker">{t("Preview")}</span>
+        <span class="hint">{draft ? t("Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)") : t("Nothing to arrange yet")}</span>
         {#if draft && !draft.locked}
-          <button type="button" class="swap-sides" title="Mirror the layout left to right" onclick={() => touch(swapSides(draft!))}><Icon name="transition" size={14} /> Swap sides</button>
+          <button type="button" class="swap-sides" title={t("Mirror the layout left to right")} onclick={() => touch(swapSides(draft!))}><Icon name="transition" size={14} /> {t("Swap sides")}</button>
         {/if}
       </figcaption>
       <div
         class="monitor preview-edit"
         bind:this={previewFrame}
         role="region"
-        aria-label="Composition preview editor"
+        aria-label={t("Composition preview editor")}
         onpointermove={moveDrag}
         onpointerup={endDrag}
         onpointercancel={endDrag}
       >
-        <Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide.">
+        <Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")}>
           {#snippet overlay()}
             {#if draft && session.live.preview.model.layout === "composition"}
               {#each draft.layers.filter((layer) => layer.visible) as layer (layer.id)}
@@ -896,7 +897,7 @@
                   style:height="{layer.bounds.h}%"
                   role="button"
                   tabindex="0"
-                  aria-label="Move {layer.name}"
+                  aria-label={t("Move {name}", { name: layer.name })}
                   onpointerdown={(event) => { selectedId = layer.id; startDrag(layer.id, "move", event); }}
                   onkeydown={(event) => {
                     const step = event.shiftKey ? 5 : 1;
@@ -911,7 +912,7 @@
                   {#if selected?.id === layer.id}<span class="frame-label">{layer.name}</span>{/if}
                   {#if selected?.id === layer.id && !layer.locked}
                     {#each dragHandles as handle (handle)}
-                      <button type="button" class="handle {handle}" aria-label="Resize {layer.name} {handle}" onpointerdown={(event) => startDrag(layer.id, handle, event)}></button>
+                      <button type="button" class="handle {handle}" aria-label={t("Resize {name} {handle}", { name: layer.name, handle })} onpointerdown={(event) => startDrag(layer.id, handle, event)}></button>
                     {/each}
                   {/if}
                 </div>
@@ -923,9 +924,9 @@
     </figure>
 
     {#if draft}
-      <section class="layers-panel" aria-label="Layers">
+      <section class="layers-panel" aria-label={t("Layers")}>
         <header>
-          <span class="kicker">Layers <span class="count">{draft.layers.length}</span></span>
+          <span class="kicker">{t("Layers")} <span class="count">{draft.layers.length}</span></span>
           <button
             type="button"
             class="desk-btn"
@@ -934,7 +935,7 @@
               selectedId = next.layers[next.layers.length - 1]?.id ?? null;
               touch(next);
             }}
-          ><Icon name="plus" size={14} /> Add layer</button>
+          ><Icon name="plus" size={14} /> {t("Add layer")}</button>
         </header>
         <ul class="layers">
           {#each draft.layers as layer, n (layer.id)}
@@ -944,12 +945,12 @@
                 <strong>{layer.name}</strong>
                 <span class="layer-kind">{layer.source.type === "song" ? "lyrics" : layer.source.type}</span>
               </button>
-              <button type="button" class="tool" title="Move up" aria-label={`Move ${layer.name} up`} disabled={n === 0} onclick={() => touch(reorderLayers(draft!, layer.id, -1))}><Icon name="chevron-up" size={14} /></button>
-              <button type="button" class="tool" title="Move down" aria-label={`Move ${layer.name} down`} disabled={n === draft.layers.length - 1} onclick={() => touch(reorderLayers(draft!, layer.id, 1))}><Icon name="chevron-down" size={14} /></button>
-              <button type="button" class="tool" class:off={!layer.visible} title={layer.visible ? "Hide" : "Show"} aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`} onclick={() => touch(layer.visible ? hideLayer(draft!, layer.id) : showLayer(draft!, layer.id))}><Icon name={layer.visible ? "eye" : "eye-off"} size={14} /></button>
-              <button type="button" class="tool" class:lit={layer.locked} title={layer.locked ? "Unlock" : "Lock"} aria-label={layer.locked ? `Unlock ${layer.name}` : `Lock ${layer.name}`} onclick={() => touch(setLayerLocked(draft!, layer.id, !layer.locked))}><Icon name={layer.locked ? "lock" : "lock-open"} size={14} /></button>
-              <button type="button" class="tool" title="Duplicate" aria-label={`Duplicate ${layer.name}`} onclick={() => { const next = duplicateLayer(draft!, layer.id); selectedId = next.layers[next.layers.length - 1]?.id ?? selectedId; touch(next); }}><Icon name="copy" size={14} /></button>
-              <button type="button" class="tool" title="Remove" aria-label={`Remove ${layer.name}`} onclick={() => { const next = removeLayer(draft!, layer.id); selectedId = next.layers.find((entry) => entry.id === selectedId)?.id ?? next.layers[0]?.id ?? null; touch(next); }}><Icon name="close" size={14} /></button>
+              <button type="button" class="tool" title={t("Move up")} aria-label={t("Move {name} up", { name: layer.name })} disabled={n === 0} onclick={() => touch(reorderLayers(draft!, layer.id, -1))}><Icon name="chevron-up" size={14} /></button>
+              <button type="button" class="tool" title={t("Move down")} aria-label={t("Move {name} down", { name: layer.name })} disabled={n === draft.layers.length - 1} onclick={() => touch(reorderLayers(draft!, layer.id, 1))}><Icon name="chevron-down" size={14} /></button>
+              <button type="button" class="tool" class:off={!layer.visible} title={layer.visible ? t("Hide") : t("Show")} aria-label={layer.visible ? t("Hide {name}", { name: layer.name }) : t("Show {name}", { name: layer.name })} onclick={() => touch(layer.visible ? hideLayer(draft!, layer.id) : showLayer(draft!, layer.id))}><Icon name={layer.visible ? "eye" : "eye-off"} size={14} /></button>
+              <button type="button" class="tool" class:lit={layer.locked} title={layer.locked ? t("Unlock") : t("Lock")} aria-label={layer.locked ? t("Unlock {name}", { name: layer.name }) : t("Lock {name}", { name: layer.name })} onclick={() => touch(setLayerLocked(draft!, layer.id, !layer.locked))}><Icon name={layer.locked ? "lock" : "lock-open"} size={14} /></button>
+              <button type="button" class="tool" title={t("Duplicate")} aria-label={t("Duplicate {name}", { name: layer.name })} onclick={() => { const next = duplicateLayer(draft!, layer.id); selectedId = next.layers[next.layers.length - 1]?.id ?? selectedId; touch(next); }}><Icon name="copy" size={14} /></button>
+              <button type="button" class="tool" title={t("Remove")} aria-label={t("Remove {name}", { name: layer.name })} onclick={() => { const next = removeLayer(draft!, layer.id); selectedId = next.layers.find((entry) => entry.id === selectedId)?.id ?? next.layers[0]?.id ?? null; touch(next); }}><Icon name="close" size={14} /></button>
             </li>
           {/each}
         </ul>
@@ -961,83 +962,83 @@
   <aside class="side">
     <figure class="screen program" class:on-air={programLive}>
       <figcaption>
-        <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
-        <span class="hint">{programLive ? "Audience sees this" : "Nothing live"}</span>
+        <span class="kicker">{#if programLive}<span class="dot"></span>{/if}{t("Program")}</span>
+        <span class="hint">{programLive ? t("Audience sees this") : t("Nothing live")}</span>
       </figcaption>
-      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
+      <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
     </figure>
 
     {#if draft && selected}
-      <section class="inspector" aria-label="Layer settings">
-        <header><span class="kicker">Layer</span><span class="hint">{selected.name}</span></header>
+      <section class="inspector" aria-label={t("Layer settings")}>
+        <header><span class="kicker">{t("Layer")}</span><span class="hint">{selected.name}</span></header>
         <div class="group-box">
-          <label>Name <input aria-label="Layer name" value={selected.name} onchange={(event) => draft && selected && touch(renameLayer(draft, selected.id, event.currentTarget.value))} /></label>
-          <label>Source
-            <select aria-label="Layer source" value={selected.source.type} onchange={(event) => assign(event.currentTarget.value as SourceType)}>
-              <option value="empty">Empty</option>
-              <option value="scripture">Scripture</option>
-              <option value="song">Lyrics</option>
-              <option value="image">Image</option>
-              <option value="camera">Camera</option>
-              <option value="timer">Timer</option>
-              <option value="lower-third">Lower third</option>
-              <option value="text">Text</option>
+          <label>{t("Name")} <input aria-label={t("Layer name")} value={selected.name} onchange={(event) => draft && selected && touch(renameLayer(draft, selected.id, event.currentTarget.value))} /></label>
+          <label>{t("Source")}
+            <select aria-label={t("Layer source")} value={selected.source.type} onchange={(event) => assign(event.currentTarget.value as SourceType)}>
+              <option value="empty">{t("Empty")}</option>
+              <option value="scripture">{t("Scripture")}</option>
+              <option value="song">{t("Lyrics")}</option>
+              <option value="image">{t("Image")}</option>
+              <option value="camera">{t("Camera")}</option>
+              <option value="timer">{t("Timer")}</option>
+              <option value="lower-third">{t("Lower third")}</option>
+              <option value="text">{t("Text")}</option>
             </select>
           </label>
         </div>
 
         <div class="group-box">
-          <p class="box-title">Content</p>
+          <p class="box-title">{t("Content")}</p>
           {#if selected.source.type === "scripture"}
             <form class="verse-find" onsubmit={(event) => { event.preventDefault(); void findVerse(verseQuery); }}>
               <label class="find-field">
                 <Icon name="search" size={14} />
-                <input aria-label="Find a verse" placeholder="John 3:16, 1 Cor 13:4-7, Psalm 23" bind:value={verseQuery} />
+                <input aria-label={t("Find a verse")} placeholder={t("John 3:16, 1 Cor 13:4-7, Psalm 23")} bind:value={verseQuery} />
               </label>
               <div class="find-row">
-                <select aria-label="Translation" bind:value={verseTranslation}>
+                <select aria-label={t("Translation")} bind:value={verseTranslation}>
                   {#each session.translations as translation (translation.id)}<option value={translation.id}>{translation.abbreviation}</option>{/each}
                 </select>
-                <button type="submit" class="desk-btn primary-soft" disabled={!verseQuery.trim() || finding}>{finding ? "Finding…" : "Show"}</button>
+                <button type="submit" class="desk-btn primary-soft" disabled={!verseQuery.trim() || finding}>{finding ? t("Finding…") : t("Show")}</button>
               </div>
               {#if verseNote}<p class="note">{verseNote}</p>{/if}
             </form>
             <div class="verse-step">
-              <button type="button" class="desk-btn ghost icon" aria-label="Previous verse" title="Previous verse" disabled={finding} onclick={() => void stepVerse(-1)}><Icon name="chevron-left" size={14} /></button>
-              <strong title={scriptureRef}>{scriptureRef || "No verse yet"}</strong>
-              <button type="button" class="desk-btn ghost icon" aria-label="Next verse" title="Next verse" disabled={finding} onclick={() => void stepVerse(1)}><Icon name="chevron-right" size={14} /></button>
+              <button type="button" class="desk-btn ghost icon" aria-label={t("Previous verse")} title={t("Previous verse")} disabled={finding} onclick={() => void stepVerse(-1)}><Icon name="chevron-left" size={14} /></button>
+              <strong title={scriptureRef}>{scriptureRef || t("No verse yet")}</strong>
+              <button type="button" class="desk-btn ghost icon" aria-label={t("Next verse")} title={t("Next verse")} disabled={finding} onclick={() => void stepVerse(1)}><Icon name="chevron-right" size={14} /></button>
             </div>
             {#if session.workspace.favorites.passages.length > 0}
-              <div class="chips" aria-label="Favorite verses">
+              <div class="chips" aria-label={t("Favorite verses")}>
                 {#each session.workspace.favorites.passages.slice(0, 10) as item (`${item.bookOrd}:${item.chapter}:${item.startVerse}-${item.endVerse}`)}
                   <button type="button" class="chip" class:on={scriptureRef === item.reference} onclick={() => void findVerse(item.reference, item.translationId)}><span class="chip-star">★</span>{item.reference}</button>
                 {/each}
               </div>
             {/if}
-            <button type="button" class="desk-btn" onclick={() => assign("scripture")}>Use the verse on the Presenter Desk</button>
+            <button type="button" class="desk-btn" onclick={() => assign("scripture")}>{t("Use the verse on the Presenter Desk")}</button>
             <details class="by-hand">
-              <summary>Edit the words by hand</summary>
-              <input aria-label="Scripture reference" placeholder="Reference" bind:value={scriptureRef} oninput={(event) => { scriptureRef = event.currentTarget.value; applyScriptureCopy(); }} />
-              <textarea aria-label="Scripture body" placeholder="Verse text" rows="3" bind:value={scriptureBody} oninput={(event) => { scriptureBody = event.currentTarget.value; applyScriptureCopy(); }}></textarea>
-              <input aria-label="Scripture attribution" placeholder="Attribution" bind:value={scriptureAttr} oninput={(event) => { scriptureAttr = event.currentTarget.value; applyScriptureCopy(); }} />
+              <summary>{t("Edit the words by hand")}</summary>
+              <input aria-label={t("Scripture reference")} placeholder={t("Reference")} bind:value={scriptureRef} oninput={(event) => { scriptureRef = event.currentTarget.value; applyScriptureCopy(); }} />
+              <textarea aria-label={t("Scripture body")} placeholder={t("Verse text")} rows="3" bind:value={scriptureBody} oninput={(event) => { scriptureBody = event.currentTarget.value; applyScriptureCopy(); }}></textarea>
+              <input aria-label={t("Scripture attribution")} placeholder={t("Attribution")} bind:value={scriptureAttr} oninput={(event) => { scriptureAttr = event.currentTarget.value; applyScriptureCopy(); }} />
             </details>
           {:else if selected.source.type === "song"}
-            <select aria-label="Song" value={lookSongId} onchange={(event) => (lookSongId = event.currentTarget.value)}>
-              <option value="">Pick a song…</option>
-              {#each session.songsByFavorite as song (song.id)}<option value={song.id}>{session.isFavorite("songs", song.id) ? "★ " : ""}{song.title || "Untitled song"}</option>{/each}
+            <select aria-label={t("Song")} value={lookSongId} onchange={(event) => (lookSongId = event.currentTarget.value)}>
+              <option value="">{t("Pick a song…")}</option>
+              {#each session.songsByFavorite as song (song.id)}<option value={song.id}>{session.isFavorite("songs", song.id) ? "★ " : ""}{song.title || t("Untitled song")}</option>{/each}
             </select>
             {#if lookSong}
-              <div class="chips" aria-label="Song sections">
+              <div class="chips" aria-label={t("Song sections")}>
                 {#each lookSong.sections as section (section.id)}
                   <button type="button" class="chip" class:on={songLabel === `${lookSong.title} — ${section.label}` || songLabel === section.label} onclick={() => useSongSection(section.id)}>{section.label}</button>
                 {/each}
               </div>
             {/if}
-            <input aria-label="Lyrics label" placeholder="Section" bind:value={songLabel} oninput={(event) => { songLabel = event.currentTarget.value; applySongCopy(); }} />
-            <textarea aria-label="Lyrics body" placeholder="Lines" rows="4" bind:value={songBody} oninput={(event) => { songBody = event.currentTarget.value; applySongCopy(); }}></textarea>
-            <button type="button" class="desk-btn" onclick={() => assign("song")}>Use the lyrics on Preview</button>
+            <input aria-label={t("Lyrics label")} placeholder={t("Section")} bind:value={songLabel} oninput={(event) => { songLabel = event.currentTarget.value; applySongCopy(); }} />
+            <textarea aria-label={t("Lyrics body")} placeholder={t("Lines")} rows="4" bind:value={songBody} oninput={(event) => { songBody = event.currentTarget.value; applySongCopy(); }}></textarea>
+            <button type="button" class="desk-btn" onclick={() => assign("song")}>{t("Use the lyrics on Preview")}</button>
           {:else if selected.source.type === "camera"}
-            <p class="note">{session.cameraNote || "Pick the camera for this region."}</p>
+            <p class="note">{session.cameraNote || t("Pick the camera for this region.")}</p>
             <div class="chips">
               {#each session.cameras as camera (camera.deviceId)}
                 <button type="button" class="chip" class:on={selected.source.payload.deviceId === camera.deviceId} onclick={() => touch(assignLayerSource(draft!, selected.id, sourceRef("camera", camera.deviceId, camera.label, { deviceId: camera.deviceId, label: camera.label })))}>{camera.label}</button>
@@ -1045,7 +1046,7 @@
             </div>
           {:else if selected.source.type === "image"}
             {#if !session.media.some((asset) => asset.kind === "image")}
-              <p class="note">No images yet. Import them in the Production Desk's Media panel.</p>
+              <p class="note">{t("No images yet. Import them in the Production Desk's Media panel.")}</p>
             {/if}
             <div class="chips">
               {#each session.mediaByFavorite.filter((asset) => asset.kind === "image") as asset (asset.id)}
@@ -1062,34 +1063,34 @@
               {/each}
             </div>
           {:else if selected.source.type === "lower-third"}
-            <input aria-label="Lower third title" placeholder="Title" bind:value={lowerTitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
-            <input aria-label="Lower third subtitle" placeholder="Subtitle" bind:value={lowerSubtitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
+            <input aria-label={t("Lower third title")} placeholder={t("Title")} bind:value={lowerTitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
+            <input aria-label={t("Lower third subtitle")} placeholder={t("Subtitle")} bind:value={lowerSubtitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
             <div class="chips">
               {#each LOWER_THIRD_TEMPLATES as template (template.id)}
                 <button type="button" class="chip" class:on={selected.source.payload.templateId === template.id} onclick={() => applyLowerThird(template)}>{template.name}</button>
               {/each}
             </div>
           {:else if selected.source.type === "text"}
-            <input aria-label="Announcement heading" placeholder="Heading" bind:value={textHeading} oninput={(event) => { textHeading = event.currentTarget.value; assign("text"); }} />
-            <textarea aria-label="Announcement body" placeholder="Body" rows="4" bind:value={textBody} oninput={(event) => { textBody = event.currentTarget.value; assign("text"); }}></textarea>
+            <input aria-label={t("Announcement heading")} placeholder={t("Heading")} bind:value={textHeading} oninput={(event) => { textHeading = event.currentTarget.value; assign("text"); }} />
+            <textarea aria-label={t("Announcement body")} placeholder={t("Body")} rows="4" bind:value={textBody} oninput={(event) => { textBody = event.currentTarget.value; assign("text"); }}></textarea>
           {:else if selected.source.type === "timer"}
-            <label>Label <input aria-label="Timer label" bind:value={timerLabel} onchange={() => assign("timer")} /></label>
-            <label>Mode
-              <select aria-label="Timer mode" bind:value={timerMode} onchange={() => assign("timer")}>
-                <option value="countdown">Countdown</option>
-                <option value="countup">Count up</option>
-                <option value="clock">Clock</option>
-                <option value="target">Target time</option>
+            <label>{t("Label")} <input aria-label={t("Timer label")} bind:value={timerLabel} onchange={() => assign("timer")} /></label>
+            <label>{t("Mode")}
+              <select aria-label={t("Timer mode")} bind:value={timerMode} onchange={() => assign("timer")}>
+                <option value="countdown">{t("Countdown")}</option>
+                <option value="countup">{t("Count up")}</option>
+                <option value="clock">{t("Clock")}</option>
+                <option value="target">{t("Target time")}</option>
               </select>
             </label>
             {#if timerMode === "countdown" || timerMode === "countup"}
-              <label>Minutes <input type="number" min="1" max="180" bind:value={timerMinutes} onchange={() => assign("timer")} /></label>
+              <label>{t("Minutes")} <input type="number" min="1" max="180" bind:value={timerMinutes} onchange={() => assign("timer")} /></label>
             {/if}
             {#if timerMode === "target"}
-              <label>At <input type="time" aria-label="Target time" bind:value={timerClock} onchange={() => assign("timer")} /></label>
+              <label>{t("At")} <input type="time" aria-label={t("Target time")} bind:value={timerClock} onchange={() => assign("timer")} /></label>
             {/if}
           {:else}
-            <p class="note">Choose a source above to fill this region.</p>
+            <p class="note">{t("Choose a source above to fill this region.")}</p>
           {/if}
           {#if ["scripture", "song", "text", "lower-third", "timer", "clock"].includes(selected.source.type)}
             <TextStyleEditor style={parseTextStyle(selected.source.payload.style)} onchange={(style) => { if (draft && selected) touch(setLayerStyle(draft, selected.id, style)); }} />
@@ -1097,7 +1098,7 @@
         </div>
 
         <div class="group-box">
-          <p class="box-title">Position {#if selected.locked}<span class="hint">· locked</span>{/if}</p>
+          <p class="box-title">{t("Position")} {#if selected.locked}<span class="hint">{t("· locked")}</span>{/if}</p>
           <div class="grid4">
             <label>X <input type="number" min="0" max="100" aria-label="X" disabled={selected.locked} value={Math.round(selected.bounds.x * 10) / 10} oninput={(event) => setBound("x", Number(event.currentTarget.value))} /></label>
             <label>Y <input type="number" min="0" max="100" aria-label="Y" disabled={selected.locked} value={Math.round(selected.bounds.y * 10) / 10} oninput={(event) => setBound("y", Number(event.currentTarget.value))} /></label>
@@ -1105,51 +1106,51 @@
             <label>H <input type="number" min="1" max="100" aria-label="H" disabled={selected.locked} value={Math.round(selected.bounds.h * 10) / 10} oninput={(event) => setBound("h", Number(event.currentTarget.value))} /></label>
           </div>
           <div class="grid2">
-            <label>Opacity % <input type="number" min="0" max="100" aria-label="Layer opacity" value={Math.round(selected.opacity * 100)} oninput={(event) => setOpacity(Number(event.currentTarget.value))} /></label>
-            <label>Fit
-              <select aria-label="Layer fit" value={selected.fit} onchange={(event) => draft && selected && touch(setLayerFit(draft, selected.id, event.currentTarget.value as "contain" | "cover" | "fill"))}>
-                <option value="contain">Contain</option>
-                <option value="cover">Cover</option>
-                <option value="fill">Fill</option>
+            <label>{t("Opacity %")} <input type="number" min="0" max="100" aria-label={t("Layer opacity")} value={Math.round(selected.opacity * 100)} oninput={(event) => setOpacity(Number(event.currentTarget.value))} /></label>
+            <label>{t("Fit")}
+              <select aria-label={t("Layer fit")} value={selected.fit} onchange={(event) => draft && selected && touch(setLayerFit(draft, selected.id, event.currentTarget.value as "contain" | "cover" | "fill"))}>
+                <option value="contain">{t("Contain")}</option>
+                <option value="cover">{t("Cover")}</option>
+                <option value="fill">{t("Fill")}</option>
               </select>
             </label>
           </div>
         </div>
 
         <details class="group-box">
-          <summary class="box-title">Motion</summary>
+          <summary class="box-title">{t("Motion")}</summary>
           <div class="grid2">
-            <label>Entrance
-              <select aria-label="Layer entrance" value={selected.animation.entrance} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}>
-                {#each ANIMATIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
+            <label>{t("Entrance")}
+              <select aria-label={t("Layer entrance")} value={selected.animation.entrance} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}>
+                {#each ANIMATIONS as [value, label] (value)}<option {value}>{t(label)}</option>{/each}
               </select>
             </label>
-            <label>Exit
-              <select aria-label="Layer exit" value={selected.animation.exit} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { exit: event.currentTarget.value as LayerAnimationKind }))}>
-                {#each ANIMATIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
+            <label>{t("Exit")}
+              <select aria-label={t("Layer exit")} value={selected.animation.exit} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { exit: event.currentTarget.value as LayerAnimationKind }))}>
+                {#each ANIMATIONS as [value, label] (value)}<option {value}>{t(label)}</option>{/each}
               </select>
             </label>
-            <label>Duration ms
-              <input type="number" min="0" max="2000" step="50" aria-label="Layer animation duration" value={selected.animation.durationMs} oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { durationMs: Number(event.currentTarget.value) }))} />
+            <label>{t("Duration ms")}
+              <input type="number" min="0" max="2000" step="50" aria-label={t("Layer animation duration")} value={selected.animation.durationMs} oninput={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { durationMs: Number(event.currentTarget.value) }))} />
             </label>
-            <label>Easing
-              <select aria-label="Layer easing" value={selected.animation.easing} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { easing: event.currentTarget.value as LayerAnimation["easing"] }))}>
-                <option value="ease-out">Ease out</option>
-                <option value="ease">Ease</option>
-                <option value="ease-in">Ease in</option>
-                <option value="linear">Linear</option>
+            <label>{t("Easing")}
+              <select aria-label={t("Layer easing")} value={selected.animation.easing} onchange={(event) => draft && selected && touch(setLayerAnimation(draft, selected.id, { easing: event.currentTarget.value as LayerAnimation["easing"] }))}>
+                <option value="ease-out">{t("Ease out")}</option>
+                <option value="ease">{t("Ease")}</option>
+                <option value="ease-in">{t("Ease in")}</option>
+                <option value="linear">{t("Linear")}</option>
               </select>
             </label>
           </div>
         </details>
 
         <div class="clears">
-          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearLowerThird(draft))}>Clear overlay</button>
-          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearTimer(draft))}>Clear timer</button>
+          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearLowerThird(draft))}>{t("Clear overlay")}</button>
+          <button type="button" class="desk-btn ghost" onclick={() => draft && touch(clearTimer(draft))}>{t("Clear timer")}</button>
         </div>
       </section>
     {:else}
-      <p class="side-empty">Select a layer to edit its source, position and motion.</p>
+      <p class="side-empty">{t("Select a layer to edit its source, position and motion.")}</p>
     {/if}
   </aside>
 </section>

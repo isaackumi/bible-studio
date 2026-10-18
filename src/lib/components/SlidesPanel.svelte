@@ -6,6 +6,7 @@
   import DeckLibrary from "./decks/DeckLibrary.svelte";
   import Icon from "./Icon.svelte";
   import TextStyleEditor from "./TextStyleEditor.svelte";
+  import { t } from "../i18n/core";
 
   // Slide decks plus the service's quick slides. Pages and slides go to Preview; LIVE or TAKE sends Program.
   let note = $state("");
@@ -41,8 +42,8 @@
   }
 
   async function ensureService() {
-    if (!session.service) await session.createService("Sunday Service");
-    if (!session.service?.sections.length) session.addSection("Service");
+    if (!session.service) await session.createService(t("Sunday Service"));
+    if (!session.service?.sections.length) session.addSection(t("Service"));
   }
 
   async function createSlide() {
@@ -64,7 +65,7 @@
       else await session.importDocument(file.name, await file.text());
       note = session.message;
     } catch (error) {
-      note = error instanceof Error ? error.message : "The file was not imported.";
+      note = error instanceof Error ? error.message : t("The file was not imported.");
     }
   }
 </script>
@@ -72,35 +73,35 @@
 <section class="slides">
   <DeckLibrary onedit={(id) => (editingDeckId = id)} />
   <div class="slide-bar">
-    <span class="service-slides">Service slides</span>
-    <button type="button" class="new-slide" onclick={() => void createSlide()}><Icon name="plus" size={14} /> Slide</button>
-    <button type="button" class="new-slide" onclick={() => slideImport?.click()}>Import text</button>
+    <span class="service-slides">{t("Service slides")}</span>
+    <button type="button" class="new-slide" onclick={() => void createSlide()}><Icon name="plus" size={14} /> {t("Slide")}</button>
+    <button type="button" class="new-slide" onclick={() => slideImport?.click()}>{t("Import text")}</button>
     <input
       bind:this={slideImport}
       type="file"
       accept=".txt,.md,.markdown,.text,.pdf,.pptx,text/plain,text/markdown,application/pdf"
       hidden
-      aria-label="Import text or Markdown"
+      aria-label={t("Import text or Markdown")}
       onchange={(event) => void importSlides(event)}
     />
-    <input placeholder="Search for slide title or content" aria-label="Search slides" bind:value={slideQuery} />
+    <input placeholder={t("Search for slide title or content")} aria-label={t("Search slides")} bind:value={slideQuery} />
   </div>
   {#if note}<p class="note">{note}</p>{/if}
   <div class="slide-row">
     {#each visibleSlides as item, index (item.id)}
       <button type="button" class="card" class:hot={index % 3 !== 2} class:cool={index % 3 === 2} onclick={(event) => { event.currentTarget.blur(); void session.selectItem(item.id); }}>
         <strong>{item.title}</strong>
-        <span>{item.kind === "announcement" ? "Announcement" : "Slide"}</span>
+        <span>{item.kind === "announcement" ? t("Announcement") : t("Slide")}</span>
       </button>
     {/each}
   </div>
   {#if editingSlide}
     {@const slideText = editingSlide.slide ?? editingSlide.announcement ?? { heading: "", body: "" }}
     <div class="slide-editor">
-      <input aria-label="Slide heading" placeholder="Heading" value={slideText.heading} oninput={(event) => patchSlide({ heading: event.currentTarget.value })} />
-      <textarea aria-label="Slide body" rows="4" placeholder="Body text" value={slideText.body} oninput={(event) => patchSlide({ body: event.currentTarget.value })}></textarea>
+      <input aria-label={t("Slide heading")} placeholder={t("Heading")} value={slideText.heading} oninput={(event) => patchSlide({ heading: event.currentTarget.value })} />
+      <textarea aria-label={t("Slide body")} rows="4" placeholder={t("Body text")} value={slideText.body} oninput={(event) => patchSlide({ body: event.currentTarget.value })}></textarea>
       <TextStyleEditor style={editingSlide.style ?? {}} onchange={(style) => patchSlide({ style })} />
-      <p class="note">Edits show on Preview. LIVE sends Program.</p>
+      <p class="note">{t("Edits show on Preview. LIVE sends Program.")}</p>
     </div>
   {/if}
 </section>

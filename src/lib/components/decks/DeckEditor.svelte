@@ -18,6 +18,7 @@
   import DeckThumb from "./DeckThumb.svelte";
   import ElementInspector from "./ElementInspector.svelte";
   import PageCanvas from "./PageCanvas.svelte";
+  import { t } from "../../i18n/core";
 
   // Full-screen deck editor. Edits stay in a draft until "Save changes"; Program never changes here.
   let { deck, onclose }: { deck: SlideDeck; onclose: () => void } = $props();
@@ -95,7 +96,7 @@
   }
 
   function addText() {
-    const next = addTextElement(page, "New text", { x: 20, y: 40, w: 60, h: 18 }, { size: 72, color: "#ffffff" });
+    const next = addTextElement(page, t("New text"), { x: 20, y: 40, w: 60, h: 18 }, { size: 72, color: "#ffffff" });
     commitPage(next);
     selectedId = next.layers.at(-1)?.id ?? null;
   }
@@ -155,20 +156,20 @@
 
 <svelte:window onkeydowncapture={onkeydown} />
 
-<div class="deck-editor" role="dialog" aria-modal="true" aria-label={`Edit ${draft.name}`}>
+<div class="deck-editor" role="dialog" aria-modal="true" aria-label={t("Edit {name}", { name: draft.name })}>
   <header>
-    <input class="deck-name" aria-label="Deck name" value={draft.name} onchange={(event) => commitDeck({ ...draft, name: event.currentTarget.value.trim() || draft.name })} />
+    <input class="deck-name" aria-label={t("Deck name")} value={draft.name} onchange={(event) => commitDeck({ ...draft, name: event.currentTarget.value.trim() || draft.name })} />
     <div class="history">
-      <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!undoStack.length} onclick={undo}>↶</button>
-      <button type="button" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!redoStack.length} onclick={redo}>↷</button>
+      <button type="button" aria-label={t("Undo")} title={t("Undo (⌘Z)")} disabled={!undoStack.length} onclick={undo}>↶</button>
+      <button type="button" aria-label={t("Redo")} title={t("Redo (⇧⌘Z)")} disabled={!redoStack.length} onclick={redo}>↷</button>
     </div>
-    <span class="status">{dirty ? "Unsaved changes" : "Saved"}</span>
-    <button type="button" class="save" disabled={!dirty} onclick={save}>Save changes</button>
-    <button type="button" class="close" class:warn={confirmClose} onclick={close}>{confirmClose ? "Discard changes?" : "Close"}</button>
+    <span class="status">{dirty ? t("Unsaved changes") : t("Saved")}</span>
+    <button type="button" class="save" disabled={!dirty} onclick={save}>{t("Save changes")}</button>
+    <button type="button" class="close" class:warn={confirmClose} onclick={close}>{confirmClose ? t("Discard changes?") : t("Close")}</button>
   </header>
 
   <div class="body">
-    <aside class="pages" aria-label="Pages">
+    <aside class="pages" aria-label={t("Pages")}>
       <ol>
         {#each draft.pages as entry, index (entry.id)}
           <li
@@ -187,31 +188,31 @@
             }}
             ondragend={() => (dragFrom = null)}
           >
-            <button type="button" class="page" aria-label={`Page ${index + 1}`} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
+            <button type="button" class="page" aria-label={t("Page {index}", { index: index + 1 })} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
               <span class="num">{index + 1}</span>
               <DeckThumb page={entry} />
             </button>
             <div class="page-actions">
-              <button type="button" aria-label={`Duplicate page ${index + 1}`} onclick={() => commitDeck(duplicatePage(draft, index))}>Duplicate</button>
-              <button type="button" aria-label={`Delete page ${index + 1}`} disabled={draft.pages.length <= 1} onclick={() => { commitDeck(removePage(draft, index)); pageIndex = Math.max(0, Math.min(pageIndex, draft.pages.length - 1)); }}>Delete</button>
+              <button type="button" aria-label={t("Duplicate page {index}", { index: index + 1 })} onclick={() => commitDeck(duplicatePage(draft, index))}>{t("Duplicate")}</button>
+              <button type="button" aria-label={t("Delete page {index}", { index: index + 1 })} disabled={draft.pages.length <= 1} onclick={() => { commitDeck(removePage(draft, index)); pageIndex = Math.max(0, Math.min(pageIndex, draft.pages.length - 1)); }}>{t("Delete")}</button>
             </div>
           </li>
         {/each}
       </ol>
-      <button type="button" class="add-page" onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>+ Add new page</button>
+      <button type="button" class="add-page" onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>{t("+ Add new page")}</button>
     </aside>
 
     <main class="work">
-      <div class="toolbar" role="toolbar" aria-label="Add to page">
-        <button type="button" onclick={addText}>Text</button>
-        <button type="button" onclick={() => addShape("rect")}>Rectangle</button>
-        <button type="button" onclick={() => addShape("ellipse")}>Ellipse</button>
+      <div class="toolbar" role="toolbar" aria-label={t("Add to page")}>
+        <button type="button" onclick={addText}>{t("Text")}</button>
+        <button type="button" onclick={() => addShape("rect")}>{t("Rectangle")}</button>
+        <button type="button" onclick={() => addShape("ellipse")}>{t("Ellipse")}</button>
         <span class="menu-wrap">
-          <button type="button" aria-haspopup="menu" aria-expanded={imageMenu} onclick={() => (imageMenu = !imageMenu)}>Image</button>
+          <button type="button" aria-haspopup="menu" aria-expanded={imageMenu} onclick={() => (imageMenu = !imageMenu)}>{t("Image")}</button>
           {#if imageMenu}
             <div class="menu" role="menu">
               {#if images.length === 0}
-                <p class="note">Import pictures in Media first.</p>
+                <p class="note">{t("Import pictures in Media first.")}</p>
               {/if}
               {#each images as asset (asset.id)}
                 <button type="button" role="menuitem" onclick={() => addImage(asset)}>{asset.name}</button>
@@ -219,7 +220,7 @@
             </div>
           {/if}
         </span>
-        <button type="button" onclick={addQr}>QR code</button>
+        <button type="button" onclick={addQr}>{t("QR code")}</button>
       </div>
       <div class="canvas-area">
         <PageCanvas
@@ -233,66 +234,66 @@
         />
       </div>
       <label class="zoom">
-        <span>Zoom</span>
-        <input type="range" min="40" max="100" step="5" aria-label="Zoom" bind:value={zoom} />
+        <span>{t("Zoom")}</span>
+        <input type="range" min="40" max="100" step="5" aria-label={t("Zoom")} bind:value={zoom} />
         <span>{zoom}%</span>
       </label>
     </main>
 
-    <aside class="inspect" aria-label="Inspector">
+    <aside class="inspect" aria-label={t("Inspector")}>
       {#if selected}
         <ElementInspector {page} layer={selected} oncommit={commitPage} />
       {:else}
         <h3>{page.name}</h3>
         <label class="field-row">
-          <span>Name</span>
-          <input class="field" aria-label="Page name" value={page.name} onchange={(event) => commitPage({ ...page, name: event.currentTarget.value.trim() || page.name })} />
+          <span>{t("Name")}</span>
+          <input class="field" aria-label={t("Page name")} value={page.name} onchange={(event) => commitPage({ ...page, name: event.currentTarget.value.trim() || page.name })} />
         </label>
         <label class="field-row">
-          <span>Background</span>
-          <select class="field" aria-label="Background type" value={page.background?.type ?? "color"} onchange={(event) => setBackground({ type: event.currentTarget.value as PageBackground["type"] })}>
-            <option value="color">Color</option>
-            <option value="gradient">Gradient</option>
-            <option value="image">Picture</option>
+          <span>{t("Background")}</span>
+          <select class="field" aria-label={t("Background type")} value={page.background?.type ?? "color"} onchange={(event) => setBackground({ type: event.currentTarget.value as PageBackground["type"] })}>
+            <option value="color">{t("Color")}</option>
+            <option value="gradient">{t("Gradient")}</option>
+            <option value="image">{t("Picture")}</option>
           </select>
         </label>
         {#if (page.background?.type ?? "color") !== "image"}
           <div class="field-row">
-            <span>{page.background?.type === "gradient" ? "Colors" : "Color"}</span>
+            <span>{page.background?.type === "gradient" ? t("Colors") : t("Color")}</span>
             <span class="inline">
-              <input type="color" aria-label="Background color" value={page.background?.color ?? "#1b1b1f"} oninput={(event) => setBackground({ color: event.currentTarget.value })} />
+              <input type="color" aria-label={t("Background color")} value={page.background?.color ?? "#1b1b1f"} oninput={(event) => setBackground({ color: event.currentTarget.value })} />
               {#if page.background?.type === "gradient"}
-                <input type="color" aria-label="Gradient end color" value={page.background.to} oninput={(event) => setBackground({ to: event.currentTarget.value })} />
-                <input class="field angle" type="number" min="0" max="359" aria-label="Gradient angle" value={page.background.angle} onchange={(event) => setBackground({ angle: Number(event.currentTarget.value) })} />
+                <input type="color" aria-label={t("Gradient end color")} value={page.background.to} oninput={(event) => setBackground({ to: event.currentTarget.value })} />
+                <input class="field angle" type="number" min="0" max="359" aria-label={t("Gradient angle")} value={page.background.angle} onchange={(event) => setBackground({ angle: Number(event.currentTarget.value) })} />
               {/if}
             </span>
           </div>
         {:else}
           <div class="stack">
-            {#if images.length === 0}<p class="note">Import pictures in Media first.</p>{/if}
+            {#if images.length === 0}<p class="note">{t("Import pictures in Media first.")}</p>{/if}
             {#each images as asset (asset.id)}
               <button type="button" class="pick" class:on={page.background?.assetId === asset.id} onclick={() => setBackground({ assetId: asset.id, imageUrl: mediaUrl(asset) ?? "" })}>{asset.name}</button>
             {/each}
           </div>
         {/if}
         <div class="field-row">
-          <span>Overlay</span>
+          <span>{t("Overlay")}</span>
           <span class="inline">
-            <input type="color" aria-label="Overlay color" value={page.background?.overlay ?? "#000000"} oninput={(event) => setBackground({ overlay: event.currentTarget.value })} />
-            <input type="range" min="0" max="1" step="0.05" aria-label="Overlay strength" value={page.background?.overlayOpacity ?? 0} onchange={(event) => setBackground({ overlayOpacity: Number(event.currentTarget.value) })} />
+            <input type="color" aria-label={t("Overlay color")} value={page.background?.overlay ?? "#000000"} oninput={(event) => setBackground({ overlay: event.currentTarget.value })} />
+            <input type="range" min="0" max="1" step="0.05" aria-label={t("Overlay strength")} value={page.background?.overlayOpacity ?? 0} onchange={(event) => setBackground({ overlayOpacity: Number(event.currentTarget.value) })} />
           </span>
         </div>
-        <p class="note">Click an element to edit it. Double-click text to type. Drag to move, corners to resize.</p>
+        <p class="note">{t("Click an element to edit it. Double-click text to type. Drag to move, corners to resize.")}</p>
       {/if}
     </aside>
   </div>
 
   {#if editing}
-    <div class="text-edit" role="dialog" aria-label="Edit text">
+    <div class="text-edit" role="dialog" aria-label={t("Edit text")}>
       <!-- svelte-ignore a11y_autofocus -->
       <textarea
         autofocus
-        aria-label="Text"
+        aria-label={t("Text")}
         rows="4"
         value={editing.source.payload.body ?? ""}
         onkeydown={(event) => {
@@ -306,7 +307,7 @@
           });
         }}
       ></textarea>
-      <button type="button" onclick={() => (editingText = null)}>Done</button>
+      <button type="button" onclick={() => (editingText = null)}>{t("Done")}</button>
     </div>
   {/if}
 </div>

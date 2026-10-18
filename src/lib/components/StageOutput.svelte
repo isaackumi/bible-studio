@@ -5,6 +5,7 @@
   import { timerDisplay, timerFromPaint } from "../domain/timer";
   import type { PresentationModel } from "../domain/types";
   import { isDesktop } from "../platform/runtime";
+  import { t } from "../i18n/core";
 
   // Confidence monitor for the platform: Program now (large), Preview as next, a clock and any timer.
   let snapshot = $state<StageSnapshot | null>(null);
@@ -39,9 +40,9 @@
 
   function cue(model: PresentationModel | undefined): string {
     if (!model) return "";
-    if (model.layout === "black") return "Black";
-    if (model.layout === "empty") return "Clear";
-    if (model.layout === "logo") return "Logo";
+    if (model.layout === "black") return t("Black");
+    if (model.layout === "empty") return t("Clear");
+    if (model.layout === "logo") return t("Logo");
     return model.reference ?? "";
   }
 
@@ -56,11 +57,11 @@
 
 <div class="stage size-{layout.size}">
   <header>
-    <span class="tag" class:live={snapshot?.live}>{snapshot?.live ? "LIVE" : "Output off"}</span>
+    <span class="tag" class:live={snapshot?.live}>{snapshot?.live ? t("LIVE") : t("Output off")}</span>
     <span class="desk">{snapshot?.desk || "Church Studio"}</span>
     {#if snapshot?.section && sectionLeft !== null}
       <span class="section-left" class:short={sectionLeft >= 0 && sectionLeft <= 5} class:over={sectionLeft < 0}>
-        {snapshot.section.name} · {sectionLeft >= 0 ? `${sectionLeft} min left` : `${-sectionLeft} min over`}
+        {snapshot.section.name} · {sectionLeft >= 0 ? t("{minutes} min left", { minutes: sectionLeft }) : t("{minutes} min over", { minutes: -sectionLeft })}
       </span>
     {/if}
     {#if layout.clock}<span class="clock">{clock}</span>{/if}
@@ -69,20 +70,20 @@
     <p class="stage-message" role="alert">{snapshot.message}</p>
   {/if}
   {#if snapshot?.program.alert}
-    <p class="stage-alert" role="alert">Alert on screen: {snapshot.program.alert.text}</p>
+    <p class="stage-alert" role="alert">{t("Alert on screen: {text}", { text: snapshot.program.alert.text })}</p>
   {/if}
   <section class="now" aria-live="polite">
-    <p class="cue">{cue(snapshot?.program) || (stale ? "Waiting for the desk" : "")}</p>
+    <p class="cue">{cue(snapshot?.program) || (stale ? t("Waiting for the desk") : "")}</p>
     {#each current as line, index (index)}
       <p class="line">{line}</p>
     {/each}
   </section>
   {#if layout.notes && snapshot?.notes}
-    <section class="notes"><p class="label">Notes</p><p>{snapshot.notes}</p></section>
+    <section class="notes"><p class="label">{t("Notes")}</p><p>{snapshot.notes}</p></section>
   {/if}
   {#if layout.next}
     <section class="next">
-      <p class="label">Next</p>
+      <p class="label">{t("Next")}</p>
       <p class="next-cue">{cue(snapshot?.next) || "—"}</p>
       {#if upcoming.length}<p class="next-line">{upcoming.slice(0, 2).join(" / ")}</p>{/if}
     </section>

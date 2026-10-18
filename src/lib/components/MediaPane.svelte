@@ -7,6 +7,7 @@
   import type { MediaAsset } from "../domain/types";
   import { isDesktop } from "../platform/runtime";
   import FavoriteStar from "./FavoriteStar.svelte";
+  import { t } from "../i18n/core";
 
   let picker: HTMLInputElement | null = $state(null);
 
@@ -53,9 +54,9 @@
 
 <div class="pane">
   {#if isDesktop()}
-    <button type="button" class="primary" onclick={() => void chooseDesktop()}>Import image or video</button>
+    <button type="button" class="primary" onclick={() => void chooseDesktop()}>{t("Import image or video")}</button>
   {:else}
-    <button type="button" class="primary" onclick={() => picker?.click()}>Import image or video</button>
+    <button type="button" class="primary" onclick={() => picker?.click()}>{t("Import image or video")}</button>
     <input
       bind:this={picker}
       type="file"
@@ -65,31 +66,31 @@
     />
   {/if}
   {#if session.media.some((asset) => asset.kind === "video")}
-    <label class="loop"><input type="checkbox" bind:checked={loop} /> Loop videos (backgrounds, walk-in loops)</label>
+    <label class="loop"><input type="checkbox" bind:checked={loop} /> {t("Loop videos (backgrounds, walk-in loops)")}</label>
   {/if}
   {#each session.mediaByFavorite as asset (asset.id)}
     <div class="hit">
       <strong><FavoriteStar on={session.isFavorite("media", asset.id)} label={asset.name} onclick={() => session.toggleFavorite("media", asset.id)} size={13} />{asset.name}</strong>
-      <span class="kind">{asset.kind === "video" ? "Video" : "Image"}</span>
+      <span class="kind">{asset.kind === "video" ? t("Video") : t("Image")}</span>
       <div class="actions">
-        <button type="button" onclick={() => preview(asset.id)}>Preview</button>
-        <button type="button" onclick={() => add(asset.id, asset.name, asset.kind)}>Add to section</button>
+        <button type="button" onclick={() => preview(asset.id)}>{t("Preview")}</button>
+        <button type="button" onclick={() => add(asset.id, asset.name, asset.kind)}>{t("Add to section")}</button>
         {#if asset.kind === "image"}
-          <button type="button" onclick={() => session.setLogo(asset.id)}>Use as logo</button>
+          <button type="button" onclick={() => session.setLogo(asset.id)}>{t("Use as logo")}</button>
         {/if}
       </div>
     </div>
   {/each}
 
-  <h4>Camera</h4>
-  <p class="camera-note">Select a camera for Preview. LIVE still sends Program. Permission denied stays on this desk.</p>
-  <button type="button" onclick={() => void session.loadCameras()}>List cameras</button>
+  <h4>{t("Camera")}</h4>
+  <p class="camera-note">{t("Select a camera for Preview. LIVE still sends Program. Permission denied stays on this desk.")}</p>
+  <button type="button" onclick={() => void session.loadCameras()}>{t("List cameras")}</button>
   {#if session.cameraNote}<p class="camera-note">{session.cameraNote}</p>{/if}
   {#each session.cameras as camera (camera.deviceId)}
     <div class="hit">
       <strong>{camera.label}</strong>
       <div class="actions">
-        <button type="button" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
+        <button type="button" onclick={() => void session.previewCamera(camera.deviceId)}>{t("Preview")}</button>
       </div>
     </div>
   {/each}

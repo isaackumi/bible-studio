@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { t } from "../../i18n/core";
 
   let {
     title,
@@ -65,7 +66,7 @@
 <svelte:window {onkeydown} />
 
 <div class="layer">
-  <button type="button" class="backdrop" aria-label="Close" tabindex="-1" onclick={onclose}></button>
+  <button type="button" class="backdrop" aria-label={t("Close")} tabindex="-1" onclick={onclose}></button>
   <div class="panel" class:wide class:huge role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
     <h2 {id}>{title}</h2>
     <div class="body">{@render children()}</div>

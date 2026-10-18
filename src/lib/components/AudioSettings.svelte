@@ -260,7 +260,7 @@
 <section class="rows">
   {#each settings.custom as entry, index (entry.phrase)}
     <div class="row">
-      <div class="row-copy"><strong><code>{prefix}{entry.phrase}</code></strong><span>{actionLabel(entry.action)}</span></div>
+      <div class="row-copy"><strong><code>{prefix}{entry.phrase}</code></strong><span>{t(actionLabel(entry.action))}</span></div>
       <button type="button" class="btn danger" aria-label={t("Remove {phrase}", { phrase: entry.phrase })} onclick={() => removeCustom(index)}>{t("Remove")}</button>
     </div>
   {/each}
@@ -268,7 +268,7 @@
     <input class="field grow" aria-label={t("Custom phrase")} placeholder={t("Phrase, e.g. next slide")} maxlength="60" bind:value={phrase} disabled={!settings.commands} />
     <select class="field" aria-label={t("Custom action")} bind:value={action} disabled={!settings.commands}>
       {#each VOICE_ACTIONS as entry (entry.id)}
-        <option value={entry.id}>{entry.label}</option>
+        <option value={entry.id}>{t(entry.label)}</option>
       {/each}
     </select>
     <button type="submit" class="btn primary" disabled={!settings.commands || !phrase.trim()}>{t("Add")}</button>

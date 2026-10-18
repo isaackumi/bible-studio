@@ -4,6 +4,7 @@
   import type { SourceFields } from "../../domain/sources";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // Find a verse for the scripture region of a look: read it first, then put it on Preview or
   // straight on Program. Favorites and recent passages are one click away.
@@ -28,7 +29,7 @@
       const fields = await session.scriptureFields(reference, translation);
       if (!fields || fields.type !== "scripture") {
         found = null;
-        note = `Nothing found for “${reference.trim()}”. Try John 3:16, 1 Cor 13:4-7 or Psalm 23.`;
+        note = t("Nothing found for “{reference}”. Try John 3:16, 1 Cor 13:4-7 or Psalm 23.", { reference: reference.trim() });
         return;
       }
       found = fields;
@@ -51,17 +52,17 @@
   });
 </script>
 
-<DeskDialog title="Find a verse" {onclose}>
+<DeskDialog title={t("Find a verse")} {onclose}>
   <form class="finder" onsubmit={(event) => { event.preventDefault(); void look(); }}>
     <label class="field">
       <Icon name="search" size={15} />
       <!-- svelte-ignore a11y_autofocus -->
-      <input aria-label="Verse" placeholder="John 3:16, 1 Cor 13:4-7, Psalm 23" bind:value={query} autofocus />
+      <input aria-label={t("Verse")} placeholder={t("John 3:16, 1 Cor 13:4-7, Psalm 23")} bind:value={query} autofocus />
     </label>
-    <select aria-label="Translation" bind:value={translationId} onchange={() => found && void look(found.reference, translationId)}>
+    <select aria-label={t("Translation")} bind:value={translationId} onchange={() => found && void look(found.reference, translationId)}>
       {#each session.translations as translation (translation.id)}<option value={translation.id}>{translation.abbreviation}</option>{/each}
     </select>
-    <button type="submit" class="desk-btn" disabled={busy || !query.trim()}>{busy ? "Finding…" : "Find"}</button>
+    <button type="submit" class="desk-btn" disabled={busy || !query.trim()}>{busy ? t("Finding…") : t("Find")}</button>
   </form>
 
   {#if session.workspace.favorites.passages.length || recent.length}
@@ -84,9 +85,9 @@
   {/if}
 
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn primary-soft" disabled={!canPreview || busy} title={canPreview ? "Put it in the look on Preview" : "No look with scripture on Preview"} onclick={() => void send("preview")}>Put on Preview</button>
-    <button type="button" class="desk-btn live" disabled={!canLive || busy} title={canLive ? "Change the verse on Program now" : "No look with scripture on Program"} onclick={() => void send("program")}>Send live</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{t("Cancel")}</button>
+    <button type="button" class="desk-btn primary-soft" disabled={!canPreview || busy} title={canPreview ? t("Put it in the look on Preview") : t("No look with scripture on Preview")} onclick={() => void send("preview")}>{t("Put on Preview")}</button>
+    <button type="button" class="desk-btn live" disabled={!canLive || busy} title={canLive ? t("Change the verse on Program now") : t("No look with scripture on Program")} onclick={() => void send("program")}>{t("Send live")}</button>
   {/snippet}
 </DeskDialog>
 

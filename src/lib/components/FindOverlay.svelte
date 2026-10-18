@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import type { SongHit } from "../domain/song-search";
+  import { t } from "../i18n/core";
 
   let field: HTMLInputElement | null = $state(null);
   let selected = $state(0);
@@ -42,25 +43,25 @@
 
 {#if session.findOpen}
   <div class="scrim">
-    <button type="button" class="backdrop" aria-label="Close song search" onclick={() => session.closeFind()}></button>
+    <button type="button" class="backdrop" aria-label={t("Close song search")} onclick={() => session.closeFind()}></button>
     <div
       class="finder"
       role="dialog"
-      aria-label="Search songs"
+      aria-label={t("Search songs")}
       aria-modal="true"
       tabindex="-1"
     >
       <input
         bind:this={field}
-        aria-label="Search songs"
-        placeholder="Title, author, or lyric"
+        aria-label={t("Search songs")}
+        placeholder={t("Title, author, or lyric")}
         value={session.findQuery}
         oninput={(event) => void session.searchFind(event.currentTarget.value)}
         onkeydown={onKey}
       />
-      <p class="hint">A match is Preview only. LIVE still sends Program.</p>
+      <p class="hint">{t("A match is Preview only. LIVE still sends Program.")}</p>
       {#if session.findHits.length === 0}
-        <p class="empty">{session.findQuery.trim() ? "No songs match." : "Recent songs appear here after you preview one."}</p>
+        <p class="empty">{session.findQuery.trim() ? t("No songs match.") : t("Recent songs appear here after you preview one.")}</p>
       {:else}
         <ul>
           {#each session.findHits as hit, index (`${hit.songId}:${hit.sectionId}`)}
@@ -70,7 +71,7 @@
                 <span>{hit.label}{hit.author ? ` · ${hit.author}` : ""}</span>
                 <span class="snip">{hit.snippet}</span>
               </button>
-              <button type="button" class="queue" onclick={() => void session.queueSongHit(hit)}>Queue</button>
+              <button type="button" class="queue" onclick={() => void session.queueSongHit(hit)}>{t("Queue")}</button>
             </li>
           {/each}
         </ul>

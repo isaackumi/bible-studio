@@ -13,6 +13,7 @@
   import OverlayLayer from "./OverlayLayer.svelte";
   import AnnouncementView from "./AnnouncementView.svelte";
   import { mutedUrl } from "../domain/web";
+  import { t } from "../i18n/core";
 
   let {
     model,
@@ -239,7 +240,7 @@
     ></div>
   {:else if model.layout === "web" && model.web}
     {#if still}
-      <div class="web-card"><span>{model.web.kind === "youtube" ? "YouTube" : model.web.kind === "vimeo" ? "Vimeo" : model.web.kind === "slides" ? "Google Slides" : "Website"}</span><strong>{model.web.label}</strong></div>
+      <div class="web-card"><span>{model.web.kind === "youtube" ? t("YouTube") : model.web.kind === "vimeo" ? t("Vimeo") : model.web.kind === "slides" ? t("Google Slides") : t("Website")}</span><strong>{model.web.label}</strong></div>
     {:else}
       {#key `${model.web.url}:${audio}`}
         <!-- Sound only on the audience screen: desk monitors always load the player muted. -->

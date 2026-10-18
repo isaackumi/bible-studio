@@ -43,6 +43,7 @@
   import SourcePicker from "./SourcePicker.svelte";
   import NewSceneDialog from "./NewSceneDialog.svelte";
   import { sourceMeta } from "./source-meta";
+  import { t, tn } from "../../i18n/core";
 
   let query = $state("");
   let kind = $state<"cut" | "fade">("fade");
@@ -104,16 +105,16 @@
   const sourceLayers = $derived(activeScene ? layerStackFrontFirst(activeScene) : []);
   const selectedLayer = $derived(sourceLayers.find((layer) => layer.id === selectedLayerId) ?? sourceLayers[0] ?? null);
   const sceneLocked = $derived(!!activeScene?.locked);
-  const sceneName = $derived(activeScene?.name ?? "No scene");
+  const sceneName = $derived(activeScene?.name ?? t("No scene"));
   const previewLabel = $derived(
     session.live.preview.model.reference ||
       session.live.preview.model.lines[0]?.text ||
-      (activeScene ? activeScene.name : "No source selected"),
+      (activeScene ? activeScene.name : t("No source selected")),
   );
   const programLabel = $derived(
     session.live.program.model.reference ||
       session.live.program.model.lines[0]?.text ||
-      (session.live.program.model.layout === "empty" ? "No scene" : "Live output"),
+      (session.live.program.model.layout === "empty" ? t("No scene") : t("Live output")),
   );
   const displayLive = $derived(
     session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
@@ -200,7 +201,7 @@
   });
 
   $effect(() => {
-    if (activeScene && renameDraft !== activeScene.name && document.activeElement?.getAttribute("aria-label") !== "Scene name") {
+    if (activeScene && renameDraft !== activeScene.name && document.activeElement?.getAttribute("aria-label") !== t("Scene name")) {
       renameDraft = activeScene.name;
     }
     if (selectedLayerId && activeScene && !activeScene.layers.some((layer) => layer.id === selectedLayerId)) {
@@ -257,7 +258,7 @@
     const payload = layer.source.payload;
     const candidates = [payload.reference, payload.heading, payload.label, payload.title, payload.mode, layer.source.title, payload.body?.replace(/\s+/g, " ").slice(0, 60)];
     const text = candidates.find((entry) => entry && entry.trim() && entry.trim() !== layer.name);
-    return text ?? (sourceMeta(layer.source.type).blurb || layer.source.type);
+    return text ?? (t(sourceMeta(layer.source.type).blurb) || layer.source.type);
   }
 
   /** Removing is two clicks: the first arms the button for three seconds, the second removes. */
@@ -299,7 +300,7 @@
   }
 
   function ensureScene(): Composition {
-    return activeScene ?? session.createSceneLook(`Scene ${scenes.length + 1}`);
+    return activeScene ?? session.createSceneLook(t("Scene {n}", { n: scenes.length + 1 }));
   }
 
   function pickType(type: SourceKind) {
@@ -340,9 +341,9 @@
       fields,
       readonly: sceneLocked || blocked.length > 0,
       notice: sceneLocked
-        ? "This scene is locked. Unlock it to edit sources."
+        ? t("This scene is locked. Unlock it to edit sources.")
         : blocked.length
-          ? `Used in locked scene “${blocked[0]}” — unlock to edit.`
+          ? t("Used in locked scene “{scene}” — unlock to edit.", { scene: blocked[0] })
           : null,
     };
   }
@@ -371,7 +372,7 @@
     if (sceneLocked || !query.trim()) return;
     const fields = await session.scriptureFields(query);
     if (!fields || fields.type !== "scripture") {
-      session.message = "Reference not found.";
+      session.message = t("Reference not found.");
       return;
     }
     selectedLayerId = session.createSourceInScene(ensureScene(), fields.reference, buildSource(fields)) ?? selectedLayerId;
@@ -385,35 +386,35 @@
   <header class="prod-bar">
     <div class="prod-left">
       <DeskSwitcher compact />
-      <nav class="prod-modes" aria-label="Production view">
-        <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip="Scenes, sources and media — select stays on Preview" onclick={() => (looksOpen = false)}>Studio</button>
-        <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip="Looks: compositions wait on Preview until you go live" onclick={() => (looksOpen = true)}>Looks</button>
+      <nav class="prod-modes" aria-label={t("Production view")}>
+        <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip={t("Scenes, sources and media — select stays on Preview")} onclick={() => (looksOpen = false)}>{t("Studio")}</button>
+        <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip={t("Looks: compositions wait on Preview until you go live")} onclick={() => (looksOpen = true)}>{t("Looks")}</button>
       </nav>
     </div>
     <div class="prod-actions">
       {#if !session.controlsAudience}
-        <button type="button" class="desk-btn" data-tip="Send to the audience from this window" onclick={() => session.claimAudience()}>Take control</button>
+        <button type="button" class="desk-btn" data-tip={t("Send to the audience from this window")} onclick={() => session.claimAudience()}>{t("Take control")}</button>
       {/if}
       <OutputMenu />
       {#if looksOpen}
-        <button type="button" class="desk-btn live" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
-          <Icon name="play" size={16} /> GO LIVE
+        <button type="button" class="desk-btn live" data-tip={t("Show Preview to the audience, with the chosen transition")} onclick={() => void transition()}>
+          <Icon name="play" size={16} /> {t("GO LIVE")}
         </button>
-        <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
-          <Icon name="scissors" size={16} /> CUT
+        <button type="button" class="desk-btn" data-tip={t("Switch instantly, no transition")} onclick={() => session.cut()}>
+          <Icon name="scissors" size={16} /> {t("CUT")}
         </button>
       {/if}
     </div>
-    <nav class="prod-tools" aria-label="Workspace">
-      <ToolMenu label="View" tip="Panels and focus" tour="view">
+    <nav class="prod-tools" aria-label={t("Workspace")}>
+      <ToolMenu label={t("View")} tip={t("Panels and focus")} tour="view">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}
-          <button type="button" role="menuitemcheckbox" aria-checked={scenesOpen} onclick={() => toggleDock("service")}><Icon name="studio" size={16} /> Scenes</button>
-          <button type="button" role="menuitemcheckbox" aria-checked={mediaOpen} onclick={toggleMedia}><Icon name="media" size={16} /> Media</button>
-          <button type="button" role="menuitemcheckbox" aria-checked={controlsOpen} onclick={() => toggleDock("controls")}><Icon name="list" size={16} /> Controls</button>
-          <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}><Icon name="focus" size={16} /> Focus Preview and Program</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={scenesOpen} onclick={() => toggleDock("service")}><Icon name="studio" size={16} /> {t("Scenes")}</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={mediaOpen} onclick={toggleMedia}><Icon name="media" size={16} /> {t("Media")}</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={controlsOpen} onclick={() => toggleDock("controls")}><Icon name="list" size={16} /> {t("Controls")}</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={focus} onclick={() => { session.savePew({ focus: !focus }); close(); }}><Icon name="focus" size={16} /> {t("Focus Preview and Program")}</button>
           <div class="menu-sep"></div>
-          <button type="button" role="menuitem" onclick={() => { resetWorkspace(); close(); }}><Icon name="reset" size={16} /> Reset workspace</button>
+          <button type="button" role="menuitem" onclick={() => { resetWorkspace(); close(); }}><Icon name="reset" size={16} /> {t("Reset workspace")}</button>
         {/snippet}
       </ToolMenu>
       <button
@@ -421,26 +422,26 @@
         class="desk-btn icon alerts-btn"
         class:on={!!session.alert}
         aria-pressed={!!session.alert}
-        aria-label="Alerts"
-        data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
+        aria-label={t("Alerts")}
+        data-tip={session.alert ? t("Alert on Program: {text}", { text: session.alert.text }) : t("Alert on Program (nursery, car lights…)")}
         onclick={() => (alertsOpen = true)}
       ><Icon name="alerts" size={16} /></button>
       <button
         type="button"
         class="desk-btn icon"
         class:on={session.workspace.overlays.some((overlay) => overlay.on)}
-        aria-label="Overlays"
-        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
+        aria-label={t("Overlays")}
+        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? t("Overlays on the screen") : t("Overlays: logo, ticker, clock, lower third")}
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
-      <button type="button" class="desk-btn icon" data-tour="tours" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
-      <ToolMenu label="More" tip="Displays, look and settings">
+      <button type="button" class="desk-btn icon" data-tour="tours" aria-label={t("Show me around")} data-tip={t("Lost? Guided tours of every page")} onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
+      <ToolMenu label={t("More")} tip={t("Displays, look and settings")}>
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}><Icon name="outputs" size={16} /> Displays…</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}><Icon name="themes" size={16} /> Themes…</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}><Icon name="outputs" size={16} /> {t("Displays…")}</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}><Icon name="themes" size={16} /> {t("Themes…")}</button>
           <div class="menu-sep"></div>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> Settings… <span class="menu-key">⌘,</span></button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> {t("Settings…")} <span class="menu-key">⌘,</span></button>
         {/snippet}
       </ToolMenu>
     </nav>
@@ -458,41 +459,41 @@
     <Pane defaultSize={frozen.stage[0]} minSize={20} order={1}>
     <section class="pane preview">
       <header>
-        <span class="kicker">Preview</span>
+        <span class="kicker">{t("Preview")}</span>
         <span class="meta">{sceneName}</span>
       </header>
-      <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Click a scene to put it here." /></div>
+      <div class="well"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Click a scene to put it here.")} /></div>
       <footer>
         <span>{previewLabel}</span>
         {#if session.canSwapPreview()}
-          <button type="button" class="desk-btn" data-tip="Mirror the layout left to right" onclick={() => session.swapPreviewSides()}><Icon name="transition" size={14} /> Swap sides</button>
+          <button type="button" class="desk-btn" data-tip={t("Mirror the layout left to right")} onclick={() => session.swapPreviewSides()}><Icon name="transition" size={14} /> {t("Swap sides")}</button>
         {/if}
-        <button type="button" class="desk-btn" data-tip="Theme" onclick={() => (session.settingsOpen = true)}>Properties</button>
+        <button type="button" class="desk-btn" data-tip={t("Theme")} onclick={() => (session.settingsOpen = true)}>{t("Properties")}</button>
       </footer>
     </section>
     </Pane>
     <PaneResizer />
     <Pane defaultSize={frozen.stage[1]} minSize={12} maxSize={28} order={2}>
-    <aside class="bridge" aria-label="Transition">
-      <p class="flow">Preview <Icon name="transition" size={16} /> Program</p>
-      <button type="button" class="desk-btn live" data-tip="Show Preview to the audience, with the chosen transition" onclick={() => void transition()}>
-        <Icon name="play" size={16} /> GO LIVE
+    <aside class="bridge" aria-label={t("Transition")}>
+      <p class="flow">{t("Preview")} <Icon name="transition" size={16} /> {t("Program")}</p>
+      <button type="button" class="desk-btn live" data-tip={t("Show Preview to the audience, with the chosen transition")} onclick={() => void transition()}>
+        <Icon name="play" size={16} /> {t("GO LIVE")}
       </button>
-      <button type="button" class="desk-btn" data-tip="Switch instantly, no transition" onclick={() => session.cut()}>
-        <Icon name="scissors" size={16} /> CUT
+      <button type="button" class="desk-btn" data-tip={t("Switch instantly, no transition")} onclick={() => session.cut()}>
+        <Icon name="scissors" size={16} /> {t("CUT")}
       </button>
-      <button type="button" class="desk-btn" data-tip="Fade Preview in over the set duration" onclick={() => void fade(duration)}>
-        FADE
+      <button type="button" class="desk-btn" data-tip={t("Fade Preview in over the set duration")} onclick={() => void fade(duration)}>
+        {t("FADE")}
       </button>
       <div class="resets">
-        <button type="button" class="desk-btn ghost" data-tip="Clear Program" onclick={() => session.clear()}>
-          <Icon name="square" size={16} /> CLEAR
+        <button type="button" class="desk-btn ghost" data-tip={t("Clear Program")} onclick={() => session.clear()}>
+          <Icon name="square" size={16} /> {t("CLEAR")}
         </button>
-        <button type="button" class="desk-btn danger" data-tip="Black Program" onclick={() => session.black()}>
-          <Icon name="moon" size={16} /> BLACK
+        <button type="button" class="desk-btn danger" data-tip={t("Black Program")} onclick={() => session.black()}>
+          <Icon name="moon" size={16} /> {t("BLACK")}
         </button>
-        <button type="button" class="desk-btn" data-tip="Logo on Program" onclick={() => session.logo()}>
-          <Icon name="logo" size={16} /> LOGO
+        <button type="button" class="desk-btn" data-tip={t("Logo on Program")} onclick={() => session.logo()}>
+          <Icon name="logo" size={16} /> {t("LOGO")}
         </button>
       </div>
       <LookScripture />
@@ -504,12 +505,12 @@
     <Pane defaultSize={frozen.stage[2]} minSize={20} order={3}>
     <section class="pane program" class:on-air={displayLive}>
       <header>
-        <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}Program</span>
+        <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}{t("Program")}</span>
         <span class="meta">{programLabel}</span>
       </header>
-      <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. GO LIVE sends Preview here." /></div>
+      <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. GO LIVE sends Preview here.")} /></div>
       <footer>
-        <span>{session.live.program.model.reference || "Audience sees this frame."}</span>
+        <span>{session.live.program.model.reference || t("Audience sees this frame.")}</span>
       </footer>
     </section>
     </Pane>
@@ -524,8 +525,8 @@
         <Pane defaultSize={dockSize(0)} minSize={15} order={1}>
         <section class="dock" data-tour="scenes">
           <header>
-            <Icon name="studio" size={16} /> Scenes <span class="count">{scenes.length}</span>
-            <button type="button" class="dock-add" onclick={newScene} aria-label="New scene"><Icon name="plus" size={14} /> New</button>
+            <Icon name="studio" size={16} /> {t("Scenes")} <span class="count">{scenes.length}</span>
+            <button type="button" class="dock-add" onclick={newScene} aria-label={t("New scene")}><Icon name="plus" size={14} /> {t("New")}</button>
           </header>
           <div
             class="list"
@@ -546,7 +547,7 @@
             {#if scenes.length === 0}
               <button type="button" class="empty-cta" onclick={newScene}>
                 <Icon name="plus" size={18} />
-                <span><strong>Make your first scene</strong><em>A saved screen: a camera, a verse, a countdown.</em></span>
+                <span><strong>{t("Make your first scene")}</strong><em>{t("A saved screen: a camera, a verse, a countdown.")}</em></span>
               </button>
             {/if}
             {#each scenes as entry, index (entry.id)}
@@ -583,8 +584,8 @@
                 <button
                   type="button"
                   class="grip"
-                  aria-label={`Reorder ${entry.name}. Drag, or press arrow up or down`}
-                  data-tip="Drag to reorder"
+                  aria-label={t("Reorder {name}. Drag, or press arrow up or down", { name: entry.name })}
+                  data-tip={t("Drag to reorder")}
                   onkeydown={(event) => {
                     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
                     event.preventDefault();
@@ -598,34 +599,34 @@
                     {#each entry.layers.filter((layer) => layer.visible) as layer (layer.id)}
                       <i style:left="{layer.bounds.x}%" style:top="{layer.bounds.y}%" style:width="{layer.bounds.w}%" style:height="{layer.bounds.h}%" style:--tint={sourceMeta(layer.source.type).color}></i>
                     {/each}
-                    {#if session.live.program.sourceId?.includes(entry.id)}<b class="badge live">Live</b>{:else if activeScene?.id === entry.id}<b class="badge">Preview</b>{/if}
+                    {#if session.live.program.sourceId?.includes(entry.id)}<b class="badge live">{t("Live")}</b>{:else if activeScene?.id === entry.id}<b class="badge">{t("Preview")}</b>{/if}
                   </span>
                   <span class="scene-text">
                     {#if renamingId === entry.id}
                       <!-- svelte-ignore a11y_autofocus -->
-                      <input class="scene-rename" aria-label="Scene name" value={entry.name} autofocus onclick={(event) => event.stopPropagation()} onkeydown={(event) => { if (event.key === "Enter") renameScene(entry, event.currentTarget.value); if (event.key === "Escape") renamingId = null; }} onblur={(event) => renameScene(entry, event.currentTarget.value)} />
+                      <input class="scene-rename" aria-label={t("Scene name")} value={entry.name} autofocus onclick={(event) => event.stopPropagation()} onkeydown={(event) => { if (event.key === "Enter") renameScene(entry, event.currentTarget.value); if (event.key === "Escape") renamingId = null; }} onblur={(event) => renameScene(entry, event.currentTarget.value)} />
                     {:else}
                       <span class="scene-label">{#if entry.locked}<Icon name="lock" size={11} />{/if}{entry.name}</span>
                     {/if}
-                    <span class="scene-sub">{entry.layers.length} source{entry.layers.length === 1 ? "" : "s"}</span>
+                    <span class="scene-sub">{tn(entry.layers.length, "{n} source", "{n} sources")}</span>
                   </span>
                 </button>
                 <button
                   type="button"
                   class="desk-btn ghost icon toggle"
-                  aria-label={`Color for ${entry.name}`}
+                  aria-label={t("Color for {name}", { name: entry.name })}
                   aria-haspopup="menu"
                   aria-expanded={colorFor === entry.id}
-                  data-tip="Folder color"
+                  data-tip={t("Folder color")}
                   onclick={() => (colorFor = colorFor === entry.id ? null : entry.id)}
                 ><span class="swatch" class:none={!entry.color} style:background={entry.color ?? "transparent"}></span></button>
                 <button
                   type="button"
                   class="desk-btn ghost icon toggle"
                   class:on={entry.locked}
-                  aria-label={entry.locked ? `Unlock ${entry.name}` : `Lock ${entry.name}`}
+                  aria-label={entry.locked ? t("Unlock {name}", { name: entry.name }) : t("Lock {name}", { name: entry.name })}
                   aria-pressed={entry.locked}
-                  data-tip={entry.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
+                  data-tip={entry.locked ? t("Locked — click to unlock") : t("Unlocked — click to lock")}
                   onclick={() => session.setSceneLocked(entry.id, !entry.locked)}
                 ><Icon name={entry.locked ? "lock" : "lock-open"} size={16} /></button>
                 {#if activeScene?.id === entry.id && !entry.locked}
@@ -633,8 +634,8 @@
                     type="button"
                     class="desk-btn ghost icon toggle"
                     class:armed={armed === "scene"}
-                    aria-label={armed === "scene" ? `Confirm delete ${entry.name}` : `Delete ${entry.name}`}
-                    data-tip={armed === "scene" ? "Click again to delete" : "Delete scene"}
+                    aria-label={armed === "scene" ? t("Confirm delete {name}", { name: entry.name }) : t("Delete {name}", { name: entry.name })}
+                    data-tip={armed === "scene" ? t("Click again to delete") : t("Delete scene")}
                     onclick={removeActiveScene}
                   ><Icon name="trash" size={14} /></button>
                 {/if}
@@ -643,7 +644,7 @@
                     class="swatches"
                     role="menu"
                     tabindex="-1"
-                    aria-label={`Folder color for ${entry.name}`}
+                    aria-label={t("Folder color for {name}", { name: entry.name })}
                     onkeydown={(event) => event.key === "Escape" && (colorFor = null)}
                   >
                     {#each SCENE_COLORS as color (color)}
@@ -651,7 +652,7 @@
                         type="button"
                         role="menuitemradio"
                         aria-checked={entry.color === color}
-                        aria-label={`Color ${color}`}
+                        aria-label={t("Color {color}", { color })}
                         class="swatch-pick"
                         class:on={entry.color === color}
                         style:background={color}
@@ -666,7 +667,7 @@
                       role="menuitemradio"
                       aria-checked={!entry.color}
                       class="swatch-pick none"
-                      aria-label="No color"
+                      aria-label={t("No color")}
                       onclick={() => {
                         session.setSceneColor(entry.id, null);
                         colorFor = null;
@@ -685,8 +686,8 @@
       <Pane defaultSize={dockSize(1)} minSize={20} order={2}>
       <section class="dock" data-tour="sources">
         <header>
-          <Icon name="layers" size={16} /> Sources {#if activeScene}<span class="count">{activeScene.name}</span>{/if}
-          <button type="button" class="dock-add" disabled={sceneLocked} onclick={() => (typeMenu = true)} aria-label="Add source"><Icon name="plus" size={14} /> Add</button>
+          <Icon name="layers" size={16} /> {t("Sources")} {#if activeScene}<span class="count">{activeScene.name}</span>{/if}
+          <button type="button" class="dock-add" disabled={sceneLocked} onclick={() => (typeMenu = true)} aria-label={t("Add source")}><Icon name="plus" size={14} /> {t("Add")}</button>
         </header>
         <div class="list">
           {#each sourceLayers as layer, index (layer.id)}
@@ -724,8 +725,8 @@
                 <button
                   type="button"
                   class="grip"
-                  aria-label={`Reorder ${layer.name}. Drag, or press arrow up or down`}
-                  data-tip="Drag to reorder"
+                  aria-label={t("Reorder {name}. Drag, or press arrow up or down", { name: layer.name })}
+                  data-tip={t("Drag to reorder")}
                   onkeydown={(event) => {
                     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
                     event.preventDefault();
@@ -740,7 +741,7 @@
                 class="pick source-pick"
                 class:on={selectedLayer?.id === layer.id}
                 class:hidden-layer={!layer.visible}
-                data-tip="Double-click for properties"
+                data-tip={t("Double-click for properties")}
                 style:--tint={sourceMeta(layer.source.type).color}
                 onclick={() => (selectedLayerId = layer.id)}
                 ondblclick={() => openProperties(layer)}
@@ -748,11 +749,11 @@
                 <span class="source-icon"><Icon name={sourceMeta(layer.source.type).icon} size={15} /></span>
                 <span class="source-text">
                   <span class="source-name">{layer.name}</span>
-                  <span class="kind">{sourceDetail(layer)}{layer.sourceKey ? " · shared" : ""}{layer.visible ? "" : " · hidden"}</span>
+                  <span class="kind">{sourceDetail(layer)}{layer.sourceKey ? ` · ${t("shared")}` : ""}{layer.visible ? "" : ` · ${t("hidden")}`}</span>
                 </span>
               </button>
               {#if fieldsFromSource(layer.source)}
-                <button type="button" class="desk-btn ghost icon" aria-label="Source properties" data-tip="Properties" onclick={() => openProperties(layer)}>
+                <button type="button" class="desk-btn ghost icon" aria-label={t("Source properties")} data-tip={t("Properties")} onclick={() => openProperties(layer)}>
                   <Icon name="settings" size={14} />
                 </button>
               {/if}
@@ -761,18 +762,18 @@
                   type="button"
                   class="desk-btn ghost icon toggle eye"
                   class:off={!layer.visible}
-                  aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                  aria-label={layer.visible ? t("Hide {name}", { name: layer.name }) : t("Show {name}", { name: layer.name })}
                   aria-pressed={!layer.visible}
-                  data-tip={layer.visible ? "Hide" : "Show"}
+                  data-tip={layer.visible ? t("Hide") : t("Show")}
                   onclick={() => mutate(layer.visible ? hideLayer(activeScene, layer.id) : showLayer(activeScene, layer.id))}
                 ><Icon name={layer.visible ? "eye" : "eye-off"} size={16} /></button>
                 <button
                   type="button"
                   class="desk-btn ghost icon toggle"
                   class:on={layer.locked}
-                  aria-label={layer.locked ? `Unlock ${layer.name}` : `Lock ${layer.name}`}
+                  aria-label={layer.locked ? t("Unlock {name}", { name: layer.name }) : t("Lock {name}", { name: layer.name })}
                   aria-pressed={layer.locked}
-                  data-tip={layer.locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
+                  data-tip={layer.locked ? t("Locked — click to unlock") : t("Unlocked — click to lock")}
                   onclick={() => mutate(setLayerLocked(activeScene, layer.id, !layer.locked))}
                 ><Icon name={layer.locked ? "lock" : "lock-open"} size={16} /></button>
                 {#if selectedLayer?.id === layer.id}
@@ -780,8 +781,8 @@
                     type="button"
                     class="desk-btn ghost icon toggle"
                     class:armed={armed === "source"}
-                    aria-label={armed === "source" ? `Confirm remove ${layer.name}` : `Remove ${layer.name}`}
-                    data-tip={armed === "source" ? "Click again to remove" : "Remove from this scene"}
+                    aria-label={armed === "source" ? t("Confirm remove {name}", { name: layer.name }) : t("Remove {name}", { name: layer.name })}
+                    data-tip={armed === "source" ? t("Click again to remove") : t("Remove from this scene")}
                     onclick={removeSelectedSource}
                   ><Icon name="trash" size={14} /></button>
                 {/if}
@@ -789,11 +790,11 @@
             </div>
           {/each}
           {#if !activeScene}
-            <p class="empty">Select or create a scene.</p>
+            <p class="empty">{t("Select or create a scene.")}</p>
           {:else if sourceLayers.length === 0}
             <button type="button" class="empty-cta" disabled={sceneLocked} onclick={() => (typeMenu = true)}>
               <Icon name="plus" size={18} />
-              <span><strong>Add the first source</strong><em>A camera, a verse, lyrics, a timer or a picture.</em></span>
+              <span><strong>{t("Add the first source")}</strong><em>{t("A camera, a verse, lyrics, a timer or a picture.")}</em></span>
             </button>
           {/if}
         </div>
@@ -804,7 +805,7 @@
         <PaneResizer />
         <Pane defaultSize={dockSize(2)} minSize={15} order={3}>
         <section class="dock" data-tour="media">
-          <header><Icon name="media" size={16} /> Media</header>
+          <header><Icon name="media" size={16} /> {t("Media")}</header>
           <MediaDock locked={sceneLocked} onadd={addMediaSource} />
         </section>
         </Pane>
@@ -814,17 +815,17 @@
         <PaneResizer />
         <Pane defaultSize={dockSize(3)} minSize={15} order={4}>
         <section class="dock" data-tour="controls">
-          <header><Icon name="settings" size={16} /> Controls</header>
+          <header><Icon name="settings" size={16} /> {t("Controls")}</header>
           <div class="controls">
             <div class="ctl-card">
-              <span class="ctl-label">Transition for GO LIVE</span>
-              <div class="seg" role="radiogroup" aria-label="Transition type">
+              <span class="ctl-label">{t("Transition for GO LIVE")}</span>
+              <div class="seg" role="radiogroup" aria-label={t("Transition type")}>
                 {#each [["fade", "Fade"], ["cut", "Cut"]] as [id, label] (id)}
                   <button type="button" role="radio" aria-checked={kind === id} class:on={kind === id} onclick={() => { kind = id === "cut" ? "cut" : "fade"; rememberTransition(); }}>{label}</button>
                 {/each}
               </div>
               {#if kind === "fade"}
-                <div class="seg small" role="radiogroup" aria-label="Fade length">
+                <div class="seg small" role="radiogroup" aria-label={t("Fade length")}>
                   {#each [[250, "Quick"], [450, "Smooth"], [900, "Slow"]] as [ms, label] (ms)}
                     <button type="button" role="radio" aria-checked={duration === ms} class:on={duration === ms} onclick={() => { duration = Number(ms); rememberTransition(); }}>{label}</button>
                   {/each}
@@ -835,32 +836,32 @@
                       max="2000"
                       step="50"
                       bind:value={duration}
-                      aria-label="Transition duration in milliseconds"
+                      aria-label={t("Transition duration in milliseconds")}
                       onchange={(event) => {
                         duration = Number(event.currentTarget.value) || 0;
                         rememberTransition();
                       }}
-                    />ms
+                    />{t("ms")}
                   </label>
                 </div>
               {/if}
             </div>
             <div class="ctl-card">
-              <span class="ctl-label">Voice</span>
+              <span class="ctl-label">{t("Voice")}</span>
               <button
                 type="button"
                 class="desk-btn listen"
                 class:on={session.voice.status === "listening" || session.voice.status === "starting"}
                 aria-pressed={session.voice.status === "listening" || session.voice.status === "starting"}
-                data-tip="Say “next verse”, “go live” (with Live voice commands on), or a reference like “John three sixteen”."
+                data-tip={t("Say “next verse”, “go live” (with Live voice commands on), or a reference like “John three sixteen”.")}
                 onclick={() => void session.toggleVoice()}
               >
                 <Icon name={session.voice.status === "listening" ? "mic-off" : "mic"} size={16} />
-                {session.voice.status === "starting" ? "Starting…" : session.voice.status === "listening" ? "Stop listening" : "Listen"}
+                {session.voice.status === "starting" ? t("Starting…") : session.voice.status === "listening" ? t("Stop listening") : t("Listen")}
               </button>
               {#if session.voice.status !== "idle"}<VoiceStatus compact />{/if}
             </div>
-            <p class="ctl-hint">Click a scene to put it on Preview. GO LIVE shows it to the audience.</p>
+            <p class="ctl-hint">{t("Click a scene to put it on Preview. GO LIVE shows it to the audience.")}</p>
           </div>
         </section>
         </Pane>

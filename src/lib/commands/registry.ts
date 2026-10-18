@@ -1,3 +1,4 @@
+import { msg } from "../i18n/core";
 import type { ShortcutAction } from "../domain/types";
 import { PROGRAM_ACTIONS } from "../domain/types";
 
@@ -19,27 +20,30 @@ export type CommandSpec = {
   shortcut: ShortcutAction | null;
 };
 
+// The groups, named for the scanner that checks every line has its translation.
+msg("Program"); msg("Service"); msg("Workspace"); msg("Output");
+
 export const COMMANDS: CommandSpec[] = [
-  { id: "take", title: "Go live", group: "Program", changesProgram: true, shortcut: "take" },
-  { id: "cut", title: "Cut", group: "Program", changesProgram: true, shortcut: "cut" },
-  { id: "clear", title: "Clear", group: "Program", changesProgram: true, shortcut: "clear" },
-  { id: "black", title: "Black", group: "Program", changesProgram: true, shortcut: "black" },
-  { id: "logo", title: "Logo", group: "Program", changesProgram: true, shortcut: "logo" },
-  { id: "clear-words", title: "Clear words (keep the background)", group: "Program", changesProgram: true, shortcut: "clear-words" },
-  { id: "timer-pause", title: "Pause timer", group: "Program", changesProgram: true, shortcut: null },
-  { id: "timer-resume", title: "Start timer", group: "Program", changesProgram: true, shortcut: null },
-  { id: "timer-reset", title: "Reset timer", group: "Program", changesProgram: true, shortcut: null },
-  { id: "previous", title: "Previous", group: "Service", changesProgram: false, shortcut: "previous" },
-  { id: "next", title: "Next", group: "Service", changesProgram: false, shortcut: "next" },
-  { id: "escape", title: "Leave text field", group: "Service", changesProgram: false, shortcut: "escape" },
-  { id: "focus", title: "Focus preview and program", group: "Workspace", changesProgram: false, shortcut: "focus" },
-  { id: "library", title: "Show or hide library", group: "Workspace", changesProgram: false, shortcut: "library" },
-  { id: "queue", title: "Show or hide queue", group: "Workspace", changesProgram: false, shortcut: "queue" },
-  { id: "find", title: "Search", group: "Workspace", changesProgram: false, shortcut: "find" },
-  { id: "open-settings", title: "Open settings", group: "Workspace", changesProgram: false, shortcut: null },
-  { id: "save-workspace", title: "Save workspace", group: "Workspace", changesProgram: false, shortcut: null },
-  { id: "toggle-audience", title: "Toggle audience output", group: "Output", changesProgram: false, shortcut: null },
-  { id: "toggle-live", title: "Toggle live mode", group: "Workspace", changesProgram: false, shortcut: null },
+  { id: "take", title: msg("Go live"), group: "Program", changesProgram: true, shortcut: "take" },
+  { id: "cut", title: msg("Cut"), group: "Program", changesProgram: true, shortcut: "cut" },
+  { id: "clear", title: msg("Clear"), group: "Program", changesProgram: true, shortcut: "clear" },
+  { id: "black", title: msg("Black"), group: "Program", changesProgram: true, shortcut: "black" },
+  { id: "logo", title: msg("Logo"), group: "Program", changesProgram: true, shortcut: "logo" },
+  { id: "clear-words", title: msg("Clear words (keep the background)"), group: "Program", changesProgram: true, shortcut: "clear-words" },
+  { id: "timer-pause", title: msg("Pause timer"), group: "Program", changesProgram: true, shortcut: null },
+  { id: "timer-resume", title: msg("Start timer"), group: "Program", changesProgram: true, shortcut: null },
+  { id: "timer-reset", title: msg("Reset timer"), group: "Program", changesProgram: true, shortcut: null },
+  { id: "previous", title: msg("Previous"), group: "Service", changesProgram: false, shortcut: "previous" },
+  { id: "next", title: msg("Next"), group: "Service", changesProgram: false, shortcut: "next" },
+  { id: "escape", title: msg("Leave text field"), group: "Service", changesProgram: false, shortcut: "escape" },
+  { id: "focus", title: msg("Focus preview and program"), group: "Workspace", changesProgram: false, shortcut: "focus" },
+  { id: "library", title: msg("Show or hide library"), group: "Workspace", changesProgram: false, shortcut: "library" },
+  { id: "queue", title: msg("Show or hide queue"), group: "Workspace", changesProgram: false, shortcut: "queue" },
+  { id: "find", title: msg("Search"), group: "Workspace", changesProgram: false, shortcut: "find" },
+  { id: "open-settings", title: msg("Open settings"), group: "Workspace", changesProgram: false, shortcut: null },
+  { id: "save-workspace", title: msg("Save workspace"), group: "Workspace", changesProgram: false, shortcut: null },
+  { id: "toggle-audience", title: msg("Toggle audience output"), group: "Output", changesProgram: false, shortcut: null },
+  { id: "toggle-live", title: msg("Toggle live mode"), group: "Workspace", changesProgram: false, shortcut: null },
 ];
 
 export function programCommandIds(): CommandId[] {

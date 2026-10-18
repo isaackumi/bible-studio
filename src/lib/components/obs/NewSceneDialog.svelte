@@ -4,6 +4,7 @@
   import Icon from "../Icon.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import { sourceMeta } from "./source-meta";
+  import { t } from "../../i18n/core";
 
   // A new scene: its name, a folder color, and what it starts with. Layouts arrive filled with
   // what is on the desk (cameras, the verse on Preview), ready to adjust.
@@ -25,28 +26,28 @@
   const layouts = COMPOSITION_TEMPLATES.filter((entry) => entry.slots.every((slot) => slot.role));
 </script>
 
-<DeskDialog title="New scene" {onclose} wide>
+<DeskDialog title={t("New scene")} {onclose} wide>
   <form class="head" onsubmit={(event) => { event.preventDefault(); oncreate(name.trim() || suggested, color, template); }}>
     <label class="name">
-      <span>Name</span>
-      <input aria-label="Scene name" bind:value={name} />
+      <span>{t("Name")}</span>
+      <input aria-label={t("Scene name")} bind:value={name} />
     </label>
-    <div class="colors" role="radiogroup" aria-label="Folder color">
-      <span>Color</span>
+    <div class="colors" role="radiogroup" aria-label={t("Folder color")}>
+      <span>{t("Color")}</span>
       <div class="swatches">
-        <button type="button" role="radio" aria-checked={color === null} aria-label="No color" class="swatch none" class:on={color === null} onclick={() => (color = null)}></button>
+        <button type="button" role="radio" aria-checked={color === null} aria-label={t("No color")} class="swatch none" class:on={color === null} onclick={() => (color = null)}></button>
         {#each colors as entry (entry)}
-          <button type="button" role="radio" aria-checked={color === entry} aria-label={`Color ${entry}`} class="swatch" class:on={color === entry} style:background={entry} onclick={() => (color = entry)}></button>
+          <button type="button" role="radio" aria-checked={color === entry} aria-label={t("Color {entry}", { entry })} class="swatch" class:on={color === entry} style:background={entry} onclick={() => (color = entry)}></button>
         {/each}
       </div>
     </div>
   </form>
 
-  <p class="group">Start with</p>
-  <div class="layouts" role="radiogroup" aria-label="Start with">
+  <p class="group">{t("Start with")}</p>
+  <div class="layouts" role="radiogroup" aria-label={t("Start with")}>
     <button type="button" role="radio" aria-checked={template === null} class="layout" class:on={template === null} onclick={() => (template = null)}>
       <span class="schema empty"><Icon name="plus" size={18} /></span>
-      <strong>Empty</strong>
+      <strong>{t("Empty")}</strong>
     </button>
     {#each layouts as entry (entry.id)}
       <button type="button" role="radio" aria-checked={template === entry.id} class="layout" class:on={template === entry.id} onclick={() => (template = entry.id)}>
@@ -61,8 +62,8 @@
   </div>
 
   {#snippet footer()}
-    <button type="button" class="desk-btn" onclick={onclose}>Cancel</button>
-    <button type="button" class="desk-btn primary-soft" onclick={() => oncreate(name.trim() || suggested, color, template)}>Create scene</button>
+    <button type="button" class="desk-btn" onclick={onclose}>{t("Cancel")}</button>
+    <button type="button" class="desk-btn primary-soft" onclick={() => oncreate(name.trim() || suggested, color, template)}>{t("Create scene")}</button>
   {/snippet}
 </DeskDialog>
 

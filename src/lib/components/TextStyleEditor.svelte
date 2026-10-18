@@ -2,6 +2,7 @@
   import { SCREEN_FONTS } from "../domain/fonts";
   import { positionOf, TEXT_POSITIONS, TEXT_SIZE_MAX, TEXT_SIZE_MIN, withPosition } from "../domain/text-style";
   import type { TextStyle } from "../domain/types";
+  import { msg, t } from "../i18n/core";
 
   // One text-style control for every place text is typed: slides, sources, themes.
   // Empty fields mean "use the theme".
@@ -10,7 +11,7 @@
     onchange,
     disabled = false,
     effectsOnly = false,
-    label = "Text style",
+    label = msg("Text style"),
   }: {
     style: TextStyle;
     onchange: (style: TextStyle) => void;
@@ -22,11 +23,11 @@
 
   const position = $derived(positionOf(style));
   const toggles: Array<{ key: "bold" | "italic" | "underline" | "uppercase" | "shadow"; text: string; title: string }> = [
-    { key: "bold", text: "B", title: "Bold" },
-    { key: "italic", text: "I", title: "Italic" },
-    { key: "underline", text: "U", title: "Underline" },
-    { key: "uppercase", text: "AA", title: "All capitals" },
-    { key: "shadow", text: "S", title: "Text shadow" },
+    { key: "bold", text: "B", title: msg("Bold") },
+    { key: "italic", text: "I", title: msg("Italic") },
+    { key: "underline", text: "U", title: msg("Underline") },
+    { key: "uppercase", text: "AA", title: msg("All capitals") },
+    { key: "shadow", text: "S", title: msg("Text shadow") },
   ];
 
   function set(patch: Partial<TextStyle>) {
@@ -44,11 +45,11 @@
 </script>
 
 <fieldset class="text-style" {disabled}>
-  <legend>{label}</legend>
+  <legend>{t(label)}</legend>
   {#if !effectsOnly}
     <div class="row">
-      <select aria-label="Font" value={style.fontFamily ?? ""} onchange={(event) => set({ fontFamily: event.currentTarget.value || undefined })}>
-        <option value="">Theme font</option>
+      <select aria-label={t("Font")} value={style.fontFamily ?? ""} onchange={(event) => set({ fontFamily: event.currentTarget.value || undefined })}>
+        <option value="">{t("Theme font")}</option>
         {#each SCREEN_FONTS as font (font.id)}
           <option value={font.family} style:font-family={font.family}>{font.name}</option>
         {/each}
@@ -59,47 +60,47 @@
         min={TEXT_SIZE_MIN}
         max={TEXT_SIZE_MAX}
         step="2"
-        placeholder="Size"
-        aria-label="Font size"
+        placeholder={t("Size")}
+        aria-label={t("Font size")}
         value={style.size ?? ""}
         onchange={(event) => setSize(event.currentTarget.value)}
       />
-      <label class="color" title="Text color">
-        <input type="color" aria-label="Text color" value={style.color ?? "#ffffff"} oninput={(event) => set({ color: event.currentTarget.value })} />
+      <label class="color" title={t("Text color")}>
+        <input type="color" aria-label={t("Text color")} value={style.color ?? "#ffffff"} oninput={(event) => set({ color: event.currentTarget.value })} />
       </label>
       {#if style.color}
-        <button type="button" class="link" onclick={() => set({ color: undefined })}>Theme color</button>
+        <button type="button" class="link" onclick={() => set({ color: undefined })}>{t("Theme color")}</button>
       {/if}
     </div>
   {/if}
-  <div class="row" role="group" aria-label="Text effects">
+  <div class="row" role="group" aria-label={t("Text effects")}>
     {#each toggles as toggle (toggle.key)}
       <button
         type="button"
         class="toggle {toggle.key}"
         aria-pressed={style[toggle.key] === true}
-        title={toggle.title}
-        aria-label={toggle.title}
+        title={t(toggle.title)}
+        aria-label={t(toggle.title)}
         onclick={() => set({ [toggle.key]: style[toggle.key] ? undefined : true })}
       >{toggle.text}</button>
     {/each}
   </div>
   <div class="position">
-    <span>Position</span>
-    <div class="grid" role="radiogroup" aria-label="Position">
+    <span>{t("Position")}</span>
+    <div class="grid" role="radiogroup" aria-label={t("Position")}>
       {#each TEXT_POSITIONS as entry (entry.id)}
         <button
           type="button"
           role="radio"
           aria-checked={position === entry.id}
-          aria-label={entry.label}
-          title={entry.label}
+          aria-label={t(entry.label)}
+          title={t(entry.label)}
           onclick={() => onchange(withPosition(style, entry.id))}
         ><i></i></button>
       {/each}
     </div>
     {#if !effectsOnly && Object.keys(style).length}
-      <button type="button" class="link" onclick={() => onchange({})}>Reset to theme</button>
+      <button type="button" class="link" onclick={() => onchange({})}>{t("Reset to theme")}</button>
     {/if}
   </div>
 </fieldset>

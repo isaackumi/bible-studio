@@ -7,6 +7,7 @@
   import type { Song } from "../../domain/types";
   import FavoriteStar from "../FavoriteStar.svelte";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // Find a song: type part of a title or any line you remember. Lists (favorites, recently used,
   // most sung, this service) and folders narrow it; the chosen song's parts sit beside the
@@ -42,7 +43,7 @@
     }
     return lists.find((list) => list.id === activeScope)?.songs ?? session.songs;
   });
-  const scopeEmpty = $derived(lists.find((list) => list.id === activeScope)?.empty ?? "This folder is empty.");
+  const scopeEmpty = $derived(lists.find((list) => list.id === activeScope)?.empty ?? t("This folder is empty."));
 
   /** Results: songs in scope, or search hits (one per song, with the line that matched). */
   const results = $derived.by((): Array<{ song: Song; line: string; sectionId: string | null }> => {
@@ -147,8 +148,8 @@
 </script>
 
 <div class="finder-layer" transition:fade={{ duration: 120 }}>
-  <button type="button" class="finder-backdrop" aria-label="Close song search" onclick={onclose}></button>
-  <div class="finder" role="dialog" aria-modal="true" aria-label="Find a song" transition:scale={{ start: 0.98, duration: 140 }}>
+  <button type="button" class="finder-backdrop" aria-label={t("Close song search")} onclick={onclose}></button>
+  <div class="finder" role="dialog" aria-modal="true" aria-label={t("Find a song")} transition:scale={{ start: 0.98, duration: 140 }}>
     <header class="finder-search">
       <Icon name="search" size={18} />
       <!-- svelte-ignore a11y_autofocus -->
@@ -156,15 +157,15 @@
         bind:this={input}
         bind:value={query}
         autofocus
-        aria-label="Find a song"
-        placeholder="Type a title or any line you remember…"
+        aria-label={t("Find a song")}
+        placeholder={t("Type a title or any line you remember…")}
         onkeydown={onKey}
       />
-      {#if query}<button type="button" class="clear" aria-label="Clear" onclick={() => { query = ""; input?.focus(); }}><Icon name="close" size={14} /></button>{/if}
+      {#if query}<button type="button" class="clear" aria-label={t("Clear")} onclick={() => { query = ""; input?.focus(); }}><Icon name="close" size={14} /></button>{/if}
       <kbd>esc</kbd>
     </header>
 
-    <nav class="scopes" aria-label="Lists and folders">
+    <nav class="scopes" aria-label={t("Lists and folders")}>
       {#each scopes as entry (entry.id)}
         <button type="button" class:on={activeScope === entry.id} aria-pressed={activeScope === entry.id} onclick={() => pickScope(entry.id)}>
           <Icon name={entry.icon} size={13} />{entry.label}<small>{entry.count}</small>
@@ -173,11 +174,11 @@
     </nav>
 
     <div class="finder-body">
-      <ul class="results" bind:this={listEl} aria-label="Songs found">
+      <ul class="results" bind:this={listEl} aria-label={t("Songs found")}>
         {#each results as row (row.song.id)}
           <li class="row" class:on={row.song.id === current?.song.id}>
             <button type="button" class="row-main" onclick={() => (selectedId = row.song.id)} ondblclick={() => open(row.song)}>
-              <strong>{row.song.title || "Untitled song"}</strong>
+              <strong>{row.song.title || t("Untitled song")}</strong>
               <span>{row.line}</span>
             </button>
             <span class="row-end" class:starred={session.isFavorite("songs", row.song.id)}>
@@ -187,24 +188,24 @@
         {:else}
           <li class="none">
             {#if query.trim()}
-              No song has “{query.trim()}”{activeScope === "all" ? "" : " in this list"}.
-              {#if activeScope !== "all"}<button type="button" class="link" onclick={() => pickScope("all")}>Search all songs</button>{/if}
+              {activeScope === "all" ? t("No song has “{query}”.", { query: query.trim() }) : t("No song in this list has “{query}”.", { query: query.trim() })}
+              {#if activeScope !== "all"}<button type="button" class="link" onclick={() => pickScope("all")}>{t("Search all songs")}</button>{/if}
             {:else}{scopeEmpty}{/if}
           </li>
         {/each}
       </ul>
 
-      <section class="detail" aria-label="Song">
+      <section class="detail" aria-label={t("Song")}>
         {#if current}
           {@const song = current.song}
           <header>
-            <h3>{song.title || "Untitled song"}</h3>
+            <h3>{song.title || t("Untitled song")}</h3>
             <p>{[song.author, `${song.sections.length} part${song.sections.length === 1 ? "" : "s"}`, cleanFolder(song.folder)].filter(Boolean).join(" · ")}</p>
           </header>
           <ol class="parts">
             {#each song.sections as section (section.id)}
               <li class:match={section.id === current.sectionId} style:--tone="var(--sec-{sectionTone(section)})">
-                <button type="button" title={clickLive ? "Show on the screen" : "Put on Preview"} onclick={() => void showPart(song, section.id)}>
+                <button type="button" title={clickLive ? t("Show on the screen") : t("Put on Preview")} onclick={() => void showPart(song, section.id)}>
                   <b>{sectionShort(section)}</b>
                   <span>
                     <em>{section.label}</em>
@@ -215,20 +216,20 @@
             {/each}
           </ol>
           <footer class="detail-actions">
-            <button type="button" class="desk-btn" onclick={() => void session.addSongToService(song)}><Icon name="queue" size={14} /> Add to service</button>
-            <button type="button" class="desk-btn" onclick={() => open(song)}>Open</button>
-            <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={() => void start()}><Icon name="play" size={14} /> {clickLive ? "Show it" : "Start"}</button>
+            <button type="button" class="desk-btn" onclick={() => void session.addSongToService(song)}><Icon name="queue" size={14} /> {t("Add to service")}</button>
+            <button type="button" class="desk-btn" onclick={() => open(song)}>{t("Open")}</button>
+            <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={() => void start()}><Icon name="play" size={14} /> {clickLive ? t("Show it") : t("Start")}</button>
           </footer>
         {:else}
-          <p class="detail-empty">Pick a song to see its parts.</p>
+          <p class="detail-empty">{t("Pick a song to see its parts.")}</p>
         {/if}
       </section>
     </div>
 
     <footer class="keys">
-      <span><kbd>↑↓</kbd> choose</span>
-      <span><kbd>↵</kbd> open</span>
-      <span><kbd>⇧↵</kbd> {clickLive ? "show it" : "start"}</span>
+      <span><kbd>↑↓</kbd> {t("choose")}</span>
+      <span><kbd>↵</kbd> {t("open")}</span>
+      <span><kbd>⇧↵</kbd> {clickLive ? t("show it") : "start"}</span>
     </footer>
   </div>
 </div>

@@ -4,6 +4,7 @@
 // workspace loads, so editing the saved file cannot grant a plan. Free and the 14-day trial are
 // local to this computer.
 
+import { msg } from "../i18n/core";
 import { looksLikeLicense, normalizeLicense, readLicense } from "./license";
 
 export type PlanId = "free" | "premium" | "church";
@@ -35,24 +36,24 @@ export type PlanPrice = { monthly: number; yearly: number };
 export type Plan = { id: PlanId; name: string; tagline: string; color: string; features: PlanFeature[]; price: PlanPrice; popular?: boolean };
 
 export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean }> = {
-  presenter: { label: "Presenter Desk" },
-  scripture: { label: "Scripture with every translation" },
-  songs: { label: "Song library, folders and imports" },
-  sermon: { label: "Sermon outlines and desk notes" },
-  slides: { label: "Slides and announcements" },
-  media: { label: "Images and backgrounds" },
-  "audience-output": { label: "Audience output" },
-  production: { label: "Production Desk: scenes, cameras, video" },
-  voice: { label: "Voice: verse detection and commands" },
-  "song-detection": { label: "Song detection that follows the singing" },
-  "phone-remote": { label: "Phone remote" },
-  "stage-display": { label: "Stage display" },
-  "song-packs": { label: "Song packs" },
-  "theme-library": { label: "Theme library: animated, photo and video backgrounds, full editing" },
-  "cloud-sync": { label: "Cloud sync across computers", soon: true },
-  ndi: { label: "NDI in and out", soon: true },
-  streaming: { label: "Streaming", soon: true },
-  recording: { label: "Recording", soon: true },
+  presenter: { label: msg("Presenter Desk") },
+  scripture: { label: msg("Scripture with every translation") },
+  songs: { label: msg("Song library, folders and imports") },
+  sermon: { label: msg("Sermon outlines and desk notes") },
+  slides: { label: msg("Slides and announcements") },
+  media: { label: msg("Images and backgrounds") },
+  "audience-output": { label: msg("Audience output") },
+  production: { label: msg("Production Desk: scenes, cameras, video") },
+  voice: { label: msg("Voice: verse detection and commands") },
+  "song-detection": { label: msg("Song detection that follows the singing") },
+  "phone-remote": { label: msg("Phone remote") },
+  "stage-display": { label: msg("Stage display") },
+  "song-packs": { label: msg("Song packs") },
+  "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
+  "cloud-sync": { label: msg("Cloud sync across computers"), soon: true },
+  ndi: { label: msg("NDI in and out"), soon: true },
+  streaming: { label: msg("Streaming"), soon: true },
+  recording: { label: msg("Recording"), soon: true },
 };
 
 const FREE: PlanFeature[] = ["presenter", "scripture", "songs", "sermon", "slides", "media", "audience-output"];
@@ -60,9 +61,9 @@ const PREMIUM: PlanFeature[] = [...FREE, "production", "voice", "song-detection"
 const CHURCH: PlanFeature[] = [...PREMIUM, "cloud-sync", "ndi", "streaming", "recording"];
 
 export const PLANS: Plan[] = [
-  { id: "free", name: "Free", tagline: "Everything to put scripture, songs and sermons on screen.", color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 } },
-  { id: "premium", name: "Premium", tagline: "Production, voice and remote control for a full service.", color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true },
-  { id: "church", name: "Church", tagline: "Several computers and broadcast for larger teams.", color: "#7c5cff", features: CHURCH, price: { monthly: 29, yearly: 290 } },
+  { id: "free", name: msg("Free"), tagline: msg("Everything to put scripture, songs and sermons on screen."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 } },
+  { id: "premium", name: msg("Premium"), tagline: msg("Production, voice and remote control for a full service."), color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true },
+  { id: "church", name: msg("Church"), tagline: msg("Several computers and broadcast for larger teams."), color: "#7c5cff", features: CHURCH, price: { monthly: 29, yearly: 290 } },
 ];
 
 export const TRIAL_DAYS = 14;
@@ -115,8 +116,8 @@ export function freeEntitlement(): Entitlement {
 
 /** Test codes work in development builds only: shipped apps take signed license keys. */
 const TEST_CODES: Record<string, { plan: Exclude<PlanId, "free">; note: string }> = {
-  "PREMIUM-TEST": { plan: "premium", note: "Premium for testing" },
-  "CHURCH-TEST": { plan: "church", note: "Church for testing" },
+  "PREMIUM-TEST": { plan: "premium", note: msg("Premium for testing") },
+  "CHURCH-TEST": { plan: "church", note: msg("Church for testing") },
 };
 
 /** `now`, test-code permission and the public key, overridable for tests. */

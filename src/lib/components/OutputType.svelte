@@ -5,6 +5,7 @@
   import type { Theme } from "../domain/types";
   import { sanitizeTextStyle } from "../domain/text-style";
   import TextStyleEditor from "./TextStyleEditor.svelte";
+  import { t } from "../i18n/core";
 
   const theme = $derived(session.theme());
   const fill = $derived(backgroundFill(theme.background));
@@ -28,7 +29,7 @@
       URL.revokeObjectURL(url);
       themeNote = `${fileName} saved.`;
     } catch (error) {
-      themeNote = error instanceof Error ? error.message : "The theme was not exported.";
+      themeNote = error instanceof Error ? error.message : t("The theme was not exported.");
     }
   }
 
@@ -38,18 +39,18 @@
     input.value = "";
     if (!file) return;
     try {
-      if (file.size > 25 * 1024 * 1024) throw new Error("That theme file is too large.");
+      if (file.size > 25 * 1024 * 1024) throw new Error(t("That theme file is too large."));
       await session.importTheme(await file.text());
       themeNote = session.message;
     } catch (error) {
-      themeNote = error instanceof Error ? error.message : "The theme was not imported.";
+      themeNote = error instanceof Error ? error.message : t("The theme was not imported.");
     }
   }
 </script>
 
 <div class="type">
-  <p class="label">Display theme</p>
-  <div class="themes" role="group" aria-label="Display theme">
+  <p class="label">{t("Display theme")}</p>
+  <div class="themes" role="group" aria-label={t("Display theme")}>
     {#each session.themesByFavorite as item (item.id)}
       <button
         type="button"
@@ -59,45 +60,45 @@
         style:font-family={item.fontFamily}
         onclick={() => session.useTheme(item.id)}
       >
-        <span>Aa</span>
+        <span>{t("Aa")}</span>
         {item.name}
       </button>
     {/each}
   </div>
 
   <p class="sample" style:font-family={theme.fontFamily} style:color={theme.color} style:background={fill} style:text-align={theme.align}>
-    In the beginning
+    {t("In the beginning")}
   </p>
 
   <div class="theme-files">
-    <button type="button" onclick={() => void exportTheme()}>Export theme</button>
-    <button type="button" onclick={() => themeFile?.click()}>Import theme</button>
+    <button type="button" onclick={() => void exportTheme()}>{t("Export theme")}</button>
+    <button type="button" onclick={() => themeFile?.click()}>{t("Import theme")}</button>
     <input bind:this={themeFile} type="file" accept=".json,application/json" hidden onchange={(event) => void importTheme(event)} />
     {#if themeNote}<span class="theme-note" role="status">{themeNote}</span>{/if}
   </div>
 
   <label>
-    Theme name
-    <input class="field" value={theme.name} aria-label="Theme name" onchange={(event) => save({ ...theme, name: event.currentTarget.value.trim() || theme.name })} />
+    {t("Theme name")}
+    <input class="field" value={theme.name} aria-label={t("Theme name")} onchange={(event) => save({ ...theme, name: event.currentTarget.value.trim() || theme.name })} />
   </label>
 
-  <p class="label">Verse font</p>
-  <div class="fonts" role="group" aria-label="Verse font">
+  <p class="label">{t("Verse font")}</p>
+  <div class="fonts" role="group" aria-label={t("Verse font")}>
     {#each SCREEN_FONTS as font (font.id)}
       <button type="button" class:on={screenFont(theme.fontFamily)?.id === font.id} style:font-family={font.family} onclick={() => save({ ...theme, fontFamily: font.family })}>
-        <span>Aa</span>
+        <span>{t("Aa")}</span>
         {font.name}
       </button>
     {/each}
   </div>
 
   <label>
-    Size {theme.fontSize}
-    <input class="field" type="range" min="28" max="120" value={theme.fontSize} aria-label="Font size" oninput={(event) => save({ ...theme, fontSize: Number(event.currentTarget.value) })} />
+    {t("Size {fontSize}", { fontSize: theme.fontSize })}
+    <input class="field" type="range" min="28" max="120" value={theme.fontSize} aria-label={t("Font size")} oninput={(event) => save({ ...theme, fontSize: Number(event.currentTarget.value) })} />
   </label>
 
   <TextStyleEditor
-    label="Effects and position"
+    label={t("Effects and position")}
     effectsOnly
     style={{ ...(theme.effects ?? {}), align: theme.align, vertical: theme.vertical }}
     onchange={(style) => {
@@ -108,21 +109,21 @@
 
   <div class="colors">
     <label>
-      Text
-      <input type="color" value={theme.color} aria-label="Text color" oninput={(event) => save({ ...theme, color: event.currentTarget.value })} />
+      {t("Text")}
+      <input type="color" value={theme.color} aria-label={t("Text color")} oninput={(event) => save({ ...theme, color: event.currentTarget.value })} />
     </label>
     <label>
-      Background
-      <input type="color" value={solid} aria-label="Background color" oninput={(event) => save({ ...theme, background: { type: "color", color: event.currentTarget.value } })} />
+      {t("Background")}
+      <input type="color" value={solid} aria-label={t("Background color")} oninput={(event) => save({ ...theme, background: { type: "color", color: event.currentTarget.value } })} />
     </label>
     <label>
-      Reference
-      <input type="color" value={theme.reference.color} aria-label="Reference color" oninput={(event) => save({ ...theme, reference: { ...theme.reference, color: event.currentTarget.value } })} />
+      {t("Reference")}
+      <input type="color" value={theme.reference.color} aria-label={t("Reference color")} oninput={(event) => save({ ...theme, reference: { ...theme.reference, color: event.currentTarget.value } })} />
     </label>
   </div>
 
-  <p class="label">Display background</p>
-  <div class="washes" role="group" aria-label="Display background">
+  <p class="label">{t("Display background")}</p>
+  <div class="washes" role="group" aria-label={t("Display background")}>
     {#each DISPLAY_WASHES as wash (wash.id)}
       <button
         type="button"
@@ -136,41 +137,41 @@
     {/each}
   </div>
 
-  <p class="label">Alignment</p>
-  <div class="segment" role="group" aria-label="Text alignment">
+  <p class="label">{t("Alignment")}</p>
+  <div class="segment" role="group" aria-label={t("Text alignment")}>
     {#each ["left", "center", "right"] as align (align)}
       <button type="button" class:on={theme.align === align} onclick={() => save({ ...theme, align: align as Theme["align"] })}>{align}</button>
     {/each}
   </div>
 
-  <p class="label">Position</p>
-  <div class="segment" role="group" aria-label="Text position">
+  <p class="label">{t("Position")}</p>
+  <div class="segment" role="group" aria-label={t("Text position")}>
     {#each ["top", "middle", "bottom"] as vertical (vertical)}
       <button type="button" class:on={theme.vertical === vertical} onclick={() => save({ ...theme, vertical: vertical as Theme["vertical"] })}>{vertical}</button>
     {/each}
   </div>
 
-  <p class="label">Layout</p>
-  <div class="segment" role="group" aria-label="Verse layout">
-    <button type="button" class:on={theme.layout !== "lower-third"} onclick={() => save({ ...theme, layout: "frame" })}>Full frame</button>
-    <button type="button" class:on={theme.layout === "lower-third"} onclick={() => save({ ...theme, layout: "lower-third" })}>Lower third</button>
+  <p class="label">{t("Layout")}</p>
+  <div class="segment" role="group" aria-label={t("Verse layout")}>
+    <button type="button" class:on={theme.layout !== "lower-third"} onclick={() => save({ ...theme, layout: "frame" })}>{t("Full frame")}</button>
+    <button type="button" class:on={theme.layout === "lower-third"} onclick={() => save({ ...theme, layout: "lower-third" })}>{t("Lower third")}</button>
   </div>
 
   <label>
-    Margin {theme.margin}
-    <input class="field" type="range" min="24" max="240" value={theme.margin} aria-label="Margin" oninput={(event) => save({ ...theme, margin: Number(event.currentTarget.value) })} />
+    {t("Margin {margin}", { margin: theme.margin })}
+    <input class="field" type="range" min="24" max="240" value={theme.margin} aria-label={t("Margin")} oninput={(event) => save({ ...theme, margin: Number(event.currentTarget.value) })} />
   </label>
 
   <label class="check">
-    <input type="checkbox" checked={theme.reference.show} aria-label="Show reference" onchange={(event) => save({ ...theme, reference: { ...theme.reference, show: event.currentTarget.checked } })} />
-    Show the reference
+    <input type="checkbox" checked={theme.reference.show} aria-label={t("Show reference")} onchange={(event) => save({ ...theme, reference: { ...theme.reference, show: event.currentTarget.checked } })} />
+    {t("Show the reference")}
   </label>
   <label>
-    Reference size {theme.reference.size}
-    <input class="field" type="range" min="16" max="64" value={theme.reference.size} aria-label="Reference size" oninput={(event) => save({ ...theme, reference: { ...theme.reference, size: Number(event.currentTarget.value) } })} />
+    {t("Reference size {size}", { size: theme.reference.size })}
+    <input class="field" type="range" min="16" max="64" value={theme.reference.size} aria-label={t("Reference size")} oninput={(event) => save({ ...theme, reference: { ...theme.reference, size: Number(event.currentTarget.value) } })} />
   </label>
 
-  <p class="note">This changes Preview. LIVE sends it to the audience.</p>
+  <p class="note">{t("This changes Preview. LIVE sends it to the audience.")}</p>
 </div>
 
 <style>

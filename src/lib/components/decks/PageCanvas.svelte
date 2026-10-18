@@ -6,6 +6,7 @@
   import FrameView from "../FrameView.svelte";
   import { canvasFor } from "../../display/shape";
   import { outputShape } from "../../display/output-shape.svelte";
+  import { t } from "../../i18n/core";
 
   // The editable page: the real frame underneath, selection boxes and handles on top.
   let {
@@ -91,7 +92,7 @@
         class:locked={layer.locked}
         role="button"
         tabindex="-1"
-        aria-label={`Select ${layer.name}`}
+        aria-label={t("Select {name}", { name: layer.name })}
         style:left="{layer.bounds.x}%"
         style:top="{layer.bounds.y}%"
         style:width="{layer.bounds.w}%"

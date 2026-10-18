@@ -9,6 +9,7 @@
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
   import SlidesPanel from "../SlidesPanel.svelte";
+  import { msg, t } from "../../i18n/core";
 
   // Production Desk media: files, cameras and slide decks. "Add to scene" puts a source on the
   // scene on Preview; "Preview" shows the item alone. Program changes only on TAKE / LIVE.
@@ -16,14 +17,14 @@
 
   type Tab = "files" | "cameras" | "slides";
   const TABS: { id: Tab; label: string }[] = [
-    { id: "files", label: "Files" },
-    { id: "cameras", label: "Cameras" },
-    { id: "slides", label: "Slides" },
+    { id: "files", label: msg("Files") },
+    { id: "cameras", label: msg("Cameras") },
+    { id: "slides", label: msg("Slides") },
   ];
   let tab = $state<Tab>("files");
   let loop = $state(false);
   let picker = $state<HTMLInputElement | null>(null);
-  const lockedTip = "This scene is locked. Unlock it to add sources.";
+  const lockedTip = $derived(t("This scene is locked. Unlock it to add sources."));
 
   onMount(() => {
     void session.loadCameras();
@@ -32,7 +33,7 @@
   async function chooseDesktop() {
     const picked = await open({
       multiple: false,
-      filters: [{ name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }],
+      filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }],
     });
     if (typeof picked === "string") await session.importImage(picked);
   }
@@ -74,9 +75,9 @@
 </script>
 
 <div class="media-dock">
-  <div class="tabs" role="tablist" aria-label="Media">
+  <div class="tabs" role="tablist" aria-label={t("Media")}>
     {#each TABS as entry (entry.id)}
-      <button type="button" role="tab" aria-selected={tab === entry.id} class:on={tab === entry.id} onclick={() => (tab = entry.id)}>{entry.label}</button>
+      <button type="button" role="tab" aria-selected={tab === entry.id} class:on={tab === entry.id} onclick={() => (tab = entry.id)}>{t(entry.label)}</button>
     {/each}
   </div>
 
@@ -84,9 +85,9 @@
     <div class="body">
       <div class="bar">
         {#if isDesktop()}
-          <button type="button" class="desk-btn" onclick={() => void chooseDesktop()}><Icon name="plus" size={14} /> Import</button>
+          <button type="button" class="desk-btn" onclick={() => void chooseDesktop()}><Icon name="plus" size={14} /> {t("Import")}</button>
         {:else}
-          <button type="button" class="desk-btn" onclick={() => picker?.click()}><Icon name="plus" size={14} /> Import</button>
+          <button type="button" class="desk-btn" onclick={() => picker?.click()}><Icon name="plus" size={14} /> {t("Import")}</button>
           <input
             bind:this={picker}
             type="file"
@@ -96,20 +97,20 @@
           />
         {/if}
         {#if session.media.some((asset) => asset.kind === "video")}
-          <label class="loop"><input type="checkbox" bind:checked={loop} /> Loop videos</label>
+          <label class="loop"><input type="checkbox" bind:checked={loop} /> {t("Loop videos")}</label>
         {/if}
       </div>
       {#if session.media.length === 0}
-        <p class="empty">Import images and videos for backgrounds, walk-in loops and clips.</p>
+        <p class="empty">{t("Import images and videos for backgrounds, walk-in loops and clips.")}</p>
       {/if}
       {#each session.mediaByFavorite as asset (asset.id)}
         <div class="row">
           <FavoriteStar on={session.isFavorite("media", asset.id)} label={asset.name} onclick={() => session.toggleFavorite("media", asset.id)} size={13} />
-          <span class="name"><strong>{asset.name}</strong><small>{asset.kind === "video" ? "Video" : "Image"}</small></span>
-          <button type="button" class="desk-btn ghost" data-tip="Show alone on Preview" onclick={() => previewFile(asset.id)}>Preview</button>
-          <button type="button" class="desk-btn" disabled={locked} data-tip={locked ? lockedTip : "Add to the scene on Preview"} onclick={() => addFile(asset.id)}>Add to scene</button>
+          <span class="name"><strong>{asset.name}</strong><small>{asset.kind === "video" ? t("Video") : t("Image")}</small></span>
+          <button type="button" class="desk-btn ghost" data-tip={t("Show alone on Preview")} onclick={() => previewFile(asset.id)}>{t("Preview")}</button>
+          <button type="button" class="desk-btn" disabled={locked} data-tip={locked ? lockedTip : t("Add to the scene on Preview")} onclick={() => addFile(asset.id)}>{t("Add to scene")}</button>
           {#if asset.kind === "image"}
-            <button type="button" class="desk-btn ghost icon" aria-label={`Use ${asset.name} as logo`} data-tip="Use as logo" onclick={() => session.setLogo(asset.id)}><Icon name="logo" size={14} /></button>
+            <button type="button" class="desk-btn ghost icon" aria-label={t("Use {name} as logo", { name: asset.name })} data-tip={t("Use as logo")} onclick={() => session.setLogo(asset.id)}><Icon name="logo" size={14} /></button>
           {/if}
         </div>
       {/each}
@@ -117,20 +118,20 @@
   {:else if tab === "cameras"}
     <div class="body">
       <div class="bar">
-        <button type="button" class="desk-btn" onclick={() => void session.loadCameras()}><Icon name="refresh" size={14} /> Refresh</button>
+        <button type="button" class="desk-btn" onclick={() => void session.loadCameras()}><Icon name="refresh" size={14} /> {t("Refresh")}</button>
       </div>
       {#if session.cameraNote}<p class="empty">{session.cameraNote}</p>{/if}
       {#if session.cameras.length === 0 && !session.cameraNote}
-        <p class="empty">No cameras found. Connect a camera, then Refresh.</p>
+        <p class="empty">{t("No cameras found. Connect a camera, then Refresh.")}</p>
       {/if}
       <div class="cam-grid">
         {#each session.cameras as camera (camera.deviceId)}
           <div class="cam-card">
             <span class="cam-icon"><Icon name="camera" size={18} /></span>
-            <span class="cam-copy"><strong>{camera.label}</strong><em>{session.cameraFeeds[`camera:${camera.deviceId}`] ? "In use" : "Ready"}</em></span>
+            <span class="cam-copy"><strong>{camera.label}</strong><em>{session.cameraFeeds[`camera:${camera.deviceId}`] ? t("In use") : t("Ready")}</em></span>
             <span class="cam-actions">
-              <button type="button" class="desk-btn ghost" data-tip="Show alone on Preview" onclick={() => void session.previewCamera(camera.deviceId)}>Preview</button>
-              <button type="button" class="desk-btn primary-soft" disabled={locked} data-tip={locked ? lockedTip : "Add to the scene on Preview"} onclick={() => addCamera(camera.deviceId, camera.label)}><Icon name="plus" size={13} /> Scene</button>
+              <button type="button" class="desk-btn ghost" data-tip={t("Show alone on Preview")} onclick={() => void session.previewCamera(camera.deviceId)}>{t("Preview")}</button>
+              <button type="button" class="desk-btn primary-soft" disabled={locked} data-tip={locked ? lockedTip : t("Add to the scene on Preview")} onclick={() => addCamera(camera.deviceId, camera.label)}><Icon name="plus" size={13} /> {t("Scene")}</button>
             </span>
           </div>
         {/each}

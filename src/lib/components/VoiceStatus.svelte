@@ -7,21 +7,21 @@
 
   const voice = $derived(session.voice);
   const label = $derived.by(() => {
-    if (voice.status === "starting") return "Starting";
-    if (voice.status === "listening") return voice.hearing ? "Hearing" : "Listening";
-    if (voice.status === "stopped") return "Stopped";
-    if (voice.status === "idle") return "Voice off";
+    if (voice.status === "starting") return t("Starting");
+    if (voice.status === "listening") return voice.hearing ? t("Hearing") : t("Listening");
+    if (voice.status === "stopped") return t("Stopped");
+    if (voice.status === "idle") return t("Voice off");
     switch (voice.error) {
       case "denied":
-        return "Permission denied";
+        return t("Permission denied");
       case "no-mic":
-        return "No microphone";
+        return t("No microphone");
       case "unsupported":
-        return "Speech unavailable";
+        return t("Speech unavailable");
       case "network":
-        return "Network error";
+        return t("Network error");
       default:
-        return "Voice error";
+        return t("Voice error");
     }
   });
   const recent = $derived(voice.command && Date.now() - voice.command.at < 15_000 ? voice.command : null);
@@ -46,7 +46,7 @@
   {/if}
   {#if recent}
     <p class="command" data-outcome={recent.outcome}>
-      {recent.outcome === "executed" ? "Done" : recent.outcome === "blocked" ? "Blocked" : "Failed"}: {recent.label}
+      {recent.outcome === "executed" ? t("Done") : recent.outcome === "blocked" ? t("Blocked") : t("Failed")}: {recent.label}
     </p>
   {/if}
   {#if voice.message && !compact}

@@ -4,6 +4,7 @@
   import { session } from "../../app/session.svelte";
   import { placeCard, TOURS, type Rect, type TourStep } from "../../tour/steps";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // A spotlight walk through the screen: the room dims, one part lights up, and a card says
   // what it is for. Steps whose target is not on screen are skipped.
@@ -120,25 +121,25 @@
 {#if tour && step}
   <div class="tour" transition:fade={{ duration: 160 }} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body">
     <!-- Clicks on the dimmed room are caught so nothing changes by accident during the tour. -->
-    <button type="button" class="catch" aria-label="End tour" tabindex="-1" onclick={close}></button>
+    <button type="button" class="catch" aria-label={t("End tour")} tabindex="-1" onclick={close}></button>
     {#if rect}
       <div class="spot" style:left="{rect.left}px" style:top="{rect.top}px" style:width="{rect.width}px" style:height="{rect.height}px"></div>
     {:else}
       <div class="dim"></div>
     {/if}
     <div class="card" bind:this={card} style:left="{spot.left}px" style:top="{spot.top}px">
-      <p class="count">{tour.name} tour · {index + 1} of {steps.length}
-        <button type="button" class="all-tours" onclick={() => { close(); session.tourHubOpen = true; }}>All tours</button>
+      <p class="count">{t("{name} tour · {index} of {length}", { name: t(tour.name), index: index + 1, length: steps.length })}
+        <button type="button" class="all-tours" onclick={() => { close(); session.tourHubOpen = true; }}>{t("All tours")}</button>
       </p>
-      <h2 id="tour-title">{step.title}</h2>
-      <p id="tour-body" class="body">{step.body}</p>
+      <h2 id="tour-title">{t(step.title)}</h2>
+      <p id="tour-body" class="body">{t(step.body)}</p>
       <div class="bar">
         <div class="dots" aria-hidden="true">
           {#each steps as _, n (n)}<i class:on={n === index} class:done={n < index}></i>{/each}
         </div>
-        <button type="button" class="ghost" onclick={close}>{index === steps.length - 1 ? "Close" : "Skip"}</button>
-        {#if index > 0}<button type="button" class="ghost" onclick={() => go(-1)} aria-label="Previous step"><Icon name="chevron-left" size={16} /></button>{/if}
-        <button type="button" class="next" onclick={() => go(1)}>{index === steps.length - 1 ? "Done" : "Next"}</button>
+        <button type="button" class="ghost" onclick={close}>{index === steps.length - 1 ? t("Close") : t("Skip")}</button>
+        {#if index > 0}<button type="button" class="ghost" onclick={() => go(-1)} aria-label={t("Previous step")}><Icon name="chevron-left" size={16} /></button>{/if}
+        <button type="button" class="next" onclick={() => go(1)}>{index === steps.length - 1 ? t("Done") : t("Next")}</button>
       </div>
     </div>
   </div>

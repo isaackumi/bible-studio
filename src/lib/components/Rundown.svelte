@@ -1,10 +1,11 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import Icon from "./Icon.svelte";
+  import { msg, t } from "../i18n/core";
 
-  const suggestions = ["Opening", "Worship", "Word", "Offering", "Announcements", "Closing"];
+  const suggestions = [msg("Opening"), msg("Worship"), msg("Word"), msg("Offering"), msg("Announcements"), msg("Closing")];
   let sectionName = $state("");
-  let name = $state("Sunday Service");
+  let name = $state(t("Sunday Service"));
   // Drag a part or an item by its handle; an item can go into any part. Alt+arrows move it too.
   let dragSection = $state<string | null>(null);
   let dragItem = $state<string | null>(null);
@@ -33,12 +34,12 @@
         sectionName = "";
       }}
     >
-      <input class="field" placeholder="Add section" bind:value={sectionName} aria-label="Section name" />
-      <button class="primary" type="submit">Add</button>
+      <input class="field" placeholder={t("Add section")} bind:value={sectionName} aria-label={t("Section name")} />
+      <button class="primary" type="submit">{t("Add")}</button>
     </form>
     <div class="books" style="margin: 8px 0 12px">
       {#each suggestions as name}
-        <button type="button" onclick={() => session.addSection(name)}>{name}</button>
+        <button type="button" onclick={() => session.addSection(t(name))}>{t(name)}</button>
       {/each}
     </div>
     {#each session.service.sections as section, sectionIndex (section.id)}
@@ -60,8 +61,8 @@
             type="button"
             class="grip"
             draggable="true"
-            aria-label="Move {section.name}: drag, or Alt+arrow keys"
-            title="Drag to move"
+            aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: section.name })}
+            title={t("Drag to move")}
             ondragstart={(event) => { dragSection = section.id; event.dataTransfer?.setData("text/plain", section.id); }}
             ondragend={end}
             onkeydown={(event) => key(event, (direction) => session.moveSection(section.id, direction))}
@@ -69,10 +70,10 @@
           <input
             class="field"
             value={section.name}
-            aria-label="Rename section"
+            aria-label={t("Rename section")}
             onchange={(event) => session.renameSection(section.id, event.currentTarget.value)}
           />
-          <button class="ghost del" type="button" onclick={() => session.removeSection(section.id)} aria-label="Remove section" title="Delete this part"><Icon name="trash" size={14} /></button>
+          <button class="ghost del" type="button" onclick={() => session.removeSection(section.id)} aria-label={t("Remove section")} title={t("Delete this part")}><Icon name="trash" size={14} /></button>
         </div>
         {#each section.items as item, itemIndex (item.id)}
           <div
@@ -87,8 +88,8 @@
               type="button"
               class="grip"
               draggable="true"
-              aria-label="Move {item.title}: drag, or Alt+arrow keys"
-              title="Drag to move"
+              aria-label={t("Move {title}: drag, or Alt+arrow keys", { title: item.title })}
+              title={t("Drag to move")}
               ondragstart={(event) => { dragItem = item.id; event.dataTransfer?.setData("text/plain", item.id); }}
               ondragend={end}
               onkeydown={(event) => key(event, (direction) => session.moveItem(item.id, direction))}
@@ -99,7 +100,7 @@
               <div class="kind">{item.kind}</div>
             </button>
             <span class="row-actions">
-              <button class="ghost del" type="button" onclick={() => session.removeItem(item.id)} aria-label="Remove {item.title}" title="Delete"><Icon name="trash" size={14} /></button>
+              <button class="ghost del" type="button" onclick={() => session.removeItem(item.id)} aria-label={t("Remove {title}", { title: item.title })} title={t("Delete")}><Icon name="trash" size={14} /></button>
             </span>
           </div>
         {/each}
@@ -113,10 +114,10 @@
         void session.createService(name);
       }}
     >
-      <p class="hint">Service</p>
-      <h1>Name this service</h1>
-      <input class="field" bind:value={name} aria-label="New service name" />
-      <button class="primary" type="submit">Create service</button>
+      <p class="hint">{t("Service")}</p>
+      <h1>{t("Name this service")}</h1>
+      <input class="field" bind:value={name} aria-label={t("New service name")} />
+      <button class="primary" type="submit">{t("Create service")}</button>
     </form>
   {/if}
 </div>

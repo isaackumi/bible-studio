@@ -2,6 +2,7 @@
   import { session } from "../../app/session.svelte";
   import Icon from "../Icon.svelte";
   import VerseFinder from "./VerseFinder.svelte";
+  import { t } from "../../i18n/core";
 
   // Live scripture inside a look (Scripture + Camera and the like): the verse on Program and on
   // Preview, each with back and next. Live steps change the audience screen at once; Preview
@@ -23,25 +24,25 @@
 </script>
 
 {#if live || preview}
-  <section class="look-verse" aria-label="Scripture in the look">
-    <p class="title"><Icon name="bible" size={13} /> Scripture</p>
+  <section class="look-verse" aria-label={t("Scripture in the look")}>
+    <p class="title"><Icon name="bible" size={13} /> {t("Scripture")}</p>
     {#if live}
       <div class="row on-air">
-        <span class="tag">Live</span>
+        <span class="tag">{t("Live")}</span>
         <strong title={live.reference}>{live.reference}</strong>
-        <button type="button" aria-label="Previous verse live" title="Previous verse, live now" disabled={busy} onclick={() => void step("program", -1)}><Icon name="chevron-left" size={15} /></button>
-        <button type="button" aria-label="Next verse live" title="Next verse, live now" disabled={busy} onclick={() => void step("program", 1)}><Icon name="chevron-right" size={15} /></button>
+        <button type="button" aria-label={t("Previous verse live")} title={t("Previous verse, live now")} disabled={busy} onclick={() => void step("program", -1)}><Icon name="chevron-left" size={15} /></button>
+        <button type="button" aria-label={t("Next verse live")} title={t("Next verse, live now")} disabled={busy} onclick={() => void step("program", 1)}><Icon name="chevron-right" size={15} /></button>
       </div>
     {/if}
     {#if preview}
       <div class="row">
-        <span class="tag">Preview</span>
+        <span class="tag">{t("Preview")}</span>
         <strong title={preview.reference}>{preview.reference}</strong>
-        <button type="button" aria-label="Previous verse on Preview" title="Previous verse on Preview (←)" disabled={busy} onclick={() => void step("preview", -1)}><Icon name="chevron-left" size={15} /></button>
-        <button type="button" aria-label="Next verse on Preview" title="Next verse on Preview (→)" disabled={busy} onclick={() => void step("preview", 1)}><Icon name="chevron-right" size={15} /></button>
+        <button type="button" aria-label={t("Previous verse on Preview")} title={t("Previous verse on Preview (←)")} disabled={busy} onclick={() => void step("preview", -1)}><Icon name="chevron-left" size={15} /></button>
+        <button type="button" aria-label={t("Next verse on Preview")} title={t("Next verse on Preview (→)")} disabled={busy} onclick={() => void step("preview", 1)}><Icon name="chevron-right" size={15} /></button>
       </div>
     {/if}
-    <button type="button" class="find" onclick={() => (finding = true)}><Icon name="search" size={13} /> Find a verse…</button>
+    <button type="button" class="find" onclick={() => (finding = true)}><Icon name="search" size={13} /> {t("Find a verse…")}</button>
   </section>
 {/if}
 

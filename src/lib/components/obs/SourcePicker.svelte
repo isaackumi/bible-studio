@@ -3,6 +3,7 @@
   import Icon from "../Icon.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import { sourceMeta } from "./source-meta";
+  import { msg, t } from "../../i18n/core";
 
   // Choosing what to add to a scene: big, labelled tiles grouped by what they are for, plus a
   // quick way to drop a verse straight in.
@@ -20,29 +21,30 @@
 
   let reference = $state("");
   const GROUPS = ["Live", "Words", "Time", "Graphics"] as const;
+  msg("Live"); msg("Words"); msg("Time"); msg("Graphics");
   const kinds = $derived(SOURCE_KINDS.map((kind) => ({ ...kind, meta: sourceMeta(kind.type) })));
 </script>
 
-<DeskDialog title="Add to {scene}" {onclose} wide>
+<DeskDialog title={t("Add to {scene}", { scene })} {onclose} wide>
   <form class="quick" onsubmit={(event) => { event.preventDefault(); if (reference.trim()) onscripture(reference.trim()); }}>
     <span class="quick-icon" style:--tint="#c18a3d"><Icon name="bible" size={16} /></span>
     <label class="quick-copy">
-      <strong>Quick scripture</strong>
-      <input aria-label="Quick scripture reference" placeholder="John 3:16, Psalm 23" bind:value={reference} />
+      <strong>{t("Quick scripture")}</strong>
+      <input aria-label={t("Quick scripture reference")} placeholder={t("John 3:16, Psalm 23")} bind:value={reference} />
     </label>
-    <button type="submit" class="desk-btn primary-soft" disabled={!reference.trim()}>Add verse</button>
+    <button type="submit" class="desk-btn primary-soft" disabled={!reference.trim()}>{t("Add verse")}</button>
   </form>
 
   {#each GROUPS as group (group)}
     {@const items = kinds.filter((kind) => kind.meta.group === group)}
     {#if items.length}
-      <p class="group">{group}</p>
+      <p class="group">{t(group)}</p>
       <div class="tiles">
         {#each items as kind (kind.type)}
           <button type="button" class="tile" style:--tint={kind.meta.color} onclick={() => onpick(kind.type)}>
             <span class="tile-icon"><Icon name={kind.meta.icon} size={20} /></span>
-            <strong>{kind.label}</strong>
-            <span class="blurb">{kind.meta.blurb}</span>
+            <strong>{t(kind.label)}</strong>
+            <span class="blurb">{t(kind.meta.blurb)}</span>
           </button>
         {/each}
       </div>

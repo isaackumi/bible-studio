@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { t } from "../i18n/core";
 
   // One phone UI for every transport: static/remote.html (LAN server and same-origin windows).
   onMount(() => {
@@ -7,4 +8,4 @@
   });
 </script>
 
-<p style="font: 15px system-ui; color: #9aa7b8; padding: 24px">Opening the remote…</p>
+<p style="font: 15px system-ui; color: #9aa7b8; padding: 24px">{t("Opening the remote…")}</p>
