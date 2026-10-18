@@ -524,7 +524,10 @@
         onclick={() => session.take()}
       ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
       <button type="button" class="desk-btn danger" data-tip="Black program" onclick={() => session.black()}>BLACK</button>
-      <button type="button" class="desk-btn ghost" data-tip="Clear program" onclick={() => session.clear()}>CLEAR</button>
+      <span class="clear-pair">
+        <button type="button" class="desk-btn ghost" data-tip="Clear the words; the background, camera or video stays (W)" onclick={() => void session.clearWords()}>CLEAR WORDS</button>
+        <button type="button" class="desk-btn ghost" data-tip="Clear everything back to the theme (Backspace)" onclick={() => session.clear()}>CLEAR</button>
+      </span>
     </div>
     <nav class="pb-tools" aria-label="Tools">
       <ToolMenu label="View" tip="Panels, monitors and focus">

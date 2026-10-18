@@ -25,6 +25,7 @@ export const COMMANDS: CommandSpec[] = [
   { id: "clear", title: "Clear", group: "Program", changesProgram: true, shortcut: "clear" },
   { id: "black", title: "Black", group: "Program", changesProgram: true, shortcut: "black" },
   { id: "logo", title: "Logo", group: "Program", changesProgram: true, shortcut: "logo" },
+  { id: "clear-words", title: "Clear words (keep the background)", group: "Program", changesProgram: true, shortcut: "clear-words" },
   { id: "timer-pause", title: "Pause timer", group: "Program", changesProgram: true, shortcut: null },
   { id: "timer-resume", title: "Start timer", group: "Program", changesProgram: true, shortcut: null },
   { id: "timer-reset", title: "Reset timer", group: "Program", changesProgram: true, shortcut: null },
@@ -52,9 +53,12 @@ export function changesProgram(id: CommandId): boolean {
 /** Change the timer already on Program (not which frame is on Program). */
 export const TIMER_COMMANDS: CommandId[] = ["timer-pause", "timer-resume", "timer-reset"];
 
-/** Program changes only through the frame actions (take, cut, clear, black, logo) and timer controls. */
+/** Change what is already on Program in place: take its words away. */
+export const IN_PLACE_COMMANDS: CommandId[] = ["clear-words"];
+
+/** Program changes only through the frame actions (take, cut, clear, black, logo), clear words and timer controls. */
 export function programCommandsMatchActions(): boolean {
   const ids = programCommandIds();
-  const expected: CommandId[] = [...PROGRAM_ACTIONS, ...TIMER_COMMANDS];
+  const expected: CommandId[] = [...PROGRAM_ACTIONS, ...IN_PLACE_COMMANDS, ...TIMER_COMMANDS];
   return ids.length === expected.length && expected.every((action, index) => action === ids[index]);
 }

@@ -71,3 +71,23 @@ export function programPacket(state: LiveState, transitionMs: number, epoch = 0)
 export function sameProgram(left: LiveState, right: LiveState): boolean {
   return JSON.stringify(left.program) === JSON.stringify(right.program) && left.revision === right.revision;
 }
+
+/** Layouts that are words on the screen (what Clear words takes away). */
+const WORD_LAYOUTS = new Set<PresentationModel["layout"]>(["scripture", "lyrics", "title", "lower-third"]);
+
+/**
+ * Program without its words: the background (theme photo, video, motion), a camera, a picture
+ * or a look's other regions stay. Null when there are no words to take away.
+ */
+export function withoutWords(model: PresentationModel): PresentationModel | null {
+  if (model.layout === "composition") {
+    const layers = model.layers ?? [];
+    const kept = layers.filter((layer) => !WORD_LAYOUTS.has(layer.model.layout));
+    return kept.length === layers.length ? null : { ...model, layers: kept };
+  }
+  if (!WORD_LAYOUTS.has(model.layout)) return null;
+  const rest: PresentationModel = { ...model, layout: "empty", lines: [], reference: null, attribution: null };
+  delete rest.parallel;
+  delete rest.announcement;
+  return rest;
+}

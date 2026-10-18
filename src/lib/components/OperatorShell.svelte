@@ -77,6 +77,7 @@
       previous: () => void session.run("previous"),
       next: () => void session.run("next"),
       clear: () => void session.run("clear"),
+      "clear-words": () => void session.run("clear-words"),
       black: () => void session.run("black"),
       logo: () => void session.run("logo"),
       escape: () => session.run("escape"),

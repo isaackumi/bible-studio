@@ -6,6 +6,7 @@ export const defaultShortcuts: ShortcutMap = {
   previous: ["ArrowLeft", "ArrowUp"],
   next: ["ArrowRight", "ArrowDown"],
   clear: ["Backspace"],
+  "clear-words": ["KeyW"],
   black: ["KeyB"],
   logo: ["KeyL"],
   escape: ["Escape"],
@@ -23,12 +24,12 @@ export type KeyInput = {
   preventDefault: () => void;
 };
 
-const ORDER: ShortcutAction[] = ["escape", "take", "cut", "previous", "next", "clear", "black", "logo", "focus", "library", "queue", "find"];
+const ORDER: ShortcutAction[] = ["escape", "take", "cut", "previous", "next", "clear", "clear-words", "black", "logo", "focus", "library", "queue", "find"];
 const DESK_ACTIONS = new Set<ShortcutAction>(["focus", "library", "queue", "find"]);
 
 export function shortcutFor(map: ShortcutMap, code: string): ShortcutAction | null {
   for (const action of ORDER) {
-    if (map[action].includes(code)) return action;
+    if (map[action]?.includes(code)) return action;
   }
   return null;
 }
@@ -67,7 +68,7 @@ export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record
 }
 
 export function shortcutLabel(map: ShortcutMap, action: ShortcutAction): string {
-  const code = map[action][0] ?? "";
+  const code = map[action]?.[0] ?? "";
   const labels: Record<string, string> = {
     Space: "Space",
     Backspace: "⌫",

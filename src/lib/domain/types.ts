@@ -288,7 +288,7 @@ export type MediaAsset = {
 
 export type RecentPassage = BibleItem;
 
-export type ShortcutAction = ProgramAction | "previous" | "next" | "escape" | "focus" | "library" | "queue" | "find";
+export type ShortcutAction = ProgramAction | "clear-words" | "previous" | "next" | "escape" | "focus" | "library" | "queue" | "find";
 
 export type ShortcutMap = Record<ShortcutAction, string[]>;
 

@@ -60,7 +60,7 @@ import {
   type SharedSource,
   type SourceFields,
 } from "../domain/sources";
-import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview } from "../domain/live";
+import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview, withoutWords } from "../domain/live";
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo } from "../domain/present";
 import {
   cameraDeviceId,
@@ -3353,6 +3353,23 @@ class Session {
   take = () => this.act("take");
   cut = () => this.act("cut");
   clear = () => this.act("clear");
+
+  /** Take the words off Program; the background, camera, picture or a look's other regions stay. */
+  clearWords = async () => {
+    if (!this.desktop() && !this.controlsAudience) {
+      this.message = "This window is not sending to the audience.";
+      return;
+    }
+    const model = withoutWords(this.live.program.model);
+    if (!model) {
+      this.message = "No words on the screen to clear.";
+      return;
+    }
+    if (this.deckLoop) this.stopDeckLoop();
+    this.live = replaceProgramModel(this.live, model, "fade");
+    await this.pushProgram();
+    this.message = "Words cleared. The background stays.";
+  };
   black = () => this.act("black");
   logo = () => this.act("logo");
 
@@ -3830,6 +3847,8 @@ class Session {
         return this.cut();
       case "clear":
         return this.clear();
+      case "clear-words":
+        return this.clearWords();
       case "black":
         return this.black();
       case "logo":

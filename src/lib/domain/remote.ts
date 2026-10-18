@@ -17,10 +17,10 @@ export const REMOTE_PENDING_MS = 2 * 60 * 1000;
 export const REMOTE_SESSION_MS = 12 * 60 * 60 * 1000;
 export const REMOTE_LAN_PORT = 17891;
 
-export const REMOTE_COMMANDS = ["take", "cut", "next", "previous", "next-item", "previous-item", "clear", "black", "logo", "timer-pause", "timer-resume", "timer-reset"] as const;
+export const REMOTE_COMMANDS = ["take", "cut", "next", "previous", "next-item", "previous-item", "clear", "clear-words", "black", "logo", "timer-pause", "timer-resume", "timer-reset"] as const;
 export type RemoteCommandId = (typeof REMOTE_COMMANDS)[number];
 /** These change Program. Next/Previous only move Preview. */
-export const REMOTE_LIVE_COMMANDS: readonly RemoteCommandId[] = ["take", "cut", "clear", "black", "logo", "timer-pause", "timer-resume", "timer-reset"];
+export const REMOTE_LIVE_COMMANDS: readonly RemoteCommandId[] = ["take", "cut", "clear", "clear-words", "black", "logo", "timer-pause", "timer-resume", "timer-reset"];
 
 export type RemotePairing = { code: string; token: string; expiresAt: number; attempts: number };
 

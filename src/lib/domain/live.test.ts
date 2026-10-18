@@ -96,3 +96,24 @@ describe("video on Program follows one clock", async () => {
     expect(videoPosition({ playing: true, at: 0, stamp: 5000, volume: 1 }, 4000)).toBe(0);
   });
 });
+
+describe("clear words", () => {
+  it("keeps the background and drops the words", async () => {
+    const { withoutWords } = await import("./live");
+    const { defaultTheme } = await import("./theme");
+    const theme = defaultTheme();
+    const verse = { layout: "scripture", theme, reference: "John 3:16", attribution: "KJV", lines: [{ text: "For God" }], imageUrl: null, backgroundImageUrl: "photo.jpg" } as const;
+    expect(withoutWords({ ...verse, lines: [...verse.lines] })).toMatchObject({ layout: "empty", lines: [], reference: null, backgroundImageUrl: "photo.jpg" });
+    expect(withoutWords({ ...verse, layout: "image", lines: [] })).toBeNull();
+    const look = {
+      ...verse,
+      layout: "composition" as const,
+      lines: [],
+      layers: [
+        { id: "cam", zIndex: 0, opacity: 1, bounds: { x: 0, y: 0, w: 100, h: 100 }, fit: "cover" as const, sourceId: "c", model: { ...verse, layout: "image" as const, lines: [] } },
+        { id: "words", zIndex: 1, opacity: 1, bounds: { x: 0, y: 70, w: 100, h: 30 }, fit: "contain" as const, sourceId: "s", model: { ...verse, lines: [...verse.lines] } },
+      ],
+    };
+    expect(withoutWords(look)?.layers?.map((layer) => layer.id)).toEqual(["cam"]);
+  });
+});
