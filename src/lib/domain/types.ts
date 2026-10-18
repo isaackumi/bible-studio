@@ -474,6 +474,8 @@ export type Workspace = {
   ndiAudio: boolean;
   /** OBS or vMix on this computer or the network, driven from the desk. */
   switcher: import("../integrations/switcher").SwitcherSettings;
+  /** Going live and recording from the app itself. The stream key stays on this computer. */
+  broadcast: import("./broadcast").BroadcastSettings;
   /** Beeps as a countdown runs out, on the operator's computer only. */
   timerSounds: import("./timer-cues").TimerSounds;
   /** Service templates: the usual parts of a service with their times. */

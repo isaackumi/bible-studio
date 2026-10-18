@@ -2,6 +2,7 @@ import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, Shortcu
 import { sanitizeUiLanguage } from "../i18n/core";
 import { sanitizeTimerSounds } from "../domain/timer-cues";
 import { sanitizeSwitcher } from "../integrations/switcher";
+import { sanitizeBroadcast } from "../domain/broadcast";
 import { factoryProfiles, normalizeProfile } from "../display/profiles";
 import { sanitizeComposition, sanitizeLayouts } from "../domain/composition";
 import { sanitizeSharedSource } from "../domain/sources";
@@ -149,6 +150,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     timerSounds: sanitizeTimerSounds(value.timerSounds),
     ndiAudio: value.ndiAudio !== false,
     switcher: sanitizeSwitcher(value.switcher),
+    broadcast: sanitizeBroadcast(value.broadcast),
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)

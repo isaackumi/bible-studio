@@ -4,6 +4,7 @@ mod displays;
 mod remote;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod noise;
+mod broadcast;
 mod ndi;
 mod voice;
 
@@ -329,6 +330,17 @@ fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String>
 #[tauri::command]
 fn start_ndi(app: tauri::AppHandle, name: String, fps: u32, pattern: bool, audio: Option<bool>) -> Result<(), String> {
     ndi::start(app, ndi::Output::Program, &name, fps, pattern, audio.unwrap_or(true))
+}
+
+/// Go live and/or record (see broadcast.rs). Returns where the recording is being saved.
+#[tauri::command]
+fn start_broadcast(app: tauri::AppHandle, options: broadcast::Options, stamp: String) -> Result<Option<String>, String> {
+    broadcast::start(app, options, stamp)
+}
+
+#[tauri::command]
+fn stop_broadcast() {
+    broadcast::stop();
 }
 
 #[tauri::command]
@@ -664,6 +676,8 @@ pub fn run() {
             start_ndi,
             stop_ndi,
             vmix_get,
+            start_broadcast,
+            stop_broadcast,
             start_ndi_key,
             stop_ndi_key,
             ndi_key_words,

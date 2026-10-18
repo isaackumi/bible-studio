@@ -123,6 +123,10 @@
                   </select>
                 {:else if step.kind === "stage-message"}
                   <input class="text" aria-label={t("Stage message")} maxlength="140" placeholder={t("Empty clears it")} value={step.text} onchange={(event) => setStep(index, { kind: "stage-message", text: event.currentTarget.value })} />
+                {:else if step.kind === "broadcast"}
+                  <select aria-label={t("Go live or record")} value={step.action} onchange={(event) => setStep(index, { kind: "broadcast", action: event.currentTarget.value as typeof step.action })}>
+                    <option value="live-and-record">{t("Go live and record")}</option><option value="live">{t("Go live only")}</option><option value="record">{t("Record only")}</option><option value="stop">{t("Stop")}</option>
+                  </select>
                 {:else if step.kind === "switcher"}
                   <select aria-label={t("Production app action")} value={step.action} onchange={(event) => setStep(index, { ...step, action: event.currentTarget.value as typeof step.action })}>
                     <option value="scene">{t("Scene on air")}</option><option value="stream-start">{t("Start streaming")}</option><option value="stream-stop">{t("Stop streaming")}</option><option value="record-start">{t("Start recording")}</option><option value="record-stop">{t("Stop recording")}</option>

@@ -7,6 +7,7 @@
   import AlertsDialog from "../AlertsDialog.svelte";
   import MacrosDialog from "../MacrosDialog.svelte";
   import SwitcherMenu from "../SwitcherMenu.svelte";
+  import BroadcastMenu from "../BroadcastMenu.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
   import { findItem } from "../../domain/service";
@@ -626,6 +627,7 @@
       {:else}
         <button type="button" class="desk-btn icon" aria-label={t("Audio")} data-tip={t("Audio: walk-in music, backing tracks, playlists")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
       {/if}
+      <BroadcastMenu />
       <SwitcherMenu />
       <ToolMenu label={t("On the screen")} tip={onScreenTip} on={onScreenCount > 0}>
         {#snippet trigger()}<Icon name="layers" size={16} />{#if onScreenCount}<span class="tool-dot">{onScreenCount}</span>{/if}{/snippet}

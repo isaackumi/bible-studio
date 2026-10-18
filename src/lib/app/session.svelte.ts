@@ -3,6 +3,7 @@ import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
+import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
@@ -735,6 +736,15 @@ class Session {
       case "stage-message":
         this.sendStageMessage(step.text);
         return;
+      case "broadcast": {
+        if (step.action === "stop") {
+          await this.stopBroadcast();
+          return;
+        }
+        const ok = await this.startBroadcast({ stream: step.action !== "record", record: step.action !== "live" });
+        if (!ok) throw new Error(this.broadcastState.message);
+        return;
+      }
       case "switcher": {
         const done =
           step.action === "scene"
@@ -3046,6 +3056,83 @@ class Session {
   switchScene = (name: string) => this.switcherDo((client) => client.setProgram(name));
   setSwitcherStreaming = (on: boolean) => this.switcherDo((client) => client.setStreaming(on));
   setSwitcherRecording = (on: boolean) => this.switcherDo((client) => client.setRecording(on));
+
+  // Going live and recording from Church Studio itself (see broadcast.rs and the Swift helper).
+  broadcastState = $state<{ status: "off" | "starting" | "on" | "error"; streaming: boolean; recording: boolean; live: boolean; pattern: boolean; seconds: number; kbps: number; message: string; saved: string | null }>({
+    status: "off",
+    streaming: false,
+    recording: false,
+    live: false,
+    pattern: false,
+    seconds: 0,
+    kbps: 0,
+    message: "",
+    saved: null,
+  });
+  private broadcastUnlisten: (() => void) | null = null;
+
+  setBroadcast = (patch: Partial<BroadcastSettings>) => {
+    this.workspace = { ...this.workspace, broadcast: sanitizeBroadcast({ ...this.workspace.broadcast, ...patch }) };
+    this.persistSoon();
+  };
+
+  /** Start streaming, recording or both. With `pattern`, colour bars and a beep test the stream key. */
+  startBroadcast = async (options: { stream: boolean; record: boolean; pattern?: boolean }) => {
+    if (!this.desktop()) {
+      this.broadcastState = { ...this.broadcastState, status: "error", message: t("Streaming and recording work in the Church Studio app for Mac.") };
+      return false;
+    }
+    const settings = this.workspace.broadcast;
+    let rtmp: string | null = null;
+    if (options.stream) {
+      const target = streamTarget(settings);
+      if ("missing" in target) {
+        this.broadcastState = { ...this.broadcastState, status: "error", message: target.missing === "key" ? t("Add the stream key first: Settings › Stream & record.") : t("Add the stream server address first: Settings › Stream & record.") };
+        return false;
+      }
+      rtmp = target.url;
+    }
+    if (!this.broadcastUnlisten) this.broadcastUnlisten = await listen<{ line: string }>("broadcast-status", (event) => this.onBroadcastLine(event.payload.line));
+    const quality = QUALITIES[settings.quality];
+    this.broadcastState = { status: "starting", streaming: options.stream, recording: options.record, live: false, pattern: options.pattern === true, seconds: 0, kbps: 0, message: t("Starting…"), saved: null };
+    try {
+      if (!options.pattern && !this.output.online) await this.openAudience();
+      const saved = await invoke<string | null>("start_broadcast", {
+        options: { rtmp, recordFolder: options.record ? settings.recordFolder || null : null, width: quality.width, height: quality.height, fps: quality.fps, videoKbps: quality.videoKbps, audio: settings.sound, pattern: options.pattern === true },
+        stamp: recordingStamp(),
+      });
+      this.broadcastState = { ...this.broadcastState, saved: saved ?? null };
+      return true;
+    } catch (error) {
+      this.broadcastState = { ...this.broadcastState, status: "error", message: error instanceof Error ? error.message : String(error) };
+      return false;
+    }
+  };
+
+  stopBroadcast = async () => {
+    if (this.desktop()) await invoke("stop_broadcast").catch(() => {});
+    this.broadcastState = { ...this.broadcastState, status: "off", live: false, message: this.broadcastState.saved ? t("Saved to {path}", { path: this.broadcastState.saved }) : t("Stopped.") };
+  };
+
+  private onBroadcastLine = (line: string) => {
+    let message: { kind?: string; message?: string; seconds?: number; kbps?: number; live?: boolean; path?: string };
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const state = this.broadcastState;
+    if (message.kind === "status") this.broadcastState = { ...state, status: "on", message: "" };
+    else if (message.kind === "live") {
+      this.broadcastState = { ...state, live: true };
+      this.notify(t("You are live"), { detail: state.pattern ? t("Test pattern on the stream") : t("The stream server has the picture and sound.") });
+    } else if (message.kind === "stats") this.broadcastState = { ...state, seconds: Number(message.seconds) || 0, kbps: Number(message.kbps) || 0, live: message.live === true || state.live };
+    else if (message.kind === "saved" && message.path) {
+      this.broadcastState = { ...state, saved: message.path };
+      this.notify(t("Recording saved"), { detail: message.path, actions: this.desktop() ? [{ label: t("Show in Finder"), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(message.path!)).catch(() => {}) }] : [] });
+    } else if (message.kind === "error") this.broadcastState = { ...state, status: "error", message: message.message ?? t("Streaming stopped.") };
+    else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
+  };
 
   /** Sound with the NDI picture; a running sender restarts to take the change. */
   setNdiAudio = async (on: boolean) => {

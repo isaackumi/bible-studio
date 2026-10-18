@@ -1,5 +1,5 @@
 {
   "bundle": {
-    "externalBin": ["binaries/church-studio-transcribe", "binaries/church-studio-ndi"]
+    "externalBin": ["binaries/church-studio-transcribe", "binaries/church-studio-ndi", "binaries/church-studio-broadcast"]
   }
 }

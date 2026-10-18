@@ -15,6 +15,13 @@ fn main() {
             header: Some("ndi/ndi_shim.h"),
             frameworks: &["ScreenCaptureKit", "CoreMedia", "AVFoundation", "Foundation"],
         });
+        build_helper(Helper {
+            name: "church-studio-broadcast",
+            source: "broadcast/main.swift",
+            plist: "broadcast/Info.plist",
+            header: None,
+            frameworks: &["ScreenCaptureKit", "CoreMedia", "AVFoundation", "VideoToolbox", "AudioToolbox", "Network", "Foundation"],
+        });
     }
     tauri_build::build()
 }

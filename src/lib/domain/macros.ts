@@ -16,7 +16,12 @@ export type MacroStep =
   | { kind: "stage-message"; text: string }
   | { kind: "wait"; seconds: number }
   /** The production app (OBS, vMix): a scene or input on air, or its stream and recording. */
-  | { kind: "switcher"; action: SwitcherAction; scene: string };
+  | { kind: "switcher"; action: SwitcherAction; scene: string }
+  /** Church Studio's own stream and recording. */
+  | { kind: "broadcast"; action: BroadcastAction };
+
+export type BroadcastAction = "live-and-record" | "live" | "record" | "stop";
+const BROADCAST_ACTIONS: BroadcastAction[] = ["live-and-record", "live", "record", "stop"];
 
 export type SwitcherAction = "scene" | "stream-start" | "stream-stop" | "record-start" | "record-stop";
 const SWITCHER_ACTIONS: SwitcherAction[] = ["scene", "stream-start", "stream-stop", "record-start", "record-stop"];
@@ -34,6 +39,7 @@ export const STEP_KINDS: Array<{ kind: MacroStep["kind"]; label: string; make: (
   { kind: "captions", label: msg("Captions on or off"), make: () => ({ kind: "captions", on: true }) },
   { kind: "stage-message", label: msg("Message to the stage"), make: () => ({ kind: "stage-message", text: "You're on" }) },
   { kind: "wait", label: msg("Wait"), make: () => ({ kind: "wait", seconds: 2 }) },
+  { kind: "broadcast", label: msg("Go live or record"), make: () => ({ kind: "broadcast", action: "record" }) },
   { kind: "switcher", label: msg("OBS or vMix: scene, stream, record"), make: () => ({ kind: "switcher", action: "scene", scene: "" }) },
 ];
 
@@ -92,6 +98,8 @@ function cleanStep(value: unknown): MacroStep | null {
       return { kind: "stage-message", text: typeof step.text === "string" ? step.text.slice(0, 140) : "" };
     case "wait":
       return { kind: "wait", seconds: seconds(step.seconds, 2) };
+    case "broadcast":
+      return { kind: "broadcast", action: BROADCAST_ACTIONS.includes(step.action as BroadcastAction) ? (step.action as BroadcastAction) : "record" };
     case "switcher":
       return {
         kind: "switcher",
@@ -141,6 +149,8 @@ export function describeStep(step: MacroStep, names: { playlist: (id: string) =>
       return step.text ? t("Stage: “{text}”", { text: step.text }) : t("Clear the stage message");
     case "wait":
       return t("Wait {seconds} s", { seconds: step.seconds });
+    case "broadcast":
+      return { "live-and-record": t("Go live and record"), live: t("Go live only"), record: t("Record only"), stop: t("Stop going live and recording") }[step.action];
     case "switcher":
       return step.action === "scene"
         ? t("Production app: put “{scene}” on air", { scene: step.scene || "…" })

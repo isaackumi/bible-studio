@@ -1,6 +1,7 @@
 <script lang="ts">
   import StageLinks from "./StageLinks.svelte";
   import SwitcherSettings from "./SwitcherSettings.svelte";
+  import BroadcastSettings from "./BroadcastSettings.svelte";
   import CaptionsSettings from "./CaptionsSettings.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
@@ -43,6 +44,7 @@
     | "captions"
     | "remote"
     | "switcher"
+    | "broadcast"
     | "bible"
     | "lyrics"
     | "media"
@@ -83,6 +85,7 @@
         { id: "themes", title: msg("Themes"), icon: "themes", color: "#c2410c", about: msg("How verses, songs and slides look on the screen."), keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
         { id: "audience", title: msg("Audience output"), icon: "cast", color: "#e5484d", about: msg("What the congregation sees, and on which screen."), keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
         { id: "displays", title: msg("Displays"), icon: "screens", color: "#0a84ff", about: msg("Which screen is the desk, and which is the audience."), keywords: "monitor screen profile second assign" },
+        { id: "broadcast", title: msg("Stream & record"), icon: "video", color: "#e5484d", about: msg("Stream to YouTube or Facebook, and record the service."), keywords: "stream live youtube facebook rtmp rtmps key record recording mp4 broadcast online" },
         { id: "stage", title: msg("Stage display"), icon: "stage", color: "#ff9f0a", about: msg("A private confidence screen for the people on stage."), keywords: "confidence platform next clock" },
         { id: "captions", title: msg("Captions"), icon: "captions", color: "#0f9d8a", about: msg("Live captions on the screen and on phones, translated."), keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
       ],
@@ -991,6 +994,8 @@
           <p class="note">{t("Click a key, then press the new one. Esc cancels. Tab and Enter stay for typing and moving around.")}</p>
           {#if session.workspace.shortcuts}<button type="button" class="btn" onclick={() => { session.resetShortcuts(); keyNote = ""; }}>{t("Reset to the usual keys")}</button>{/if}
         </div>
+      {:else if section === "broadcast"}
+        <BroadcastSettings />
       {:else if section === "switcher"}
         <SwitcherSettings />
       {:else if section === "remote"}
