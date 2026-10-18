@@ -17,6 +17,8 @@ const PAD: &str = include_str!("../../static/remote.html");
 const STREAM: &str = include_str!("../../static/stream.html");
 /// The stage view for a phone or tablet on the platform (read-only stage link).
 const STAGE: &str = include_str!("../../static/stage.html");
+/// Live captions for congregants' phones (read-only captions link).
+const CAPTIONS: &str = include_str!("../../static/captions.html");
 /// Concurrent connections; a phone polls once a second, so this is generous.
 const MAX_CONNECTIONS: usize = 32;
 const MAX_REQUEST: usize = 64 * 1024;
@@ -231,6 +233,10 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
     }
     if req.method == "GET" && req.path == "/stage" {
         write_http(stream, 200, "text/html; charset=utf-8", STAGE.as_bytes());
+        return;
+    }
+    if req.method == "GET" && req.path == "/captions" {
+        write_http(stream, 200, "text/html; charset=utf-8", CAPTIONS.as_bytes());
         return;
     }
     // Controllers (Stream Deck via Companion, scripts): GET /v1/command/<id>?token=…

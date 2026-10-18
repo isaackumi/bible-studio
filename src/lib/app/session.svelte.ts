@@ -10,7 +10,7 @@ import { shiftPassage, stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
-import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageLayout, type StageSnapshot, publishSecondLocal } from "../display/channel";
+import { claimOwner, controlsOutput, publishLocal, publishStageLocal, publishStandbyLocal, readOwner, type StageLayout, type StageSnapshot, publishSecondLocal, publishCaptionsLocal } from "../display/channel";
 import {
   browserAudienceState,
   openBrowserAudience,
@@ -99,13 +99,15 @@ import {
 } from "../domain/remote";
 import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
-import { controllerDevice, stageDevice } from "../domain/remote";
+import { captionsDevice, controllerDevice, stageDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
+import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
+import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
@@ -1070,6 +1072,108 @@ class Session {
     }
   };
 
+  // Live captions: what is said, on the audience screen and on phones, translated when asked.
+  captionsOn = $state(false);
+  captions = $state(emptyCaptions());
+  private captionTimer: ReturnType<typeof setTimeout> | null = null;
+  private translating: Promise<void> = Promise.resolve();
+
+  /** Start or stop captions. Starting also starts listening if it is off. */
+  setCaptions = async (on: boolean) => {
+    if (on && !this.requireFeature("voice")) return;
+    this.captionsOn = on;
+    if (on && this.voice.status !== "listening" && this.voice.status !== "starting") await this.startVoice();
+    this.message = on ? "Captions on. What is said shows as it is heard." : "Captions off.";
+    this.publishCaptions(true);
+  };
+
+  setCaptionSettings = (patch: Partial<CaptionSettings>) => {
+    this.workspace = { ...this.workspace, captions: { ...this.workspace.captions, ...patch } };
+    this.persistSoon();
+    this.publishCaptions(true);
+  };
+
+  clearCaptions = () => {
+    this.captions = emptyCaptions();
+    this.publishCaptions(true);
+  };
+
+  private hearCaption(latest: string, final: boolean) {
+    const before = this.captions.next;
+    this.captions = addHeard(this.captions, latest, final, Date.now());
+    if (this.captions.next !== before) void this.translateCaption(before);
+    this.publishCaptions();
+  }
+
+  /** Translate a finished line into the chosen languages, one request at a time. */
+  private translateCaption(id: number) {
+    const languages = this.workspace.captions.languages;
+    if (!languages.length || !aiReady(this.workspace.ai)) return;
+    this.translating = this.translating.then(async () => {
+      const line = this.captions.lines.find((entry) => entry.id === id);
+      if (!line) return;
+      const context = this.captions.lines.filter((entry) => entry.id < id).slice(-2).map((entry) => entry.text).join(" ");
+      try {
+        const reply = await api.aiPost(translateRequest(this.workspace.ai, line.text, languages, context));
+        const translations = parseTranslations(replyText(this.workspace.ai.provider, reply), languages);
+        if (Object.keys(translations).length) this.captions = withTranslation(this.captions, id, translations);
+      } catch (error) {
+        this.message = `Caption translation: ${error instanceof Error ? error.message : "it did not work"}`;
+      }
+    });
+  }
+
+  /** The caption rows to the audience screen, at most every 120 ms. */
+  private publishCaptions(now = false) {
+    if (typeof window === "undefined") return;
+    const send = () => {
+      this.captionTimer = null;
+      const settings = this.workspace.captions;
+      const frame = { rows: this.captionsOn && settings.screen ? captionRows(this.captions, 2, 64) : [], position: settings.position, size: settings.size, at: Date.now() };
+      try {
+        publishCaptionsLocal(frame);
+      } catch {
+        // Storage blocked: the desktop event still reaches the screen.
+      }
+      if (isDesktop()) void emit("captions", JSON.stringify(frame)).catch(() => {});
+    };
+    if (now) {
+      if (this.captionTimer) clearTimeout(this.captionTimer);
+      send();
+      return;
+    }
+    this.captionTimer ??= setTimeout(send, 120);
+  }
+
+  /** The captions link for congregants' phones (a new link replaces the old one). */
+  createCaptionsLink = async (): Promise<string | null> => {
+    if (!this.requireFeature("voice")) return null;
+    if (!this.desktop()) {
+      this.message = "Captions on phones work with the desktop app, which runs the network server.";
+      return null;
+    }
+    const token = randomToken(24);
+    const device = captionsDevice(crypto.randomUUID(), await sha256Hex(token), Date.now());
+    const gate = this.remoteGate();
+    this.applyRemoteGate({ ...gate, devices: [...gate.devices.filter((entry) => !entry.captions), device] }, true);
+    if (!this.remoteLanUrl) await this.attachLanRemote(true);
+    this.message = "Captions link ready. Show its QR code so people can follow on their phones.";
+    return token;
+  };
+
+  /** What a phone shows: new lines since `after`, in its language when translated. */
+  private captionsRemoteState = (after: number, language: string | null): Record<string, string> => {
+    const languages = this.workspace.captions.languages;
+    const lang = language && languages.includes(language) ? language : null;
+    return {
+      desk: this.workspace.churchName || "Church Studio",
+      on: this.captionsOn && this.voice.status === "listening" ? "1" : "",
+      lines: JSON.stringify(linesFor(this.captions, after, lang)),
+      interim: lang ? "" : this.captions.interim,
+      languages: JSON.stringify(languages.map((code) => ({ code, name: CAPTION_LANGUAGES.find((entry) => entry.code === code)?.name ?? code }))),
+    };
+  };
+
   /** A stage link for a phone or tablet on the platform: it shows the stage and presses nothing. */
   createStageLink = async (name: string): Promise<string | null> => {
     if (!this.requireFeature("stage-display")) return null;
@@ -1200,6 +1304,7 @@ class Session {
     const action = routed.action;
     if (!action) return routed.reply;
     if (action.kind === "stage") return remoteEnvelope("stage", this.stageRemoteState());
+    if (action.kind === "captions") return remoteEnvelope("captions", this.captionsRemoteState(Number(envelope.payload.after) || 0, envelope.payload.lang || null));
     try {
       if (action.kind === "command") await this.runFromRemote(action.id);
       else if (action.kind === "preview-item") await this.selectItem(action.itemId);
@@ -1826,6 +1931,7 @@ class Session {
         return;
       }
     }
+    if (this.captionsOn) this.hearCaption(latest, final);
     for (const listener of this.voiceListeners) listener(text, final, alternatives);
   };
 

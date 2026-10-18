@@ -607,12 +607,21 @@
       <button
         type="button"
         class="desk-btn icon"
+        class:on={session.captionsOn}
+        aria-pressed={session.captionsOn}
+        aria-label="Live captions"
+        data-tip={session.captionsOn ? "Captions on: click to stop. Settings › Captions for phones and languages" : "Live captions on the screen and phones"}
+        onclick={() => void session.setCaptions(!session.captionsOn)}
+      ><Icon name="captions" size={16} /></button>
+      <button
+        type="button"
+        class="desk-btn icon"
         class:on={session.workspace.overlays.some((overlay) => overlay.on)}
         aria-label="Overlays"
         data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
-      <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
+      <button type="button" class="desk-btn icon help-tool" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look, help and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
         {#snippet children(close)}
@@ -1052,7 +1061,7 @@
   @media (prefers-reduced-motion: reduce) {
     .live.on-air, .pip.on::after, .live.on-air .pip::after, .live.on-air .pip, .pb-panel.output.on-air { animation: none; }
   }
-  .pb-tools { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); flex: none; }
+  .pb-tools { display: flex; align-items: center; gap: 3px; margin-left: 4px; padding-left: 8px; border-left: 1px solid var(--line); flex: none; }
   .pb-tools > button {
     width: var(--tool-size);
     height: var(--tool-size);
@@ -1331,6 +1340,8 @@
   .now-audio-name { display: inline-flex; align-items: center; gap: 6px; max-width: 160px; height: 100%; padding: 0 8px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
   .now-audio-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
   @media (max-width: 1560px) { .chip-name { display: none; } }
+  /* Guided tours are also in the More menu; narrower desks keep the bar for live tools. */
+  @media (max-width: 1500px) { .pb-tools > .help-tool { display: none; } }
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }
   .now-audio-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   /* Narrower desks: shorter labels so the tools on the right stay in reach. */
@@ -1350,7 +1361,7 @@
     .pb-tools { padding-left: 8px; margin-left: 2px; }
     .pb-modes button { padding-inline: 6px; font-size: 13px; }
     .pb-bar :global(.output-trigger) { max-width: 96px; }
-    .pb-tools { gap: 2px; }
+    .pb-tools { gap: 1px; --tool-size: 32px; }
     .desk-btn.live, .desk-btn.danger { padding-inline: 10px; }
     .now-audio-name { padding: 0 5px; }
     .now-audio-btn { width: 24px; }

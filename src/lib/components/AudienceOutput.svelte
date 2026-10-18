@@ -11,6 +11,7 @@
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel, ProgramPacket } from "../domain/types";
   import Screen from "./Screen.svelte";
+  import CaptionBar from "./CaptionBar.svelte";
   import { AUDIENCE_ASPECT_KEY, cleanAspect } from "../display/shape";
 
   let current = $state<PresentationModel>(emptyModel(defaultTheme()));
@@ -252,6 +253,7 @@
   <div class:fade-in={fading} style:--fade="{fadeMs}ms">
     <Screen model={current} sourceId={currentSource} {feeds} {aspect} audio />
   </div>
+  <CaptionBar />
   {#if testing}
     <p class="test-card">Test. Program was not changed.</p>
   {/if}

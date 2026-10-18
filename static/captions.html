@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0d12" />
+<title>Live captions</title>
+<style>
+  :root { --scale: 1; --bg: #0b0d12; --ink: #f4f5f7; --muted: #8b93a1; --line: #232836; --accent: #ff7a2f; }
+  body.light { --bg: #f7f5f1; --ink: #17181c; --muted: #6b7180; --line: #e2ded6; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  body { display: flex; flex-direction: column; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: max(10px, env(safe-area-inset-top)) 14px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; flex: none; }
+  .dot.on { background: #ff4d4f; box-shadow: 0 0 0 4px rgb(255 77 79 / 0.2); }
+  .desk { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  select, header button { height: 34px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; padding: 0 10px; }
+  header button { min-width: 38px; padding: 0 8px; }
+  main { flex: 1; padding: 14px 16px max(24px, env(safe-area-inset-bottom)); }
+  .line { margin: 0 0 0.7em; font-size: calc(21px * var(--scale)); line-height: 1.45; }
+  .line.old { color: var(--muted); }
+  .interim { color: var(--muted); font-style: italic; }
+  .waiting { color: var(--muted); font-size: 16px; line-height: 1.5; }
+  .jump { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; height: 38px; padding: 0 16px; border-radius: 19px; border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 700; box-shadow: 0 6px 18px rgb(0 0 0 / 0.3); }
+  .jump.show { display: block; }
+  .note { margin: 10px 16px; padding: 10px 12px; border-radius: 10px; background: #2a1416; color: #ffd7d9; font-size: 14px; display: none; }
+  .note.show { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot" title="Live"></span>
+  <span class="desk" id="desk">Live captions</span>
+  <select id="lang" aria-label="Language" hidden></select>
+  <button type="button" id="smaller" aria-label="Smaller text">A−</button>
+  <button type="button" id="bigger" aria-label="Larger text">A+</button>
+  <button type="button" id="theme" aria-label="Light or dark">◐</button>
+</header>
+<p class="note" id="note"></p>
+<main id="main" aria-live="polite">
+  <p class="waiting" id="waiting">Waiting for the service to begin. What is said will show here as it is heard.</p>
+</main>
+<button type="button" class="jump" id="jump">Latest ↓</button>
+<script>
+  // Church Studio live captions on a phone: what is said in the service, as it is heard, in the
+  // language chosen here when the church translates. It reads the desk and presses nothing.
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const $ = (id) => document.getElementById(id);
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+  let scale = Number(store.get("cap-scale")) || 1;
+  let lang = store.get("cap-lang") || "";
+  let after = 0;
+  let failures = 0;
+  let follow = true;
+  const main = $("main");
+  const interim = document.createElement("p");
+  interim.className = "line interim";
+
+  function setScale(next) {
+    scale = Math.min(2.2, Math.max(0.7, next));
+    document.documentElement.style.setProperty("--scale", String(scale));
+    store.set("cap-scale", String(scale));
+  }
+  setScale(scale);
+  if (store.get("cap-light") === "1") document.body.classList.add("light");
+  $("smaller").onclick = () => setScale(scale - 0.1);
+  $("bigger").onclick = () => setScale(scale + 0.1);
+  $("theme").onclick = () => { const on = !document.body.classList.contains("light"); document.body.classList.toggle("light", on); store.set("cap-light", on ? "1" : "0"); };
+  $("lang").onchange = (event) => {
+    lang = event.target.value;
+    store.set("cap-lang", lang);
+    // Start again in the new language.
+    after = 0;
+    main.replaceChildren();
+  };
+  $("jump").onclick = () => { follow = true; window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); $("jump").classList.remove("show"); };
+  window.addEventListener("scroll", () => {
+    const atEnd = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
+    follow = atEnd;
+    $("jump").classList.toggle("show", !atEnd);
+  }, { passive: true });
+
+  function say(text) {
+    $("note").textContent = text;
+    $("note").classList.toggle("show", !!text);
+  }
+
+  function languages(list) {
+    const select = $("lang");
+    const key = JSON.stringify(list);
+    if (select.dataset.key === key) return;
+    select.dataset.key = key;
+    select.replaceChildren();
+    const original = document.createElement("option");
+    original.value = "";
+    original.textContent = "Original";
+    select.append(original);
+    for (const entry of list) {
+      const option = document.createElement("option");
+      option.value = entry.code;
+      option.textContent = entry.name;
+      select.append(option);
+    }
+    if (!list.some((entry) => entry.code === lang)) lang = "";
+    select.value = lang;
+    select.hidden = list.length === 0;
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch("/v1/remote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ v: 2, type: "captions", payload: { token, after: String(after), lang } }),
+      });
+      const reply = await response.json();
+      failures = 0;
+      if (reply.type !== "captions") {
+        say("This captions link has ended. Ask for the new QR code.");
+        return;
+      }
+      say("");
+      const p = reply.payload || {};
+      $("desk").textContent = p.desk ? `${p.desk} · captions` : "Live captions";
+      $("dot").classList.toggle("on", p.on === "1");
+      languages(JSON.parse(p.languages || "[]"));
+      const lines = JSON.parse(p.lines || "[]");
+      if (lines.length) $("waiting")?.remove();
+      for (const line of lines) {
+        const node = document.createElement("p");
+        node.className = "line";
+        node.textContent = line.text;
+        main.append(node);
+        after = Math.max(after, line.id);
+      }
+      // Dim older lines so the newest stand out.
+      const all = main.querySelectorAll(".line:not(.interim)");
+      all.forEach((node, index) => node.classList.toggle("old", index < all.length - 3));
+      interim.textContent = p.interim || "";
+      if (p.interim) main.append(interim);
+      else interim.remove();
+      if (follow && (lines.length || p.interim)) window.scrollTo({ top: document.body.scrollHeight });
+    } catch {
+      failures += 1;
+      if (failures > 3) say("Lost the connection. Check you are on the church Wi-Fi.");
+    } finally {
+      setTimeout(poll, 700);
+    }
+  }
+  poll();
+</script>
+</body>
+</html>

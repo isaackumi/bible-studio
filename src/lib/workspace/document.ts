@@ -21,6 +21,7 @@ import { sanitizeFavorites } from "../domain/favorites";
 import { sanitizeGoneLive } from "../domain/gone-live";
 import { sanitizeAudioSettings, sanitizePlaylists } from "../domain/playlists";
 import { sanitizeSecondOutput } from "../domain/second-output";
+import { sanitizeCaptionSettings } from "../domain/captions";
 import { sanitizeOverlays } from "../domain/screen-overlays";
 import { sanitizeAiSettings } from "../ai/summarize";
 
@@ -128,6 +129,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     playlists: sanitizePlaylists(value.playlists),
     audio: sanitizeAudioSettings(value.audio),
     secondOutput: sanitizeSecondOutput(value.secondOutput),
+    captions: sanitizeCaptionSettings(value.captions),
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],

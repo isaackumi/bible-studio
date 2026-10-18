@@ -35,6 +35,8 @@ export type RemoteDevice = {
   controller?: boolean;
   /** A stage link (a phone or tablet on the platform): shows the stage only, presses nothing, never expires. */
   viewer?: boolean;
+  /** A captions link (congregants' phones): reads the captions only, never expires. */
+  captions?: boolean;
 };
 
 export type RemotePending = {
@@ -58,7 +60,8 @@ export type RemoteAction =
   | { kind: "command"; id: RemoteCommandId }
   | { kind: "preview-item"; itemId: string }
   | { kind: "preview-scene"; sceneId: string }
-  | { kind: "stage" };
+  | { kind: "stage" }
+  | { kind: "captions" };
 
 export type RemoteEnvelope = {
   v: number;
@@ -131,7 +134,7 @@ export function pruneRemoteGate(gate: RemoteGate, now: number): RemoteGate {
   return {
     pairing: gate.pairing && gate.pairing.expiresAt > now ? gate.pairing : null,
     pending: gate.pending.filter((entry) => now - entry.at < REMOTE_PENDING_MS),
-    devices: gate.devices.filter((device) => device.controller || device.viewer || device.expiresAt > now),
+    devices: gate.devices.filter((device) => device.controller || device.viewer || device.captions || device.expiresAt > now),
   };
 }
 
@@ -210,7 +213,7 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
 
   const device = ctx.tokenHash ? gate.devices.find((entry) => entry.tokenHash === ctx.tokenHash) : undefined;
   if (!device) return deny(gate, "unauthorized", "This phone is not paired, or the desk removed it. Pair again.");
-  const seen: RemoteDevice = { ...device, lastSeen: ctx.now, expiresAt: device.controller || device.viewer ? device.expiresAt : ctx.now + REMOTE_SESSION_MS };
+  const seen: RemoteDevice = { ...device, lastSeen: ctx.now, expiresAt: device.controller || device.viewer || device.captions ? device.expiresAt : ctx.now + REMOTE_SESSION_MS };
   const next = { ...gate, devices: gate.devices.map((entry) => (entry.id === device.id ? seen : entry)) };
   const ok = (action: RemoteAction, type = "state"): RemoteRoute => ({
     gate: next,
@@ -221,10 +224,14 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
 
   // A stage link reads the stage and nothing else.
   if (device.viewer && envelope.type !== "stage") return deny(next, "denied", "This stage link only shows the stage.");
+  if (device.captions && envelope.type !== "captions") return deny(next, "denied", "This link only shows captions.");
+  if (envelope.type === "captions" && !device.captions) return deny(next, "denied", "Captions need a captions link.");
 
   switch (envelope.type) {
     case "stage":
       return ok({ kind: "stage" }, "stage");
+    case "captions":
+      return ok({ kind: "captions" }, "captions");
     case "state":
       return ok({ kind: "state" });
     case "command":
@@ -281,6 +288,7 @@ export function sanitizeRemoteDevices(value: unknown): RemoteDevice[] {
         expiresAt: number(record.expiresAt),
         ...(record.controller === true ? { controller: true } : {}),
         ...(record.viewer === true ? { viewer: true } : {}),
+        ...(record.captions === true ? { captions: true } : {}),
       },
     ];
   });
@@ -316,6 +324,11 @@ export function controllerDevice(id: string, name: string, tokenHash: string, no
 /** A stage link for a phone or tablet: read-only, stored by hash, never expires. The token is shown once. */
 export function stageDevice(id: string, name: string, tokenHash: string, now: number): RemoteDevice {
   return { id, name: deviceName(name) || "Stage", tokenHash, pairedAt: now, lastSeen: 0, expiresAt: Number.MAX_SAFE_INTEGER, viewer: true };
+}
+
+/** The captions link for congregants' phones: read-only, stored by hash, never expires. */
+export function captionsDevice(id: string, tokenHash: string, now: number): RemoteDevice {
+  return { id, name: "Captions", tokenHash, pairedAt: now, lastSeen: 0, expiresAt: Number.MAX_SAFE_INTEGER, captions: true };
 }
 
 /** A one-click link for a controller button: GET /v1/command/<id>?token=… */

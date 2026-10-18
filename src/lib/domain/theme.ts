@@ -9,6 +9,7 @@ import type { AppearanceSettings, PresentationModel, Theme, Workspace } from "./
 import { emptyFavorites } from "./favorites";
 import { defaultAudioSettings, defaultPlaylists } from "./playlists";
 import { defaultSecondOutput } from "./second-output";
+import { defaultCaptionSettings } from "./captions";
 import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
@@ -321,6 +322,7 @@ export function defaultWorkspace(): Workspace {
     playlists: defaultPlaylists(),
     audio: defaultAudioSettings(),
     secondOutput: defaultSecondOutput(),
+    captions: defaultCaptionSettings(),
   };
 }
 

@@ -203,6 +203,40 @@ export function subscribeStageLocal(onStage: (snapshot: StageSnapshot) => void) 
   return () => window.removeEventListener("storage", onStorage);
 }
 
+const CAPTIONS_KEY = "church-studio.captions";
+
+/** What the audience screen shows of the live captions. */
+export type CaptionFrame = { rows: string[]; position: "bottom" | "top"; size: "s" | "m" | "l"; at: number };
+
+export function parseCaptionFrame(raw: string | null): CaptionFrame | null {
+  try {
+    const value = raw ? (JSON.parse(raw) as Partial<CaptionFrame>) : null;
+    if (!value || !Array.isArray(value.rows)) return null;
+    return {
+      rows: value.rows.filter((row): row is string => typeof row === "string").slice(-3),
+      position: value.position === "top" ? "top" : "bottom",
+      size: value.size === "s" || value.size === "l" ? value.size : "m",
+      at: typeof value.at === "number" ? value.at : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function publishCaptionsLocal(frame: CaptionFrame) {
+  localStorage.setItem(CAPTIONS_KEY, JSON.stringify(frame));
+}
+
+export function subscribeCaptionsLocal(onFrame: (frame: CaptionFrame) => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== CAPTIONS_KEY) return;
+    const frame = parseCaptionFrame(event.newValue);
+    if (frame) onFrame(frame);
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
 const SECOND_KEY = "church-studio.second";
 
 /** A frame for the second audience screen (lobby, overflow room). */

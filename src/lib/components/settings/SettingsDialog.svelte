@@ -1,5 +1,6 @@
 <script lang="ts">
   import StageLinks from "./StageLinks.svelte";
+  import CaptionsSettings from "./CaptionsSettings.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -35,6 +36,7 @@
     | "themes"
     | "displays"
     | "stage"
+    | "captions"
     | "remote"
     | "bible"
     | "lyrics"
@@ -77,6 +79,7 @@
         { id: "audience", title: "Audience output", icon: "cast", color: "#e5484d", about: "What the congregation sees, and on which screen.", keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
         { id: "displays", title: "Displays", icon: "screens", color: "#0a84ff", about: "Which screen is the desk, and which is the audience.", keywords: "monitor screen profile second assign" },
         { id: "stage", title: "Stage display", icon: "stage", color: "#ff9f0a", about: "A private confidence screen for the people on stage.", keywords: "confidence platform next clock" },
+        { id: "captions", title: "Captions", icon: "captions", color: "#0f9d8a", about: "Live captions on the screen and on phones, translated.", keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
       ],
     },
     {
@@ -978,6 +981,8 @@
             </select>
           </div>
         </section>
+      {:else if section === "captions"}
+        <CaptionsSettings onai={() => (section = "ai")} />
       {:else if section === "ai"}
         {@const ai = session.workspace.ai}
         <section class="rows">

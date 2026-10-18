@@ -171,3 +171,16 @@ describe("stage links", () => {
     expect(pruneRemoteGate(gate, ctx.now).devices).toHaveLength(1);
   });
 });
+
+describe("captions links", () => {
+  it("read captions and nothing else", async () => {
+    const { routeRemote, captionsDevice, stageDevice, remoteEnvelope } = await import("./remote");
+    const ctx = (hash: string) => ({ now: 10_000_000_000, tokenHash: hash, newId: () => "x", newSecret: () => "y" });
+    const gate = { pairing: null, devices: [captionsDevice("c", "c".repeat(64), 1), stageDevice("s", "Band", "s".repeat(64), 1)], pending: [] };
+    expect(routeRemote(gate, remoteEnvelope("captions", { token: "t" }), ctx("c".repeat(64))).action).toEqual({ kind: "captions" });
+    expect(routeRemote(gate, remoteEnvelope("stage", { token: "t" }), ctx("c".repeat(64))).action).toBeNull();
+    expect(routeRemote(gate, remoteEnvelope("command", { token: "t", id: "take" }), ctx("c".repeat(64))).action).toBeNull();
+    // A stage link does not read captions.
+    expect(routeRemote(gate, remoteEnvelope("captions", { token: "t" }), ctx("s".repeat(64))).action).toBeNull();
+  });
+});

@@ -59,6 +59,11 @@ export type AiRequest = { url: string; headers: Record<string, string>; body: st
 
 export function summaryRequest(settings: AiSettings, input: { title: string; notes: string }): AiRequest {
   const message = `Sermon title: ${input.title || "(untitled)"}\n\nNotes:\n${input.notes.slice(0, 40_000)}`;
+  return chatRequest(settings, INSTRUCTIONS, message, { maxTokens: 1500, temperature: 0.3 });
+}
+
+/** One instruction and one message to the church's AI service (Claude, or any OpenAI-style API). */
+export function chatRequest(settings: AiSettings, system: string, message: string, options: { maxTokens: number; temperature: number }): AiRequest {
   if (settings.provider === "anthropic") {
     const base = (settings.baseUrl || AI_DEFAULTS.anthropic.baseUrl).replace(/\/+$/, "");
     return {
@@ -72,8 +77,8 @@ export function summaryRequest(settings: AiSettings, input: { title: string; not
       },
       body: JSON.stringify({
         model: settings.model,
-        max_tokens: 1500,
-        system: INSTRUCTIONS,
+        max_tokens: options.maxTokens,
+        system,
         messages: [{ role: "user", content: message }],
       }),
     };
@@ -88,10 +93,10 @@ export function summaryRequest(settings: AiSettings, input: { title: string; not
     body: JSON.stringify({
       model: settings.model,
       messages: [
-        { role: "system", content: INSTRUCTIONS },
+        { role: "system", content: system },
         { role: "user", content: message },
       ],
-      temperature: 0.3,
+      temperature: options.temperature,
     }),
   };
 }

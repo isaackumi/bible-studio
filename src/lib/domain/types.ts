@@ -451,6 +451,8 @@ export type Workspace = {
   audio: import("./playlists").AudioSettings;
   /** A second audience screen with its own look (lobby, overflow room). */
   secondOutput: import("./second-output").SecondOutputSettings;
+  /** Live captions on the screen and on phones. */
+  captions: import("./captions").CaptionSettings;
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];
