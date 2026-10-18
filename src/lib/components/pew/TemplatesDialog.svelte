@@ -19,6 +19,30 @@
       : null,
   );
   let armed = $state<string | null>(null);
+  /** The part being dragged, and where it would land. */
+  let dragFrom = $state<number | null>(null);
+  let dragOver = $state<number | null>(null);
+
+  function dropAt(to: number) {
+    if (dragFrom === null || !selected) return;
+    const from = dragFrom;
+    dragFrom = null;
+    dragOver = null;
+    if (from === to) return;
+    const parts = [...selected.parts];
+    const [part] = parts.splice(from, 1);
+    parts.splice(to, 0, part!);
+    save({ parts });
+  }
+
+  /** Alt+↑ / Alt+↓ on the handle moves a part without a mouse. */
+  function handleKey(event: KeyboardEvent, index: number) {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    event.preventDefault();
+    movePart(index, event.key === "ArrowUp" ? -1 : 1);
+    const to = index + (event.key === "ArrowUp" ? -1 : 1);
+    queueMicrotask(() => document.getElementById(`tpl-grip-${to}`)?.focus());
+  }
 
   function save(change: Partial<ServiceTemplate>) {
     if (!selected) return;
@@ -96,7 +120,26 @@
         <ol class="parts">
           {#each selected.parts as part, index (index)}
             {@const slot = plan.slots[index]!}
-            <li class="part" style:--tone={TONES[index % TONES.length]}>
+            <li
+              class="part"
+              class:dragging={dragFrom === index}
+              class:over={dragOver === index && dragFrom !== index}
+              style:--tone={TONES[index % TONES.length]}
+              ondragover={(event) => { if (dragFrom !== null) { event.preventDefault(); dragOver = index; } }}
+              ondragleave={() => { if (dragOver === index) dragOver = null; }}
+              ondrop={(event) => { event.preventDefault(); dropAt(index); }}
+            >
+              <button
+                type="button"
+                id="tpl-grip-{index}"
+                class="grip"
+                draggable="true"
+                aria-label="Move {part.name}: drag, or Alt+arrow keys"
+                title="Drag to move"
+                ondragstart={(event) => { dragFrom = index; event.dataTransfer?.setData("text/plain", String(index)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
+                ondragend={() => { dragFrom = null; dragOver = null; }}
+                onkeydown={(event) => handleKey(event, index)}
+              ><Icon name="grip" size={14} /></button>
               <span class="when"><i class="p-dot" aria-hidden="true"></i>{clockLabel(slot.start)}</span>
               <input class="part-name" aria-label="Part name" value={part.name} onchange={(event) => setPart(index, { ...part, name: event.currentTarget.value.trim() || part.name })} />
               <select
@@ -120,11 +163,7 @@
               {:else if part.minutes !== undefined && !LENGTH_PRESETS.includes(part.minutes)}
                 <input type="number" class="small" min="0" max="600" aria-label="Minutes" value={part.minutes} onchange={(event) => setPart(index, { name: part.name, minutes: Number(event.currentTarget.value) || 0 })} />
               {/if}
-              <span class="tools">
-                <button type="button" aria-label="Move {part.name} up" disabled={index === 0} onclick={() => movePart(index, -1)}><Icon name="chevron-up" size={13} /></button>
-                <button type="button" aria-label="Move {part.name} down" disabled={index === selected.parts.length - 1} onclick={() => movePart(index, 1)}><Icon name="chevron-down" size={13} /></button>
-                <button type="button" aria-label="Remove {part.name}" onclick={() => save({ parts: selected.parts.filter((_, n) => n !== index) })}><Icon name="close" size={13} /></button>
-              </span>
+              <button type="button" class="del" aria-label="Delete {part.name}" title="Delete this part" onclick={() => save({ parts: selected.parts.filter((_, n) => n !== index) })}><Icon name="trash" size={14} /></button>
             </li>
           {/each}
         </ol>
@@ -175,10 +214,13 @@
   .part-name { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
   .part-name:hover, .part-name:focus { border-color: var(--line); background: var(--field); }
   .part select { flex: none; width: 150px; height: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
-  .tools { display: inline-flex; gap: 2px; }
-  .tools button { width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; }
-  .tools button:disabled { opacity: 0.3; }
-  .tools button:hover:not(:disabled) { color: var(--ink); background: var(--field); }
+  .grip { flex: none; width: 22px; height: 30px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--ink); background: var(--field); }
+  .grip:active { cursor: grabbing; }
+  .part.dragging { opacity: 0.4; }
+  .part.over { border-color: var(--accent); box-shadow: 0 -2px 0 var(--accent); }
+  .del { flex: none; width: 30px; height: 30px; border: 0; border-radius: 7px; background: none; color: var(--muted); display: grid; place-items: center; }
+  .del:hover { color: var(--danger, #e5484d); background: color-mix(in srgb, var(--danger, #e5484d) 12%, transparent); }
   .row-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .ghost { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
   .chip { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 13px; background: none; color: var(--ink); font: inherit; font-size: 12px; }
