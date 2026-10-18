@@ -117,3 +117,20 @@ describe("clear words", () => {
     expect(withoutWords(look)?.layers?.map((layer) => layer.id)).toEqual(["cam"]);
   });
 });
+
+describe("clearing a lower-third theme", () => {
+  it("leaves only the background: no bars, verse or reference", async () => {
+    const { withoutWords } = await import("./live");
+    const theme = { ...defaultTheme(), layout: "lower-third" as const };
+    const verse: PresentationModel = { layout: "scripture", theme, reference: "John 3:16", attribution: "KJV", lines: [{ text: "For God so loved the world" }], imageUrl: null, backgroundImageUrl: null };
+    const live = applyProgramAction(setPreview(createLiveState(theme), frame(verse, "v", "cut")), "take", theme, { title: "", imageUrl: null });
+    const cleared = applyProgramAction(live, "clear", theme, { title: "", imageUrl: null }).program.model;
+    expect(cleared.layout).toBe("empty");
+    expect(cleared.reference).toBeNull();
+    expect(cleared.lines).toEqual([]);
+    const words = withoutWords(live.program.model)!;
+    expect(words.layout).toBe("empty");
+    expect(words.reference).toBeNull();
+    expect(words.lines).toEqual([]);
+  });
+});
