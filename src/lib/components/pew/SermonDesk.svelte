@@ -303,6 +303,21 @@
     void session.previewSermonSection(sermon, sectionId);
   }
 
+  // Dragging sermon sections in the editor.
+  let cardDrag = $state<number | null>(null);
+  let cardDrop = $state<number | null>(null);
+  function dropCard(to: number) {
+    if (cardDrag === null || !draft) return;
+    const from = cardDrag;
+    cardDrag = null;
+    cardDrop = null;
+    if (from === to) return;
+    const next = draft.sections.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved!);
+    draft.sections = next;
+  }
+
   function moveDraft(sectionId: string, direction: 1 | -1) {
     if (!draft) return;
     const from = draft.sections.findIndex((entry) => entry.id === sectionId);
@@ -418,14 +433,30 @@
         </label>
 
         {#each draft.sections as section, i (section.id)}
-          <div class="edit-card">
+          <div
+            class="edit-card"
+            role="group"
+            aria-label={section.name}
+            class:drop-before={cardDrag !== null && cardDrop === i && cardDrag !== i}
+            class:dragging={cardDrag === i}
+            ondragover={(event) => { if (cardDrag !== null) { event.preventDefault(); cardDrop = i; } }}
+            ondrop={(event) => { event.preventDefault(); dropCard(i); }}
+          >
             <div class="edit-head">
+              <button
+                type="button"
+                class="grip"
+                draggable="true"
+                aria-label="Move {section.name || 'this section'}: drag, or Alt+arrow keys"
+                title="Drag to move"
+                ondragstart={(event) => { cardDrag = i; event.dataTransfer?.setData("text/plain", String(i)); }}
+                ondragend={() => { cardDrag = null; cardDrop = null; }}
+                onkeydown={(event) => { if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) { event.preventDefault(); moveDraft(section.id, event.key === "ArrowUp" ? -1 : 1); } }}
+              ><Icon name="grip" size={14} /></button>
               <i>{i + 1}</i>
               <input aria-label="Section name" placeholder="Section name" bind:value={section.name} />
               <button type="button" class="row-tool" aria-label={`Preview ${section.name}`} title="Preview" onclick={() => previewDraftSection(section.id)}><Icon name="play" size={14} /></button>
-              <button type="button" class="row-tool" aria-label={`Move ${section.name} up`} title="Move up" disabled={i === 0} onclick={() => moveDraft(section.id, -1)}><Icon name="chevron-up" size={14} /></button>
-              <button type="button" class="row-tool" aria-label={`Move ${section.name} down`} title="Move down" disabled={i === draft.sections.length - 1} onclick={() => moveDraft(section.id, 1)}><Icon name="chevron-down" size={14} /></button>
-              <button type="button" class="row-tool" aria-label={`Remove ${section.name}`} title="Remove" onclick={() => removeDraft(section.id)}><Icon name="close" size={14} /></button>
+              <button type="button" class="row-tool del" aria-label={`Delete ${section.name}`} title="Delete this section" onclick={() => removeDraft(section.id)}><Icon name="trash" size={14} /></button>
             </div>
             <div class="two">
               <div class="audience-edit">
@@ -670,4 +701,9 @@
     .card-main, .two { grid-template-columns: 1fr; }
     .notes { padding-left: 0; border-left: 0; }
   }
+  .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--ink); background: var(--field); }
+  .edit-card.dragging { opacity: 0.4; }
+  .edit-card.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+  .row-tool.del:hover { color: var(--danger, #e5484d); }
 </style>

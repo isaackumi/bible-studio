@@ -1,9 +1,26 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
+  import Icon from "./Icon.svelte";
 
   const suggestions = ["Opening", "Worship", "Word", "Offering", "Announcements", "Closing"];
   let sectionName = $state("");
   let name = $state("Sunday Service");
+  // Drag a part or an item by its handle; an item can go into any part. Alt+arrows move it too.
+  let dragSection = $state<string | null>(null);
+  let dragItem = $state<string | null>(null);
+  let over = $state<string | null>(null);
+
+  function end() {
+    dragSection = null;
+    dragItem = null;
+    over = null;
+  }
+
+  function key(event: KeyboardEvent, move: (direction: 1 | -1) => void) {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    event.preventDefault();
+    move(event.key === "ArrowUp" ? -1 : 1);
+  }
 </script>
 
 <div class="rundown">
@@ -24,29 +41,65 @@
         <button type="button" onclick={() => session.addSection(name)}>{name}</button>
       {/each}
     </div>
-    {#each session.service.sections as section (section.id)}
-      <div class="section-block">
+    {#each session.service.sections as section, sectionIndex (section.id)}
+      <div
+        class="section-block"
+        role="group"
+        aria-label={section.name}
+        class:drop-on={over === `section:${section.id}`}
+        ondragover={(event) => { if (dragSection || dragItem) { event.preventDefault(); over = `section:${section.id}`; } }}
+        ondrop={(event) => {
+          event.preventDefault();
+          if (dragSection) session.moveSectionTo(dragSection, sectionIndex);
+          else if (dragItem) session.moveItemTo(dragItem, section.id, section.items.length);
+          end();
+        }}
+      >
         <div class="section-head">
+          <button
+            type="button"
+            class="grip"
+            draggable="true"
+            aria-label="Move {section.name}: drag, or Alt+arrow keys"
+            title="Drag to move"
+            ondragstart={(event) => { dragSection = section.id; event.dataTransfer?.setData("text/plain", section.id); }}
+            ondragend={end}
+            onkeydown={(event) => key(event, (direction) => session.moveSection(section.id, direction))}
+          ><Icon name="grip" size={14} /></button>
           <input
             class="field"
             value={section.name}
             aria-label="Rename section"
             onchange={(event) => session.renameSection(section.id, event.currentTarget.value)}
           />
-          <button class="ghost" type="button" onclick={() => session.moveSection(section.id, -1)} aria-label="Move section up">↑</button>
-          <button class="ghost" type="button" onclick={() => session.moveSection(section.id, 1)} aria-label="Move section down">↓</button>
-          <button class="ghost" type="button" onclick={() => session.removeSection(section.id)} aria-label="Remove section">✕</button>
+          <button class="ghost del" type="button" onclick={() => session.removeSection(section.id)} aria-label="Remove section" title="Delete this part"><Icon name="trash" size={14} /></button>
         </div>
-        {#each section.items as item (item.id)}
-          <div class="item-row" class:selected={session.cursor.itemId === item.id}>
+        {#each section.items as item, itemIndex (item.id)}
+          <div
+            class="item-row"
+            role="listitem"
+            class:selected={session.cursor.itemId === item.id}
+            class:drop-on={over === `item:${item.id}`}
+            ondragover={(event) => { if (dragItem) { event.preventDefault(); event.stopPropagation(); over = `item:${item.id}`; } }}
+            ondrop={(event) => { event.preventDefault(); event.stopPropagation(); if (dragItem) session.moveItemTo(dragItem, section.id, itemIndex); end(); }}
+          >
+            <button
+              type="button"
+              class="grip"
+              draggable="true"
+              aria-label="Move {item.title}: drag, or Alt+arrow keys"
+              title="Drag to move"
+              ondragstart={(event) => { dragItem = item.id; event.dataTransfer?.setData("text/plain", item.id); }}
+              ondragend={end}
+              onkeydown={(event) => key(event, (direction) => session.moveItem(item.id, direction))}
+            ><Icon name="grip" size={14} /></button>
             <span class="on-air-mark" class:live={session.live.program.sourceId === item.id || (item.kind === "composition" && (session.live.program.sourceId === item.composition?.compositionId || session.live.program.sourceId === `composition:${item.composition?.compositionId}`))}></span>
             <button type="button" class="text-button" onclick={(event) => { event.currentTarget.blur(); void session.selectItem(item.id); }}>
               <div>{item.title}</div>
               <div class="kind">{item.kind}</div>
             </button>
             <span class="row-actions">
-              <button class="ghost" type="button" onclick={() => session.moveItem(item.id, -1)} aria-label="Move item up">↑</button>
-              <button class="ghost" type="button" onclick={() => session.moveItem(item.id, 1)} aria-label="Move item down">↓</button>
+              <button class="ghost del" type="button" onclick={() => session.removeItem(item.id)} aria-label="Remove {item.title}" title="Delete"><Icon name="trash" size={14} /></button>
             </span>
           </div>
         {/each}
@@ -67,3 +120,9 @@
     </form>
   {/if}
 </div>
+
+<style>
+  .grip { flex: none; display: grid; place-items: center; width: 22px; height: 26px; border: 0; background: none; color: var(--muted); cursor: grab; }
+  .grip:hover { color: var(--ink); }
+  .drop-on { box-shadow: 0 -2px 0 var(--accent); }
+</style>
