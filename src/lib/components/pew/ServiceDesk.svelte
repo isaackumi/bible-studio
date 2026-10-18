@@ -210,7 +210,7 @@
               class="row-tool"
               class:armed={armedService === entry.id}
               aria-label={armedService === entry.id ? t("Confirm delete {name}", { name: entry.name }) : t("Delete {name}", { name: entry.name })}
-              title={armedService === entry.id ? "Click again to delete" : "Delete"}
+              title={armedService === entry.id ? t("Click again to delete") : t("Delete")}
               onclick={() => {
                 if (armedService !== entry.id) {
                   armedService = entry.id;
@@ -286,7 +286,7 @@
               </span>
             </header>
             {#if section.items.length === 0}
-              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => (session.cursor = { sectionId: section.id, itemId: null })}>{dragItem ? "Drop here" : "Empty. Select this section, then add songs, scripture or slides below."}</button>
+              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => (session.cursor = { sectionId: section.id, itemId: null })}>{dragItem ? t("Drop here") : t("Empty. Select this section, then add songs, scripture or slides below.")}</button>
             {/if}
             <ol class="items">
               {#each section.items as item, itemIndex (item.id)}
@@ -329,8 +329,8 @@
                   <span class="tools">
                     {#if item.kind === "deck" && item.deck}
                       {@const looping = session.deckLoop?.deckId === item.deck.deckId}
-                      <button type="button" class="loop" class:on={looping} title={looping ? "Stop the loop" : "Play on the screen by itself, a page every 8 seconds, round and round"} onclick={() => (looping ? session.stopDeckLoop() : void session.startDeckLoop(item.deck!.deckId, 8))}>
-                        <Icon name="refresh" size={12} /> {looping ? "Stop loop" : "Loop"}
+                      <button type="button" class="loop" class:on={looping} title={looping ? t("Stop the loop") : t("Play on the screen by itself, a page every 8 seconds, round and round")} onclick={() => (looping ? session.stopDeckLoop() : void session.startDeckLoop(item.deck!.deckId, 8))}>
+                        <Icon name="refresh" size={12} /> {looping ? t("Stop loop") : t("Loop")}
                       </button>
                     {/if}
                     <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
@@ -366,7 +366,7 @@
               {#each songs as song (song.id)}
                 <button type="button" onclick={() => session.addSongToService(song)}><Icon name="plus" size={13} /> <strong>{song.title || "Untitled song"}</strong><em>{song.author}</em></button>
               {:else}
-                <p class="empty">{session.songs.length ? "No songs match." : "No songs yet. Add them on the Songs page."}</p>
+                <p class="empty">{session.songs.length ? t("No songs match.") : t("No songs yet. Add them on the Songs page.")}</p>
               {/each}
             </div>
           {:else if adding === "scripture"}

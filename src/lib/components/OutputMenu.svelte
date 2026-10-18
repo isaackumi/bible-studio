@@ -4,6 +4,7 @@
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
   import ToolMenu from "./ToolMenu.svelte";
+  import { t } from "../i18n/core";
 
   // One toolbar control for the audience output: its status on the button, the output actions in the menu.
   const profile = $derived(
@@ -19,34 +20,34 @@
 </script>
 
 <ToolMenu
-  label="Audience output"
-  tip={unseen ? "Program has content, but the audience window is closed. Open output." : `${desk.title} · ${desk.line}`}
+  label={t("Audience output")}
+  tip={unseen ? t("Program has content, but the audience window is closed. Open output.") : `${desk.title} · ${desk.line}`}
   className={unseen ? "desk-btn output-trigger unseen" : "desk-btn output-trigger"}
 >
   {#snippet trigger()}
     <span class="lamp" class:on={chip.on} class:warn={unseen}></span>
-    <span class="name">{unseen ? "Not showing · Open" : chip.label}</span>
+    <span class="name">{unseen ? t("Not showing · Open") : chip.label}</span>
     <Icon name="chevron-down" size={14} />
   {/snippet}
   {#snippet children(close)}
     {#if desk.line}<p class="menu-note">{desk.title} · {desk.line}</p>{/if}
     {#if session.output.desired}
-      <button type="button" role="menuitem" onclick={() => { session.closeAudience(); close(); }}>Close output</button>
+      <button type="button" role="menuitem" onclick={() => { session.closeAudience(); close(); }}>{t("Close output")}</button>
       {#if !session.output.online}
-        <button type="button" role="menuitem" onclick={() => { session.openAudience(); close(); }}>Reopen output</button>
+        <button type="button" role="menuitem" onclick={() => { session.openAudience(); close(); }}>{t("Reopen output")}</button>
       {/if}
     {:else}
       <button type="button" role="menuitem" onclick={() => { session.openAudience(); close(); }}>
-        {external ? `Show on ${external.name}` : "Open output"}
+        {external ? t("Show on {name}", { name: external.name }) : t("Open output")}
       </button>
     {/if}
     <button type="button" role="menuitemcheckbox" aria-checked={fullscreen} onclick={() => { session.setOutputMode(fullscreen ? "window" : "fullscreen"); close(); }}>
-      Fullscreen
+      {t("Fullscreen")}
     </button>
-    <button type="button" role="menuitem" onclick={() => { void session.openStage(); close(); }}>Stage display</button>
+    <button type="button" role="menuitem" onclick={() => { void session.openStage(); close(); }}>{t("Stage display")}</button>
     <div class="menu-sep"></div>
-    <button type="button" role="menuitem" onclick={() => { session.testOutput(); close(); }}>Test output</button>
-    <button type="button" role="menuitem" onclick={() => { session.openSettings("audience"); close(); }}>Output settings…</button>
+    <button type="button" role="menuitem" onclick={() => { session.testOutput(); close(); }}>{t("Test output")}</button>
+    <button type="button" role="menuitem" onclick={() => { session.openSettings("audience"); close(); }}>{t("Output settings…")}</button>
   {/snippet}
 </ToolMenu>
 

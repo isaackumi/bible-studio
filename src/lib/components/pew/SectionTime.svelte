@@ -3,6 +3,7 @@
   import { clockLabel, clockValue, LENGTH_PRESETS, leftLabel, lengthLabel, minutesOfDay, type SlotPlan, slotNow, type SchedulePlan } from "../../domain/schedule";
   import type { ServiceSection } from "../../domain/types";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // A section's time on its heading: "9:00 – 9:45 · 45 min", with a small editor for its length
   // or the clock time it runs until, and on the day how much is left.
@@ -36,21 +37,21 @@
   {#if status}
     <span class="left" class:over={status.left < 0}>{leftLabel(status.left)}</span>
   {/if}
-  <button type="button" class="chip" class:untimed={slot.untimed} aria-expanded={open} aria-label="Time for {section.name}" onclick={() => (open = !open)}>
+  <button type="button" class="chip" class:untimed={slot.untimed} aria-expanded={open} aria-label={t("Time for {name}", { name: section.name })} onclick={() => (open = !open)}>
     <Icon name="clock" size={12} />
     {#if slot.untimed}
-      Set time
+      {t("Set time")}
     {:else}
       <span class="range">{clockLabel(slot.start)} – {clockLabel(slot.end)}</span>
-      <span class="len">{slot.until ? `until ${clockLabel(slot.end)}` : lengthLabel(slot.minutes)}</span>
+      <span class="len">{slot.until ? t("until {end}", { end: clockLabel(slot.end) }) : lengthLabel(slot.minutes)}</span>
     {/if}
   </button>
 
   {#if open}
-    <div class="pop" role="dialog" aria-label="Time for {section.name}">
-      <div class="seg" role="radiogroup" aria-label="How the time is set">
-        <button type="button" role="radio" aria-checked={mode === "length"} onclick={() => session.setSectionTiming(section.id, { minutes: section.minutes ?? (slot.minutes || 15) })}>A length</button>
-        <button type="button" role="radio" aria-checked={mode === "until"} onclick={() => session.setSectionTiming(section.id, { until: section.until ?? clockValue(slot.end > slot.start ? slot.end : slot.start + 30) })}>Until a time</button>
+    <div class="pop" role="dialog" aria-label={t("Time for {name}", { name: section.name })}>
+      <div class="seg" role="radiogroup" aria-label={t("How the time is set")}>
+        <button type="button" role="radio" aria-checked={mode === "length"} onclick={() => session.setSectionTiming(section.id, { minutes: section.minutes ?? (slot.minutes || 15) })}>{t("A length")}</button>
+        <button type="button" role="radio" aria-checked={mode === "until"} onclick={() => session.setSectionTiming(section.id, { until: section.until ?? clockValue(slot.end > slot.start ? slot.end : slot.start + 30) })}>{t("Until a time")}</button>
       </div>
 
       {#if mode === "length"}
@@ -60,26 +61,26 @@
           {/each}
         </div>
         <div class="stepper">
-          <button type="button" aria-label="Five minutes less" onclick={() => session.setSectionTiming(section.id, { minutes: Math.max(0, (section.minutes ?? 0) - 5) })}><Icon name="minus" size={14} /></button>
+          <button type="button" aria-label={t("Five minutes less")} onclick={() => session.setSectionTiming(section.id, { minutes: Math.max(0, (section.minutes ?? 0) - 5) })}><Icon name="minus" size={14} /></button>
           <label>
-            <input type="number" min="0" max="600" step="5" aria-label="Minutes" value={section.minutes ?? ""} placeholder="0" onchange={(event) => session.setSectionTiming(section.id, { minutes: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) })} />
-            <span>min</span>
+            <input type="number" min="0" max="600" step="5" aria-label={t("Minutes")} value={section.minutes ?? ""} placeholder="0" onchange={(event) => session.setSectionTiming(section.id, { minutes: event.currentTarget.value === "" ? null : Number(event.currentTarget.value) })} />
+            <span>{t("min")}</span>
           </label>
-          <button type="button" aria-label="Five minutes more" onclick={() => session.setSectionTiming(section.id, { minutes: (section.minutes ?? 0) + 5 })}><Icon name="plus" size={14} /></button>
+          <button type="button" aria-label={t("Five minutes more")} onclick={() => session.setSectionTiming(section.id, { minutes: (section.minutes ?? 0) + 5 })}><Icon name="plus" size={14} /></button>
         </div>
       {:else}
         <label class="until">
-          <span>Ends at</span>
-          <input type="time" aria-label="Ends at" value={section.until ?? ""} onchange={(event) => session.setSectionTiming(section.id, { until: event.currentTarget.value || null })} />
+          <span>{t("Ends at")}</span>
+          <input type="time" aria-label={t("Ends at")} value={section.until ?? ""} onchange={(event) => session.setSectionTiming(section.id, { until: event.currentTarget.value || null })} />
         </label>
-        <p class="note">Starts {clockLabel(slot.start)}, so {lengthLabel(slot.minutes)} long.</p>
+        <p class="note">{t("Starts {start}, so {minutes} long.", { start: clockLabel(slot.start), minutes: lengthLabel(slot.minutes) })}</p>
       {/if}
 
       <div class="foot">
-        <button type="button" class="ghost" onclick={() => { session.setSectionTiming(section.id, { minutes: null }); open = false; }}>No time</button>
-        <button type="button" class="ghost start" title="Mark this section as begun now (also happens when something in it goes live)" onclick={() => { session.startSection(section.id); open = false; }}><Icon name="play" size={12} /> Starting now</button>
-        <button type="button" class="ghost" title="A big countdown to the end of this section on Preview; LIVE shows it" onclick={() => { session.showCountdown(section.id); open = false; }}><Icon name="timer" size={12} /> Countdown</button>
-        <button type="button" class="done" onclick={() => (open = false)}>Done</button>
+        <button type="button" class="ghost" onclick={() => { session.setSectionTiming(section.id, { minutes: null }); open = false; }}>{t("No time")}</button>
+        <button type="button" class="ghost start" title={t("Mark this section as begun now (also happens when something in it goes live)")} onclick={() => { session.startSection(section.id); open = false; }}><Icon name="play" size={12} /> {t("Starting now")}</button>
+        <button type="button" class="ghost" title={t("A big countdown to the end of this section on Preview; LIVE shows it")} onclick={() => { session.showCountdown(section.id); open = false; }}><Icon name="timer" size={12} /> {t("Countdown")}</button>
+        <button type="button" class="done" onclick={() => (open = false)}>{t("Done")}</button>
       </div>
     </div>
   {/if}

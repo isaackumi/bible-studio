@@ -4,6 +4,7 @@
   import Screen from "../Screen.svelte";
   import VideoControls from "../VideoControls.svelte";
   import type { PewPage } from "../../domain/types";
+  import { t } from "../../i18n/core";
 
   // Framed Preview and Program monitors for the Songs and Sermon windows.
   // Each page chooses which monitors it shows (View menu); Program keeps running when hidden.
@@ -18,28 +19,28 @@
 {#if shown.preview}
 <figure class="screen preview">
   <figcaption>
-    <span class="kicker">Preview</span>
-    <span class="place">{place || (session.live.preview.model.layout === "empty" ? "Nothing on Preview" : "")}</span>
+    <span class="kicker">{t("Preview")}</span>
+    <span class="place">{place || (session.live.preview.model.layout === "empty" ? t("Nothing on Preview") : "")}</span>
     {#if onstep}
       <span class="steps">
-        <button type="button" class="row-tool" aria-label="Previous section" title="Previous section" onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>
-        <button type="button" class="row-tool" aria-label="Next section" title="Next section" onclick={() => onstep(1)}><Icon name="chevron-right" size={14} /></button>
+        <button type="button" class="row-tool" aria-label={t("Previous section")} title={t("Previous section")} onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>
+        <button type="button" class="row-tool" aria-label={t("Next section")} title={t("Next section")} onclick={() => onstep(1)}><Icon name="chevron-right" size={14} /></button>
       </span>
     {/if}
   </figcaption>
-  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
+  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /></div>
 </figure>
 {/if}
 {#if shown.program}
 <figure class="screen program" class:on-air={programLive}>
   <figcaption>
-    <span class="kicker">{#if programLive}<span class="dot"></span>{/if}Program</span>
-    <span class="place" class:warn={programSet && !programLive}>{programLive ? "Audience sees this" : programSet ? "Audience window closed" : "Nothing live"}</span>
+    <span class="kicker">{#if programLive}<span class="dot"></span>{/if}{t("Program")}</span>
+    <span class="place" class:warn={programSet && !programLive}>{programLive ? t("Audience sees this") : programSet ? t("Audience window closed") : t("Nothing live")}</span>
     {#if session.deckLoop}
-      <button type="button" class="loop-chip" title="Stop the loop; Program stays on this page" onclick={() => session.stopDeckLoop()}><Icon name="refresh" size={12} /> Looping · Stop</button>
+      <button type="button" class="loop-chip" title={t("Stop the loop; Program stays on this page")} onclick={() => session.stopDeckLoop()}><Icon name="refresh" size={12} /> {t("Looping · Stop")}</button>
     {/if}
   </figcaption>
-  <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
+  <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
   <VideoControls />
 </figure>
 {/if}

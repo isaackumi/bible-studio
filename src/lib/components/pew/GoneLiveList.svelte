@@ -11,6 +11,7 @@
   } from "../../domain/gone-live";
   import Icon from "../Icon.svelte";
   import { parseReference } from "../../bible/reference";
+  import { t } from "../../i18n/core";
 
   // Scriptures that have gone live, in order. A click sends one straight to the screen. The side
   // panel shows it compact; the wide window adds the words, the verses stepped through, day groups
@@ -105,7 +106,7 @@
     class:air={airOf(entry)}
     class:cursor={wide && index === cursor}
   >
-    <button type="button" class="gl-go" title="Send straight to the screen" onclick={() => void send(entry)} onfocus={() => (cursor = index)}>
+    <button type="button" class="gl-go" title={t("Send straight to the screen")} onclick={() => void send(entry)} onfocus={() => (cursor = index)}>
       <span class="gl-n">{#if order === null}<Icon name="pin" size={12} />{:else}{order}{/if}</span>
       <span class="gl-text">
         <strong>{entry.passage.reference}{#if span.endVerse > entry.passage.endVerse || span.startVerse < entry.passage.startVerse}<span class="gl-reach">&nbsp;→ {entry.passage.chapter}:{span.endVerse}</span>{/if}</strong>
@@ -113,20 +114,20 @@
         {#if wide && entry.snippet}<span class="gl-snippet">{entry.snippet}</span>{/if}
       </span>
     </button>
-    <button type="button" class="gl-act" class:on={entry.pinned} aria-label={entry.pinned ? `Unpin ${entry.passage.reference}` : `Pin ${entry.passage.reference}`} title={entry.pinned ? "Unpin" : "Pin to the top"} onclick={() => session.pinGoneLive(key, !entry.pinned)}>
+    <button type="button" class="gl-act" class:on={entry.pinned} aria-label={entry.pinned ? t("Unpin {reference}", { reference: entry.passage.reference }) : t("Pin {reference}", { reference: entry.passage.reference })} title={entry.pinned ? t("Unpin") : t("Pin to the top")} onclick={() => session.pinGoneLive(key, !entry.pinned)}>
       <Icon name={entry.pinned ? "pin-off" : "pin"} size={14} />
     </button>
-    <button type="button" class="gl-act" aria-label="Remove {entry.passage.reference} from the list" title="Remove from the list" onclick={() => session.removeGoneLive(key, true)}>
+    <button type="button" class="gl-act" aria-label={t("Remove {reference} from the list", { reference: entry.passage.reference })} title={t("Remove from the list")} onclick={() => session.removeGoneLive(key, true)}>
       <Icon name="close" size={14} />
     </button>
   </div>
   {#if wide && span.endVerse > span.startVerse}
-    <div class="gl-verses" aria-label="Verses of {entry.passage.reference}">
+    <div class="gl-verses" aria-label={t("Verses of {reference}", { reference: entry.passage.reference })}>
       {#each Array.from({ length: Math.min(60, span.endVerse - span.startVerse + 1) }, (_, n) => span.startVerse + n) as verse (verse)}
         <button
           type="button"
           class:air={airOf(entry) && onAir?.startVerse === verse}
-          title="Send {entry.passage.chapter}:{verse} to the screen"
+          title={t("Send {chapter}:{verse} to the screen", { chapter: entry.passage.chapter, verse })}
           onclick={() => void sendVerse(entry, verse)}
         >{entry.passage.chapter}:{verse}</button>
       {/each}
@@ -144,16 +145,16 @@
           <input
             bind:this={searchInput}
             type="search"
-            aria-label="Search scriptures that have gone live"
-            placeholder={wide ? "Search, e.g. John 3 or Psalm 23" : "Search, e.g. John 3"}
+            aria-label={t("Search scriptures that have gone live")}
+            placeholder={wide ? t("Search, e.g. John 3 or Psalm 23") : t("Search, e.g. John 3")}
             bind:value={query}
           />
         </label>
       {/if}
       {#if hasOlder}
-        <div class="gl-scope" role="radiogroup" aria-label="Which days">
-          <button type="button" role="radio" aria-checked={scope === "today"} onclick={() => (scope = "today")}>Today</button>
-          <button type="button" role="radio" aria-checked={scope === "all"} onclick={() => (scope = "all")}>All</button>
+        <div class="gl-scope" role="radiogroup" aria-label={t("Which days")}>
+          <button type="button" role="radio" aria-checked={scope === "today"} onclick={() => (scope = "today")}>{t("Today")}</button>
+          <button type="button" role="radio" aria-checked={scope === "all"} onclick={() => (scope = "all")}>{t("All")}</button>
         </div>
       {/if}
     </div>
@@ -161,7 +162,7 @@
 
   <div class="gl-list">
     {#if view.pinned.length}
-      {#if wide || scope === "all"}<p class="gl-day">Pinned</p>{/if}
+      {#if wide || scope === "all"}<p class="gl-day">{t("Pinned")}</p>{/if}
       {#each view.pinned as entry (goneLiveKey(entry.passage))}{@render row(entry, null)}{/each}
     {/if}
     {#each days as day (day.day)}
@@ -170,20 +171,20 @@
     {/each}
     {#if !rows.length}
       <p class="gl-empty">
-        {#if query.trim()}Nothing that has gone live matches “{query.trim()}”.
-        {:else if scope === "today" && hasOlder}Nothing has gone live today yet. All shows earlier services.
-        {:else}Every scripture that goes live is kept here, in order. Click one to send it straight back to the screen.{/if}
+        {#if query.trim()}{t("Nothing that has gone live matches “{query}”.", { query: query.trim() })}
+        {:else if scope === "today" && hasOlder}{t("Nothing has gone live today yet. All shows earlier services.")}
+        {:else}{t("Every scripture that goes live is kept here, in order. Click one to send it straight back to the screen.")}{/if}
       </p>
     {/if}
     {#if view.removed.length}
       <button type="button" class="gl-fold" aria-expanded={showRemoved} onclick={() => (showRemoved = !showRemoved)}>
-        <Icon name={showRemoved ? "chevron-down" : "chevron-right"} size={13} /> Removed ({view.removed.length})
+        <Icon name={showRemoved ? "chevron-down" : "chevron-right"} size={13} /> {t("Removed ({length})", { length: view.removed.length })}
       </button>
       {#if showRemoved}
         {#each view.removed as entry (goneLiveKey(entry.passage))}
           <div class="gl-row removed">
             <span class="gl-text"><strong>{entry.passage.reference}</strong><small>{abbr(entry.passage.translationId)} · {when(entry)}</small></span>
-            <button type="button" class="gl-act" aria-label="Add {entry.passage.reference} back" title="Add back to the list" onclick={() => session.removeGoneLive(goneLiveKey(entry.passage), false)}>
+            <button type="button" class="gl-act" aria-label={t("Add {reference} back", { reference: entry.passage.reference })} title={t("Add back to the list")} onclick={() => session.removeGoneLive(goneLiveKey(entry.passage), false)}>
               <Icon name="plus" size={14} />
             </button>
           </div>
@@ -192,7 +193,7 @@
     {/if}
   </div>
   {#if wide}
-    <p class="gl-keys"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> send to the screen · <kbd>P</kbd> pin · <kbd>Delete</kbd> remove</p>
+    <p class="gl-keys"><kbd>↑</kbd><kbd>↓</kbd> {t("move")} · <kbd>Enter</kbd> {t("send to the screen")} · <kbd>P</kbd> {t("pin")} · <kbd>Delete</kbd> {t("remove")}</p>
   {/if}
 </div>
 

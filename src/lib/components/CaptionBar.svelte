@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { parseCaptionFrame, subscribeCaptionsLocal, type CaptionFrame } from "../display/channel";
   import { isDesktop } from "../platform/runtime";
+  import { t } from "../i18n/core";
 
   // Live captions on the audience screen: the newest words in a bar over Program. The desk sends
   // them apart from Program, so captions never disturb what is on the screen.
@@ -25,7 +26,7 @@
 </script>
 
 {#if frame && frame.rows.length}
-  <div class="captions {frame.position} size-{frame.size}" role="log" aria-live="polite" aria-label="Captions">
+  <div class="captions {frame.position} size-{frame.size}" role="log" aria-live="polite" aria-label={t("Captions")}>
     {#each frame.rows as row, n (n)}<p>{row}</p>{/each}
   </div>
 {/if}

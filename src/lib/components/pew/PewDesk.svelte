@@ -561,7 +561,7 @@
             class:on={mode === entry.id}
             aria-pressed={mode === entry.id}
             aria-keyshortcuts={`Alt+${index + 1}`}
-            data-tip={`${entry.label} (Alt+${index + 1})`}
+            data-tip={t("{label} (Alt+{index})", { label: entry.label, index: index + 1 })}
             onclick={() => pickMode(entry.id)}
           >{entry.label}</button>
         {/each}
@@ -576,10 +576,10 @@
         type="button"
         class="desk-btn live"
         class:on-air={displayLive}
-        aria-label={displayLive ? "On air. Send Preview to Program" : "Go live: send Preview to Program"}
-        data-tip={displayLive ? "On air: the audience sees Program" : programSet ? "Program is set, but the audience window is closed" : "Send Preview to Program"}
+        aria-label={displayLive ? t("On air. Send Preview to Program") : t("Go live: send Preview to Program")}
+        data-tip={displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")}
         onclick={() => session.take()}
-      ><span class="pip"></span>{displayLive ? "ON AIR" : "LIVE"}</button>
+      ><span class="pip"></span>{displayLive ? t("ON AIR") : t("LIVE")}</button>
       <button type="button" class="desk-btn danger" data-tip={t("Black program")} onclick={() => session.black()}>{t("BLACK")}</button>
       <span class="clear-pair">
         <button type="button" class="desk-btn ghost" data-tip={t("Clear the words; the background, camera or video stays (W)")} aria-label={t("Clear words")} onclick={() => void session.clearWords()}><span class="wide-only">{t("CLEAR")} </span>{t("WORDS")}</button>
@@ -618,7 +618,7 @@
         class="desk-btn icon alerts-btn"
         class:on={!!session.alert}
         aria-pressed={!!session.alert}
-        data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
+        data-tip={session.alert ? t("Alert on Program: {text}", { text: session.alert.text }) : t("Alert on Program (nursery, car lights…)")}
         aria-label={t("Alerts")}
         onclick={() => (alertsOpen = true)}
       >
@@ -638,7 +638,7 @@
         class:on={session.captionsOn}
         aria-pressed={session.captionsOn}
         aria-label={t("Live captions")}
-        data-tip={session.captionsOn ? "Captions on: click to stop. Settings › Captions for phones and languages" : "Live captions on the screen and phones"}
+        data-tip={session.captionsOn ? t("Captions on: click to stop. Settings › Captions for phones and languages") : t("Live captions on the screen and phones")}
         onclick={() => void session.setCaptions(!session.captionsOn)}
       ><Icon name="captions" size={16} /></button>
       <button
@@ -646,7 +646,7 @@
         class="desk-btn icon"
         class:on={session.workspace.overlays.some((overlay) => overlay.on)}
         aria-label={t("Overlays")}
-        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
+        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? t("Overlays on the screen") : t("Overlays: logo, ticker, clock, lower third")}
         onclick={() => (overlaysOpen = true)}
       ><Icon name="layers" size={16} /></button>
       <button type="button" class="desk-btn icon help-tool" data-tour="tours" aria-label={t("Show me around")} data-tip={t("Lost? Guided tours of every page")} onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
@@ -679,7 +679,7 @@
       {#if !libraryVisible && !focus}
         <button type="button" class="lib-rail" aria-label={t("Show library")} title={t("Show library")} onclick={() => session.togglePanel(LIBRARY_PANEL)}>
           <Icon name="library" size={16} />
-          <span>{mode === "scriptures" ? "Scripture" : "Library"}</span>
+          <span>{mode === "scriptures" ? t("Scripture") : t("Library")}</span>
         </button>
       {/if}
       <div class="pb-panes">
@@ -706,13 +706,13 @@
               {/each}
               {#if session.captions.interim}<p class="heard interim">{session.captions.interim}</p>{/if}
               {#if !session.captions.lines.length && !session.captions.interim}
-                <p class="transcript-empty">{voiceActive ? "Listening. What is said shows here, and verses it hears go to Preview." : "Press Listen: what is said shows here, and verses it hears go to Preview."}</p>
+                <p class="transcript-empty">{voiceActive ? t("Listening. What is said shows here, and verses it hears go to Preview.") : t("Press Listen: what is said shows here, and verses it hears go to Preview.")}</p>
               {/if}
             </div>
             <footer class="pb-foot">
               <button type="button" class="go" class:on={voiceActive} aria-pressed={voiceActive} onclick={toggleVoice}>
                 {@render icon(voiceActive ? "mic-off" : "mic")}
-                {session.voice.status === "starting" ? "Starting…" : voiceActive ? "Stop listening" : "Listen"}
+                {session.voice.status === "starting" ? t("Starting…") : voiceActive ? t("Stop listening") : t("Listen")}
               </button>
               <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} {t("Find")}</button>
             </footer>
@@ -876,7 +876,7 @@
               <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">{t("Preview")}</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /></div>
                 </section>
               </Pane>
               {/if}
@@ -902,7 +902,7 @@
                       {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
                     </button>
                   </header>
-                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
+                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
                   <TimerControls compact />
                   <VideoControls />
                   <footer class="output-tools">
@@ -946,7 +946,7 @@
   {#if sheet}
     <div class="sheet" role="dialog" aria-label={sheet}>
       <header>
-        <strong>{sheet === "help" ? "How this desk works" : sheet === "type" ? "Theme" : "Lexicon"}</strong>
+        <strong>{sheet === "help" ? t("How this desk works") : sheet === "type" ? t("Theme") : t("Lexicon")}</strong>
         <button type="button" aria-label={t("Close")} onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
       </header>
       {#if sheet === "help"}

@@ -2,6 +2,7 @@
 // minutes") or runs until a clock time ("Worship until 11:00"). From that every section's start
 // and end follow, and on the day the desk can say how much is left and whether it runs late.
 
+import { t } from "../i18n/core";
 import type { Service, ServiceSection } from "./types";
 
 /** "08:00" → 480 (minutes after midnight). Null when it is not a time. */
@@ -108,7 +109,7 @@ export function slotNow(plan: SchedulePlan, sectionId: string | null, now: numbe
 
 /** "12 min left", "1 min left", "4 min over". */
 export function leftLabel(left: number): string {
-  return left >= 0 ? `${lengthLabel(left)} left` : `${lengthLabel(-left)} over`;
+  return left >= 0 ? t("{length} left", { length: lengthLabel(left) }) : t("{length} over", { length: lengthLabel(-left) });
 }
 
 /** Minutes after midnight for a moment. */

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import Icon from "../Icon.svelte";
+  import { t } from "../../i18n/core";
 
   // A library column that can be resized by its edge or collapsed to a rail. Width and collapsed
   // state are remembered per sidebar in this browser (a convenience; it survives without storage).
@@ -76,7 +77,7 @@
 
 {#if collapsed}
   <aside class="rail" aria-label={title}>
-    <button type="button" class="rail-btn" aria-label={`Show ${title}`} title={`Show ${title}`} onclick={() => (collapsed = false)}>
+    <button type="button" class="rail-btn" aria-label={t("Show {title}", { title })} title={t("Show {title}", { title })} onclick={() => (collapsed = false)}>
       <Icon name="library" size={16} />
     </button>
     <button type="button" class="rail-label" onclick={() => (collapsed = false)}>
@@ -91,7 +92,7 @@
       <h2>{title}</h2>
       <div class="head-actions">
         {@render actions?.()}
-        <button type="button" class="collapse" aria-label={`Hide ${title}`} title={`Hide ${title}`} onclick={() => (collapsed = true)}>
+        <button type="button" class="collapse" aria-label={t("Hide {title}", { title })} title={t("Hide {title}", { title })} onclick={() => (collapsed = true)}>
           <Icon name="chevron-left" size={16} />
         </button>
       </div>
@@ -103,12 +104,12 @@
       class="edge"
       role="separator"
       aria-orientation="vertical"
-      aria-label={`Resize ${title}`}
+      aria-label={t("Resize {title}", { title })}
       aria-valuemin={MIN}
       aria-valuemax={MAX}
       aria-valuenow={width}
       tabindex="0"
-      title="Drag to resize · double-click to reset"
+      title={t("Drag to resize · double-click to reset")}
       onpointerdown={startDrag}
       ondblclick={() => (width = DEFAULT)}
       onkeydown={keyResize}

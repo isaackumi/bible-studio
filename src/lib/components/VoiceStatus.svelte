@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import { isDesktop } from "../platform/runtime";
+  import { t } from "../i18n/core";
 
   let { compact = false }: { compact?: boolean } = $props();
 
@@ -35,9 +36,9 @@
     {#if voice.status === "listening"}
       <span class="meter" aria-hidden="true"><span style="width: {Math.max(4, Math.round(voice.level * 100))}%"></span></span>
     {/if}
-    <label class="live" data-tip="Let voice go live, cut, clear, black and show the logo. Off on every launch.">
+    <label class="live" data-tip={t("Let voice go live, cut, clear, black and show the logo. Off on every launch.")}>
       <input type="checkbox" checked={voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
-      Live voice commands
+      {t("Live voice commands")}
     </label>
   </div>
   {#if voice.heard && (voice.status === "listening" || voice.status === "stopped")}
@@ -52,7 +53,7 @@
     <p class="note">{voice.message}</p>
   {/if}
   {#if voice.status === "error" && voice.error === "denied" && isDesktop()}
-    <button type="button" class="desk-btn" onclick={session.openVoicePrivacy}>Open Privacy settings</button>
+    <button type="button" class="desk-btn" onclick={session.openVoicePrivacy}>{t("Open Privacy settings")}</button>
   {/if}
 </div>
 

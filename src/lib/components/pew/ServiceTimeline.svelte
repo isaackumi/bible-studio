@@ -2,6 +2,7 @@
   import { session } from "../../app/session.svelte";
   import { clockLabel, DEFAULT_START, leftLabel, lengthLabel, minutesOfDay, planSchedule, slotNow } from "../../domain/schedule";
   import type { Service } from "../../domain/types";
+  import { t } from "../../i18n/core";
 
   // The service at a glance: when it starts and ends, each section as a block in proportion to
   // its time, the time now, and on the day how much of the running section is left.
@@ -29,20 +30,20 @@
 <div class="timeline">
   <div class="summary">
     <label class="start">
-      <span>Starts</span>
-      <input type="time" aria-label="Service start time" value={service.startTime ?? DEFAULT_START} onchange={(event) => session.setServiceStart(event.currentTarget.value)} />
+      <span>{t("Starts")}</span>
+      <input type="time" aria-label={t("Service start time")} value={service.startTime ?? DEFAULT_START} onchange={(event) => session.setServiceStart(event.currentTarget.value)} />
     </label>
     {#if timed}
-      <span class="fact"><span>Ends</span><strong>{clockLabel(plan.end)}</strong></span>
-      <span class="fact"><span>Length</span><strong>{lengthLabel(plan.end - plan.start)}</strong></span>
+      <span class="fact"><span>{t("Ends")}</span><strong>{clockLabel(plan.end)}</strong></span>
+      <span class="fact"><span>{t("Length")}</span><strong>{lengthLabel(plan.end - plan.start)}</strong></span>
     {:else}
-      <span class="hint">Give each section a time (the clock on its heading) to see the whole morning here.</span>
+      <span class="hint">{t("Give each section a time (the clock on its heading) to see the whole morning here.")}</span>
     {/if}
-    <span class="countdown" role="group" aria-label="Countdown on the screen">
-      <span class="cd-label">Countdown</span>
-      <button type="button" class:on={session.countdownOverlayOn} aria-pressed={session.countdownOverlayOn} title="The time left in a corner of the screen (place and size it in Overlays)" onclick={() => session.toggleCountdownOverlay()}>On screen</button>
-      <button type="button" title="A big countdown on Preview; LIVE shows it" onclick={() => session.showCountdown()}>Full screen</button>
-      <select aria-label="Full-screen countdown size" value={String(session.workspace.countdownSize)} onchange={(event) => session.setCountdownSize(Number(event.currentTarget.value))}>
+    <span class="countdown" role="group" aria-label={t("Countdown on the screen")}>
+      <span class="cd-label">{t("Countdown")}</span>
+      <button type="button" class:on={session.countdownOverlayOn} aria-pressed={session.countdownOverlayOn} title={t("The time left in a corner of the screen (place and size it in Overlays)")} onclick={() => session.toggleCountdownOverlay()}>{t("On screen")}</button>
+      <button type="button" title={t("A big countdown on Preview; LIVE shows it")} onclick={() => session.showCountdown()}>{t("Full screen")}</button>
+      <select aria-label={t("Full-screen countdown size")} value={String(session.workspace.countdownSize)} onchange={(event) => session.setCountdownSize(Number(event.currentTarget.value))}>
         {#each [[160, "Medium"], [220, "Large"], [300, "Huge"], [400, "Giant"]] as [size, label] (size)}<option value={String(size)}>{label}</option>{/each}
       </select>
     </span>
@@ -51,14 +52,14 @@
         <i class="pulse" aria-hidden="true"></i>
         <strong>{runningName}</strong> · {leftLabel(status.left)}
         {#if status.behind !== null && Math.abs(status.behind) >= 2}
-          <em class:late={status.behind > 0}>{status.behind > 0 ? `${lengthLabel(status.behind)} behind` : `${lengthLabel(-status.behind)} ahead`}</em>
+          <em class:late={status.behind > 0}>{status.behind > 0 ? t("{behind} behind", { behind: lengthLabel(status.behind) }) : t("{behind} ahead", { behind: lengthLabel(-status.behind) })}</em>
         {/if}
       </span>
     {/if}
   </div>
 
   {#if timed}
-    <div class="bar" role="img" aria-label="Service timeline from {clockLabel(plan.start)} to {clockLabel(plan.end)}">
+    <div class="bar" role="img" aria-label={t("Service timeline from {start} to {end}", { start: clockLabel(plan.start), end: clockLabel(plan.end) })}>
       {#each plan.slots as slot, index (slot.sectionId)}
         {#if slot.minutes > 0}
           <button
@@ -77,7 +78,7 @@
         {/if}
       {/each}
       {#if nowPercent >= 0 && nowPercent <= 100}
-        <span class="now" style:left="{nowPercent}%" title="Now, {clockLabel(now)}"><span>{clockLabel(now)}</span></span>
+        <span class="now" style:left="{nowPercent}%" title={t("Now, {time}", { time: clockLabel(now) })}><span>{clockLabel(now)}</span></span>
       {/if}
     </div>
     <div class="ticks" aria-hidden="true">
