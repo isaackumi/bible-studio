@@ -22,13 +22,21 @@ struct BundledTranslation {
     name: &'static str,
     abbreviation: &'static str,
     file: &'static str,
+    license: &'static str,
 }
 
 const BUNDLED: &[BundledTranslation] = &[
-    BundledTranslation { id: "kjv", name: "King James Version", abbreviation: "KJV", file: "kjv.json" },
-    BundledTranslation { id: "asv", name: "American Standard Version", abbreviation: "ASV", file: "asv.json" },
-    BundledTranslation { id: "web", name: "World English Bible", abbreviation: "WEB", file: "web.json" },
-    BundledTranslation { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", file: "bbe.json" },
+    BundledTranslation { id: "kjv", name: "King James Version", abbreviation: "KJV", file: "kjv.json", license: "Public domain" },
+    BundledTranslation { id: "asv", name: "American Standard Version", abbreviation: "ASV", file: "asv.json", license: "Public domain" },
+    BundledTranslation { id: "web", name: "World English Bible", abbreviation: "WEB", file: "web.json", license: "Public domain" },
+    BundledTranslation { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", file: "bbe.json", license: "Public domain" },
+    BundledTranslation {
+        id: "twi",
+        name: "Akuapem Twi (Nkwa Asɛm)",
+        abbreviation: "TWI",
+        file: "twi.json",
+        license: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0",
+    },
 ];
 
 /// Installed on first launch. The rest are installed on request (Settings → Bible).
@@ -102,8 +110,8 @@ fn seed_translation_if_needed(
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     tx.execute(
         "INSERT INTO bible_translations (id, name, abbreviation, license_note, source)
-         VALUES (?1, ?2, ?3, 'Public domain', 'bundled')",
-        params![translation.id, translation.name, translation.abbreviation],
+         VALUES (?1, ?2, ?3, ?4, 'bundled')",
+        params![translation.id, translation.name, translation.abbreviation, translation.license],
     )
     .map_err(|e| e.to_string())?;
 
@@ -286,6 +294,14 @@ mod tests {
     #[test]
     fn bundled_kjv_contains_john_3_16() {
         assert!(john_3_16("kjv.json").starts_with("For God so loved the world"));
+    }
+
+    #[test]
+    fn bundled_twi_has_every_book_and_john_3_16() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("twi.json");
+        let books: Vec<SourceBook> = serde_json::from_reader(BufReader::new(File::open(path).expect("twi"))).expect("json");
+        assert_eq!(books.len(), 66);
+        assert!(!john_3_16("twi.json").trim().is_empty());
     }
 
     #[test]

@@ -9,6 +9,7 @@ const LOADERS: Record<string, () => Promise<{ default?: SourceBook[] } | SourceB
   asv: () => import("../../../src-tauri/resources/asv.json"),
   web: () => import("../../../src-tauri/resources/web.json"),
   bbe: () => import("../../../src-tauri/resources/bbe.json"),
+  twi: () => import("../../../src-tauri/resources/twi.json"),
 };
 
 const cache = new Map<string, Promise<SourceBook[]>>();
@@ -18,6 +19,8 @@ export const BUNDLED_TRANSLATIONS: TranslationInfo[] = [
   { id: "asv", name: "American Standard Version", abbreviation: "ASV", licenseNote: "Public domain", source: "bundled" },
   { id: "web", name: "World English Bible", abbreviation: "WEB", licenseNote: "Public domain", source: "bundled" },
   { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", licenseNote: "Public domain", source: "bundled" },
+  // Biblica's open Akuapem Twi Bible (eBible.org), CC BY-SA 4.0: shown with this credit.
+  { id: "twi", name: "Akuapem Twi (Nkwa Asɛm)", abbreviation: "TWI", licenseNote: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0", source: "bundled" },
 ];
 
 /** Every translation the app can install. `default` ones are installed on first launch. Sizes are the download. */
@@ -28,6 +31,7 @@ export const BIBLE_CATALOG: CatalogEntry[] = [
   { ...BUNDLED_TRANSLATIONS[2]!, default: true, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[1]!, default: false, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[3]!, default: false, sizeMb: 4.2, language: "English" },
+  { ...BUNDLED_TRANSLATIONS[4]!, default: false, sizeMb: 3.8, language: "Twi (Akuapem)" },
 ];
 
 export const DEFAULT_BIBLES = BIBLE_CATALOG.filter((entry) => entry.default).map((entry) => entry.id);

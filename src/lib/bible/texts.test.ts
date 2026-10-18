@@ -2,8 +2,17 @@ import { describe, expect, it } from "vitest";
 import { BUNDLED_TRANSLATIONS, bundledPassage } from "./texts";
 
 describe("bundled translations", () => {
-  it("lists four public-domain English texts", () => {
-    expect(BUNDLED_TRANSLATIONS.map((entry) => entry.id)).toEqual(["kjv", "asv", "web", "bbe"]);
+  it("lists four public-domain English texts and the open Akuapem Twi Bible", () => {
+    expect(BUNDLED_TRANSLATIONS.map((entry) => entry.id)).toEqual(["kjv", "asv", "web", "bbe", "twi"]);
+    expect(BUNDLED_TRANSLATIONS.filter((entry) => entry.licenseNote === "Public domain").map((entry) => entry.id)).toEqual(["kjv", "asv", "web", "bbe"]);
+    // Twi is shared under CC BY-SA and always shown with Biblica's credit.
+    expect(BUNDLED_TRANSLATIONS.find((entry) => entry.id === "twi")?.licenseNote).toContain("Biblica");
+  });
+
+  it("reads the Twi Bible by book, chapter and verse", async () => {
+    const [verse] = await bundledPassage("twi", 43, 3, 16, 16);
+    expect(verse?.verse).toBe(16);
+    expect(verse?.text.trim().length).toBeGreaterThan(10);
   });
 
   it("reads John 3:16 from ASV, WEB, and BBE", async () => {
