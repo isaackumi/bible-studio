@@ -17,6 +17,7 @@
   >
     <Icon name="pew" size={16} />
     <span class="label">Presenter Desk</span>
+    <span class="short">Presenter</span>
   </button>
   <button
     type="button"
@@ -28,10 +29,17 @@
   >
     <Icon name="obs" size={16} />
     <span class="label">Production Desk</span>
+    <span class="short">Production</span>
   </button>
 </nav>
 
 <style>
+  .short { display: none; }
   .compact .label { display: none; }
   .compact button { width: var(--tool-size); padding: 0; justify-content: center; }
+  /* With room in the bar, the compact switch names its desks too. */
+  @media (min-width: 1400px) {
+    .compact .short { display: inline; font-size: 12px; font-weight: 650; }
+    .compact button { width: auto; padding: 0 10px; gap: 6px; }
+  }
 </style>

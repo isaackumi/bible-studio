@@ -155,10 +155,18 @@
     {#if service}
       <header class="head">
         <input class="name" aria-label="Service name" value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
-        <span class="muted">{count} item{count === 1 ? "" : "s"} in {service.sections.length} section{service.sections.length === 1 ? "" : "s"}</span>
+        <span class="muted">{count === 0 ? "Nothing added yet" : `${count} item${count === 1 ? "" : "s"} in ${service.sections.length} section${service.sections.length === 1 ? "" : "s"}`}</span>
       </header>
 
       <div class="order">
+        {#if count === 0 && service.sections.length === 0}
+          <div class="start-guide">
+            <Icon name="list" size={22} />
+            <strong>Build the running order</strong>
+            <p>Add songs, scripture, slides and announcements with the buttons below, in the order the service goes. On Sunday, Next item moves through them.</p>
+            <p class="soft">Sections like Welcome or Worship are optional; they group items under a heading.</p>
+          </div>
+        {/if}
         {#each service.sections as section, sectionIndex (section.id)}
           <section class="block" class:target={session.cursor.sectionId === section.id}>
             <header class="block-head">
@@ -208,7 +216,7 @@
           </section>
         {/each}
 
-        <form class="add-section" onsubmit={(event) => { event.preventDefault(); if (sectionName.trim()) session.addSection(sectionName.trim()); sectionName = ""; }}>
+        <form class="add-section" class:quiet={count === 0 && service.sections.length === 0} onsubmit={(event) => { event.preventDefault(); if (sectionName.trim()) session.addSection(sectionName.trim()); sectionName = ""; }}>
           <input aria-label="New section" placeholder="Add a section" bind:value={sectionName} />
           {#each SUGGESTED.filter((name) => !service.sections.some((section) => section.name === name)).slice(0, 4) as name (name)}
             <button type="button" class="chip" onclick={() => session.addSection(name)}>{name}</button>
@@ -291,7 +299,7 @@
     <div class="next">
       <div class="next-copy">
         <span class="kicker">Up next</span>
-        <strong>{upNext?.title ?? (service ? "End of the service" : "Nothing planned")}</strong>
+        <strong>{upNext?.title ?? (!service || count === 0 ? "Nothing added yet" : "End of the service")}</strong>
       </div>
       <div class="item-steps">
         <button type="button" class="desk-btn" disabled={!service} onclick={() => void session.stepItem(-1)} title="Previous item (Page Up)"><Icon name="chevron-left" size={15} /> Previous</button>
@@ -366,6 +374,11 @@
   .loop { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .loop:hover { color: var(--ink); border-color: var(--accent); }
   .loop.on { border-color: var(--live); color: var(--live); background: color-mix(in srgb, var(--live) 10%, transparent); }
+  .start-guide { display: grid; justify-items: center; gap: 8px; max-width: 460px; margin: 48px auto 24px; text-align: center; color: var(--muted); }
+  .start-guide strong { color: var(--ink); font-size: 16px; }
+  .start-guide p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .start-guide .soft { font-size: 12px; opacity: 0.85; }
+  .add-section.quiet { opacity: 0.75; }
   .add-section { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .add-section input { width: 180px; }
   .chip { height: 28px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }

@@ -49,7 +49,7 @@
   let lastSpokenRef = "";
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
-  const themeName = $derived(session.theme().name.toUpperCase());
+  const themeName = $derived(session.theme().name);
   /** Program is showing something: the desk is on air (the audience sees it once output is open). */
   /** Program has something on it. */
   const programSet = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
@@ -62,7 +62,6 @@
   const queueVisible = $derived(panelOpen(activeLayout, QUEUE_PANEL));
   const focus = $derived(session.workspace.pew.focus);
   const showLibrary = $derived(libraryVisible && !focus);
-  const showReading = $derived(!focus);
   const showQueue = $derived(queueVisible && !focus);
   /** This page's monitor choice; Focus always shows both. */
   const monitors = $derived(session.workspace.pew.monitors[mode]);
@@ -73,8 +72,10 @@
   let frozen = $state(session.workspace.pew);
   let applying = false;
   let chromeReady = false;
+  /** The transcript and detections take room only while listening or when a phrase search found verses. */
+  const showVoice = $derived(session.voice.status !== "idle" || detections.length > 0);
   const chrome = $derived(
-    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}`,
+    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${Number(showVoice)}:${session.workspace.activeLayoutId}`,
   );
 
   function retarget() {
@@ -93,11 +94,6 @@
   function onLibrarySplit(reported: number[]) {
     if (applying || focus) return;
     session.savePew({ librarySplit: mergeSplit(session.workspace.pew.librarySplit, reported) });
-  }
-
-  function onStageSplit(reported: number[]) {
-    if (applying || focus || !showPreview) return;
-    session.savePew({ stageSplit: mergeSplit(session.workspace.pew.stageSplit, reported) });
   }
 
   function onProgramSplit(reported: number[]) {
@@ -219,6 +215,7 @@
       anchor = parsed.startVerse;
       await showPassage(parsed.startVerse, parsed.endVerse ?? parsed.startVerse);
       detections = [];
+      focusVerses();
       return;
     }
     if (parsed) {
@@ -272,6 +269,37 @@
   }
 
   let bibleInput = $state<HTMLInputElement | undefined>();
+  let verseList = $state<HTMLDivElement | undefined>();
+
+  /**
+   * After a reference is found, the keys belong to the verses: Space sends it live, ↑ ↓ step,
+   * and typing starts a new search. The cursor would otherwise stay in the search box, where
+   * Space only types a space.
+   */
+  function focusVerses() {
+    requestAnimationFrame(() => verseList?.focus({ preventScroll: true }));
+  }
+
+  function verseListKey(event: KeyboardEvent) {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      bibleKey(event);
+      return;
+    }
+    if (event.key.length === 1 && event.key !== " " && event.key !== "/") {
+      // The typed character lands in the search box, replacing the old reference.
+      bibleInput?.focus();
+      bibleInput?.select();
+    }
+  }
+
+  // Keep the chosen verse in view (a search for John 3:16 opens the chapter at verse 16).
+  $effect(() => {
+    const picked = start;
+    const count = verses.length;
+    if (picked === null || count === 0) return;
+    requestAnimationFrame(() => verseList?.querySelector(".verse.picked")?.scrollIntoView({ block: "nearest" }));
+  });
 
   // The desk's "/" focuses the Bible search while Scriptures is open with its library showing.
   $effect(() => {
@@ -585,10 +613,11 @@
           <Pane defaultSize={frozen.columns[0]} minSize={18} order={1}>
             <div class="fill">
               <PaneGroup direction="vertical" onLayoutChange={onLibrarySplit}>
+                {#if showVoice}
                 <Pane defaultSize={frozen.librarySplit} minSize={20} order={1}>
                   <div class="pb-split">
           <section class="pb-panel">
-            <header class="pb-head"><span>Live transcript</span></header>
+            <header class="pb-head"><span>Listening</span></header>
             <div class="pb-body transcript">
               {#if session.voice.status !== "idle"}<VoiceStatus />{/if}
               {#if reading.length === 0}
@@ -609,7 +638,7 @@
           </section>
           <section class="pb-panel">
             <header class="pb-head">
-              <span>Recent detections</span>
+              <span>Verses found</span>
               <button type="button" class="quiet" onclick={() => (detections = [])}><Icon name="close" size={14} /> Clear all</button>
             </header>
             <div class="pb-body detections">
@@ -624,7 +653,8 @@
         </div>
                 </Pane>
                 <PaneResizer />
-                <Pane defaultSize={100 - frozen.librarySplit} minSize={24} order={2}>
+                {/if}
+                <Pane defaultSize={showVoice ? 100 - frozen.librarySplit : 100} minSize={24} order={2}>
         {#if mode === "scriptures"}
           <section class="pb-panel scriptures">
             <form class="script-bar" onsubmit={lookup}>
@@ -680,6 +710,15 @@
                 {@const current = passage()!}
                 <FavoriteStar on={session.isFavoritePassage(current)} label={current.reference} onclick={() => session.toggleFavoritePassage(current)} size={16} />
               {/if}
+              <button
+                type="button"
+                class="mini mic"
+                class:on={voiceActive}
+                aria-pressed={voiceActive}
+                aria-label={voiceActive ? "Stop listening" : "Listen for verses"}
+                data-tip={voiceActive ? "Stop listening" : "Listen: verses the preacher reads go to Preview"}
+                onclick={toggleVoice}
+              >{@render icon(voiceActive ? "mic-off" : "mic")}</button>
               <button type="button" class="mini" aria-label="Previous chapter" onclick={() => moveChapter(-1)}>{@render icon("chevron-left")}</button>
               <button type="button" class="mini" aria-label="Next chapter" onclick={() => moveChapter(1)}>{@render icon("chevron-right")}</button>
               <button type="button" class="mini" aria-label="Hide library" title="Hide library" onclick={() => session.togglePanel(LIBRARY_PANEL)}><Icon name="library" size={16} /></button>
@@ -701,7 +740,9 @@
               </div>
             {/if}
             {#if note}<p class="script-note">{note}</p>{/if}
-            <div class="verse-list" class:wrap={wrapVerses}>
+            <!-- The list takes the keys after a search: Space for LIVE, arrows to step, typing searches again. -->
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+            <div class="verse-list" class:wrap={wrapVerses} bind:this={verseList} tabindex="-1" role="group" aria-label="Verses" onkeydown={verseListKey}>
               {#each verses as verse (verse.verse)}
                 <button
                   type="button"
@@ -724,27 +765,9 @@
         {/if}
         <Pane defaultSize={!showRight ? (showLibrary ? frozen.columns[1] + frozen.columns[2] : 100) : showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
           <div class="fill">
-            <PaneGroup direction="vertical" onLayoutChange={onStageSplit}>
-              {#if showReading}
-                <Pane defaultSize={showPreview ? frozen.stageSplit : 100} minSize={20} order={1}>
-                  <section class="pb-panel">
-                    <header class="pb-head"><span class="kicker plain">Scripture reading</span></header>
-          <div class="pb-body display">
-            {#if mode === "scriptures"}
-              <article class="reading">
-                <p class="reading-ref">{passage()?.reference ?? query}</p>
-                {#each reading as verse (verse.verse)}
-                  <p><sup>{verse.verse}</sup> {verse.text}</p>
-                {/each}
-              </article>
-            {/if}
-          </div>
-        </section>
-                </Pane>
-                {#if showPreview}<PaneResizer />{/if}
-              {/if}
+            <PaneGroup direction="vertical">
               {#if showPreview}
-              <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
+              <Pane defaultSize={100} minSize={20} order={2}>
                 <section class="pb-panel preview">
                   <header class="pb-head"><span class="kicker">Preview</span></header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint="Nothing on Preview yet. Pick a verse, song or slide." /></div>
@@ -767,10 +790,10 @@
                     <button
                       type="button"
                       class="style-name"
-                      data-tip="Font, color, and layout. Preview only until you press LIVE."
+                      data-tip="Change the look: font, color and layout"
                       onclick={() => (sheet = sheet === "type" ? null : "type")}
                     >
-                      {themeName} · {session.theme().layout === "lower-third" ? "Lower third" : "Frame"}
+                      <Icon name="themes" size={12} /> Theme: {themeName}
                     </button>
                   </header>
                   <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint="The audience sees nothing yet. Press LIVE (Space) to send Preview." /></div>
@@ -1129,10 +1152,10 @@
     -webkit-box-orient: vertical;
   }
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
-  .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
-  .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
-  .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
+  .transcript, .detections { overflow: auto; padding: var(--panel-pad); }
+  .transcript p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
+  .transcript sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
+  .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
   .detections button {
     border: 1px solid var(--line);
@@ -1149,13 +1172,12 @@
   .queue-actions { display: flex; gap: 8px; }
   .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
-  .display { padding: 12px; }
   .monitor {
     flex: 1;
     min-height: 0;
     container-type: size;
     display: grid;
-    place-items: center;
+    place-items: start center;
     padding: 8px 12px 12px;
   }
   .monitor :global(.ratio) {
@@ -1166,7 +1188,6 @@
     background: #050505;
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
-  .kicker.plain { font-size: 12px; letter-spacing: 0; text-transform: none; }
   .kicker.program { color: var(--live); }
   .pb-panel.preview { border-style: dashed; }
   .pb-panel.output { border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
@@ -1175,12 +1196,18 @@
     margin-left: auto;
     border: 0;
     background: transparent;
-    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     font: inherit;
-    font-size: 10px;
-    letter-spacing: 0.12em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--muted);
     cursor: pointer;
   }
+  .style-name:hover { color: var(--ink); }
   .output-tools { justify-content: space-between; padding-bottom: 10px; flex: none; position: relative; z-index: 1; }
   .lex, .steppers button {
     height: 32px;
