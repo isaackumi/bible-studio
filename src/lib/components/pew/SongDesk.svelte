@@ -398,6 +398,20 @@
   // The order the song is sung in. Editing starts from the order shown (the sections as written
   // until the song has its own).
   let dragFrom = $state<number | null>(null);
+  // Dragging the song's sections in the editor.
+  let sectionDrag = $state<number | null>(null);
+  let sectionDrop = $state<number | null>(null);
+  function dropSection(to: number) {
+    if (sectionDrag === null || !draft) return;
+    const from = sectionDrag;
+    sectionDrag = null;
+    sectionDrop = null;
+    if (from === to) return;
+    const sections = [...draft.sections];
+    const [moved] = sections.splice(from, 1);
+    sections.splice(to, 0, moved!);
+    draft.sections = sections;
+  }
   const draftOrder = $derived(draft ? songOrder(asSong(draft)) : []);
   const draftById = $derived(new Map((draft?.sections ?? []).map((section) => [section.id, section])));
   function setOrder(next: string[]) {
@@ -666,12 +680,36 @@
           </div>
         </div>
         {#each draft.sections as section, i (section.id)}
-          <div class="edit-section" style:--tone="var(--sec-{sectionTone(section)})">
+          <div
+            class="edit-section"
+            role="group"
+            aria-label={section.label}
+            class:dragging={sectionDrag === i}
+            class:drop-before={sectionDrag !== null && sectionDrop === i && sectionDrag !== i}
+            style:--tone="var(--sec-{sectionTone(section)})"
+            ondragover={(event) => { if (sectionDrag !== null) { event.preventDefault(); sectionDrop = i; } }}
+            ondrop={(event) => { event.preventDefault(); dropSection(i); }}
+          >
             <div class="edit-section-head">
+              <button
+                type="button"
+                id="song-grip-{i}"
+                class="grip"
+                draggable="true"
+                aria-label="Move {section.label}: drag, or Alt+arrow keys"
+                title="Drag to move this section"
+                ondragstart={(event) => { sectionDrag = i; event.dataTransfer?.setData("text/plain", String(i)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
+                ondragend={() => { sectionDrag = null; sectionDrop = null; }}
+                onkeydown={(event) => {
+                  if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown") || !draft) return;
+                  event.preventDefault();
+                  const step = event.key === "ArrowUp" ? -1 : 1;
+                  draft.sections = moveSongSection(asSong(draft), section.id, step).sections;
+                  queueMicrotask(() => document.getElementById(`song-grip-${i + step}`)?.focus());
+                }}
+              ><Icon name="grip" size={14} /></button>
               <input aria-label="Section label" bind:value={section.label} />
-              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} up`} disabled={i === 0} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, -1).sections)}><Icon name="chevron-up" size={14} /></button>
-              <button type="button" class="desk-btn ghost icon" aria-label={`Move ${section.label} down`} disabled={i === draft.sections.length - 1} onclick={() => draft && (draft.sections = moveSongSection(asSong(draft), section.id, 1).sections)}><Icon name="chevron-down" size={14} /></button>
-              <button type="button" class="desk-btn ghost icon" aria-label={`Remove ${section.label}`} onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="close" size={14} /></button>
+              <button type="button" class="desk-btn ghost icon del" aria-label={`Delete ${section.label}`} title="Delete this section" onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="trash" size={14} /></button>
             </div>
             <textarea
               aria-label="{section.label} lines"
@@ -1128,4 +1166,9 @@
   .order-add .muted { font-size: 12px; }
   .order-add-btn { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--tone) 60%, var(--line)); background: none; color: var(--ink); font: inherit; font-size: 12px; }
   .order-add-btn:hover { background: color-mix(in srgb, var(--tone) 14%, transparent); }
+  .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--ink); background: var(--field); }
+  .edit-section.dragging { opacity: 0.4; }
+  .edit-section.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+  .desk-btn.del:hover { color: var(--danger, #e5484d); }
 </style>

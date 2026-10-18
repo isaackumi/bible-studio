@@ -15,6 +15,9 @@
   let fileInput = $state<HTMLInputElement | undefined>();
   let armed = $state<string | null>(null);
   let note = $state("");
+  /** Dragging tracks to reorder the playlist. */
+  let trackDrag = $state<number | null>(null);
+  let trackDrop = $state<number | null>(null);
 
   const playlists = $derived(session.workspace.playlists);
   const selected = $derived(playlists.find((list) => list.id === selectedId) ?? playlists[0] ?? null);
@@ -96,16 +99,39 @@
         <ol class="track-list">
           {#each tracks as track, index (`${index}:${track.id}`)}
             {@const now = playingHere && deck.index === index}
-            <li class="track" class:now>
+            <li
+              class="track"
+              class:now
+              class:dragging={trackDrag === index}
+              class:drop-before={trackDrag !== null && trackDrop === index && trackDrag !== index}
+              ondragover={(event) => { if (trackDrag !== null) { event.preventDefault(); trackDrop = index; } }}
+              ondrop={(event) => { event.preventDefault(); if (trackDrag !== null && trackDrag !== index) session.moveInPlaylist(selected.id, trackDrag, index); trackDrag = null; trackDrop = null; }}
+            >
+              <button
+                type="button"
+                id="track-grip-{index}"
+                class="grip"
+                draggable="true"
+                aria-label="Move {track.name}: drag, or Alt+arrow keys"
+                title="Drag to move"
+                ondragstart={(event) => { trackDrag = index; event.dataTransfer?.setData("text/plain", String(index)); if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"; }}
+                ondragend={() => { trackDrag = null; trackDrop = null; }}
+                onkeydown={(event) => {
+                  if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+                  event.preventDefault();
+                  const to = index + (event.key === "ArrowUp" ? -1 : 1);
+                  if (to < 0 || to >= tracks.length) return;
+                  session.moveInPlaylist(selected.id, index, to);
+                  queueMicrotask(() => document.getElementById(`track-grip-${to}`)?.focus());
+                }}
+              ><Icon name="grip" size={14} /></button>
               <button type="button" class="track-play" aria-label={now && deck.playing ? `Pause ${track.name}` : `Play ${track.name}`} onclick={() => (now ? void deck.toggle() : void session.playPlaylist(selected.id, index))}>
                 {#if now && deck.playing}<Icon name="square" size={12} />{:else}<Icon name="play" size={12} />{/if}
               </button>
               <span class="track-n">{index + 1}</span>
               <span class="track-name">{track.name.replace(/\.[a-z0-9]+$/i, "")}</span>
               {#if now}<span class="track-time">{formatDuration(deck.time)} / {formatDuration(deck.duration)}</span>{/if}
-              <button type="button" class="mini" aria-label="Move {track.name} up" disabled={index === 0} onclick={() => session.moveInPlaylist(selected.id, index, index - 1)}><Icon name="chevron-up" size={13} /></button>
-              <button type="button" class="mini" aria-label="Move {track.name} down" disabled={index === tracks.length - 1} onclick={() => session.moveInPlaylist(selected.id, index, index + 1)}><Icon name="chevron-down" size={13} /></button>
-              <button type="button" class="mini" aria-label="Remove {track.name} from {selected.name}" onclick={() => session.removeFromPlaylist(selected.id, index)}><Icon name="close" size={13} /></button>
+              <button type="button" class="mini del" aria-label="Remove {track.name} from {selected.name}" title="Remove from this playlist" onclick={() => session.removeFromPlaylist(selected.id, index)}><Icon name="trash" size={14} /></button>
             </li>
           {:else}
             <li class="empty">
@@ -203,4 +229,9 @@
     .audio { grid-template-columns: 1fr; }
     .lists { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 10px; }
   }
+  .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
+  .grip:hover { color: var(--ink); background: var(--field); }
+  .track.dragging { opacity: 0.4; }
+  .track.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+  .mini.del:hover { color: var(--danger, #e5484d); }
 </style>
