@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMedia
+import CoreText
 import Foundation
 import ImageIO
 import Network
@@ -12,6 +13,8 @@ import UniformTypeIdentifiers
 //
 // Arguments: --pid <app pid> --title <window title> --name <NDI source name> [--fps 30]
 //            [--width 1920 --height 1080]
+//            --key: send only the words, as a lower third on a transparent picture, for keying
+//            over cameras. The app writes the words as JSON lines on stdin: {"cue","body"}.
 // Prints one JSON line per event: status, stats (connections), error. Closing stdin stops it.
 
 private func emit(_ payload: [String: Any]) {
@@ -36,6 +39,8 @@ private struct Options {
     var height = 1080
     /** Send colour bars instead of the audience window (find the source in OBS before a service). */
     var pattern = false
+    /** Key: draw the words the app sends on a transparent picture instead of capturing a window. */
+    var key = false
     /** Hub: receive NDI sources and serve them to the app's screens on this computer only. */
     var hub = false
     var port: UInt16 = 47129
@@ -55,6 +60,7 @@ private struct Options {
             case "--width": width = max(320, min(3840, Int(next() ?? "") ?? width))
             case "--height": height = max(180, min(2160, Int(next() ?? "") ?? height))
             case "--pattern": pattern = true
+            case "--key": key = true
             case "--hub": hub = true
             case "--port": port = UInt16(next() ?? "") ?? port
             default: break
@@ -136,6 +142,14 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             return ndi.sendCreate(&settings)
         }
         guard instance != nil else { fail("send", "NDI could not start a sender.") }
+
+        if options.key {
+            // Words may already have arrived on stdin; start clear only if not.
+            if !hasPicture() { setWords(nil) }
+            startSending()
+            emit(["kind": "status", "message": "Sending the words as “\(options.name)” on a transparent picture (\(ndi.version)).", "name": options.name])
+            return
+        }
 
         if options.pattern {
             latest = makePattern()
@@ -235,6 +249,106 @@ private final class Sender: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
                 pixel[1] = low ? 40 : bar.1
                 pixel[2] = low ? 40 : bar.2
                 pixel[3] = 255
+            }
+        }
+        return buffer
+    }
+
+    private func hasPicture() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return latest != nil
+    }
+
+    /// Draw the words as a lower third on a transparent picture; nil or empty clears it.
+    func setWords(_ words: [String: Any]?) {
+        let cue = (words?["cue"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = (words?["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let buffer = renderKey(cue: cue, body: body)
+        lock.lock()
+        latest = buffer
+        lock.unlock()
+    }
+
+    private func renderKey(cue: String, body: String) -> CVPixelBuffer? {
+        let width = options.width, height = options.height
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, nil, &buffer)
+        guard let buffer else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return nil }
+        let stride = CVPixelBufferGetBytesPerRow(buffer)
+        memset(base, 0, stride * height)
+        if cue.isEmpty && body.isEmpty { return buffer }
+
+        let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let context = CGContext(data: base, width: width, height: height, bitsPerComponent: 8, bytesPerRow: stride,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info) else { return buffer }
+        let h = CGFloat(height), w = CGFloat(width)
+        let margin = w * 0.05
+        let pad = h * 0.03
+        let textWidth = w - margin * 2 - pad * 2
+
+        func text(_ string: String, size: CGFloat, weight: CGFloat, alpha: CGFloat) -> NSAttributedString {
+            let traits = [kCTFontWeightTrait: weight] as CFDictionary
+            let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: "Helvetica Neue", kCTFontTraitsAttribute: traits] as CFDictionary)
+            let font = CTFontCreateWithFontDescriptor(descriptor, size, nil)
+            let style = [CTParagraphStyleSetting]()
+            return NSAttributedString(string: string, attributes: [
+                NSAttributedString.Key(kCTFontAttributeName as String): font,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(red: 1, green: 1, blue: 1, alpha: alpha),
+                NSAttributedString.Key(kCTParagraphStyleAttributeName as String): CTParagraphStyleCreate(style, 0),
+            ])
+        }
+        func measure(_ string: NSAttributedString) -> CGFloat {
+            let setter = CTFramesetterCreateWithAttributedString(string)
+            return CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(location: 0, length: 0), nil, CGSize(width: textWidth, height: .greatestFiniteMagnitude), nil).height.rounded(.up)
+        }
+
+        // The words shrink until the bar fits in the lower 40% of the picture.
+        var size = h * 0.05
+        var bodyText = text(body, size: size, weight: 0.0, alpha: 1)
+        while !body.isEmpty && measure(bodyText) > h * 0.4 - pad * 2 - h * 0.05 && size > h * 0.022 {
+            size *= 0.92
+            bodyText = text(body, size: size, weight: 0.0, alpha: 1)
+        }
+        let cueText = text(cue, size: max(h * 0.024, size * 0.62), weight: 0.3, alpha: 0.82)
+        let cueHeight = cue.isEmpty ? 0 : measure(cueText)
+        let bodyHeight = body.isEmpty ? 0 : min(measure(bodyText), h * 0.4)
+        let gap = !cue.isEmpty && !body.isEmpty ? h * 0.012 : 0
+        let barHeight = cueHeight + gap + bodyHeight + pad * 2
+        let bar = CGRect(x: margin, y: h * 0.06, width: w - margin * 2, height: barHeight)
+
+        context.setFillColor(CGColor(red: 0.04, green: 0.06, blue: 0.1, alpha: 0.78))
+        context.addPath(CGPath(roundedRect: bar, cornerWidth: h * 0.012, cornerHeight: h * 0.012, transform: nil))
+        context.fillPath()
+        context.saveGState()
+        context.addPath(CGPath(roundedRect: bar, cornerWidth: h * 0.012, cornerHeight: h * 0.012, transform: nil))
+        context.clip()
+        context.setFillColor(CGColor(red: 0.95, green: 0.75, blue: 0.3, alpha: 1))
+        context.fill(CGRect(x: bar.minX, y: bar.minY, width: h * 0.006, height: bar.height))
+        context.restoreGState()
+
+        // CoreGraphics draws from the bottom up: the body sits lowest, the reference above it.
+        func draw(_ string: NSAttributedString, y: CGFloat, height: CGFloat) {
+            let setter = CTFramesetterCreateWithAttributedString(string)
+            let path = CGPath(rect: CGRect(x: bar.minX + pad, y: y, width: textWidth, height: height), transform: nil)
+            CTFrameDraw(CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil), context)
+        }
+        if !body.isEmpty { draw(bodyText, y: bar.minY + pad, height: bodyHeight) }
+        if !cue.isEmpty { draw(cueText, y: bar.minY + pad + bodyHeight + gap, height: cueHeight) }
+        context.flush()
+
+        // NDI's BGRA is straight alpha; CoreGraphics drew premultiplied.
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+        for y in 0..<height {
+            let row = pixels + y * stride
+            for x in 0..<width {
+                let pixel = row + x * 4
+                let alpha = Int(pixel[3])
+                if alpha == 0 || alpha == 255 { continue }
+                for channel in 0..<3 { pixel[channel] = UInt8(min(255, (Int(pixel[channel]) * 255 + alpha / 2) / alpha)) }
             }
         }
         return buffer
@@ -575,10 +689,15 @@ enum ChurchNDI {
         }
         let sender = Sender(options: options, ndi: ndi)
         retained = sender
-        // Closing stdin (the app stopping NDI, or quitting) ends the sender cleanly.
+        // Closing stdin (the app stopping NDI, or quitting) ends the sender cleanly. In key mode,
+        // each other line is the words to show.
         Thread {
             while let line = readLine() {
                 if line.trimmingCharacters(in: .whitespaces) == "stop" { break }
+                if options.key, let data = line.data(using: .utf8),
+                   let words = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    sender.setWords(words)
+                }
             }
             sender.stop()
         }.start()

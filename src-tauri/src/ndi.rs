@@ -10,6 +10,22 @@ pub struct NdiLine {
     pub line: String,
 }
 
+/// The two senders: Program (the audience window) and Key (the words alone, on transparency).
+#[derive(Clone, Copy)]
+pub enum Output {
+    Program,
+    Key,
+}
+
+impl Output {
+    fn event(self) -> &'static str {
+        match self {
+            Output::Program => "ndi-status",
+            Output::Key => "ndi-key-status",
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod running {
     use std::sync::Mutex;
@@ -19,15 +35,24 @@ mod running {
         pub stdin: std::process::ChildStdin,
     }
 
-    pub static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
+    pub static PROGRAM: Mutex<Option<Running>> = Mutex::new(None);
+    pub static KEY: Mutex<Option<Running>> = Mutex::new(None);
+
+    pub fn slot(output: super::Output) -> &'static Mutex<Option<Running>> {
+        match output {
+            super::Output::Program => &PROGRAM,
+            super::Output::Key => &KEY,
+        }
+    }
 }
 
 /// Start sending. `pattern` sends colour bars instead of Program (to find the source first).
-pub fn start(app: tauri::AppHandle, name: &str, fps: u32, pattern: bool) -> Result<(), String> {
+/// The key output draws the words it is given (`key_words`) on a transparent picture.
+pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, pattern: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use tauri::Emitter;
-        stop();
+        stop(output);
         let helper = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-ndi")))
@@ -39,8 +64,14 @@ pub fn start(app: tauri::AppHandle, name: &str, fps: u32, pattern: bool) -> Resu
             .args(["--pid", &std::process::id().to_string(), "--title", "Audience", "--name"])
             .arg(if clean.trim().is_empty() { "Church Studio" } else { clean.trim() })
             .args(["--fps", &fps.clamp(10, 60).to_string()]);
-        if pattern {
-            command.arg("--pattern");
+        match output {
+            Output::Key => {
+                command.arg("--key");
+            }
+            Output::Program if pattern => {
+                command.arg("--pattern");
+            }
+            Output::Program => {}
         }
         let mut child = command
             .stdin(std::process::Stdio::piped())
@@ -50,28 +81,46 @@ pub fn start(app: tauri::AppHandle, name: &str, fps: u32, pattern: bool) -> Resu
             .map_err(|error| format!("Could not start the NDI sender. {error}"))?;
         let stdout = child.stdout.take().ok_or("The NDI sender gave no status.")?;
         let stdin = child.stdin.take().ok_or("The NDI sender could not be stopped later.")?;
+        let event = output.event();
         std::thread::spawn(move || {
             let reader = std::io::BufReader::new(stdout);
             for line in std::io::BufRead::lines(reader) {
                 let Ok(line) = line else { break };
-                let _ = app.emit("ndi-status", NdiLine { line });
+                let _ = app.emit(event, NdiLine { line });
             }
-            let _ = app.emit("ndi-status", NdiLine { line: r#"{"kind":"end"}"#.into() });
+            let _ = app.emit(event, NdiLine { line: r#"{"kind":"end"}"#.into() });
         });
-        *running::RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(running::Running { child, stdin });
+        *running::slot(output).lock().unwrap_or_else(|poison| poison.into_inner()) = Some(running::Running { child, stdin });
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, name, fps, pattern);
+        let _ = (app, output, name, fps, pattern);
         Err("NDI output works on macOS for now. On Windows, NDI Tools' Screen Capture can send the audience screen meanwhile.".into())
     }
 }
 
-pub fn stop() {
+/// The words the key output shows now (empty clears it). Quiet when the key is not running.
+pub fn key_words(cue: &str, body: &str) {
     #[cfg(target_os = "macos")]
     {
-        let taken = running::RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()).take();
+        let line = serde_json::json!({ "cue": cue.chars().take(160).collect::<String>(), "body": body.chars().take(800).collect::<String>() });
+        let mut guard = running::KEY.lock().unwrap_or_else(|poison| poison.into_inner());
+        if let Some(running) = guard.as_mut() {
+            let ok = std::io::Write::write_all(&mut running.stdin, format!("{line}\n").as_bytes()).is_ok();
+            if !ok {
+                *guard = None;
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (cue, body);
+}
+
+pub fn stop(output: Output) {
+    #[cfg(target_os = "macos")]
+    {
+        let taken = running::slot(output).lock().unwrap_or_else(|poison| poison.into_inner()).take();
         if let Some(mut running) = taken {
             let _ = std::io::Write::write_all(&mut running.stdin, b"stop\n");
             drop(running.stdin);
@@ -82,6 +131,8 @@ pub fn stop() {
             });
         }
     }
+    #[cfg(not(target_os = "macos"))]
+    let _ = output;
 }
 
 /// The port the NDI hub serves on (this computer only). The app's screens show an NDI source as

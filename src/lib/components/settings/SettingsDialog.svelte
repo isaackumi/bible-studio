@@ -711,6 +711,27 @@
               {session.ndi.status === "on" && session.ndi.pattern ? "Stop test" : "Send test pattern"}
             </button>
           </div>
+          <div class="row">
+            <div class="row-copy">
+              <strong>Send the words for keying</strong>
+              <span>
+                {#if session.ndiKey.status === "on"}
+                  Sending the scripture and lyrics on Program as “{session.ndiKey.name}”, on a transparent background. {session.ndiKey.connections === 0 ? "Nothing is watching yet." : `${session.ndiKey.connections} receiver${session.ndiKey.connections === 1 ? "" : "s"} watching.`}
+                {:else if session.ndiKey.status === "starting"}{session.ndiKey.message}
+                {:else if session.ndiKey.status === "error"}<span class="form-error">{session.ndiKey.message}</span>
+                {:else}A second source with only the scripture or lyrics on Program, as a lower third on a transparent background. Lay it over a camera in OBS or vMix. It needs no screen recording permission.{/if}
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              role="switch"
+              aria-label="Send the words for keying"
+              disabled={!isDesktop()}
+              checked={session.ndiKey.status === "on" || session.ndiKey.status === "starting"}
+              onchange={(event) => (event.currentTarget.checked ? void session.startNdiKey() : void session.stopNdiKey())}
+            />
+          </div>
         </section>
         <p class="note stand">NDI needs the free NDI Tools or NDI Runtime on this computer: <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
         <p class="section-label">Screen</p>

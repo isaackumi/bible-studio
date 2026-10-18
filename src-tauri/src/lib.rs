@@ -318,12 +318,29 @@ fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String>
 /// Send Program over the network as an NDI source (macOS). Status arrives as `ndi-status` events.
 #[tauri::command]
 fn start_ndi(app: tauri::AppHandle, name: String, fps: u32, pattern: bool) -> Result<(), String> {
-    ndi::start(app, &name, fps, pattern)
+    ndi::start(app, ndi::Output::Program, &name, fps, pattern)
 }
 
 #[tauri::command]
 fn stop_ndi() {
-    ndi::stop();
+    ndi::stop(ndi::Output::Program);
+}
+
+/// Send only the words on Program, on a transparent picture, for keying over cameras in OBS or
+/// vMix (macOS). Status arrives as `ndi-key-status` events; `ndi_key_words` sets the words.
+#[tauri::command]
+fn start_ndi_key(app: tauri::AppHandle, name: String, fps: u32) -> Result<(), String> {
+    ndi::start(app, ndi::Output::Key, &name, fps, false)
+}
+
+#[tauri::command]
+fn stop_ndi_key() {
+    ndi::stop(ndi::Output::Key);
+}
+
+#[tauri::command]
+fn ndi_key_words(cue: String, body: String) {
+    ndi::key_words(&cue, &body);
 }
 
 #[tauri::command]
@@ -590,6 +607,9 @@ pub fn run() {
             start_noise_test,
             start_ndi,
             stop_ndi,
+            start_ndi_key,
+            stop_ndi_key,
+            ndi_key_words,
             stop_noise_test,
             start_remote_lan,
             remote_lan_status,

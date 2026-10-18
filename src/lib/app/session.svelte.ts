@@ -100,6 +100,7 @@ import {
 import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { controllerDevice } from "../domain/remote";
+import { keyWords } from "../domain/ndi";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
@@ -297,6 +298,7 @@ class Session {
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
+    this.pushKeyWords();
   }
   output = $state<OutputStatus>({
     desired: false,
@@ -2085,6 +2087,64 @@ class Session {
     else if (message.kind === "stats") this.ndi = { ...this.ndi, connections: Number(message.connections) || 0 };
     else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? "NDI stopped." };
     else if (message.kind === "end" && this.ndi.status !== "error") this.ndi = { ...this.ndi, status: "off", connections: 0 };
+  };
+
+  /** NDI key output: only the words on Program, on a transparent picture, to key over cameras. */
+  ndiKey = $state<{ status: "off" | "starting" | "on" | "error"; message: string; connections: number; name: string }>({
+    status: "off",
+    message: "",
+    connections: 0,
+    name: "",
+  });
+  private ndiKeyUnlisten: (() => void) | null = null;
+  private keySent = "";
+
+  startNdiKey = async () => {
+    if (!this.desktop()) {
+      this.ndiKey = { ...this.ndiKey, status: "error", message: "NDI output works in the desktop app." };
+      return;
+    }
+    const church = this.workspace.churchName.trim() || "Church Studio";
+    const name = `${church} Words`;
+    this.ndiKey = { status: "starting", message: "Starting the words output…", connections: 0, name };
+    if (!this.ndiKeyUnlisten) {
+      this.ndiKeyUnlisten = await listen<{ line: string }>("ndi-key-status", (event) => this.onNdiKeyLine(event.payload.line));
+    }
+    try {
+      await invoke("start_ndi_key", { name, fps: 30 });
+      this.keySent = "";
+      this.pushKeyWords();
+    } catch (error) {
+      this.ndiKey = { ...this.ndiKey, status: "error", message: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  stopNdiKey = async () => {
+    if (this.desktop()) await invoke("stop_ndi_key").catch(() => {});
+    this.ndiKey = { ...this.ndiKey, status: "off", message: "", connections: 0 };
+  };
+
+  /** Send the words on Program to the key output when they change. */
+  private pushKeyWords = () => {
+    if (this.ndiKey.status !== "on" && this.ndiKey.status !== "starting") return;
+    const words = keyWords(this.#live.program.model) ?? { cue: "", body: "" };
+    const sent = `${words.cue}\n${words.body}`;
+    if (sent === this.keySent) return;
+    this.keySent = sent;
+    void invoke("ndi_key_words", words).catch(() => {});
+  };
+
+  private onNdiKeyLine = (line: string) => {
+    let message: { kind?: string; message?: string; connections?: number };
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (message.kind === "status") this.ndiKey = { ...this.ndiKey, status: "on", message: message.message ?? "Sending." };
+    else if (message.kind === "stats") this.ndiKey = { ...this.ndiKey, connections: Number(message.connections) || 0 };
+    else if (message.kind === "error") this.ndiKey = { ...this.ndiKey, status: "error", message: message.message ?? "NDI stopped." };
+    else if (message.kind === "end" && this.ndiKey.status !== "error") this.ndiKey = { ...this.ndiKey, status: "off", connections: 0 };
   };
 
   /** AI assistant settings (provider, the church's own key, model). */

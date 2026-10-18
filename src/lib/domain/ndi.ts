@@ -2,6 +2,8 @@
 // video and serves it as a picture stream any screen can show. Keep the port in step with
 // HUB_PORT in src-tauri/src/ndi.rs.
 
+import type { PresentationModel } from "./types";
+
 export const NDI_HUB = "http://127.0.0.1:47129";
 
 /** The picture stream for an NDI source, by its full NDI name ("MACHINE (Name)"). */
@@ -24,4 +26,31 @@ export async function listNdiSources(fetcher: typeof fetch = fetch): Promise<str
   } catch {
     return null;
   }
+}
+
+/** The words a key output shows: a small line (the reference) and the text. */
+export type KeyWords = { cue: string; body: string };
+
+const WORD_LAYOUTS = new Set(["scripture", "lyrics", "title", "lower-third"]);
+
+/**
+ * The words on Program for the transparent key output, or null when nothing worded is showing
+ * (black, a picture, a camera, a video). In a look, the first visible scripture or lyrics region
+ * gives the words.
+ */
+export function keyWords(model: Pick<PresentationModel, "layout" | "reference" | "lines" | "layers">): KeyWords | null {
+  if (model.layout === "composition") {
+    const layer = [...(model.layers ?? [])]
+      .filter((layer) => layer.opacity > 0 && WORD_LAYOUTS.has(layer.model.layout))
+      .sort((a, b) => (a.model.layout === "scripture" || a.model.layout === "lyrics" ? 0 : 1) - (b.model.layout === "scripture" || b.model.layout === "lyrics" ? 0 : 1) || b.zIndex - a.zIndex)[0];
+    return layer ? keyWords(layer.model) : null;
+  }
+  if (!WORD_LAYOUTS.has(model.layout)) return null;
+  const body = model.lines
+    .map((line) => (line.marker ? `${line.marker} ${line.text}` : line.text).trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 600);
+  const cue = (model.reference ?? "").trim().slice(0, 120);
+  return body || cue ? { cue, body } : null;
 }
