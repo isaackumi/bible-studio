@@ -1,10 +1,11 @@
+import { cleanOrder, songOrder } from "./song-order";
 import type { Song, SongSection, SongSectionKind } from "./types";
 
 // OpenLyrics (openlyrics.org) is the open XML format for worship songs: one song per file, used
 // by OpenLP, FreeShow and others. This reads the parts a lyric projector needs (titles, authors,
 // copyright, CCLI number, verses) and writes the same back. No DOM: it runs in tests and workers.
 
-export type ParsedOpenLyrics = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[] };
+export type ParsedOpenLyrics = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[] };
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
@@ -81,20 +82,27 @@ export function parseOpenLyrics(xml: string, newId: () => string = () => crypto.
   // A song may carry each verse in several languages (lang="…"): keep the first one of each name.
   const seen = new Set<string>();
   const sections: SongSection[] = [];
+  const idByName = new Map<string, string>();
   for (const match of lyrics.matchAll(/<(?:\w+:)?verse\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?verse>/gi)) {
     const name = attr(match[1]!, "name") ?? `v${sections.length + 1}`;
     if (seen.has(name)) continue;
     seen.add(name);
     const lines = [...match[2]!.matchAll(/<(?:\w+:)?lines\b[^>]*>([\s\S]*?)<\/(?:\w+:)?lines>/gi)].flatMap((block) => linesOf(block[1]!));
     if (lines.length === 0) continue;
-    sections.push({ id: newId(), ...sectionName(name), lines });
+    const id = newId();
+    idByName.set(name.toLowerCase(), id);
+    sections.push({ id, ...sectionName(name), lines });
   }
+  // verseOrder ("v1 c v2 c b c"): the order the song is sung in.
+  const verseOrder = (texts(properties, "verseOrder")[0] ?? "").split(/\s+/).filter(Boolean);
+  const order = cleanOrder(verseOrder.map((name) => idByName.get(name.toLowerCase())).filter(Boolean), sections);
   return {
     ...(title ? { title } : {}),
     ...(author ? { author } : {}),
     ...(ccli ? { ccli } : {}),
     ...(copyright ? { copyright } : {}),
     sections,
+    ...(order ? { order } : {}),
   };
 }
 
@@ -111,13 +119,15 @@ function exportNames(sections: SongSection[]): string[] {
 
 export function songToOpenLyrics(song: Song, now = new Date()): string {
   const names = exportNames(song.sections);
+  const nameOf = new Map(song.sections.map((section, index) => [section.id, names[index]!]));
+  const sung = songOrder(song).map((id) => nameOf.get(id)).filter(Boolean);
   const authors = song.author.split(/\s*[,|&]\s*|\s+and\s+/i).map((name) => name.trim()).filter(Boolean);
   const props = [
     `    <titles>\n      <title>${encode(song.title)}</title>\n    </titles>`,
     authors.length ? `    <authors>\n${authors.map((name) => `      <author>${encode(name)}</author>`).join("\n")}\n    </authors>` : "",
     song.copyright ? `    <copyright>${encode(song.copyright)}</copyright>` : "",
     song.ccli ? `    <ccliNo>${encode(song.ccli)}</ccliNo>` : "",
-    `    <verseOrder>${names.join(" ")}</verseOrder>`,
+    `    <verseOrder>${sung.join(" ")}</verseOrder>`,
   ].filter(Boolean);
   const verses = song.sections.map(
     (section, index) =>

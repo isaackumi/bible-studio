@@ -6,7 +6,8 @@
 // accept requests from a web page); tests pass their own.
 
 import { parseLyrics } from "../domain/song";
-import type { PresentationItem, Service, ServiceSection, Song } from "../domain/types";
+import { orderFromNames } from "../domain/song-order";
+import type { PresentationItem, Service, ServiceSection, Song, SongSection } from "../domain/types";
 
 export const PCO_BASE = "https://api.planningcenteronline.com/services/v2";
 
@@ -106,6 +107,7 @@ export async function importPlan(
           title: songTitle,
           author: text(songInfo?.author),
           sections: parsed.sections,
+          ...(orderOf(arrangement, parsed.sections) ? { order: orderOf(arrangement, parsed.sections) } : {}),
           ...(ccli ? { ccli } : {}),
           ...(text(songInfo?.copyright) ? { copyright: text(songInfo?.copyright) } : {}),
           folder: "Planning Center",
@@ -123,6 +125,13 @@ export async function importPlan(
   }
   const name = [plan.title, plan.dates].filter(Boolean).join(" · ") || "Planning Center plan";
   return { service: { id: newId(), name, sections, updatedAt: now.toISOString() }, songs };
+}
+
+/** The arrangement's sequence ("Verse 1", "Chorus", …) as the song's order. */
+function orderOf(arrangement: Record<string, unknown> | undefined, sections: SongSection[]): string[] | undefined {
+  const sequence = arrangement?.sequence;
+  if (!Array.isArray(sequence)) return undefined;
+  return orderFromNames(sections, sequence.filter((name): name is string => typeof name === "string"));
 }
 
 /** HTTP Basic credentials for a Personal Access Token. */

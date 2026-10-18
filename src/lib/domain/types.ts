@@ -258,6 +258,8 @@ export type Song = {
   ccli?: string;
   /** Copyright line as published, without the © sign (e.g. "2010 Some Publisher"). */
   copyright?: string;
+  /** The order it is sung in, by section id, repeats allowed. Absent: the sections as written. */
+  order?: string[];
 };
 
 export type SermonSection = {

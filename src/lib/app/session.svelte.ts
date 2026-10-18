@@ -102,13 +102,14 @@ import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
 import { controllerDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
+import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor } from "../domain/service";
 import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
-import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, sectionPlace, songError, songFromFile, stepSongSection } from "../domain/song";
+import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { blackModel, DEFAULT_THEME_ID, defaultTheme, defaultWorkspace, emptyModel, factoryThemes, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
@@ -251,7 +252,8 @@ class Session {
   workspace = $state<Workspace>(defaultWorkspace());
   themes = $state<Theme[]>([defaultTheme()]);
   songs = $state<Song[]>([]);
-  songFocus = $state<{ songId: string; sectionId: string } | null>(null);
+  /** The song part on Preview; `slot` is its place in the song's order (a chorus is sung several times). */
+  songFocus = $state<{ songId: string; sectionId: string; slot?: number } | null>(null);
   findOpen = $state(false);
   findQuery = $state("");
   findHits = $state<SongHit[]>([]);
@@ -2478,14 +2480,16 @@ class Session {
     this.message = `${hit.title} queued. Preview it, then LIVE.`;
   };
 
-  previewSongSection = (song: Song, sectionId: string | null) => {
+  previewSongSection = (song: Song, sectionId: string | null, slot?: number) => {
     const clean = sanitizeSong(song);
     const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
     if (!section) {
       this.message = "This song has no sections.";
       return;
     }
-    this.songFocus = { songId: clean.id, sectionId: section.id };
+    const current = this.songFocus?.songId === clean.id ? (this.songFocus.slot ?? null) : null;
+    const place = slot !== undefined && songOrder(clean)[slot] === section.id ? slot : slotFor(clean, section.id, current);
+    this.songFocus = { songId: clean.id, sectionId: section.id, slot: place };
     this.previewBible = null;
     this.recentSongs = rememberSongRecent(this.recentSongs, { songId: clean.id, sectionId: section.id });
     this.library = "songs";
@@ -2508,10 +2512,10 @@ class Session {
       this.previewModel(emptyModel(this.theme()), null);
       return false;
     }
-    const next = stepSongSection(song, focus.sectionId, direction);
-    // At the first or last section there is nowhere further inside the song.
-    if (!next || next.id === focus.sectionId) return false;
-    this.previewSongSection(song, next.id);
+    // Through the song's order (a repeated chorus included); at either end there is nowhere further.
+    const next = stepSlot(song, focus.slot ?? slotFor(song, focus.sectionId), direction);
+    if (!next) return false;
+    this.previewSongSection(song, next.section.id, next.slot);
     return true;
   };
 
@@ -2519,8 +2523,11 @@ class Session {
     const focus = this.songFocus;
     if (!focus) return "";
     const song = this.songs.find((entry) => entry.id === focus.songId);
-    const place = song ? sectionPlace(song, focus.sectionId) : null;
-    return place ? `${place.label} · ${place.index + 1} of ${place.count}` : "";
+    if (!song) return "";
+    const slots = songSlots(song);
+    const slot = focus.slot ?? slotFor(song, focus.sectionId);
+    const section = slots[slot];
+    return section ? `${section.label} · ${slot + 1} of ${slots.length}` : "";
   };
 
   saveSong = async (song: Song): Promise<boolean> => {

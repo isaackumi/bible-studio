@@ -3,6 +3,7 @@
   import { songFileName, songToOpenLyrics } from "../../domain/openlyrics";
   import { createZip, readZip } from "../../domain/zip";
   import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, sectionShort, sectionTone, songCredit, songFolders } from "../../domain/song";
+  import { chorusAfterVerses, hasOwnOrder, songOrder, songSlots } from "../../domain/song-order";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
   import Icon from "../Icon.svelte";
@@ -17,7 +18,8 @@
   // Songs window: library in folders, the song's sections one click from Preview, and detection
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
 
-  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; isNew: boolean };
+  /** `order`: section ids as sung (repeats allowed); empty means the sections as written. */
+  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; order: string[]; isNew: boolean };
 
   /** The song search window. */
   let finding = $state(false);
@@ -121,7 +123,7 @@
   /** Set for a Preview that must stay on Preview (opening a song from search). */
   let previewOnly = false;
   $effect(() => {
-    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}` : null;
+    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}:${onPreview.slot ?? ""}` : null;
     const was = lastPreview;
     lastPreview = now;
     const quiet = previewOnly;
@@ -187,13 +189,13 @@
   }
 
   /** Option-click (Alt-click) puts a part on Preview only, even when its song is on the screen. */
-  function show(song: Song, sectionId: string, event?: MouseEvent) {
+  function show(song: Song, sectionId: string, event?: MouseEvent, slot?: number) {
     if (event?.altKey) previewOnly = true;
-    session.previewSongSection(song, sectionId);
+    session.previewSongSection(song, sectionId, slot);
   }
 
-  async function showAndTake(song: Song, sectionId: string) {
-    session.previewSongSection(song, sectionId);
+  async function showAndTake(song: Song, sectionId: string, slot?: number) {
+    session.previewSongSection(song, sectionId, slot);
     if (!clickLive) await session.take();
   }
 
@@ -351,6 +353,7 @@
       ccli: "",
       copyright: "",
       sections: [{ id: crypto.randomUUID(), kind: "verse", label: "Verse 1", lines: [""] }],
+      order: [],
       isNew: true,
     };
     pasteText = "";
@@ -365,13 +368,14 @@
       ccli: song.ccli ?? "",
       copyright: song.copyright ?? "",
       sections: song.sections.map((section) => ({ ...section, lines: [...section.lines] })),
+      order: [...(song.order ?? [])],
       isNew: false,
     };
     pasteText = "";
   }
 
   function asSong(value: Draft): Song {
-    return { id: value.id, title: value.title, author: value.author, folder: value.folder, ccli: value.ccli, copyright: value.copyright, sections: value.sections };
+    return { id: value.id, title: value.title, author: value.author, folder: value.folder, ccli: value.ccli, copyright: value.copyright, sections: value.sections, ...(value.order.length ? { order: value.order } : {}) };
   }
 
   function applyPaste() {
@@ -382,12 +386,47 @@
       return;
     }
     draft.sections = parsed.sections;
+    draft.order = parsed.order ? [...parsed.order] : [];
     if (!draft.title.trim() && parsed.title) draft.title = parsed.title;
     if (!draft.author.trim() && parsed.author) draft.author = parsed.author;
     if (!draft.ccli.trim() && parsed.ccli) draft.ccli = parsed.ccli;
     if (!draft.copyright.trim() && parsed.copyright) draft.copyright = parsed.copyright;
     pasteText = "";
     note = `${parsed.sections.length} section${parsed.sections.length === 1 ? "" : "s"} ready. Check the labels, then Save.`;
+  }
+
+  // The order the song is sung in. Editing starts from the order shown (the sections as written
+  // until the song has its own).
+  let dragFrom = $state<number | null>(null);
+  const draftOrder = $derived(draft ? songOrder(asSong(draft)) : []);
+  const draftById = $derived(new Map((draft?.sections ?? []).map((section) => [section.id, section])));
+  function setOrder(next: string[]) {
+    if (draft) draft.order = next;
+  }
+  function addToOrder(id: string) {
+    setOrder([...draftOrder, id]);
+  }
+  function removeFromOrder(index: number) {
+    const next = draftOrder.filter((_, n) => n !== index);
+    setOrder(next.length ? next : []);
+  }
+  function moveInOrder(from: number, to: number) {
+    if (from === to || to < 0 || to >= draftOrder.length) return;
+    const next = [...draftOrder];
+    const [id] = next.splice(from, 1);
+    next.splice(to, 0, id!);
+    setOrder(next);
+  }
+  function orderKey(event: KeyboardEvent, index: number) {
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      removeFromOrder(index);
+    } else if (event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+      event.preventDefault();
+      const to = index + (event.key === "ArrowRight" ? 1 : -1);
+      moveInOrder(index, to);
+      queueMicrotask(() => document.getElementById(`order-${to}`)?.focus());
+    }
   }
 
   function addSection(kind: SongSectionKind) {
@@ -587,6 +626,45 @@
           ></textarea>
           <button type="button" class="desk-btn" disabled={!pasteText.trim()} onclick={applyPaste}>Split into sections</button>
         </details>
+        <div class="order-edit" aria-label="Order the song is sung in">
+          <div class="order-head">
+            <strong>Order</strong>
+            <span class="muted">{hasOwnOrder(asSong(draft)) ? "Arrows and the song map follow this order." : "As written. Click a part below to add it again, e.g. the chorus after each verse."}</span>
+            <span class="order-tools">
+              {#if draft.sections.some((section) => section.kind === "chorus") && draft.sections.some((section) => section.kind === "verse")}
+                <button type="button" class="desk-btn ghost" onclick={() => draft && setOrder(chorusAfterVerses(asSong(draft)))}>Chorus after each verse</button>
+              {/if}
+              {#if hasOwnOrder(asSong(draft))}<button type="button" class="desk-btn ghost" onclick={() => setOrder([])}>As written</button>{/if}
+            </span>
+          </div>
+          <div class="order-chips" role="list">
+            {#each draftOrder as id, n (`${n}:${id}`)}
+              {@const section = draftById.get(id)}
+              {#if section}
+                <span
+                  class="order-chip"
+                  class:dragging={dragFrom === n}
+                  role="listitem"
+                  draggable="true"
+                  style:--tone="var(--sec-{sectionTone(section)})"
+                  ondragstart={() => (dragFrom = n)}
+                  ondragend={() => (dragFrom = null)}
+                  ondragover={(event) => event.preventDefault()}
+                  ondrop={(event) => { event.preventDefault(); if (dragFrom !== null) moveInOrder(dragFrom, n); dragFrom = null; }}
+                >
+                  <button type="button" id="order-{n}" class="order-name" title="{section.label}. Drag to move, or Alt+← →; Delete removes" onkeydown={(event) => orderKey(event, n)}>{sectionShort(section)}</button>
+                  <button type="button" class="order-x" aria-label="Remove {section.label} at place {n + 1}" onclick={() => removeFromOrder(n)}><Icon name="close" size={11} /></button>
+                </span>
+              {/if}
+            {/each}
+          </div>
+          <div class="order-add">
+            <span class="muted">Add</span>
+            {#each draft.sections as section (section.id)}
+              <button type="button" class="order-add-btn" style:--tone="var(--sec-{sectionTone(section)})" title="Add {section.label} to the end" onclick={() => addToOrder(section.id)}>+ {sectionShort(section)}</button>
+            {/each}
+          </div>
+        </div>
         {#each draft.sections as section, i (section.id)}
           <div class="edit-section" style:--tone="var(--sec-{sectionTone(section)})">
             <div class="edit-section-head">
@@ -647,16 +725,17 @@
       </header>
       <div class="song-bar">
       <nav class="song-map" aria-label="Song map">
-        {#each selected.sections as section (section.id)}
+        {#each songSlots(selected) as section, slot (slot)}
+          {@const here = onPreview?.songId === selected.id && onPreview.sectionId === section.id && (onPreview.slot === undefined || onPreview.slot === slot)}
           <button
             type="button"
             style:--tone="var(--sec-{sectionTone(section)})"
-            class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
-            class:live={programLive && programSource === `song:${selected.id}:${section.id}`}
-            title={section.label}
-            aria-label={section.label}
-            onclick={(event) => show(selected, section.id, event)}
-            ondblclick={() => void showAndTake(selected, section.id)}
+            class:on={here}
+            class:live={here && programLive && programSource === `song:${selected.id}:${section.id}`}
+            title="{section.label} · {slot + 1} of {songOrder(selected).length}"
+            aria-label="{section.label}, part {slot + 1}"
+            onclick={(event) => show(selected, section.id, event, slot)}
+            ondblclick={() => void showAndTake(selected, section.id, slot)}
           >{sectionShort(section)}</button>
         {/each}
       </nav>
@@ -1035,4 +1114,18 @@
     .song-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
     .fields { grid-template-columns: 1fr 1fr; }
   }
+  .order-edit { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 60%, transparent); }
+  .order-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .order-head .muted { font-size: 12px; flex: 1; min-width: 160px; }
+  .order-tools { display: inline-flex; gap: 6px; }
+  .order-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .order-chip { display: inline-flex; align-items: center; height: 28px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--tone) 55%, var(--line)); background: color-mix(in srgb, var(--tone) 18%, var(--field)); cursor: grab; }
+  .order-chip.dragging { opacity: 0.4; }
+  .order-name { height: 100%; padding: 0 4px 0 9px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: inherit; }
+  .order-x { height: 100%; width: 22px; border: 0; background: none; color: var(--muted); display: grid; place-items: center; border-radius: 0 7px 7px 0; }
+  .order-x:hover { color: var(--ink); }
+  .order-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .order-add .muted { font-size: 12px; }
+  .order-add-btn { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--tone) 60%, var(--line)); background: none; color: var(--ink); font: inherit; font-size: 12px; }
+  .order-add-btn:hover { background: color-mix(in srgb, var(--tone) 14%, transparent); }
 </style>

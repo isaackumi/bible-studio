@@ -1,4 +1,5 @@
 import { isOpenLyrics, parseOpenLyrics } from "./openlyrics";
+import { cleanOrder } from "./song-order";
 import { moveInList } from "./service";
 import type { Song, SongSection, SongSectionKind } from "./types";
 
@@ -23,6 +24,7 @@ export function sanitizeSong(song: Song): Song {
   const folder = cleanFolder(song.folder);
   const ccli = cleanCcli(song.ccli);
   const copyright = cleanCopyright(song.copyright);
+  const order = cleanOrder(song.order, sections);
   return {
     id: song.id,
     title: song.title.trim(),
@@ -31,6 +33,7 @@ export function sanitizeSong(song: Song): Song {
     ...(folder ? { folder } : {}),
     ...(ccli ? { ccli } : {}),
     ...(copyright ? { copyright } : {}),
+    ...(order ? { order } : {}),
   };
 }
 
@@ -129,6 +132,7 @@ export function songFromFile(filename: string, text: string, folder: string, new
     folder,
     ...(parsed.ccli ? { ccli: parsed.ccli } : {}),
     ...(parsed.copyright ? { copyright: parsed.copyright } : {}),
+    ...(parsed.order ? { order: parsed.order } : {}),
   });
 }
 
@@ -298,7 +302,7 @@ export function parseLyrics(
   return { ...(title ? { title } : {}), ...(author ? { author } : {}), ...(ccli ? { ccli } : {}), ...(copyright ? { copyright } : {}), sections };
 }
 
-type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[] };
+type ParsedSong = { title?: string; author?: string; ccli?: string; copyright?: string; sections: SongSection[]; order?: string[] };
 
 /** Pick the reader by file name and content: OpenLyrics, SongSelect .usr, SongSelect text, else plain lyrics / ChordPro. */
 export function parseSongFile(filename: string, text: string, newId: () => string = () => crypto.randomUUID()): ParsedSong {

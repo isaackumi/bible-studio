@@ -16,7 +16,7 @@ const routes: Record<string, unknown> = {
     ],
     included: [
       { id: "s1", type: "Song", attributes: { title: "Amazing Grace", author: "John Newton", ccli_number: 22025, copyright: "Public Domain" } },
-      { id: "a1", type: "Arrangement", attributes: { lyrics: "VERSE 1\nAmazing grace how sweet the sound\nThat saved a wretch like me\n\nVERSE 2\nTwas grace that taught my heart to fear" } },
+      { id: "a1", type: "Arrangement", attributes: { lyrics: "VERSE 1\nAmazing grace how sweet the sound\nThat saved a wretch like me\n\nVERSE 2\nTwas grace that taught my heart to fear", sequence: ["Verse 1", "Verse 2", "Verse 1"] } },
       { id: "s2", type: "Song", attributes: { title: "Holy, Holy, Holy", author: "Heber", ccli_number: 1156 } },
     ],
   },
@@ -45,6 +45,9 @@ describe("Planning Center", () => {
     expect(result.songs[0]).toMatchObject({ title: "Amazing Grace", author: "John Newton", ccli: "22025", folder: "Planning Center" });
     expect(result.songs[0]!.sections.map((section) => section.lines[0])).toEqual(["Amazing grace how sweet the sound", "Twas grace that taught my heart to fear"]);
     expect(result.service.sections[1]!.items[0]!.lyric?.songId).toBe("lib-holy");
+    // The arrangement's sequence becomes the song's order.
+    const [v1, v2] = result.songs[0]!.sections.map((section) => section.id);
+    expect(result.songs[0]!.order).toEqual([v1, v2, v1]);
   });
 
   it("explains a rejected token", async () => {
