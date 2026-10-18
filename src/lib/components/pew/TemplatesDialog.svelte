@@ -97,7 +97,7 @@
           {#each selected.parts as part, index (index)}
             {@const slot = plan.slots[index]!}
             <li class="part" style:--tone={TONES[index % TONES.length]}>
-              <span class="when">{clockLabel(slot.start)}</span>
+              <span class="when"><i class="p-dot" aria-hidden="true"></i>{clockLabel(slot.start)}</span>
               <input class="part-name" aria-label="Part name" value={part.name} onchange={(event) => setPart(index, { ...part, name: event.currentTarget.value.trim() || part.name })} />
               <select
                 aria-label="How long"
@@ -165,11 +165,13 @@
   .start input, .small { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; }
   .small { flex: none; width: 110px; }
   .strip { display: flex; gap: 2px; height: 26px; }
-  .strip span { flex-basis: 0; min-width: 4px; padding: 0 6px; border-radius: 5px; background: color-mix(in srgb, var(--tone) 32%, var(--field)); box-shadow: inset 0 -2px 0 var(--tone); font-size: 11px; font-weight: 650; line-height: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip span { flex-basis: 0; min-width: 4px; padding: 0 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--field); font-size: 11px; font-weight: 650; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: var(--tone); vertical-align: middle; }
   .sum { margin: -4px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; overflow: auto; max-height: 40vh; }
-  .part { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid var(--tone); border-radius: 8px; background: color-mix(in srgb, var(--field) 50%, transparent); }
-  .when { width: 70px; flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .part { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--field) 50%, transparent); }
+  .when { width: 86px; flex: none; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .p-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); flex: none; }
   .part-name { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
   .part-name:hover, .part-name:focus { border-color: var(--line); background: var(--field); }
   .part select { flex: none; width: 150px; height: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }

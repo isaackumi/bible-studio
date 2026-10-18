@@ -71,7 +71,7 @@
             title="{slot.name}: {clockLabel(slot.start)} – {clockLabel(slot.end)} ({lengthLabel(slot.minutes)})"
             onclick={() => (session.cursor = { sectionId: slot.sectionId, itemId: session.cursor.itemId })}
           >
-            <span class="block-name">{slot.name}</span>
+            <span class="block-name"><i class="tl-dot" aria-hidden="true"></i>{slot.name}</span>
             <span class="block-time">{clockLabel(slot.start)}</span>
           </button>
         {/if}
@@ -97,7 +97,7 @@
   .hint { font-size: 12px; color: var(--muted); }
   .countdown { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; }
   .cd-label { padding: 0 6px; font-size: 12px; font-weight: 650; color: var(--muted); }
-  .countdown button, .countdown select { height: 26px; padding: 0 9px; border: 0; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; }
+  .countdown button, .countdown select { height: 26px; padding: 0 9px; border: 0; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; }
   .countdown button:hover { background: var(--field); }
   .countdown button.on { background: #30a46c; color: #fff; }
   .countdown select { background: var(--field); }
@@ -111,11 +111,12 @@
   @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 
   .bar { position: relative; display: flex; gap: 3px; height: 46px; }
-  .block { position: relative; flex-basis: 0; min-width: 6px; display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 8px; border: 0; border-radius: 7px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); box-shadow: inset 0 -3px 0 var(--tone); color: var(--ink); font: inherit; text-align: left; overflow: hidden; }
-  .block:hover { background: color-mix(in srgb, var(--tone) 38%, var(--field)); }
-  .block.past { opacity: 0.55; }
-  .block.running { background: color-mix(in srgb, var(--tone) 48%, var(--field)); outline: 2px solid var(--tone); outline-offset: 1px; }
-  .block-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block { position: relative; flex-basis: 0; min-width: 6px; display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; text-align: left; overflow: hidden; }
+  .block:hover { border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
+  .block.past { opacity: 0.5; }
+  .block.running { background: color-mix(in srgb, #30a46c 16%, var(--field)); border-color: color-mix(in srgb, #30a46c 55%, var(--line)); }
+  .block-name { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); flex: none; }
   .block-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
   .now { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #e5484d; border-radius: 1px; pointer-events: none; }
   .now span { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); padding: 0 5px; border-radius: 4px; background: #e5484d; color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }

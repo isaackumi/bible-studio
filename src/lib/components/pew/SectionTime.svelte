@@ -87,8 +87,8 @@
 
 <style>
   .time { position: relative; display: inline-flex; align-items: center; gap: 6px; flex: none; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--tone) 45%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--tone) 12%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .chip:hover { background: color-mix(in srgb, var(--tone) 22%, transparent); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 13px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chip:hover { border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
   .chip.untimed { border-style: dashed; color: var(--muted); background: none; }
   .len { color: var(--muted); font-weight: 500; }
   .left { height: 24px; padding: 0 9px; border-radius: 12px; background: color-mix(in srgb, #30a46c 18%, transparent); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
@@ -99,7 +99,7 @@
   .seg button[aria-checked="true"] { background: var(--panel); color: var(--ink); }
   .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
   .presets button { height: 30px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
-  .presets button.on { background: var(--tone); border-color: var(--tone); color: #fff; }
+  .presets button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .stepper { display: flex; align-items: center; gap: 6px; }
   .stepper > button { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); display: grid; place-items: center; }
   .stepper label { flex: 1; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); font-size: 12px; color: var(--muted); }

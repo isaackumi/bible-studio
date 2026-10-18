@@ -211,7 +211,7 @@
   .gl-day:first-child { margin-top: 0; }
   .gl-row { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; background: var(--field); flex: none; }
   .gl-row.pinned { border-color: color-mix(in srgb, var(--mustard, #f5b301) 45%, var(--line)); }
-  .gl-row.air { border-color: var(--live, #e5484d); box-shadow: inset 3px 0 0 var(--live, #e5484d); }
+  .gl-row.air { border-color: color-mix(in srgb, var(--live, #e5484d) 55%, var(--line)); background: color-mix(in srgb, var(--live, #e5484d) 9%, var(--field)); }
   .gl-row.cursor { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 1px; }
   .gl-row.removed { align-items: center; padding-left: 10px; opacity: 0.75; }
   .gl-go { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 7px 10px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; border-radius: 8px 0 0 8px; }

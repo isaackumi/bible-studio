@@ -631,7 +631,7 @@
   .row strong { flex: none; font-size: 14px; font-variant-numeric: tabular-nums; }
   .row.verse strong { width: 46px; color: var(--muted); font-weight: 650; }
   .row .text { min-width: 0; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row.on { background: var(--field); box-shadow: inset 3px 0 0 var(--accent); }
+  .row.on { background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
   .row.range { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .row.ref strong { font-size: 15px; }
   mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; }

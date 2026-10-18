@@ -13,6 +13,7 @@
   import ItemThumb from "./ItemThumb.svelte";
   import ServiceTimeline from "./ServiceTimeline.svelte";
   import TemplatesDialog from "./TemplatesDialog.svelte";
+  import OutlineDialog from "./OutlineDialog.svelte";
   import SectionTime from "./SectionTime.svelte";
   import { planSchedule } from "../../domain/schedule";
 
@@ -28,6 +29,7 @@
   let templatesOpen = $state<{ id: string | null } | null>(null);
   /** A service whose delete button was pressed once (press again to delete). */
   let armedService = $state<string | null>(null);
+  let outlineOpen = $state(false);
   let songQuery = $state("");
   let reference = $state("");
   let referenceNote = $state("");
@@ -188,6 +190,7 @@
     {#if service}
       <header class="head">
         <input class="name" aria-label="Service name" value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
+        <button type="button" class="desk-btn ghost save-tpl" title="The service on one page: print, save as PDF or copy" onclick={() => (outlineOpen = true)}><Icon name="files" size={13} /> Outline</button>
         <button type="button" class="desk-btn ghost save-tpl" title="Keep this service's parts and times to start the next one from" onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> Save as template</button>
         <span class="muted">{count === 0 ? "Nothing added yet" : `${count} item${count === 1 ? "" : "s"} in ${service.sections.length} section${service.sections.length === 1 ? "" : "s"}`}</span>
       </header>
@@ -208,7 +211,9 @@
           {@const slot = plan.slots[sectionIndex]!}
           <section class="block" class:target={session.cursor.sectionId === section.id} class:running={session.runningSectionId === section.id} style:--tone="var(--slot-{sectionIndex % 8})">
             <header class="block-head">
+              <span class="dot" aria-hidden="true"></span>
               <input class="section-name" aria-label="Section name" value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
+              {#if session.runningSectionId === section.id}<span class="now-tag">Now</span>{/if}
               <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
               <span class="tools">
                 <button type="button" class="row-tool" aria-label="Move section up" disabled={sectionIndex === 0} onclick={() => session.moveSection(section.id, -1)}><Icon name="chevron-up" size={14} /></button>
@@ -366,6 +371,9 @@
   </aside>
 </section>
 
+{#if outlineOpen && session.service}
+  <OutlineDialog service={session.service} onclose={() => (outlineOpen = false)} />
+{/if}
 {#if templatesOpen}
   <TemplatesDialog initialId={templatesOpen.id} onclose={() => (templatesOpen = null)} />
 {/if}
@@ -409,9 +417,11 @@
   .timeline-wrap { flex: none; padding: 12px 14px 0; }
   .order { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
   .order > :global(*) { flex: none; }
-  .block { border: 1px solid var(--line); border-left: 3px solid var(--tone, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); }
-  .block.running { border-color: color-mix(in srgb, var(--tone) 60%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent); }
+  .block { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); }
+  .block.running { background: color-mix(in srgb, #30a46c 7%, var(--panel)); border-color: color-mix(in srgb, #30a46c 35%, var(--line)); }
   .block.running .section-name { color: var(--ink); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, var(--muted)); flex: none; margin-left: 6px; }
+  .now-tag { flex: none; height: 20px; padding: 0 8px; border-radius: 10px; background: #30a46c; color: #fff; font-size: 11px; font-weight: 750; display: inline-flex; align-items: center; letter-spacing: 0.02em; }
   /* The same colours as the timeline, by a section's place in the service. */
   .service-desk { --slot-0: #5aa0d6; --slot-1: #b07cc6; --slot-2: #e0884e; --slot-3: #58b3a4; --slot-4: #d9677a; --slot-5: #c9a35b; --slot-6: #7d8fe0; --slot-7: #7fa36b; }
   .block.target { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
@@ -480,11 +490,11 @@
   .save-tpl { flex: none; height: 30px; font-size: 12px; }
   .from-label { margin: 6px 0 0; font-size: 12px; font-weight: 650; color: var(--muted); }
   .from-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: min(640px, 100%); }
-  .tpl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; }
+  .tpl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; }
   .tpl-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .tpl-card strong { font-size: 14px; }
   .tpl-card span { font-size: 12px; color: var(--muted); line-height: 1.4; }
-  .tpl-card.edit { border-left-color: var(--line); border-style: dashed; background: none; }
+  .tpl-card.edit { border-style: dashed; background: none; }
   .svc { position: relative; flex: none; }
   .svc .row { padding-right: 64px; }
   .svc-tools { position: absolute; top: 8px; right: 6px; display: none; gap: 2px; }
