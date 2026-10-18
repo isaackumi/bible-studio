@@ -250,14 +250,20 @@ mod macos {
         if refresh_binary(&exe, &bundled).is_err() {
             return;
         }
-        let helper_src = parent.join("church-studio-transcribe");
-        let helper_dst = macos_dir.join("church-studio-transcribe");
-        if helper_src.exists() {
-            let _ = refresh_binary(&helper_src, &helper_dst);
-            let _ = std::process::Command::new("codesign")
-                .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present.transcribe"])
-                .arg(&helper_dst)
-                .status();
+        // Helpers live beside the app binary so macOS attributes their permissions to Church Studio.
+        for (name, identifier) in [
+            ("church-studio-transcribe", "app.churchstudio.present.transcribe"),
+            ("church-studio-ndi", "app.churchstudio.present.ndi"),
+        ] {
+            let helper_src = parent.join(name);
+            let helper_dst = macos_dir.join(name);
+            if helper_src.exists() {
+                let _ = refresh_binary(&helper_src, &helper_dst);
+                let _ = std::process::Command::new("codesign")
+                    .args(["--force", "--sign", "-", "--identifier", identifier])
+                    .arg(&helper_dst)
+                    .status();
+            }
         }
         let _ = std::process::Command::new("codesign")
             .args(["--force", "--sign", "-", "--identifier", "app.churchstudio.present"])

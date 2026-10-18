@@ -681,6 +681,38 @@
             </div>
           {/if}
         </section>
+        <p class="section-label">Network video (NDI®)</p>
+        <section class="rows">
+          <div class="row">
+            <div class="row-copy">
+              <strong>Send Program over NDI</strong>
+              <span>
+                {#if session.ndi.status === "on"}
+                  {session.ndi.pattern ? "Sending a test pattern" : "Sending Program"} as “{session.ndi.name}”. {session.ndi.connections === 0 ? "Nothing is watching yet." : `${session.ndi.connections} receiver${session.ndi.connections === 1 ? "" : "s"} watching.`}
+                {:else if session.ndi.status === "starting"}{session.ndi.message}
+                {:else if session.ndi.status === "error"}<span class="form-error">{session.ndi.message}</span>
+                {:else if !isDesktop()}OBS, vMix or an NDI monitor can take what the audience sees, over the network. This works in the Church Studio app for Mac.
+                {:else}OBS, vMix, a streaming computer or an NDI monitor can take what the audience sees, over the network. It captures the audience window, which opens if it is closed.{/if}
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              class="switch"
+              role="switch"
+              aria-label="Send Program over NDI"
+              disabled={!isDesktop()}
+              checked={session.ndi.status === "on" || session.ndi.status === "starting"}
+              onchange={(event) => (event.currentTarget.checked ? void session.startNdi() : void session.stopNdi())}
+            />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>Find it first</strong><span>Sends colour bars under the same name, so you can add the source in OBS or vMix before the service.</span></div>
+            <button type="button" class="btn" disabled={!isDesktop() || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
+              {session.ndi.status === "on" && session.ndi.pattern ? "Stop test" : "Send test pattern"}
+            </button>
+          </div>
+        </section>
+        <p class="note stand">NDI needs the free NDI Tools or NDI Runtime on this computer: <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
         <p class="section-label">Screen</p>
         {#if isDesktop() && session.output.displays.length > 0}
           <div class="monitor-list">
@@ -1170,6 +1202,7 @@
             </div>
           </div>
         </section>
+        <p class="note stand">Church Studio can send video over NDI®. NDI® is a registered trademark of Vizrt NDI AB. <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
       {:else if section === "account"}
         {@const current = planById(session.plan)}
         {@const ent = session.workspace.entitlement}

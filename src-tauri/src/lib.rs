@@ -4,6 +4,7 @@ mod displays;
 mod remote;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod noise;
+mod ndi;
 mod voice;
 
 use serde_json::Value;
@@ -314,6 +315,17 @@ fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String>
     }
 }
 
+/// Send Program over the network as an NDI source (macOS). Status arrives as `ndi-status` events.
+#[tauri::command]
+fn start_ndi(app: tauri::AppHandle, name: String, fps: u32, pattern: bool) -> Result<(), String> {
+    ndi::start(app, &name, fps, pattern)
+}
+
+#[tauri::command]
+fn stop_ndi() {
+    ndi::stop();
+}
+
 #[tauri::command]
 fn stop_noise_test() {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -575,6 +587,8 @@ pub fn run() {
             start_sermon_listen,
             stop_sermon_listen,
             start_noise_test,
+            start_ndi,
+            stop_ndi,
             stop_noise_test,
             start_remote_lan,
             remote_lan_status,

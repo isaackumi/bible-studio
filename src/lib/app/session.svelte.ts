@@ -2036,6 +2036,57 @@ class Session {
   };
 
   // Planning Center Services import.
+  /** NDI output (desktop, macOS): Program as a network video source. */
+  ndi = $state<{ status: "off" | "starting" | "on" | "error"; message: string; connections: number; pattern: boolean; name: string }>({
+    status: "off",
+    message: "",
+    connections: 0,
+    pattern: false,
+    name: "",
+  });
+  private ndiUnlisten: (() => void) | null = null;
+
+  /**
+   * Start sending over NDI. Program comes from the audience window, so it is opened first.
+   * `pattern` sends colour bars instead, to find the source in OBS or vMix before a service.
+   */
+  startNdi = async (options: { pattern?: boolean; fps?: number } = {}) => {
+    if (!this.desktop()) {
+      this.ndi = { ...this.ndi, status: "error", message: "NDI output works in the desktop app." };
+      return;
+    }
+    const pattern = options.pattern === true;
+    const name = this.workspace.churchName.trim() ? `${this.workspace.churchName.trim()} Program` : "Church Studio Program";
+    this.ndi = { status: "starting", message: pattern ? "Starting the test pattern…" : "Starting NDI…", connections: 0, pattern, name };
+    if (!this.ndiUnlisten) {
+      this.ndiUnlisten = await listen<{ line: string }>("ndi-status", (event) => this.onNdiLine(event.payload.line));
+    }
+    try {
+      if (!pattern && !this.output.online) await this.openAudience();
+      await invoke("start_ndi", { name, fps: options.fps ?? 30, pattern });
+    } catch (error) {
+      this.ndi = { ...this.ndi, status: "error", message: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  stopNdi = async () => {
+    if (this.desktop()) await invoke("stop_ndi").catch(() => {});
+    this.ndi = { ...this.ndi, status: "off", message: "NDI stopped.", connections: 0 };
+  };
+
+  private onNdiLine = (line: string) => {
+    let message: { kind?: string; message?: string; connections?: number; code?: string };
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (message.kind === "status") this.ndi = { ...this.ndi, status: "on", message: message.message ?? "Sending." };
+    else if (message.kind === "stats") this.ndi = { ...this.ndi, connections: Number(message.connections) || 0 };
+    else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? "NDI stopped." };
+    else if (message.kind === "end" && this.ndi.status !== "error") this.ndi = { ...this.ndi, status: "off", connections: 0 };
+  };
+
   /** AI assistant settings (provider, the church's own key, model). */
   setAiSettings = (patch: Partial<AiSettings>) => {
     this.workspace = { ...this.workspace, ai: sanitizeAiSettings({ ...this.workspace.ai, ...patch }) };
