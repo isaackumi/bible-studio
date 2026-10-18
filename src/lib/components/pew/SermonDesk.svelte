@@ -4,6 +4,7 @@
   import { searchSermonHits, sermonAudienceItem } from "../../domain/sermon";
   import type { SermonSummary } from "../../ai/summarize";
   import type { PresentationItem, Sermon, SermonSection } from "../../domain/types";
+  import AiSlidesDialog from "../decks/AiSlidesDialog.svelte";
   import Icon from "../Icon.svelte";
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
@@ -348,7 +349,10 @@
     selectedId = sermon.id;
     draft = null;
   }
+  let aiSlides = $state<{ notes: string; title: string } | null>(null);
 </script>
+
+{#if aiSlides}<AiSlidesDialog notes={aiSlides.notes} title={aiSlides.title} onclose={() => (aiSlides = null)} />{/if}
 
 <section class="sermon-desk">
   <!-- Library -->
@@ -401,6 +405,7 @@
             <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? t("Make a summary and points from your notes") : t("Set up your AI key first")} onclick={() => void summarize()}>
               <Icon name="sparkles" size={14} /> {summarizing ? t("Summarizing…") : t("Summarize")}
             </button>
+            <button type="button" class="desk-btn ai-btn" data-tip={t("Make a slide deck from these notes with your AI service")} onclick={() => draft && (aiSlides = { notes: notesFor(draft), title: draft.title })}><Icon name="stage" size={14} /> {t("Make slides")}</button>
             <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>{t("Cancel")}</button>
             <button type="submit" class="desk-btn primary">{t("Save")}</button>
           </div>

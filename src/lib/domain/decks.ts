@@ -185,3 +185,24 @@ export function deckSource(source: string | null | undefined): { deckId: string;
   return cut > 0 && Number.isInteger(index) ? { deckId: rest.slice(0, cut), index } : null;
 }
 
+/**
+ * A deck from an outline (AI slide generation, or any list of headings): a title slide, then a
+ * heading, a line or two and the scripture on each, in the deck's usual look, ready to edit.
+ */
+export function deckFromOutline(name: string, slides: Array<{ heading: string; body: string; scripture: string }>, now = new Date()): SlideDeck {
+  const pages = slides.map((slide, index) => {
+    let page = setCompositionBackground(createComposition(slide.heading || `Page ${index + 1}`), DEFAULT_BACKGROUND);
+    if (index === 0) {
+      page = addTextElement(page, slide.heading, { x: 8, y: 30, w: 84, h: 24 }, { size: 110, bold: true, color: "#111111" }, "Title");
+      const sub = [slide.body, slide.scripture].filter(Boolean).join(" · ");
+      if (sub) page = addTextElement(page, sub, { x: 12, y: 56, w: 76, h: 14 }, { size: 58, color: "#4a4a4a" }, "Subtitle");
+    } else {
+      page = addTextElement(page, slide.heading, { x: 8, y: 14, w: 84, h: 18 }, { size: 92, bold: true, color: "#111111" }, "Heading");
+      if (slide.body) page = addTextElement(page, slide.body, { x: 10, y: 38, w: 80, h: 34 }, { size: 62, color: "#2b2b2b" }, "Text");
+      if (slide.scripture) page = addTextElement(page, slide.scripture, { x: 10, y: 76, w: 80, h: 10 }, { size: 46, bold: true, color: "#8a4b12" }, "Scripture");
+    }
+    return { ...page, transition: { type: "fade" as const, ms: 300 } };
+  });
+  return { id: uid("deck"), name: name.trim() || "Slides", updatedAt: now.toISOString(), pages: pages.length ? pages : [newPage("Page 1")] };
+}
+

@@ -13,6 +13,7 @@
   import type { BibleItem } from "../../domain/types";
   import { msg, t, tn } from "../../i18n/core";
   import DeskDialog from "../sources/DeskDialog.svelte";
+  import AiSlidesDialog from "../decks/AiSlidesDialog.svelte";
   import Icon from "../Icon.svelte";
 
   // One window to fill a part of the service: pick what to add on the left, add as many as you
@@ -113,6 +114,7 @@
     newPart = "";
   }
   let newPart = $state("");
+  let aiOpen = $state(false);
 </script>
 
 <DeskDialog title={part ? t("Add to {part}", { part: part.name }) : t("Add to the service")} huge {onclose}>
@@ -203,6 +205,7 @@
           <button type="submit" class="primary wide" disabled={!heading.trim()}><Icon name="plus" size={14} /> {tab === "text" ? t("Add text") : t("Add announcement")}</button>
         </form>
       {:else if tab === "slides"}
+        <button type="button" class="ai-make" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={14} /> {t("Make slides with AI")}<small>{t("From notes, a passage or a topic")}</small></button>
         <div class="grid">
           {#each session.decks as deck (deck.id)}
             <button type="button" class="card" class:done={wasAdded(`deck:${deck.id}`)} onclick={() => { void session.addDeckToService(deck.id, target ?? undefined); note(`deck:${deck.id}`, deck.name); }}>
@@ -248,6 +251,8 @@
     <button type="button" class="done-btn" onclick={onclose}>{t("Done")}</button>
   {/snippet}
 </DeskDialog>
+
+{#if aiOpen}<AiSlidesDialog sectionId={target ?? undefined} onclose={() => (aiOpen = false)} onmade={(deck) => note(`deck:${deck.id}`, deck.name)} />{/if}
 
 <style>
   .adder { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; height: min(70vh, 660px); }
@@ -312,6 +317,8 @@
   .thumb.done .pic { border-color: #30a46c; }
   .tick { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #30a46c; color: #fff; }
   .thumb strong { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ai-make { display: flex; align-items: center; gap: 8px; width: fit-content; height: 38px; padding: 0 14px; border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .ai-make small { font-size: 12px; font-weight: 500; color: var(--muted); }
   .empty { margin: 0; padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
   .foot-note { flex: 1; font-size: 12px; color: var(--muted); }
   .done-btn { height: 34px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; }

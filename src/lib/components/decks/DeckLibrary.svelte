@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
   import { createDeck, duplicateDeck } from "../../domain/decks";
+  import AiSlidesDialog from "./AiSlidesDialog.svelte";
   import DeckThumb from "./DeckThumb.svelte";
   import { t, tn } from "../../i18n/core";
 
@@ -27,6 +28,8 @@
   );
   const open = $derived(session.decks.find((deck) => deck.id === openDeckId) ?? null);
 
+  let aiOpen = $state(false);
+
   function createNew() {
     const deck = createDeck(t("Slides {n}", { n: session.decks.length + 1 }));
     session.saveDeck(deck);
@@ -48,9 +51,12 @@
   }
 </script>
 
+{#if aiOpen}<AiSlidesDialog onclose={() => (aiOpen = false)} onmade={(deck) => (openDeckId = deck.id)} />{/if}
+
 <div class="decks">
   <div class="bar">
     <button type="button" class="new-deck" onclick={createNew}>{t("+ Create new")}</button>
+    <button type="button" class="new-deck ghost" title={t("Write a deck from notes, a passage or a topic with your AI service")} onclick={() => (aiOpen = true)}>✦ {t("Make with AI")}</button>
     <button type="button" class="new-deck ghost" title={t("Bring in a PowerPoint (.pptx) as an editable deck, or a PDF as a deck of pages")} onclick={() => pptxInput?.click()}>{t("Import PowerPoint or PDF")}</button>
     <input
       bind:this={pptxInput}

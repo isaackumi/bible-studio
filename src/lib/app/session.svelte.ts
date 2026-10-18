@@ -3,6 +3,7 @@ import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
+import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
@@ -163,7 +164,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
-import { deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
+import { deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, createTimer, presentTimer, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
@@ -3388,6 +3389,20 @@ class Session {
     if (!input.notes.trim()) throw new Error(t("Write some notes first; the summary is made from them."));
     const reply = await api.aiPost(summaryRequest(settings, input));
     return parseSummary(replyText(settings.provider, reply));
+  };
+
+  /** AI slide generation: a deck from notes, a passage or a topic, saved to the slide library. */
+  generateSlides = async (input: { source: SlideSource; text: string; title?: string; count: number; addToService?: boolean; sectionId?: string }): Promise<SlideDeck> => {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings)) throw new Error(t("Add your AI key in Settings › AI assistant first."));
+    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : t("Write some notes first; the slides are made from them."));
+    const reply = await api.aiPost(slidesRequest(settings, input));
+    const outline = parseSlides(replyText(settings.provider, reply));
+    const deck = deckFromOutline(input.title?.trim() || outline.title, outline.slides);
+    this.saveDeck(deck);
+    if (input.addToService) await this.addDeckToService(deck.id, input.sectionId);
+    this.message = t("{name}: {pages} made. Edit them on the Production Desk › Media › Slides.", { name: deck.name, pages: tn(deck.pages.length, "{n} slide", "{n} slides") });
+    return deck;
   };
 
   /** A tiny request to check the key and model work. */
