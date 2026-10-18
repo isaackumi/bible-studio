@@ -2511,4 +2511,10 @@ export const fr: Readonly<Record<string, string>> = {
   "On Facebook: Live Producer › Streaming software. Copy the Stream key.": "Sur Facebook : Live Producer › Logiciel de diffusion. Copiez la clé de diffusion.",
   "Your service shows a server address (rtmp:// or rtmps://) and a stream key.": "Votre service indique une adresse de serveur (rtmp:// ou rtmps://) et une clé de diffusion.",
   "Stream & record": "Diffusion et enregistrement",
+
+  // Settings groups
+  "Desk layouts": "Dispositions du bureau",
+  "Going live": "Diffusion",
+  "Sound & devices": "Son et appareils",
+  "Connected services": "Services connectés",
 };
