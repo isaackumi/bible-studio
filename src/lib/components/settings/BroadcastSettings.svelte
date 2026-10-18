@@ -66,7 +66,7 @@
     <input type="checkbox" class="switch" role="switch" aria-label={t("Sound")} checked={settings.sound} onchange={(event) => session.setBroadcast({ sound: event.currentTarget.checked })} />
   </div>
   <div class="row">
-    <div class="row-copy"><strong>{t("Recordings")}</strong><span class="mono">{settings.recordFolder || t("Movies › Church Studio")}</span></div>
+    <div class="row-copy"><strong>{t("Recordings")}</strong><span class="path">{settings.recordFolder || t("Movies › Church Studio")}</span></div>
     <div class="row-end">
       {#if settings.recordFolder}<button type="button" class="btn" onclick={() => session.setBroadcast({ recordFolder: "" })}>{t("Reset")}</button>{/if}
       <button type="button" class="btn" disabled={!isDesktop()} onclick={() => void chooseFolder()}>{t("Choose folder")}</button>
@@ -93,4 +93,5 @@
 <style>
   .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; word-break: break-all; }
   .wide { width: min(360px, 100%); }
+  .path { word-break: break-all; }
 </style>
