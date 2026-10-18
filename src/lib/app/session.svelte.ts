@@ -5,6 +5,7 @@ import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
 import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
+import { ACTIVATION_URL, askServer, deviceId, dueForCheck, idleActivation, withinGrace, type ActivationState } from "../domain/activation";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -461,6 +462,7 @@ class Session {
       this.ready = true;
       this.booted = true;
       if (this.workspace.switcher.kind !== "none" && this.workspace.switcher.autoConnect) void this.connectSwitcher();
+      void this.checkActivation(true);
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
@@ -3824,8 +3826,50 @@ class Session {
   upgradeFor = $state<PlanFeature | null>(null);
 
   get plan(): PlanId {
-    return effectivePlan(this.workspace.entitlement, this.planClock);
+    const plan = effectivePlan(this.workspace.entitlement, this.planClock);
+    // A license already on all the computers it covers runs this one as Free until one is released,
+    // as does a computer that has not reached the license server for a month.
+    if (plan !== "free" && this.workspace.entitlement.source === "license" && ACTIVATION_URL) {
+      if (this.activation.status === "full") return "free";
+      if ((this.activation.status === "offline" || this.activation.status === "error") && !withinGrace(this.workspace.activationOkAt)) return "free";
+    }
+    return plan;
   }
+
+  // Device activations (see domain/activation.ts and server/activations.ts).
+  activation = $state<ActivationState>(idleActivation());
+  readonly deviceId = deviceId();
+
+  private deviceName(): string {
+    const platform = typeof navigator === "undefined" ? "" : /mac/i.test(navigator.platform) ? "Mac" : /win/i.test(navigator.platform) ? "Windows PC" : "Computer";
+    return `${this.workspace.churchName.trim() || "Church Studio"} · ${platform || "Computer"}`.slice(0, 60);
+  }
+
+  /** Check this computer in with the license server (when the key is a license and a server is set). */
+  checkActivation = async (force = false) => {
+    const key = this.workspace.entitlement.source === "license" ? this.workspace.entitlement.license : null;
+    if (!key || !ACTIVATION_URL) {
+      this.activation = idleActivation();
+      return;
+    }
+    if (!force && !dueForCheck(this.workspace.activationOkAt) && this.activation.status === "ok") return;
+    this.activation = { ...this.activation, status: "checking" };
+    const answer = await askServer("activate", { key, device: this.deviceId, name: this.deviceName() });
+    this.activation = answer;
+    if (answer.status === "ok") {
+      this.workspace = { ...this.workspace, activationOkAt: new Date().toISOString() };
+      this.persistSoon();
+    }
+  };
+
+  /** Free a computer's place on the license (this one or another). */
+  releaseDevice = async (device: string) => {
+    const key = this.workspace.entitlement.license;
+    if (!key || !ACTIVATION_URL) return;
+    const answer = await askServer("release", { key, device });
+    if (answer.status === "ok" && device !== this.deviceId) await this.checkActivation(true);
+    else this.activation = device === this.deviceId ? { ...answer, status: "full", message: t("This computer was released from the license.") } : answer;
+  };
 
   get trialDays(): number {
     return trialDaysLeft(this.workspace.entitlement, this.planClock);
@@ -3897,6 +3941,9 @@ class Session {
     this.planClock = Date.now();
     this.persistSoon();
     this.message = t("License added: {note}.", { note: result.note });
+    // A new key starts its 30 days offline from now, then checks in.
+    this.workspace = { ...this.workspace, activationOkAt: new Date().toISOString() };
+    void this.checkActivation(true);
     return null;
   };
 

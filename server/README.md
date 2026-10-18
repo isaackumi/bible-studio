@@ -54,3 +54,19 @@ buyer. The app checks the key offline, so the server is needed only at the momen
   refunded one-off purchase keeps working; revoking those needs an online check, which can come
   with accounts.
 - Tests: `npx vitest run server`.
+
+## Device activations (computers per key)
+
+The same Worker counts the computers each key runs on: Premium 1, Church 3 at once. The app checks
+in when a key is added and then about once a week; a computer not seen for 60 days drops off by
+itself, and Settings › Plan & account can release one.
+
+1. Create a KV namespace: `wrangler kv namespace create ACTIVATIONS`, and bind it to the Worker as
+   `ACTIVATIONS` (in wrangler.toml: `[[kv_namespaces]] binding = "ACTIVATIONS" id = "…"`).
+2. Deploy again. The endpoints are `POST /v1/activate`, `/v1/release` and `/v1/devices`.
+3. Put the Worker's address in `ACTIVATION_URL` in `src/lib/domain/activation.ts`. Until it is set,
+   the app does not check activations (a key simply works on any computer).
+
+The app keeps working offline: a computer that cannot reach the server keeps its plan for 30 days
+from its last successful check.
+

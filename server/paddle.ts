@@ -6,6 +6,7 @@
 // makes the very same key instead of a second one.
 
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
+import { handleActivation, type Store } from "./activations.ts";
 
 export type Env = {
   /** Paddle › Developer tools › Notifications › the endpoint's secret key. */
@@ -23,6 +24,8 @@ export type Env = {
   MAIL_FROM: string;
   /** Days a subscription key keeps working past the paid period, to cover a late renewal. */
   GRACE_DAYS?: string;
+  /** A KV namespace for device activations (computers per key). Without it, /v1/* answers 404. */
+  ACTIVATIONS?: Store;
 };
 
 type Fetch = typeof fetch;
@@ -31,7 +34,11 @@ type Fetch = typeof fetch;
 const MAX_AGE_SECONDS = 300;
 
 export default {
-  fetch: (request: Request, env: Env) => handle(request, env),
+  fetch: (request: Request, env: Env) => {
+    const path = new URL(request.url).pathname;
+    if (path.startsWith("/v1/") && env.ACTIVATIONS) return handleActivation(request, env.ACTIVATIONS);
+    return handle(request, env);
+  },
 };
 
 export async function handle(request: Request, env: Env, http: Fetch = fetch, now = Date.now()): Promise<Response> {

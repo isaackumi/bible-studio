@@ -108,6 +108,17 @@ export const CHECKOUT: Record<Exclude<PlanId, "free">, Record<Billing, string | 
   church: { monthly: null, yearly: null },
 };
 
+/** Where support email goes. PLACEHOLDER: set the support address; until then the button only copies the report. */
+export const SUPPORT_EMAIL: string | null = null;
+
+/** A support email with the plan and version filled in. */
+export function supportMailto(plan: PlanId, version: string, to = SUPPORT_EMAIL): string | null {
+  if (!to) return null;
+  const subject = `Church Studio ${plan === "church" ? "priority " : ""}support (${plan}, ${version})`;
+  const body = "What happened, and what you expected:\n\n\n(Paste the problem report from Settings › This computer › Problem reports below.)\n";
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 /** The checkout link for a plan, with the buyer's email filled in when known. */
 export function checkoutUrl(plan: PlanId, billing: Billing, email?: string | null, links = CHECKOUT): string | null {
   if (plan === "free") return null;

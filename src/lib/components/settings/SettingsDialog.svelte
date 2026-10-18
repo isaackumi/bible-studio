@@ -25,7 +25,7 @@
   import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
-  import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
+  import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
@@ -203,9 +203,9 @@
   // Problem reports.
   let problems = $state(readProblems());
 
-  async function saveProblemReport() {
+  async function buildReport(): Promise<string> {
     const crashLog = isDesktop() ? await invoke<string>("crash_log").catch(() => "") : "";
-    const report = problemReport({
+    return problemReport({
       version: "0.1.0",
       platform: isDesktop() ? "Desktop app" : "Browser",
       userAgent: navigator.userAgent,
@@ -213,6 +213,27 @@
       problems: readProblems(),
       crashLog,
     });
+  }
+
+  let supportNote = $state("");
+
+  /** Contact support: copy the problem report, then open an email with the plan filled in. */
+  async function contactSupport() {
+    const report = await buildReport();
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(report);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+    const mail = supportMailto(session.plan, "0.1.0");
+    if (mail) await openExternal(mail);
+    supportNote = copied ? (mail ? t("The problem report is copied: paste it into the email.") : t("The problem report is copied. Send it to Church Studio support.")) : t("Save the report below and attach it to your email.");
+  }
+
+  async function saveProblemReport() {
+    const report = await buildReport();
     const url = URL.createObjectURL(new Blob([report], { type: "text/plain" }));
     const link = document.createElement("a");
     link.href = url;
@@ -1473,6 +1494,38 @@
         </section>
         {#if ent.trialUsed && session.trialDays === 0 && session.plan === "free"}
           <p class="note stand">{t("Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.")}</p>
+        {/if}
+        {#if session.plan !== "free"}
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy">
+                <strong>{session.entitled("priority-support") ? t("Priority support") : t("Support")}</strong>
+                <span>{supportNote || (session.entitled("priority-support") ? t("Your plan is answered first. The email opens with your plan, and the problem report is copied to paste in.") : t("The email opens with your plan, and the problem report is copied to paste in."))}</span>
+              </div>
+              <button type="button" class="btn" onclick={() => void contactSupport()}>{t("Contact support")}</button>
+            </div>
+          </section>
+        {/if}
+        {#if ent.source === "license" && session.activation.status !== "off"}
+          {@const act = session.activation}
+          <p class="section-label">{t("Computers on this license")}</p>
+          <section class="rows">
+            {#if act.status === "full"}
+              <div class="row"><div class="row-copy"><strong class="form-error">{t("This license is in use on {n} of {n} computers", { n: act.seats })}</strong><span>{act.message || t("Release one below (a computer no longer used, or the old one), then check again. Until then this computer runs on Free.")}</span></div><button type="button" class="btn primary" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
+            {:else if act.status === "offline" || act.status === "error"}
+              <div class="row"><div class="row-copy"><strong>{act.status === "offline" ? t("The license server could not be reached") : t("The license server said no")}</strong><span>{act.status === "offline" ? t("No problem for now: this computer keeps its plan for 30 days without checking.") : act.message}</span></div><button type="button" class="btn" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
+            {:else if act.status === "ok"}
+              <div class="row"><div class="row-copy"><strong>{t("{used} of {seats} in use", { used: act.devices.length, seats: act.seats })}</strong><span>{t("A computer not used for 60 days frees its place by itself.")}</span></div></div>
+            {:else}
+              <div class="row"><div class="row-copy"><span>{t("Checking…")}</span></div></div>
+            {/if}
+            {#each act.devices as device (device.device)}
+              <div class="row">
+                <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}{device.device === session.deviceId ? ` · ${t("this computer")}` : ""}</strong><span>{t("Last seen {date}", { date: new Date(device.seenAt).toLocaleDateString() })}</span></div></div>
+                <button type="button" class="btn" onclick={() => void session.releaseDevice(device.device)}>{t("Release")}</button>
+              </div>
+            {/each}
+          </section>
         {/if}
 
         <div class="pricing-head">

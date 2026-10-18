@@ -488,6 +488,8 @@ export type Workspace = {
   ndiAudio: boolean;
   /** Free plan: listening used this month (on this computer). */
   listenUsage?: import("./plans").ListenUsage;
+  /** When this computer last checked its license in with the server (ISO). */
+  activationOkAt?: string;
   /** OBS or vMix on this computer or the network, driven from the desk. */
   switcher: import("../integrations/switcher").SwitcherSettings;
   /** Going live and recording from the app itself. The stream key stays on this computer. */
