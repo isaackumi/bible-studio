@@ -155,3 +155,19 @@ describe("controller keys (Stream Deck, scripts)", async () => {
     expect(commandUrl("http://192.168.1.20:17891/", "take", "ab+c")).toBe("http://192.168.1.20:17891/v1/command/take?token=ab%2Bc");
   });
 });
+
+describe("stage links", () => {
+  it("read the stage and press nothing", async () => {
+    const { routeRemote, stageDevice, remoteEnvelope, pruneRemoteGate } = await import("./remote");
+    const device = stageDevice("d1", "Band iPad", "a".repeat(64), 1);
+    const gate = { pairing: null, devices: [device], pending: [] };
+    const ctx = { now: 10_000_000_000, tokenHash: "a".repeat(64), newId: () => "x", newSecret: () => "y" };
+    expect(routeRemote(gate, remoteEnvelope("stage", { token: "t" }), ctx).action).toEqual({ kind: "stage" });
+    const pressed = routeRemote(gate, remoteEnvelope("command", { token: "t", id: "take" }), ctx);
+    expect(pressed.action).toBeNull();
+    expect(pressed.reply.type).toBe("denied");
+    expect(routeRemote(gate, remoteEnvelope("state", { token: "t" }), ctx).action).toBeNull();
+    // Never expires like a phone does.
+    expect(pruneRemoteGate(gate, ctx.now).devices).toHaveLength(1);
+  });
+});

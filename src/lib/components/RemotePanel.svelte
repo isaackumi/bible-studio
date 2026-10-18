@@ -146,7 +146,7 @@
 
 <p class="section-label">Paired phones</p>
 <section class="rows">
-  {#each session.remoteDevices.filter((device) => !device.controller) as device (device.id)}
+  {#each session.remoteDevices.filter((device) => !device.controller && !device.viewer) as device (device.id)}
     <div class="row">
       <div class="row-copy"><strong>{device.name}</strong><span>Last seen {ago(device.lastSeen)} · signs out after 12 h idle</span></div>
       <button

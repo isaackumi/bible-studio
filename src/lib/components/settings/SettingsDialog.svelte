@@ -1,4 +1,5 @@
 <script lang="ts">
+  import StageLinks from "./StageLinks.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -914,6 +915,8 @@
             </div>
           </div>
         </section>
+        <p class="section-label">On phones and tablets</p>
+        <StageLinks />
         <p class="section-label">What the stage screen shows</p>
         <section class="rows">
           {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."]] as [key, title, detail] (key)}

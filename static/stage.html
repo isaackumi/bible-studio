@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0d12" />
+<title>Stage · Church Studio</title>
+<style>
+  :root { --scale: 1; --bg: #0b0d12; --ink: #f4f5f7; --muted: #8b93a1; --line: #232836; --live: #ff4d4f; --warn: #ffcc33; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  body { display: flex; flex-direction: column; padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); gap: 10px; }
+  header { display: flex; align-items: center; gap: 10px; flex: none; font-size: 14px; color: var(--muted); }
+  .desk { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #555; flex: none; }
+  .dot.on { background: var(--live); box-shadow: 0 0 0 4px rgb(255 77 79 / 0.2); }
+  .spacer { flex: 1; }
+  .clock { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); font-size: 18px; white-space: nowrap; }
+  @media (max-width: 480px) {
+    header { gap: 8px; font-size: 13px; }
+    .desk { display: none; }
+    .tools button { height: 30px; min-width: 32px; padding: 0 7px; font-size: 13px; }
+    .clock, .timer { font-size: 16px; }
+  }
+  .timer { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 18px; padding: 2px 10px; border-radius: 8px; background: #1b2030; color: var(--ink); }
+  .timer.warn { background: var(--warn); color: #111; }
+  .tools { display: flex; gap: 6px; }
+  .tools button { height: 32px; min-width: 38px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: #141826; color: var(--ink); font: inherit; font-weight: 700; }
+  .tools button[aria-pressed="true"] { background: #2a3350; }
+  .message { flex: none; display: none; padding: 12px 16px; border-radius: 12px; background: var(--warn); color: #111; font-weight: 800; font-size: calc(26px * var(--scale)); line-height: 1.2; text-align: center; }
+  .message.show { display: block; }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+  .cue { font-size: calc(17px * var(--scale)); font-weight: 700; color: #ffb547; letter-spacing: 0.02em; }
+  .place { font-size: calc(14px * var(--scale)); color: var(--muted); }
+  .now { margin: 0; font-weight: 700; line-height: 1.22; white-space: pre-line; font-size: calc(var(--fit, 44px) * var(--scale)); }
+  .now.quiet { color: var(--muted); font-weight: 600; }
+  .next { flex: none; border-top: 1px solid var(--line); padding-top: 10px; color: var(--muted); }
+  .next .label { font-size: 13px; font-weight: 700; text-transform: none; }
+  .next p { margin: 4px 0 0; font-size: calc(20px * var(--scale)); line-height: 1.3; color: #c4c9d3; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .notes { flex: none; border-top: 1px solid var(--line); padding-top: 10px; font-size: calc(17px * var(--scale)); line-height: 1.4; white-space: pre-line; color: #dfe3ea; max-height: 30vh; overflow: auto; }
+  .notes .label { font-size: 13px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
+  body.words .next, body.words .notes { display: none; }
+  .hidden { display: none !important; }
+  .note { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 92vw; padding: 10px 14px; border-radius: 10px; background: #2a1416; color: #ffd7d9; font-size: 14px; display: none; text-align: center; }
+  .note.show { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot" title="Audience screen"></span>
+  <span class="desk" id="desk">Church Studio</span>
+  <span class="spacer"></span>
+  <span class="timer hidden" id="timer"></span>
+  <span class="clock hidden" id="clock"></span>
+  <span class="tools">
+    <button type="button" id="smaller" aria-label="Smaller text">A−</button>
+    <button type="button" id="bigger" aria-label="Larger text">A+</button>
+    <button type="button" id="wordsOnly" aria-pressed="false" title="Show only the words on the screen">Words</button>
+  </span>
+</header>
+<div class="message" id="message" role="alert"></div>
+<main>
+  <span class="cue" id="cue"></span>
+  <span class="place" id="place"></span>
+  <p class="now" id="now">Connecting…</p>
+</main>
+<section class="next hidden" id="nextBox"><span class="label" id="nextLabel">Next</span><p id="next"></p></section>
+<section class="notes hidden" id="notesBox"><span class="label">Notes</span><span id="notes"></span></section>
+<p class="note" id="note"></p>
+<script>
+  // Church Studio stage view on a phone or tablet: what is on the screen now, what is next, the
+  // stage message, notes, clock and timer. It reads the desk through its stage link and presses nothing.
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const $ = (id) => document.getElementById(id);
+  const SIZES = { s: 0.85, m: 1, l: 1.25 };
+  let scale = Number(localStorage.getItem("stage-scale")) || 0;
+  let wordsOnly = localStorage.getItem("stage-words") === "1";
+  let failures = 0;
+
+  function applyScale(base) {
+    const value = scale || base || 1;
+    document.documentElement.style.setProperty("--scale", String(value));
+  }
+  function setWords(on) {
+    wordsOnly = on;
+    document.body.classList.toggle("words", on);
+    $("wordsOnly").setAttribute("aria-pressed", String(on));
+    try { localStorage.setItem("stage-words", on ? "1" : "0"); } catch {}
+  }
+  $("smaller").onclick = () => { scale = Math.max(0.6, (scale || 1) - 0.1); try { localStorage.setItem("stage-scale", String(scale)); } catch {} applyScale(); };
+  $("bigger").onclick = () => { scale = Math.min(2.2, (scale || 1) + 0.1); try { localStorage.setItem("stage-scale", String(scale)); } catch {} applyScale(); };
+  $("wordsOnly").onclick = () => setWords(!wordsOnly);
+  setWords(wordsOnly);
+
+  function say(text) {
+    $("note").textContent = text;
+    $("note").classList.toggle("show", !!text);
+  }
+  // Long passages get smaller type so they fit without scrolling.
+  function fit(text) {
+    const n = text.length;
+    const px = n < 60 ? 56 : n < 140 ? 46 : n < 260 ? 38 : n < 420 ? 32 : 27;
+    $("now").style.setProperty("--fit", px + "px");
+  }
+  function clean(text) {
+    return (text || "").replace(/^\d+ /gm, "");
+  }
+  function tick() {
+    $("clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  async function poll() {
+    try {
+      const response = await fetch("/v1/remote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ v: 2, type: "stage", payload: { token } }),
+      });
+      const reply = await response.json();
+      failures = 0;
+      if (reply.type !== "stage") {
+        say("This stage link is not allowed any more. Make a new one in Church Studio › Settings › Stage display.");
+        return;
+      }
+      say("");
+      const p = reply.payload || {};
+      applyScale(SIZES[p.size] || 1);
+      $("desk").textContent = p.desk || "Church Studio";
+      $("dot").classList.toggle("on", p.live === "on");
+      $("clock").classList.toggle("hidden", p.clock !== "1");
+      $("timer").classList.toggle("hidden", !p.timer);
+      $("timer").classList.toggle("warn", p.timerWarn === "1");
+      $("timer").textContent = p.timer || "";
+      $("message").textContent = p.message || "";
+      $("message").classList.toggle("show", !!p.message);
+      const body = clean(p.nowBody);
+      $("cue").textContent = body ? p.nowCue || "" : "";
+      $("place").textContent = p.place || "";
+      $("now").textContent = body || p.nowCue || "Nothing on the screen";
+      $("now").classList.toggle("quiet", !body);
+      fit(body);
+      const next = clean(p.nextBody);
+      $("nextBox").classList.toggle("hidden", !next && !p.nextCue);
+      $("nextLabel").textContent = p.nextCue ? `Next · ${p.nextCue}` : "Next";
+      $("next").textContent = next;
+      $("notesBox").classList.toggle("hidden", !p.notes);
+      $("notes").textContent = p.notes || "";
+    } catch {
+      failures += 1;
+      if (failures > 3) say("Lost the desk. Check this device is on the church Wi-Fi and Church Studio is open.");
+    } finally {
+      setTimeout(poll, 600);
+    }
+  }
+  // Keep a tablet's screen on while it shows the stage (where the browser allows it).
+  async function stayAwake() {
+    try { await navigator.wakeLock?.request("screen"); } catch {}
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") stayAwake(); });
+  stayAwake();
+  poll();
+</script>
+</body>
+</html>

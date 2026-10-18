@@ -99,7 +99,7 @@ import {
 } from "../domain/remote";
 import { serveRemote } from "../remote/channel";
 import { randomCode, randomToken, sha256Hex } from "../remote/crypto";
-import { controllerDevice } from "../domain/remote";
+import { controllerDevice, stageDevice } from "../domain/remote";
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
@@ -149,7 +149,7 @@ import { styleModel } from "../domain/text-style";
 import { deckFromPageImages, deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
-import { controlTimers, timersIn, type TimerAction } from "../domain/timer";
+import { controlTimers, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
 import {
   parseVoiceCommand,
   sanitizeVoiceSettings,
@@ -890,6 +890,52 @@ class Session {
     return token;
   };
 
+  /** A stage link for a phone or tablet on the platform: it shows the stage and presses nothing. */
+  createStageLink = async (name: string): Promise<string | null> => {
+    if (!this.requireFeature("stage-display")) return null;
+    if (!this.desktop()) {
+      this.message = "Stage links work with the desktop app, which runs the network server.";
+      return null;
+    }
+    const token = randomToken(24);
+    const device = stageDevice(crypto.randomUUID(), name.trim() || "Stage", await sha256Hex(token), Date.now());
+    const gate = this.remoteGate();
+    this.applyRemoteGate({ ...gate, devices: [...gate.devices, device] }, true);
+    if (!this.remoteLanUrl) await this.attachLanRemote(true);
+    this.message = `${device.name} can now show the stage. Open the link or scan the code on that phone or tablet.`;
+    return token;
+  };
+
+  /** What a stage link shows: the words now and next, the song place, message, notes, timer. */
+  private stageRemoteState = (): Record<string, string> => {
+    const program = this.live.program.model;
+    const preview = this.live.preview.model;
+    const now = keyWords(program);
+    const next = keyWords(preview);
+    const sermon = this.sermonFocus && this.sermons.find((entry) => entry.id === this.sermonFocus?.sermonId);
+    const notes = sermon ? (sermon.sections.find((section) => section.id === this.sermonFocus?.sectionId)?.notes ?? "") : "";
+    const timer = timersIn(program)[0];
+    const view = timer ? timerDisplay(timerFromPaint(timer), Date.now()) : null;
+    const layout = this.workspace.stageLayout;
+    const describe = (model: PresentationModel) =>
+      model.layout === "black" ? "Black" : model.layout === "empty" ? "Clear" : model.layout === "image" ? "Picture" : model.layout === "video" ? "Video" : model.layout === "composition" ? "Look" : model.layout === "web" ? "Web page" : "";
+    return {
+      desk: this.workspace.churchName || "Church Studio",
+      live: this.output.online ? "on" : "off",
+      nowCue: now?.cue ?? describe(program),
+      nowBody: now?.body ?? "",
+      nextCue: layout.next ? (next?.cue ?? describe(preview)) : "",
+      nextBody: layout.next ? (next?.body ?? "") : "",
+      place: this.songFocus && program.layout === "lyrics" ? this.songPlace() : "",
+      message: this.stageMessage,
+      notes: layout.notes ? notes.slice(0, 1200) : "",
+      timer: view?.text ?? "",
+      timerWarn: view?.warning ? "1" : "",
+      clock: layout.clock ? "1" : "",
+      size: layout.size,
+    };
+  };
+
   stopRemoteLan = async () => {
     this.closeRemotePairing();
     try {
@@ -973,6 +1019,7 @@ class Session {
     }
     const action = routed.action;
     if (!action) return routed.reply;
+    if (action.kind === "stage") return remoteEnvelope("stage", this.stageRemoteState());
     try {
       if (action.kind === "command") await this.runFromRemote(action.id);
       else if (action.kind === "preview-item") await this.selectItem(action.itemId);

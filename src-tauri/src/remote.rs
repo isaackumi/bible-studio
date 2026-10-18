@@ -15,6 +15,8 @@ pub const PORT: u16 = 17891;
 const PAD: &str = include_str!("../../static/remote.html");
 /// The livestream lower-third overlay, for an OBS or vMix Browser Source.
 const STREAM: &str = include_str!("../../static/stream.html");
+/// The stage view for a phone or tablet on the platform (read-only stage link).
+const STAGE: &str = include_str!("../../static/stage.html");
 /// Concurrent connections; a phone polls once a second, so this is generous.
 const MAX_CONNECTIONS: usize = 32;
 const MAX_REQUEST: usize = 64 * 1024;
@@ -225,6 +227,10 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
     }
     if req.method == "GET" && req.path == "/stream" {
         write_http(stream, 200, "text/html; charset=utf-8", STREAM.as_bytes());
+        return;
+    }
+    if req.method == "GET" && req.path == "/stage" {
+        write_http(stream, 200, "text/html; charset=utf-8", STAGE.as_bytes());
         return;
     }
     // Controllers (Stream Deck via Companion, scripts): GET /v1/command/<id>?token=…
