@@ -93,10 +93,10 @@
     else if (type === "motion") setBackground({ type: "motion", motionId: MOTIONS[0]!.id, tint: MOTIONS[0]!.tint, base: MOTIONS[0]!.base });
     else if (type === "image") {
       if (images[0]) setBackground({ type: "image", assetId: images[0].id });
-      else mediaInput?.click();
+      else chooseMedia(type);
     } else if (type === "video") {
       if (videos[0]) setBackground({ type: "video", assetId: videos[0].id });
-      else mediaInput?.click();
+      else chooseMedia(type);
     }
   }
 
@@ -114,22 +114,42 @@
     selectedId = session.workspace.themeId;
   }
 
+  /**
+   * Pick a photo or video for the background. The desktop app imports by file path from the
+   * system picker; the browser takes the file itself.
+   */
+  function chooseMedia(type: "image" | "video" = "image") {
+    if (!session.requireFeature("theme-library")) return;
+    if (isDesktop()) void pickMediaDesktop(type);
+    else mediaInput?.click();
+  }
+
+  async function useImported(added: Awaited<ReturnType<typeof session.importImage>>) {
+    if (!added) {
+      note = session.message || "That file was not added.";
+      return;
+    }
+    setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
+    note = `${added.name} is the background now.`;
+  }
+
   async function importMedia(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    // Use the asset this import made (the library lists newest first).
-    const added = await session.importImage(file);
-    if (added) setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
+    await useImported(await session.importImage(file));
   }
 
-  async function pickMediaDesktop() {
+  async function pickMediaDesktop(type: "image" | "video") {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const picked = await open({ multiple: false, filters: [{ name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
+    const filters =
+      type === "video"
+        ? [{ name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }, { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }]
+        : [{ name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }, { name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }];
+    const picked = await open({ multiple: false, filters });
     if (typeof picked !== "string") return;
-    const added = await session.importImage(picked);
-    if (added) setBackground({ type: added.kind === "video" ? "video" : "image", assetId: added.id });
+    await useImported(await session.importImage(picked));
   }
 
   async function exportTheme() {
@@ -319,7 +339,7 @@
               {#each list as asset (asset.id)}
                 <button type="button" class="chip-btn" class:on={"assetId" in bg && bg.assetId === asset.id} onclick={() => setBackground({ type: bg.type === "video" ? "video" : "image", assetId: asset.id })}>{asset.name}</button>
               {/each}
-              <button type="button" class="chip-btn add" onclick={() => (isDesktop() ? void pickMediaDesktop() : mediaInput?.click())}><Icon name="plus" size={12} /> Import</button>
+              <button type="button" class="chip-btn add" onclick={() => chooseMedia(bg.type === "video" ? "video" : "image")}><Icon name="plus" size={12} /> Import</button>
             </div>
           </div>
         {/if}

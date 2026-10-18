@@ -3183,7 +3183,14 @@ class Session {
 
   private showThemeOnPreview(next: Theme) {
     if (this.cursor.itemId) void this.selectItem(this.cursor.itemId);
-    else this.live = setPreview(this.live, frame(this.withBackdrop({ ...this.live.preview.model, theme: next }), this.live.preview.sourceId, "cut"));
+    else {
+      // Words on Preview take the new theme's photo (or lose the old one); pictures and looks keep theirs.
+      const current = this.live.preview.model;
+      const words = current.layout === "scripture" || current.layout === "lyrics" || current.layout === "title" || current.layout === "lower-third";
+      const photo = next.background.type === "image" ? this.mediaSrc(next.background.assetId) : null;
+      const model = words ? { ...current, theme: next, backgroundImageUrl: photo } : { ...current, theme: next };
+      this.live = setPreview(this.live, frame(this.withBackdrop(model), this.live.preview.sourceId, "cut"));
+    }
   }
 
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {

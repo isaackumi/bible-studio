@@ -78,7 +78,12 @@ export const api = {
   },
   importMedia: (source: string | File) => {
     if (desktop()) {
-      if (typeof source !== "string") return Promise.reject(new Error("Use the file picker to import an image."));
+      // A picture handed over as a file (a browser file input, a drop) goes in as bytes; videos
+      // are too large for that and come by path from the system picker.
+      if (typeof source !== "string") {
+        if (source.type.startsWith("image/")) return api.importMediaBytes(source.name, source);
+        return Promise.reject(new Error("Use Import… to choose the video from this Mac."));
+      }
       return invoke<MediaAsset>("import_media", { path: source });
     }
     if (typeof source === "string") return Promise.reject(new Error("This browser import needs the image file, not a path."));
