@@ -55,3 +55,18 @@ describe("service timing", () => {
     expect(sectionTiming({ minutes: null })).toEqual({ minutes: undefined, until: undefined });
   });
 });
+
+describe("section deadlines", () => {
+  it("ends a length after it began, and a clock end on that day", async () => {
+    const { sectionDeadline, readSavedStarts } = await import("./schedule");
+    const plan = planSchedule(service);
+    const began = new Date(2026, 9, 18, 11, 10).getTime();
+    expect(sectionDeadline(plan, "Preaching", began)).toEqual({ sectionId: "Preaching", name: "Preaching", endsAt: began + 45 * 60_000 });
+    expect(sectionDeadline(plan, "Worship", new Date(2026, 9, 18, 9, 50).getTime())?.endsAt).toBe(new Date(2026, 9, 18, 11, 0).getTime());
+    expect(sectionDeadline(plan, "Preaching", null)).toBeNull();
+    const saved = JSON.stringify({ day: "Sun Oct 18 2026", serviceId: "s1", starts: { a: 5, b: "x" } });
+    expect(readSavedStarts(saved, "s1", "Sun Oct 18 2026")).toEqual({ a: 5 });
+    expect(readSavedStarts(saved, "s1", "Mon Oct 19 2026")).toEqual({});
+    expect(readSavedStarts("not json", "s1", "Sun Oct 18 2026")).toEqual({});
+  });
+});

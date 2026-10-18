@@ -106,7 +106,7 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
-import { sectionTiming } from "../domain/schedule";
+import { planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
@@ -195,6 +195,9 @@ import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, type Overla
 import { aiReady, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
+
+/** Where today's section starts are kept between restarts. */
+const STARTS_KEY = "church-studio.section-starts";
 
 function uid(): string {
   return crypto.randomUUID();
@@ -397,6 +400,7 @@ class Session {
       if (this.workspace.lastServiceId) {
         try {
           this.service = await api.serviceGet(this.workspace.lastServiceId);
+          if (typeof window !== "undefined") this.loadSectionStarts(this.workspace.lastServiceId);
         } catch (error) {
           console.error(error);
         }
@@ -1191,6 +1195,13 @@ class Session {
     return token;
   };
 
+  /** The running section for a stage link: its name and minutes left (negative: over). */
+  private sectionStageFields = (): Record<string, string> => {
+    const deadline = this.runningDeadline();
+    if (!deadline) return { section: "", sectionLeft: "" };
+    return { section: deadline.name, sectionLeft: String(Math.round((deadline.endsAt - Date.now()) / 60_000)) };
+  };
+
   /** What a stage link shows: the words now and next, the song place, message, notes, timer. */
   private stageRemoteState = (): Record<string, string> => {
     const program = this.live.program.model;
@@ -1216,6 +1227,7 @@ class Session {
       notes: layout.notes ? notes.slice(0, 1200) : "",
       timer: view?.text ?? "",
       timerWarn: view?.warning ? "1" : "",
+      ...this.sectionStageFields(),
       clock: layout.clock ? "1" : "",
       size: layout.size,
     };
@@ -2202,7 +2214,34 @@ class Session {
       this.sectionStarts = {};
     }
     this.sectionStarts = { ...this.sectionStarts, [id]: at };
+    // Kept for the day, so a restart in the middle of the service remembers where it was.
+    try {
+      if (this.service) localStorage.setItem(STARTS_KEY, JSON.stringify({ day, serviceId: this.service.id, starts: this.sectionStarts }));
+    } catch {
+      // Storage blocked: the starts last until the app closes.
+    }
+    this.publishStage();
   };
+
+  /** The section running now and when it should end, for the stage screens. */
+  runningDeadline = (): { name: string; endsAt: number } | null => {
+    const id = this.runningSectionId;
+    if (!this.service || !id) return null;
+    const found = sectionDeadline(planSchedule(this.service), id, this.sectionStarts[id] ?? null);
+    return found ? { name: found.name, endsAt: found.endsAt } : null;
+  };
+
+  private loadSectionStarts(serviceId: string) {
+    const today = new Date().toDateString();
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(STARTS_KEY);
+    } catch {
+      raw = null;
+    }
+    this.sectionStartsDay = today;
+    this.sectionStarts = readSavedStarts(raw, serviceId, today);
+  }
 
   /** The section running now: the one most recently begun today. */
   get runningSectionId(): string | null {
@@ -2224,6 +2263,7 @@ class Session {
 
   openService = async (id: string) => {
     this.service = await api.serviceGet(id);
+    if (typeof window !== "undefined") this.loadSectionStarts(id);
     this.cursor = { sectionId: null, itemId: null };
     this.workspace = { ...this.workspace, lastServiceId: id };
     await this.saveWorkspaceDocument(this.workspace);
@@ -3425,6 +3465,7 @@ class Session {
       message: this.stageMessage,
       notes,
       layout: this.workspace.stageLayout,
+      section: this.runningDeadline(),
     };
     try {
       publishStageLocal(snapshot);

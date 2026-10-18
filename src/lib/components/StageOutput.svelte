@@ -50,12 +50,19 @@
   const clock = $derived(new Date(now).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
   const stale = $derived(!snapshot || now - snapshot.at > 6 * 60 * 60 * 1000);
   const layout = $derived(snapshot?.layout ?? defaultStageLayout());
+  /** Minutes left in the running section of the service (negative: over). */
+  const sectionLeft = $derived(snapshot?.section ? Math.round((snapshot.section.endsAt - now) / 60_000) : null);
 </script>
 
 <div class="stage size-{layout.size}">
   <header>
     <span class="tag" class:live={snapshot?.live}>{snapshot?.live ? "LIVE" : "Output off"}</span>
     <span class="desk">{snapshot?.desk || "Church Studio"}</span>
+    {#if snapshot?.section && sectionLeft !== null}
+      <span class="section-left" class:short={sectionLeft >= 0 && sectionLeft <= 5} class:over={sectionLeft < 0}>
+        {snapshot.section.name} · {sectionLeft >= 0 ? `${sectionLeft} min left` : `${-sectionLeft} min over`}
+      </span>
+    {/if}
     {#if layout.clock}<span class="clock">{clock}</span>{/if}
   </header>
   {#if snapshot?.message}
@@ -99,6 +106,9 @@
   .tag { padding: 0.3em 0.8em; border-radius: 999px; border: 1px solid #444; font-weight: 700; letter-spacing: 0.1em; }
   .tag.live { background: #d92d20; border-color: #d92d20; color: #fff; }
   .desk { flex: 1; }
+  .section-left { padding: 0.35em 0.9em; border-radius: 999px; background: #1f3d2c; color: #fff; font-weight: 700; font-size: 3vh; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .section-left.short { background: #8a5a00; }
+  .section-left.over { background: #c8102e; }
   .clock { font: 700 5vh/1 "Inter Variable", system-ui, sans-serif; color: #fff; font-variant-numeric: tabular-nums; }
   .stage-alert { margin: 0; padding: 1vh 1.5vw; border-radius: 8px; background: #c8102e; color: #fff; font-size: 2.6vh; font-weight: 700; }
   .now { overflow: hidden; display: flex; flex-direction: column; justify-content: center; }

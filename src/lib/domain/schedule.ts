@@ -116,3 +116,33 @@ export function minutesOfDay(at: number | Date): number {
   const date = at instanceof Date ? at : new Date(at);
   return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
 }
+
+/**
+ * The running section and when it ends, as a moment (epoch ms), so a stage screen can count down
+ * by itself. `startedAt` is when the section began (epoch ms); null before anything began.
+ */
+export function sectionDeadline(
+  plan: SchedulePlan,
+  sectionId: string | null,
+  startedAt: number | null,
+): { sectionId: string; name: string; endsAt: number } | null {
+  const slot = plan.slots.find((entry) => entry.sectionId === sectionId);
+  if (!slot || slot.untimed || startedAt === null) return null;
+  const day = new Date(startedAt);
+  day.setHours(0, 0, 0, 0);
+  const endsAt = slot.until ? day.getTime() + slot.end * 60_000 : startedAt + slot.minutes * 60_000;
+  return { sectionId: slot.sectionId, name: slot.name, endsAt };
+}
+
+/** Section starts kept for the day, so a restart in the middle of a service remembers them. */
+export type SavedStarts = { day: string; serviceId: string; starts: Record<string, number> };
+
+export function readSavedStarts(raw: string | null, serviceId: string, today: string): Record<string, number> {
+  try {
+    const value = raw ? (JSON.parse(raw) as Partial<SavedStarts>) : null;
+    if (!value || value.day !== today || value.serviceId !== serviceId || !value.starts || typeof value.starts !== "object") return {};
+    return Object.fromEntries(Object.entries(value.starts).filter(([, at]) => typeof at === "number" && Number.isFinite(at)));
+  } catch {
+    return {};
+  }
+}

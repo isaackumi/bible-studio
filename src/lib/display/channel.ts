@@ -153,6 +153,8 @@ export type StageSnapshot = {
   /** Private notes for what is on Program (sermon desk notes). */
   notes?: string;
   layout?: StageLayout;
+  /** The section of the service running now and when it should end (epoch ms). */
+  section?: { name: string; endsAt: number } | null;
 };
 
 export type StageLayout = { next: boolean; clock: boolean; notes: boolean; size: "s" | "m" | "l" };
@@ -179,6 +181,9 @@ export function parseStage(raw: string | null): StageSnapshot | null {
       message: typeof value.message === "string" ? value.message.slice(0, 140) : "",
       notes: typeof value.notes === "string" ? value.notes.slice(0, 2000) : "",
       layout: sanitizeStageLayout(value.layout),
+      ...(value.section && typeof value.section.name === "string" && typeof value.section.endsAt === "number"
+        ? { section: { name: value.section.name.slice(0, 60), endsAt: value.section.endsAt } }
+        : {}),
     };
   } catch {
     return null;
