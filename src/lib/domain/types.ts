@@ -142,6 +142,8 @@ export type PresentationModel = {
   qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
   /** An alert riding on top of Program (never Preview), e.g. a nursery call. */
   alert?: ProgramAlert;
+  /** Overlays that are on (logo bug, ticker, clock…), painted above everything on Program. */
+  overlays?: import("./screen-overlays").PaintedOverlay[];
   /** CSS background for the whole frame (deck page gradients); wins over the theme. */
   fill?: string;
   /** layout "shape": a filled rectangle or ellipse. */
@@ -438,6 +440,8 @@ export type Workspace = {
   songFolders: string[];
   /** Starred songs, verses, themes, layouts, looks and media, shown first in their lists. */
   favorites: import("./favorites").Favorites;
+  /** Overlays the church has set up; each is switched on or off by itself. */
+  overlays: import("./screen-overlays").ScreenOverlay[];
   /** The church's CCLI Church Copyright License number, shown with song copyright. */
   ccliLicense: string;
   /** Song pack ids already installed (static/song-packs), so they are not offered twice. */

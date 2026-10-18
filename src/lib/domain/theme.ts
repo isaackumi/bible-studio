@@ -279,6 +279,7 @@ export function defaultWorkspace(): Workspace {
     schemaVersion: 2,
     songFolders: [],
     favorites: emptyFavorites(),
+    overlays: [],
     ccliLicense: "",
     installedPacks: [],
     customLayouts: [],

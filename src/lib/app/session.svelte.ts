@@ -181,6 +181,7 @@ import {
 } from "../workspace/layout";
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
+import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -289,8 +290,8 @@ class Session {
   }
   /** Every Preview/Program write keeps camera feeds and the audience standby list in step. */
   set live(next: LiveState) {
-    // An active alert rides on every Program frame until it is cleared or expires.
-    const model = withAlert(next.program.model, this.alert);
+    // An active alert, and the overlays that are on, ride on every Program frame.
+    const model = this.withScreenOverlays(withAlert(next.program.model, this.alert));
     this.#live = model === next.program.model ? next : { ...next, program: { ...next.program, model } };
     void this.syncCameraFeeds();
     this.publishStandby();
@@ -2826,6 +2827,61 @@ class Session {
     this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
     await this.pushProgram();
     this.message = alert.until ? `Alert on Program for ${input.seconds} s.` : "Alert on Program until you clear it.";
+  };
+
+  /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
+  private withScreenOverlays = (model: PresentationModel): PresentationModel => {
+    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id));
+    if (painted.length === 0) {
+      if (!model.overlays) return model;
+      const { overlays: _gone, ...rest } = model;
+      return rest;
+    }
+    if (model.overlays && JSON.stringify(model.overlays) === JSON.stringify(painted)) return model;
+    return { ...model, overlays: painted };
+  };
+
+  /** Save overlays and repaint Program everywhere at once (a cut: overlays never fade with the content). */
+  private setOverlays = async (overlays: ScreenOverlay[]) => {
+    this.workspace = { ...this.workspace, overlays };
+    this.persistSoon();
+    this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
+    await this.pushProgram();
+  };
+
+  addOverlay = (kind: OverlayKind): string => {
+    let overlay = newOverlay(kind, this.workspace.churchName);
+    // A corner overlay starts in a corner no other corner overlay uses, so nothing hides.
+    if (kind === "logo" || kind === "clock" || kind === "badge") {
+      const taken = new Set(this.workspace.overlays.filter((entry) => entry.kind === "logo" || entry.kind === "clock" || entry.kind === "badge").map((entry) => entry.corner));
+      const free = (["top-right", "top-left", "bottom-right", "bottom-left"] as const).find((corner) => !taken.has(corner));
+      if (taken.has(overlay.corner) && free) overlay = { ...overlay, corner: free };
+    }
+    void this.setOverlays([...this.workspace.overlays, overlay]);
+    return overlay.id;
+  };
+
+  updateOverlay = (id: string, patch: Partial<ScreenOverlay>) => {
+    void this.setOverlays(sanitizeOverlays(this.workspace.overlays.map((overlay) => (overlay.id === id ? { ...overlay, ...patch, id } : overlay))));
+  };
+
+  toggleOverlay = (id: string, on?: boolean) => {
+    const overlay = this.workspace.overlays.find((entry) => entry.id === id);
+    if (!overlay) return;
+    const next = on ?? !overlay.on;
+    this.updateOverlay(id, { on: next });
+    this.message = next ? `${OVERLAY_KINDS.find((entry) => entry.kind === overlay.kind)?.label ?? "Overlay"} is on the screen.` : "Overlay off.";
+  };
+
+  removeOverlay = (id: string) => {
+    void this.setOverlays(this.workspace.overlays.filter((overlay) => overlay.id !== id));
+  };
+
+  /** Every overlay off at once. */
+  clearOverlays = () => {
+    if (!this.workspace.overlays.some((overlay) => overlay.on)) return;
+    void this.setOverlays(this.workspace.overlays.map((overlay) => ({ ...overlay, on: false })));
+    this.message = "All overlays off.";
   };
 
   clearAlert = async () => {

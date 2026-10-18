@@ -18,6 +18,7 @@ import { sanitizeSongUses } from "../domain/song-usage";
 import { sanitizeStageLayout } from "../display/channel";
 import { cleanAspect, sanitizeScreenShape } from "../display/shape";
 import { sanitizeFavorites } from "../domain/favorites";
+import { sanitizeOverlays } from "../domain/screen-overlays";
 
 const SHORTCUTS = Object.keys(defaultShortcuts) as (keyof ShortcutMap)[];
 
@@ -124,6 +125,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
       : [],
     songFolders: sanitizeFolderNames(value.songFolders),
     favorites: sanitizeFavorites(value.favorites),
+    overlays: sanitizeOverlays(value.overlays),
     ccliLicense: cleanCcli(value.ccliLicense),
     entitlement: sanitizeEntitlement(value.entitlement),
     profile: sanitizeProfile(value.profile),

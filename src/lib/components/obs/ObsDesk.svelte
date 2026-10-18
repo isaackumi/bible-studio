@@ -2,6 +2,7 @@
   import VideoControls from "../VideoControls.svelte";
   import LookScripture from "./LookScripture.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
+  import OverlaysDialog from "../OverlaysDialog.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import {
@@ -377,6 +378,7 @@
     query = "";
   }
   let alertsOpen = $state(false);
+  let overlaysOpen = $state(false);
 </script>
 
 <div class="prod" class:focus class:looks={looksOpen}>
@@ -423,6 +425,14 @@
         data-tip={session.alert ? `Alert on Program: ${session.alert.text}` : "Alert on Program (nursery, car lights…)"}
         onclick={() => (alertsOpen = true)}
       ><Icon name="alerts" size={16} /></button>
+      <button
+        type="button"
+        class="desk-btn icon"
+        class:on={session.workspace.overlays.some((overlay) => overlay.on)}
+        aria-label="Overlays"
+        data-tip={session.workspace.overlays.some((overlay) => overlay.on) ? "Overlays on the screen" : "Overlays: logo, ticker, clock, lower third"}
+        onclick={() => (overlaysOpen = true)}
+      ><Icon name="layers" size={16} /></button>
       <button type="button" class="desk-btn icon" aria-label="Show me around" data-tip="Lost? Guided tours of every page" onclick={() => (session.tourHubOpen = true)}><Icon name="help" size={16} /></button>
       <ToolMenu label="More" tip="Displays, look and settings">
         {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
@@ -906,6 +916,9 @@
   />
 {/if}
 
+{#if overlaysOpen}
+  <OverlaysDialog onclose={() => (overlaysOpen = false)} />
+{/if}
 {#if alertsOpen}
   <AlertsDialog onclose={() => (alertsOpen = false)} />
 {/if}

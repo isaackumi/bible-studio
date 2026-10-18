@@ -10,6 +10,7 @@
   import FrameView from "./FrameView.svelte";
   import QrView from "./QrView.svelte";
   import MotionBackground from "./MotionBackground.svelte";
+  import OverlayLayer from "./OverlayLayer.svelte";
 
   let {
     model,
@@ -268,6 +269,7 @@
       {/if}
     </div>
   {/if}
+  {#if model.overlays?.length && !nested}<OverlayLayer overlays={model.overlays} {still} />{/if}
   {#if model.alert && !nested}
     <div class="alert-bar {model.alert.style} {model.alert.position}" role="alert">
       {#if model.alert.style === "ticker"}
