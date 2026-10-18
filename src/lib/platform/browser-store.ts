@@ -37,6 +37,7 @@ export type BrowserLibrary = {
   services(): Promise<Service[]>;
   getService(id: string): Promise<Service | null>;
   saveService(service: Service): Promise<void>;
+  deleteService(id: string): Promise<void>;
   themes(): Promise<Theme[]>;
   saveTheme(theme: Theme): Promise<void>;
   deleteTheme(id: string): Promise<void>;
@@ -284,6 +285,9 @@ export function createLibrary(getStore: () => Promise<RecordStore>): BrowserLibr
       return services.find((service) => service.id === id) ?? null;
     },
     saveService: (service) => save("services", service),
+    async deleteService(id) {
+      await (await records()).remove("services", id);
+    },
     async themes() {
       return byRecent(await (await records()).list<Theme>("themes")).map(sanitizeTheme);
     },
@@ -352,6 +356,7 @@ export const browserLibrary: BrowserLibrary = {
   services: () => ready().then((library) => library.services()),
   getService: (id) => ready().then((library) => library.getService(id)),
   saveService: (service) => ready().then((library) => library.saveService(service)),
+  deleteService: (id) => ready().then((library) => library.deleteService(id)),
   themes: () => ready().then((library) => library.themes()),
   saveTheme: (theme) => ready().then((library) => library.saveTheme(theme)),
   deleteTheme: (id) => ready().then((library) => library.deleteTheme(id)),

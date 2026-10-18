@@ -463,6 +463,12 @@ export type Workspace = {
   countdownSize: number;
   /** Service templates: the usual parts of a service with their times. */
   serviceTemplates: import("./service-templates").ServiceTemplate[];
+  /** Song parts used lately (Songs › Recently used). */
+  recentSongs: import("./song-search").SongRecent[];
+  /** Alert messages sent lately, to send again in one click. */
+  recentAlerts: string[];
+  /** The translation the Scriptures page was last on. */
+  deskTranslationId: string | null;
   voice: VoiceSettings;
   /** Song folders, kept even while empty. Songs name their folder in Song.folder. */
   songFolders: string[];

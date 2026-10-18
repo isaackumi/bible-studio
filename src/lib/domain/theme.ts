@@ -326,6 +326,9 @@ export function defaultWorkspace(): Workspace {
     captions: defaultCaptionSettings(),
     countdownSize: 220,
     serviceTemplates: defaultTemplates(),
+    recentSongs: [],
+    recentAlerts: [],
+    deskTranslationId: null,
   };
 }
 

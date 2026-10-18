@@ -125,6 +125,8 @@
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
+  /** A media file whose Delete was pressed once. */
+  let armedMedia = $state<string | null>(null);
 
   // Updates (desktop): signed releases from GitHub.
   let updateNote = $state("");
@@ -1194,12 +1196,27 @@
             <button type="button" class="btn primary" onclick={() => void importMedia()}>Import…</button>
             <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
           </div>
-          {#each session.media as asset (asset.id)}
+          {#each [...session.media, ...session.audioTracks] as asset (asset.id)}
             <div class="row">
-              <div class="row-lead"><span class="row-icon"><Icon name="media" size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? "Video" : "Image"}{session.workspace.logoAssetId === asset.id ? " · logo" : ""}</span></div></div>
-              {#if asset.kind === "image"}
-                <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? "Logo" : "Use as logo"}</button>
-              {/if}
+              <div class="row-lead"><span class="row-icon"><Icon name={asset.kind === "audio" ? "audio" : "media"} size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? "Video" : asset.kind === "audio" ? "Audio" : "Image"}{session.workspace.logoAssetId === asset.id ? " · logo" : ""}</span></div></div>
+              <div class="row-end">
+                {#if asset.kind === "image"}
+                  <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? "Logo" : "Use as logo"}</button>
+                {/if}
+                <button
+                  type="button"
+                  class="btn danger"
+                  aria-label={armedMedia === asset.id ? `Confirm delete ${asset.name}` : `Delete ${asset.name}`}
+                  onclick={() => {
+                    if (armedMedia !== asset.id) {
+                      armedMedia = asset.id;
+                      return;
+                    }
+                    armedMedia = null;
+                    void session.deleteMedia(asset.id);
+                  }}
+                >{armedMedia === asset.id ? "Delete? Click again" : "Delete"}</button>
+              </div>
             </div>
           {/each}
         </section>

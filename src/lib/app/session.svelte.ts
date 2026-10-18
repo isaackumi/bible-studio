@@ -267,7 +267,14 @@ class Session {
   findOpen = $state(false);
   findQuery = $state("");
   findHits = $state<SongHit[]>([]);
-  recentSongs = $state<SongRecent[]>([]);
+  /** Song parts used lately: kept with the workspace so Recently used survives a restart. */
+  get recentSongs(): SongRecent[] {
+    return this.workspace.recentSongs;
+  }
+  set recentSongs(list: SongRecent[]) {
+    this.workspace = { ...this.workspace, recentSongs: list.slice(0, 30) };
+    this.persistSoon();
+  }
   sermons = $state<Sermon[]>([]);
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   /** Every stored file: pictures, videos and audio. */
@@ -630,9 +637,25 @@ class Session {
     }
   };
 
+  /** The translation the Scriptures page is on, kept for next time. */
+  setDeskTranslation = (id: string) => {
+    if (this.workspace.deskTranslationId === id) return;
+    this.workspace = { ...this.workspace, deskTranslationId: id };
+    this.persistSoon();
+  };
+
+  /** Save now (the window is closing or hidden): nothing waits on the short delay. */
+  flushSave = async () => {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
+    await this.persist();
+  };
+
   private persistSoon = () => {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
+      this.saveTimer = undefined;
       void this.persist();
     }, 250);
   };
@@ -2359,6 +2382,57 @@ class Session {
     this.saveTemplates(this.workspace.serviceTemplates.filter((entry) => entry.id !== id));
   };
 
+  /** Delete a service; if it is the one open, the next one opens (or none). */
+  deleteService = async (id: string) => {
+    const name = this.services.find((entry) => entry.id === id)?.name ?? "Service";
+    await api.serviceDelete(id);
+    this.services = await api.serviceList();
+    if (this.service?.id === id) {
+      const next = this.services[0];
+      this.service = null;
+      this.cursor = { sectionId: null, itemId: null };
+      if (next) await this.openService(next.id);
+      else {
+        this.workspace = { ...this.workspace, lastServiceId: null };
+        this.persistSoon();
+      }
+    }
+    this.message = `${name} deleted.`;
+  };
+
+  /** A copy of a service (its parts, times and items), to plan a similar one. */
+  duplicateService = async (id: string) => {
+    const source = this.service?.id === id ? this.service : await api.serviceGet(id);
+    if (!source) return;
+    const copy: Service = {
+      ...structuredClone($state.snapshot(source) as Service),
+      id: uid(),
+      name: `${source.name} (copy)`,
+      updatedAt: new Date().toISOString(),
+    };
+    copy.sections = copy.sections.map((section) => ({ ...section, id: uid(), items: section.items.map((item) => ({ ...item, id: uid() })) }));
+    this.service = copy;
+    this.cursor = { sectionId: copy.sections[0]?.id ?? null, itemId: null };
+    await this.persist();
+    this.message = `${copy.name} made. Rename it at the top.`;
+  };
+
+  /** Delete a picture, video or audio file; playlists, the logo and overlays let go of it. */
+  deleteMedia = async (id: string) => {
+    const asset = [...this.media, ...this.audioTracks].find((entry) => entry.id === id);
+    await api.mediaDelete(id);
+    this.media = (await api.mediaList());
+    this.workspace = {
+      ...this.workspace,
+      logoAssetId: this.workspace.logoAssetId === id ? null : this.workspace.logoAssetId,
+      playlists: this.workspace.playlists.map((list) => ({ ...list, trackIds: list.trackIds.filter((track) => track !== id) })),
+      overlays: this.workspace.overlays.map((overlay) => (overlay.assetId === id ? { ...overlay, assetId: null } : overlay)),
+      favorites: { ...this.workspace.favorites, media: this.workspace.favorites.media.filter((entry) => entry !== id) },
+    };
+    this.persistSoon();
+    this.message = `${asset?.name ?? "The file"} deleted.`;
+  };
+
   createService = async (name: string) => {
     const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString() };
     this.service = service;
@@ -3599,7 +3673,14 @@ class Session {
 
   /** The alert on Program (nursery call, car lights…). Never on Preview. */
   alert = $state<ProgramAlert | null>(null);
-  recentAlerts = $state<string[]>([]);
+  /** Alerts sent lately, kept with the workspace. */
+  get recentAlerts(): string[] {
+    return this.workspace.recentAlerts;
+  }
+  set recentAlerts(list: string[]) {
+    this.workspace = { ...this.workspace, recentAlerts: list.slice(0, 12) };
+    this.persistSoon();
+  }
   private alertTimer: ReturnType<typeof setTimeout> | undefined;
 
   showAlert = async (input: { text: string; style: ProgramAlert["style"]; position: ProgramAlert["position"]; seconds: number | null }) => {

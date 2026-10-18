@@ -65,9 +65,11 @@ export const api = {
   },
   serviceGet: (id: string) => (desktop() ? invoke<Service | null>("service_get", { id }) : browserLibrary.getService(id)),
   serviceSave: (document: Service) => (desktop() ? invoke<void>("service_save", { document }) : browserLibrary.saveService(document)),
+  serviceDelete: (id: string) => (desktop() ? invoke<void>("service_delete", { id }) : browserLibrary.deleteService(id)),
   importSnapshot: (snapshot: LibrarySnapshot) =>
     desktop() ? invoke<void>("import_library", { snapshot }) : browserLibrary.importSnapshot(snapshot),
   mediaList: () => (desktop() ? invoke<MediaAsset[]>("media_list") : browserMedia.list()),
+  mediaDelete: (id: string) => (desktop() ? invoke<void>("media_delete", { id }) : browserMedia.remove(id)),
   /** In-memory image (for example a rendered PDF page). Desktop sends raw bytes to Rust. */
   importMediaBytes: async (name: string, blob: Blob): Promise<MediaAsset> => {
     if (desktop()) {

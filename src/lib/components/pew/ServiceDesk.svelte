@@ -26,6 +26,8 @@
   let adding = $state<Adding>(null);
   /** The templates window, opened on a template (or the first). */
   let templatesOpen = $state<{ id: string | null } | null>(null);
+  /** A service whose delete button was pressed once (press again to delete). */
+  let armedService = $state<string | null>(null);
   let songQuery = $state("");
   let reference = $state("");
   let referenceNote = $state("");
@@ -153,10 +155,31 @@
     <div class="list">
       {#if session.services.length === 0}<p class="empty">No services yet. Start one to plan the order.</p>{/if}
       {#each session.services as entry (entry.id)}
-        <button type="button" class="row" class:on={service?.id === entry.id} onclick={() => void session.openService(entry.id)}>
-          <strong>{entry.name}</strong>
-          <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
-        </button>
+        <div class="svc" class:on={service?.id === entry.id}>
+          <button type="button" class="row" class:on={service?.id === entry.id} onclick={() => void session.openService(entry.id)}>
+            <strong>{entry.name}</strong>
+            <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+          </button>
+          <span class="svc-tools">
+            <button type="button" class="row-tool" aria-label="Duplicate {entry.name}" title="Duplicate" onclick={() => void session.duplicateService(entry.id)}><Icon name="copy" size={13} /></button>
+            <button
+              type="button"
+              class="row-tool"
+              class:armed={armedService === entry.id}
+              aria-label={armedService === entry.id ? `Confirm delete ${entry.name}` : `Delete ${entry.name}`}
+              title={armedService === entry.id ? "Click again to delete" : "Delete"}
+              onclick={() => {
+                if (armedService !== entry.id) {
+                  armedService = entry.id;
+                  setTimeout(() => (armedService = armedService === entry.id ? null : armedService), 3000);
+                  return;
+                }
+                armedService = null;
+                void session.deleteService(entry.id);
+              }}
+            >{#if armedService === entry.id}Delete?{:else}<Icon name="trash" size={13} />{/if}</button>
+          </span>
+        </div>
       {/each}
     </div>
   </LibrarySidebar>
@@ -462,4 +485,9 @@
   .tpl-card strong { font-size: 14px; }
   .tpl-card span { font-size: 12px; color: var(--muted); line-height: 1.4; }
   .tpl-card.edit { border-left-color: var(--line); border-style: dashed; background: none; }
+  .svc { position: relative; flex: none; }
+  .svc .row { padding-right: 64px; }
+  .svc-tools { position: absolute; top: 8px; right: 6px; display: none; gap: 2px; }
+  .svc:hover .svc-tools, .svc:focus-within .svc-tools, .svc-tools:has(.armed) { display: inline-flex; }
+  .svc-tools .armed { width: auto; padding: 0 8px; color: var(--danger, #e5484d); font-size: 12px; font-weight: 700; }
 </style>

@@ -158,6 +158,16 @@ fn song_save(db: State<Db>, document: Value) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn service_delete(db: State<Db>, id: String) -> Result<(), String> {
+    with_db(&db, |conn| db::service_delete(conn, &id))
+}
+
+#[tauri::command]
+fn media_delete(db: State<Db>, id: String) -> Result<(), String> {
+    with_db(&db, |conn| db::media_delete(conn, &id))
+}
+
+#[tauri::command]
 fn song_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::song_delete(conn, &id))
 }
@@ -583,6 +593,8 @@ pub fn run() {
             song_search,
             song_save,
             song_delete,
+            service_delete,
+            media_delete,
             sermon_list,
             sermon_save,
             sermon_delete,

@@ -36,7 +36,8 @@
 
   type Mode = "scriptures" | "songs" | "sermon" | "service";
   let mode = $state<Mode>("scriptures");
-  let translationId = $state("kjv");
+  // The translation the page was last on (kept with the workspace).
+  let translationId = $state(untrack(() => session.workspace.deskTranslationId ?? "kjv"));
   let bookOrd = $state(1);
   let chapter = $state(1);
   let verses = $state<VerseText[]>([]);
@@ -157,9 +158,26 @@
   const reading = $derived(
     verses.filter((verse) => start !== null && verse.verse >= start && verse.verse <= (end ?? start)),
   );
+  // Once the workspace and translations have loaded, go back to the translation used last; only
+  // after that are changes saved (so the starting KJV never overwrites it).
+  let translationRestored = false;
   $effect(() => {
     const first = session.translations[0];
-    if (first && !session.translations.some((entry) => entry.id === translationId)) translationId = first.id;
+    if (!first || !session.booted) return;
+    const has = (id: string | null | undefined) => !!id && session.translations.some((entry) => entry.id === id);
+    if (!translationRestored) {
+      translationRestored = true;
+      const saved = session.workspace.deskTranslationId;
+      if (has(saved) && saved !== translationId) {
+        translationId = saved!;
+        return;
+      }
+    }
+    if (!has(translationId)) {
+      translationId = first.id;
+      return;
+    }
+    session.setDeskTranslation(translationId);
   });
 
   $effect(() => {

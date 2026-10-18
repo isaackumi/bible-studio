@@ -153,6 +153,29 @@ pub fn song_save(conn: &Connection, document: &Value) -> Result<(), String> {
     Ok(())
 }
 
+pub fn service_delete(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM services WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Remove a picture, video or audio file from the library, and its copy in the app's folder.
+pub fn media_delete(conn: &Connection, id: &str) -> Result<(), String> {
+    let path: Option<String> = conn
+        .query_row("SELECT path FROM media_assets WHERE id = ?1", params![id], |row| row.get(0))
+        .ok();
+    conn.execute("DELETE FROM media_assets WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    if let Some(path) = path {
+        // Only files the app copied into its own media folder are removed.
+        let file = std::path::Path::new(&path);
+        if file.parent().and_then(|dir| dir.file_name()).map(|name| name == "media").unwrap_or(false) {
+            let _ = fs::remove_file(file);
+        }
+    }
+    Ok(())
+}
+
 pub fn song_delete(conn: &Connection, id: &str) -> Result<(), String> {
     conn.execute("DELETE FROM songs WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;

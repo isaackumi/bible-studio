@@ -132,6 +132,13 @@ export function normalizeWorkspace(input: unknown): Workspace {
     secondOutput: sanitizeSecondOutput(value.secondOutput),
     captions: sanitizeCaptionSettings(value.captions),
     serviceTemplates: sanitizeTemplates(value.serviceTemplates),
+    recentSongs: Array.isArray(value.recentSongs)
+      ? value.recentSongs
+          .filter((entry): entry is { songId: string; sectionId: string } => !!entry && typeof entry.songId === "string" && typeof entry.sectionId === "string")
+          .slice(0, 30)
+      : [],
+    recentAlerts: Array.isArray(value.recentAlerts) ? value.recentAlerts.filter((text): text is string => typeof text === "string" && text.trim().length > 0).map((text) => text.slice(0, 200)).slice(0, 12) : [],
+    deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)

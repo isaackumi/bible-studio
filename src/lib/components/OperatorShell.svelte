@@ -27,9 +27,29 @@
       if (event.key === AUDIENCE_ASPECT_KEY && event.newValue) session.noteAudienceAspect(Number(event.newValue));
     };
     window.addEventListener("storage", onStorage);
+    // Save at once when the window is hidden or closes, so the last change is never lost.
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void session.flushSave();
+    };
+    const onLeave = () => void session.flushSave();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onLeave);
+    let stopClose = () => {};
+    if (isDesktop()) {
+      void import("@tauri-apps/api/window").then(({ getCurrentWindow }) =>
+        getCurrentWindow()
+          .onCloseRequested(async () => {
+            await session.flushSave();
+          })
+          .then((stop) => (stopClose = stop)),
+      );
+    }
     return () => {
       stopShape();
+      stopClose();
       window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onLeave);
       session.destroy();
     };
   });

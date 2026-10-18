@@ -91,6 +91,7 @@ describe("browser media adapter", () => {
     const store: MediaStore = {
       list: () => inner.list(),
       get: (id) => inner.get(id),
+      remove: (id) => inner.remove(id),
       put: async () => {
         throw new DOMException("The quota was exceeded.", "QuotaExceededError");
       },

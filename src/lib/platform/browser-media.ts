@@ -39,12 +39,14 @@ export type MediaStore = {
   list(): Promise<StoredMedia[]>;
   put(record: StoredMedia): Promise<void>;
   get(id: string): Promise<StoredMedia | null>;
+  remove(id: string): Promise<void>;
 };
 
 export type BrowserMedia = {
   list(): Promise<MediaAsset[]>;
   importFile(file: File): Promise<MediaAsset>;
   url(id: string): string | null;
+  remove(id: string): Promise<void>;
 };
 
 export function imageTypeOf(file: { name: string; type: string }): string | null {
@@ -103,6 +105,11 @@ export function idbMediaStore(db: IDBDatabase): MediaStore {
       await transactionDone(transaction);
       return (row as StoredMedia | undefined) ?? null;
     },
+    async remove(id) {
+      const transaction = db.transaction(BROWSER_MEDIA_STORE, "readwrite");
+      transaction.objectStore(BROWSER_MEDIA_STORE).delete(id);
+      await transactionDone(transaction);
+    },
   };
 }
 
@@ -118,6 +125,9 @@ export function memoryMediaStore(seed: StoredMedia[] = []): MediaStore {
     async get(id) {
       const row = rows.get(id);
       return row ? { ...row } : null;
+    },
+    async remove(id) {
+      rows.delete(id);
     },
   };
 }
@@ -178,6 +188,12 @@ export function createMediaAdapter(
     url(id) {
       return urls.get(id) ?? null;
     },
+    async remove(id) {
+      await (await store()).remove(id);
+      const url = urls.get(id);
+      if (url) URL.revokeObjectURL(url);
+      urls.delete(id);
+    },
   };
 }
 
@@ -208,4 +224,5 @@ export const browserMedia: BrowserMedia = {
   list: () => ready().then((media) => media.list()),
   importFile: (file) => ready().then((media) => media.importFile(file)),
   url: (id) => adapter?.url(id) ?? null,
+  remove: (id) => ready().then((media) => media.remove(id)),
 };
