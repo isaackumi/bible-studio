@@ -45,6 +45,14 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let detections = $state<SearchHit[]>([]);
+  // The transcript follows the newest words as they are heard.
+  let transcriptEl = $state<HTMLDivElement | undefined>();
+  $effect(() => {
+    void session.captions.lines.length;
+    void session.captions.interim;
+    const node = transcriptEl;
+    if (node) requestAnimationFrame(() => (node.scrollTop = node.scrollHeight));
+  });
 
   // Scriptures that have gone live: kept in order, one click sends one straight back to Program.
   let sideTab = $state<"live" | "detections">("live");
@@ -662,15 +670,22 @@
                 <Pane defaultSize={frozen.librarySplit} minSize={20} order={1}>
                   <div class="pb-split">
           <section class="pb-panel">
-            <header class="pb-head"><span>Live transcript</span></header>
-            <div class="pb-body transcript">
+            <header class="pb-head">
+              <span>Live transcript</span>
+              {#if session.captions.lines.length}
+                <button type="button" class="quiet" title="Clear what was heard" onclick={() => session.clearCaptions()}><Icon name="close" size={14} /> Clear</button>
+              {/if}
+            </header>
+            <!-- What the microphone heard (never the verses on screen: those are under Scripture reading). -->
+            <div class="pb-body transcript" bind:this={transcriptEl}>
               {#if session.voice.status !== "idle"}<VoiceStatus />{/if}
-              {#if reading.length === 0}
-                <p>{note || "Search a reference, or listen for a verse."}</p>
-              {:else}
-                {#each reading as verse (verse.verse)}
-                  <p><sup>{verse.verse}</sup> {verse.text}</p>
-                {/each}
+              {#if note}<p class="transcript-note">{note}</p>{/if}
+              {#each session.captions.lines.slice(-40) as line (line.id)}
+                <p class="heard">{line.text}</p>
+              {/each}
+              {#if session.captions.interim}<p class="heard interim">{session.captions.interim}</p>{/if}
+              {#if !session.captions.lines.length && !session.captions.interim}
+                <p class="transcript-empty">{voiceActive ? "Listening. What is said shows here, and verses it hears go to Preview." : "Press Listen: what is said shows here, and verses it hears go to Preview."}</p>
               {/if}
             </div>
             <footer class="pb-foot">
@@ -1245,7 +1260,7 @@
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
   .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .transcript sup, .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
+  .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
@@ -1366,4 +1381,8 @@
     .now-audio-name { padding: 0 5px; }
     .now-audio-btn { width: 24px; }
   }
+  .transcript .heard { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
+  .transcript .heard.interim { color: var(--muted); font-style: italic; }
+  .transcript-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .transcript-empty { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 </style>

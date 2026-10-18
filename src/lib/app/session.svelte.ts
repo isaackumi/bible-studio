@@ -1107,6 +1107,7 @@ class Session {
   private hearCaption(latest: string, final: boolean) {
     const before = this.captions.next;
     this.captions = addHeard(this.captions, latest, final, Date.now());
+    if (!this.captionsOn) return;
     if (this.captions.next !== before) void this.translateCaption(before);
     this.publishCaptions();
   }
@@ -1174,8 +1175,9 @@ class Session {
     return {
       desk: this.workspace.churchName || "Church Studio",
       on: this.captionsOn && this.voice.status === "listening" ? "1" : "",
-      lines: JSON.stringify(linesFor(this.captions, after, lang)),
-      interim: lang ? "" : this.captions.interim,
+      // Nothing reaches phones while captions are off, even though the desk keeps a transcript.
+      lines: JSON.stringify(this.captionsOn ? linesFor(this.captions, after, lang) : []),
+      interim: lang || !this.captionsOn ? "" : this.captions.interim,
       languages: JSON.stringify(languages.map((code) => ({ code, name: CAPTION_LANGUAGES.find((entry) => entry.code === code)?.name ?? code }))),
     };
   };
@@ -1945,7 +1947,8 @@ class Session {
         return;
       }
     }
-    if (this.captionsOn) this.hearCaption(latest, final);
+    // Everything heard goes to the desk's transcript; the screen and phones get it only with captions on.
+    this.hearCaption(latest, final);
     for (const listener of this.voiceListeners) listener(text, final, alternatives);
   };
 
