@@ -12,6 +12,7 @@
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import OutlineDialog from "./OutlineDialog.svelte";
   import MacroBar from "../MacroBar.svelte";
+  import FollowSermon from "./FollowSermon.svelte";
   import SectionTime from "./SectionTime.svelte";
   import { planSchedule } from "../../domain/schedule";
   import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
@@ -405,6 +406,7 @@
       </div>
       <p class="muted">{t("Arrows step inside an item (song sections, slide pages, verses); at the end they move on. Page Down jumps to the next item.")}</p>
     </div>
+    <FollowSermon />
     <MacroBar />
   </aside>
   {/if}

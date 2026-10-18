@@ -68,3 +68,15 @@ describe("decks from PDF pages", () => {
     expect(deck.pages[0]!.background?.color).toBe("#000000");
   });
 });
+
+describe("slide words and sources", () => {
+  it("reads a page's words, without editor placeholders, and reads deck source ids back", async () => {
+    const { addTextElement, deckPageText, deckSource, newPage } = await import("./decks");
+    const page = addTextElement(newPage("Point one"), "He wasted his inheritance", { x: 0, y: 0, w: 50, h: 20 });
+    const text = deckPageText(page);
+    expect(text).toContain("He wasted his inheritance");
+    expect(text).not.toMatch(/double.?click/i);
+    expect(deckSource("deck:deck:ab12:3")).toEqual({ deckId: "deck:ab12", index: 3 });
+    expect(deckSource("song:x:1")).toBeNull();
+  });
+});

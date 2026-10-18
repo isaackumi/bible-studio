@@ -3,6 +3,7 @@ import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
+import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -162,7 +163,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
-import { deckFromPageImages, deckItem, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
+import { deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, createTimer, presentTimer, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
@@ -2112,8 +2113,63 @@ class Session {
     }
     // Everything heard goes to the desk's transcript; the screen and phones get it only with captions on.
     this.hearCaption(latest, final);
+    this.followSermon(text);
     for (const listener of this.voiceListeners) listener(text, final, alternatives);
   };
+
+  // Follow the sermon: name the slide being preached (decks in this service and the one showing),
+  // and in Suggest put it on Preview, in Auto-advance on the screen when a slide of that deck is up.
+  sermonFollow = $state<{ mode: "off" | "suggest" | "auto"; match: SlideMatch | null }>({ mode: "off", match: null });
+  private sermonFollowAt = 0;
+
+  setSermonFollow = (mode: "off" | "suggest" | "auto") => {
+    this.sermonFollow = { mode, match: null };
+  };
+
+  /** The slide pages that can be followed: decks in the open service, and any deck showing. */
+  private followSlides(): SlideIndex {
+    const ids = new Set<string>();
+    for (const section of this.service?.sections ?? []) for (const item of section.items) if (item.kind === "deck" && item.deck) ids.add(item.deck.deckId);
+    for (const source of [this.live.program.sourceId, this.live.preview.sourceId]) {
+      const id = deckSource(source)?.deckId;
+      if (id) ids.add(id);
+    }
+    const slides: SlideText[] = [];
+    for (const deck of this.decks) {
+      if (!ids.has(deck.id)) continue;
+      deck.pages.forEach((page, index) => slides.push({ key: `deck:${deck.id}:${index}`, label: `${deck.name} · ${index + 1}`, text: deckPageText(page) }));
+    }
+    return buildSlideIndex(slides);
+  }
+
+  private followSermon(heard: string) {
+    if (this.sermonFollow.mode === "off" || !heard) return;
+    const now = Date.now();
+    if (now - this.sermonFollowAt < 1500) return;
+    const program = this.live.program.sourceId;
+    const match = matchSlide(heard, this.followSlides(), program?.startsWith("deck:") ? program : null);
+    if (!match) return;
+    this.sermonFollow = { ...this.sermonFollow, match };
+    if (match.key === program || match.key === this.live.preview.sourceId) return;
+    this.sermonFollowAt = now;
+    const target = deckSource(match.key);
+    if (!target) return;
+    this.previewDeckPage(target.deckId, target.index);
+    // Auto-advance changes the screen only while a slide of that same deck is up there.
+    if (this.sermonFollow.mode === "auto" && deckSource(program)?.deckId === target.deckId) void this.take();
+  }
+
+  /** The slide on Program, one page on or back (voice "next slide" with live commands on). */
+  private async stepProgramDeck(direction: 1 | -1): Promise<boolean> {
+    const on = deckSource(this.live.program.sourceId);
+    if (!on) return false;
+    const deck = this.decks.find((entry) => entry.id === on.deckId);
+    const next = deck ? stepDeckPage(deck, on.index, direction) : null;
+    if (!deck || next === null) return false;
+    this.previewDeckPage(deck.id, next);
+    await this.take();
+    return true;
+  }
 
   /** Execute a parsed voice command. Program-changing commands need allowLive. */
   runVoiceCommand = async (command: VoiceCommand) => {
@@ -2133,6 +2189,11 @@ class Session {
     }
     try {
       if (command.kind === "command") {
+        // With live commands on, "next slide" moves the slide on the screen itself.
+        if ((command.id === "next" || command.id === "previous") && this.voice.allowLive && (await this.stepProgramDeck(command.id === "next" ? 1 : -1))) {
+          record("executed", t("{label}: the slide on the screen moved.", { label }));
+          return;
+        }
         await this.run(command.id);
         record("executed", command.live ? `${label} sent Program.` : `${label}. Preview only.`);
         return;

@@ -2534,4 +2534,14 @@ export const fr: Readonly<Record<string, string>> = {
   "Overlay colour": "Couleur du voile",
   "Back to the picture as it is.": "Revenir à l’image telle quelle.",
   "Reset picture": "Réinitialiser l’image",
+
+  // Follow the sermon
+  "{label}: the slide on the screen moved.": "{label} : la diapositive à l’écran a changé.",
+  "Follow the sermon": "Suivre la prédication",
+  Suggest: "Suggérer",
+  Auto: "Auto",
+  "Add a slide deck to the service; the slides follow what the preacher says.": "Ajoutez une présentation au culte ; les diapositives suivent ce que dit le prédicateur.",
+  "The matching slide goes on the screen by itself while that deck is showing.": "La diapositive correspondante passe d’elle-même à l’écran tant que cette présentation est affichée.",
+  "The slide that matches what is preached goes to Preview; LIVE shows it.": "La diapositive qui correspond à ce qui est prêché passe en aperçu ; DIRECT l’affiche.",
+  "Listening for the slide being preached…": "À l’écoute de la diapositive prêchée…",
 };

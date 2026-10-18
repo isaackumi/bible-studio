@@ -161,3 +161,27 @@ export function stepDeckPage(deck: SlideDeck, index: number, direction: 1 | -1):
   const next = index + direction;
   return next >= 0 && next < deck.pages.length ? next : null;
 }
+
+/** The words on a slide page (headings, text, scripture, lyrics), for following the sermon. */
+export function deckPageText(page: Composition): string {
+  const parts = [page.name];
+  for (const layer of page.layers) {
+    if (!layer.visible) continue;
+    for (const key of ["heading", "body", "text", "title", "subtitle", "label", "reference", "lines"]) {
+      const value = layer.source.payload[key];
+      // Editor placeholders ("Double-click to edit title") are not words on the slide.
+      if (value && !/double.?click to edit/i.test(value)) parts.push(value);
+    }
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** A deck page's source id ("deck:<deck id>:<page>") read back; deck ids may hold colons themselves. */
+export function deckSource(source: string | null | undefined): { deckId: string; index: number } | null {
+  if (!source?.startsWith("deck:")) return null;
+  const rest = source.slice(5);
+  const cut = rest.lastIndexOf(":");
+  const index = Number(rest.slice(cut + 1));
+  return cut > 0 && Number.isInteger(index) ? { deckId: rest.slice(0, cut), index } : null;
+}
+
