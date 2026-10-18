@@ -2224,13 +2224,13 @@ class Session {
     this.message = t("Look removed. Program was not changed.");
   };
 
-  addLookToService = async (composition: Composition) => {
+  addLookToService = async (composition: Composition, sectionId?: string) => {
     const queued = queueLook(this.workspace.compositions, composition);
     this.workspace = { ...this.workspace, compositions: queued.looks };
     this.persistSoon();
     if (!this.service) await this.createService("Sunday Service");
     if (!this.service?.sections.length) this.addSection("Looks");
-    const target = this.service ? sectionIdForInsert(this.service, this.cursor) : null;
+    const target = this.service ? (sectionId && this.service.sections.some((section) => section.id === sectionId) ? sectionId : sectionIdForInsert(this.service, this.cursor)) : null;
     if (!this.service || !target) {
       this.message = t("{title} saved. Add a section first.", { title: queued.item.title });
       return;
@@ -2238,6 +2238,7 @@ class Session {
     this.insertItem(target, queued.item);
     await this.selectItem(queued.item.id);
     this.message = t("{title} queued. Preview only until LIVE.", { title: queued.item.title });
+    this.notify(t("Added to {service}", { service: this.service.name }), { detail: queued.item.title, actions: [{ label: t("Undo"), run: () => { this.removeItem(queued.item.id); this.dismissToast(); } }] });
   };
 
   previewPassage = async (passage: BibleItem) => {
@@ -2652,48 +2653,68 @@ class Session {
    * Add anything to the running order: into the selected section, or a first "Service" section
    * (creating today's service when there is none). Preview changes only when asked.
    */
-  addToService = async (item: Omit<PresentationItem, "id">, preview = false): Promise<string> => {
-    if (!this.service) await this.createService(`Service ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`);
-    if (!this.service!.sections.length) this.addSection("Service");
-    const target = sectionIdForInsert(this.service!, this.cursor)!;
+  addToService = async (item: Omit<PresentationItem, "id">, preview = false, sectionId?: string): Promise<string> => {
+    if (!this.service) await this.createService(`${t("Service")} ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`);
+    if (!this.service!.sections.length) this.addSection(t("Service"));
+    const target = sectionId && this.service!.sections.some((section) => section.id === sectionId) ? sectionId : sectionIdForInsert(this.service!, this.cursor)!;
     const full = { ...item, id: uid() } as PresentationItem;
     this.insertItem(target, full);
     this.persistSoon();
     if (preview) await this.selectItem(full.id);
+    const part = this.service!.sections.find((section) => section.id === target)?.name ?? "";
     this.message = t("{title} added to {name}.", { title: full.title, name: this.service!.name });
+    this.notify(t("Added to {service}", { service: this.service!.name }), {
+      detail: part ? `${full.title} → ${part}` : full.title,
+      actions: [
+        { label: t("Undo"), run: () => { this.removeItem(full.id); this.dismissToast(); } },
+        { label: t("Open service"), run: () => { this.pageRequest = "service"; this.dismissToast(); } },
+      ],
+    });
     return full.id;
   };
 
-  addSongToService = (song: Song) => {
+  addSongToService = (song: Song, sectionId?: string) => {
     const first = song.sections[0];
     if (!first) {
       this.message = t("{title} has no sections yet.", { title: song.title || t("That song") });
       return;
     }
-    void this.addToService({ kind: "lyric", title: song.title || "Untitled song", lyric: { songId: song.id, sectionId: first.id } });
+    void this.addToService({ kind: "lyric", title: song.title || t("Untitled song"), lyric: { songId: song.id, sectionId: first.id } }, false, sectionId);
   };
 
-  addMediaToService = (asset: MediaAsset) => {
+  addMediaToService = (asset: MediaAsset, sectionId?: string) => {
     const video = asset.kind === "video";
     void this.addToService(
       video
         ? { kind: "video", title: asset.name, video: { assetId: asset.id, loop: false, muted: false } }
         : { kind: "image", title: asset.name, image: { assetId: asset.id } },
+      false,
+      sectionId,
     );
   };
 
-  addAnnouncementToService = (heading: string, body: string, options: { design?: AnnouncementDesign; label?: string } = {}) => {
-    const title = heading.trim() || "Announcement";
-    void this.addToService({
-      kind: "announcement",
-      title,
-      announcement: { heading: title, body: body.trim(), design: options.design ?? "card", label: options.label ?? "Announcement" },
-    });
+  addAnnouncementToService = (heading: string, body: string, options: { design?: AnnouncementDesign; label?: string; sectionId?: string } = {}) => {
+    const title = heading.trim() || t("Announcement");
+    void this.addToService(
+      {
+        kind: "announcement",
+        title,
+        announcement: { heading: title, body: body.trim(), design: options.design ?? "card", label: options.label ?? t("Announcement") },
+      },
+      false,
+      options.sectionId,
+    );
   };
 
-  addPassageToService = (passage: BibleItem) => {
+  addPassageToService = (passage: BibleItem, sectionId?: string) => {
     this.remember(passage);
-    void this.addToService({ kind: "bible", title: passage.reference, bible: passage });
+    void this.addToService({ kind: "bible", title: passage.reference, bible: passage }, false, sectionId);
+  };
+
+  /** A text slide in a part, ready to edit. */
+  addTextToService = (heading: string, body: string, sectionId?: string) => {
+    const title = heading.trim() || t("Text");
+    return this.addToService({ kind: "slide", title, slide: { heading: title, body: body.trim(), imageId: null } }, false, sectionId);
   };
 
   addLyric = (songId: string, sectionId: string, title: string) => {
@@ -3089,15 +3110,16 @@ class Session {
     await this.pushProgram();
   };
 
-  addDeckToService = async (deckId: string) => {
+  addDeckToService = async (deckId: string, sectionId?: string) => {
     const deck = this.decks.find((entry) => entry.id === deckId);
     if (!deck) return;
-    const target = await this.sectionForMedia();
+    const target = sectionId && this.service?.sections.some((section) => section.id === sectionId) ? sectionId : await this.sectionForMedia();
     if (!target) return;
     const item = deckItem(deck);
     this.insertItem(target, item);
     await this.selectItem(item.id);
     this.message = t("{name} queued. Preview only until LIVE.", { name: deck.name });
+    this.notify(t("Added to {service}", { service: this.service?.name ?? "" }), { detail: deck.name, actions: [{ label: t("Undo"), run: () => { this.removeItem(item.id); this.dismissToast(); } }] });
   };
 
   /** Add a video to the current section. Preview plays it muted; LIVE plays it on the audience. */
@@ -3323,6 +3345,24 @@ class Session {
   tourHubOpen = $state(false);
   /** A Presenter Desk page the tour needs open (PewDesk switches to it). */
   pageRequest = $state<PewPage | null>(null);
+
+  /** A short note in the corner after an action ("Added to Sunday Service › Worship"), with an optional button. */
+  toast = $state<{ id: number; text: string; detail?: string; actions: Array<{ label: string; run: () => void }> } | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  notify = (text: string, options: { detail?: string; actions?: Array<{ label: string; run: () => void }>; ms?: number } = {}) => {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    const id = Date.now();
+    this.toast = { id, text, detail: options.detail, actions: options.actions ?? [] };
+    this.toastTimer = setTimeout(() => {
+      if (this.toast?.id === id) this.toast = null;
+    }, options.ms ?? 6000);
+  };
+
+  dismissToast = () => {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toast = null;
+  };
 
   /** Start a tour, on its own page or desk, from any step. */
   startTour = (id: TourId, from = 0) => {

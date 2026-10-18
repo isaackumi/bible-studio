@@ -7,6 +7,7 @@
   import type { BibleItem, PresentationModel, SearchHit, VerseText } from "../../domain/types";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Screen from "../Screen.svelte";
+  import AddToService from "./AddToService.svelte";
   import Icon from "../Icon.svelte";
   import { msg, t, tn } from "../../i18n/core";
 
@@ -364,11 +365,6 @@
   const sectionOf = (row: Row) =>
     row.kind === "ref" ? "Go to" : row.kind === "book" ? "Books" : row.kind === "verse" ? `${bookName(row.bookOrd)} ${row.chapter}` : row.kind === "hit" ? `Words · ${hits.length} found` : row.tag;
 
-  function addToService() {
-    if (!selectedItem) return;
-    session.addPassageToService(selectedItem);
-    note = `${selectedItem.reference} added to the service.`;
-  }
 </script>
 
 {#snippet chips(label: string, icon: string, items: BibleItem[], removable = false)}
@@ -545,7 +541,7 @@
           <div class="go">
             <button type="button" class="btn" onclick={() => choose(selected, false)}>{t("Preview")} <kbd>Enter</kbd></button>
             <button type="button" class="btn live" onclick={() => choose(selected, true)}>{t("Show now")} <kbd>⇧ Enter</kbd></button>
-            <button type="button" class="btn ghost" title={t("Add to the service running order")} onclick={addToService}><Icon name="queue" size={14} /> {t("Add to service")}</button>
+            <AddToService className="btn ghost" onadd={(sectionId) => selectedItem && session.addPassageToService(selectedItem, sectionId)} />
           </div>
         {:else if selected?.kind === "book"}
           <p class="ref">{selected.name}</p>

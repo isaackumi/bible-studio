@@ -1,11 +1,8 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { parseReference, formatReference } from "../../bible/reference";
   import { sectionShort, sectionTone } from "../../domain/song";
-  import { searchSongHits } from "../../domain/song-search";
   import { restoreComposition } from "../../domain/composition";
   import type { PresentationItem } from "../../domain/types";
-  import { ANNOUNCEMENT_DESIGNS, type AnnouncementDesign } from "../../domain/announcement";
   import Icon from "../Icon.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import MonitorPair from "./MonitorPair.svelte";
@@ -17,16 +14,50 @@
   import MacroBar from "../MacroBar.svelte";
   import SectionTime from "./SectionTime.svelte";
   import { planSchedule } from "../../domain/schedule";
+  import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
   import { msg, t, tn } from "../../i18n/core";
 
   // The running order for a whole service: sections in order, any kind of item, and a way to
   // move through it item by item. Nothing here changes Program; LIVE still does.
   const SUGGESTED = ["Welcome", "Worship", "Word", "Offering", "Announcements", "Closing"];
-  type Adding = "song" | "scripture" | "slides" | "media" | "announcement" | "look" | null;
+  const ADD_TILES: Array<[AddKind, string, string]> = [
+    ["song", msg("Song"), "note"],
+    ["scripture", msg("Scripture"), "bible"],
+    ["text", msg("Text"), "pencil"],
+    ["announcement", msg("Announcement"), "alerts"],
+    ["slides", msg("Slides"), "stage"],
+    ["media", msg("Media"), "media"],
+    ["look", msg("Look"), "studio"],
+  ];
+  /** The add window, open on a part and a kind of thing. */
+  let addOpen = $state<{ sectionId: string | null; kind: AddKind } | null>(null);
+  // Room to work: the services list and the monitors can each be hidden (remembered here).
+  let listHidden = $state<boolean | undefined>(undefined);
+  let stageHidden = $state(readHidden());
+  function readHidden(): boolean {
+    try {
+      return localStorage.getItem("service.stage") === "hidden";
+    } catch {
+      return false;
+    }
+  }
+  function setStage(hidden: boolean) {
+    stageHidden = hidden;
+    try {
+      localStorage.setItem("service.stage", hidden ? "hidden" : "shown");
+    } catch {
+      /* not kept */
+    }
+  }
+  const wide = $derived(listHidden === true && stageHidden);
+  function toggleWide() {
+    const next = !wide;
+    listHidden = next;
+    setStage(next);
+  }
 
   let newName = $state("");
   let sectionName = $state("");
-  let adding = $state<Adding>(null);
   /** The templates window, opened on a template (or the first). */
   let templatesOpen = $state<{ id: string | null } | null>(null);
   /** A service whose delete button was pressed once (press again to delete). */
@@ -70,13 +101,6 @@
     const target = event.currentTarget as HTMLElement;
     queueMicrotask(() => document.getElementById(target.id)?.focus());
   }
-  let songQuery = $state("");
-  let reference = $state("");
-  let referenceNote = $state("");
-  let heading = $state("");
-  let body = $state("");
-  let annLabel = $state(t("Announcement"));
-  let annDesign = $state<AnnouncementDesign>("card");
   /** The item open in the editor. */
   let editing = $state<PresentationItem | null>(null);
 
@@ -86,7 +110,6 @@
 
   /** A blank text slide, opened straight in the editor. */
   async function addText() {
-    adding = null;
     const id = await session.addToService({ kind: "slide", title: "Text", slide: { heading: "Text", body: "", imageId: null } }, true);
     edit(id);
   }
@@ -95,12 +118,7 @@
   const count = $derived(service?.sections.reduce((total, section) => total + section.items.length, 0) ?? 0);
   const upNext = $derived(session.nextItem());
   const current = $derived(service && session.cursor.itemId ? service.sections.flatMap((section) => section.items).find((item) => item.id === session.cursor.itemId) : null);
-  const songs = $derived(
-    songQuery.trim()
-      ? [...new Set(searchSongHits(session.songs, songQuery, 40).map((hit) => hit.songId))].map((id) => session.songs.find((song) => song.id === id)!).filter(Boolean)
-      : session.songsByFavorite.slice(0, 40),
-  );
-  const looks = $derived(session.looksByFavorite);
+  const barPart = $derived(service?.sections.find((section) => section.id === session.cursor.sectionId)?.id ?? service?.sections[0]?.id ?? null);
 
   const KIND: Record<string, { icon: string; label: string }> = {
     lyric: { icon: "note", label: msg("Song") },
@@ -142,37 +160,14 @@
     void session.selectItem(item.id);
   }
 
-  function addScripture() {
-    const parsed = parseReference(reference);
-    const translation = session.translations[0];
-    if (!parsed || !translation) {
-      referenceNote = t("Type a reference like John 3:16 or Psalm 23.");
-      return;
-    }
-    const book = session.books.find((entry) => entry.ord === parsed.bookOrd);
-    const start = parsed.startVerse ?? 1;
-    const end = parsed.endVerse ?? (parsed.startVerse ? start : start);
-    session.addPassageToService({
-      translationId: translation.id,
-      bookOrd: parsed.bookOrd,
-      chapter: parsed.chapter,
-      startVerse: start,
-      endVerse: end,
-      reference: formatReference(parsed.bookName, parsed.chapter, start, end, book?.chapters ?? 1),
-    });
-    reference = "";
-    referenceNote = "";
-  }
-
-  function addAnnouncement() {
-    session.addAnnouncementToService(heading, body, { design: annDesign, label: annLabel });
-    heading = "";
-    body = "";
-  }
-
   function onKey(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null;
     if (target?.closest("input, textarea, select, [contenteditable]")) return;
+    if ((event.key === "a" || event.key === "A") && !event.metaKey && !event.ctrlKey && !event.altKey && service && barPart && !addOpen && !editing) {
+      event.preventDefault();
+      addOpen = { sectionId: barPart, kind: "song" };
+      return;
+    }
     if (event.key === "PageDown" || (event.key === "ArrowDown" && event.altKey)) {
       event.preventDefault();
       void session.stepItem(1);
@@ -189,8 +184,8 @@
   <ItemEditor item={editing} onclose={() => (editing = null)} />
 {/if}
 
-<section class="service-desk">
-  <LibrarySidebar title={t("Services")} icon="list" count={session.services.length} storageKey="services">
+<section class="service-desk" class:no-stage={stageHidden}>
+  <LibrarySidebar title={t("Services")} icon="list" count={session.services.length} storageKey="services" bind:collapsed={listHidden}>
     {#snippet actions()}
       <button type="button" class="desk-btn" title={t("Start a service from a template, or edit the templates")} onclick={() => (templatesOpen = { id: null })}><Icon name="list" size={14} /> {t("Templates")}</button>
       <button type="button" class="desk-btn" onclick={() => void session.createService(`${t("Service")} ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`)}><Icon name="plus" size={14} /> {t("New")}</button>
@@ -233,6 +228,8 @@
         <input class="name" aria-label={t("Service name")} value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
         <button type="button" class="desk-btn ghost save-tpl" title={t("The service on one page: print, save as PDF or copy")} onclick={() => (outlineOpen = true)}><Icon name="files" size={13} /> {t("Outline")}</button>
         <button type="button" class="desk-btn ghost save-tpl" title={t("Keep this service's parts and times to start the next one from")} onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> {t("Save as template")}</button>
+        <button type="button" class="desk-btn ghost save-tpl" class:on={stageHidden} aria-pressed={stageHidden} title={stageHidden ? t("Show the monitors") : t("Hide the monitors")} onclick={() => setStage(!stageHidden)}><Icon name="eye" size={13} /> {t("Monitors")}</button>
+        <button type="button" class="desk-btn ghost save-tpl" class:on={wide} aria-pressed={wide} title={wide ? t("Show the services list and the monitors again") : t("Hide the services list and the monitors to edit the service")} onclick={toggleWide}><Icon name={wide ? "columns" : "expand"} size={13} /> {wide ? t("Show panels") : t("Wide view")}</button>
         <span class="muted">{count === 0 ? t("Nothing added yet") : `${tn(count, "{n} item", "{n} items")} · ${tn(service.sections.length, "{n} section", "{n} sections")}`}</span>
       </header>
 
@@ -281,12 +278,13 @@
               <input class="section-name" aria-label={t("Section name")} value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
               {#if session.runningSectionId === section.id}<span class="now-tag">{t("Now")}</span>{/if}
               <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
+              <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
               <span class="tools">
                 <button type="button" class="row-tool del" aria-label={t("Remove section")} title={t("Delete this part")} onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
               </span>
             </header>
             {#if section.items.length === 0}
-              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => (session.cursor = { sectionId: section.id, itemId: null })}>{dragItem ? t("Drop here") : t("Empty. Select this section, then add songs, scripture or slides below.")}</button>
+              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => { session.cursor = { sectionId: section.id, itemId: null }; if (!dragItem) addOpen = { sectionId: section.id, kind: "song" }; }}>{dragItem ? t("Drop here") : t("Empty. Click to add songs, scripture, slides or text.")}</button>
             {/if}
             <ol class="items">
               {#each section.items as item, itemIndex (item.id)}
@@ -351,67 +349,18 @@
       </div>
 
       <footer class="add-bar">
-        <span class="add-label">{t("Add to {part}", { part: service.sections.find((section) => section.id === session.cursor.sectionId)?.name ?? service.sections[0]?.name ?? t("the service") })}</span>
-        <button type="button" class="add" onclick={() => void addText()}><Icon name="pencil" size={14} /> {t("Text")}</button>
-        {#each [["song", msg("Song"), "note"], ["scripture", msg("Scripture"), "bible"], ["slides", msg("Slides"), "stage"], ["media", msg("Media"), "media"], ["announcement", msg("Announcement"), "alerts"], ["look", msg("Look"), "studio"]] as [id, label, icon] (id)}
-          <button type="button" class="add" class:on={adding === id} aria-expanded={adding === id} onclick={() => (adding = adding === id ? null : (id as Adding))}><Icon name={icon} size={14} /> {t(label)}</button>
-        {/each}
-      </footer>
-
-      {#if adding}
-        <div class="picker" role="region" aria-label={t("Add to the service")}>
-          {#if adding === "song"}
-            <input aria-label={t("Find a song")} placeholder={t("Title, author or lyrics")} bind:value={songQuery} />
-            <div class="pick-list">
-              {#each songs as song (song.id)}
-                <button type="button" onclick={() => session.addSongToService(song)}><Icon name="plus" size={13} /> <strong>{song.title || t("Untitled song")}</strong><em>{song.author}</em></button>
-              {:else}
-                <p class="empty">{session.songs.length ? t("No songs match.") : t("No songs yet. Add them on the Songs page.")}</p>
-              {/each}
-            </div>
-          {:else if adding === "scripture"}
-            <form class="inline" onsubmit={(event) => { event.preventDefault(); addScripture(); }}>
-              <input aria-label={t("Scripture reference")} placeholder={t("John 3:16-18, Psalm 23")} bind:value={reference} />
-              <button type="submit" class="desk-btn">{t("Add")}</button>
-            </form>
-            {#if referenceNote}<p class="empty">{referenceNote}</p>{/if}
-          {:else if adding === "slides"}
-            <div class="pick-list">
-              {#each session.decks as deck (deck.id)}
-                <button type="button" onclick={() => void session.addDeckToService(deck.id)}><Icon name="plus" size={13} /> <strong>{deck.name}</strong><em>{tn(deck.pages.length, "{n} page", "{n} pages")}</em></button>
-              {:else}
-                <p class="empty">{t("No slide decks yet. Make or import one (PowerPoint too) on the Production Desk › Media › Slides.")}</p>
-              {/each}
-            </div>
-          {:else if adding === "media"}
-            <div class="pick-list">
-              {#each session.mediaByFavorite as asset (asset.id)}
-                <button type="button" onclick={() => session.addMediaToService(asset)}><Icon name="plus" size={13} /> <strong>{asset.name}</strong><em>{asset.kind}</em></button>
-              {:else}
-                <p class="empty">{t("No pictures or videos yet. Import them in Settings › Media.")}</p>
-              {/each}
-            </div>
-          {:else if adding === "announcement"}
-            <form class="stack" onsubmit={(event) => { event.preventDefault(); addAnnouncement(); }}>
-              <input aria-label={t("Small line above the heading")} placeholder={t("Small line above (optional)")} bind:value={annLabel} />
-              <input aria-label={t("Announcement heading")} placeholder={t("Youth camp")} bind:value={heading} />
-              <textarea aria-label={t("Announcement text")} rows="2" placeholder={t("Saturday, 9am at the church hall")} bind:value={body}></textarea>
-              <select aria-label={t("Announcement design")} bind:value={annDesign}>
-                {#each ANNOUNCEMENT_DESIGNS as design (design.id)}<option value={design.id}>{design.name}: {design.hint.toLowerCase()}</option>{/each}
-              </select>
-              <button type="submit" class="desk-btn" disabled={!heading.trim()}>{t("Add announcement")}</button>
-            </form>
-          {:else if adding === "look"}
-            <div class="pick-list">
-              {#each looks as look (look.id)}
-                <button type="button" onclick={() => void session.addLookToService(restoreComposition(look))}><Icon name="plus" size={13} /> <strong>{look.name}</strong><em>{t("Look")}</em></button>
-              {:else}
-                <p class="empty">{t("No saved looks yet. Design them on the Production Desk › Looks.")}</p>
-              {/each}
-            </div>
-          {/if}
+        <label class="add-to">
+          <span>{t("Add to")}</span>
+          <select aria-label={t("Part to add to")} value={barPart ?? ""} onchange={(event) => (session.cursor = { sectionId: event.currentTarget.value, itemId: session.cursor.itemId })}>
+            {#each service.sections as section (section.id)}<option value={section.id}>{section.name}</option>{/each}
+          </select>
+        </label>
+        <div class="tiles">
+          {#each ADD_TILES as [id, label, icon] (id)}
+            <button type="button" class="tile" disabled={!barPart} onclick={() => (addOpen = { sectionId: barPart, kind: id })}><Icon name={icon} size={16} /><span>{t(label)}</span></button>
+          {/each}
         </div>
-      {/if}
+      </footer>
     {:else}
       <div class="blank">
         <Icon name="list" size={28} />
@@ -437,6 +386,12 @@
     {/if}
   </div>
 
+  {#if stageHidden}
+    <aside class="stage-rail">
+      <button type="button" class="rail-show" aria-label={t("Show the monitors")} title={t("Show the monitors")} onclick={() => setStage(false)}><Icon name="chevron-left" size={16} /></button>
+      <span class="rail-title">{t("Preview")} · {t("Program")}</span>
+    </aside>
+  {:else}
   <aside class="stage">
     <MonitorPair page="service" place={current?.title ?? ""} onstep={(direction) => void session.step(direction)} />
     <div class="next">
@@ -452,7 +407,12 @@
     </div>
     <MacroBar />
   </aside>
+  {/if}
 </section>
+
+{#if addOpen}
+  <AddSourcesDialog sectionId={addOpen.sectionId} kind={addOpen.kind} onclose={() => (addOpen = null)} />
+{/if}
 
 {#if outlineOpen && session.service}
   <OutlineDialog service={session.service} onclose={() => (outlineOpen = false)} />
@@ -479,9 +439,8 @@
     border-radius: var(--radius-panel, 12px);
     overflow: hidden;
   }
-  input, textarea { border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; min-width: 0; }
+  input { border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; min-width: 0; }
   input { height: 32px; padding: 0 10px; }
-  textarea { padding: 8px 10px; resize: vertical; }
   .muted { margin: 0; color: var(--muted); font-size: 12px; }
   .empty { margin: 0; padding: 8px 6px; color: var(--muted); font-size: 12px; }
 
@@ -493,8 +452,8 @@
   .row:hover { background: var(--field); }
   .row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 
-  .head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none; }
-  .name { flex: 1; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
+  .name { flex: 1 1 240px; min-width: 200px; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; }
   .name:hover, .name:focus { border-color: var(--line); background: var(--field); }
 
   .timeline-wrap { flex: none; padding: 12px 14px 0; }
@@ -542,19 +501,28 @@
   .chip { height: 28px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
   .chip:hover { color: var(--ink); border-color: var(--accent); }
 
-  .add-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); flex: none; }
-  .add-label { margin-right: 4px; font-size: 12px; font-weight: 650; color: var(--muted); }
-  .add { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-  .add.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .picker { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; max-height: 260px; flex: none; }
-  .pick-list { overflow: auto; display: grid; gap: 2px; }
-  .pick-list button { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 0; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-  .pick-list button:hover { background: var(--field); }
-  .pick-list strong { font-weight: 600; }
-  .pick-list em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--muted); }
+  .add-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line); flex: none; background: color-mix(in srgb, var(--field) 35%, transparent); }
+  .add-to { display: flex; align-items: center; gap: 8px; flex: none; }
+  .add-to span { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .add-to select { height: 34px; max-width: 170px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
+  .tiles { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 50px; padding: 0 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; min-width: 0; }
+  .tile span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile :global(svg) { color: var(--muted); }
+  .tile:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+  .tile:hover:not(:disabled) :global(svg) { color: var(--accent); }
+  .tile:disabled { opacity: 0.45; cursor: default; }
+  .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+  .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .stage { position: relative; }
+  .stage-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 40px; padding: 8px 0; border: 1px solid var(--line); border-radius: var(--radius-panel, 12px); background: var(--panel); }
+  .rail-show { width: 28px; height: 28px; border: 0; border-radius: 7px; background: var(--field); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+  .rail-title { writing-mode: vertical-rl; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
+  .save-tpl.on { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .tile { height: 40px; flex-direction: row; } }
   .inline { display: flex; gap: 6px; }
   .inline input { flex: 1; }
-  .stack { display: grid; gap: 6px; }
 
   .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 12px; padding: 24px; color: var(--muted); text-align: center; }
   .blank p { margin: 0; max-width: 40ch; }

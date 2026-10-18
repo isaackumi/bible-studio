@@ -13,6 +13,8 @@
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SongFinder from "./SongFinder.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
+  import { quickFilter, sortSongs, withLetters, type SongSort } from "../../domain/song-browse";
+  import AddToService from "./AddToService.svelte";
   import ToolMenu from "../ToolMenu.svelte";
   import { t, tn } from "../../i18n/core";
 
@@ -77,6 +79,66 @@
           (song) => session.isFavorite("songs", song.id),
         ),
   );
+  // Browsing a long list: a filter, an order (kept on this computer), letter headings for A–Z,
+  // and rows drawn a page at a time so hundreds of songs stay quick.
+  const readPref = (key: string, fallback: string) => {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const writePref = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* private window: the choice lasts until reload */
+    }
+  };
+  let listQuery = $state("");
+  let sort = $state<SongSort>(readPref("songs.sort", "favorites") as SongSort);
+  let foldersOpen = $state(readPref("songs.folders", "open") !== "closed");
+  let limit = $state(150);
+  let listEl = $state<HTMLUListElement | undefined>();
+  const mostSung = $derived(lists.find((list) => list.id === "most")?.songs.map((song) => song.id) ?? []);
+  const shown = $derived(
+    sortSongs(quickFilter(visible, listQuery), sort, { starred: (song) => session.isFavorite("songs", song.id), mostSung }),
+  );
+  const lettered = $derived(sort === "az" && shown.length > 20);
+  const rows = $derived(lettered ? withLetters(shown) : shown.map((song) => ({ kind: "song" as const, song })));
+  const letters = $derived(lettered ? rows.flatMap((row) => (row.kind === "letter" ? [row.letter] : [])) : []);
+  $effect(() => {
+    void folder;
+    void listQuery;
+    void sort;
+    limit = 150;
+  });
+
+  function setSort(next: SongSort) {
+    sort = next;
+    writePref("songs.sort", next);
+  }
+
+  function toggleFolders() {
+    foldersOpen = !foldersOpen;
+    writePref("songs.folders", foldersOpen ? "open" : "closed");
+  }
+
+  function jumpTo(letter: string) {
+    const index = rows.findIndex((row) => row.kind === "letter" && row.letter === letter);
+    if (index >= limit) limit = index + 150;
+    requestAnimationFrame(() => listEl?.querySelector(`[data-letter="${letter}"]`)?.scrollIntoView({ block: "start" }));
+  }
+
+  /** Draw the next page of rows when the end of the list comes into view. */
+  function more(node: HTMLElement) {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) limit += 150;
+    });
+    observer.observe(node);
+    return { destroy: () => observer.disconnect() };
+  }
+
   /** Where new songs and imports go: the open folder, or none. */
   const targetFolder = $derived(folder && !folder.startsWith(LIST) ? folder : "");
 
@@ -204,15 +266,6 @@
     const match = detected;
     const song = match ? session.songs.find((entry) => entry.id === match.songId) : null;
     if (match && song) show(song, match.sectionId);
-  }
-
-  async function queueSong(song: Song) {
-    const first = song.sections[0];
-    if (!first) return;
-    if (!session.service) await session.createService(t("Sunday Service"));
-    if (!session.service?.sections.length) session.addSection(t("Songs"));
-    session.addLyric(song.id, first.id, song.title);
-    note = `${song.title} added to the queue.`;
   }
 
   // Folders
@@ -506,6 +559,11 @@
       <Icon name="search" size={15} /><span>{t("Find a song")}</span><kbd>/</kbd>
     </button>
 
+    <button type="button" class="fold-head" aria-expanded={foldersOpen} onclick={toggleFolders}>
+      <Icon name={foldersOpen ? "chevron-down" : "chevron-right"} size={13} /><span>{t("Lists and folders")}</span>
+      {#if !foldersOpen}<em>{listTitle}</em>{/if}
+    </button>
+    {#if foldersOpen}
     <nav class="folders lists" aria-label={t("Song lists")}>
       <button type="button" class="folder" class:on={folder === null} onclick={() => (folder = null)}>
         <Icon name="library" size={16} /><span>{t("All songs")}</span><small>{session.songs.length}</small>
@@ -572,6 +630,7 @@
         <button type="button" class="folder add" onclick={startFolder}><Icon name="plus" size={16} /><span>{t("New folder")}</span></button>
       {/if}
     </nav>
+    {/if}
 
     {#if showPacks && packs.length > 0}
       <div class="packs" aria-label={t("Song packs")}>
@@ -598,11 +657,32 @@
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 
-    <ul class="songs" aria-label={t("Songs")}>
+    {#if visible.length > 8}
+      <div class="list-tools">
+        <label class="list-filter">
+          <Icon name="search" size={13} />
+          <input type="search" aria-label={t("Filter this list")} placeholder={t("Filter")} bind:value={listQuery} />
+        </label>
+        <select class="list-sort" aria-label={t("Order")} value={sort} onchange={(event) => setSort(event.currentTarget.value as SongSort)}>
+          <option value="favorites">{t("Favorites first")}</option>
+          <option value="az">{t("A–Z")}</option>
+          <option value="most">{t("Most sung")}</option>
+        </select>
+      </div>
+    {/if}
+
+    <div class="song-scroll">
+    <ul class="songs" aria-label={t("Songs")} bind:this={listEl}>
       {#if visible.length === 0}
         <li class="empty">{openList ? openList.empty : session.songs.length ? t("This folder is empty.") : t("No songs yet. Press New song to type or paste one, or Import to bring in files.")}</li>
+      {:else if shown.length === 0}
+        <li class="empty">{t("No song in this list has “{query}”.", { query: listQuery.trim() })}</li>
       {/if}
-      {#each visible as song (song.id)}
+      {#each rows.slice(0, limit) as row (row.kind === "letter" ? `letter:${row.letter}` : row.song.id)}
+        {#if row.kind === "letter"}
+          <li class="letter" data-letter={row.letter}>{row.letter}</li>
+        {:else}
+        {@const song = row.song}
         <li class="song-item">
           <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || t("this song")} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
           <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
@@ -614,8 +694,16 @@
             <span class="sub">{snippet(song) || song.author}<em>{song.sections.length}</em></span>
           </button>
         </li>
+        {/if}
       {/each}
+      {#if rows.length > limit}<li class="more" use:more>{t("Loading more…")}</li>{/if}
     </ul>
+    {#if letters.length > 3}
+      <nav class="letters" aria-label={t("Jump to a letter")}>
+        {#each letters as letter (letter)}<button type="button" onclick={() => jumpTo(letter)}>{letter}</button>{/each}
+      </nav>
+    {/if}
+    </div>
   </LibrarySidebar>
 
   <!-- Song -->
@@ -769,7 +857,7 @@
         </div>
         <div class="row-actions">
           <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> {t("Start")}</button>
-          <button type="button" class="desk-btn" data-tip={t("Add to the queue for this service")} onclick={() => void queueSong(selected)}><Icon name="queue" size={14} /> {t("Add to service")}</button>
+          <AddToService onadd={(sectionId) => session.addSongToService(selected, sectionId)} />
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
           <ToolMenu label={t("More for this song")} tip={t("Folder, save as a file, delete")}>
             {#snippet trigger()}<Icon name="more" size={16} />{/snippet}
@@ -897,11 +985,11 @@
         <button type="button" class="desk-btn ghost lc-stop" onclick={() => void session.toggleVoice()}><Icon name="mic-off" size={14} /> {t("Stop listening")}</button>
       {/if}
       <label class="lc-follow">
-        <input type="checkbox" class="switch" role="switch" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
         <span>
           {t("Follow the singing")}
           <small>{follow && clickLive ? t("Each part heard goes straight to the screen (Live mode).") : t("Each part heard goes to Preview by itself.")}</small>
         </span>
+        <input type="checkbox" class="switch" role="switch" checked={follow} onchange={(event) => { if (event.currentTarget.checked && !session.requireFeature("song-detection")) { event.currentTarget.checked = false; return; } follow = event.currentTarget.checked; }} />
       </label>
       {#if session.voice.status !== "idle" && session.voice.error}<VoiceStatus compact />{/if}
     </section>
@@ -928,14 +1016,14 @@
   }
   h2 { margin: 0; font-size: 16px; }
   .muted { margin: 0; color: var(--muted); font-size: 12px; }
-  input, textarea {
+  input:not(.switch), textarea {
     border: 1px solid var(--line);
     border-radius: var(--radius-control, 8px);
     background: var(--field);
     color: var(--ink);
     font: inherit;
   }
-  input { height: 32px; padding: 0 10px; min-width: 0; }
+  input:not(.switch) { height: 32px; padding: 0 10px; min-width: 0; }
   textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
 
   /* Library */
@@ -1032,13 +1120,27 @@
   }
   .import:hover:not(:disabled) { color: var(--ink); background: var(--field); }
   .import:disabled { opacity: 0.4; }
-  .songs { list-style: none; margin: 0; padding: 4px 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .song-scroll { position: relative; flex: 1; min-height: 0; display: flex; }
+  .songs { flex: 1; list-style: none; margin: 0; padding: 4px 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 2px; min-height: 0; scroll-padding-top: 4px; }
+  .letter { position: sticky; top: -4px; z-index: 2; margin-top: 6px; padding: 4px 6px; font-size: 11px; font-weight: 800; color: var(--muted); background: var(--panel); }
+  .more { padding: 10px; font-size: 12px; color: var(--muted); text-align: center; }
+  .letters { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 0; padding: 4px 4px 14px 0; overflow: auto; }
+  .letters button { width: 18px; height: 17px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1; }
+  .letters button:hover { color: var(--accent); background: var(--field); }
+  .list-tools { display: flex; gap: 6px; padding: 0 10px 6px; flex: none; }
+  .list-filter { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--muted); }
+  .list-filter:focus-within { border-color: var(--accent); }
+  .list-filter input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
+  .list-sort { flex: none; max-width: 120px; height: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
+  .fold-head { display: flex; align-items: center; gap: 6px; margin: 0 10px 6px; padding: 4px 6px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; text-align: left; flex: none; }
+  .fold-head:hover { color: var(--ink); background: var(--field); }
+  .fold-head em { margin-left: auto; font-style: normal; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .song {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 3px;
-    padding: 10px 12px;
+    padding: 7px 10px;
     border: 1px solid transparent;
     border-radius: var(--radius-control, 8px);
     background: none;
@@ -1182,9 +1284,9 @@
   .lc-part b { padding: 1px 6px; border-radius: 5px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-size: 11px; }
   .lc-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
   .lc-stop { align-self: flex-start; }
-  .lc-follow { display: flex; align-items: flex-start; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 600; cursor: pointer; }
-  .lc-follow small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--muted); }
-  .lc-follow input { flex: none; margin-top: 2px; }
+  .lc-follow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 55%, transparent); font-size: 13px; font-weight: 650; cursor: pointer; }
+  .lc-follow:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .lc-follow small { display: block; margin-top: 3px; font-size: 11px; font-weight: 500; line-height: 1.35; color: var(--muted); }
 
   /* Find a song */
   .find-song { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 14px 10px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; flex: none; }

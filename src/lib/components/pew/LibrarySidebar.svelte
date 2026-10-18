@@ -12,7 +12,8 @@
     storageKey,
     actions,
     children,
-  }: { title: string; icon: string; count: number; storageKey: string; actions?: Snippet; children: Snippet } = $props();
+    collapsed = $bindable(),
+  }: { title: string; icon: string; count: number; storageKey: string; actions?: Snippet; children: Snippet; collapsed?: boolean } = $props();
 
   const MIN = 220;
   const MAX = 460;
@@ -34,7 +35,7 @@
 
   const initial = load();
   let width = $state(initial.width);
-  let collapsed = $state(initial.collapsed);
+  if (collapsed === undefined) collapsed = initial.collapsed;
   let dragging = $state(false);
 
   $effect(() => {
