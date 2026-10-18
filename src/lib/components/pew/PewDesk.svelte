@@ -273,9 +273,10 @@
   }
 
   /** Verses with these words: exact wording first, then most of the words (spelling slips allowed). */
-  async function searchWords(text: string): Promise<SearchHit[]> {
-    const exact = await api.search(translationId, text);
-    const ranked = quoteIndex ? searchQuotes(text, quoteIndex, 40) : [];
+  async function searchWords(text: string, translation = translationId): Promise<SearchHit[]> {
+    const exact = await api.search(translation, text);
+    // The spelling-forgiving index is built for the desk's translation only.
+    const ranked = quoteIndex && translation === translationId ? searchQuotes(text, quoteIndex, 40) : [];
     const key = (hit: SearchHit) => `${hit.bookOrd}:${hit.chapter}:${hit.verse}`;
     const exactKeys = new Set(exact.map(key));
     const rankedKeys = new Set(ranked.map(key));

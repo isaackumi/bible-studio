@@ -8,6 +8,7 @@
     footer,
     returnTo,
     wide = false,
+    huge = false,
   }: {
     title: string;
     onclose: () => void;
@@ -17,6 +18,8 @@
     returnTo?: () => HTMLElement | null | undefined;
     /** Room for an editor with a preview beside it. */
     wide?: boolean;
+    /** Most of the screen: a finder with several columns. */
+    huge?: boolean;
   } = $props();
 
   const id = `desk-dialog-${Math.random().toString(36).slice(2, 8)}`;
@@ -63,7 +66,7 @@
 
 <div class="layer">
   <button type="button" class="backdrop" aria-label="Close" tabindex="-1" onclick={onclose}></button>
-  <div class="panel" class:wide role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
+  <div class="panel" class:wide class:huge role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
     <h2 {id}>{title}</h2>
     <div class="body">{@render children()}</div>
     {#if footer}
@@ -82,6 +85,7 @@
   }
   .panel:focus { outline: none; }
   .panel.wide { width: min(1040px, calc(100% - 28px)); }
+  .panel.huge { width: min(1360px, calc(100% - 28px)); }
   .backdrop {
     position: absolute;
     inset: 0;
