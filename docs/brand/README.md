@@ -15,7 +15,7 @@ of the way down). The top-right pane is the live screen, in the app's live orang
 Colours: ink `#111010`, bone `#f5f5f5`, live `#fa4f00`.
 
 Rules: keep the four panes and the gaps as drawn (the cross is the gaps); only the top-right pane is
-orange; leave clear space of one gap's width at 4× (a quarter of the mark) around it; below 32 px
+orange; leave clear space around it at least the height of a top pane (about a third of the mark); below 32 px
 use the small cut. Don't stretch it, recolour other panes, add outlines or shadows, or put the
 light version on light backgrounds.
 
