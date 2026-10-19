@@ -1,6 +1,8 @@
-# Signed releases with automatic updates. Push a tag like v0.2.0 and this builds Windows, macOS
-# and Linux installers, signs the update files, and publishes a GitHub release with latest.json,
-# which installed copies check from Settings › Updates.
+# Signed releases with automatic updates. Push a tag like v0.2.0 (matching the version in
+# tauri.conf.json), or run this workflow from the Actions tab, and this builds Windows, macOS and
+# Linux installers, signs the update files, and publishes a GitHub release with latest.json,
+# which installed copies check from Settings › Updates. The release is named after the app's
+# version, so bump it in package.json, tauri.conf.json and Cargo.toml before releasing again.
 #
 # One-time setup: add the repository secret TAURI_SIGNING_PRIVATE_KEY with the contents of
 # ~/.church-studio/updater.key (and TAURI_SIGNING_PRIVATE_KEY_PASSWORD if you set a password).
@@ -9,6 +11,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
   release:
@@ -46,9 +49,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Church Studio ${{ github.ref_name }}
+          tagName: v__VERSION__
+          releaseName: Church Studio v__VERSION__
           releaseBody: See the changes below. Installed copies update from Settings › Updates.
-          releaseDraft: true
+          releaseDraft: false
           includeUpdaterJson: true
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}
