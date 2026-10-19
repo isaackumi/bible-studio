@@ -2,8 +2,8 @@
 // runs on as many computers as its plan allows (Premium 1, Church 3). Offline is fine: a computer
 // keeps its plan for 30 days from its last good check. See server/activations.ts.
 
-/** The license server's address (the Worker). PLACEHOLDER: until set, activations are not checked. */
-export const ACTIVATION_URL: string | null = null;
+/** The license server's address (the Worker in server/); null turns the activation check off. */
+export const ACTIVATION_URL: string | null = "https://church-studio-keys.heitech-inc.workers.dev";
 
 /** Days a computer keeps its plan without reaching the server. */
 export const OFFLINE_GRACE_DAYS = 30;
@@ -73,6 +73,8 @@ export async function askServer(
   }
   const seats = Number(answer.seats) || 0;
   const devices = Array.isArray(answer.devices) ? answer.devices : [];
+  // A fault on the server's side is not a refusal: treat it like no network, so the offline grace applies.
+  if (response.status >= 500) return { status: "offline", seats, devices, message: "The license server is having trouble; try again later." };
   if (response.status === 409 || answer.full) return { status: "full", seats, devices, message: "" };
   if (!response.ok) return { status: "error", seats, devices, message: answer.error ?? `The license server said ${response.status}.` };
   return { status: "ok", seats, devices, message: "" };

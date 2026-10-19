@@ -25,6 +25,7 @@ describe("activations on this computer", () => {
     expect((await askServer("activate", { key: "k", device: "d" }, "https://keys.example", answer(200, { ok: true, seats: 3, devices: [] }))).status).toBe("ok");
     expect((await askServer("activate", { key: "k", device: "d" }, "https://keys.example", answer(409, { full: true, seats: 1, devices: [{ device: "x", name: "Other", seenAt: "" }] }))).status).toBe("full");
     expect((await askServer("activate", { key: "k" }, "https://keys.example", answer(401, { error: "That license key is not valid." }))).message).toMatch(/not valid/);
+    expect((await askServer("activate", { key: "k" }, "https://keys.example", answer(503, { error: "busy" }))).status).toBe("offline");
     const down = (async () => {
       throw new TypeError("fetch failed");
     }) as unknown as typeof fetch;
