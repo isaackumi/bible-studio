@@ -444,8 +444,11 @@ class Session {
       this.adoptAudienceOwner();
       // A restart restores the operator workspace and the preview cursor.
       // The owning session publishes an empty Program so a stored frame is not shown again.
+      // It starts on the logo slide in the screen theme, so the desk opens with Program showing what
+      // the room sees before the service, and the big screen shows the welcome when it opens.
       if (!keepLive && (this.desktop() || this.controlsAudience)) {
         try {
+          this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
           await this.pushProgram();
         } catch (error) {
           console.error(error);
@@ -3778,6 +3781,8 @@ class Session {
   finishOnboarding = () => {
     this.workspace = { ...this.workspace, onboarded: true };
     this.persistSoon();
+    // The logo slide on Program now carries the church name (and theme) chosen in setup.
+    if (this.live.program.model.layout === "logo") void this.logo();
   };
 
   restartOnboarding = () => {

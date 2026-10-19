@@ -14,13 +14,14 @@
   import Icon from "../Icon.svelte";
   import MotionBackground from "../MotionBackground.svelte";
   import Screen from "../Screen.svelte";
-  import MiniDesk from "./MiniDesk.svelte";
+  import MiniApp, { type Zone } from "./MiniApp.svelte";
+  import BrandMark from "../BrandMark.svelte";
   import { UI_LANGUAGES, msg, t } from "../../i18n/core";
 
-  // First run, in the app's own colors, laid out as one composed stage: questions on the left,
-  // and on the right a living sky from the theme library with a working miniature of the desk.
-  // Every answer shows on the miniature through the real slide engine: the church name on the
-  // logo slide, the screen theme on Preview and Program, the desk colors on the desk itself.
+  // First run, in the app's own colors: questions on the left; on the right the whole desk in
+  // miniature over a living sky from the theme library. Every answer shows on it through the real
+  // slide engine (the church name on the logo slide, the screen theme on Preview and Program, the
+  // desk colors on the desk itself), and each step picks out the part of the desk it changes.
   let { booting = false }: { booting?: boolean } = $props();
 
   // Voice is not a setup step: the microphone is asked for the first time someone presses Listen,
@@ -63,16 +64,26 @@
   /** The sky behind the desk for each step: real theme-library backgrounds. */
   const SKY: Record<Step, MotionId> = { welcome: "rays", church: "bokeh", wall: "waves", look: "aurora", scripture: "embers", screen: "stars", ready: "rays" };
 
-  /** A line of scripture over the sky; the church step shows the church name. */
-  const LINES: Record<Step, { text: string; ref: string }> = {
-    welcome: { text: "Let there be light.", ref: "Genesis 1:3" },
-    church: { text: "", ref: "Your logo slide" },
-    wall: { text: "Let your light so shine before men.", ref: "Matthew 5:16" },
-    look: { text: "Arise, shine; for thy light is come.", ref: "Isaiah 60:1" },
-    scripture: { text: "Thy word is a lamp unto my feet.", ref: "Psalm 119:105" },
-    screen: { text: "Ye are the light of the world.", ref: "Matthew 5:14" },
-    ready: { text: "This is the day which the Lord hath made.", ref: "Psalm 118:24" },
+  /** The part of the desk each step is about, and the line that says so under the miniature. */
+  const FOCUS: Record<Step, { zones: Zone[]; note: string }> = {
+    welcome: { zones: [], note: msg("This is your desk. Preview is yours; Program is what the congregation sees.") },
+    church: { zones: ["program"], note: msg("Your church name becomes the logo slide on Program.") },
+    wall: { zones: ["preview", "program"], note: msg("The screen theme dresses verses, songs and the logo slide.") },
+    look: { zones: [], note: msg("Desk colors are for you; the congregation never sees them.") },
+    scripture: { zones: ["bible", "reading", "preview"], note: msg("Look up a verse, read on, and it waits on Preview.") },
+    screen: { zones: ["audience", "program"], note: msg("Audience opens the big screen. It shows only Program.") },
+    ready: { zones: ["live", "program"], note: msg("Press LIVE and Preview goes to the big screen.") },
   };
+  /** John 3:14-20 for the miniature's Bible pane until the chosen translation loads. */
+  const JOHN3: VerseText[] = [
+    { verse: 14, text: "And as Moses lifted up the serpent in the wilderness, even so must the Son of man be lifted up:" },
+    { verse: 15, text: "That whosoever believeth in him should not perish, but have eternal life." },
+    { verse: 16, text: "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life." },
+    { verse: 17, text: "For God sent not his Son into the world to condemn the world; but that the world through him might be saved." },
+    { verse: 18, text: "He that believeth on him is not condemned: but he that believeth not is condemned already." },
+    { verse: 19, text: "And this is the condemnation, that light is come into the world, and men loved darkness rather than light." },
+    { verse: 20, text: "For every one that doeth evil hateth the light, neither cometh to the light." },
+  ];
 
   let step = $state<Step>("welcome");
   let artWidth = $state(0);
@@ -83,9 +94,7 @@
   const index = $derived(STEPS.findIndex((entry) => entry.id === step));
   let churchName = $state(session.workspace.churchName);
   let translation = $state(session.translations[0]?.id ?? "kjv");
-  let verses = $state<{ v16: VerseText[] }>({
-    v16: [{ verse: 16, text: "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life." }],
-  });
+  let verses = $state<{ v16: VerseText[]; chapter: VerseText[] }>({ v16: [JOHN3[2]!], chapter: JOHN3 });
   let uses = $state<Use[]>(["scripture", "songs"]);
   /** What the church step's Preview shows: the logo slide while typing, or the thing just ticked. */
   let showing = $state<"name" | Use>("name");
@@ -107,9 +116,10 @@
     const id = translation;
     if (!installedIds.includes(id)) return;
     void api
-      .passage(id, 43, 3, 16, 16)
-      .then((v16) => {
-        if (id === translation && v16.length) verses = { v16 };
+      .passage(id, 43, 3, 14, 20)
+      .then((chapter) => {
+        const v16 = chapter.filter((row) => row.verse === 16);
+        if (id === translation && v16.length) verses = { v16, chapter };
       })
       .catch(() => {});
   });
@@ -130,13 +140,13 @@
     const verse = scripture(verses.v16, 16);
     switch (step) {
       case "welcome":
-        return { preview: presentScripture({ theme: session.theme(), reference: "Genesis 1:3", attribution: "King James Version", verses: GENESIS }), program: empty, onAir: false, reference: "Genesis 1:3", mode: "Scriptures" };
+        return { preview: presentScripture({ theme: session.theme(), reference: "Genesis 1:3", attribution: "King James Version", verses: GENESIS }), program: title(), onAir: false, reference: "Genesis 1:3", mode: "Scriptures" };
       case "church": {
         if (showing !== "name" && uses.includes(showing)) {
           const example = EXAMPLE[showing];
           return { preview: example.model(), program: title(), onAir: false, reference: example.reference, mode: example.mode };
         }
-        return { preview: title(), program: empty, onAir: false, reference: "Logo slide", mode: "Scriptures" };
+        return { preview: scripture(verses.v16, 16), program: title(), onAir: false, reference: "John 3:16", mode: "Scriptures" };
       }
       case "wall":
         return { preview: verse, program: title(), onAir: false, reference: screenTheme.name, mode: "Scriptures" };
@@ -150,7 +160,10 @@
     }
   });
   /** The miniature is the desk they will land on: the Production Desk once cameras are in. */
-  const miniDesk = $derived<DeskStyle>(step === "ready" ? desk : shown.mode === "Studio" || (step !== "church" && uses.includes("cameras")) ? "obs" : "pewbeam");
+  const miniDesk = $derived<DeskStyle>(step === "ready" ? desk : "pewbeam");
+  /** On the church step a ticked use shows on Preview, so Preview is the part to look at. */
+  const zones = $derived<Zone[]>(step === "church" && showing !== "name" ? ["preview"] : FOCUS[step].zones);
+  const miniVerses = $derived(verses.chapter.map((row): [number, string] => [row.verse, row.text]));
 
   function sample(theme: Theme): PresentationModel {
     return presentScripture({ theme, reference: "John 3:16", attribution: chosen.name, verses: verses.v16 });
@@ -216,7 +229,7 @@
   <div class="room" aria-hidden="true"></div>
   {#if booting}
     <div class="ob-boot" role="status" aria-live="polite">
-      <span class="mark halo"><Icon name="church" size={30} /></span>
+      <BrandMark size={76} boot tone="current" />
       <p class="wordmark">{t("Church Studio")}</p>
       <span class="loader"><i></i></span>
       <p class="boot-note">{session.ready ? t("Opening your library") : t("Starting up")}</p>
@@ -225,7 +238,7 @@
     <main class="stage-card">
       <section class="ask" aria-labelledby="step-title">
         <header class="ob-top">
-          <span class="ob-brand"><span class="mark small"><Icon name="church" size={16} /></span>{t("Church Studio")}</span>
+          <span class="ob-brand"><BrandMark size={28} tone="current" />{t("Church Studio")}</span>
           <button type="button" class="skip" onclick={() => finish()}>{t("Skip setup")}</button>
         </header>
 
@@ -399,31 +412,20 @@
           </div>
         {/key}
         <div class="vignette" aria-hidden="true"></div>
-        {#key step}
-          <p class="ob-verse" in:fade={{ duration: 700, delay: 150 }} aria-hidden="true">
-            {step === "church" ? name : LINES[step].text}
-            <span>{LINES[step].ref}</span>
-          </p>
-        {/key}
         <div class="grain" aria-hidden="true"></div>
 
         <div class="float">
-          {#key step}
-            <div class="settle" in:fade={{ duration: 500 }}>
-              <MiniDesk preview={shown.preview} program={shown.program} onAir={shown.onAir} reference={shown.reference} mode={shown.mode} desk={miniDesk} />
-            </div>
-          {/key}
+          <div class="settle">
+            <MiniApp preview={shown.preview} program={shown.program} onAir={shown.onAir} reference={shown.reference} mode={shown.mode} desk={miniDesk} focus={zones} verses={miniVerses} translation={chosen.abbreviation} />
+          </div>
           <div class="floor" aria-hidden="true"></div>
         </div>
 
         <div class="art-foot">
           <p class="credit"><Icon name="media" size={12} /> {t("{name} background, from the theme library", { name: sky.name })}</p>
-          {#if step === "welcome" || step === "screen" || step === "ready"}
-            <p class="caption">
-              {#if step === "ready"}{t("On air: Program is what the congregation sees")}
-              {:else}{t("Preview is yours. Program is what the congregation sees.")}{/if}
-            </p>
-          {/if}
+          {#key step}
+            <p class="caption" in:fade={{ duration: 300 }}><span class="cap-dot"></span>{t(FOCUS[step].note)}</p>
+          {/key}
         </div>
       </section>
     </main>
@@ -455,10 +457,6 @@
 
   /* Loading */
   .ob-boot { position: relative; display: grid; justify-items: center; gap: 14px; }
-  .mark { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: var(--accent); color: var(--on-accent); box-shadow: 0 16px 40px color-mix(in srgb, var(--accent) 35%, transparent); }
-  .mark.halo { animation: halo 2.4s ease-in-out infinite; }
-  @keyframes halo { 50% { box-shadow: 0 16px 70px color-mix(in srgb, var(--accent) 60%, transparent); } }
-  .mark.small { width: 28px; height: 28px; border-radius: 8px; box-shadow: none; }
   .wordmark { margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .loader { position: relative; width: 160px; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden; }
   .loader i { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: 3px; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
@@ -596,25 +594,6 @@
   /* The art: a living sky from the theme library, with the desk floating in it. */
   .art { position: relative; min-width: 0; overflow: hidden; background: #000; isolation: isolate; }
   .sky { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center; filter: blur(5px) saturate(1.15); }
-  .ob-verse {
-    position: absolute;
-    left: clamp(28px, 5%, 64px);
-    right: clamp(28px, 5%, 64px);
-    top: clamp(28px, 6%, 56px);
-    margin: 0;
-    max-width: 24ch;
-    font-family: var(--font-scripture);
-    font-size: clamp(24px, 2.3vw, 36px);
-    font-weight: 500;
-    line-height: 1.04;
-    letter-spacing: -0.01em;
-    color: #fff;
-    text-shadow: 0 2px 30px rgba(0, 0, 0, 0.5);
-    text-wrap: balance;
-    overflow-wrap: anywhere;
-    pointer-events: none;
-  }
-  .ob-verse span { display: block; margin-top: 10px; font-family: var(--font-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.65); text-shadow: none; }
   .vignette {
     position: absolute;
     inset: 0;
@@ -631,29 +610,30 @@
     pointer-events: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
-  .float { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: clamp(110px, 17%, 150px) clamp(24px, 4%, 52px) 72px; }
-  .settle { position: relative; z-index: 1; width: min(100%, 940px); min-width: 0; animation: settle 900ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .float { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: clamp(28px, 5%, 56px) clamp(24px, 4%, 48px) 76px; }
+  .settle { position: relative; z-index: 1; width: min(100%, 1040px); min-width: 0; animation: settle 900ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   @keyframes settle { from { transform: translateY(14px) scale(0.985); } }
-  .settle :global(.window) { box-shadow: 0 50px 120px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 80px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .settle :global(.mini-app) { box-shadow: 0 50px 120px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 80px color-mix(in srgb, var(--accent) 18%, transparent); }
   .float > :global(*) { grid-area: 1 / 1; }
   .floor { align-self: end; justify-self: center; width: 70%; height: 60px; margin-bottom: -40px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 30%, transparent), transparent); filter: blur(10px); }
   .art-foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 18px 22px; color: rgba(255, 255, 255, 0.82); font-size: 12px; }
   .art-foot p { margin: 0; }
+  .cap-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
   .credit { display: inline-flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.6); }
-  .caption { margin-left: auto !important; padding: 7px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(12px); font-weight: 600; text-align: right; }
+  .caption { display: inline-flex; align-items: center; gap: 8px; margin-left: auto !important; padding: 7px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(12px); font-weight: 600; text-align: right; }
 
   @media (max-width: 980px) {
     .first-run { place-items: stretch; padding: 0; }
     .stage-card { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; min-height: 100%; border-radius: 0; border: 0; }
     .art { order: -1; }
     .float { position: relative; padding: 24px 24px 64px; }
-    .credit, .ob-verse { display: none; }
+    .credit { display: none; }
     .ask { padding: 24px 20px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .loader i { animation: none; width: 100%; }
     .tick { transition: none; }
-    .mark.halo, .settle { animation: none; }
+    .settle { animation: none; }
   }
   .ob-lang { display: inline-flex; align-self: flex-start; width: max-content; gap: 4px; margin-top: 18px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; }
   .ob-lang button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }

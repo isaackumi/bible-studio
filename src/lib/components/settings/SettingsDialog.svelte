@@ -18,6 +18,7 @@
   import { isDesktop, openExternal } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
+  import BrandMark from "../BrandMark.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { usageCsv, usageReport, type UsageRow } from "../../domain/song-usage";
   import type { PcoPlan } from "../../integrations/pco";
@@ -522,7 +523,7 @@
         {#if session.workspace.profile}
           <span class="set-brand-mark avatar-mark" style:background={planById(session.plan).color}>{initials(session.workspace.profile.name)}</span>
         {:else}
-          <span class="set-brand-mark" style:background={session.workspace.appearance.accent}><Icon name="church" size={18} /></span>
+          <span class="set-brand-mark app-tile"><BrandMark size={22} /></span>
         {/if}
         <span class="account-copy">
           <strong id="settings-title">{session.workspace.profile?.name || session.workspace.churchName || "Church Studio"}</strong>
@@ -1670,6 +1671,7 @@
   .account-card:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   .account-card.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .account-card > :global(svg) { color: var(--muted); flex: none; }
+  .set-brand-mark.app-tile { background: #111010; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
   .set-brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: #fff; flex: none; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
   .account-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
   .account-copy strong { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

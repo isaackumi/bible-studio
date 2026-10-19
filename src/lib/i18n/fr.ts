@@ -2614,4 +2614,14 @@ export const fr: Readonly<Record<string, string>> = {
   "this computer": "cet ordinateur",
   "Last seen {date}": "Vu le {date}",
   Release: "Libérer",
+
+  // Onboarding: the whole desk in miniature
+  "CLEAR WORDS": "EFFACER LES PAROLES",
+  "This is your desk. Preview is yours; Program is what the congregation sees.": "Voici votre pupitre. L’aperçu est pour vous ; le programme est ce que voit l’assemblée.",
+  "Your church name becomes the logo slide on Program.": "Le nom de votre église devient la diapositive du logo sur le programme.",
+  "The screen theme dresses verses, songs and the logo slide.": "Le thème d’écran habille les versets, les chants et la diapositive du logo.",
+  "Desk colors are for you; the congregation never sees them.": "Les couleurs du pupitre sont pour vous ; l’assemblée ne les voit jamais.",
+  "Look up a verse, read on, and it waits on Preview.": "Cherchez un verset, lisez la suite : il attend dans l’aperçu.",
+  "Audience opens the big screen. It shows only Program.": "Assemblée ouvre le grand écran. Il n’affiche que le programme.",
+  "Press LIVE and Preview goes to the big screen.": "Appuyez sur DIRECT et l’aperçu passe sur le grand écran.",
 };

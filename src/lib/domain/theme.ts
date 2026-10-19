@@ -18,6 +18,8 @@ import { defaultMacros } from "./macros";
 import { emptyAiSettings } from "../ai/summarize";
 
 export const DEFAULT_THEME_ID = "theme-manuscript";
+/** The screen theme a new workspace starts with: Ember, warm and in the brand's live orange. */
+export const STARTER_THEME_ID = "theme-ember";
 export const MIN_TRANSITION_MS = 0;
 export const MAX_TRANSITION_MS = 2000;
 
@@ -307,7 +309,7 @@ export function defaultWorkspace(): Workspace {
     churchName: "",
     logoAssetId: null,
     logoText: "Church Studio",
-    themeId: DEFAULT_THEME_ID,
+    themeId: STARTER_THEME_ID,
     lastServiceId: null,
     recent: [],
     goneLive: [],
