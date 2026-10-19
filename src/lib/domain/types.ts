@@ -86,6 +86,8 @@ export type PresentationLine = {
   marker?: string;
   /** The same line in a second language, shown under it (songs in two languages). */
   alt?: string;
+  /** The line formatted (a song section in the Formatted tab); `text` has the same words plain. */
+  runs?: import("./rich-text").RichRun[];
 };
 
 export type PresentationLayout =
@@ -140,6 +142,8 @@ export type TimerPaint = {
 };
 
 export type PresentationModel = {
+  /** Formatted words (text sources and text items in Formatted mode); lines hold the same words plain. */
+  rich?: import("./rich-text").RichDoc;
   layout: PresentationLayout;
   theme: Theme;
   reference: string | null;
@@ -218,6 +222,13 @@ export type BibleItem = {
   startVerse: number;
   endVerse: number;
   reference: string;
+  /**
+   * The translation shown beside it on the screen for this item: an id, null for one translation
+   * only, or missing to follow the desk's side-by-side setting.
+   */
+  secondTranslationId?: string | null;
+  /** Verses per screen when stepping through it (Next shows the next few); missing: all at once. */
+  perScreen?: number;
 };
 
 export type PresentationItem = {
@@ -226,7 +237,8 @@ export type PresentationItem = {
   title: string;
   bible?: BibleItem;
   lyric?: { songId: string; sectionId: string };
-  slide?: { heading: string; body: string; imageId: string | null };
+  /** A text item; with `rich` it is shown formatted (the Formatted tab), else heading and body. */
+  slide?: { heading: string; body: string; imageId: string | null; rich?: import("./rich-text").RichDoc };
   image?: { assetId: string };
   /** Trim (seconds) and what happens at the end; older items only have loop. */
   video?: { assetId: string; loop: boolean; muted: boolean; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
@@ -245,6 +257,9 @@ export type ServiceSection = {
   minutes?: number;
   /** Or: runs until this clock time ("11:00"). */
   until?: string;
+  /** Who leads this part ("Kojo Mensah"), shown on the desk and as a name lower third. */
+  leader?: string;  /** Where its card sits on the flow canvas; none means its tidy place. */
+  canvas?: { x: number; y: number };
 };
 
 export type Service = {
@@ -254,7 +269,33 @@ export type Service = {
   updatedAt: string;
   /** When the service starts ("08:00"). */
   startTime?: string;
+  /** Each time the service was run: when each part began and ended (see service-run.ts). */
+  runs?: import("./service-run").ServiceRun[];
+  /** Older services: put the leader's name on the screen when their part begins (now leaderTo). */
+  showLeaders?: boolean;
+  /** Where the leader's name goes: the screen (when their part begins), Preview (when asked), or nowhere. */
+  leaderTo?: ScreenDest;
+  /** Where the part's countdown goes: a corner of the screen, full screen on Preview, or nowhere. */
+  countdownTo?: ScreenDest;
+  /** While the service runs, choosing an item (click, Next) sends it straight to LIVE. On unless turned off. */
+  liveOnClick?: boolean;
+  /**
+   * When a part's time is up: "remind" (the default) asks the operator to move on, "next" moves on
+   * by itself, "off" only shows the part as over.
+   */
+  autoAdvance?: "remind" | "next" | "off";
+  /** Minutes a part may run over before the service moves on (0: as soon as its time is up). */
+  advanceGrace?: number;
+  /** Minutes before a part's end that "Ending soon" shows; missing: the last fifth (1 to 5 minutes). */
+  warnMinutes?: number;
+  /** Verses per screen for readings added to this service; missing: all at once. */
+  versesPerScreen?: number;
+  /** Seconds a leader's name stays on the screen. */
+  leaderSeconds?: number;
 };
+
+/** Where a service extra (countdown, leader's name) goes: straight to the screen, to Preview, or off. */
+export type ScreenDest = "screen" | "preview" | "off";
 
 export type Cursor = {
   sectionId: string | null;
@@ -270,6 +311,8 @@ export type SongSection = {
   lines: string[];
   /** The section in the song's second language, line by line. */
   second?: string[];
+  /** The lyrics formatted, one block per line (the Formatted tab); `lines` keeps them plain. */
+  rich?: import("./rich-text").RichDoc;
 };
 
 export type Song = {
@@ -293,6 +336,8 @@ export type SermonSection = {
   id: string;
   name: string;
   notes: string;
+  /** The notes formatted (desk and stage only); `notes` keeps them plain. */
+  notesRich?: import("./rich-text").RichDoc;
   items: PresentationItem[];
 };
 
@@ -301,6 +346,8 @@ export type Sermon = {
   title: string;
   speaker: string;
   notes: string;
+  /** The whole sermon's notes formatted (desk only); `notes` keeps them plain. */
+  notesRich?: import("./rich-text").RichDoc;
   sections: SermonSection[];
   updatedAt: string;
 };
@@ -488,8 +535,10 @@ export type Workspace = {
   ndiAudio: boolean;
   /** Free plan: listening used this month (on this computer). */
   listenUsage?: import("./plans").ListenUsage;
-  /** When this computer last checked its license in with the server (ISO). */
+  /** Older builds: when this computer last checked its license in (no longer trusted; leases decide). */
   activationOkAt?: string;
+  /** Send an anonymous daily check-in (app version, system, plan) to help improve Church Studio. */
+  shareUsage: boolean;
   /** OBS or vMix on this computer or the network, driven from the desk. */
   switcher: import("../integrations/switcher").SwitcherSettings;
   /** Going live and recording from the app itself. The stream key stays on this computer. */

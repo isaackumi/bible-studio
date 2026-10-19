@@ -5,7 +5,8 @@ import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
 import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
-import { ACTIVATION_URL, askServer, deviceId, dueForCheck, idleActivation, withinGrace, type ActivationState } from "../domain/activation";
+import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
+import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult } from "../domain/billing";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -15,7 +16,7 @@ import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { shiftPassage, stepVerse } from "../bible/passage";
+import { screenful, shiftPassage, stepScreenful, stepVerse } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
@@ -53,6 +54,7 @@ import {
   setCompositionLocked,
   moveLook,
   takeTransitionForPreview,
+  presentLowerThird,
   type Composition,
   type SourceRef,
 } from "../domain/composition";
@@ -118,18 +120,22 @@ import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
 import type { ShortcutAction } from "../domain/types";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
-import { parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming } from "../domain/schedule";
+import { clockLabel, DEFAULT_START, minutesOfDay, parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming, shiftSchedule } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
 import { findItem, moveInList, sectionIdForInsert, stepCursor, moveTo, moveItemTo } from "../domain/service";
-import { deskNotes, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
+import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
-import { dropToFree, redeemCode, sanitizeProfile, validEmail, effectivePlan, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, startTrial, TRIAL_DAYS, trialDaysLeft, type PlanFeature, type PlanId } from "../domain/plans";
+import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
+import { serviceFirst, serviceSongIds } from "../domain/service-first";
+import { activeRun, endRun, markPart } from "../domain/service-run";
+import { cleanSettings, pickSettings, withoutSettings, type ServiceSettingsValues } from "../domain/service-settings";
+import { plainFromRich, richIsEmpty, richLines, type RichDoc } from "../domain/rich-text";
 import { blackModel, DEFAULT_THEME_ID, defaultTheme, defaultWorkspace, emptyModel, factoryThemes, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
 import { defaultProductionLayout, normalizeProductionLayout, sameProductionLayout } from "../workspace/production";
@@ -155,6 +161,8 @@ import type {
   RegionId,
   Sermon,
   Service,
+  ScreenDest,
+  ServiceSection,
   Song,
   Theme,
   TranslationInfo,
@@ -184,7 +192,7 @@ import {
   type ListenErrorKind,
 } from "../voice/listen";
 import { parseLibrarySnapshot } from "../platform/library";
-import { isDesktop } from "../platform/runtime";
+import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { aspectFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
 import {
@@ -211,6 +219,10 @@ const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
 /** Where today's section starts are kept between restarts. */
 const STARTS_KEY = "church-studio.section-starts";
+/** Service settings that new services start with. */
+const DEFAULTS_KEY = "church-studio.service-defaults";
+/** The name lower third that shows who leads the part now (set in Overlays like any other). */
+const LEADER_OVERLAY = "service-leader";
 
 function uid(): string {
   return crypto.randomUUID();
@@ -330,6 +342,24 @@ class Session {
   lookOnPreview = $state<Composition | null>(null);
   /** The look on Program as it was taken (with any verse stepped since), so it can move on live. */
   lookOnProgram = $state<Composition | null>(null);
+  /**
+   * At startup Program shows the logo slide on the desk only: the audience screen stays empty until
+   * the operator puts something on Program (take, cut, logo, black, clear, a verse or a loop).
+   */
+  programHeld = $state(false);
+  /**
+   * The audience window waits, closed, from startup until Program first gets something: a start,
+   * a restart or setup never puts an empty window on the big screen. Opening it by hand ends the wait.
+   */
+  private outputWaiting = false;
+
+  /** The operator put something on Program: the hold ends and a waiting audience window opens. */
+  private releaseHold() {
+    this.programHeld = false;
+    if (!this.outputWaiting) return;
+    this.outputWaiting = false;
+    void this.applyDisplays().catch((error) => console.error(error));
+  }
   previewBible = $state<BibleItem | null>(null);
   services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
   service = $state<Service | null>(null);
@@ -401,7 +431,13 @@ class Session {
   init = async () => {
     this.ready = true;
     void this.startCameraRelay();
-    if (typeof window !== "undefined") setInterval(() => (this.planClock = Date.now()), 60_000);
+    if (typeof window !== "undefined")
+      setInterval(() => {
+        this.planClock = Date.now();
+        void this.refreshEntitlement();
+      }, 60_000);
+    // A part whose time is up moves on (Service settings); checked every few seconds.
+    if (typeof window !== "undefined") setInterval(() => void this.checkAdvance(), 5_000);
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
@@ -432,6 +468,8 @@ class Session {
           console.error(error);
         }
         try {
+          // A restart that kept Program live (keepOutput) carries on; otherwise the window waits.
+          this.outputWaiting = !keepOutput;
           await this.applyDisplays();
         } catch (error) {
           console.error(error);
@@ -444,11 +482,12 @@ class Session {
       this.adoptAudienceOwner();
       // A restart restores the operator workspace and the preview cursor.
       // The owning session publishes an empty Program so a stored frame is not shown again.
-      // It starts on the logo slide in the screen theme, so the desk opens with Program showing what
-      // the room sees before the service, and the big screen shows the welcome when it opens.
+      // The desk's Program starts on the logo slide in the screen theme, but nothing goes to the
+      // audience screen until the operator puts something on Program.
       if (!keepLive && (this.desktop() || this.controlsAudience)) {
         try {
           this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
+          this.programHeld = true;
           await this.pushProgram();
         } catch (error) {
           console.error(error);
@@ -465,13 +504,17 @@ class Session {
       this.ready = true;
       this.booted = true;
       if (this.workspace.switcher.kind !== "none" && this.workspace.switcher.autoConnect) void this.connectSwitcher();
-      void this.checkActivation(true);
+      void this.bootEntitlement();
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
       if (this.desktop()) setInterval(() => void (this.workspace.backup.folder && this.backupNow()), 30 * 60 * 1000);
       if (this.message === "Opening workspace") {
-        this.message = this.desktop() ? this.output.message : "Browser session. Audience output opens in its own window.";
+        this.message = this.desktop()
+          ? this.outputWaiting
+            ? t("The audience screen opens when you put something on Program.")
+            : this.output.message
+          : "Browser session. Audience output opens in its own window.";
       }
       if (!keepLive && this.cursor.itemId && this.service) await this.selectItem(this.cursor.itemId);
     } catch (error) {
@@ -562,6 +605,11 @@ class Session {
     await api.assignOperator(profile.assignments.operator);
     await api.assignAudience(profile.assignments.audience);
     const mode = profile.outputMode;
+    // Until Program first gets something, the audience window stays closed (the choice to use it is kept).
+    if (this.outputWaiting) {
+      this.output = await api.setOutput(false, mode);
+      return;
+    }
     this.output = await api.setOutput(profile.outputEnabled || this.output.desired, mode);
     const external = this.output.displays.some((display) => !display.primary);
     if (!this.output.desired && external && !this.outputHeldClosed) {
@@ -633,8 +681,10 @@ class Session {
       this.looksForTake(),
       themeTransition,
     );
+    // While held, the audience gets an empty frame (same revision, so later updates still apply).
+    const sent = this.programHeld ? { ...this.live, program: createLiveState(this.theme()).program } : this.live;
     const packet = {
-      ...programPacket(this.live, lookTransition.ms),
+      ...programPacket(sent, lookTransition.ms),
       sessionId: this.sessionId,
       generation: this.audienceGeneration,
       calm: this.workspace.appearance.calm === true,
@@ -1585,9 +1635,9 @@ class Session {
     return { ...model, backgroundVideoUrl: this.mediaSrc(background.assetId) };
   };
 
-  /** The same verses in the side-by-side translation, if one is chosen and it is not this one. */
+  /** The same verses in the side-by-side translation (the item's own, else the desk's), if not this one. */
   private async parallelVerses(bible: BibleItem): Promise<{ attribution: string | null; verses: VerseText[] } | null> {
-    const id = this.workspace.parallelTranslationId;
+    const id = bible.secondTranslationId === undefined ? this.workspace.parallelTranslationId : bible.secondTranslationId;
     if (!id || id === bible.translationId) return null;
     const translation = this.translations.find((entry) => entry.id === id);
     if (!translation) return null;
@@ -1665,6 +1715,7 @@ class Session {
       layout: "title",
       heading,
       body,
+      rich: item.slide?.rich ?? null,
       backgroundImageUrl: slideImage ?? backgroundImageUrl,
     });
   }
@@ -1697,11 +1748,82 @@ class Session {
       this.persistSoon();
       return;
     }
-    const model = await this.modelFor(found.item);
+    // A passage shown a few verses at a time starts at its first screenful.
+    // (A reading still on LIVE keeps its place while something else is on Preview.)
+    if (found.item.bible?.perScreen) {
+      if (this.bibleStep?.itemId !== itemId || this.live.program.sourceId !== itemId) this.bibleStep = { itemId, start: found.item.bible.startVerse };
+    } else if (this.bibleStep && this.live.program.sourceId !== this.bibleStep.itemId) this.bibleStep = null;
+    const model = await this.modelFor(this.screenfulItem(found.item));
     if (token !== this.selectToken) return;
     this.lookOnPreview = null;
     this.live = setPreview(this.live, frame(model, itemId, "cut"));
     this.persistSoon();
+  };
+
+  /** Where a passage shown a few verses at a time has got to (the item and its screenful's first verse). */
+  bibleStep = $state<{ itemId: string; start: number } | null>(null);
+
+  /** The item as its current screenful (a scripture item with verses per screen), else as it is. */
+  private screenfulItem(item: PresentationItem): PresentationItem {
+    const bible = item.bible;
+    if (!bible?.perScreen) return item;
+    const start = this.bibleStep?.itemId === item.id ? this.bibleStep.start : bible.startVerse;
+    const shown = screenful(bible, start, bible.perScreen);
+    const book = this.books.find((entry) => entry.ord === bible.bookOrd);
+    const reference = formatReference(book?.name ?? bible.reference.replace(/\s*\d+(:.*)?$/, ""), bible.chapter, shown.start, shown.end, book?.chapters ?? 1);
+    return { ...item, bible: { ...bible, startVerse: shown.start, endVerse: shown.end, reference } };
+  }
+
+  /**
+   * Next / previous screenful of the scripture item on Preview. When that item is live, the new
+   * screenful goes to LIVE too, so the reader can be followed verse by verse. False at either end.
+   */
+  private stepScreenful = async (direction: 1 | -1): Promise<boolean> => {
+    const step = this.bibleStep;
+    if (!this.service || !step || step.itemId !== this.cursor.itemId) return false;
+    const item = findItem(this.service, step.itemId)?.item;
+    if (!item?.bible?.perScreen) return false;
+    const next = stepScreenful(item.bible, step.start, item.bible.perScreen, direction);
+    if (next === null) return false;
+    const wasLive = this.live.program.sourceId === item.id;
+    this.bibleStep = { itemId: item.id, start: next };
+    const shown = this.screenfulItem(item);
+    const model = await this.modelFor(shown);
+    this.lookOnPreview = null;
+    this.live = setPreview(this.live, frame(model, item.id, "cut"));
+    if (wasLive || this.liveOnClick) await this.take();
+    this.message = t("{reference} is on {where}.", { reference: shown.bible!.reference, where: wasLive || this.liveOnClick ? t("LIVE") : t("Preview") });
+    return true;
+  };
+
+  /** Show a scripture item a few verses at a time (null: all at once), from its first screenful. */
+  setVersesPerScreen = async (itemId: string, perScreen: number | null) => {
+    if (!this.service) return;
+    const found = findItem(this.service, itemId);
+    if (!found?.item.bible) return;
+    const bible = { ...found.item.bible };
+    if (perScreen && perScreen > 0) bible.perScreen = Math.min(20, Math.round(perScreen));
+    else delete bible.perScreen;
+    this.updateItem({ ...found.item, bible });
+    if (this.cursor.itemId === itemId) await this.selectItem(itemId);
+  };
+
+  /** While the service runs, choosing an item sends it straight to LIVE (unless turned off for this service). */
+  get liveOnClick(): boolean {
+    return this.serviceRunning && this.service?.liveOnClick !== false;
+  }
+
+  setLiveOnClick = (on: boolean) => {
+    if (!this.service) return;
+    this.service = { ...this.service, liveOnClick: on };
+    this.persistSoon();
+    this.message = on ? t("While the service runs, a click sends the item straight to LIVE.") : t("A click puts the item on Preview; LIVE sends it.");
+  };
+
+  /** Choose an item from the running order: Preview, and LIVE too while the service runs (if on). */
+  chooseItem = async (itemId: string) => {
+    await this.selectItem(itemId);
+    if (this.liveOnClick && this.cursor.itemId === itemId && this.live.preview.model.layout !== "empty") await this.take();
   };
 
   step = async (direction: 1 | -1) => {
@@ -1732,9 +1854,11 @@ class Session {
     if (freeVerse && (await this.stepPreviewScripture(direction))) return;
     // A look with a scripture region on Preview steps its verse.
     if (this.lookVerse("preview") && (await this.stepLookVerse("preview", direction))) return;
+    // A scripture item shown a few verses at a time steps through its verses first.
+    if (await this.stepScreenful(direction)) return;
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
-    if (next.itemId && next.itemId !== this.cursor.itemId) await this.selectItem(next.itemId);
+    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId);
   };
 
   previewModel = (model: PresentationModel, sourceId: string | null) => {
@@ -1812,6 +1936,7 @@ class Session {
       return false;
     }
     this.lookOnProgram = next;
+    this.releaseHold();
     this.live = replaceProgramModel(this.live, model, "fade");
     await this.pushProgram();
     this.message = t("{reference} is live.", { reference: fields.reference });
@@ -2457,8 +2582,209 @@ class Session {
     } catch {
       // Storage blocked: the starts last until the app closes.
     }
+    // The run log keeps counting past the planned time, for the planned-and-used report.
+    if (this.service?.sections.some((section) => section.id === id)) {
+      const before = activeRun(this.service)?.marks.at(-1)?.sectionId;
+      this.service = markPart(this.service, id, at, uid());
+      this.persistSoon();
+      const section = this.service.sections.find((entry) => entry.id === id);
+      if (this.leaderTo === "screen" && section?.leader?.trim() && before !== id) this.showLeader(id);
+    }
     this.publishStage();
     this.refreshCountdown();
+  };
+
+  /** A start waiting for the planned time (epoch ms), set from the Start service window. */
+  queuedStart = $state<number | null>(null);
+  private queueTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Start the service now: its first part begins and the clock starts. With `move`, the plan is moved
+   * first so it begins now (each part keeps its length), instead of running behind or ahead.
+   */
+  startService = (move = false) => {
+    this.cancelQueuedStart(false);
+    this.advanced.clear();
+    this.snoozed.clear();
+    this.timeUp = null;
+    const service = this.service;
+    const first = service?.sections[0];
+    if (!service || !first) {
+      this.message = t("Add a part to the service first.");
+      return;
+    }
+    if (move) {
+      this.service = shiftSchedule(service, Math.floor(minutesOfDay(Date.now())));
+      this.persistSoon();
+    }
+    this.startSection(first.id);
+    this.message = move
+      ? t("{name} started. The times now begin at {time}.", { name: service.name, time: clockLabel(Math.floor(minutesOfDay(Date.now()))) })
+      : t("{name} started.", { name: service.name });
+  };
+
+  /** Wait for the planned start, then start by itself (optionally with the countdown on Preview). */
+  queueStart = (countdown: boolean) => {
+    const service = this.service;
+    if (!service) return;
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+    const at = day.getTime() + (parseClock(service.startTime) ?? (parseClock(DEFAULT_START) as number)) * 60_000;
+    if (at <= Date.now()) {
+      this.startService();
+      return;
+    }
+    clearTimeout(this.queueTimer);
+    this.queuedStart = at;
+    this.queueTimer = setTimeout(() => {
+      this.queuedStart = null;
+      // Already begun by hand (something went live early): leave it running where it is.
+      if (this.service?.id === service.id && !this.serviceRunning) this.startService();
+    }, at - Date.now());
+    if (countdown) this.showCountdown();
+    this.message = t("{name} will start by itself at {time}. Keep this window open.", { name: service.name, time: clockLabel(minutesOfDay(at)) });
+  };
+
+  cancelQueuedStart = (say = true) => {
+    if (this.queuedStart === null) return;
+    clearTimeout(this.queueTimer);
+    this.queuedStart = null;
+    if (say) this.message = t("The waiting start is cancelled.");
+  };
+
+  /** The service running now (a part has begun and it has not been ended). */
+  get serviceRunning(): boolean {
+    return activeRun(this.service) !== null;
+  }
+
+  /**
+   * End the service: the running part stops counting, the countdown leaves the screen and the
+   * leader's name comes off. The planned and used times are kept in the service's report.
+   */
+  endService = () => {
+    if (!this.service) return;
+    const running = this.serviceRunning;
+    this.advanced.clear();
+    this.snoozed.clear();
+    this.timeUp = null;
+    this.service = endRun(this.service, Date.now());
+    this.sectionStarts = {};
+    try {
+      localStorage.removeItem(STARTS_KEY);
+    } catch {
+      // Storage blocked: nothing kept to remove.
+    }
+    this.hideLeader();
+    this.persistSoon();
+    this.publishStage();
+    this.refreshCountdown();
+    this.message = running ? t("{name} ended. Planned and used times are in Report.", { name: this.service.name }) : t("{name} is not running.", { name: this.service.name });
+  };
+
+  /** Close the service on the desk (ending it first if it is running). Program stays as it is. */
+  closeService = async () => {
+    if (!this.service) return;
+    const name = this.service.name;
+    this.cancelQueuedStart(false);
+    if (this.serviceRunning) this.endService();
+    await this.persist();
+    this.service = null;
+    this.cursor = { sectionId: null, itemId: null };
+    this.workspace = { ...this.workspace, lastServiceId: null };
+    await this.saveWorkspaceDocument(this.workspace);
+    this.message = t("{name} closed. Open it again from the services list.", { name });
+  };
+
+  /** Who leads a part. */
+  setSectionLeader = (id: string, leader: string) => {
+    if (!this.service) return;
+    const name = leader.trim().slice(0, 80);
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => {
+        if (section.id !== id) return section;
+        const next: typeof section = { ...section, leader: name };
+        if (!name) delete next.leader;
+        return next;
+      }),
+    };
+    this.persistSoon();
+    this.publishStage();
+  };
+
+  /** Where the leader's name goes (older services kept a yes/no for the screen). */
+  get leaderTo(): ScreenDest {
+    const service = this.service;
+    return service?.leaderTo ?? (service?.showLeaders ? "screen" : "off");
+  }
+
+  setLeaderTo = (dest: ScreenDest) => {
+    if (!this.service) return;
+    const next: Service = { ...this.service, leaderTo: dest };
+    delete next.showLeaders;
+    this.service = next;
+    this.persistSoon();
+    if (dest !== "screen") this.hideLeader();
+    if (dest === "preview" && this.runningSectionId) this.showLeader(this.runningSectionId);
+    else
+      this.message =
+        dest === "screen"
+          ? t("Leaders' names will show for a few seconds when their part begins.")
+          : dest === "preview"
+            ? t("Show name puts the leader on Preview. LIVE sends it.")
+            : t("Leaders' names stay off the screen.");
+  };
+
+  /** Where the countdown goes. The countdown overlay being on means the screen, however it was turned on. */
+  get countdownTo(): ScreenDest {
+    if (this.countdownOverlayOn) return "screen";
+    return this.service?.countdownTo === "preview" ? "preview" : "off";
+  }
+
+  setCountdownTo = (dest: ScreenDest) => {
+    if (this.service) {
+      this.service = { ...this.service, countdownTo: dest };
+      this.persistSoon();
+    }
+    if ((dest === "screen") !== this.countdownOverlayOn) this.toggleCountdownOverlay();
+    if (dest === "preview") this.showCountdown();
+    else if (dest === "off") this.message = t("The countdown stays off the screen.");
+  };
+
+  private leaderTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The section whose leader's name is on the screen now. */
+  leaderOnScreen = $state<string | null>(null);
+
+  /** The leader's name and their part as a lower third, for a few seconds (or until hidden). */
+  showLeader = (sectionId: string, seconds = this.service?.leaderSeconds ?? 10) => {
+    const section = this.service?.sections.find((entry) => entry.id === sectionId);
+    const leader = section?.leader?.trim();
+    if (!section || !leader) {
+      this.message = t("Add who leads this part first.");
+      return;
+    }
+    if (this.leaderTo === "preview") {
+      this.previewModel(presentLowerThird(this.theme(), leader, section.name), `leader:${sectionId}`);
+      this.message = t("{leader} · {part} is on Preview. LIVE shows it.", { leader, part: section.name });
+      return;
+    }
+    if (this.leaderTo === "off") {
+      this.message = t("Leaders' names are off. Choose Screen or Preview in On the screen.");
+      return;
+    }
+    const existing = this.workspace.overlays.find((overlay) => overlay.id === LEADER_OVERLAY);
+    const overlay = { ...(existing ?? newOverlay("lower-third", "", LEADER_OVERLAY)), text: leader, subtitle: section.name, rich: undefined, subtitleRich: undefined, on: true };
+    void this.setOverlays(existing ? this.workspace.overlays.map((entry) => (entry.id === LEADER_OVERLAY ? overlay : entry)) : [...this.workspace.overlays, overlay]);
+    this.leaderOnScreen = sectionId;
+    clearTimeout(this.leaderTimer);
+    if (seconds > 0) this.leaderTimer = setTimeout(() => this.hideLeader(), seconds * 1000);
+    this.message = t("{leader} · {part} is on the screen.", { leader, part: section.name });
+  };
+
+  hideLeader = () => {
+    clearTimeout(this.leaderTimer);
+    this.leaderOnScreen = null;
+    if (this.workspace.overlays.some((overlay) => overlay.id === LEADER_OVERLAY && overlay.on)) this.toggleOverlay(LEADER_OVERLAY, false);
   };
 
   /** The countdown overlay on or off (made the first time). Where it sits and its size are set in Overlays. */
@@ -2636,6 +2962,13 @@ class Session {
   /** Hear what the timer sounds are like. */
   testTimerSound = (cue: TimerCue) => playCue(cue, this.workspace.timerSounds.volume || 0.5);
 
+  /** The running section for the stage screen, with who leads it ("Worship · Ama"). */
+  private stageSection = (): { name: string; endsAt: number } | null => {
+    const deadline = this.runningDeadline();
+    const leader = this.service?.sections.find((section) => section.id === this.runningSectionId)?.leader?.trim();
+    return deadline && leader ? { ...deadline, name: `${deadline.name} · ${leader}` } : deadline;
+  };
+
   /** The section running now and when it should end, for the stage screens. */
   runningDeadline = (): { name: string; endsAt: number } | null => {
     const id = this.runningSectionId;
@@ -2653,7 +2986,14 @@ class Session {
       raw = null;
     }
     this.sectionStartsDay = today;
-    this.sectionStarts = readSavedStarts(raw, serviceId, today);
+    const starts = readSavedStarts(raw, serviceId, today);
+    // The run log is saved with the service, so a restart that lost the starts still knows which
+    // part is running and since when.
+    const run = this.service?.id === serviceId ? activeRun(this.service) : null;
+    if (run && new Date(run.startedAt).toDateString() === today) {
+      for (const mark of run.marks) starts[mark.sectionId] = Math.max(starts[mark.sectionId] ?? 0, mark.at);
+    }
+    this.sectionStarts = starts;
   }
 
   /** The section running now: the one most recently begun today. */
@@ -2670,7 +3010,7 @@ class Session {
   createServiceFromTemplate = async (templateId: string, date = new Date()) => {
     const template = this.workspace.serviceTemplates.find((entry) => entry.id === templateId);
     if (!template) return;
-    const service = serviceFromTemplate(template, serviceNameFor(template, date), uid, new Date());
+    const service: Service = { ...serviceFromTemplate(template, serviceNameFor(template, date), uid, new Date()), ...this.serviceDefaults() };
     this.service = service;
     this.cursor = { sectionId: service.sections[0]?.id ?? null, itemId: null };
     this.loadSectionStarts(service.id);
@@ -2738,6 +3078,8 @@ class Session {
       name: `${source.name} (copy)`,
       updatedAt: new Date().toISOString(),
     };
+    // The copy starts with no history of its own.
+    delete copy.runs;
     copy.sections = copy.sections.map((section) => ({ ...section, id: uid(), items: section.items.map((item) => ({ ...item, id: uid() })) }));
     this.service = copy;
     this.cursor = { sectionId: copy.sections[0]?.id ?? null, itemId: null };
@@ -2762,7 +3104,7 @@ class Session {
   };
 
   createService = async (name: string) => {
-    const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString() };
+    const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString(), ...this.serviceDefaults() };
     this.service = service;
     this.cursor = { sectionId: null, itemId: null };
     await this.persist();
@@ -2770,6 +3112,7 @@ class Session {
   };
 
   openService = async (id: string) => {
+    this.cancelQueuedStart(false);
     this.service = await api.serviceGet(id);
     if (typeof window !== "undefined") this.loadSectionStarts(id);
     this.cursor = { sectionId: null, itemId: null };
@@ -2782,6 +3125,47 @@ class Session {
     const section = { id: uid(), name: name.trim() || "Section", items: [] };
     this.service = { ...this.service, sections: [...this.service.sections, section] };
     this.cursor = { sectionId: section.id, itemId: null };
+    this.persistSoon();
+  };
+
+  /** A new part at a place in the running order (from the flow canvas's + between two cards). */
+  insertSection = (name: string, at: number, canvas?: { x: number; y: number }): string | null => {
+    if (!this.service) return null;
+    const section: ServiceSection = { id: uid(), name: name.trim() || "Section", items: [], ...(canvas ? { canvas } : {}) };
+    const sections = [...this.service.sections];
+    sections.splice(Math.max(0, Math.min(sections.length, at)), 0, section);
+    this.service = { ...this.service, sections };
+    this.cursor = { sectionId: section.id, itemId: null };
+    this.persistSoon();
+    return section.id;
+  };
+
+  /** Where a part's card sits on the flow canvas (null: back to its tidy place). */
+  setSectionCanvas = (id: string, place: { x: number; y: number } | null) => {
+    if (!this.service) return;
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => {
+        if (section.id !== id) return section;
+        const next: ServiceSection = { ...section, ...(place ? { canvas: { x: Math.round(place.x), y: Math.round(place.y) } } : {}) };
+        if (!place) delete next.canvas;
+        return next;
+      }),
+    };
+    this.persistSoon();
+  };
+
+  /** Every card back to its tidy place. */
+  tidyCanvas = () => {
+    if (!this.service) return;
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => {
+        const next = { ...section };
+        delete next.canvas;
+        return next;
+      }),
+    };
     this.persistSoon();
   };
 
@@ -2853,7 +3237,7 @@ class Session {
   stepItem = async (direction: 1 | -1) => {
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
-    if (next.itemId && next.itemId !== this.cursor.itemId) await this.selectItem(next.itemId);
+    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId);
   };
 
   /** The item after the selected one, for "Up next". */
@@ -2907,13 +3291,13 @@ class Session {
     );
   };
 
-  addAnnouncementToService = (heading: string, body: string, options: { design?: AnnouncementDesign; label?: string; sectionId?: string } = {}) => {
+  addAnnouncementToService = (heading: string, body: string, options: { design?: AnnouncementDesign; label?: string; sectionId?: string; rich?: RichDoc | null } = {}) => {
     const title = heading.trim() || t("Announcement");
     void this.addToService(
       {
         kind: "announcement",
         title,
-        announcement: { heading: title, body: body.trim(), design: options.design ?? "card", label: options.label ?? t("Announcement") },
+        announcement: { heading: title, body: body.trim(), design: options.design ?? "card", label: options.label ?? t("Announcement"), ...(options.rich ? { rich: options.rich } : {}) },
       },
       false,
       options.sectionId,
@@ -2922,13 +3306,166 @@ class Session {
 
   addPassageToService = (passage: BibleItem, sectionId?: string) => {
     this.remember(passage);
-    void this.addToService({ kind: "bible", title: passage.reference, bible: passage }, false, sectionId);
+    // The service's own verses-per-screen applies to readings longer than one screenful.
+    const per = this.service?.versesPerScreen;
+    const bible = per && !passage.perScreen && passage.endVerse - passage.startVerse + 1 > per ? { ...passage, perScreen: per } : passage;
+    void this.addToService({ kind: "bible", title: passage.reference, bible }, false, sectionId);
+  };
+
+  /** Settings new services start with (saved on this computer by "Use for new services"). */
+  serviceDefaults = (): ServiceSettingsValues => {
+    try {
+      return cleanSettings(JSON.parse(localStorage.getItem(DEFAULTS_KEY) ?? "null"));
+    } catch {
+      return {};
+    }
+  };
+
+  /** Keep this service's settings as the starting point for new services. */
+  saveServiceDefaults = () => {
+    if (!this.service) return;
+    try {
+      localStorage.setItem(DEFAULTS_KEY, JSON.stringify(pickSettings(this.service)));
+      this.message = t("New services will start with these settings.");
+    } catch {
+      this.message = t("These settings could not be kept on this computer.");
+    }
+  };
+
+  /** This service back on the built-in behaviour. */
+  resetServiceSettings = () => {
+    if (!this.service) return;
+    if (this.countdownOverlayOn) this.toggleCountdownOverlay();
+    this.hideLeader();
+    this.service = withoutSettings(this.service);
+    this.persistSoon();
+    this.message = t("Service settings are back to the defaults.");
+  };
+
+  /** Change this service's own settings (Service settings). */
+  setServiceSettings = (patch: Partial<Pick<Service, "liveOnClick" | "autoAdvance" | "advanceGrace" | "warnMinutes" | "versesPerScreen" | "leaderSeconds">>) => {
+    if (!this.service) return;
+    const next: Service = { ...this.service, ...patch };
+    for (const key of Object.keys(patch) as Array<keyof typeof patch>) if (next[key] === undefined || next[key] === null) delete next[key];
+    this.service = next;
+    this.persistSoon();
+  };
+
+  /** Parts already moved on from (or kept on by the operator), so a part is moved on from once only. */
+  private advanced = new Set<string>();
+  private lastChime = 0;
+  /** A reminder put off until this moment (epoch ms), by part. */
+  private snoozed = new Map<string, number>();
+
+  /** The running part whose time is up, waiting for the operator (the "Remind me" mode). */
+  timeUp = $state<{ sectionId: string; nextId: string | null; since: number } | null>(null);
+
+  /**
+   * When the running part's time is up (plus the service's grace): in "Remind me" (the default) the
+   * desk asks to move on and chimes, again every few minutes; in "Move on" the next part begins by
+   * itself (its first item goes up) with a message offering to stay. The plan never runs ahead of
+   * the room: a part only begins when it is moved on to or something from it goes live.
+   */
+  private checkAdvance = async () => {
+    const service = this.service;
+    const running = this.runningSectionId;
+    const mode = service?.autoAdvance ?? "remind";
+    if (!service || !running || !this.serviceRunning || mode === "off") {
+      if (this.timeUp) this.timeUp = null;
+      return;
+    }
+    if (this.timeUp && this.timeUp.sectionId !== running) this.timeUp = null;
+    const deadline = sectionDeadline(planSchedule(service), running, this.sectionStarts[running] ?? null);
+    if (!deadline || Date.now() < deadline.endsAt + (service.advanceGrace ?? 0) * 60_000) return;
+    const index = service.sections.findIndex((section) => section.id === running);
+    const next = service.sections[index + 1] ?? null;
+    if (mode === "remind") {
+      if ((this.snoozed.get(running) ?? 0) > Date.now()) return;
+      const chime = () => {
+        this.lastChime = Date.now();
+        if (this.workspace.timerSounds.on) playCue("end", this.workspace.timerSounds.volume || 0.5);
+      };
+      if (!this.timeUp) {
+        // `since`: when the part's time was up (its planned end), so "over" counts from there.
+        this.timeUp = { sectionId: running, nextId: next?.id ?? null, since: deadline.endsAt };
+        chime();
+        const part = service.sections[index]!;
+        // Seen on any page of the desk, not only the Service page.
+        this.notify(t("{part}'s time is up.", { part: part.name }), {
+          detail: next ? t("Next: {next}", { next: next.name }) : t("This is the last part."),
+          ms: 60_000,
+          actions: [
+            ...(next ? [{ label: t("Move on now"), run: () => { void this.moveOn(part.id); this.dismissToast(); } }] : []),
+            { label: t("5 more min"), run: () => { this.snoozeTimeUp(5); this.dismissToast(); } },
+          ],
+        });
+      } else if (Date.now() - this.lastChime > 3 * 60_000) chime();
+      return;
+    }
+    if (this.advanced.has(running)) return;
+    this.advanced.add(running);
+    if (next) await this.moveOn(running, true);
+  };
+
+  /** Move from a part to the next: it begins, and its first item goes up (LIVE with Auto LIVE). */
+  moveOn = async (fromId: string | null = this.runningSectionId, offerStay = false) => {
+    const service = this.service;
+    if (!service || !fromId) return;
+    const index = service.sections.findIndex((section) => section.id === fromId);
+    const from = service.sections[index];
+    const next = service.sections[index + 1];
+    this.timeUp = null;
+    if (!from || !next) return;
+    const previousItem = this.cursor.itemId;
+    this.startSection(next.id);
+    if (next.items[0]) await this.chooseItem(next.items[0].id);
+    else this.cursor = { sectionId: next.id, itemId: null };
+    if (!offerStay) {
+      this.message = t("Moved on to {next}.", { next: next.name });
+      return;
+    }
+    this.notify(t("{part}'s time is up. Moved on to {next}.", { part: from.name, next: next.name }), {
+      detail: t("Turn this off in Service settings."),
+      ms: 15_000,
+      actions: [
+        {
+          label: t("Stay on {part}", { part: from.name }),
+          run: () => {
+            // Back on the part (the run log notes it resumed); its countdown keeps its first start.
+            const began = this.sectionStarts[from.id];
+            this.startSection(from.id);
+            if (began) this.sectionStarts = { ...this.sectionStarts, [from.id]: began };
+            if (previousItem) void this.selectItem(previousItem);
+            this.dismissToast();
+          },
+        },
+      ],
+    });
+  };
+
+  /** Not yet: remind again in a few minutes (the part keeps running and shows as over). */
+  snoozeTimeUp = (minutes = 5) => {
+    const up = this.timeUp;
+    if (!up) return;
+    this.snoozed.set(up.sectionId, Date.now() + minutes * 60_000);
+    this.timeUp = null;
+    this.message = t("Reminding you again in {n} min.", { n: minutes });
+  };
+
+  /** Stay on the part until it is moved on by hand (no more reminders for it). */
+  stayOnPart = () => {
+    const up = this.timeUp;
+    if (!up) return;
+    this.snoozed.set(up.sectionId, Number.MAX_SAFE_INTEGER);
+    this.timeUp = null;
   };
 
   /** A text slide in a part, ready to edit. */
-  addTextToService = (heading: string, body: string, sectionId?: string) => {
-    const title = heading.trim() || t("Text");
-    return this.addToService({ kind: "slide", title, slide: { heading: title, body: body.trim(), imageId: null } }, false, sectionId);
+  /** A text item; with `rich` it is formatted (the Formatted tab), and heading may be empty. */
+  addTextToService = (heading: string, body: string, sectionId?: string, rich: RichDoc | null = null) => {
+    const title = heading.trim() || (rich ? plainFromRich(rich).heading || richLines(rich).find((line) => line.trim()) : "") || t("Text");
+    const slide = rich ? { heading: heading.trim(), body, imageId: null, rich } : { heading: title, body: body.trim(), imageId: null };
+    return this.addToService({ kind: "slide", title: title.slice(0, 80), slide }, false, sectionId);
   };
 
   addLyric = (songId: string, sectionId: string, title: string) => {
@@ -3289,6 +3826,7 @@ class Session {
     }
     if (this.deckLoop) this.stopDeckLoop();
     this.lookOnProgram = null;
+    this.releaseHold();
     this.live = replaceProgramModel(this.live, model, "fade");
     await this.pushProgram();
     this.message = t("{reference} is live.", { reference: passage.reference });
@@ -3484,6 +4022,7 @@ class Session {
     const page = deck?.pages[loop!.index];
     if (!loop || !deck || !page) return;
     const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    this.releaseHold();
     this.live = { ...this.live, program: frame(model, `deck:${deck.id}:${loop.index}`, page.transition.type === "cut" ? "cut" : "fade"), revision: this.live.revision + 1 };
     await this.pushProgram();
   };
@@ -3604,7 +4143,8 @@ class Session {
       return;
     }
     const songs = await api.songSearch(needle);
-    this.findHits = searchSongHits(songs, needle);
+    const inService = serviceSongIds(this.service);
+    this.findHits = serviceFirst(searchSongHits(songs, needle), (hit) => inService.has(hit.songId));
   };
 
   previewSongHit = (hit: SongHit) => {
@@ -3782,7 +4322,11 @@ class Session {
     this.workspace = { ...this.workspace, onboarded: true };
     this.persistSoon();
     // The logo slide on Program now carries the church name (and theme) chosen in setup.
-    if (this.live.program.model.layout === "logo") void this.logo();
+    // While held at startup it is redrawn on the desk only.
+    if (this.live.program.model.layout === "logo") {
+      if (this.programHeld) this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
+      else void this.logo();
+    }
   };
 
   restartOnboarding = () => {
@@ -3827,57 +4371,137 @@ class Session {
 
   // Plans. `now` ticks once a minute so a trial ends on time without a restart.
   planClock = $state(Date.now());
-  /** The feature an upgrade prompt is explaining, or null when no prompt is open. */
+  /** The feature the plans page is explaining (a locked feature was used), or null. */
   upgradeFor = $state<PlanFeature | null>(null);
+  /** The full-screen plans page, opened from Settings or a "See plans" button. */
+  paywallOpen = $state(false);
+
+  /** Open the plans page (about one feature, if given). */
+  openPlans = (feature: PlanFeature | null = null) => {
+    this.upgradeFor = feature;
+    this.paywallOpen = true;
+  };
 
   get plan(): PlanId {
-    const plan = effectivePlan(this.workspace.entitlement, this.planClock);
-    // A license already on all the computers it covers runs this one as Free until one is released,
-    // as does a computer that has not reached the license server for a month.
-    if (plan !== "free" && this.workspace.entitlement.source === "license" && ACTIVATION_URL) {
-      if (this.activation.status === "full") return "free";
-      if ((this.activation.status === "offline" || this.activation.status === "error") && !withinGrace(this.workspace.activationOkAt)) return "free";
-    }
-    return plan;
+    void this.planClock;
+    // Development builds keep the PREMIUM-TEST / CHURCH-TEST codes (never in a release build).
+    const ent = this.workspace.entitlement;
+    if (ent.source === "promo" && ent.plan !== "free") return ent.plan;
+    // Otherwise only a lease signed by the license server grants a plan, checked by the native core.
+    return this.ent.plan;
   }
 
-  // Device activations (see domain/activation.ts and server/activations.ts).
+  /** The native core's word on this computer's plan (src-tauri/src/entitlement.rs). */
+  ent = $state<EntitlementStatus>(freeStatus());
+  /** This computer's id for the license server (hashed hardware id on the desktop). */
+  deviceId = $state("");
+  /** Seats on the license key (for Settings › Computers on this license). */
   activation = $state<ActivationState>(idleActivation());
-  readonly deviceId = deviceId();
+  /** True while the server runs its test checkout (no money moves). */
+  billingTest = $state(false);
 
   private deviceName(): string {
     const platform = typeof navigator === "undefined" ? "" : /mac/i.test(navigator.platform) ? "Mac" : /win/i.test(navigator.platform) ? "Windows PC" : "Computer";
     return `${this.workspace.churchName.trim() || "Church Studio"} · ${platform || "Computer"}`.slice(0, 60);
   }
 
-  /** Check this computer in with the license server (when the key is a license and a server is set). */
+  private osName(): string {
+    const platform = typeof navigator === "undefined" ? "" : navigator.platform;
+    return /mac/i.test(platform) ? "macos" : /win/i.test(platform) ? "windows" : /linux/i.test(platform) ? "linux" : "other";
+  }
+
+  /** Read the plan again from the native core (each minute, and after any change). */
+  refreshEntitlement = async () => {
+    try {
+      this.ent = await api.entitlementStatus();
+      if (this.ent.device) this.deviceId = this.ent.device;
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  /** Keep a lease from the server (verified by the native core). */
+  private keepLease = async (token: string): Promise<boolean> => {
+    try {
+      this.ent = await api.entitlementSet(token);
+      this.planClock = Date.now();
+      return true;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : String(error);
+      return false;
+    }
+  };
+
+  /**
+   * At start: read the plan, check in (anonymous, unless turned off), and renew the license's lease
+   * when it is due. A computer offline keeps its plan until its lease asks for a check-in.
+   */
+  private bootEntitlement = async () => {
+    this.deviceId = await api.entitlementDevice().catch(() => "");
+    await this.refreshEntitlement();
+    if (this.workspace.shareUsage !== false) {
+      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), plan: this.plan });
+      if (hello.ok) {
+        this.billingTest = hello.data.test === true;
+        // The server's clock: the native core never lets this computer's clock trail it.
+        if (typeof hello.data.now === "number") this.ent = await api.entitlementNoteTime(hello.data.now).catch(() => this.ent);
+      }
+    }
+    await this.checkActivation();
+    // Moving from a build that kept the trial on the computer: a trial still running there is
+    // started again on the server (one per computer, so it cannot repeat).
+    const old = this.workspace.entitlement.trialEndsAt;
+    if (this.ent.plan === "free" && this.ent.kind === null && old && Date.parse(old) > Date.now()) await this.startTrial();
+  };
+
+  /** Renew the license key's lease when it is due (or now, with force). */
   checkActivation = async (force = false) => {
     const key = this.workspace.entitlement.source === "license" ? this.workspace.entitlement.license : null;
-    if (!key || !ACTIVATION_URL) {
+    if (!key) {
       this.activation = idleActivation();
       return;
     }
-    if (!force && !dueForCheck(this.workspace.activationOkAt) && this.activation.status === "ok") return;
+    const due = this.ent.kind !== "license" || this.ent.reason !== null || (this.ent.renewBy ?? 0) - Date.now() < RENEW_EARLY_DAYS * 86_400_000;
+    if (!force && !due) return;
     this.activation = { ...this.activation, status: "checking" };
-    const answer = await askServer("activate", { key, device: this.deviceId, name: this.deviceName() });
-    this.activation = answer;
-    if (answer.status === "ok") {
-      this.workspace = { ...this.workspace, activationOkAt: new Date().toISOString() };
-      this.persistSoon();
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key, device: this.deviceId, name: this.deviceName() });
+    if (answer.ok) {
+      await this.keepLease(answer.data.lease);
+      this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
+      return;
     }
+    const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; revoked?: boolean; ended?: boolean };
+    const status: ActivationState["status"] = answer.offline ? "offline" : answer.status === 409 ? "full" : "error";
+    this.activation = { status, seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: answer.error };
+    // A refunded or ended key stops here: no new lease, and the old one is let go.
+    if (data.revoked || data.ended) this.ent = await api.entitlementClear().catch(() => this.ent);
   };
 
   /** Free a computer's place on the license (this one or another). */
   releaseDevice = async (device: string) => {
     const key = this.workspace.entitlement.license;
-    if (!key || !ACTIVATION_URL) return;
-    const answer = await askServer("release", { key, device });
-    if (answer.status === "ok" && device !== this.deviceId) await this.checkActivation(true);
-    else this.activation = device === this.deviceId ? { ...answer, status: "full", message: t("This computer was released from the license.") } : answer;
+    if (!key) return;
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[] }>("/v1/release", { key, device });
+    if (!answer.ok) {
+      this.activation = { ...this.activation, message: answer.error };
+      return;
+    }
+    if (device === this.deviceId) {
+      this.ent = await api.entitlementClear().catch(() => this.ent);
+      this.activation = { status: "full", seats: answer.data.seats, devices: answer.data.devices, message: t("This computer was released from the license.") };
+    } else await this.checkActivation(true);
   };
 
+  /** Whole days left in a running trial (rounded up), else 0. */
   get trialDays(): number {
-    return trialDaysLeft(this.workspace.entitlement, this.planClock);
+    void this.planClock;
+    if (this.ent.kind !== "trial" || this.ent.plan === "free" || !this.ent.endsAt) return 0;
+    return Math.max(0, Math.ceil((this.ent.endsAt - Date.now()) / 86_400_000));
+  }
+
+  /** The free trial was used on this computer (the server says so; shown, not trusted). */
+  get trialUsed(): boolean {
+    return this.workspace.entitlement.trialUsed || this.ent.kind === "trial";
   }
 
   entitled = (feature: PlanFeature): boolean => planIncludes(this.plan, feature);
@@ -3938,35 +4562,135 @@ class Session {
     this.message = t("Signed out. Your library stays on this computer.");
   };
 
-  /** Add a license key (or a test code in development). Returns an error to show, or null on success. */
-  redeemCode = (code: string): string | null => {
+  /**
+   * Add a license key (or a test code in development): the server checks it, counts this computer
+   * and returns a lease. Returns an error to show, or null on success.
+   */
+  redeemCode = async (code: string): Promise<string | null> => {
     const result = redeemCode(this.workspace.entitlement, code, { now: Date.now() });
     if (!result.ok) return result.error;
+    if (result.entitlement.source !== "license") {
+      // A development test code: no server.
+      this.workspace = { ...this.workspace, entitlement: result.entitlement };
+      this.planClock = Date.now();
+      this.persistSoon();
+      this.message = t("License added: {note}.", { note: result.note });
+      return null;
+    }
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key: result.entitlement.license, device: this.deviceId, name: this.deviceName() });
+    if (!answer.ok) {
+      if (answer.status === 409) {
+        this.workspace = { ...this.workspace, entitlement: result.entitlement };
+        this.persistSoon();
+        const data = answer.data as { seats?: number; devices?: ActivatedDevice[] };
+        this.activation = { status: "full", seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: "" };
+        return t("This key is in use on all the computers it covers. Release one below, then check again.");
+      }
+      return answer.offline ? t("Connect to the internet once to add the key; after that it works offline.") : answer.error;
+    }
     this.workspace = { ...this.workspace, entitlement: result.entitlement };
-    this.planClock = Date.now();
     this.persistSoon();
+    await this.keepLease(answer.data.lease);
+    this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
     this.message = t("License added: {note}.", { note: result.note });
-    // A new key starts its 30 days offline from now, then checks in.
-    this.workspace = { ...this.workspace, activationOkAt: new Date().toISOString() };
-    void this.checkActivation(true);
     return null;
   };
 
-  /** Return to Free: removes a license key or test code from this computer. */
-  useFreePlan = () => {
+  /** Return to Free: removes a license key (or test code) from this computer. */
+  useFreePlan = async () => {
+    const key = this.workspace.entitlement.license;
+    if (key) void serverCall("/v1/release", { key, device: this.deviceId });
     this.workspace = { ...this.workspace, entitlement: dropToFree(this.workspace.entitlement) };
     this.persistSoon();
+    this.ent = await api.entitlementClear().catch(() => this.ent);
+    this.activation = idleActivation();
     this.message = t("Now on Free.");
   };
 
-  startTrial = () => {
-    const next = startTrial(this.workspace.entitlement);
-    if (next === this.workspace.entitlement) return false;
-    this.workspace = { ...this.workspace, entitlement: next };
-    this.planClock = Date.now();
+  /** Start the free trial: one per computer, given by the server. Returns an error to show, or null. */
+  startTrial = async (promo?: string): Promise<string | null> => {
+    const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", { device: this.deviceId, name: this.deviceName(), ...(promo ? { promo } : {}) });
+    if (!answer.ok) {
+      if (answer.status === 403) {
+        this.workspace = { ...this.workspace, entitlement: { ...this.workspace.entitlement, trialUsed: true } };
+        this.persistSoon();
+        return t("The free trial has already been used on this computer.");
+      }
+      return answer.offline ? t("Connect to the internet to start the trial.") : answer.error;
+    }
+    if (!(await this.keepLease(answer.data.lease))) return this.message;
+    this.workspace = { ...this.workspace, entitlement: { ...this.workspace.entitlement, trialUsed: true } };
     this.persistSoon();
-    this.message = t("Premium trial started: {TRIAL_DAYS} days on this computer.", { TRIAL_DAYS });
-    return true;
+    this.message = t("Premium trial started: {TRIAL_DAYS} days on this computer.", { TRIAL_DAYS: answer.data.days ?? TRIAL_DAYS });
+    return null;
+  };
+
+  // Paying from the app: the server opens a checkout, the app waits for it, then keeps the key and
+  // the lease it gets back. No key to copy from an email.
+
+  /** The checkout opened in the browser, while the app waits for it. */
+  checkout = $state<{ session: string; url: string; plan: PlanId; status: "waiting" | "paid" | "cancelled" | "error"; key?: string; message?: string } | null>(null);
+  private checkoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** A promo code's worth for a plan, from the server. */
+  checkPromo = async (code: string, plan: "premium" | "church", interval: Interval): Promise<PromoResult | { ok: false; reason: "offline" }> => {
+    const answer = await serverCall<PromoResult>("/v1/promo", { code, plan, interval });
+    return answer.ok ? answer.data : { ok: false, reason: "offline" };
+  };
+
+  /** Open a checkout for a plan; the app then waits for the payment. Returns an error, or null. */
+  buy = async (input: { plan: "premium" | "church"; interval: Interval; email: string; name: string; promo?: string }): Promise<string | null> => {
+    const answer = await serverCall<CheckoutStart>("/v1/checkout", { ...input, device: this.deviceId });
+    if (!answer.ok) return answer.error;
+    this.billingTest = answer.data.test;
+    this.checkout = { session: answer.data.session, url: answer.data.url, plan: input.plan, status: "waiting" };
+    await openExternal(answer.data.url).catch(() => {});
+    this.watchCheckout(answer.data.session, Date.now());
+    return null;
+  };
+
+  private watchCheckout(session: string, startedAt: number) {
+    clearTimeout(this.checkoutTimer);
+    this.checkoutTimer = setTimeout(async () => {
+      if (this.checkout?.session !== session || this.checkout.status !== "waiting") return;
+      const answer = await serverCall<CheckoutPoll>("/v1/checkout/status", { session, device: this.deviceId, name: this.deviceName() });
+      if (answer.ok && answer.data.status === "paid" && answer.data.key) {
+        const entitlement = redeemCode(this.workspace.entitlement, answer.data.key, { now: Date.now() });
+        if (entitlement.ok) this.workspace = { ...this.workspace, entitlement: entitlement.entitlement };
+        this.persistSoon();
+        if (answer.data.lease) await this.keepLease(answer.data.lease);
+        else await this.checkActivation(true);
+        this.checkout = { ...this.checkout!, status: "paid", key: answer.data.key };
+        this.message = t("Payment received. Welcome to {plan}!", { plan: this.plan === "church" ? "Church" : "Premium" });
+        return;
+      }
+      if (answer.ok && answer.data.status === "cancelled") {
+        this.checkout = { ...this.checkout!, status: "cancelled" };
+        return;
+      }
+      if (Date.now() - startedAt > CHECKOUT_WAIT_MS) {
+        this.checkout = { ...this.checkout!, status: "error", message: t("The checkout took too long. If you paid, your key is in your email.") };
+        return;
+      }
+      this.watchCheckout(session, startedAt);
+    }, 2500);
+  }
+
+  /** Open the waiting checkout's page again. */
+  reopenCheckout = () => {
+    if (this.checkout?.url) void openExternal(this.checkout.url).catch(() => {});
+  };
+
+  /** Stop waiting for a checkout. */
+  dismissCheckout = () => {
+    clearTimeout(this.checkoutTimer);
+    this.checkout = null;
+  };
+
+  /** Anonymous daily check-in on or off (Settings › Privacy). */
+  setShareUsage = (on: boolean) => {
+    this.workspace = { ...this.workspace, shareUsage: on };
+    this.persistSoon();
   };
 
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
@@ -4147,6 +4871,14 @@ class Session {
     void this.selectItem(item.id);
   };
 
+  /** The same notes formatted, when either part was written in the Formatted tab. */
+  sermonDeskNotesRich = (): RichDoc | null => {
+    const focus = this.sermonFocus;
+    if (!focus) return null;
+    const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
+    return sermon ? deskNotesRich(sermon, focus.sectionId) : null;
+  };
+
   sermonDeskNotes = (): string => {
     const focus = this.sermonFocus;
     if (!focus) return "";
@@ -4263,7 +4995,8 @@ class Session {
   private publishStage = () => {
     if (typeof window === "undefined" || !this.stageOpen) return;
     const sermon = this.sermonFocus && this.sermons.find((entry) => entry.id === this.sermonFocus?.sermonId);
-    const notes = sermon ? (sermon.sections.find((section) => section.id === this.sermonFocus?.sectionId)?.notes ?? "") : "";
+    const focused = sermon ? sermon.sections.find((section) => section.id === this.sermonFocus?.sectionId) : undefined;
+    const notes = focused?.notes ?? "";
     const snapshot: StageSnapshot = {
       program: this.live.program.model,
       next: this.live.preview.model,
@@ -4272,8 +5005,9 @@ class Session {
       at: Date.now(),
       message: this.stageMessage,
       notes,
+      ...(focused?.notesRich ? { notesRich: focused.notesRich } : {}),
       layout: this.workspace.stageLayout,
-      section: this.runningDeadline(),
+      section: this.stageSection(),
     };
     try {
       publishStageLocal(snapshot);
@@ -4555,6 +5289,7 @@ class Session {
     }
     // The operator taking over Program ends a running loop.
     if (this.deckLoop) this.stopDeckLoop();
+    this.releaseHold();
     const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
     const themeTransition = this.theme().transition;
     const takeTransition =
@@ -4735,6 +5470,7 @@ class Session {
   };
 
   openAudience = async () => {
+    this.outputWaiting = false;
     this.outputHeldClosed = false;
     this.rememberOutput({ outputEnabled: true });
     await this.persist();
@@ -4764,6 +5500,7 @@ class Session {
   };
 
   closeAudience = async () => {
+    this.outputWaiting = false;
     this.outputHeldClosed = true;
     this.rememberOutput({ outputEnabled: false });
     await this.persist();

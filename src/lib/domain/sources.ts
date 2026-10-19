@@ -1,3 +1,4 @@
+import { encodeRich, parseRich, plainFromRich, type RichDoc } from "./rich-text";
 import { msg, t } from "../i18n/core";
 import {
   addLayer,
@@ -38,10 +39,11 @@ export type SourceFields =
   | { type: "camera"; deviceId: string; label: string; mirror: boolean }
   | { type: "scripture"; reference: string; body: string; attribution: string; verse: number; style: TextStyle }
   | { type: "song"; songId: string; sectionId: string; label: string; body: string; style: TextStyle }
-  | { type: "text"; heading: string; body: string; style: TextStyle }
+  /** `rich` is set while the Formatted tab is in use; heading and body keep the same words plain. */
+  | { type: "text"; heading: string; body: string; style: TextStyle; rich?: RichDoc | null }
   | { type: "timer"; mode: TimerMode; durationMs: number; targetAt: number | null; label: string; warningMs: number; style: TextStyle }
   | { type: "clock"; label: string; style: TextStyle }
-  | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle }
+  | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle; titleRich?: RichDoc | null; subtitleRich?: RichDoc | null }
   | { type: "image"; assetId: string; name: string; imageUrl: string }
   | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean }
   | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string }
@@ -233,7 +235,12 @@ export function buildSource(fields: SourceFields): SourceRef {
         ...stylePayload(fields.style),
       });
     case "text":
-      return sourceRef("text", "text", fields.heading || "Text", { heading: fields.heading, body: fields.body, ...stylePayload(fields.style) });
+      return sourceRef("text", "text", fields.heading || plainFromRich(fields.rich ?? { blocks: [] }).body.split("\n")[0] || "Text", {
+        heading: fields.heading,
+        body: fields.body,
+        ...stylePayload(fields.style),
+        ...(fields.rich ? { mode: "rich", rich: encodeRich(fields.rich) } : {}),
+      });
     case "timer":
       return sourceRef("timer", "timer", fields.label || "Timer", {
         mode: fields.mode,
@@ -251,6 +258,8 @@ export function buildSource(fields: SourceFields): SourceRef {
         title: fields.title,
         subtitle: fields.subtitle,
         ...stylePayload(fields.style),
+        ...(fields.titleRich ? { titleRich: encodeRich(fields.titleRich) } : {}),
+        ...(fields.subtitleRich ? { subtitleRich: encodeRich(fields.subtitleRich) } : {}),
       });
     case "image":
       return sourceRef("image", fields.assetId || "image", fields.name || "Image", {
@@ -288,8 +297,10 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       return { type: "scripture", reference: p.reference ?? source.title, body: p.body ?? "", attribution: p.attribution ?? "", verse: Number(p.verse) || 1, style: parseTextStyle(p.style) };
     case "song":
       return { type: "song", songId: p.songId ?? "", sectionId: p.sectionId ?? "", label: p.label ?? source.title, body: p.body ?? "", style: parseTextStyle(p.style) };
-    case "text":
-      return { type: "text", heading: p.heading ?? source.title, body: p.body ?? "", style: parseTextStyle(p.style) };
+    case "text": {
+      const rich = p.mode === "rich" ? parseRich(p.rich) : null;
+      return { type: "text", heading: p.heading ?? source.title, body: p.body ?? "", style: parseTextStyle(p.style), ...(rich ? { rich } : {}) };
+    }
     case "timer":
       if (p.mode === "clock") return { type: "clock", label: p.label ?? "", style: parseTextStyle(p.style) };
       return {
@@ -303,8 +314,19 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       };
     case "clock":
       return { type: "clock", label: p.label ?? "", style: parseTextStyle(p.style) };
-    case "lower-third":
-      return { type: "lower-third", templateId: p.templateId ?? source.id, title: p.title ?? source.title, subtitle: p.subtitle ?? "", style: parseTextStyle(p.style) };
+    case "lower-third": {
+      const titleRich = parseRich(p.titleRich);
+      const subtitleRich = parseRich(p.subtitleRich);
+      return {
+        type: "lower-third",
+        templateId: p.templateId ?? source.id,
+        title: p.title ?? source.title,
+        subtitle: p.subtitle ?? "",
+        style: parseTextStyle(p.style),
+        ...(titleRich ? { titleRich } : {}),
+        ...(subtitleRich ? { subtitleRich } : {}),
+      };
+    }
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
     case "ndi":

@@ -6,6 +6,8 @@ import { browserMedia } from "../platform/browser-media";
 import { browserLibrary } from "../platform/browser-store";
 import type { LibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
+import { webDevice, webEntitlement } from "../platform/web-entitlement";
+import type { EntitlementStatus } from "../domain/billing";
 import type {
   BookInfo,
   MediaAsset,
@@ -40,6 +42,12 @@ export const api = {
   getProgram: () => invoke<ProgramPacket>("get_program"),
   workspaceLoad: () => invoke<Workspace | null>("workspace_load"),
   workspaceSave: (document: Workspace) => invoke<void>("workspace_save", { document }),
+  // The plan, decided by the native core from server-signed leases (src-tauri/src/entitlement.rs).
+  entitlementStatus: (): Promise<EntitlementStatus> => (isDesktop() ? invoke<EntitlementStatus>("entitlement_status") : webEntitlement.status()),
+  entitlementSet: (token: string): Promise<EntitlementStatus> => (isDesktop() ? invoke<EntitlementStatus>("entitlement_set", { token }) : webEntitlement.set(token)),
+  entitlementNoteTime: (at: number): Promise<EntitlementStatus> => (isDesktop() ? invoke<EntitlementStatus>("entitlement_note_time", { at }) : webEntitlement.noteTime(at)),
+  entitlementClear: (): Promise<EntitlementStatus> => (isDesktop() ? invoke<EntitlementStatus>("entitlement_clear") : webEntitlement.clear()),
+  entitlementDevice: async (): Promise<string> => (isDesktop() ? (await invoke<{ device: string }>("entitlement_device")).device : webDevice()),
   themeList: () => (desktop() ? invoke<Theme[]>("theme_list") : browserLibrary.themes()),
   themeSave: (document: Theme) => (desktop() ? invoke<void>("theme_save", { document }) : browserLibrary.saveTheme(document)),
   themeDelete: (id: string) => (desktop() ? invoke<void>("theme_delete", { id }) : browserLibrary.deleteTheme(id)),

@@ -1,3 +1,4 @@
+import { sanitizeRich } from "./rich-text";
 import { isOpenLyrics, parseOpenLyrics } from "./openlyrics";
 import { cleanOrder } from "./song-order";
 import { moveInList } from "./service";
@@ -18,9 +19,14 @@ export function sanitizeSong(song: Song): Song {
     if (!section || typeof section.id !== "string" || !section.id) continue;
     const kind = KINDS.has(section.kind) ? section.kind : "verse";
     const lines = Array.isArray(section.lines) ? section.lines.map((line) => String(line)) : [];
+    // Formatted lyrics are one block per line. They are kept only while their words match the
+    // lines: anything that changed the words without them (an import, a split) wins, plainly.
+    const formatted = section.rich ? sanitizeRich(section.rich) : null;
+    const trim = (list: string[]) => list.join("\n").replace(/\n+$/, "");
+    const rich = formatted && trim(formatted.blocks.map((block) => block.runs.map((run) => run.text).join(""))) === trim(lines) ? formatted : null;
     const label = section.label?.trim() || defaultLabel(kind, sections);
     const second = Array.isArray(section.second) ? section.second.map((line) => String(line)) : [];
-    sections.push({ id: section.id, kind, label, lines, ...(second.some((line) => line.trim()) ? { second } : {}) });
+    sections.push({ id: section.id, kind, label, lines, ...(second.some((line) => line.trim()) ? { second } : {}), ...(rich ? { rich } : {}) });
   }
   const folder = cleanFolder(song.folder);
   const ccli = cleanCcli(song.ccli);
@@ -187,17 +193,23 @@ export function lyricsFor(
 ): { label: string; lines: PresentationLine[] } {
   const section = song?.sections.find((entry) => entry.id === sectionId);
   if (!song || !section) return { label: fallbackTitle || "Song", lines: [{ text: "This section is missing." }] };
-  const first = section.lines.filter((line) => line.trim());
+  // First-language lines carry their formatting (block n of `rich` is line n).
+  const first: PresentationLine[] = section.lines
+    .map((text, n): PresentationLine => {
+      const runs = section.rich?.blocks[n]?.runs;
+      return runs?.some((run) => Object.keys(run).length > 1) ? { text, runs } : { text };
+    })
+    .filter((line) => line.text.trim());
   const second = (section.second ?? []).filter((line) => line.trim());
   if (!first.length && !second.length) return { label: section.label, lines: [{ text: "This section is empty." }] };
-  if (!second.length || language === "first") return { label: section.label, lines: (first.length ? first : second).map((text) => ({ text })) };
+  if (!second.length || language === "first") return { label: section.label, lines: first.length ? first : second.map((text) => ({ text })) };
   if (language === "second" || !first.length) return { label: section.label, lines: second.map((text) => ({ text })) };
   const rows = Math.max(first.length, second.length);
   const lines: PresentationLine[] = [];
   for (let n = 0; n < rows; n += 1) {
-    const text = first[n];
+    const line = first[n];
     const alt = second[n];
-    if (text) lines.push(alt ? { text, alt } : { text });
+    if (line) lines.push(alt ? { ...line, alt } : line);
     else if (alt) lines.push({ text: alt });
   }
   return { label: section.label, lines };

@@ -1,3 +1,4 @@
+import { encodeRich, inlineRuns, parseRich, scaleRuns, type RichDoc } from "./rich-text";
 import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText, presentVideo } from "./present";
@@ -697,9 +698,10 @@ export function setLayerStyle(composition: Composition, layerId: string, style: 
   };
 }
 
-export function assignText(composition: Composition, layerId: string, heading: string, body: string): Composition {
+/** Fill a layer with words: heading and body, or formatted text (`rich`, the Formatted tab). */
+export function assignText(composition: Composition, layerId: string, heading: string, body: string, rich: RichDoc | null = null): Composition {
   const title = heading.trim() || "Announcement";
-  return assignLayerSource(composition, layerId, sourceRef("text", "announcement", title, { heading: title, body }));
+  return assignLayerSource(composition, layerId, sourceRef("text", "announcement", title, { heading: title, body, ...(rich ? { mode: "rich", rich: encodeRich(rich) } : {}) }));
 }
 
 export function assignScripture(
@@ -1484,6 +1486,8 @@ export function applyLowerThirdTemplate(
   template: LowerThirdTemplate,
   title?: string,
   subtitle?: string,
+  /** The title and subtitle formatted (the Formatted tab); plain title and subtitle stay too. */
+  rich: { title?: RichDoc | null; subtitle?: RichDoc | null } = {},
 ): Composition {
   if (composition.locked) return composition;
   return {
@@ -1498,6 +1502,10 @@ export function applyLowerThirdTemplate(
               subtitle: subtitle?.trim() || template.subtitle,
               templateId: template.id,
               durationMs: String(template.durationMs),
+              // The layer keeps its text style when the template or words change.
+              ...(layer.source.type === "lower-third" && layer.source.payload.style ? { style: layer.source.payload.style } : {}),
+              ...(rich.title ? { titleRich: encodeRich(rich.title) } : {}),
+              ...(rich.subtitle ? { subtitleRich: encodeRich(rich.subtitle) } : {}),
             }),
           }
         : layer,
@@ -1616,11 +1624,12 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
     return mode === "clock" && !payload.label?.trim() ? { ...painted, reference: null } : painted;
   }
   if (source.type === "lower-third") {
-    return presentLowerThird(ctx.theme, payload.title || source.title, payload.subtitle || "");
+    return presentLowerThird(ctx.theme, payload.title || source.title, payload.subtitle || "", parseRich(payload.titleRich), parseRich(payload.subtitleRich));
   }
   if (source.type === "text") {
     // An empty heading is deliberate (deck text elements); only a missing one falls back to the title.
-    return presentText({ theme: ctx.theme, layout: "title", heading: payload.heading ?? source.title, body: payload.body || "" });
+    const rich = payload.mode === "rich" ? parseRich(payload.rich) : null;
+    return presentText({ theme: ctx.theme, layout: "title", heading: payload.heading ?? source.title, body: payload.body || "", rich });
   }
   if (extra) return extra(source, ctx);
   if (source.type === "plugin") {
@@ -1633,8 +1642,20 @@ function startIfNeeded(timer: ReturnType<typeof createTimer>, now: number) {
   return timer.mode === "clock" ? timer : { ...timer, running: true, startedAt: now };
 }
 
-export function presentLowerThird(theme: Theme, title: string, subtitle: string): PresentationModel {
+export function presentLowerThird(theme: Theme, title: string, subtitle: string, titleRich: RichDoc | null = null, subtitleRich: RichDoc | null = null): PresentationModel {
+  // Formatted: one line for the name, a smaller one for the title (at the theme's attribution size).
+  const formatted = titleRich || subtitleRich;
+  const small = theme.attribution.size / Math.max(1, theme.fontSize);
+  const rich: RichDoc | null = formatted
+    ? {
+        blocks: [
+          { type: "p", runs: titleRich ? inlineRuns(titleRich) : title.trim() ? [{ text: title.trim(), bold: true }] : [] },
+          ...(subtitleRich || subtitle.trim() ? [{ type: "p" as const, runs: scaleRuns(subtitleRich ? inlineRuns(subtitleRich) : [{ text: subtitle.trim() }], small) }] : []),
+        ],
+      }
+    : null;
   return {
+    ...(rich ? { rich } : {}),
     layout: "lower-third",
     theme: { ...theme, layout: "lower-third", vertical: "bottom", align: "left", margin: 48 },
     reference: null,

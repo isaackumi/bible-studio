@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InlineWords from "../InlineWords.svelte";
   import { session } from "../../app/session.svelte";
   import { songFileName, songToOpenLyrics } from "../../domain/openlyrics";
   import { createZip, readZip } from "../../domain/zip";
@@ -6,6 +7,7 @@
   import { chorusAfterVerses, hasOwnOrder, songOrder, songSlots } from "../../domain/song-order";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
+  import { preferService, serviceSongIds } from "../../domain/service-first";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
   import { favoritesFirst } from "../../domain/favorites";
@@ -158,9 +160,12 @@
   const selected = $derived(session.songs.find((song) => song.id === selectedId) ?? null);
   const onPreview = $derived(session.songFocus);
   const index = $derived(buildSongIndex(session.songs));
+  // The open service's songs are matched first; the whole library when the service lacks the song.
+  const inService = $derived(serviceSongIds(session.service));
+  const serviceIndex = $derived(buildSongIndex(session.songs.filter((song) => inService.has(song.id))));
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
-  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
   /** Live mode: a part goes straight to the screen when chosen (click, chips, arrows, follow singing). */
   const CLICK_KEY = "church-studio:songs-click-live";
   let clickLive = $state(readClickLive());
@@ -222,7 +227,10 @@
     return session.onVoiceHeard((text, _final, alternatives) => {
       if (!text) return;
       heard = text;
-      const match = chooseSung(alternatives.length ? alternatives : [text], index, session.songFocus?.songId ?? null);
+      const phrases = alternatives.length ? alternatives : [text];
+      const current = session.songFocus?.songId ?? null;
+      const own = serviceIndex.entries.length ? chooseSung(phrases, serviceIndex, current) : null;
+      const match = preferService(own, chooseSung(phrases, index, current));
       if (!match) return;
       detected = match;
       if (!follow) return;
@@ -814,13 +822,19 @@
               <button type="button" class="desk-btn ghost icon del" aria-label={t("Delete {label}", { label: section.label })} title={t("Delete this section")} onclick={() => draft && (draft.sections = removeSongSection(asSong(draft), section.id).sections)}><Icon name="trash" size={14} /></button>
             </div>
             <div class="langs" class:two={!!draft.secondLanguage.trim()}>
-              <textarea
-                aria-label={t("{label} lines", { label: section.label })}
+              <InlineWords
+                text={section.lines.join("\n")}
+                rich={section.rich ?? null}
+                multiline
                 rows={Math.max(3, section.lines.length, section.second?.length ?? 0)}
+                label={t("{label} lines", { label: section.label })}
                 placeholder={t("One lyric line per row")}
-                value={section.lines.join("\n")}
-                oninput={(event) => (section.lines = event.currentTarget.value.split("\n"))}
-              ></textarea>
+                onchange={(words) => {
+                  section.lines = words.text.split("\n");
+                  if (words.rich) section.rich = words.rich;
+                  else delete section.rich;
+                }}
+              />
               {#if draft.secondLanguage.trim()}
                 <label class="second">
                   <span>{t("In {language}", { language: draft.secondLanguage.trim() })}</span>

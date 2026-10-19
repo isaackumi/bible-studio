@@ -12,10 +12,16 @@
     "PADDLE_PRICES": "pri_premium_monthly:premium,pri_premium_yearly:premium,pri_church_monthly:church,pri_church_yearly:church",
     // The sender of the key email; the domain must be verified in Resend. PLACEHOLDER.
     "MAIL_FROM": "Church Studio <keys@example.com>",
-    "GRACE_DAYS": "7"
+    "GRACE_DAYS": "7",
+    // "mock" runs the built-in test checkout (no money moves); "paddle" sells for real through Paddle.
+    // Changing provider later is this one line (plus that provider's secrets).
+    "BILLING_PROVIDER": "mock",
+    // Free trial length, and how long a computer may stay offline before it must check in.
+    "TRIAL_DAYS": "14",
+    "LEASE_DAYS": "30"
   },
   "kv_namespaces": [
-    // Device activations (made with `wrangler kv namespace create ACTIVATIONS`).
+    // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }
   ]
 }

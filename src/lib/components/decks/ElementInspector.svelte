@@ -18,7 +18,9 @@
   } from "../../domain/composition";
   import { parseTextStyle } from "../../domain/text-style";
   import TextStyleEditor from "../TextStyleEditor.svelte";
-  import { t } from "../../i18n/core";
+  import { msg, t } from "../../i18n/core";
+  import { encodeRich, parseRich, type RichDoc } from "../../domain/rich-text";
+  import TextWords from "../TextWords.svelte";
 
   // Properties of the selected element on a deck page. Every change is one history step.
   let { page, layer, oncommit }: { page: Composition; layer: CompositionLayer; oncommit: (page: Composition) => void } = $props();
@@ -26,6 +28,11 @@
   const payload = $derived(layer.source.payload);
   const setPayload = (patch: Record<string, string>) =>
     oncommit(assignLayerSource(page, layer.id, { ...layer.source, payload: { ...layer.source.payload, ...patch } }));
+  /** The box's words: plain, or formatted (kept as JSON beside the plain words). */
+  const setText = (body: string, rich: RichDoc | null) => {
+    const { mode: _mode, rich: _rich, ...rest } = layer.source.payload;
+    oncommit(assignLayerSource(page, layer.id, { ...layer.source, payload: { ...rest, body, ...(rich ? { mode: "rich", rich: encodeRich(rich) } : {}) } }));
+  };
   const bound = (key: "x" | "y" | "w" | "h", raw: string) => {
     const value = Number(raw);
     if (Number.isFinite(value)) oncommit(resizeLayer(page, layer.id, { ...layer.bounds, [key]: value }));
@@ -40,10 +47,17 @@
   </label>
 
   {#if layer.source.type === "text"}
-    <label class="stack">
+    <div class="stack">
       <span>{t("Text")}</span>
-      <textarea class="field area" aria-label={t("Element text")} rows="3" value={payload.body ?? ""} onchange={(event) => setPayload({ body: event.currentTarget.value })}></textarea>
-    </label>
+      <TextWords
+        heading={payload.heading ?? ""}
+        body={payload.body ?? ""}
+        rich={payload.mode === "rich" ? parseRich(payload.rich) : null}
+        headingMode="none"
+        bodyLabel={msg("Element text")}
+        onchange={(words) => setText(words.body, words.rich)}
+      />
+    </div>
     <TextStyleEditor style={parseTextStyle(payload.style)} onchange={(style) => oncommit(setLayerStyle(page, layer.id, style))} />
   {:else if layer.source.type === "shape"}
     <div class="field-row">
@@ -132,7 +146,6 @@
   .field-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .stack { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
   .field { height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 0 8px; font: inherit; font-size: 13px; min-width: 0; }
-  .area { height: auto; padding: 6px 8px; resize: vertical; }
   .inline { display: flex; gap: 6px; }
   input[type="color"] { width: 40px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
   h4 { margin: 6px 0 0; font-size: 12px; letter-spacing: 0; color: var(--muted); }

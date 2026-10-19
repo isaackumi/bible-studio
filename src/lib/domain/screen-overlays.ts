@@ -2,6 +2,8 @@
 // changes underneath, like a TV channel's logo or a news ticker. Each is switched on or off by
 // itself, and appears on the audience screen and the Program monitor (never on Preview alone).
 
+import { richIsEmpty, sanitizeRich, type RichDoc } from "./rich-text";
+
 export type OverlayKind = "logo" | "ticker" | "banner" | "clock" | "lower-third" | "badge" | "countdown";
 export type OverlayCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type OverlayEdge = "top" | "bottom";
@@ -17,6 +19,10 @@ export type ScreenOverlay = {
   text: string;
   /** Lower third second line. */
   subtitle: string;
+  /** The main words formatted (the Formatted tab); `text` keeps them plain. */
+  rich?: RichDoc;
+  /** The lower third's second line formatted; `subtitle` keeps it plain. */
+  subtitleRich?: RichDoc;
   corner: OverlayCorner;
   edge: OverlayEdge;
   /** Logo: a library picture; none uses the church name. */
@@ -86,6 +92,11 @@ export function newOverlay(kind: OverlayKind, churchName = "", id: string = cryp
   }
 }
 
+function cleanRich<K extends "rich" | "subtitleRich">(key: K, value: unknown): Partial<Record<K, RichDoc>> {
+  const doc = value ? sanitizeRich(value) : null;
+  return doc && !richIsEmpty(doc) ? ({ [key]: doc } as Partial<Record<K, RichDoc>>) : {};
+}
+
 export function sanitizeOverlays(value: unknown): ScreenOverlay[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -107,6 +118,8 @@ export function sanitizeOverlays(value: unknown): ScreenOverlay[] {
       color: typeof record.color === "string" && HEX.test(record.color) ? record.color.toLowerCase() : base.color,
       spot: SPOTS.has(record.spot as OverlaySpot) ? (record.spot as OverlaySpot) : base.spot,
       size: record.size === "s" || record.size === "l" || record.size === "xl" ? record.size : "m",
+      ...cleanRich("rich", record.rich),
+      ...cleanRich("subtitleRich", record.subtitleRich),
     });
   }
   return result;

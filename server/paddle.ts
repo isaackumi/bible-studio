@@ -6,7 +6,9 @@
 // makes the very same key instead of a second one.
 
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
-import { handleActivation, type Store } from "./activations.ts";
+import { completeCheckout, handleApi, licenseOfSubscription, renewLicense, revoke, type ApiConfig } from "./api.ts";
+import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
+import { getJson, kvStore, type KvNamespace } from "./store.ts";
 
 export type Env = {
   /** Paddle › Developer tools › Notifications › the endpoint's secret key. */
@@ -24,9 +26,48 @@ export type Env = {
   MAIL_FROM: string;
   /** Days a subscription key keeps working past the paid period, to cover a late renewal. */
   GRACE_DAYS?: string;
-  /** A KV namespace for device activations (computers per key). Without it, /v1/* answers 404. */
-  ACTIVATIONS?: Store;
+  /** The KV namespace for everything the server keeps (activations, trials, checkouts, promos, stats). */
+  ACTIVATIONS?: KvNamespace;
+  /** "mock" (built-in test checkout, the default) or "paddle". */
+  BILLING_PROVIDER?: string;
+  /** Promo codes charged through Paddle discounts: "EASTER25:dsc_01abc,…". */
+  PADDLE_DISCOUNTS?: string;
+  /** Bearer token for /admin and /v1/admin/*. */
+  ADMIN_TOKEN?: string;
+  /** Days a computer may stay offline before it must check in (default 30). */
+  LEASE_DAYS?: string;
+  /** Free trial length (default 14). */
+  TRIAL_DAYS?: string;
 };
+
+/** Everything the API needs, from the Worker's settings. */
+export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
+  if (!env.ACTIVATIONS || !env.CHURCH_STUDIO_SIGNING_KEY) return null;
+  const provider =
+    env.BILLING_PROVIDER === "paddle"
+      ? paddleProvider({ apiKey: env.PADDLE_API_KEY, sandbox: env.PADDLE_ENV === "sandbox", prices: paddlePriceMap(env.PADDLE_PRICES ?? ""), discounts: codeMap(env.PADDLE_DISCOUNTS ?? "") }, http)
+      : mockProvider;
+  return {
+    store: kvStore(env.ACTIVATIONS),
+    signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
+    provider,
+    adminToken: env.ADMIN_TOKEN,
+    leaseDays: Number(env.LEASE_DAYS ?? 30) || 30,
+    trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
+    graceDays: Number(env.GRACE_DAYS ?? 7) || 7,
+    mail: env.RESEND_API_KEY
+      ? async (to, subject, text) => {
+          const response = await http("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+            body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+          });
+          if (!response.ok) throw new Error(`Email failed: ${response.status}`);
+        }
+      : undefined,
+    now: () => Date.now(),
+  };
+}
 
 type Fetch = typeof fetch;
 
@@ -36,12 +77,14 @@ const MAX_AGE_SECONDS = 300;
 export default {
   fetch: (request: Request, env: Env) => {
     const path = new URL(request.url).pathname;
-    if (path.startsWith("/v1/") && env.ACTIVATIONS) return handleActivation(request, env.ACTIVATIONS);
-    return handle(request, env);
+    if (path === "/paddle/webhook") return handle(request, env, fetch, Date.now(), apiConfig(env));
+    const config = apiConfig(env);
+    if (!config) return new Response("The server is not set up yet (KV binding and signing key).", { status: 503 });
+    return handleApi(request, config);
   },
 };
 
-export async function handle(request: Request, env: Env, http: Fetch = fetch, now = Date.now()): Promise<Response> {
+export async function handle(request: Request, env: Env, http: Fetch = fetch, now = Date.now(), api: ApiConfig | null = null): Promise<Response> {
   const url = new URL(request.url);
   if (request.method !== "POST" || url.pathname !== "/paddle/webhook") return new Response("Not found", { status: 404 });
   const body = await request.text();
@@ -49,7 +92,37 @@ export async function handle(request: Request, env: Env, http: Fetch = fetch, no
     return new Response("Bad signature", { status: 401 });
   }
   const event = JSON.parse(body) as PaddleEvent;
+  // A refund: the license stops getting leases, so its computers drop to Free at their next check-in.
+  if (api && event.event_type.startsWith("adjustment.") && event.data.action === "refund" && event.data.status === "approved" && event.data.transaction_id) {
+    const license = await api.store.get(`txn:${event.data.transaction_id}`);
+    if (license) await revoke(api, license, "refund");
+    return new Response("Refund noted", { status: 200 });
+  }
   if (event.event_type !== "transaction.completed") return new Response("Ignored", { status: 200 });
+  // Bought from the app: finish that checkout, so the app collects its key and activates by itself.
+  // Only the transaction made for that order, with that order's price, completes it (custom data
+  // can be set by a buyer, so it alone proves nothing).
+  const session = event.data.custom_data?.session;
+  if (api && session) {
+    const order = await getJson<{ reference?: string | null; plan: string; interval: string; status: string }>(api.store, `checkout:${session}`);
+    if (!order) return new Response("Unknown checkout", { status: 200 });
+    const expected = paddlePriceMap(env.PADDLE_PRICES ?? "")[`${order.plan}:${order.interval}`];
+    const prices = (event.data.items ?? []).map((item) => item.price.id);
+    if (order.reference !== event.data.id || !expected || !prices.includes(expected)) return new Response("Transaction does not match the checkout", { status: 400 });
+    const paid = await completeCheckout(api, session, event.data.subscription_id ?? undefined);
+    if (paid?.license) await api.store.put(`txn:${event.data.id}`, paid.license);
+    return new Response(paid ? "Checkout complete" : "Unknown checkout", { status: 200 });
+  }
+  // A renewal of a subscription bought from the app: the same key, paid through the new period.
+  if (api && event.data.subscription_id) {
+    const license = await licenseOfSubscription(api, event.data.subscription_id);
+    if (license) {
+      const ends = event.data.billing_period?.ends_at ? Date.parse(event.data.billing_period.ends_at) : null;
+      await renewLicense(api, license, ends && Number.isFinite(ends) ? ends : null);
+      await api.store.put(`txn:${event.data.id}`, license);
+      return new Response("Renewed", { status: 200 });
+    }
+  }
 
   const issued = licenseFor(event.data, env);
   if (!issued) return new Response("No Church Studio plan in this transaction", { status: 200 });
@@ -73,8 +146,14 @@ export type PaddleEvent = {
     id: string;
     customer_id: string | null;
     origin?: string;
-    items: { price: { id: string } }[];
+    items?: { price: { id: string } }[];
     billing_period?: { starts_at: string; ends_at: string } | null;
+    custom_data?: { session?: string } | null;
+    subscription_id?: string | null;
+    /** Adjustments (refunds). */
+    action?: string;
+    status?: string;
+    transaction_id?: string;
   };
 };
 
@@ -111,9 +190,10 @@ export function licenseFor(data: PaddleEvent["data"], env: Env): Issued | null {
   const prices = Object.fromEntries(
     env.PADDLE_PRICES.split(",")
       .map((pair) => pair.trim().split(":"))
-      .filter((pair) => pair.length === 2) as [string, string][],
+      .filter((pair) => pair.length === 2 || pair.length === 3)
+      .map((pair) => [pair[0], pair[1]]) as [string, string][],
   );
-  const plans = data.items.map((item) => prices[item.price.id]).filter((plan): plan is LicensePlan => plan === "premium" || plan === "church");
+  const plans = (data.items ?? []).map((item) => prices[item.price.id]).filter((plan): plan is LicensePlan => plan === "premium" || plan === "church");
   if (plans.length === 0) return null;
   const plan: LicensePlan = plans.includes("church") ? "church" : "premium";
   const ends = data.billing_period?.ends_at;
@@ -168,4 +248,15 @@ async function sendKey(to: string, key: string, issued: Issued, env: Env, http: 
     body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
   });
   if (!response.ok) throw new Error(`Email failed: ${response.status}`);
+}
+
+/** "CODE:dsc_01abc,CODE2:dsc_02def" → { CODE: "dsc_01abc", … }. */
+function codeMap(text: string): Record<string, string> {
+  return Object.fromEntries(
+    text
+      .split(",")
+      .map((pair) => pair.trim().split(":"))
+      .filter((pair): pair is [string, string] => pair.length === 2 && !!pair[0] && !!pair[1])
+      .map(([code, id]) => [code.trim().toUpperCase(), id.trim()]),
+  );
 }

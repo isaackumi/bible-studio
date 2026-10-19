@@ -2,6 +2,7 @@
 // week", "Save the date") that the church writes itself. Each design lays them out differently;
 // the theme still gives the background, font and text colour, and the accent colours the design.
 
+import { richIsEmpty, richLines } from "./rich-text";
 import type { PresentationModel, Theme } from "./types";
 
 export type AnnouncementDesign = "classic" | "card" | "banner" | "split" | "bulletin" | "lower";
@@ -30,6 +31,8 @@ export type AnnouncementWords = {
   accent?: string;
   /** A picture from the media library behind the words; null uses the theme's background. */
   imageId?: string | null;
+  /** The body formatted (the Formatted tab); the heading stays as the design draws it. */
+  rich?: import("./rich-text").RichDoc;
 };
 
 export type AnnouncementPaint = {
@@ -37,6 +40,8 @@ export type AnnouncementPaint = {
   label: string;
   heading: string;
   body: string[];
+  /** The body formatted, drawn instead of the plain body lines. */
+  rich?: import("./rich-text").RichDoc;
   accent: string;
   /** Text that reads on the accent colour. */
   onAccent: string;
@@ -73,7 +78,8 @@ export function cleanAccent(value: unknown): string {
  */
 export function presentAnnouncement(input: { theme: Theme; words: AnnouncementWords; backgroundImageUrl?: string | null }): PresentationModel {
   const heading = input.words.heading.trim();
-  const body = input.words.body.split("\n").map((line) => line.trim()).filter(Boolean);
+  const rich = input.words.rich && !richIsEmpty(input.words.rich) ? input.words.rich : null;
+  const body = (rich ? richLines(rich) : input.words.body.split("\n")).map((line) => line.trim()).filter(Boolean);
   const accent = cleanAccent(input.words.accent) || themeAccent(input.theme);
   const label = (input.words.label ?? "").trim().slice(0, 60);
   return {
@@ -89,6 +95,7 @@ export function presentAnnouncement(input: { theme: Theme; words: AnnouncementWo
       label,
       heading,
       body,
+      ...(rich ? { rich } : {}),
       accent,
       onAccent: inkOn(accent),
     },

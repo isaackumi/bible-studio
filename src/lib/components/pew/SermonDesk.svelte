@@ -1,4 +1,8 @@
 <script lang="ts">
+  import InlineWords from "../InlineWords.svelte";
+  import TextWords from "../TextWords.svelte";
+  import RichView from "../RichView.svelte";
+  import type { RichDoc } from "../../domain/rich-text";
   import { session } from "../../app/session.svelte";
   import { formatReference, parseReference } from "../../bible/reference";
   import { searchSermonHits, sermonAudienceItem } from "../../domain/sermon";
@@ -9,7 +13,7 @@
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SearchField from "./SearchField.svelte";
-  import { t, tn } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
 
   // Sermon window: a library of sermons, the outline as cards (what the audience sees, and the
   // notes that stay on this desk), and the speaker's notes beside Preview and Program.
@@ -18,8 +22,8 @@
   let { translationId = "kjv" }: { translationId?: string } = $props();
 
   type Show = "slide" | "scripture" | "image";
-  type DraftSection = { id: string; name: string; notes: string; show: Show; heading: string; body: string; scripture: string; imageId: string };
-  type Draft = { id: string; title: string; speaker: string; notes: string; sections: DraftSection[]; isNew: boolean };
+  type DraftSection = { id: string; name: string; notes: string; notesRich: RichDoc | null; show: Show; heading: string; body: string; rich: RichDoc | null; scripture: string; imageId: string };
+  type Draft = { id: string; title: string; speaker: string; notes: string; notesRich: RichDoc | null; sections: DraftSection[]; isNew: boolean };
 
   let query = $state("");
   let selectedId = $state<string | null>(null);
@@ -78,13 +82,14 @@
   const selected = $derived(session.sermons.find((entry) => entry.id === selectedId) ?? null);
   const focus = $derived(session.sermonFocus);
   const programSource = $derived(session.live.program.sourceId ?? "");
-  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
   const images = $derived(session.media.filter((asset) => asset.kind === "image"));
   const focusSection = $derived.by(() => {
     const doc = focus ? session.sermons.find((entry) => entry.id === focus.sermonId) : null;
     return doc?.sections.find((entry) => entry.id === focus?.sectionId) ?? null;
   });
   const deskNotes = $derived(session.sermonDeskNotes());
+  const deskNotesDoc = $derived(session.sermonDeskNotesRich());
   const place = $derived.by(() => {
     const doc = focus ? session.sermons.find((entry) => entry.id === focus.sermonId) : null;
     const index = doc?.sections.findIndex((entry) => entry.id === focus?.sectionId) ?? -1;
@@ -232,11 +237,11 @@
   }
 
   function blankSection(name: string): DraftSection {
-    return { id: crypto.randomUUID(), name, notes: "", show: "slide", heading: "", body: "", scripture: "", imageId: "" };
+    return { id: crypto.randomUUID(), name, notes: "", notesRich: null, show: "slide", heading: "", body: "", rich: null, scripture: "", imageId: "" };
   }
 
   function newSermon() {
-    draft = { id: crypto.randomUUID(), title: "", speaker: "", notes: "", sections: [blankSection(t("Opening"))], isNew: true };
+    draft = { id: crypto.randomUUID(), title: "", speaker: "", notes: "", notesRich: null, sections: [blankSection(t("Opening"))], isNew: true };
   }
 
   function edit(doc: Sermon) {
@@ -245,6 +250,7 @@
       title: doc.title,
       speaker: doc.speaker,
       notes: doc.notes,
+      notesRich: doc.notesRich ?? null,
       isNew: false,
       sections: doc.sections.map((section) => {
         const attached = section.items.find((item) => item.kind === "bible" || item.kind === "image") ?? null;
@@ -253,6 +259,8 @@
           id: section.id,
           name: section.name,
           notes: section.notes,
+          notesRich: section.notesRich ?? null,
+          rich: slide?.slide?.rich ?? null,
           show: attached?.kind === "bible" ? "scripture" : attached?.kind === "image" ? "image" : "slide",
           heading: slide?.slide?.heading ?? "",
           body: slide?.slide?.body ?? "",
@@ -268,7 +276,8 @@
     const problems: string[] = [];
     const sections: SermonSection[] = value.sections.map((section) => {
       const heading = section.heading.trim() || section.name.trim() || t("Sermon");
-      const slide: PresentationItem = { id: `${section.id}-slide`, kind: "slide", title: heading, slide: { heading, body: section.body, imageId: null } };
+      const words = section.show === "slide" && section.rich ? { heading: section.heading.trim(), body: section.body, imageId: null, rich: section.rich } : { heading, body: section.body, imageId: null };
+      const slide: PresentationItem = { id: `${section.id}-slide`, kind: "slide", title: heading, slide: words };
       let attached: PresentationItem | null = null;
       if (section.show === "scripture") {
         const parsed = parseReference(section.scripture);
@@ -290,10 +299,10 @@
         if (!asset) problems.push(t("{name}: pick an image.", { name: section.name || t("A section") }));
         else attached = { id: `${section.id}-image`, kind: "image", title: asset.name, image: { assetId: asset.id } };
       }
-      return { id: section.id, name: section.name, notes: section.notes, items: attached ? [attached, slide] : [slide] };
+      return { id: section.id, name: section.name, notes: section.notes, ...(section.notesRich ? { notesRich: section.notesRich } : {}), items: attached ? [attached, slide] : [slide] };
     });
     return {
-      sermon: { id: value.id, title: value.title, speaker: value.speaker, notes: value.notes, sections, updatedAt: new Date().toISOString() },
+      sermon: { id: value.id, title: value.title, speaker: value.speaker, notes: value.notes, ...(value.notesRich ? { notesRich: value.notesRich } : {}), sections, updatedAt: new Date().toISOString() },
       problems,
     };
   }
@@ -433,10 +442,10 @@
           <input aria-label={t("Sermon title")} placeholder={t("Title")} bind:value={draft.title} />
           <input aria-label={t("Speaker")} placeholder={t("Speaker")} bind:value={draft.speaker} />
         </div>
-        <label class="desk-only">
+        <div class="desk-only">
           <span><Icon name="lock" size={12} /> {t("Notes for the whole sermon · desk only")}</span>
-          <textarea aria-label={t("Operator notes")} rows="2" placeholder={t("Reminders for the operator. Never shown to the audience.")} bind:value={draft.notes}></textarea>
-        </label>
+          <InlineWords text={draft.notes} rich={draft.notesRich} multiline variant="full" rows={2} label={t("Operator notes")} placeholder={t("Reminders for the operator. Never shown to the audience.")} onchange={(words) => { if (draft) { draft.notes = words.text; draft.notesRich = words.rich; } }} />
+        </div>
 
         {#each draft.sections as section, i (section.id)}
           <div
@@ -483,15 +492,16 @@
                     <p class="muted">{t("Import images in the Production Desk's Media panel first.")}</p>
                   {/if}
                 {/if}
-                <input aria-label={t("Audience heading")} placeholder={section.show === "slide" ? t("Heading on screen") : t("Heading (when shown as a slide)")} bind:value={section.heading} />
                 {#if section.show === "slide"}
-                  <textarea aria-label={t("Audience body")} rows="3" placeholder={t("Text on screen")} bind:value={section.body}></textarea>
+                  <TextWords heading={section.heading} body={section.body} rich={section.rich} headingLabel={msg("Audience heading")} bodyLabel={msg("Audience body")} headingPlaceholder={t("Heading on screen")} bodyPlaceholder={t("Text on screen")} onchange={(words) => { section.heading = words.heading; section.body = words.body; section.rich = words.rich; }} />
+                {:else}
+                  <input aria-label={t("Audience heading")} placeholder={t("Heading (when shown as a slide)")} bind:value={section.heading} />
                 {/if}
               </div>
-              <label class="desk-only">
+              <div class="desk-only">
                 <span><Icon name="lock" size={12} /> {t("Desk notes")}</span>
-                <textarea aria-label={t("Section notes")} rows="5" placeholder={t("What to say, cues, timing. Desk only.")} bind:value={section.notes}></textarea>
-              </label>
+                <InlineWords text={section.notes} rich={section.notesRich} multiline variant="full" rows={5} label={t("Section notes")} placeholder={t("What to say, cues, timing. Desk only.")} onchange={(words) => { section.notes = words.text; section.notesRich = words.rich; }} />
+              </div>
             </div>
           </div>
         {/each}
@@ -523,7 +533,7 @@
         </div>
       </header>
       {#if selected.notes.trim()}
-        <p class="sermon-notes"><Icon name="lock" size={12} /> {selected.notes}</p>
+        <div class="sermon-notes"><Icon name="lock" size={12} /> {#if selected.notesRich}<RichView doc={selected.notesRich} base="1em" />{:else}{selected.notes}{/if}</div>
       {/if}
       <p class="hint">{t("Click a section for Preview · double-click sends it LIVE")} · <kbd>←</kbd> <kbd>→</kbd> {t("step sections")} · {t("notes never leave this desk")}</p>
       <ol class="outline">
@@ -547,7 +557,7 @@
                 {#if seen.body}<span class="seen-body">{seen.body}</span>{/if}
               </span>
               {#if section.notes.trim()}
-                <span class="notes"><Icon name="lock" size={12} /><span>{section.notes}</span></span>
+                <span class="notes"><Icon name="lock" size={12} /><span>{#if section.notesRich}<RichView doc={section.notesRich} base="1em" />{:else}{section.notes}{/if}</span></span>
               {/if}
             </button>
             <button type="button" class="row-tool queue" aria-label={t("Queue {name}", { name: section.name })} title={t("Add to queue")} onclick={() => void queueOne(selected, section)}><Icon name="queue" size={14} /></button>
@@ -570,7 +580,11 @@
         <span class="kicker"><Icon name="lock" size={12} /> {t("Desk notes")}</span>
         <span class="muted">{focusSection?.name ?? ""}</span>
       </header>
-      <p class:empty-notes={!deskNotes}>{deskNotes || t("Notes for the section on Preview show here. They never reach Preview or Program.")}</p>
+      {#if deskNotesDoc}
+        <div class="rich-notes"><RichView doc={deskNotesDoc} base="1em" /></div>
+      {:else}
+        <p class:empty-notes={!deskNotes}>{deskNotes || t("Notes for the section on Preview show here. They never reach Preview or Program.")}</p>
+      {/if}
     </section>
     <MonitorPair page="sermon" {place} onstep={(direction) => void session.stepSermon(direction)} />
   </aside>
@@ -596,7 +610,7 @@
   }
   h2 { margin: 0; font-size: 16px; }
   .muted { margin: 0; color: var(--muted); font-size: 12px; }
-  input, select, textarea {
+  input, select {
     border: 1px solid var(--line);
     border-radius: var(--radius-control, 8px);
     background: var(--field);
@@ -605,7 +619,6 @@
     min-width: 0;
   }
   input, select { height: 32px; padding: 0 10px; }
-  textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
   i { font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--panel); color: var(--ink); font-size: 11px; font-weight: 700; }
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 6px; background: none; color: var(--muted); }
   .row-tool:hover:not(:disabled) { background: var(--field); color: var(--ink); }
@@ -680,9 +693,9 @@
   .ai-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .ai-foot { margin: 0; font-size: 11px; color: var(--muted); }
   .desk-only > span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
-  .desk-only textarea { border-style: dashed; }
+  .desk-only :global(textarea) { border-style: dashed; }
   .edit-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
-  .edit-card input, .edit-card select, .edit-card textarea { background: var(--panel); }
+  .edit-card input, .edit-card select { background: var(--panel); }
   .edit-head { display: flex; align-items: center; gap: 6px; }
   .edit-head input { flex: 1; font-weight: 600; }
   .two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }

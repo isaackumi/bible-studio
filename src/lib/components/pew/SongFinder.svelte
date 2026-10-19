@@ -4,6 +4,7 @@
   import { session } from "../../app/session.svelte";
   import { cleanFolder, sectionShort, sectionTone, songFolders } from "../../domain/song";
   import { searchSongHits } from "../../domain/song-search";
+  import { serviceFirst, serviceSongIds } from "../../domain/service-first";
   import type { Song } from "../../domain/types";
   import FavoriteStar from "../FavoriteStar.svelte";
   import Icon from "../Icon.svelte";
@@ -54,7 +55,8 @@
     const allowed = new Set(pool.map((song) => song.id));
     const seen = new Set<string>();
     const rows: Array<{ song: Song; line: string; sectionId: string | null }> = [];
-    for (const hit of searchSongHits(session.songs, text, 80)) {
+    const inService = serviceSongIds(session.service);
+    for (const hit of serviceFirst(searchSongHits(session.songs, text, 80), (entry) => inService.has(entry.songId))) {
       if (!allowed.has(hit.songId) || seen.has(hit.songId)) continue;
       const song = session.songs.find((entry) => entry.id === hit.songId);
       if (!song) continue;

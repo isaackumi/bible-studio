@@ -1,74 +1,88 @@
-# License server (Paddle)
+# Church Studio server (plans, payment, trials, stats)
 
-When someone buys Premium or Church through Paddle, Paddle notifies this server. The server checks
-that the notice really came from Paddle, makes a signed `CS1-…` license key, and emails it to the
-buyer. The app checks the key offline, so the server is needed only at the moment of purchase.
+One small Cloudflare Worker is the source of truth for plans. The app never decides a paid plan
+on its own: the server signs a **lease** ("this computer has Church until this date, and must check
+in by this date"), and the app's native core (`src-tauri/src/entitlement.rs`) checks that
+signature. Editing anything saved on a computer cannot grant or extend a plan.
 
-`paddle.ts` is a standard web request handler. These steps deploy it to Cloudflare Workers
-(free tier is enough); it also runs on Deno, Bun or Vercel Edge.
+| File | What it is |
+| --- | --- |
+| `api.ts` | Every endpoint: check-in, trials, promo codes, checkout, seats, leases, admin |
+| `billing.ts` | Payment providers behind one interface: `mock` (built in) and `paddle` |
+| `pricing.ts` | Prices in cents, and promo-code rules |
+| `pages.ts` | The mock checkout page and the admin dashboard |
+| `store.ts` | Storage: Cloudflare KV in production, a Map in tests and `dev.ts` |
+| `paddle.ts` | The Worker's entry, and Paddle's webhook (payments and refunds) |
+| `dev.ts` | The same server on your computer (`npm run server:dev`) |
 
-## What happens
+## How a purchase goes
 
-1. The buyer presses **Buy Premium** in Settings › Plan & account. The app opens Paddle's checkout
-   in the browser, with their email filled in if they signed in.
-2. They pay. Paddle sends `transaction.completed` to `https://<your-worker>/paddle/webhook`.
-3. The server finds the plan from the price, looks up the buyer's email from Paddle, and signs a key:
-   - Subscription: the key runs to the end of the paid period plus 7 days' grace (`GRACE_DAYS`).
-     Each renewal is another `transaction.completed`, so a fresh key is emailed.
-   - One-off purchase: the key never ends.
-4. It emails the key through Resend. If sending fails, the server answers 500 and Paddle retries.
-   A retry makes the same key, because the key id comes from the transaction id.
+1. The app's plans page (`src/lib/components/Paywall.svelte`) asks `POST /v1/checkout` with the
+   plan, billing, email and any promo code. The server prices it and asks the provider for a
+   checkout page.
+2. The app opens that page in the browser and asks `POST /v1/checkout/status` every few seconds.
+3. Payment: the mock page's **Pay** button, or Paddle's `transaction.completed` webhook, completes
+   the checkout. That makes one subscription with one license key (its id comes from the
+   subscription, so renewals keep the same seats). The key is emailed when Resend is set up.
+4. The app's next status check gets the key **and a lease for this computer**, and the plan is on.
+   No key to copy from an email (it still comes, for other computers).
 
-## One-time setup
+Trials (`POST /v1/trial`) are one per computer: the computer id is a hash of the machine's hardware
+id, so reinstalling the app does not give a second trial. Promo codes can take a percent or an
+amount off the first payment, or add trial days, with plans, a use limit and an end date.
 
-1. **Paddle** (start in the sandbox at sandbox-vendors.paddle.com):
-   - Create the product "Church Studio Premium" with a monthly and a yearly price; same for Church.
-   - Checkout › Hosted checkouts: create one per price. Paste each link into `CHECKOUT` in
-     `src/lib/domain/plans.ts`. Plans without a link keep showing "coming soon".
-   - Developer tools › Authentication: create an API key with customer read access.
-   - Developer tools › Notifications: add a destination `https://<your-worker>/paddle/webhook`
-     for `transaction.completed`, and copy its secret key.
-2. **Resend** (resend.com): verify your sending domain and create an API key.
-3. **Cloudflare**: the Worker's settings are in `wrangler.jsonc` here. From this folder:
+## Run it on your computer
 
-   ```
-   npx wrangler login
-   npx wrangler kv namespace create ACTIVATIONS   # paste the id into wrangler.jsonc
-   npx wrangler secret put PADDLE_WEBHOOK_SECRET
-   npx wrangler secret put PADDLE_API_KEY
-   npx wrangler secret put CHURCH_STUDIO_SIGNING_KEY   # contents of ~/.church-studio/license-signing.key
-   npx wrangler secret put RESEND_API_KEY
-   npx wrangler deploy
-   ```
+```
+npm run server:dev                                     # http://localhost:8787, admin token "dev"
+VITE_LICENSE_SERVER=http://localhost:8787 npm run dev  # the app, talking to it
+```
 
-   Before deploying, fill the placeholders in `wrangler.jsonc`: `PADDLE_PRICES` (your price ids)
-   and `MAIL_FROM` (an address on your Resend domain). `npx wrangler deploy --dry-run` checks the
-   bundle without touching your account. The Worker's address is printed at the end
-   (`https://church-studio-keys.<you>.workers.dev`).
+It signs with `~/.church-studio/license-signing.key`, so the app accepts its leases, and keeps its
+data in `server/.dev-store.json`. The admin page is http://localhost:8787/admin.
 
-4. Buy with a Paddle sandbox test card and check the email arrives. Then switch Paddle to live,
-   set `PADDLE_ENV` to `live`, and replace the sandbox checkout links and price ids.
+## Deploy (Cloudflare)
 
-## Keep in mind
+`./server/deploy.sh` does all of it: it sets the two secrets from `~/.church-studio` (making
+an admin token there if there is none), deploys, and checks the live server. By hand, from this folder:
 
-- The signing key is the one secret that matters: whoever has it can make keys. It lives in
-  `~/.church-studio/license-signing.key` and in the Worker's secrets, nowhere else.
-- Refunds and cancellations need no action: the key stops at the end of the paid period. A
-  refunded one-off purchase keeps working; revoking those needs an online check, which can come
-  with accounts.
-- Tests: `npx vitest run server`.
+```
+npx wrangler login
+npx wrangler secret put CHURCH_STUDIO_SIGNING_KEY   # contents of ~/.church-studio/license-signing.key
+npx wrangler secret put ADMIN_TOKEN                 # a long random string, for /admin
+npx wrangler secret put RESEND_API_KEY              # optional: emails the key
+npx wrangler deploy
+```
 
-## Device activations (computers per key)
+`wrangler.jsonc` sets `BILLING_PROVIDER` to `mock`: the whole flow works and nothing is charged
+(pages say TEST MODE). Deploy the server before shipping an app build that uses it: the app asks
+for leases, which older servers do not give.
 
-The same Worker counts the computers each key runs on: Premium 1, Church 3 at once. The app checks
-in when a key is added and then about once a week; a computer not seen for 60 days drops off by
-itself, and Settings › Plan & account can release one.
+## Choosing a payment provider later
 
-1. The KV namespace `ACTIVATIONS` from step 3 above holds the list (its id goes in `wrangler.jsonc`).
-2. The endpoints are `POST /v1/activate`, `/v1/release` and `/v1/devices` on the same Worker.
-3. Put the Worker's address in `ACTIVATION_URL` in `src/lib/domain/activation.ts`. Until it is set,
-   the app does not check activations (a key simply works on any computer).
+Set `BILLING_PROVIDER` and that provider's secrets; the app does not change.
 
-The app keeps working offline: a computer that cannot reach the server keeps its plan for 30 days
-from its last successful check.
+- **Paddle** (built in): merchant of record, so it handles sales tax and VAT worldwide. Set
+  `BILLING_PROVIDER` to `paddle`, `PADDLE_PRICES` to `pri_x:premium:monthly,pri_y:premium:yearly,…`,
+  the secrets `PADDLE_API_KEY` and `PADDLE_WEBHOOK_SECRET`, and point Paddle's notifications (for
+  `transaction.completed` and `adjustment.updated`) at `https://<worker>/paddle/webhook`.
+- **Lemon Squeezy / Polar**: also merchants of record, with built-in license keys; add a provider
+  in `billing.ts` (create checkout) and a webhook route that calls `completeCheckout`.
+- **Stripe**: cheapest fees but you handle tax (Stripe Tax helps). Same shape: Checkout Session in
+  `billing.ts`, `checkout.session.completed` webhook → `completeCheckout`, `charge.refunded` → `revoke`.
 
+## Refunds
+
+A refunded or charged-back license gets no new leases: its computers drop to Free at their next
+check-in (at most `LEASE_DAYS` later). Paddle refunds are handled by the webhook; with the mock,
+use the admin page's **Refund a license**.
+
+## Admin
+
+`/admin` shows computers, active today/week/month, trials and how many bought, subscriptions and
+monthly recurring revenue, revenue, plan mix, app versions and systems, and promo codes (create
+them there). Only anonymous check-ins are counted: the app version, system and plan, and nothing
+from a church's library. Churches can turn the daily check-in off in Settings › Plan & account ›
+Privacy; licensing checks still happen.
+
+Tests: `npx vitest run server`.

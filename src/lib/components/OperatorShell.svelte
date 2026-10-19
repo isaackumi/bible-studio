@@ -1,6 +1,6 @@
 <script lang="ts">
   import RemoteApproval from "./RemoteApproval.svelte";
-  import UpgradePrompt from "./UpgradePrompt.svelte";
+  import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
@@ -152,7 +152,7 @@
       <SettingsDialog />
     {/if}
     <RemoteApproval />
-    <UpgradePrompt />
+    <Paywall />
     <Toast />
     {#if session.tourHubOpen}<TourHub />{/if}
     {#if session.tour}<TourGuide />{/if}

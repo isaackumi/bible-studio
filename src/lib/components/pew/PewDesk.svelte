@@ -11,6 +11,7 @@
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import TimerControls from "../TimerControls.svelte";
   import { findItem } from "../../domain/service";
+  import { inPassages, preferService, serviceFirst, servicePassages } from "../../domain/service-first";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
@@ -80,13 +81,27 @@
   let quoteIndex: QuoteIndex | null = null;
   let lastSpokenRef = "";
 
+  // The open service's passages are looked at first, by listening and by word search.
+  const passagesInService = $derived(servicePassages(session.service));
+  let serviceQuotes: { from: QuoteIndex; key: string; index: QuoteIndex } | null = null;
+  function serviceQuoteIndex(): QuoteIndex | null {
+    const passages = passagesInService;
+    if (!quoteIndex || passages.length === 0) return null;
+    const key = passages.map((p) => `${p.bookOrd}:${p.chapter}:${p.startVerse}-${p.endVerse}`).join(",");
+    if (serviceQuotes?.from !== quoteIndex || serviceQuotes.key !== key) {
+      const rows = quoteIndex.catalog.filter((row) => inPassages(passages, row.bookOrd, row.chapter, row.verse));
+      serviceQuotes = { from: quoteIndex, key, index: buildQuoteIndex(rows) };
+    }
+    return serviceQuotes.index;
+  }
+
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
   const themeName = $derived(session.theme().name.toUpperCase());
   /** Program is showing something: the desk is on air (the audience sees it once output is open). */
   /** Program has something on it. */
   const programSet = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
   /** On air only when the audience can actually see Program. */
-  const displayLive = $derived(programSet && session.output.online);
+  const displayLive = $derived(programSet && !session.programHeld && session.output.online);
   const activeLayout = $derived(
     session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
   );
@@ -314,11 +329,12 @@
     const key = (hit: SearchHit) => `${hit.bookOrd}:${hit.chapter}:${hit.verse}`;
     const exactKeys = new Set(exact.map(key));
     const rankedKeys = new Set(ranked.map(key));
-    return [
+    const merged = [
       ...ranked.filter((hit) => exactKeys.has(key(hit))),
       ...exact.filter((hit) => !rankedKeys.has(key(hit))),
       ...ranked.filter((hit) => !exactKeys.has(key(hit))),
-    ].slice(0, 40);
+    ];
+    return serviceFirst(merged, (hit) => inPassages(passagesInService, hit.bookOrd, hit.chapter, hit.verse)).slice(0, 40);
   }
 
   async function findPhrase(text: string) {
@@ -490,7 +506,10 @@
   function detectSpokenVerse(text: string, _final: boolean, alternatives: string[]) {
     // While songs are up, lyrics that quote scripture must not pull a verse onto Preview.
     if (!text || mode === "songs") return;
-    const quoted = quoteIndex ? chooseHeard(alternatives.length ? alternatives : [text], quoteIndex, translationId) : null;
+    const phrases = alternatives.length ? alternatives : [text];
+    const inService = serviceQuoteIndex();
+    const own = inService && inService.catalog.length ? chooseHeard(phrases, inService, translationId) : null;
+    const quoted = quoteIndex ? preferService(own, chooseHeard(phrases, quoteIndex, translationId)) : null;
     const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
     const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
     if (!match) {

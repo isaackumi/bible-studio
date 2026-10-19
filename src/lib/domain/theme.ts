@@ -333,6 +333,7 @@ export function defaultWorkspace(): Workspace {
     captions: defaultCaptionSettings(),
     countdownSize: 220,
     ndiAudio: true,
+    shareUsage: true,
     switcher: defaultSwitcher(),
     broadcast: defaultBroadcast(),
     timerSounds: defaultTimerSounds(),

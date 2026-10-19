@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RichView from "./RichView.svelte";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import { defaultStageLayout, readStageLocal, subscribeStageLocal, parseStage, type StageSnapshot } from "../display/channel";
@@ -79,7 +80,7 @@
     {/each}
   </section>
   {#if layout.notes && snapshot?.notes}
-    <section class="notes"><p class="label">{t("Notes")}</p><p>{snapshot.notes}</p></section>
+    <section class="notes"><p class="label">{t("Notes")}</p>{#if snapshot.notesRich}<div class="rich-notes"><RichView doc={snapshot.notesRich} base="3vh" /></div>{:else}<p>{snapshot.notes}</p>{/if}</section>
   {/if}
   {#if layout.next}
     <section class="next">
@@ -118,6 +119,7 @@
   .stage-message { margin: 0; padding: 2vh 2vw; border-radius: 12px; background: #ffd60a; color: #000; font-size: 6vh; font-weight: 800; text-align: center; animation: call 1.2s ease-in-out infinite alternate; }
   @keyframes call { from { box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.7); } to { box-shadow: 0 0 0 1.2vh rgba(255, 214, 10, 0); } }
   .notes { padding: 1.5vh 1.5vw; border: 1px dashed #444; border-radius: 10px; color: #e8e8e8; }
+  .rich-notes { margin-top: 0.6vh; max-height: 22vh; overflow: hidden; line-height: 1.35; }
   .notes p:last-child { margin: 0.6vh 0 0; font-size: 3vh; line-height: 1.35; white-space: pre-wrap; max-height: 22vh; overflow: hidden; }
   .size-s .line { font-size: 4.6vh; }
   .size-l .line { font-size: 8.4vh; }

@@ -13,7 +13,7 @@
 
   const programSet = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
   /** On air only when the audience window is open to see it. */
-  const programLive = $derived(programSet && session.output.online);
+  const programLive = $derived(programSet && !session.programHeld && session.output.online);
 </script>
 
 {#if shown.preview}

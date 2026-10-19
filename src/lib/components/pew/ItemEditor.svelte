@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextWords from "../TextWords.svelte";
+  import type { RichDoc } from "../../domain/rich-text";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { formatReference, parseReference } from "../../bible/reference";
@@ -9,7 +11,7 @@
   import Screen from "../Screen.svelte";
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import { ACCENT_SWATCHES, ANNOUNCEMENT_DESIGNS, LABEL_SUGGESTIONS, presentAnnouncement, themeAccent, type AnnouncementDesign } from "../../domain/announcement";
-  import { t, tn } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
   import { cleanTrim, clockText, readClock, videoEnd, type VideoEnd } from "../../domain/video-play";
 
   // Everything about one service item, with a live preview. Saving changes the running order;
@@ -38,14 +40,18 @@
     return () => clearTimeout(timer);
   });
 
-  function setWords(change: Partial<{ heading: string; body: string; imageId: string | null }>) {
-    const current = { heading: words.heading, body: words.body, imageId: draft.slide?.imageId ?? draft.announcement?.imageId ?? null };
-    const next = { ...current, ...change };
-    // Announcements keep their kind; text with a picture is a slide.
-    if (draft.kind === "announcement") draft.announcement = { ...draft.announcement, heading: next.heading, body: next.body, imageId: next.imageId };
-    else {
+  function setWords(change: Partial<{ heading: string; body: string; imageId: string | null; rich: RichDoc | null }>) {
+    const current = { heading: words.heading, body: words.body, imageId: draft.slide?.imageId ?? draft.announcement?.imageId ?? null, rich: draft.slide?.rich ?? draft.announcement?.rich ?? null };
+    const { rich, ...next } = { ...current, ...change };
+    // Announcements keep their kind (a formatted body, the heading as the design draws it); text with a picture is a slide.
+    if (draft.kind === "announcement") {
+      const words = { ...draft.announcement, heading: next.heading, body: next.body, imageId: next.imageId };
+      if (rich) words.rich = rich;
+      else delete words.rich;
+      draft.announcement = words;
+    } else {
       draft.kind = "slide";
-      draft.slide = next;
+      draft.slide = rich ? { ...next, rich } : next;
       delete draft.announcement;
     }
   }
@@ -104,15 +110,18 @@
         <input aria-label={t("Item name")} bind:value={draft.title} />
       </label>
 
+      {#if wordy && draft.kind !== "announcement"}
+        <div class="field-row">
+          <span>{t("Words")}</span>
+          <TextWords heading={words.heading} body={words.body} rich={draft.slide?.rich ?? null} bodyLabel={msg("Text")} onchange={(next) => setWords(next)} />
+        </div>
+      {:else if wordy}
+        <div class="field-row">
+          <span>{t("Words")}</span>
+          <TextWords heading={words.heading} body={words.body} rich={draft.announcement?.rich ?? null} headingMode="separate" bodyLabel={msg("Text")} onchange={(next) => setWords(next)} />
+        </div>
+      {/if}
       {#if wordy}
-        <label class="field-row">
-          <span>{t("Heading")}</span>
-          <input aria-label={t("Heading")} value={words.heading} oninput={(event) => setWords({ heading: event.currentTarget.value })} />
-        </label>
-        <label class="field-row">
-          <span>{t("Text")}</span>
-          <textarea aria-label={t("Text")} rows="5" value={words.body} oninput={(event) => setWords({ body: event.currentTarget.value })}></textarea>
-        </label>
         {#if announcement}
           <label class="field-row">
             <span>{t("Small line above the heading")}</span>
@@ -263,9 +272,8 @@
   .fields { display: grid; gap: 12px; min-width: 0; }
   .field-row { display: grid; gap: 5px; margin: 0; }
   .field-row > span { font-size: 12px; font-weight: 650; color: var(--muted); }
-  input, select, textarea { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; }
+  input, select { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; }
   input, select { height: 34px; padding: 0 10px; }
-  textarea { padding: 8px 10px; resize: vertical; line-height: 1.45; }
   .inline { display: flex; gap: 6px; }
   .inline input { flex: 1; }
   .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }

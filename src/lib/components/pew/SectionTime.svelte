@@ -7,7 +7,8 @@
 
   // A section's time on its heading: "9:00 – 9:45 · 45 min", with a small editor for its length
   // or the clock time it runs until, and on the day how much is left.
-  let { section, slot, plan, tone }: { section: ServiceSection; slot: SlotPlan; plan: SchedulePlan; tone: string } = $props();
+  // `showLeft`: the time left beside the chip (the list shows it on the part's second line instead).
+  let { section, slot, plan, tone, showLeft = true }: { section: ServiceSection; slot: SlotPlan; plan: SchedulePlan; tone: string; showLeft?: boolean } = $props();
 
   let open = $state(false);
   let wrap = $state<HTMLSpanElement | undefined>();
@@ -34,7 +35,7 @@
 </script>
 
 <span class="time" bind:this={wrap} style:--tone={tone}>
-  {#if status}
+  {#if status && showLeft}
     <span class="left" class:over={status.left < 0}>{leftLabel(status.left)}</span>
   {/if}
   <button type="button" class="chip" class:untimed={slot.untimed} aria-expanded={open} aria-label={t("Time for {name}", { name: section.name })} onclick={() => (open = !open)}>

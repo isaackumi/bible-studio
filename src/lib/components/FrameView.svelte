@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RichView from "./RichView.svelte";
+  import InlineRich from "./InlineRich.svelte";
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
   import { backdropCss, displayWash, frameBackground } from "../domain/backgrounds";
   import { effectsCss } from "../domain/text-style";
@@ -213,10 +215,12 @@
         </div>
       {/each}
     </div>
+  {:else if model.rich && !timerView}
+    <RichView doc={model.rich} fontSize={model.theme.fontSize} />
   {:else}
   {#each displayLines as line}
     <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size={model.layout === "logo" || model.layout === "timer" ? `${model.layout === "logo" ? 92 : model.theme.fontSize}px` : `calc(${model.theme.fontSize}px * var(--fit, 1))`}>
-      {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{line.text}
+      {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{#if line.runs}<InlineRich runs={line.runs} />{:else}{line.text}{/if}
       {#if line.alt}<span class="alt-line">{line.alt}</span>{/if}
     </p>
   {/each}

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { untrack } from "svelte";
+  import { slide } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { session } from "../../app/session.svelte";
   import { sectionShort, sectionTone } from "../../domain/song";
   import { restoreComposition } from "../../domain/composition";
@@ -14,6 +17,17 @@
   import MacroBar from "../MacroBar.svelte";
   import FollowSermon from "./FollowSermon.svelte";
   import SectionTime from "./SectionTime.svelte";
+  import PartLeader from "./PartLeader.svelte";
+  import ServiceReport from "./ServiceReport.svelte";
+  import ServiceCanvas from "./ServiceCanvas.svelte";
+  import StartServiceDialog from "./StartServiceDialog.svelte";
+  import ServiceSettings from "./ServiceSettings.svelte";
+  import ToolMenu from "../ToolMenu.svelte";
+  import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
+  import { screenful } from "../../bible/passage";
+  import { activeRun } from "../../domain/service-run";
+  import { clockCount } from "../../domain/schedule";
+  import { clockLabel, minutesOfDay } from "../../domain/schedule";
   import { planSchedule } from "../../domain/schedule";
   import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
   import { msg, t, tn } from "../../i18n/core";
@@ -64,6 +78,132 @@
   /** A service whose delete button was pressed once (press again to delete). */
   let armedService = $state<string | null>(null);
   let outlineOpen = $state(false);
+  let reportOpen = $state(false);
+
+  // Folding parts in the list: each part's items fold away under its heading (remembered per service).
+  let folded = $state<Set<string>>(new Set());
+  let foldedFor = "";
+  const FOLD_KEY = (id: string) => `service.folded.${id}`;
+  $effect(() => {
+    const id = session.service?.id ?? "";
+    if (id === foldedFor) return;
+    foldedFor = id;
+    try {
+      const raw = id ? localStorage.getItem(FOLD_KEY(id)) : null;
+      folded = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      folded = new Set();
+    }
+  });
+  function saveFolded(next: Set<string>) {
+    folded = next;
+    try {
+      if (foldedFor) localStorage.setItem(FOLD_KEY(foldedFor), JSON.stringify([...next]));
+    } catch {
+      /* not kept */
+    }
+  }
+  function toggleFold(id: string) {
+    const next = new Set(folded);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    saveFolded(next);
+  }
+  function foldAll(fold: boolean) {
+    saveFolded(fold ? new Set(session.service?.sections.map((section) => section.id) ?? []) : new Set());
+  }
+  // When the item on Preview or the running part moves into a folded part, that part opens by itself
+  // (once: folding it again afterwards is the operator's choice).
+  let lastFocus = "";
+  $effect(() => {
+    const previewPart = session.cursor.itemId ? session.cursor.sectionId : null;
+    const running = session.runningSectionId;
+    const key = `${previewPart}|${session.cursor.itemId}|${running}`;
+    if (key === lastFocus) return;
+    lastFocus = key;
+    untrack(() => {
+      const open = [previewPart, running].filter((id): id is string => !!id && folded.has(id));
+      if (open.length) saveFolded(new Set([...folded].filter((id) => !open.includes(id))));
+    });
+  });
+  /** Unfold animation; none when the computer asks for less motion. */
+  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const unfold = { duration: reduced ? 0 : 220, easing: cubicOut };
+  let startOpen = $state(false);
+  // The services list: the running one first, then by when they were last worked on.
+  let serviceQuery = $state("");
+  const serviceGroups = $derived.by(() => {
+    const query = serviceQuery.trim().toLowerCase();
+    const list = session.services.filter((entry) => !query || entry.name.toLowerCase().includes(query));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const week = today.getTime() - 6 * 86_400_000;
+    const running = session.serviceRunning ? session.service?.id : null;
+    const groups: Array<{ id: string; label: string; entries: typeof list }> = [
+      { id: "running", label: msg("Running now"), entries: list.filter((entry) => entry.id === running) },
+      { id: "today", label: msg("Today"), entries: [] },
+      { id: "week", label: msg("This week"), entries: [] },
+      { id: "earlier", label: msg("Earlier"), entries: [] },
+    ];
+    for (const entry of list) {
+      if (entry.id === running) continue;
+      const at = new Date(entry.updatedAt).getTime();
+      groups[at >= today.getTime() ? 1 : at >= week ? 2 : 3]!.entries.push(entry);
+    }
+    return groups.filter((group) => group.entries.length > 0);
+  });
+  let settingsOpen = $state(false);
+  /** When the open service's run began (epoch ms), and a clock ticking each second while it runs. */
+  const runStartedAt = $derived(activeRun(session.service)?.startedAt ?? null);
+  let clockNow = $state(Date.now());
+  $effect(() => {
+    if (runStartedAt === null) return;
+    const timer = setInterval(() => (clockNow = Date.now()), 1000);
+    return () => clearInterval(timer);
+  });
+  /** Time left until a waiting start, ticking each second while there is one. */
+  let tickNow = $state(Date.now());
+  $effect(() => {
+    if (session.queuedStart === null) return;
+    const timer = setInterval(() => (tickNow = Date.now()), 1000);
+    return () => clearInterval(timer);
+  });
+  function untilStart(at: number): string {
+    const total = Math.max(0, Math.round((at - tickNow) / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = String(total % 60).padStart(2, "0");
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+  }
+  /** The running order as a list, or as a flow on a canvas (remembered here). */
+  let view = $state<"list" | "canvas">(readView());
+  function readView(): "list" | "canvas" {
+    try {
+      return localStorage.getItem("service.view") === "canvas" ? "canvas" : "list";
+    } catch {
+      return "list";
+    }
+  }
+  function setView(next: "list" | "canvas") {
+    view = next;
+    try {
+      localStorage.setItem("service.view", next);
+    } catch {
+      /* not kept */
+    }
+  }
+  /** End service was pressed once (press again to end). */
+  let armedEnd = $state(false);
+  function endService() {
+    if (!armedEnd) {
+      armedEnd = true;
+      setTimeout(() => (armedEnd = false), 3000);
+      return;
+    }
+    armedEnd = false;
+    session.endService();
+    reportOpen = true;
+  }
 
   // Drag and drop in the running order: a section by its handle, an item by its handle (into any
   // section). Alt+arrow keys on a handle move it without a mouse.
@@ -153,12 +293,38 @@
     return kindOf(item).label;
   }
 
+  /** What an item on Preview or LIVE does next: the next verses, its page, the song part showing. */
+  function hint(item: PresentationItem): string {
+    const active = live(item) || session.cursor.itemId === item.id;
+    if (!active) return "";
+    if (item.kind === "bible" && item.bible?.perScreen) {
+      const step = session.bibleStep?.itemId === item.id ? session.bibleStep : null;
+      if (!step) return "";
+      const now = screenful(item.bible, step.start, item.bible.perScreen);
+      if (now.end >= item.bible.endVerse) return t("Last verses · Next moves on");
+      const next = screenful(item.bible, now.end + 1, item.bible.perScreen);
+      return t("v{range} next", { range: next.end > next.start ? `${next.start}–${next.end}` : String(next.start) });
+    }
+    if (item.kind === "deck" && item.deck) {
+      const deck = session.decks.find((entry) => entry.id === item.deck?.deckId);
+      const focus = session.deckFocus?.deckId === item.deck.deckId ? session.deckFocus : null;
+      if (!deck || !focus) return "";
+      return focus.index + 1 >= deck.pages.length ? t("Last page · Next moves on") : t("Page {n} of {total}", { n: focus.index + 1, total: deck.pages.length });
+    }
+    if (item.kind === "lyric" && item.lyric) {
+      const focus = session.songFocus?.songId === item.lyric.songId ? session.songFocus : null;
+      const part = focus ? songOf(item)?.sections.find((entry) => entry.id === focus.sectionId) : null;
+      return part ? t("On {part}", { part: part.label }) : "";
+    }
+    return "";
+  }
+
   const live = (item: PresentationItem) =>
     session.live.program.sourceId === item.id || (item.kind === "composition" && session.live.program.sourceId?.includes(item.composition?.compositionId ?? "~"));
 
   function open(item: PresentationItem, event: MouseEvent) {
     (event.currentTarget as HTMLElement).blur();
-    void session.selectItem(item.id);
+    void session.chooseItem(item.id);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -193,11 +359,20 @@
     {/snippet}
     <div class="list">
       {#if session.services.length === 0}<p class="empty">{t("No services yet. Start one to plan the order.")}</p>{/if}
-      {#each session.services as entry (entry.id)}
+      {#if session.services.length > 8}
+        <label class="svc-find"><Icon name="search" size={13} /><input type="search" aria-label={t("Find a service")} placeholder={t("Find a service")} bind:value={serviceQuery} /></label>
+      {/if}
+      {#each serviceGroups as group (group.id)}
+      <p class="svc-group">{t(group.label)}</p>
+      {#each group.entries as entry (entry.id)}
         <div class="svc" class:on={service?.id === entry.id}>
           <button type="button" class="row" class:on={service?.id === entry.id} onclick={() => void session.openService(entry.id)}>
             <strong>{entry.name}</strong>
-            <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+            {#if service?.id === entry.id && runStartedAt !== null}
+              <span class="running-clock" title={t("Running since {time}", { time: new Date(runStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) })}><i aria-hidden="true"></i>{t("LIVE")} · {clockCount(clockNow - runStartedAt)}</span>
+            {:else}
+              <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+            {/if}
           </button>
           <span class="svc-tools">
             <button type="button" class="row-tool" aria-label={t("Duplicate {name}", { name: entry.name })} title={t("Duplicate")} onclick={() => void session.duplicateService(entry.id)}><Icon name="copy" size={13} /></button>
@@ -220,22 +395,90 @@
           </span>
         </div>
       {/each}
+      {/each}
     </div>
   </LibrarySidebar>
 
   <div class="sheet">
     {#if service}
       <header class="head">
-        <input class="name" aria-label={t("Service name")} value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
-        <button type="button" class="desk-btn ghost save-tpl" title={t("The service on one page: print, save as PDF or copy")} onclick={() => (outlineOpen = true)}><Icon name="files" size={13} /> {t("Outline")}</button>
-        <button type="button" class="desk-btn ghost save-tpl" title={t("Keep this service's parts and times to start the next one from")} onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; }}><Icon name="copy" size={13} /> {t("Save as template")}</button>
-        <button type="button" class="desk-btn ghost save-tpl" class:on={stageHidden} aria-pressed={stageHidden} title={stageHidden ? t("Show the monitors") : t("Hide the monitors")} onclick={() => setStage(!stageHidden)}><Icon name="eye" size={13} /> {t("Monitors")}</button>
-        <button type="button" class="desk-btn ghost save-tpl" class:on={wide} aria-pressed={wide} title={wide ? t("Show the services list and the monitors again") : t("Hide the services list and the monitors to edit the service")} onclick={toggleWide}><Icon name={wide ? "columns" : "expand"} size={13} /> {wide ? t("Show panels") : t("Wide view")}</button>
-        <span class="muted">{count === 0 ? t("Nothing added yet") : `${tn(count, "{n} item", "{n} items")} · ${tn(service.sections.length, "{n} section", "{n} sections")}`}</span>
+        <div class="title">
+          <input class="name" aria-label={t("Service name")} value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
+        </div>
+        <div class="views" role="radiogroup" aria-label={t("View")}>
+          <button type="button" role="radio" aria-checked={view === "list"} aria-label={t("List")} title={t("The running order as a list")} onclick={() => setView("list")}><Icon name="list" size={14} /><span class="view-name">{t("List")}</span></button>
+          <button type="button" role="radio" aria-checked={view === "canvas"} aria-label={t("Canvas")} title={t("The service as a flow on a canvas: drag parts, wire the order")} onclick={() => setView("canvas")}><Icon name="layers" size={14} /><span class="view-name">{t("Canvas")}</span></button>
+        </div>
+        <button type="button" class="desk-btn icon more" aria-label={t("Service settings")} title={t("Service settings: Auto LIVE, moving on when time is up, readings, screen, warnings")} onclick={() => (settingsOpen = true)}><Icon name="settings" size={15} /></button>
+        <ToolMenu label={t("More for this service")} className="desk-btn icon more">
+          {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
+          {#snippet children(close)}
+            <button type="button" role="menuitem" onclick={() => { reportOpen = true; close(); }}><Icon name="clock" size={13} /> {t("Report")}<span class="menu-hint">{t("Planned and used time per part")}</span></button>
+            <button type="button" role="menuitem" onclick={() => { outlineOpen = true; close(); }}><Icon name="files" size={13} /> {t("Outline")}<span class="menu-hint">{t("Print, PDF or copy")}</span></button>
+            <button type="button" role="menuitem" onclick={() => { const made = session.saveServiceAsTemplate(service.name); if (made) templatesOpen = { id: made.id }; close(); }}><Icon name="copy" size={13} /> {t("Save as template")}</button>
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitem" onclick={() => { settingsOpen = true; close(); }}><Icon name="settings" size={13} /> {t("Service settings…")}<span class="menu-hint">{t("Auto LIVE, moving on, readings")}</span></button>
+            <button type="button" role="menuitemcheckbox" aria-checked={service.liveOnClick !== false} onclick={() => { session.setLiveOnClick(service.liveOnClick === false); close(); }}><Icon name="play" size={13} /> {t("Auto LIVE while running")}</button>
+            <p class="menu-note">{t("When a part's time is up")}</p>
+            {#each [["remind", msg("Remind me")], ["next", msg("Move on by itself")], ["off", msg("Only show it as over")]] as [mode, label] (mode)}
+              <button type="button" role="menuitemradio" aria-checked={(service.autoAdvance ?? "remind") === mode} onclick={() => { session.setServiceSettings({ autoAdvance: mode as "remind" | "next" | "off" }); close(); }}>{t(label)}</button>
+            {/each}
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitem" onclick={() => { foldAll(true); close(); }}><Icon name="chevron-up" size={13} /> {t("Fold all parts")}</button>
+            <button type="button" role="menuitem" onclick={() => { foldAll(false); close(); }}><Icon name="chevron-down" size={13} /> {t("Unfold all parts")}</button>
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitemcheckbox" aria-checked={!stageHidden} onclick={() => { setStage(!stageHidden); close(); }}><Icon name="eye" size={13} /> {t("Monitors")}</button>
+            <button type="button" role="menuitemcheckbox" aria-checked={wide} onclick={() => { toggleWide(); close(); }}><Icon name={wide ? "columns" : "expand"} size={13} /> {t("Wide view")}</button>
+            <div class="menu-sep"></div>
+            <button type="button" role="menuitem" onclick={() => { void session.closeService(); close(); }}><Icon name="close" size={13} /> {session.serviceRunning ? t("End and close") : t("Close service")}</button>
+          {/snippet}
+        </ToolMenu>
+        {#if session.queuedStart !== null}
+          <span class="queued" role="status">
+            <i aria-hidden="true"></i>{t("Starts at {time}", { time: clockLabel(minutesOfDay(session.queuedStart)) })} · <strong>{untilStart(session.queuedStart)}</strong>
+            <button type="button" onclick={() => session.startService(true)}>{t("Start now")}</button>
+            <button type="button" onclick={() => session.cancelQueuedStart()}>{t("Cancel")}</button>
+          </span>
+        {:else if session.serviceRunning}
+          <button type="button" class="auto-live" class:on={session.liveOnClick} aria-pressed={session.liveOnClick} title={session.liveOnClick ? t("A click (or Next) sends the item straight to LIVE. Click to put items on Preview first.") : t("Items go to Preview first. Click to send them straight to LIVE while the service runs.")} onclick={() => session.setLiveOnClick(!session.liveOnClick)}>
+            <span class="switch" aria-hidden="true"><i></i></span>{t("Auto LIVE")}
+          </button>
+          <button type="button" class="desk-btn end" class:armed={armedEnd} title={t("Stop the clock: the countdown leaves the screen and the times are kept in Report")} onclick={endService}><Icon name="square" size={12} /> {armedEnd ? t("End now?") : t("End service")}</button>
+        {:else if service.sections.length > 0}
+          <button type="button" class="desk-btn start" title={t("Begin the service: checks the time against the planned start first")} onclick={() => (startOpen = true)}><Icon name="play" size={12} /> {t("Start service")}</button>
+        {/if}
       </header>
 
-      <div class="timeline-wrap"><ServiceTimeline {service} /></div>
+      {#if session.serviceRunning}
+        {@const keys = session.workspace.shortcuts ?? defaultShortcuts}
+        <p class="key-hints" aria-label={t("Keys")}>
+          <span><kbd>{shortcutLabel(keys, "next")}</kbd> {t("next verse or slide")}</span>
+          <span><kbd>Page Down</kbd> {t("next item")}</span>
+          <span><kbd>{shortcutLabel(keys, "take")}</kbd> {t("LIVE")}</span>
+          <span><kbd>{shortcutLabel(keys, "black")}</kbd> {t("black")}</span>
+          <span><kbd>{shortcutLabel(keys, "logo")}</kbd> {t("logo")}</span>
+        </p>
+      {/if}
+      {#if session.timeUp}
+        {@const up = session.timeUp}
+        {@const part = service.sections.find((entry) => entry.id === up.sectionId)}
+        {@const nextPart = up.nextId ? service.sections.find((entry) => entry.id === up.nextId) : null}
+        <div class="time-up" role="alert">
+          <span class="time-up-icon" aria-hidden="true"><Icon name="timer" size={16} /></span>
+          <span class="time-up-copy">
+            <strong>{t("{part}'s time is up", { part: part?.name ?? "" })}</strong>
+            <em>{nextPart ? t("Next: {next}", { next: nextPart.name }) : t("This is the last part.")} · {t("{time} over", { time: clockCount(clockNow - up.since) })}</em>
+          </span>
+          {#if nextPart}<button type="button" class="tu-btn primary" onclick={() => void session.moveOn(up.sectionId)}>{t("Move on now")}<Icon name="chevron-right" size={13} /></button>{/if}
+          <button type="button" class="tu-btn" onclick={() => session.snoozeTimeUp(5)}>{t("5 more min")}</button>
+          <button type="button" class="tu-btn ghost" title={t("No more reminders for this part; move on by hand")} onclick={() => session.stayOnPart()}>{t("Stay")}</button>
+        </div>
+      {/if}
+      <div class="timeline-wrap"><ServiceTimeline {service} {count} compact={view === "canvas"} /></div>
 
+      {#if view === "canvas"}
+        <ServiceCanvas {service} {kindOf} onadd={(sectionId) => (addOpen = { sectionId, kind: "song" })} onedit={edit} />
+      {:else}
       <div class="order">
         {#if count === 0 && service.sections.length === 0}
           <div class="start-guide">
@@ -255,15 +498,28 @@
             class:target={session.cursor.sectionId === section.id}
             class:running={session.runningSectionId === section.id}
             class:dragging={dragSection === section.id}
+            class:folded={folded.has(section.id)}
             class:drop-before={dragSection !== null && dropSection === sectionIndex && dragSection !== section.id}
             style:--tone="var(--slot-{sectionIndex % 8})"
             ondragover={(event) => {
               if (dragSection) { event.preventDefault(); dropSection = sectionIndex; }
               else if (dragItem) { event.preventDefault(); dropItem = { sectionId: section.id, index: section.items.length }; }
             }}
+            ondragenter={() => { if (dragItem && folded.has(section.id)) toggleFold(section.id); }}
             ondrop={dropHere}
           >
             <header class="block-head">
+              <div class="head-main">
+              <button
+                type="button"
+                class="fold"
+                class:open={!folded.has(section.id)}
+                aria-expanded={!folded.has(section.id)}
+                aria-controls="part-body-{section.id}"
+                aria-label={folded.has(section.id) ? t("Unfold {name}", { name: section.name }) : t("Fold {name}", { name: section.name })}
+                title={folded.has(section.id) ? t("Show what is in this part") : t("Fold this part away")}
+                onclick={() => toggleFold(section.id)}
+              ><Icon name="chevron-right" size={14} /></button>
               <button
                 type="button"
                 id="grip-section-{section.id}"
@@ -278,21 +534,38 @@
               <span class="dot" aria-hidden="true"></span>
               <input class="section-name" aria-label={t("Section name")} value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
               {#if session.runningSectionId === section.id}<span class="now-tag">{t("Now")}</span>{/if}
-              <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" />
+              <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" showLeft={false} />
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
               <span class="tools">
                 <button type="button" class="row-tool del" aria-label={t("Remove section")} title={t("Delete this part")} onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
               </span>
+              </div>
+              <div class="head-meta"><PartLeader {section} {slot} {plan} /></div>
+              {#if folded.has(section.id)}
+                <button type="button" class="fold-summary" onclick={() => toggleFold(section.id)} title={t("Show what is in this part")}>
+                  {#if section.items.length === 0}
+                    <span class="muted">{t("Nothing in this part yet")}</span>
+                  {:else}
+                    {#each section.items.slice(0, 3) as item (item.id)}
+                      {@const kind = kindOf(item)}
+                      <span class="peek" class:live={live(item)}><Icon name={kind.icon} size={11} />{item.title}</span>
+                    {/each}
+                    {#if section.items.length > 3}<span class="peek more">{t("+{n} more", { n: section.items.length - 3 })}</span>{/if}
+                  {/if}
+                </button>
+              {/if}
             </header>
+            {#if !folded.has(section.id)}
+            <div class="part-body" id="part-body-{section.id}" transition:slide={unfold}>
             {#if section.items.length === 0}
-              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => { session.cursor = { sectionId: section.id, itemId: null }; if (!dragItem) addOpen = { sectionId: section.id, kind: "song" }; }}>{dragItem ? t("Drop here") : t("Empty. Click to add songs, scripture, slides or text.")}</button>
+              <button type="button" class="drop-hint" class:drop-on={dropItem?.sectionId === section.id} onclick={() => { session.cursor = { sectionId: section.id, itemId: null }; if (!dragItem) addOpen = { sectionId: section.id, kind: "song" }; }}><Icon name="plus" size={12} /> {dragItem ? t("Drop here") : t("Add to {part}: songs, scripture, slides, text", { part: section.name })}</button>
             {/if}
             <ol class="items">
               {#each section.items as item, itemIndex (item.id)}
                 {@const kind = kindOf(item)}
                 <li
                   class="item"
-                  class:on={session.cursor.itemId === item.id}
+                  class:on={session.cursor.itemId === item.id && !live(item)}
                   class:live={live(item)}
                   class:dragging={dragItem === item.id}
                   class:drop-before={dragItem !== null && dropItem?.sectionId === section.id && dropItem.index === itemIndex}
@@ -322,10 +595,27 @@
                       {:else}
                         <em>{detail(item)}</em>
                       {/if}
+                      {#if hint(item)}<span class="next-hint">{hint(item)}</span>{/if}
                     </span>
-                    {#if live(item)}<span class="badge live-badge">{t("Live")}</span>{:else if session.cursor.itemId === item.id}<span class="badge">{t("Preview")}</span>{/if}
+                    {#if live(item)}<span class="badge live-badge"><i aria-hidden="true"></i>{t("LIVE")}</span>{:else if session.cursor.itemId === item.id}<span class="badge preview-badge">{t("Preview")}</span>{/if}
                   </button>
                   <span class="tools">
+                    {#if item.kind === "bible" && item.bible}
+                      {@const step = session.bibleStep?.itemId === item.id ? session.bibleStep : null}
+                      {@const span = item.bible.endVerse - item.bible.startVerse + 1}
+                      {#if step && item.bible.perScreen}
+                        {@const shown = screenful(item.bible, step.start, item.bible.perScreen)}
+                        <span class="verse-at" title={t("The verses on Preview or LIVE now. Next shows the next ones.")}>v{shown.start}{shown.end > shown.start ? `–${shown.end}` : ""} · {t("of {n}", { n: span })}</span>
+                      {/if}
+                      {#if span > 1}
+                        <label class="per-screen" title={t("How many verses each screen shows; Next steps to the next ones")}>
+                          <select aria-label={t("Verses per screen for {title}", { title: item.title })} value={String(item.bible.perScreen ?? 0)} onchange={(event) => void session.setVersesPerScreen(item.id, Number(event.currentTarget.value) || null)}>
+                            <option value="0">{t("All verses")}</option>
+                            {#each [1, 2, 3, 4, 5, 6, 8, 10].filter((n) => n < span) as n (n)}<option value={String(n)}>{tn(n, "{n} verse a screen", "{n} verses a screen")}</option>{/each}
+                          </select>
+                        </label>
+                      {/if}
+                    {/if}
                     {#if item.kind === "deck" && item.deck}
                       {@const looping = session.deckLoop?.deckId === item.deck.deckId}
                       <button type="button" class="loop" class:on={looping} title={looping ? t("Stop the loop") : t("Play on the screen by itself, a page every 8 seconds, round and round")} onclick={() => (looping ? session.stopDeckLoop() : void session.startDeckLoop(item.deck!.deckId, 8))}>
@@ -338,6 +628,8 @@
                 </li>
               {/each}
             </ol>
+            </div>
+            {/if}
           </section>
         {/each}
 
@@ -348,7 +640,9 @@
           {/each}
         </form>
       </div>
+      {/if}
 
+      {#if view === "canvas"}
       <footer class="add-bar">
         <label class="add-to">
           <span>{t("Add to")}</span>
@@ -362,6 +656,7 @@
           {/each}
         </div>
       </footer>
+      {/if}
     {:else}
       <div class="blank">
         <Icon name="list" size={28} />
@@ -396,18 +691,30 @@
   <aside class="stage">
     <MonitorPair page="service" place={current?.title ?? ""} onstep={(direction) => void session.step(direction)} />
     <div class="next">
-      <div class="next-copy">
-        <span class="kicker">{t("Up next")}</span>
-        <strong>{upNext?.title ?? (!service || count === 0 ? t("Nothing added yet") : t("End of the service"))}</strong>
-      </div>
+      <span class="kicker">{t("Up next")}</span>
+      {#if upNext}
+        {@const kind = kindOf(upNext)}
+        {@const nextPart = service?.sections.find((section) => section.items.some((entry) => entry.id === upNext.id))}
+        <div class="next-card">
+          <ItemThumb item={upNext} icon={kind.icon} label={kind.label} />
+          <span class="next-copy">
+            <strong>{upNext.title}</strong>
+            <em>{kind.label}{nextPart && nextPart.id !== session.cursor.sectionId ? ` · ${t("starts {part}", { part: nextPart.name })}` : ""}</em>
+          </span>
+        </div>
+      {:else}
+        <strong class="next-none">{!service || count === 0 ? t("Nothing added yet") : t("End of the service")}</strong>
+      {/if}
       <div class="item-steps">
         <button type="button" class="desk-btn" disabled={!service} onclick={() => void session.stepItem(-1)} title={t("Previous item (Page Up)")}><Icon name="chevron-left" size={15} /> {t("Previous")}</button>
-        <button type="button" class="desk-btn primary-soft" disabled={!upNext} onclick={() => void session.stepItem(1)} title={t("Next item (Page Down)")}>{t("Next item")} <Icon name="chevron-right" size={15} /></button>
+        <button type="button" class="desk-btn next-btn" disabled={!upNext} onclick={() => void session.stepItem(1)} title={t("Next item (Page Down)")}>{session.liveOnClick ? t("Next to LIVE") : t("Next item")} <Icon name="chevron-right" size={15} /></button>
       </div>
-      <p class="muted">{t("Arrows step inside an item (song sections, slide pages, verses); at the end they move on. Page Down jumps to the next item.")}</p>
     </div>
-    <FollowSermon />
-    <MacroBar />
+    <details class="more-tools">
+      <summary><Icon name="chevron-right" size={13} /> {t("More tools")}<span class="muted">{t("Follow the sermon, macros")}</span></summary>
+      <FollowSermon />
+      <MacroBar />
+    </details>
   </aside>
   {/if}
 </section>
@@ -418,6 +725,15 @@
 
 {#if outlineOpen && session.service}
   <OutlineDialog service={session.service} onclose={() => (outlineOpen = false)} />
+{/if}
+{#if settingsOpen && session.service}
+  <ServiceSettings service={session.service} onclose={() => (settingsOpen = false)} />
+{/if}
+{#if startOpen && session.service}
+  <StartServiceDialog service={session.service} onclose={() => (startOpen = false)} />
+{/if}
+{#if reportOpen && session.service}
+  <ServiceReport service={session.service} onclose={() => (reportOpen = false)} />
 {/if}
 {#if templatesOpen}
   <TemplatesDialog initialId={templatesOpen.id} onclose={() => (templatesOpen = null)} />
@@ -454,34 +770,59 @@
   .row:hover { background: var(--field); }
   .row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 
-  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
-  .name { flex: 1 1 240px; min-width: 200px; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
+  .title { flex: 1 1 160px; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+  .name { flex: 0 1 auto; width: 100%; min-width: 120px; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; text-overflow: ellipsis; }
+  .head :global(.more) { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; }
+  .head :global(.menu .menu-hint) { margin-left: auto; padding-left: 14px; font-size: 11px; color: var(--muted); }
+  .head :global(.menu button) { display: flex; align-items: center; gap: 8px; }
   .name:hover, .name:focus { border-color: var(--line); background: var(--field); }
 
   .timeline-wrap { flex: none; padding: 12px 14px 0; }
   .order { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
   .order > :global(*) { flex: none; }
   .block { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 50%, var(--panel)); }
-  .block.running { background: color-mix(in srgb, #30a46c 7%, var(--panel)); border-color: color-mix(in srgb, #30a46c 35%, var(--line)); }
+  .block { position: relative; }
+  .block.running { border-color: color-mix(in srgb, #30a46c 45%, var(--line)); box-shadow: inset 4px 0 0 #30a46c; }
+  .block.running .block-head { background: color-mix(in srgb, #30a46c 8%, transparent); border-radius: 10px 10px 0 0; }
   .block.running .section-name { color: var(--ink); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, var(--muted)); flex: none; margin-left: 6px; }
   .now-tag { flex: none; height: 20px; padding: 0 8px; border-radius: 10px; background: #30a46c; color: #fff; font-size: 11px; font-weight: 750; display: inline-flex; align-items: center; letter-spacing: 0.02em; }
   /* The same colours as the timeline, by a section's place in the service. */
   .service-desk { --slot-0: #5aa0d6; --slot-1: #b07cc6; --slot-2: #e0884e; --slot-3: #58b3a4; --slot-4: #d9677a; --slot-5: #c9a35b; --slot-6: #7d8fe0; --slot-7: #7fa36b; }
-  .block.target { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
-  .block-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border-bottom: 1px solid var(--line); }
-  .section-name { flex: 1; height: 28px; border-color: transparent; background: none; font-size: 12px; font-weight: 750; letter-spacing: 0; color: var(--muted); }
+  .block.target:not(.running) { border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
+  .block-head { display: grid; gap: 2px; padding: 6px 8px 6px 6px; border-bottom: 1px solid var(--line); }
+  .head-main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .fold { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); cursor: pointer; }
+  .fold :global(svg) { transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .fold.open :global(svg) { transform: rotate(90deg); }
+  .fold:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 25%, var(--line)); }
+  .fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .block.folded .block-head { border-bottom: 0; }
+  .fold-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin: 2px 0 2px 36px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  .peek { display: inline-flex; align-items: center; gap: 5px; max-width: 200px; height: 22px; padding: 0 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--field); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .peek :global(svg) { flex: none; color: var(--muted); }
+  .peek.live { border-color: color-mix(in srgb, var(--live, #fa4f00) 60%, transparent); }
+  .peek.more { color: var(--muted); }
+  .fold-summary:hover .peek { border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
+  .part-body { overflow: hidden; }
+  @media (prefers-reduced-motion: reduce) { .fold :global(svg) { transition: none; } }
+  .head-meta { padding: 0 0 2px 36px; min-width: 0; }
+  .section-name { flex: 1 1 120px; min-width: 80px; height: 30px; border-color: transparent; background: none; font-size: 14px; font-weight: 750; letter-spacing: 0; color: var(--ink); text-overflow: ellipsis; }
   .section-name:focus { border-color: var(--line); background: var(--field); color: var(--ink); }
   .tools { display: flex; gap: 2px; flex: none; }
   .row-tool { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
   .row-tool:hover:not(:disabled) { background: var(--field); color: var(--ink); }
   .row-tool:disabled { opacity: 0.3; }
-  .drop-hint { display: block; width: calc(100% - 12px); margin: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  .drop-hint { display: flex; align-items: center; gap: 6px; width: calc(100% - 12px); height: 30px; margin: 4px 6px 6px; padding: 0 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  .drop-hint:hover, .drop-hint:focus-visible { border-color: var(--line); color: var(--ink); background: var(--field); }
   .items { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; }
   .item { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; }
   .item:hover { background: var(--field); }
-  .item.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
-  .item.live { box-shadow: inset 3px 0 0 var(--live); }
+  .item.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); box-shadow: inset 4px 0 0 var(--accent); }
+  .item.live { border-color: color-mix(in srgb, var(--live, #e5484d) 55%, transparent); background: color-mix(in srgb, var(--live, #e5484d) 11%, var(--panel)); box-shadow: inset 4px 0 0 var(--live, #e5484d); }
+  .item.live .item-copy strong { font-weight: 750; }
+  .next-hint { justify-self: start; margin-top: 2px; padding: 1px 7px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font-size: 11px; font-weight: 650; white-space: nowrap; }
   .item-main { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .item-copy { flex: 1; display: grid; gap: 1px; min-width: 0; }
   .item-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -489,7 +830,11 @@
   .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 10px; font-weight: 700; line-height: 15px; }
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10px; font-weight: 750; }
-  .live-badge { background: var(--live); color: #fff; }
+  .live-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--live); color: #fff; letter-spacing: 0.04em; }
+  .live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: live-dot 1.4s ease-in-out infinite; }
+  @keyframes live-dot { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .live-badge i { animation: none; } }
+  .preview-badge { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
   .loop { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .loop:hover { color: var(--ink); border-color: var(--accent); }
   .loop.on { border-color: var(--live); color: var(--live); background: color-mix(in srgb, var(--live) 10%, transparent); }
@@ -521,7 +866,6 @@
   .stage-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 40px; padding: 8px 0; border: 1px solid var(--line); border-radius: var(--radius-panel, 12px); background: var(--panel); }
   .rail-show { width: 28px; height: 28px; border: 0; border-radius: 7px; background: var(--field); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
   .rail-title { writing-mode: vertical-rl; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
-  .save-tpl.on { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .tile { height: 40px; flex-direction: row; } }
   .inline { display: flex; gap: 6px; }
   .inline input { flex: 1; }
@@ -531,16 +875,62 @@
 
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .next { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); flex: none; }
-  .next-copy { display: grid; gap: 4px; }
+  .next-card { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .next-card :global(.item-thumb) { width: 112px; }
+  .next-copy { display: grid; gap: 3px; min-width: 0; }
+  .next-copy em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .next-none { font-size: 15px; }
   .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
-  .next-copy strong { font-size: 15px; }
+  .next-copy strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .next-btn { border-color: var(--accent); background: var(--accent); color: #fff; height: 40px; font-weight: 750; }
+  .next-btn:disabled { opacity: 0.45; }
+  .more-tools { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); padding: 8px 10px; }
+  .more-tools summary { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }
+  .more-tools summary::-webkit-details-marker { display: none; }
+  .more-tools summary :global(svg) { transition: transform 0.2s; }
+  .more-tools[open] summary :global(svg) { transform: rotate(90deg); }
+  .more-tools summary .muted { margin-left: auto; font-weight: 500; font-size: 11px; }
   .item-steps { display: flex; gap: 6px; }
   .item-steps :global(.desk-btn) { flex: 1; justify-content: center; }
 
   @media (max-width: 1280px) {
     .service-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
   }
-  .save-tpl { flex: none; height: 30px; font-size: 12px; }
+  .views { display: inline-flex; flex: none; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; }
+  .views button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
+  .views .view-name { display: none; }
+  .views button[aria-checked="true"] .view-name { display: inline; }
+  .views button[aria-checked="true"] { background: var(--field); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
+  .running-clock { display: inline-flex; align-items: center; gap: 5px; color: #30a46c !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .running-clock i { width: 6px; height: 6px; border-radius: 50%; background: #30a46c; }
+  .key-hints { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 14px 0; font-size: 11px; color: var(--muted); }
+  .key-hints span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .key-hints kbd { min-width: 18px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--field); color: var(--ink); font: inherit; font-size: 10px; font-weight: 700; text-align: center; }
+  .time-up { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 10px 14px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, #f5a524 60%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #f5a524 14%, var(--panel)); animation: time-up-in 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .time-up-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #f5a524; color: #111; animation: time-up-pulse 1.6s ease-out infinite; }
+  .time-up-copy { flex: 1 1 200px; display: grid; gap: 1px; min-width: 0; }
+  .time-up-copy strong { font-size: 14px; }
+  .time-up-copy em { font-style: normal; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tu-btn { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .tu-btn.primary { border-color: #f5a524; background: #f5a524; color: #111; }
+  .tu-btn.ghost { background: none; }
+  @keyframes time-up-in { from { opacity: 0; transform: translateY(-6px); } }
+  @keyframes time-up-pulse { 0% { box-shadow: 0 0 0 0 rgb(245 165 36 / 0.6); } 100% { box-shadow: 0 0 0 10px rgb(245 165 36 / 0); } }
+  @media (prefers-reduced-motion: reduce) { .time-up, .time-up-icon { animation: none; } }
+  .auto-live { display: inline-flex; align-items: center; gap: 7px; flex: none; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .auto-live.on { color: var(--ink); border-color: color-mix(in srgb, var(--live, #fa4f00) 55%, var(--line)); }
+  .switch { position: relative; width: 26px; height: 15px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 22%, transparent); transition: background 0.15s; }
+  .switch i { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+  .auto-live.on .switch { background: var(--live, #fa4f00); }
+  .auto-live.on .switch i { transform: translateX(11px); }
+  .per-screen select { height: 24px; max-width: 132px; padding: 0 4px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 11px; }
+  .verse-at { padding: 1px 7px; border-radius: 7px; background: color-mix(in srgb, #30a46c 18%, transparent); font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .end { flex: none; height: 30px; font-size: 12px; border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); background: none; }
+  .end.armed { background: var(--danger, #e5484d); color: #fff; }
+  .start { flex: none; height: 30px; font-size: 12px; border-color: #30a46c; background: #30a46c; color: #fff; }
+  .queued { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 10px; border: 1px solid color-mix(in srgb, #30a46c 55%, var(--line)); border-radius: 15px; background: color-mix(in srgb, #30a46c 12%, transparent); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .queued i { width: 7px; height: 7px; border-radius: 50%; background: #30a46c; }
+  .queued button { height: 22px; padding: 0 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; }
   .from-label { margin: 6px 0 0; font-size: 12px; font-weight: 650; color: var(--muted); }
   .from-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: min(640px, 100%); }
   .tpl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; }
@@ -549,6 +939,9 @@
   .tpl-card span { font-size: 12px; color: var(--muted); line-height: 1.4; }
   .tpl-card.edit { border-style: dashed; background: none; }
   .svc { position: relative; flex: none; }
+  .svc-group { margin: 8px 6px 2px; font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .svc-find { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); }
+  .svc-find input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
   .svc .row { padding-right: 64px; }
   .svc-tools { position: absolute; top: 8px; right: 6px; display: none; gap: 2px; }
   .svc:hover .svc-tools, .svc:focus-within .svc-tools, .svc-tools:has(.armed) { display: inline-flex; }

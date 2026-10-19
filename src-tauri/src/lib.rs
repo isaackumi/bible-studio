@@ -1,4 +1,5 @@
 mod bible;
+mod entitlement;
 mod db;
 mod displays;
 mod remote;
@@ -329,12 +330,14 @@ fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String>
 /// Send Program over the network as an NDI source (macOS). Status arrives as `ndi-status` events.
 #[tauri::command]
 fn start_ndi(app: tauri::AppHandle, name: String, fps: u32, pattern: bool, audio: Option<bool>) -> Result<(), String> {
+    entitlement::require(&app, "church", "NDI")?;
     ndi::start(app, ndi::Output::Program, &name, fps, pattern, audio.unwrap_or(true))
 }
 
 /// Go live and/or record (see broadcast.rs). Returns where the recording is being saved.
 #[tauri::command]
 fn start_broadcast(app: tauri::AppHandle, options: broadcast::Options, stamp: String) -> Result<Option<String>, String> {
+    entitlement::require(&app, "church", "Streaming and recording")?;
     broadcast::start(app, options, stamp)
 }
 
@@ -352,6 +355,7 @@ fn stop_ndi() {
 /// vMix (macOS). Status arrives as `ndi-key-status` events; `ndi_key_words` sets the words.
 #[tauri::command]
 fn start_ndi_key(app: tauri::AppHandle, name: String, fps: u32) -> Result<(), String> {
+    entitlement::require(&app, "church", "NDI")?;
     ndi::start(app, ndi::Output::Key, &name, fps, false, false)
 }
 
@@ -378,6 +382,9 @@ fn stop_sermon_listen() {
 
 #[tauri::command]
 fn start_remote_lan(app: AppHandle, lan: State<Arc<remote::LanRemote>>) -> Value {
+    if let Err(message) = entitlement::require(&app, "premium", "The phone remote") {
+        return serde_json::json!({ "listening": false, "url": "", "port": remote::PORT, "error": message });
+    }
     remote::start(app, Arc::clone(&lan));
     remote_lan_status(lan)
 }
@@ -617,6 +624,7 @@ pub fn run() {
             record_panics(app.handle());
             let database = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;
             app.manage(database);
+            app.manage(entitlement::load(app.handle()));
             displays::place_operator(app.handle());
             displays::reconcile(app.handle()).map_err(|message| std::io::Error::other(message))?;
             displays::start(app.handle().clone());
@@ -625,6 +633,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            entitlement::entitlement_status,
+            entitlement::entitlement_set,
+            entitlement::entitlement_note_time,
+            entitlement::entitlement_clear,
+            entitlement::entitlement_device,
             pco_get,
             ai_post,
             crash_log,

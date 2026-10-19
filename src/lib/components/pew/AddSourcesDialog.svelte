@@ -3,17 +3,23 @@
 </script>
 
 <script lang="ts">
+  import TextWords from "../TextWords.svelte";
+  import { richIsEmpty, richLines, type RichDoc } from "../../domain/rich-text";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { parseReference, formatReference } from "../../bible/reference";
-  import { mediaUrl } from "../../db/api";
+  import { api, mediaUrl } from "../../db/api";
   import { ANNOUNCEMENT_DESIGNS, type AnnouncementDesign } from "../../domain/announcement";
   import { restoreComposition } from "../../domain/composition";
   import { quickFilter } from "../../domain/song-browse";
-  import type { BibleItem } from "../../domain/types";
+  import type { BibleItem, VerseText } from "../../domain/types";
   import { msg, t, tn } from "../../i18n/core";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import AiSlidesDialog from "../decks/AiSlidesDialog.svelte";
+  import DeckEditor from "../decks/DeckEditor.svelte";
+  import { createDeck } from "../../domain/decks";
+  import { open as openDialog } from "@tauri-apps/plugin-dialog";
+  import { isDesktop } from "../../platform/runtime";
   import Icon from "../Icon.svelte";
 
   // One window to fill a part of the service: pick what to add on the left, add as many as you
@@ -56,13 +62,63 @@
   // Scripture
   let reference = $state("");
   let translationId = $state(untrack(() => session.workspace.deskTranslationId ?? session.translations[0]?.id ?? "kjv"));
+  /** The translation beside it on the screen: an id, "" for none (starts as the desk's setting). */
+  let secondId = $state(untrack(() => session.workspace.parallelTranslationId ?? ""));
   const parsed = $derived(reference.trim() ? parseReference(reference) : null);
-  const preview = $derived.by(() => {
-    if (!parsed) return "";
-    const book = session.books.find((entry) => entry.ord === parsed.bookOrd);
-    const start = parsed.startVerse ?? 1;
-    return formatReference(parsed.bookName, parsed.chapter, start, parsed.endVerse ?? start, book?.chapters ?? 1);
+  const book = $derived(parsed ? session.books.find((entry) => entry.ord === parsed.bookOrd) : undefined);
+
+  // The verses as they will show, read as the reference is typed, so a wrong chapter or verse is seen
+  // before it is added. A reference without verses ("Psalm 23") is the whole chapter.
+  type Found = { key: string; count: number; start: number; end: number; first: VerseText[]; second: VerseText[] | null; problem: string };
+  let found = $state<Found | null>(null);
+  let finding = $state(false);
+  const wanted = $derived(parsed ? `${translationId}|${secondId}|${parsed.bookOrd}|${parsed.chapter}|${parsed.startVerse ?? ""}|${parsed.endVerse ?? ""}` : "");
+  $effect(() => {
+    const key = wanted;
+    const ref = parsed;
+    if (!key || !ref) {
+      found = null;
+      return;
+    }
+    finding = true;
+    const timer = setTimeout(async () => {
+      const chapters = book?.chapters ?? 0;
+      if (chapters && ref.chapter > chapters) {
+        if (wanted === key) {
+          found = { key, count: 0, start: 0, end: 0, first: [], second: null, problem: t("{book} has {n} chapters.", { book: ref.bookName, n: chapters }) };
+          finding = false;
+        }
+        return;
+      }
+      try {
+        const chapter = await api.verses(translationId, ref.bookOrd, ref.chapter);
+        const count = chapter.length ? Math.max(...chapter.map((verse) => verse.verse)) : 0;
+        const start = ref.startVerse ?? 1;
+        const end = Math.min(count || start, ref.endVerse ?? (ref.startVerse ? start : count || 1));
+        let problem = "";
+        if (!count) problem = t("Nothing found for {reference} in this translation.", { reference: `${ref.bookName} ${ref.chapter}` });
+        else if (start > count) problem = t("{book} {chapter} has {n} verses.", { book: ref.bookName, chapter: ref.chapter, n: count });
+        const first = chapter.filter((verse) => verse.verse >= start && verse.verse <= end);
+        let second: VerseText[] | null = null;
+        if (!problem && secondId && secondId !== translationId) {
+          try {
+            second = await api.passage(secondId, ref.bookOrd, ref.chapter, start, end);
+          } catch {
+            second = [];
+          }
+        }
+        if (wanted === key) found = { key, count, start, end, first, second, problem };
+      } catch {
+        if (wanted === key) found = { key, count: 0, start: 0, end: 0, first: [], second: null, problem: t("This translation could not be read. Check the connection or pick another.") };
+      } finally {
+        if (wanted === key) finding = false;
+      }
+    }, 180);
+    return () => clearTimeout(timer);
   });
+  const ready = $derived(!!parsed && !!found && found.key === wanted && !found.problem && found.first.length > 0);
+  const preview = $derived(parsed && found && ready ? formatReference(parsed.bookName, parsed.chapter, found.start, found.end, book?.chapters ?? 1) : "");
+  const nameOf = (id: string) => session.translations.find((entry) => entry.id === id)?.abbreviation ?? id;
   const quick = $derived(
     [...session.workspace.favorites.passages.slice(0, 6), ...session.workspace.recent.slice(0, 8)].filter(
       (item, index, all) => all.findIndex((other) => other.reference === item.reference) === index,
@@ -70,9 +126,16 @@
   );
   function addReference(event?: SubmitEvent) {
     event?.preventDefault();
-    if (!parsed || !target) return;
-    const start = parsed.startVerse ?? 1;
-    const passage: BibleItem = { translationId, bookOrd: parsed.bookOrd, chapter: parsed.chapter, startVerse: start, endVerse: parsed.endVerse ?? start, reference: preview };
+    if (!parsed || !target || !found || !ready) return;
+    const passage: BibleItem = {
+      translationId,
+      bookOrd: parsed.bookOrd,
+      chapter: parsed.chapter,
+      startVerse: found.start,
+      endVerse: found.end,
+      reference: preview,
+      secondTranslationId: secondId && secondId !== translationId ? secondId : null,
+    };
     session.addPassageToService(passage, target);
     note(`bible:${preview}`, preview);
     reference = "";
@@ -86,23 +149,28 @@
   // Text and announcement
   let heading = $state("");
   let body = $state("");
+  /** Formatted words (the Formatted tab); null while Simple is in use. */
+  let rich = $state<RichDoc | null>(null);
   let annLabel = $state(untrack(() => t("Announcement")));
   let annDesign = $state<AnnouncementDesign>("card");
   function addText(event: SubmitEvent) {
     event.preventDefault();
-    if (!target || !heading.trim()) return;
-    void session.addTextToService(heading, body, target);
-    note(`text:${heading}:${added.length}`, heading.trim());
+    if (!target || (!heading.trim() && richIsEmpty(rich))) return;
+    void session.addTextToService(heading, body, target, rich);
+    const name = heading.trim() || (rich ? richLines(rich).find((line) => line.trim()) ?? "" : "") || t("Text");
+    note(`text:${name}:${added.length}`, name);
     heading = "";
     body = "";
+    rich = null;
   }
   function addAnnouncement(event: SubmitEvent) {
     event.preventDefault();
     if (!target || !heading.trim()) return;
-    session.addAnnouncementToService(heading, body, { design: annDesign, label: annLabel, sectionId: target });
+    session.addAnnouncementToService(heading, body, { design: annDesign, label: annLabel, sectionId: target, rich });
     note(`ann:${heading}:${added.length}`, heading.trim());
     heading = "";
     body = "";
+    rich = null;
   }
 
   function addPart(event: SubmitEvent) {
@@ -115,6 +183,74 @@
   }
   let newPart = $state("");
   let aiOpen = $state(false);
+
+  // Bring in or make what is not in the library yet, and add it to the part in one go.
+  let mediaInput = $state<HTMLInputElement | undefined>();
+  let deckInput = $state<HTMLInputElement | undefined>();
+  let busy = $state("");
+  /** A deck open in the deck editor (made here), over this window. */
+  let editingDeckId = $state<string | null>(null);
+  const editingDeck = $derived(session.decks.find((deck) => deck.id === editingDeckId) ?? null);
+
+  async function importMediaFiles(sources: Array<string | File>) {
+    if (!target || sources.length === 0) return;
+    busy = t("Importing…");
+    try {
+      for (const source of sources) {
+        const asset = await session.importImage(source);
+        if (asset) {
+          session.addMediaToService(asset, target);
+          note(`media:${asset.id}`, asset.name);
+        }
+      }
+    } finally {
+      busy = "";
+    }
+  }
+
+  async function chooseMedia() {
+    if (!isDesktop()) {
+      mediaInput?.click();
+      return;
+    }
+    const picked = await openDialog({
+      multiple: true,
+      filters: [{ name: t("Pictures and videos"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }],
+    });
+    await importMediaFiles(Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : []);
+  }
+
+  async function importDeckFile(file: File) {
+    if (!target) return;
+    busy = t("Importing…");
+    try {
+      const pdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+      const id = pdf ? await session.importPdf(file, undefined, false) : await session.importPowerPoint(file);
+      const deck = id ? session.decks.find((entry) => entry.id === id) : null;
+      if (deck) {
+        await session.addDeckToService(deck.id, target);
+        note(`deck:${deck.id}`, deck.name);
+      }
+    } finally {
+      busy = "";
+    }
+  }
+
+  async function newDeck() {
+    if (!target) return;
+    const deck = createDeck(t("New slides"));
+    session.saveDeck(deck);
+    await session.addDeckToService(deck.id, target);
+    note(`deck:${deck.id}`, deck.name);
+    editingDeckId = deck.id;
+  }
+
+  async function newLook() {
+    if (!target) return;
+    const look = session.createSceneLook(t("New look"));
+    await session.addLookToService(restoreComposition(look), target);
+    note(`look:${look.id}`, look.name);
+  }
 </script>
 
 <DeskDialog title={part ? t("Add to {part}", { part: part.name }) : t("Add to the service")} huge {onclose}>
@@ -174,12 +310,48 @@
             <!-- svelte-ignore a11y_autofocus -->
             <input autofocus aria-label={t("Scripture reference")} placeholder={t("John 3:16-18, Psalm 23")} bind:value={reference} />
           </label>
-          <select aria-label={t("Translation")} bind:value={translationId}>
+          <select aria-label={t("Translation")} title={t("Translation")} bind:value={translationId}>
             {#each session.translations as entry (entry.id)}<option value={entry.id}>{entry.abbreviation}</option>{/each}
           </select>
-          <button type="submit" class="primary" disabled={!parsed}><Icon name="plus" size={14} /> {t("Add")}</button>
+          <select aria-label={t("Side by side with")} title={t("Show a second translation beside it on the screen")} bind:value={secondId}>
+            <option value="">{t("One translation")}</option>
+            {#each session.translations.filter((entry) => entry.id !== translationId) as entry (entry.id)}<option value={entry.id}>{t("+ {name} side by side", { name: entry.abbreviation })}</option>{/each}
+          </select>
+          <button type="submit" class="primary" disabled={!ready}><Icon name="plus" size={14} /> {t("Add")}</button>
         </form>
-        <p class="hint">{reference.trim() ? (parsed ? t("Adds {reference}", { reference: preview }) : t("Type a reference like John 3:16 or Psalm 23.")) : t("Type the short way: jn 3 16, ps 23, rom 8:28-30.")}</p>
+        {#if !reference.trim()}
+          <p class="hint">{t("Type the short way: jn 3 16, ps 23, rom 8:28-30. The verses show here before you add them.")}</p>
+        {:else if !parsed}
+          <p class="hint warn">{t("That is not a reference yet. Try John 3:16 or Psalm 23.")}</p>
+        {:else}
+          <div class="verse-check" class:loading={finding} aria-live="polite">
+            <header>
+              <strong>{preview || `${parsed.bookName} ${parsed.chapter}${parsed.startVerse ? `:${parsed.startVerse}` : ""}`}</strong>
+              {#if found && !found.problem}
+                <span class="muted">{t("{book} {chapter} has {n} verses", { book: parsed.bookName, chapter: parsed.chapter, n: found.count })}{parsed.startVerse ? "" : ` · ${t("the whole chapter")}`}</span>
+              {/if}
+            </header>
+            {#if found?.problem}
+              <p class="problem"><Icon name="alerts" size={13} /> {found.problem}</p>
+            {:else if found && found.first.length}
+              <div class="columns" class:two={found.second !== null}>
+                <div class="col">
+                  <span class="tr">{nameOf(translationId)}</span>
+                  {#each found.first.slice(0, 12) as verse (verse.verse)}<p><sup>{verse.verse}</sup>{verse.text}</p>{/each}
+                  {#if found.first.length > 12}<p class="muted">{t("+{n} more verses", { n: found.first.length - 12 })}</p>{/if}
+                </div>
+                {#if found.second !== null}
+                  <div class="col">
+                    <span class="tr">{nameOf(secondId)}</span>
+                    {#each found.second.slice(0, 12) as verse (verse.verse)}<p><sup>{verse.verse}</sup>{verse.text}</p>{:else}<p class="muted">{t("Not available in this translation; the screen shows one translation.")}</p>{/each}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <p class="muted">{t("Finding the verses…")}</p>
+            {/if}
+          </div>
+        {/if}
         {#if quick.length}
           <p class="sub">{t("Favorites and recent")}</p>
           <div class="chips">
@@ -193,8 +365,16 @@
           {#if tab === "announcement"}
             <label><span>{t("Small line above")}</span><input aria-label={t("Small line above the heading")} bind:value={annLabel} /></label>
           {/if}
-          <label><span>{t("Heading")}</span><!-- svelte-ignore a11y_autofocus --><input autofocus aria-label={t("Heading")} placeholder={tab === "text" ? t("Welcome") : t("Youth camp")} bind:value={heading} /></label>
-          <label><span>{t("Text")}</span><textarea aria-label={t("Text")} rows="5" placeholder={tab === "text" ? t("A few lines for the screen") : t("Saturday, 9am at the church hall")} bind:value={body}></textarea></label>
+          <TextWords
+            {heading}
+            {body}
+            {rich}
+            headingMode={tab === "announcement" ? "separate" : "inline"}
+            bodyLabel={msg("Text")}
+            headingPlaceholder={tab === "text" ? t("Welcome") : t("Youth camp")}
+            bodyPlaceholder={tab === "text" ? t("A few lines for the screen") : t("Saturday, 9am at the church hall")}
+            onchange={(words) => { heading = words.heading; body = words.body; rich = words.rich; }}
+          />
           {#if tab === "announcement"}
             <div class="designs" role="radiogroup" aria-label={t("Announcement design")}>
               {#each ANNOUNCEMENT_DESIGNS as design (design.id)}
@@ -202,10 +382,16 @@
               {/each}
             </div>
           {/if}
-          <button type="submit" class="primary wide" disabled={!heading.trim()}><Icon name="plus" size={14} /> {tab === "text" ? t("Add text") : t("Add announcement")}</button>
+          <button type="submit" class="primary wide" disabled={tab === "text" ? !heading.trim() && richIsEmpty(rich) : !heading.trim()}><Icon name="plus" size={14} /> {tab === "text" ? t("Add text") : t("Add announcement")}</button>
         </form>
       {:else if tab === "slides"}
-        <button type="button" class="ai-make" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={14} /> {t("Make slides with AI")}<small>{t("From notes, a passage or a topic")}</small></button>
+        <div class="makers">
+          <button type="button" class="make primary" onclick={() => void newDeck()}><Icon name="plus" size={14} /> {t("New slides")}</button>
+          <button type="button" class="make" disabled={!!busy} onclick={() => deckInput?.click()}><Icon name="download" size={14} /> {t("Import PowerPoint or PDF")}</button>
+          <button type="button" class="make ai" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>
+          {#if busy}<span class="busy" role="status">{busy}</span>{/if}
+          <input bind:this={deckInput} type="file" hidden accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label={t("Import PowerPoint or PDF")} onchange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; input.value = ""; if (file) void importDeckFile(file); }} />
+        </div>
         <div class="grid">
           {#each session.decks as deck (deck.id)}
             <button type="button" class="card" class:done={wasAdded(`deck:${deck.id}`)} onclick={() => { void session.addDeckToService(deck.id, target ?? undefined); note(`deck:${deck.id}`, deck.name); }}>
@@ -213,10 +399,15 @@
               <Icon name={wasAdded(`deck:${deck.id}`) ? "check" : "plus"} size={15} />
             </button>
           {:else}
-            <p class="empty">{t("No slide decks yet. Make or import one (PowerPoint too) on the Production Desk › Media › Slides.")}</p>
+            <p class="empty">{t("No slide decks yet. Start new slides, import a PowerPoint or PDF, or make them with AI above.")}</p>
           {/each}
         </div>
       {:else if tab === "media"}
+        <div class="makers">
+          <button type="button" class="make primary" disabled={!!busy} onclick={() => void chooseMedia()}><Icon name="plus" size={14} /> {t("Import pictures or videos")}</button>
+          <span class="busy" role="status">{busy || t("They are saved to the media library and added to this part.")}</span>
+          <input bind:this={mediaInput} type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v" aria-label={t("Import pictures or videos")} onchange={(event) => { const input = event.currentTarget; const files = [...(input.files ?? [])]; input.value = ""; void importMediaFiles(files); }} />
+        </div>
         <div class="thumbs">
           {#each session.mediaByFavorite as asset (asset.id)}
             {@const url = mediaUrl(asset)}
@@ -228,10 +419,14 @@
               <strong>{asset.name}</strong>
             </button>
           {:else}
-            <p class="empty">{t("No pictures or videos yet. Import them in Settings › Media.")}</p>
+            <p class="empty">{t("No pictures or videos yet. Import them with the button above.")}</p>
           {/each}
         </div>
       {:else if tab === "look"}
+        <div class="makers">
+          <button type="button" class="make primary" onclick={() => void newLook()}><Icon name="plus" size={14} /> {t("New look")}</button>
+          <span class="busy">{t("Design it on the Production Desk › Looks; it is in this part already.")}</span>
+        </div>
         <div class="grid">
           {#each session.looksByFavorite as look (look.id)}
             <button type="button" class="card" class:done={wasAdded(`look:${look.id}`)} onclick={() => { void session.addLookToService(restoreComposition(look), target ?? undefined); note(`look:${look.id}`, look.name); }}>
@@ -239,7 +434,7 @@
               <Icon name={wasAdded(`look:${look.id}`) ? "check" : "plus"} size={15} />
             </button>
           {:else}
-            <p class="empty">{t("No saved looks yet. Design them on the Production Desk › Looks.")}</p>
+            <p class="empty">{t("No saved looks yet. Start one with New look above.")}</p>
           {/each}
         </div>
       {/if}
@@ -252,9 +447,25 @@
   {/snippet}
 </DeskDialog>
 
+{#if editingDeck}
+  {#key editingDeck.id}<DeckEditor deck={editingDeck} onclose={() => (editingDeckId = null)} />{/key}
+{/if}
 {#if aiOpen}<AiSlidesDialog sectionId={target ?? undefined} onclose={() => (aiOpen = false)} onmade={(deck) => note(`deck:${deck.id}`, deck.name)} />{/if}
 
 <style>
+  .verse-check { display: grid; gap: 8px; min-height: 0; max-height: 300px; overflow: auto; margin-top: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--field) 60%, transparent); transition: opacity 0.15s; }
+  .verse-check.loading { opacity: 0.6; }
+  .verse-check header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+  .verse-check header strong { font-size: 15px; }
+  .verse-check header .muted { font-size: 12px; }
+  .verse-check .columns { display: grid; gap: 16px; }
+  .verse-check .columns.two { grid-template-columns: 1fr 1fr; }
+  .verse-check .col { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .verse-check .tr { justify-self: start; padding: 1px 7px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); font-size: 11px; font-weight: 750; }
+  .verse-check p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .verse-check sup { margin-right: 4px; font-size: 10px; font-weight: 750; color: var(--muted); }
+  .verse-check .problem { display: flex; align-items: center; gap: 6px; color: var(--danger, #e5484d); font-weight: 650; }
+  .hint.warn { color: var(--danger, #e5484d); }
   .adder { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; height: min(70vh, 660px); }
   .rail { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding-right: 14px; border-right: 1px solid var(--line); }
   .part-pick { display: grid; gap: 4px; }
@@ -304,7 +515,7 @@
   .compose { display: grid; gap: 10px; max-width: 640px; }
   .compose label { display: grid; gap: 4px; }
   .compose label span { font-size: 11px; font-weight: 700; color: var(--muted); }
-  .compose input, .compose textarea { padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; }
+  .compose input { padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; }
   .designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .designs button { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); font: inherit; text-align: left; }
   .designs button small { font-size: 11px; color: var(--muted); }
@@ -317,8 +528,13 @@
   .thumb.done .pic { border-color: #30a46c; }
   .tick { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #30a46c; color: #fff; }
   .thumb strong { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ai-make { display: flex; align-items: center; gap: 8px; width: fit-content; height: 38px; padding: 0 14px; border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
-  .ai-make small { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .makers { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .make { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .make:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .make.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .make.ai { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .make:disabled { opacity: 0.6; cursor: default; }
+  .busy { font-size: 12px; color: var(--muted); }
   .empty { margin: 0; padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
   .foot-note { flex: 1; font-size: 12px; color: var(--muted); }
   .done-btn { height: 34px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; }

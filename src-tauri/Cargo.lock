@@ -598,6 +598,7 @@ dependencies = [
 name = "church-studio"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "block2",
  "cpal",
  "env_logger",
@@ -609,9 +610,11 @@ dependencies = [
  "objc2-av-foundation",
  "objc2-foundation",
  "objc2-speech",
+ "ring",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

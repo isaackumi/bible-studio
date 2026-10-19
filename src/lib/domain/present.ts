@@ -1,3 +1,4 @@
+import { richIsEmpty, richLines, type RichDoc } from "./rich-text";
 import { emptyModel } from "./theme";
 import type { PresentationLine, PresentationModel, Theme, VerseText } from "./types";
 
@@ -47,14 +48,21 @@ export function presentLyrics(
 }
 
 export function presentText(
-  input: BuildBase & { layout: "title"; heading: string; body: string },
+  input: BuildBase & { layout: "title"; heading: string; body: string; rich?: RichDoc | null },
 ): PresentationModel {
+  // Formatted text is drawn from its blocks; its plain lines stay for search, captions and sizing.
+  const rich = input.rich && !richIsEmpty(input.rich) ? input.rich : null;
   const lines = [];
-  if (input.heading.trim()) lines.push({ text: input.heading.trim() });
-  for (const line of input.body.split("\n")) {
-    if (line.trim()) lines.push({ text: line.trim() });
+  if (rich) {
+    for (const line of richLines(rich)) if (line.trim()) lines.push({ text: line.trim() });
+  } else {
+    if (input.heading.trim()) lines.push({ text: input.heading.trim() });
+    for (const line of input.body.split("\n")) {
+      if (line.trim()) lines.push({ text: line.trim() });
+    }
   }
   return {
+    ...(rich ? { rich } : {}),
     layout: "title",
     theme: input.theme,
     reference: null,

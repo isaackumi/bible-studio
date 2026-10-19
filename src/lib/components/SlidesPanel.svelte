@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextWords from "./TextWords.svelte";
+  import { itemWithWords } from "../domain/rich-text";
   import { session } from "../app/session.svelte";
   import { findItem } from "../domain/service";
   import type { PresentationItem, TextStyle } from "../domain/types";
@@ -6,7 +8,7 @@
   import DeckLibrary from "./decks/DeckLibrary.svelte";
   import Icon from "./Icon.svelte";
   import TextStyleEditor from "./TextStyleEditor.svelte";
-  import { t } from "../i18n/core";
+  import { msg, t } from "../i18n/core";
 
   // Slide decks plus the service's quick slides. Pages and slides go to Preview; LIVE or TAKE sends Program.
   let note = $state("");
@@ -98,8 +100,15 @@
   {#if editingSlide}
     {@const slideText = editingSlide.slide ?? editingSlide.announcement ?? { heading: "", body: "" }}
     <div class="slide-editor">
-      <input aria-label={t("Slide heading")} placeholder={t("Heading")} value={slideText.heading} oninput={(event) => patchSlide({ heading: event.currentTarget.value })} />
-      <textarea aria-label={t("Slide body")} rows="4" placeholder={t("Body text")} value={slideText.body} oninput={(event) => patchSlide({ body: event.currentTarget.value })}></textarea>
+      <TextWords
+        heading={slideText.heading}
+        body={slideText.body}
+        rich={(editingSlide.kind === "announcement" ? editingSlide.announcement?.rich : editingSlide.slide?.rich) ?? null}
+        headingMode={editingSlide.kind === "announcement" ? "separate" : "inline"}
+        headingLabel={msg("Slide heading")}
+        bodyLabel={msg("Slide body")}
+        onchange={(words) => editingSlide && session.updateItem(itemWithWords(editingSlide, words))}
+      />
       <TextStyleEditor style={editingSlide.style ?? {}} onchange={(style) => patchSlide({ style })} />
       <p class="note">{t("Edits show on Preview. LIVE sends Program.")}</p>
     </div>
@@ -151,12 +160,4 @@
   .hot { background: linear-gradient(160deg, #ff8a3d, #ff5a1f); border-color: transparent; }
   .cool { background: linear-gradient(160deg, #1aa8a0, #0e6e74); border-color: transparent; }
   .slide-editor { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; }
-  .slide-editor input, .slide-editor textarea {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    background: var(--field);
-    color: var(--ink);
-    padding: 8px 10px;
-    font: inherit;
-  }
 </style>

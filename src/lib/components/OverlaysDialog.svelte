@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InlineWords from "./InlineWords.svelte";
   import { untrack } from "svelte";
   import { session } from "../app/session.svelte";
   import { OVERLAY_KINDS, OVERLAY_SPOTS, paintOverlays, type OverlayCorner, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
@@ -31,6 +32,19 @@
 
   function add(kind: OverlayKind) {
     selectedId = session.addOverlay(kind);
+  }
+
+  // Words reach the screen once typing pauses, so the room never watches each letter appear.
+  let soon: ReturnType<typeof setTimeout> | undefined;
+  let pending: Partial<ScreenOverlay> = {};
+  function setSoon(patch: Partial<ScreenOverlay>) {
+    pending = { ...pending, ...patch };
+    clearTimeout(soon);
+    soon = setTimeout(() => {
+      const next = pending;
+      pending = {};
+      set(next);
+    }, 450);
   }
 
   function set(patch: Partial<ScreenOverlay>) {
@@ -87,17 +101,19 @@
       {#if selected}
         <div class="ov-fields">
           {#if selected.kind !== "clock"}
-            <label class="ov-field">
+            <div class="ov-field">
               <span>{selected.kind === "lower-third" ? t("Name") : selected.kind === "logo" ? t("Words (when there is no picture)") : selected.kind === "badge" ? t("Word") : selected.kind === "countdown" ? t("Words above the time (empty: the section's name)") : t("Words")}</span>
-              {#if selected.kind === "ticker"}
-                <textarea rows="2" value={selected.text} onchange={(event) => set({ text: event.currentTarget.value })}></textarea>
-              {:else}
-                <input value={selected.text} onchange={(event) => set({ text: event.currentTarget.value })} />
-              {/if}
-            </label>
+              {#key selected.id}
+                <InlineWords text={selected.text} rich={selected.rich ?? null} label={t("Words")} multiline={selected.kind === "ticker"} variant={selected.kind === "ticker" ? "lines" : "line"} rows={2} onchange={(words) => setSoon({ text: words.text, rich: words.rich ?? undefined })} />
+              {/key}
+            </div>
           {/if}
           {#if selected.kind === "lower-third"}
-            <label class="ov-field"><span>{t("Title")}</span><input value={selected.subtitle} onchange={(event) => set({ subtitle: event.currentTarget.value })} /></label>
+            <div class="ov-field"><span>{t("Title")}</span>
+              {#key selected.id}
+                <InlineWords text={selected.subtitle} rich={selected.subtitleRich ?? null} label={t("Title")} onchange={(words) => setSoon({ subtitle: words.text, subtitleRich: words.rich ?? undefined })} />
+              {/key}
+            </div>
           {/if}
           {#if selected.kind === "logo"}
             <label class="ov-field">
@@ -202,8 +218,7 @@
   .ov-preview figcaption { font-size: 12px; color: var(--muted); }
   .ov-fields { display: grid; gap: 12px; }
   .ov-field { display: grid; gap: 5px; font-size: 12px; font-weight: 650; color: var(--muted); }
-  .ov-field input, .ov-field select, .ov-field textarea { min-width: 0; padding: 0 10px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; }
-  .ov-field textarea { height: auto; padding: 8px 10px; resize: vertical; }
+  .ov-field > input, .ov-field > select { min-width: 0; padding: 0 10px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; }
   .ov-color input { width: 60px; padding: 2px; }
   .ov-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); justify-self: start; }
   .ov-seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }

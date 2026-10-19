@@ -14,6 +14,24 @@ ed.hashes.sha512 = sha512;
 /** Church Studio's license public key (Ed25519, hex). Replace only together with the signing key. */
 export const LICENSE_PUBLIC_KEY = "8014f76328f5296fa6c0458aecdf5cfc17073eed8998b145b1abf73502536132";
 
+/**
+ * The test key (RFC 8032's published test vector, so its secret is public on purpose): test-mode
+ * purchases (the mock provider, Paddle's sandbox) are signed with it. Release builds never accept
+ * it, so a test purchase can never unlock a real copy; development builds do, to test end to end.
+ */
+export const TEST_LICENSE_SECRET = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+export const TEST_LICENSE_PUBLIC_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+
+/** Keys the app trusts: Church Studio's, plus the test key in development builds only. */
+export function trustedKeys(allowTest = import.meta.env?.DEV === true): string[] {
+  return allowTest ? [LICENSE_PUBLIC_KEY, TEST_LICENSE_PUBLIC_KEY] : [LICENSE_PUBLIC_KEY];
+}
+
+/** The public half of a signing key (hex). */
+export function publicKeyOf(secretKeyHex: string): string {
+  return hex(ed.getPublicKey(fromHex(secretKeyHex)));
+}
+
 export type LicensePlan = "premium" | "church";
 
 export type License = {
@@ -120,8 +138,15 @@ export function signLicense(
   return `${PREFIX}-${toBase32(new Uint8Array([...body, ...signature])).match(/.{1,5}/g)!.join("-")}`;
 }
 
-/** Read and check a key. Null when it is malformed or not signed by Church Studio. */
+/** Read and check a key. Null when it is malformed or not signed by a trusted key. */
 export function readLicense(text: string, publicKeyHex?: string): License | null {
+  if (publicKeyHex === undefined) {
+    for (const key of trustedKeys()) {
+      const found = readLicense(text, key);
+      if (found) return found;
+    }
+    return null;
+  }
   const clean = normalizeLicense(text);
   if (!clean.startsWith(PREFIX)) return null;
   const bytes = fromBase32(clean.slice(PREFIX.length));
@@ -130,7 +155,7 @@ export function readLicense(text: string, publicKeyHex?: string): License | null
   const signature = bytes.slice(bytes.length - SIGNATURE);
   if (body[0] !== VERSION) return null;
   try {
-    if (!ed.verify(signature, body, fromHex(publicKeyHex ?? LICENSE_PUBLIC_KEY))) return null;
+    if (!ed.verify(signature, body, fromHex(publicKeyHex))) return null;
   } catch {
     return null;
   }

@@ -119,7 +119,7 @@
       (session.live.program.model.layout === "empty" ? t("No scene") : t("Live output")),
   );
   const displayLive = $derived(
-    session.output.online && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
+    session.output.online && !session.programHeld && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
   );
   const focus = $derived(session.workspace.pew.focus);
   const activeLayout = $derived(

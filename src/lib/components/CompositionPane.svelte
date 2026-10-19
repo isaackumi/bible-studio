@@ -1,4 +1,7 @@
 <script lang="ts">
+  import TextWords from "./TextWords.svelte";
+  import InlineWords from "./InlineWords.svelte";
+  import { parseRich, type RichDoc } from "../domain/rich-text";
   import TextStyleEditor from "./TextStyleEditor.svelte";
   import { parseTextStyle } from "../domain/text-style";
   import { onMount, untrack } from "svelte";
@@ -76,12 +79,17 @@
   let selectedId = $state<string | null>(null);
   let lowerTitle = $state("Pastor");
   let lowerSubtitle = $state("Speaker");
+  /** The lower third's title and subtitle formatted (the Formatted tab); null while Simple. */
+  let lowerTitleRich = $state<RichDoc | null>(null);
+  let lowerSubtitleRich = $state<RichDoc | null>(null);
   let timerMinutes = $state(10);
   let timerLabel = $state("Service starts in");
   let timerMode = $state<TimerMode>("countdown");
   let timerClock = $state("10:30");
   let textHeading = $state("Welcome");
   let textBody = $state("Please join us after the service.");
+  /** Formatted words (the Formatted tab); null while the Simple tab is in use. */
+  let textRich = $state<RichDoc | null>(null);
   let scriptureRef = $state("John 3:16");
   let scriptureBody = $state("For God so loved the world.");
   let scriptureAttr = $state("KJV");
@@ -158,6 +166,12 @@
     } else if (layer.source.type === "text") {
       textHeading = layer.source.payload.heading || textHeading;
       textBody = layer.source.payload.body || textBody;
+      textRich = layer.source.payload.mode === "rich" ? parseRich(layer.source.payload.rich) : null;
+    } else if (layer.source.type === "lower-third") {
+      lowerTitle = layer.source.payload.title || lowerTitle;
+      lowerSubtitle = layer.source.payload.subtitle ?? lowerSubtitle;
+      lowerTitleRich = parseRich(layer.source.payload.titleRich);
+      lowerSubtitleRich = parseRich(layer.source.payload.subtitleRich);
     }
   });
 
@@ -410,7 +424,7 @@
 
   let armedDelete = $state<string | null>(null);
   let armTimer: ReturnType<typeof setTimeout> | undefined;
-  const programLive = $derived(session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
   const SOURCE_ICON: Record<string, string> = { camera: "cast", scripture: "bible", song: "lyrics", image: "media", video: "media", timer: "speed", clock: "speed", text: "list", "lower-third": "stage", qr: "layout", empty: "square" };
 
   function deleteSaved(look: Composition) {
@@ -594,7 +608,16 @@
     const copy = copyForLowerThird(template);
     lowerTitle = copy.title;
     lowerSubtitle = copy.subtitle;
+    lowerTitleRich = null;
+    lowerSubtitleRich = null;
     touch(applyLowerThirdTemplate(draft, selected.id, template, copy.title, copy.subtitle));
+  }
+
+  /** The lower third's words changed: same template, new (maybe formatted) title and subtitle. */
+  function setLowerWords() {
+    if (!draft || !selected) return;
+    const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!;
+    touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle, { title: lowerTitleRich, subtitle: lowerSubtitleRich }));
   }
 
   function assign(type: SourceType) {
@@ -655,7 +678,7 @@
       return;
     }
     if (type === "text") {
-      touch(assignText(draft, selected.id, textHeading, textBody));
+      touch(assignText(draft, selected.id, textHeading, textBody, textRich));
       return;
     }
     touch(assignLayerSource(draft, selected.id, sourceRef("empty", "empty", "Empty")));
@@ -1063,16 +1086,15 @@
               {/each}
             </div>
           {:else if selected.source.type === "lower-third"}
-            <input aria-label={t("Lower third title")} placeholder={t("Title")} bind:value={lowerTitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
-            <input aria-label={t("Lower third subtitle")} placeholder={t("Subtitle")} bind:value={lowerSubtitle} onchange={() => { const template = LOWER_THIRD_TEMPLATES.find((entry) => entry.id === selected.source.payload.templateId) ?? LOWER_THIRD_TEMPLATES[0]!; if (draft && selected) touch(applyLowerThirdTemplate(draft, selected.id, template, lowerTitle, lowerSubtitle)); }} />
+            <InlineWords text={lowerTitle} rich={lowerTitleRich} label={t("Lower third title")} placeholder={t("Title")} onchange={(words) => { lowerTitle = words.text; lowerTitleRich = words.rich; setLowerWords(); }} />
+            <InlineWords text={lowerSubtitle} rich={lowerSubtitleRich} label={t("Lower third subtitle")} placeholder={t("Subtitle")} onchange={(words) => { lowerSubtitle = words.text; lowerSubtitleRich = words.rich; setLowerWords(); }} />
             <div class="chips">
               {#each LOWER_THIRD_TEMPLATES as template (template.id)}
                 <button type="button" class="chip" class:on={selected.source.payload.templateId === template.id} onclick={() => applyLowerThird(template)}>{template.name}</button>
               {/each}
             </div>
           {:else if selected.source.type === "text"}
-            <input aria-label={t("Announcement heading")} placeholder={t("Heading")} bind:value={textHeading} oninput={(event) => { textHeading = event.currentTarget.value; assign("text"); }} />
-            <textarea aria-label={t("Announcement body")} placeholder={t("Body")} rows="4" bind:value={textBody} oninput={(event) => { textBody = event.currentTarget.value; assign("text"); }}></textarea>
+            <TextWords heading={textHeading} body={textBody} rich={textRich} onchange={(words) => { textHeading = words.heading; textBody = words.body; textRich = words.rich; assign("text"); }} />
           {:else if selected.source.type === "timer"}
             <label>{t("Label")} <input aria-label={t("Timer label")} bind:value={timerLabel} onchange={() => assign("timer")} /></label>
             <label>{t("Mode")}

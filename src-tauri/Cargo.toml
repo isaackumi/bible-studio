@@ -23,6 +23,10 @@ uuid = { version = "1", features = ["v4"] }
 log = "0.4"
 env_logger = "0.11"
 ureq = "3"
+# Licensing: checking the server's signed leases (Ed25519) and hashing the hardware id.
+ring = "0.17"
+sha2 = "0.10"
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

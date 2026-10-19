@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { licenseKeyPair, readLicense } from "../src/lib/domain/license";
 import { handle, licenseFor, verifySignature, type Env } from "./paddle";
+import { mockProvider } from "./billing";
+import { memoryStore, putJson } from "./store";
+import type { ApiConfig } from "./api";
 
 const pair = licenseKeyPair();
 const NOW = Date.parse("2026-10-17T12:00:00Z");
@@ -79,5 +82,23 @@ describe("Paddle license server", () => {
     expect(net.sent).toHaveLength(0);
     expect((await handle(await post(completed()), env, network(503).http, NOW)).status).toBe(500);
     expect((await handle(new Request("https://keys.example.org/"), env, net.http, NOW)).status).toBe(404);
+  });
+
+  it("completes an app checkout only with the transaction and price made for it", async () => {
+    const store = memoryStore();
+    const api: ApiConfig = { store, signingKey: pair.secretKey, publicKey: pair.publicKey, provider: { ...mockProvider, name: "paddle", test: false }, leaseDays: 30, trialDays: 14, graceDays: 7, now: () => NOW };
+    const order = { id: "cs_1", plan: "premium", interval: "yearly", email: "a@b.co", name: "", promo: null, list: 12000, due: 12000, currency: "USD", device: null, status: "pending", createdAt: NOW, reference: "txn_01" };
+    await putJson(store, "checkout:cs_1", order);
+    const withSession = (txn: string, price: string) =>
+      JSON.stringify({ event_type: "transaction.completed", data: { id: txn, customer_id: "ctm_01", items: [{ price: { id: price } }], custom_data: { session: "cs_1" }, subscription_id: "sub_9" } });
+    const net = network();
+    // Another transaction carrying this checkout's session (a cheaper price paid): refused.
+    expect((await handle(await post(withSession("txn_other", "pri_premium_year")), env, net.http, NOW, api)).status).toBe(400);
+    expect((await handle(await post(withSession("txn_01", "pri_cheap")), env, net.http, NOW, api)).status).toBe(400);
+    expect((await handle(await post(withSession("txn_01", "pri_premium_year")), env, net.http, NOW, api)).status).toBe(200);
+    expect(JSON.parse((await store.get("checkout:cs_1"))!).status).toBe("paid");
+    // A later renewal of that subscription keeps the license paid.
+    const renewal = JSON.stringify({ event_type: "transaction.completed", data: { id: "txn_02", customer_id: "ctm_01", items: [{ price: { id: "pri_premium_year" } }], subscription_id: "sub_9", billing_period: { starts_at: "2027-10-17T12:00:00Z", ends_at: "2028-10-17T12:00:00Z" } } });
+    expect(await (await handle(await post(renewal), env, net.http, NOW, api)).text()).toBe("Renewed");
   });
 });

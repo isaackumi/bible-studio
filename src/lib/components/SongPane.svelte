@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InlineWords from "./InlineWords.svelte";
   import { session } from "../app/session.svelte";
   import { moveSongSection, removeSongSection } from "../domain/song";
   import type { Song, SongSection, SongSectionKind } from "../domain/types";
@@ -60,18 +61,18 @@
     {#each draft.sections as section, index (section.id)}
       <p class="hint">{t("{kind} · {index} of {length}", { kind: section.kind, index: index + 1, length: draft.sections.length })}</p>
       <input class="field" bind:value={section.label} aria-label={t("Section label")} />
-      <textarea
-        class="field"
-        rows="4"
-        value={section.lines.join("\n")}
-        aria-label={t("{label} lines", { label: section.label })}
-        oninput={(event) => {
+      <InlineWords
+        text={section.lines.join("\n")}
+        rich={section.rich ?? null}
+        multiline
+        label={t("{label} lines", { label: section.label })}
+        onchange={(words) => {
           if (!draft) return;
-          const lines = event.currentTarget.value.split("\n");
-          draft.sections[index] = { ...section, lines };
+          const { rich: _old, ...rest } = section;
+          draft.sections[index] = { ...rest, lines: words.text.split("\n"), ...(words.rich ? { rich: words.rich } : {}) };
           draft = draft;
         }}
-      ></textarea>
+      />
       <div class="actions">
         <button type="button" onclick={() => draft && (draft = moveSongSection(draft, section.id, -1))}>{t("Up")}</button>
         <button type="button" onclick={() => draft && (draft = moveSongSection(draft, section.id, 1))}>{t("Down")}</button>

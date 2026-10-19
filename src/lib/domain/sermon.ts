@@ -1,3 +1,4 @@
+import { richFromText, richIsEmpty, sanitizeRich, textFromRich, type RichDoc } from "./rich-text";
 import { searchWords, wordsFound, wordsNeeded } from "./match-words";
 import { isRundownKind } from "./content";
 import { moveInList } from "./service";
@@ -50,6 +51,8 @@ function sanitizeItem(item: PresentationItem | undefined): PresentationItem | nu
       body: String(item.slide.body ?? ""),
       imageId: item.slide.imageId ? String(item.slide.imageId) : null,
     };
+    const rich = item.slide.rich ? sanitizeRich(item.slide.rich) : null;
+    if (rich) clean.slide.rich = rich;
   }
   if (item.image) {
     clean.image = { assetId: String(item.image.assetId ?? "") };
@@ -59,6 +62,8 @@ function sanitizeItem(item: PresentationItem | undefined): PresentationItem | nu
       heading: String(item.announcement.heading ?? ""),
       body: String(item.announcement.body ?? ""),
     };
+    const rich = item.announcement.rich ? sanitizeRich(item.announcement.rich) : null;
+    if (rich) clean.announcement.rich = rich;
   }
   return clean;
 }
@@ -72,6 +77,7 @@ export function sanitizeSermon(sermon: Sermon): Sermon {
       id: section.id,
       name: String(section.name ?? "").trim() || `Section ${sections.length + 1}`,
       notes: String(section.notes ?? ""),
+      ...keptNotes(section.notes, section.notesRich),
       items,
     });
   }
@@ -80,6 +86,7 @@ export function sanitizeSermon(sermon: Sermon): Sermon {
     title: String(sermon.title ?? "").trim(),
     speaker: String(sermon.speaker ?? "").trim(),
     notes: String(sermon.notes ?? ""),
+    ...keptNotes(sermon.notes, sermon.notesRich),
     sections,
     updatedAt: sermon.updatedAt || new Date().toISOString(),
   };
@@ -88,6 +95,28 @@ export function sanitizeSermon(sermon: Sermon): Sermon {
 export function sermonError(sermon: Sermon): string | null {
   if (!sermon.title.trim()) return "Add a sermon title.";
   return null;
+}
+
+/** Formatted notes, kept while their words still match the plain notes (anything else changed them). */
+function keptNotes(notes: unknown, rich: unknown): { notesRich?: RichDoc } {
+  const doc = rich ? sanitizeRich(rich) : null;
+  if (!doc || richIsEmpty(doc)) return {};
+  const trim = (text: string) => text.replace(/\s+$/, "");
+  return trim(textFromRich(doc)) === trim(String(notes ?? "")) ? { notesRich: doc } : {};
+}
+
+/**
+ * The desk notes for a section as one formatted document (the sermon's, then the section's), or
+ * null when neither is formatted. Operator-only, like deskNotes.
+ */
+export function deskNotesRich(sermon: Sermon, sectionId: string | null | undefined): RichDoc | null {
+  const section = sermon.sections.find((entry) => entry.id === sectionId);
+  if (!sermon.notesRich && !section?.notesRich) return null;
+  const parts = [
+    sermon.notes.trim() ? (sermon.notesRich ?? richFromText(sermon.notes)) : null,
+    section?.notes.trim() ? (section.notesRich ?? richFromText(section.notes)) : null,
+  ].filter((part): part is RichDoc => part !== null);
+  return { blocks: parts.flatMap((part, index) => (index > 0 ? [{ type: "p" as const, runs: [] }, ...part.blocks] : part.blocks)) };
 }
 
 /** Operator-only. Never copied onto PresentationModel. */

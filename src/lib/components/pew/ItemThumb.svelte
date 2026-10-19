@@ -29,7 +29,7 @@
 </span>
 
 <style>
-  .item-thumb { position: relative; flex: none; width: 76px; border-radius: 5px; overflow: hidden; background: #000; border: 1px solid var(--line); pointer-events: none; }
+  .item-thumb { position: relative; flex: none; width: 88px; border-radius: 5px; overflow: hidden; background: #000; border: 1px solid var(--line); pointer-events: none; }
   .item-thumb :global(.ratio) { width: 100%; }
   .item-thumb-kind { position: absolute; left: 3px; bottom: 3px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.72); color: #fff; }
 </style>

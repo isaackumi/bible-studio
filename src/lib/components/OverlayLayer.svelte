@@ -1,4 +1,6 @@
 <script lang="ts">
+  import InlineRich from "./InlineRich.svelte";
+  import type { RichDoc } from "../domain/rich-text";
   import type { PaintedOverlay } from "../domain/screen-overlays";
   import { formatCountdown } from "../domain/timer";
 
@@ -25,35 +27,37 @@
   const barBottom = $derived(overlays.some((overlay) => (overlay.kind === "ticker" || overlay.kind === "banner") && overlay.edge === "bottom"));
 </script>
 
+{#snippet words(text: string, rich: RichDoc | undefined)}{#if rich}<InlineRich doc={rich} />{:else}{text}{/if}{/snippet}
+
 <div class="overlay-layer" class:bar-top={barTop} class:bar-bottom={barBottom} aria-hidden="true">
   {#each overlays as overlay (overlay.id)}
     {#if overlay.kind === "logo"}
       <div class="ov-corner {overlay.corner}">
         {#if overlay.imageUrl}<img class="ov-logo-img" src={overlay.imageUrl} alt="" />
-        {:else}<span class="ov-logo-text">{overlay.text}</span>{/if}
+        {:else}<span class="ov-logo-text">{@render words(overlay.text, overlay.rich)}</span>{/if}
       </div>
     {:else if overlay.kind === "clock"}
       <div class="ov-corner {overlay.corner}"><span class="ov-clock">{time}</span></div>
     {:else if overlay.kind === "badge"}
-      <div class="ov-corner {overlay.corner}"><span class="ov-badge" style:background={overlay.color}><i></i>{overlay.text}</span></div>
+      <div class="ov-corner {overlay.corner}"><span class="ov-badge" style:background={overlay.color}><i></i>{@render words(overlay.text, overlay.rich)}</span></div>
     {:else if overlay.kind === "ticker"}
       <div class="ov-bar ov-ticker {overlay.edge}" style:--accent-bar={overlay.color}>
-        <span class="ov-track" class:still style:--dur="{SPEED[overlay.speed]}s"><span>{overlay.text}</span><span>{overlay.text}</span></span>
+        <span class="ov-track" class:still style:--dur="{SPEED[overlay.speed]}s"><span>{@render words(overlay.text, overlay.rich)}</span><span>{@render words(overlay.text, overlay.rich)}</span></span>
       </div>
     {:else if overlay.kind === "banner"}
-      <div class="ov-bar ov-banner {overlay.edge}" style:--accent-bar={overlay.color}><span>{overlay.text}</span></div>
+      <div class="ov-bar ov-banner {overlay.edge}" style:--accent-bar={overlay.color}><span>{@render words(overlay.text, overlay.rich)}</span></div>
     {:else if overlay.kind === "countdown"}
       {#if overlay.endsAt}
         {@const view = left(overlay.endsAt)}
         <div class="ov-count {overlay.spot} size-{overlay.size}" class:over={view.over} class:short={view.short} style:--accent-bar={overlay.color}>
-          <span class="ov-count-label">{overlay.text || overlay.section}</span>
+          <span class="ov-count-label">{#if overlay.rich}<InlineRich doc={overlay.rich} />{:else}{overlay.text || overlay.section}{/if}</span>
           <span class="ov-count-time">{view.text}</span>
         </div>
       {/if}
     {:else if overlay.kind === "lower-third"}
       <div class="ov-lower" style:--accent-bar={overlay.color}>
-        <strong>{overlay.text}</strong>
-        {#if overlay.subtitle}<span>{overlay.subtitle}</span>{/if}
+        <strong>{@render words(overlay.text, overlay.rich)}</strong>
+        {#if overlay.subtitle || overlay.subtitleRich}<span>{@render words(overlay.subtitle, overlay.subtitleRich)}</span>{/if}
       </div>
     {/if}
   {/each}

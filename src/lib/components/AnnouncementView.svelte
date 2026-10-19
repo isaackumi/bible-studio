@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RichView from "./RichView.svelte";
   import type { AnnouncementPaint } from "../domain/announcement";
 
   // An announcement in its design. Sizes follow the frame (container units), so it lays out the
@@ -18,7 +19,7 @@
     <div class="split-side"><span class="split-label">{paint.label}</span></div>
     <div class="split-main">
       <h2 class="ann-heading">{paint.heading}</h2>
-      {#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}
+      {#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}{/if}
     </div>
   {:else if paint.design === "banner"}
     <div class="banner-band">
@@ -26,7 +27,7 @@
       <h2 class="ann-heading">{paint.heading}</h2>
     </div>
     {#if paint.body.length}
-      <div class="banner-body">{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}</div>
+      <div class="banner-body">{#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}{/if}</div>
     {/if}
   {:else}
     <div class="ann-box">
@@ -34,9 +35,9 @@
       <h2 class="ann-heading">{paint.heading}</h2>
       {#if paint.design === "classic" && paint.body.length}<span class="ann-rule" aria-hidden="true"></span>{/if}
       {#if paint.design === "bulletin"}
-        <ul class="ann-list">{#each paint.body as line, n (n)}<li class="ann-body">{line}</li>{/each}</ul>
+        {#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}<ul class="ann-list">{#each paint.body as line, n (n)}<li class="ann-body">{line}</li>{/each}</ul>{/if}
       {:else}
-        {#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}
+        {#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}{/if}
       {/if}
     </div>
   {/if}

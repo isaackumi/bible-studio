@@ -155,7 +155,12 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
             primary: Some(monitor_key(monitor).as_str()) == primary_key.as_deref(),
         })
         .collect::<Vec<_>>();
-    let chosen_index = choose_index(&candidates, assigned.as_deref());
+    // Where the operator window is now: the audience never opens on top of it.
+    let operator_key = app
+        .get_webview_window("main")
+        .and_then(|window| window.current_monitor().ok().flatten())
+        .map(|monitor| display_key_of(&monitor));
+    let chosen_index = choose_index(&candidates, assigned.as_deref(), operator_key.as_deref());
     let displays = monitors
         .iter()
         .enumerate()
@@ -234,6 +239,14 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         if release_native_fullscreen(&window, &output) {
             log::info!("AUDIENCE_LEAVE_FULLSCREEN");
             return Ok(());
+        }
+        // An assigned audience display the operator window was dragged onto: the desk moves to
+        // another display first, so the audience does not cover it.
+        if operator_key.as_deref() == Some(display_key_of(monitor).as_str()) {
+            if let Some(other) = monitors.iter().find(|other| display_key_of(other) != display_key_of(monitor)) {
+                move_operator(app, other);
+                log::info!("OPERATOR_MOVED_OFF_AUDIENCE to={}", monitor_name(other));
+            }
         }
         place(&window, monitor, fullscreen)?;
         window.show().map_err(|e| e.to_string())?;
@@ -541,6 +554,18 @@ fn ns_screen_frame(monitor: &Monitor) -> Option<(f64, f64, f64, f64)> {
     let screens = NSScreen::screens(marker);
     // The first screen holds the menu bar and defines the Cocoa origin.
     let main_height = screens.iter().next().map(|screen| screen.frame().size.height)?;
+    // The display's own name is the surest match (tao's positions and sizes mix pixels and
+    // points when a Retina screen sits beside a 1x one). Only a name shared by two displays
+    // falls back to matching by place and size.
+    let name = raw_monitor_name(monitor);
+    let named = screens
+        .iter()
+        .filter(|screen| screen.localizedName().to_string() == name)
+        .map(|screen| screen.frame())
+        .collect::<Vec<_>>();
+    if let [frame] = named.as_slice() {
+        return Some((frame.origin.x, frame.origin.y, frame.size.width, frame.size.height));
+    }
     let mut best: Option<(f64, (f64, f64, f64, f64))> = None;
     for screen in screens {
         let frame = screen.frame();
@@ -616,6 +641,12 @@ fn coverage(window: &WebviewWindow, monitor: &Monitor) -> Option<Coverage> {
     let ns_window = unsafe { &*(pointer as *const objc2_app_kit::NSWindow) };
     let frame = ns_window.frame();
     let actual = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+    // The screen AppKit says the window is on, by name, so the status never names the wrong one.
+    let on = ns_window.screen().map(|screen| screen.localizedName().to_string());
+    let wanted = raw_monitor_name(monitor);
+    if let Some(on) = on.filter(|on| *on != wanted) {
+        return Some(Coverage { covers: false, detail: format!("the window is on {on}, not {wanted}") });
+    }
     Some(Coverage {
         covers: frames_close(actual, target),
         detail: format!(
@@ -691,11 +722,28 @@ struct DisplayCandidate {
     primary: bool,
 }
 
-fn choose_index(candidates: &[DisplayCandidate], assigned: Option<&str>) -> Option<usize> {
+/// The audience display: the assigned one; otherwise a display the operator window is not on,
+/// external first (so dragging the desk onto the external screen sends the audience to the other).
+fn choose_index(candidates: &[DisplayCandidate], assigned: Option<&str>, operator: Option<&str>) -> Option<usize> {
     if let Some(key) = assigned {
         return candidates.iter().position(|candidate| candidate.key == key);
     }
-    candidates.iter().position(|candidate| !candidate.primary)
+    let free = |candidate: &DisplayCandidate| Some(candidate.key.as_str()) != operator;
+    candidates
+        .iter()
+        .position(|candidate| !candidate.primary && free(candidate))
+        .or_else(|| if operator.is_some() { candidates.iter().position(free) } else { None })
+}
+
+/// Move the operator window to a display without focusing it (focus can pull the audience back).
+fn move_operator(app: &AppHandle, monitor: &Monitor) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let position = monitor.position();
+    let _ = window.unmaximize();
+    let _ = window.set_position(PhysicalPosition::new(position.x, position.y));
+    let _ = window.maximize();
 }
 
 fn fallback_allowed(assigned: Option<&str>) -> bool {
@@ -859,7 +907,7 @@ mod tests {
             candidate("mac|2560x1600|2.00", true),
             candidate("dell|1920x1200|1.00", false),
         ];
-        assert_eq!(choose_index(&displays, None), Some(1));
+        assert_eq!(choose_index(&displays, None, None), Some(1));
     }
 
     #[test]
@@ -868,7 +916,24 @@ mod tests {
             candidate("mac|2560x1600|2.00", true),
             candidate("dell|1920x1200|1.00", false),
         ];
-        assert_eq!(choose_index(&displays, Some("mac|2560x1600|2.00")), Some(0));
+        assert_eq!(choose_index(&displays, Some("mac|2560x1600|2.00"), None), Some(0));
+    }
+
+    #[test]
+    fn auto_avoids_the_display_the_operator_is_on() {
+        let displays = vec![candidate("mac|2560x1600|2.00", true), candidate("dell|1920x1080|1.00", false)];
+        // The desk dragged onto the external display: the audience takes the laptop screen.
+        assert_eq!(choose_index(&displays, None, Some("dell|1920x1080|1.00")), Some(0));
+        // The desk on the laptop: the audience takes the external display, as before.
+        assert_eq!(choose_index(&displays, None, Some("mac|2560x1600|2.00")), Some(1));
+        // One display only: never on top of the desk.
+        assert_eq!(choose_index(&displays[..1], None, Some("mac|2560x1600|2.00")), None);
+    }
+
+    #[test]
+    fn an_assignment_wins_even_where_the_operator_is() {
+        let displays = vec![candidate("mac|2560x1600|2.00", true), candidate("dell|1920x1080|1.00", false)];
+        assert_eq!(choose_index(&displays, Some("dell|1920x1080|1.00"), Some("dell|1920x1080|1.00")), Some(1));
     }
 
     #[test]
@@ -877,7 +942,7 @@ mod tests {
             candidate("mac|2560x1600|2.00", true),
             candidate("dell|1920x1200|1.00", false),
         ];
-        assert_eq!(choose_index(&displays, Some("gone|1x1|1.00")), None);
+        assert_eq!(choose_index(&displays, Some("gone|1x1|1.00"), None), None);
         assert!(!fallback_allowed(Some("gone|1x1|1.00")));
     }
 
@@ -916,7 +981,7 @@ mod tests {
     #[test]
     fn a_laptop_alone_stays_closed_until_it_is_assigned() {
         let displays = vec![candidate("mac|2560x1600|2.00", true)];
-        assert_eq!(choose_index(&displays, None), None);
+        assert_eq!(choose_index(&displays, None, None), None);
         assert!(fallback_allowed(None));
         assert!(fallback_allowed(Some("External display|1920x1200|1.00")));
     }

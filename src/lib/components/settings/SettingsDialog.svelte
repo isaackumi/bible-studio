@@ -15,7 +15,7 @@
   import { canAssign, defaultShortcuts, shortcutLabel, shortcutLabels } from "../../keyboard/manager";
   import type { ShortcutAction } from "../../domain/types";
   import { canUse } from "../../platform/capabilities";
-  import { isDesktop, openExternal } from "../../platform/runtime";
+  import { APP_VERSION, isDesktop, openExternal } from "../../platform/runtime";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import BrandMark from "../BrandMark.svelte";
@@ -228,7 +228,7 @@
     } catch {
       copied = false;
     }
-    const mail = supportMailto(session.plan, "0.1.0");
+    const mail = supportMailto(session.plan, APP_VERSION);
     if (mail) await openExternal(mail);
     supportNote = copied ? (mail ? t("The problem report is copied: paste it into the email.") : t("The problem report is copied. Send it to Church Studio support.")) : t("Save the report below and attach it to your email.");
   }
@@ -339,6 +339,9 @@
   }
   let code = $state("");
   let codeError = $state("");
+  let codeBusy = $state(false);
+  let trialBusy = $state(false);
+  let trialError = $state("");
   let signInName = $state("");
   let signInEmail = $state("");
   let signInError = $state("");
@@ -1487,13 +1490,23 @@
             </h3>
             <p>{ent.source === "license" && ent.holder && session.plan !== "free" ? t("Licensed to {holder}.", { holder: ent.holder }) : current.tagline}</p>
           </div>
-          {#if ent.plan === "free" && !ent.trialUsed}
-            <button type="button" class="btn primary" onclick={() => session.startTrial()}>{t("Try Premium free · {TRIAL_DAYS} days", { TRIAL_DAYS })}</button>
-          {:else if (ent.source === "promo" || ent.source === "license") && session.plan !== "free"}
-            <button type="button" class="btn" onclick={() => session.useFreePlan()}>{ent.source === "license" ? t("Remove license") : t("Return to Free")}</button>
-          {/if}
+          <div class="hero-actions">
+            {#if session.plan === "free" && !session.trialUsed}
+              <button type="button" class="btn primary" disabled={trialBusy} onclick={async () => { trialBusy = true; trialError = (await session.startTrial()) ?? ""; trialBusy = false; }}>{t("Try Premium free · {TRIAL_DAYS} days", { TRIAL_DAYS })}</button>
+            {/if}
+            <button type="button" class="btn" class:primary={session.plan === "free" && session.trialUsed} onclick={() => session.openPlans()}>{session.plan === "church" ? t("See plans") : t("Upgrade")}</button>
+            {#if (ent.source === "promo" || ent.source === "license") && session.plan !== "free"}
+              <button type="button" class="btn" onclick={() => void session.useFreePlan()}>{ent.source === "license" ? t("Remove license") : t("Return to Free")}</button>
+            {/if}
+          </div>
         </section>
-        {#if ent.trialUsed && session.trialDays === 0 && session.plan === "free"}
+        {#if trialError}<p class="note stand form-error">{trialError}</p>{/if}
+        {#if session.ent.reason === "clock"}
+          <p class="note stand form-error">{t("This computer's clock is set earlier than it was. Set the date and time correctly; paid features are paused until then.")}</p>
+        {:else if session.ent.reason === "renew" && session.workspace.entitlement.source === "license"}
+          <p class="note stand form-error">{t("This computer has been offline too long. Connect to the internet once to keep your plan.")}</p>
+        {/if}
+        {#if session.trialUsed && session.trialDays === 0 && session.plan === "free"}
           <p class="note stand">{t("Your Premium trial on this computer has ended. Everything you made stays; Premium features are paused.")}</p>
         {/if}
         {#if session.plan !== "free"}
@@ -1514,7 +1527,7 @@
             {#if act.status === "full"}
               <div class="row"><div class="row-copy"><strong class="form-error">{t("This license is in use on {n} of {n} computers", { n: act.seats })}</strong><span>{act.message || t("Release one below (a computer no longer used, or the old one), then check again. Until then this computer runs on Free.")}</span></div><button type="button" class="btn primary" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
             {:else if act.status === "offline" || act.status === "error"}
-              <div class="row"><div class="row-copy"><strong>{act.status === "offline" ? t("The license server could not be reached") : t("The license server said no")}</strong><span>{act.status === "offline" ? t("No problem for now: this computer keeps its plan for 30 days without checking.") : act.message}</span></div><button type="button" class="btn" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
+              <div class="row"><div class="row-copy"><strong>{act.status === "offline" ? t("The license server could not be reached") : t("The license server said no")}</strong><span>{act.status === "offline" ? (session.ent.renewBy ? t("No problem for now: this computer keeps its plan offline until {date}.", { date: new Date(session.ent.renewBy).toLocaleDateString() }) : t("Connect to the internet once to start using the key.")) : act.message}</span></div><button type="button" class="btn" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
             {:else if act.status === "ok"}
               <div class="row"><div class="row-copy"><strong>{t("{used} of {seats} in use", { used: act.devices.length, seats: act.seats })}</strong><span>{t("A computer not used for 60 days frees its place by itself.")}</span></div></div>
             {:else}
@@ -1522,84 +1535,48 @@
             {/if}
             {#each act.devices as device (device.device)}
               <div class="row">
-                <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}{device.device === session.deviceId ? ` · ${t("this computer")}` : ""}</strong><span>{t("Last seen {date}", { date: new Date(device.seenAt).toLocaleDateString() })}</span></div></div>
+                <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}{device.you || device.device === session.deviceId ? ` · ${t("this computer")}` : ""}</strong><span>{t("Last seen {date}", { date: new Date(device.seenAt).toLocaleDateString() })}</span></div></div>
                 <button type="button" class="btn" onclick={() => void session.releaseDevice(device.device)}>{t("Release")}</button>
               </div>
             {/each}
           </section>
         {/if}
 
-        <div class="pricing-head">
-          <p class="section-label">{t("Plans")}</p>
-          <div class="billing" role="radiogroup" aria-label={t("Billing")}>
-            <button type="button" role="radio" aria-checked={billing === "monthly"} class:on={billing === "monthly"} onclick={() => (billing = "monthly")}>{t("Monthly")}</button>
-            <button type="button" role="radio" aria-checked={billing === "yearly"} class:on={billing === "yearly"} onclick={() => (billing = "yearly")}>{t("Yearly")} <em>{t("save {savePercent}%", { savePercent: yearlyDeal(PLANS[1]!.price).savePercent })}</em></button>
-          </div>
-        </div>
-        <div class="plan-grid">
-          {#each PLANS as plan, i (plan.id)}
-            {@const deal = yearlyDeal(plan.price)}
-            <article class="plan-card" class:current={plan.id === session.plan} class:popular={plan.popular} style:--plan={plan.color}>
-              {#if plan.popular}<span class="ribbon">{t("Most popular")}</span>{/if}
-              <header>
-                <strong>{t(plan.name)}</strong>
-                {#if plan.id === session.plan}<span class="pill ok">{t("Current")}</span>{/if}
-              </header>
-              <p class="price">
-                {#if plan.price.monthly === 0}
-                  <b>$0</b><span>{t("forever")}</span>
-                {:else if billing === "monthly"}
-                  <b>${plan.price.monthly}</b><span>{t("/ month")}</span>
-                {:else}
-                  <b>${deal.perMonth}</b><span>{t("/ month, billed ${yearly} a year", { yearly: plan.price.yearly })}</span>
-                {/if}
-              </p>
-              <p class="tag">{t(plan.tagline)}</p>
-              <p class="facts">
-                <span><Icon name="laptop" size={12} /> {tn(plan.computers, "{n} computer", "{n} computers at once")}</span>
-                {#if plan.id === "free"}<span><Icon name="mic" size={12} /> {t("{minutes} min of listening a month", { minutes: FREE_LISTEN_MINUTES })}</span>{:else}<span><Icon name="mic" size={12} /> {t("Unlimited listening")}</span>{/if}
-              </p>
-              {#if i > 0}<p class="plus">{t("Everything in {name}, plus", { name: t(PLANS[i - 1]!.name) })}</p>{/if}
-              <ul>
-                {#each i > 0 ? plan.features.filter((entry) => !PLANS[i - 1]!.features.includes(entry)) : plan.features as feature (feature)}
-                  <li class:soon={FEATURE_LABELS[feature].soon}>
-                    <Icon name="check" size={13} />
-                    <span>{t(FEATURE_LABELS[feature].label)}{#if FEATURE_LABELS[feature].soon}<em>{t("soon")}</em>{/if}</span>
-                  </li>
-                {/each}
-              </ul>
-              {#if plan.id === session.plan}
-                <span class="plan-cta muted">{t("Your plan")}</span>
-              {:else if plan.id === "free"}
-                <span class="plan-cta muted">{t("Always free")}</span>
-              {:else if plan.id === "premium" && ent.plan === "free" && !ent.trialUsed}
-                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => session.startTrial()}>{t("Start free trial")}</button>
-              {:else if checkoutUrl(plan.id, billing)}
-                <button type="button" class="btn primary plan-cta" style:background={plan.color} style:border-color={plan.color} onclick={() => void openExternal(checkoutUrl(plan.id, billing, session.workspace.profile?.email)!)}>{t("Buy {name}", { name: plan.name })}</button>
-              {:else}
-                <button type="button" class="btn plan-cta" disabled title={t("Purchasing is coming soon")}>{t("Upgrade · coming soon")}</button>
-              {/if}
-            </article>
-          {/each}
-        </div>
-        <p class="note stand">{t("Prices are placeholders while pricing is decided. Your songs, sermons and settings stay yours on every plan.")}</p>
+        <button type="button" class="upsell" onclick={() => session.openPlans()}>
+          <span class="upsell-copy">
+            <strong>{t("Plans and pricing")}</strong>
+            <span>{t("Compare Free, Premium and Church, start a trial, use a promo code or buy.")}</span>
+          </span>
+          <span class="upsell-plans" aria-hidden="true">{#each PLANS as plan (plan.id)}<i style:background={plan.color}></i>{/each}</span>
+          <Icon name="chevron-right" size={16} />
+        </button>
 
         <p class="section-label">{t("License key")}</p>
         <section class="rows">
           <form
             class="row"
-            onsubmit={(event) => {
+            onsubmit={async (event) => {
               event.preventDefault();
-              codeError = session.redeemCode(code) ?? "";
+              codeBusy = true;
+              codeError = (await session.redeemCode(code)) ?? "";
+              codeBusy = false;
               if (!codeError) code = "";
             }}
           >
-            <div class="row-copy"><strong>{t("Add a license key")}</strong><span class:form-error={!!codeError}>{codeError || t("Paste the key from your purchase email. It starts with CS1 and is checked on this computer, no internet needed.")}</span></div>
+            <div class="row-copy"><strong>{t("Add a license key")}</strong><span class:form-error={!!codeError}>{codeError || t("Paste the key from your purchase email (it starts with CS1). The first time needs the internet; after that it works offline.")}</span></div>
             <div class="row-end">
               <input class="field license-field" aria-label={t("License key")} placeholder={t("CS1-…")} autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
-              <button type="submit" class="btn primary" disabled={!code.trim()}>{t("Add key")}</button>
+              <button type="submit" class="btn primary" disabled={!code.trim() || codeBusy}>{codeBusy ? t("Checking…") : t("Add key")}</button>
             </div>
           </form>
+        </section>
+
+        <p class="section-label">{t("Privacy")}</p>
+        <section class="rows">
+          <label class="row">
+            <div class="row-copy"><strong>{t("Share anonymous usage")}</strong><span>{t("Once a day: the app version, the computer's system and your plan. No names, songs or sermons. It helps us see what to improve.")}</span></div>
+            <input type="checkbox" role="switch" checked={session.workspace.shareUsage !== false} onchange={(event) => session.setShareUsage(event.currentTarget.checked)} />
+          </label>
         </section>
       {:else}
         <section class="rows">
@@ -1863,19 +1840,6 @@
   .sign-in .field { min-width: 160px; }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
   .license-field { width: 280px; letter-spacing: 0.02em; }
-  .pricing-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 6px; }
-  .billing { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
-  .billing button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-  .billing button.on { background: var(--ink); color: var(--panel); }
-  .billing em { margin-left: 4px; font-style: normal; color: var(--presence, #3fb950); }
-  .billing button.on em { color: inherit; opacity: 0.8; }
-  .plan-card { position: relative; }
-  .plan-card.popular { border-color: color-mix(in srgb, var(--plan) 60%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--plan) 10%, var(--field)), var(--field) 45%); }
-  .ribbon { position: absolute; top: -10px; right: 12px; padding: 2px 10px; border-radius: 999px; background: var(--plan); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
-  .price { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 0; min-height: 0 !important; }
-  .price b { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
-  .price span { font-size: 12px; color: var(--muted); }
-  .plan-card > p.tag { min-height: 34px; }
 
   /* Plans */
   .plan-hero { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid color-mix(in srgb, var(--plan) 50%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--plan) 18%, var(--field)), var(--field) 70%); flex: none; }
@@ -1883,23 +1847,6 @@
   .plan-hero .eyebrow { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); }
   .plan-hero h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 20px; font-weight: 700; }
   .plan-hero p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-  .plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; flex: none; }
-  .plan-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-top: 3px solid var(--plan); border-radius: 12px; background: var(--field); }
-  .plan-card.current { box-shadow: 0 0 0 1px var(--plan); }
-  .plan-card header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-  .plan-card header strong { font-size: 15px; }
-  .plan-card > p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; min-height: 34px; }
-  .plan-card > p.plus { min-height: 0; font-weight: 700; color: var(--ink); }
-  .plan-card ul { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-  .plan-card li { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; line-height: 1.35; }
-  .plan-card li :global(svg) { flex: none; margin-top: 1px; color: var(--plan); }
-  .plan-card li.soon { color: var(--muted); }
-  .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12px; color: var(--muted); }
-  .facts span { display: inline-flex; align-items: center; gap: 5px; }
-  .plan-card li em { margin-left: 6px; font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-  .plan-card :global(.btn.plan-cta) { width: 100%; }
-  span.plan-cta { display: block; padding: 7px 0; text-align: center; font-size: 12px; font-weight: 600; }
-  .plan-cta.muted { color: var(--muted); }
 
   /* Appearance */
   .choice-row, .theme-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -2016,7 +1963,6 @@
   @media (max-width: 760px) {
     .settings { grid-template-columns: 1fr; height: min(92dvh, 760px); }
     .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 220px; }
-    .theme-row, .split, .choice-row, .plan-grid { grid-template-columns: 1fr 1fr; }
     .row { flex-direction: column; align-items: stretch; }
     .row .field { width: 100%; }
   }
@@ -2024,4 +1970,12 @@
   .key-btn:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .key-btn.listening { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
   .key-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .upsell { display: flex; align-items: center; gap: 14px; width: 100%; margin: 14px 0; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 14px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 12%, var(--panel)), color-mix(in srgb, #7c5cff 10%, var(--panel))); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: transform 0.15s; }
+  .upsell:hover { transform: translateY(-1px); }
+  .upsell-copy { flex: 1; display: grid; gap: 2px; }
+  .upsell-copy strong { font-size: 14px; }
+  .upsell-copy span { font-size: 12px; color: var(--muted); }
+  .upsell-plans { display: inline-flex; gap: 4px; }
+  .upsell-plans i { width: 10px; height: 10px; border-radius: 50%; }
 </style>

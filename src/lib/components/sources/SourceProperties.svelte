@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TextWords from "../TextWords.svelte";
+  import InlineWords from "../InlineWords.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { mediaUrl } from "../../db/api";
@@ -267,14 +269,10 @@
         <pre class="preview">{fields.body}</pre>
       {/if}
     {:else if fields.type === "text"}
-      <label class="row">
-        <span>{t("Heading")}</span>
-        <input class="field" aria-label={t("Heading")} value={fields.heading} oninput={(event) => fields.type === "text" && (fields = { ...fields, heading: event.currentTarget.value })} />
-      </label>
-      <label class="row">
-        <span>{t("Body")}</span>
-        <textarea class="field area" aria-label={t("Body")} value={fields.body} oninput={(event) => fields.type === "text" && (fields = { ...fields, body: event.currentTarget.value })}></textarea>
-      </label>
+      <div class="row words-row">
+        <span>{t("Words")}</span>
+        <TextWords heading={fields.heading} body={fields.body} rich={fields.rich ?? null} onchange={(words) => fields.type === "text" && (fields = { ...fields, ...words })} />
+      </div>
     {:else if fields.type === "timer"}
       <label class="row">
         <span>{t("Mode")}</span>
@@ -347,14 +345,14 @@
           {/each}
         </select>
       </label>
-      <label class="row">
+      <div class="row words-row">
         <span>{t("Title")}</span>
-        <input class="field" aria-label={t("Title")} value={fields.title} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, title: event.currentTarget.value })} />
-      </label>
-      <label class="row">
+        <InlineWords text={fields.title} rich={fields.titleRich ?? null} label={t("Title")} onchange={(words) => fields.type === "lower-third" && (fields = { ...fields, title: words.text, titleRich: words.rich })} />
+      </div>
+      <div class="row words-row">
         <span>{t("Subtitle")}</span>
-        <input class="field" aria-label={t("Subtitle")} value={fields.subtitle} oninput={(event) => fields.type === "lower-third" && (fields = { ...fields, subtitle: event.currentTarget.value })} />
-      </label>
+        <InlineWords text={fields.subtitle} rich={fields.subtitleRich ?? null} label={t("Subtitle")} onchange={(words) => fields.type === "lower-third" && (fields = { ...fields, subtitle: words.text, subtitleRich: words.rich })} />
+      </div>
     {:else if fields.type === "ndi"}
       <div class="row">
         <span>{t("Source")}</span>
@@ -545,6 +543,8 @@
   fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 10px; }
   .row > span:first-child { color: var(--muted); }
+  .row.words-row { align-items: start; }
+  .row.words-row > span:first-child { padding-top: 6px; }
   .inline { display: flex; gap: 6px; min-width: 0; }
   .inline .field { flex: 1; min-width: 0; }
   .unit { color: var(--muted); font-size: 12px; align-self: center; }
@@ -562,7 +562,6 @@
     font: inherit;
     min-width: 0;
   }
-  .area { height: 88px; padding: 8px 10px; resize: vertical; }
   .check { display: flex; align-items: center; gap: 8px; margin-left: 94px; }
   .hint { margin: -6px 0 0 94px; font-size: 12px; line-height: 1.45; color: var(--muted); }
   .thumb {

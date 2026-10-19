@@ -147,3 +147,58 @@ export function readSavedStarts(raw: string | null, serviceId: string, today: st
     return {};
   }
 }
+
+/** Minutes either side of the planned start that still count as on time. */
+export const START_GRACE = 2;
+
+export type StartCheck =
+  | { kind: "on-time"; planned: number }
+  | { kind: "late"; planned: number; by: number }
+  | { kind: "early"; planned: number; by: number };
+
+/**
+ * Starting the service at `now` (minutes after midnight) against its planned start: on time, late
+ * (the plan is in the past) or early (the plan is still to come). `by` is in whole minutes.
+ */
+export function startCheck(service: Pick<Service, "startTime">, now: number): StartCheck {
+  const planned = parseClock(service.startTime) ?? (parseClock(DEFAULT_START) as number);
+  const gap = now - planned;
+  if (Math.abs(gap) <= START_GRACE) return { kind: "on-time", planned };
+  return gap > 0 ? { kind: "late", planned, by: Math.round(gap) } : { kind: "early", planned, by: Math.round(-gap) };
+}
+
+/**
+ * The plan moved to begin at `start` (minutes after midnight): each part keeps its length, and a part
+ * that runs until a clock time moves by the same amount, so the whole morning slides together.
+ */
+export function shiftSchedule<T extends Pick<Service, "sections" | "startTime">>(service: T, start: number): T {
+  const from = parseClock(service.startTime) ?? (parseClock(DEFAULT_START) as number);
+  const delta = Math.round(start) - from;
+  return {
+    ...service,
+    startTime: clockValue(start),
+    sections: service.sections.map((section) => {
+      const until = parseClock(section.until);
+      return until === null ? section : { ...section, until: clockValue(Math.min(1439, Math.max(0, until + delta))) };
+    }),
+  };
+}
+
+/** "12:34", "1:02:05" (a countdown or a count, never negative). */
+export function clockCount(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+/**
+ * How a running part stands: on time, ending soon (the last fifth of it, at least one minute and
+ * at most five), or over its time.
+ */
+export function partState(plannedMinutes: number, leftMs: number, warnMinutes?: number | null): "ok" | "soon" | "over" {
+  if (leftMs < 0) return "over";
+  const warn = (warnMinutes && warnMinutes > 0 ? warnMinutes : Math.min(5, Math.max(1, plannedMinutes * 0.2))) * 60_000;
+  return leftMs <= warn ? "soon" : "ok";
+}

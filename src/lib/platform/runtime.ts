@@ -48,3 +48,7 @@ export async function openExternal(url: string): Promise<void> {
   }
   window.open(url, "_blank", "noopener");
 }
+
+declare const __APP_VERSION__: string | undefined;
+/** This build's version (package.json), for check-ins and support emails. */
+export const APP_VERSION: string = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0";
