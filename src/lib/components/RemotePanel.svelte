@@ -1,14 +1,15 @@
 <script lang="ts">
-  import QRCode from "qrcode";
   import { session } from "../app/session.svelte";
   import { isDesktop } from "../platform/runtime";
   import { commandUrl, REMOTE_COMMANDS } from "../domain/remote";
+  import { REMOTE_PAIR_MS } from "../domain/remote";
   import { t } from "../i18n/core";
+  import Icon from "./Icon.svelte";
+  import QrView from "./QrView.svelte";
 
   let keyName = $state("");
   let newKey = $state<string | null>(null);
 
-  let qr = $state("");
   let now = $state(Date.now());
 
   const pairUrl = $derived(session.remotePairingUrl());
@@ -23,22 +24,23 @@
     return () => clearInterval(id);
   });
 
-  $effect(() => {
-    const url = pairUrl;
-    if (!url) {
-      qr = "";
-      return;
+  /** Minutes and seconds left on the code, and how much of its life is left (for the bar). */
+  const clock = $derived(`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`);
+  const left = $derived(Math.min(100, (secondsLeft * 1000 * 100) / REMOTE_PAIR_MS));
+  const digits = $derived(pairing ? pairing.code.split("") : []);
+
+  let copied = $state(false);
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(session.remoteLanUrl);
+      copied = true;
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => (copied = false), 1800);
+    } catch {
+      session.notify(t("Could not copy. Select the address and copy it."));
     }
-    let cancelled = false;
-    void QRCode.toString(url, { type: "svg", errorCorrectionLevel: "M", margin: 1, color: { dark: "#000000", light: "#ffffff" } }).then(
-      (svg) => {
-        if (!cancelled) qr = svg;
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
+  }
 
   /** Two clicks: the first arms for three seconds, the second removes the phone. */
   let armed = $state<string | null>(null);
@@ -79,19 +81,53 @@
   {#if session.remoteLanError}<p class="error" role="alert">{session.remoteLanError}</p>{/if}
   {#if pairing}
     <section class="card pair">
-      {#if qr}
-        <div class="qr" aria-label={t("Pairing QR code")}>{@html qr}</div>
-      {:else}
-        <div class="qr empty">{t("Starting the phone server…")}</div>
-      {/if}
-      <div class="pair-info">
-        <span class="step">{t("Scan with the phone's camera, or open")}</span>
-        <strong class="url">{session.remoteLanUrl || "…"}</strong>
-        <span class="step">{t("and type")}</span>
-        <p class="code">{pairing.code}</p>
-        <span class="step">{t("Expires in {secondsLeft}s · the QR code works once.", { secondsLeft })}</span>
-        <button type="button" class="btn" onclick={session.closeRemotePairing}>{t("Close pairing")}</button>
+      <div class="qr-side">
+        <div class="qr-box" aria-label={t("Pairing QR code")}>
+          {#if pairUrl}
+            <QrView qr={{ data: pairUrl, style: "square", dark: "#000000", light: "#ffffff", caption: "" }} />
+          {:else}
+            <span class="qr-wait">{t("Starting the phone server…")}</span>
+          {/if}
+        </div>
+        <div class="life" aria-hidden="true"><i style:width="{left}%" class:low={secondsLeft <= 20}></i></div>
+        <span class="expires" class:low={secondsLeft <= 20}>{t("Code expires in {clock}", { clock })}</span>
       </div>
+
+      <ol class="pair-steps">
+        <li>
+          <b>1</b>
+          <div><strong>{t("Join the same Wi-Fi")}</strong><span>{t("The phone and this computer must be on the same network.")}</span></div>
+        </li>
+        <li>
+          <b>2</b>
+          <div>
+            <strong>{t("Scan the code with the phone's camera")}</strong>
+            <span>{t("Or open this address in the phone's browser:")}</span>
+            <div class="addr">
+              <input readonly aria-label={t("Phone address")} value={session.remoteLanUrl || "…"} onfocus={(event) => event.currentTarget.select()} />
+              <button type="button" class="btn small" disabled={!session.remoteLanUrl} onclick={() => void copyAddress()}><Icon name={copied ? "check" : "copy"} size={13} />{copied ? t("Copied") : t("Copy")}</button>
+            </div>
+          </div>
+        </li>
+        <li>
+          <b>3</b>
+          <div>
+            <strong>{t("Type this code on the phone")}</strong>
+            <div class="digits" role="img" aria-label={t("Code {code}", { code: pairing.code })}>
+              {#each digits as digit, i (i)}<span class:gap={i === 3}>{digit}</span>{/each}
+            </div>
+          </div>
+        </li>
+        <li>
+          <b>4</b>
+          <div><strong>{t("Allow it here")}</strong><span>{t("This computer asks you before a phone can control the screen.")}</span></div>
+        </li>
+      </ol>
+
+      <footer class="pair-foot">
+        <button type="button" class="btn" onclick={() => void session.openRemotePairing()}><Icon name="refresh" size={13} />{t("New code")}</button>
+        <button type="button" class="btn" onclick={session.closeRemotePairing}>{t("Close pairing")}</button>
+      </footer>
     </section>
   {:else}
     <section class="rows">
@@ -163,14 +199,31 @@
 </section>
 
 <style>
-  .pair { flex-direction: row !important; align-items: center; gap: 20px !important; flex-wrap: wrap; }
-  .qr { width: 184px; height: 184px; background: #fff; border-radius: 12px; padding: 8px; flex: none; }
-  .qr :global(svg) { width: 100%; height: 100%; display: block; }
-  .qr.empty { display: grid; place-items: center; color: #333; font-size: 12px; text-align: center; }
-  .pair-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .step { font-size: 12px; color: var(--muted); }
-  .url { font-size: 14px; word-break: break-all; }
-  .code { margin: 2px 0 6px; font: 700 32px/1.1 var(--font-ui); letter-spacing: 0.2em; }
+  .pair { display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 18px 26px !important; align-items: start; }
+  .qr-side { display: grid; gap: 8px; justify-items: center; }
+  .qr-box { display: grid; place-items: center; width: 208px; height: 208px; padding: 10px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+  .qr-box :global(.qr-frame) { padding: 0; }
+  .qr-wait { padding: 0 18px; color: #333; font-size: 12px; text-align: center; }
+  .life { width: 100%; height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden; }
+  .life i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 1s linear; }
+  .life i.low { background: var(--live); }
+  .expires { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .expires.low { color: var(--live); }
+  .pair-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; min-width: 0; }
+  .pair-steps li { display: flex; gap: 12px; min-width: 0; }
+  .pair-steps li > b { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; font-weight: 800; }
+  .pair-steps li > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
+  .pair-steps strong { font-size: 13.5px; }
+  .pair-steps span { font-size: 12.5px; color: var(--muted); }
+  .addr { display: flex; gap: 6px; max-width: 420px; margin-top: 4px; min-width: 0; }
+  .addr input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: 600 13px/1 ui-monospace, "SF Mono", Menlo, monospace; }
+  .addr .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .digits { display: flex; gap: 6px; margin-top: 4px; }
+  .digits span { display: grid; place-items: center; width: 40px; height: 50px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); font: 750 26px/1 var(--font-ui); font-variant-numeric: tabular-nums; }
+  .digits span.gap { margin-left: 10px; }
+  .pair-foot { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); }
+  .pair-foot .btn { display: inline-flex; align-items: center; gap: 6px; }
+  @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
   .links { flex-direction: column; align-items: stretch !important; }
   .cmd-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
   .cmd-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }

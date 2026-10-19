@@ -2624,4 +2624,18 @@ export const fr: Readonly<Record<string, string>> = {
   "Look up a verse, read on, and it waits on Preview.": "Cherchez un verset, lisez la suite : il attend dans l’aperçu.",
   "Audience opens the big screen. It shows only Program.": "Assemblée ouvre le grand écran. Il n’affiche que le programme.",
   "Press LIVE and Preview goes to the big screen.": "Appuyez sur DIRECT et l’aperçu passe sur le grand écran.",
+
+  // Phone pairing card
+  "Could not copy. Select the address and copy it.": "Copie impossible. Sélectionnez l’adresse et copiez-la.",
+  "Code expires in {clock}": "Le code expire dans {clock}",
+  "Join the same Wi-Fi": "Rejoignez le même Wi-Fi",
+  "The phone and this computer must be on the same network.": "Le téléphone et cet ordinateur doivent être sur le même réseau.",
+  "Scan the code with the phone's camera": "Scannez le code avec l’appareil photo du téléphone",
+  "Or open this address in the phone's browser:": "Ou ouvrez cette adresse dans le navigateur du téléphone :",
+  "Phone address": "Adresse pour le téléphone",
+  Copy: "Copier",
+  "Type this code on the phone": "Saisissez ce code sur le téléphone",
+  "Allow it here": "Autorisez-le ici",
+  "This computer asks you before a phone can control the screen.": "Cet ordinateur vous demande avant qu’un téléphone puisse piloter l’écran.",
+  "New code": "Nouveau code",
 };

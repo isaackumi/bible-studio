@@ -51,10 +51,75 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
-/// The address a phone on this network can reach. A UDP "connect" sends nothing; it only asks
-/// the OS which interface routes there. Private targets keep this working on a LAN without internet.
+/// The address a phone on this network can reach. Every interface's IPv4 address is ranked: a
+/// private Wi-Fi or Ethernet address first, never a VPN tunnel (a work VPN, Tailscale's 100.64/10)
+/// or loopback, because a phone on the church Wi-Fi cannot reach those. Asking the OS which
+/// interface routes to the internet is only the fallback: with a VPN on, that is the tunnel.
 pub fn lan_host() -> Option<String> {
-    const TARGETS: [&str; 4] = ["1.1.1.1:80", "192.168.1.1:80", "10.0.0.1:80", "172.16.0.1:80"];
+    let mut found = interface_addresses();
+    found.sort_by_key(|(name, ip)| host_rank(name, *ip));
+    found
+        .into_iter()
+        .find(|(name, ip)| host_rank(name, *ip) < UNUSABLE)
+        .map(|(_, ip)| ip.to_string())
+        .or_else(routed_host)
+}
+
+const UNUSABLE: u32 = 100;
+
+/// Lower is better; UNUSABLE never goes in the QR code.
+fn host_rank(name: &str, ip: Ipv4Addr) -> u32 {
+    let tunnel = ["utun", "ipsec", "ppp", "tun", "tap", "wg", "gif", "stf", "awdl", "llw", "anpi", "tailscale", "zt"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix));
+    let cgnat = ip.octets()[0] == 100 && (64..128).contains(&ip.octets()[1]);
+    if !usable_lan_ip(std::net::IpAddr::V4(ip)) || tunnel || cgnat {
+        return UNUSABLE;
+    }
+    let physical = ["en", "eth", "wlan", "wl"].iter().any(|prefix| name.starts_with(prefix));
+    match (ip.is_private(), physical) {
+        (true, true) => 0,
+        (true, false) => 10,
+        (false, true) => 20,
+        (false, false) => 30,
+    }
+}
+
+#[cfg(unix)]
+fn interface_addresses() -> Vec<(String, Ipv4Addr)> {
+    let mut found = Vec::new();
+    let mut list: *mut libc::ifaddrs = std::ptr::null_mut();
+    // SAFETY: getifaddrs fills a linked list that freeifaddrs releases; each entry is read while
+    // the list is alive, and the name and address are copied out before it is freed.
+    unsafe {
+        if libc::getifaddrs(&mut list) != 0 {
+            return found;
+        }
+        let mut entry = list;
+        while !entry.is_null() {
+            let item = &*entry;
+            let up = item.ifa_flags & (libc::IFF_UP as u32) != 0;
+            if up && !item.ifa_addr.is_null() && i32::from((*item.ifa_addr).sa_family) == libc::AF_INET {
+                let addr = &*(item.ifa_addr as *const libc::sockaddr_in);
+                let ip = Ipv4Addr::from(u32::from_be(addr.sin_addr.s_addr));
+                let name = std::ffi::CStr::from_ptr(item.ifa_name).to_string_lossy().into_owned();
+                found.push((name, ip));
+            }
+            entry = item.ifa_next;
+        }
+        libc::freeifaddrs(list);
+    }
+    found
+}
+
+#[cfg(not(unix))]
+fn interface_addresses() -> Vec<(String, Ipv4Addr)> {
+    Vec::new()
+}
+
+/// Which interface the OS would use to reach these targets (a UDP "connect" sends nothing).
+fn routed_host() -> Option<String> {
+    const TARGETS: [&str; 4] = ["192.168.1.1:80", "10.0.0.1:80", "172.16.0.1:80", "1.1.1.1:80"];
     TARGETS.iter().find_map(|target| {
         let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
         socket.connect(target).ok()?;
@@ -341,6 +406,27 @@ mod tests {
             Parsed::Complete(req) => req,
             Parsed::Partial => panic!("partial"),
             Parsed::Invalid => panic!("invalid"),
+        }
+    }
+
+    #[test]
+    fn puts_the_wifi_address_in_the_qr_code_not_a_vpn() {
+        let wifi = Ipv4Addr::new(192, 168, 0, 24);
+        assert_eq!(host_rank("en0", wifi), 0);
+        assert!(host_rank("bridge100", Ipv4Addr::new(192, 168, 64, 1)) > host_rank("en0", wifi));
+        assert_eq!(host_rank("utun4", Ipv4Addr::new(10, 8, 0, 2)), UNUSABLE);
+        assert_eq!(host_rank("en0", Ipv4Addr::new(100, 101, 7, 9)), UNUSABLE, "Tailscale's range");
+        assert_eq!(host_rank("lo0", Ipv4Addr::LOCALHOST), UNUSABLE);
+        assert_eq!(host_rank("en1", Ipv4Addr::new(169, 254, 3, 4)), UNUSABLE);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn lists_this_computers_addresses() {
+        let found = interface_addresses();
+        assert!(found.iter().any(|(_, ip)| ip.is_loopback()), "{found:?}");
+        if let Some(host) = lan_host() {
+            assert!(host.parse::<Ipv4Addr>().is_ok_and(|ip| !ip.is_loopback()), "{host}");
         }
     }
 

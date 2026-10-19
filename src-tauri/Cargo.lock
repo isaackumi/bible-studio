@@ -601,6 +601,7 @@ dependencies = [
  "block2",
  "cpal",
  "env_logger",
+ "libc",
  "log",
  "nnnoiseless",
  "objc2",
