@@ -1518,6 +1518,15 @@ export const fr: Readonly<Record<string, string>> = {
   "Translation removed. Download it again any time.": "Traduction retirée. Vous pouvez la télécharger à nouveau à tout moment.",
   "Signed in as {name}.": "Connecté en tant que {name}.",
   "Signed out. Your library stays on this computer.": "Déconnecté. Votre bibliothèque reste sur cet ordinateur.",
+  // 0.2.1
+  "Songs line by line": "Les chants ligne par ligne",
+  "Choose how many lines show at once with Lines on the song desk. The arrows step through them, and listening follows the line being sung.": "Choisissez combien de lignes s’affichent à la fois avec Lignes sur le pupitre des chants. Les flèches les font défiler et l’écoute suit la ligne chantée.",
+  "Faster verse and song detection": "Détection plus rapide des versets et des chants",
+  "What is read or sung reaches Preview much sooner, even with a large song library.": "Ce qui est lu ou chanté arrive sur Aperçu bien plus tôt, même avec une grande bibliothèque de chants.",
+  "Your playlists stay as you left them": "Vos listes de lecture restent telles que vous les avez laissées",
+  "Church Studio now opens only once, so a second copy can no longer save over your music.": "Church Studio ne s’ouvre plus qu’une fois : une deuxième copie ne peut plus écraser votre musique.",
+  "Updates come to you": "Les mises à jour viennent à vous",
+  "When a new version is ready, a note on the desk offers it, to install after the service.": "Quand une nouvelle version est prête, une note sur le pupitre la propose, à installer après le culte.",
   // Songs line by line
   "lines {n} of {total}": "lignes {n} sur {total}",
   "Lines on the screen": "Lignes à l’écran",

@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.1",
+    date: "2026-10-20",
+    highlights: [
+      { icon: "lyrics", title: msg("Songs line by line"), text: msg("Choose how many lines show at once with Lines on the song desk. The arrows step through them, and listening follows the line being sung.") },
+      { icon: "speed", title: msg("Faster verse and song detection"), text: msg("What is read or sung reaches Preview much sooner, even with a large song library.") },
+      { icon: "audio", title: msg("Your playlists stay as you left them"), text: msg("Church Studio now opens only once, so a second copy can no longer save over your music.") },
+      { icon: "refresh", title: msg("Updates come to you"), text: msg("When a new version is ready, a note on the desk offers it, to install after the service.") },
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-10-20",
     highlights: [
