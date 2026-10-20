@@ -3,16 +3,18 @@
 // missing entry never shows a code. Placeholders are {name}: t("Step {n} of {total}", { n, total }).
 // This module has no Svelte in it so domain code can use it; i18n.svelte.ts makes it reactive.
 
+import { es } from "./es";
 import { fr } from "./fr";
 
-export type UiLanguage = "en" | "fr";
+export type UiLanguage = "en" | "fr" | "es";
 
 export const UI_LANGUAGES: Array<{ id: UiLanguage; name: string; english: string }> = [
   { id: "en", name: "English", english: "English" },
   { id: "fr", name: "Français", english: "French" },
+  { id: "es", name: "Español", english: "Spanish" },
 ];
 
-const CATALOGS: Record<UiLanguage, Readonly<Record<string, string>> | null> = { en: null, fr };
+const CATALOGS: Record<UiLanguage, Readonly<Record<string, string>> | null> = { en: null, fr, es };
 
 type Params = Record<string, string | number | null | undefined>;
 
@@ -53,7 +55,7 @@ export function t(text: string, params?: Params): string {
   return translate(read(), text, params);
 }
 
-/** A count: tn(3, "{n} step", "{n} steps"). French uses the singular for 0 and 1. */
+/** A count: tn(3, "{n} step", "{n} steps"). French uses the singular for 0 and 1; Spanish, like English, for 1. */
 export function tn(n: number, one: string, other: string, params?: Params): string {
   const language = read();
   const singular = language === "fr" ? n < 2 : n === 1;

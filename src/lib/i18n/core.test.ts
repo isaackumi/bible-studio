@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bindLanguage, guessUiLanguage, sanitizeUiLanguage, t, tn, translate } from "./core";
+import { es } from "./es";
 import { fr } from "./fr";
 
 function sources(dir: string): string[] {
@@ -39,6 +40,13 @@ describe("interface language", () => {
     expect(missing).toEqual([]);
   });
 
+  it("has a Spanish line for every line the app shows, with the same placeholders", () => {
+    const missing = [...usedKeys()].filter(([key]) => !(key in es)).map(([key, file]) => `${file}: ${key}`);
+    expect(missing).toEqual([]);
+    const wrong = Object.entries(es).filter(([key, value]) => placeholders(key).join() !== placeholders(value).join());
+    expect(wrong).toEqual([]);
+  });
+
   it("keeps the same placeholders in French", () => {
     const wrong = Object.entries(fr).filter(([key, value]) => placeholders(key).join() !== placeholders(value).join());
     expect(wrong).toEqual([]);
@@ -65,5 +73,7 @@ describe("interface language", () => {
     expect(guessUiLanguage(["tw-GH"])).toBe("en");
     expect(sanitizeUiLanguage("de")).toBe("en");
     expect(sanitizeUiLanguage("fr")).toBe("fr");
+    expect(guessUiLanguage(["es-MX", "en"])).toBe("es");
+    expect(sanitizeUiLanguage("es")).toBe("es");
   });
 });
