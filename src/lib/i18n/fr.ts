@@ -1636,6 +1636,15 @@ export const fr: Readonly<Record<string, string>> = {
   "This song has unsaved changes. Click again to discard them, or press Save.": "Ce chant a des modifications non enregistrées. Cliquez à nouveau pour les abandonner, ou appuyez sur Enregistrer.",
   "Discard changes": "Abandonner les modifications",
   Account: "Compte",
+  // 0.2.4
+  "Bring your songs from ProPresenter and EasyWorship": "Apportez vos chants depuis ProPresenter et EasyWorship",
+  "Import ProPresenter files or a whole EasyWorship library from Songs › Import, with parts, order and CCLI details.": "Importez des fichiers ProPresenter ou toute une bibliothèque EasyWorship depuis Chants › Importer, avec les parties, l’ordre et les informations CCLI.",
+  "Your own Bible, offline": "Votre propre Bible, hors ligne",
+  "Import a Bible file in your church's language (Zefania, OSIS or OpenSong) in Settings › Bible.": "Importez un fichier Bible dans la langue de votre église (Zefania, OSIS ou OpenSong) dans Réglages › Bible.",
+  "Chords for the band": "Des accords pour les musiciens",
+  "Songs from ChordPro files show chords on the stage screen, and the song desk can change their key.": "Les chants issus de fichiers ChordPro affichent les accords sur l’écran de scène, et le pupitre des chants peut changer leur tonalité.",
+  "Smoother setup": "Une installation plus simple",
+  "Setup ends with a verse ready to show, and the desk says when a trial ends or the plan needs to check in.": "L’installation se termine avec un verset prêt à afficher, et le pupitre indique quand un essai se termine ou quand l’abonnement doit se vérifier.",
   // 0.2.3
   "Undo on Program": "Annuler sur Programme",
   "Cleared or blacked the screen by mistake? Press Undo, or Command-Z (Ctrl+Z on Windows), and it comes back.": "Écran effacé ou mis au noir par erreur ? Appuyez sur Annuler, ou Commande-Z (Ctrl+Z sous Windows), et il revient.",

@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.4",
+    date: "2026-10-20",
+    highlights: [
+      { icon: "download", title: msg("Bring your songs from ProPresenter and EasyWorship"), text: msg("Import ProPresenter files or a whole EasyWorship library from Songs › Import, with parts, order and CCLI details.") },
+      { icon: "bible", title: msg("Your own Bible, offline"), text: msg("Import a Bible file in your church's language (Zefania, OSIS or OpenSong) in Settings › Bible.") },
+      { icon: "lyrics", title: msg("Chords for the band"), text: msg("Songs from ChordPro files show chords on the stage screen, and the song desk can change their key.") },
+      { icon: "check", title: msg("Smoother setup"), text: msg("Setup ends with a verse ready to show, and the desk says when a trial ends or the plan needs to check in.") },
+    ],
+  },
+  {
     version: "0.2.3",
     date: "2026-10-20",
     highlights: [
