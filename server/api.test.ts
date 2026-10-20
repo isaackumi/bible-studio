@@ -63,6 +63,18 @@ describe("server API", () => {
     expect(await call("/v1/trial", { device: "mac-1" })).toMatchObject({ status: 403, data: { used: true } });
   });
 
+  it("starts only a few new trials a day from one network address", async () => {
+    const { call, advance } = setup();
+    const from = { "cf-connecting-ip": "203.0.113.9" };
+    for (let n = 0; n < 5; n++) expect((await call("/v1/trial", { device: `vm-${n}` }, from)).status).toBe(200);
+    expect((await call("/v1/trial", { device: "vm-6" }, from)).status).toBe(429);
+    // The same computer asking again is not a new trial; another address is not limited.
+    expect((await call("/v1/trial", { device: "vm-0" }, from)).status).toBe(200);
+    expect((await call("/v1/trial", { device: "vm-7" }, { "cf-connecting-ip": "198.51.100.4" })).status).toBe(200);
+    advance(DAY);
+    expect((await call("/v1/trial", { device: "vm-8" }, from)).status).toBe(200);
+  });
+
   it("checks promo codes and charges the discounted price", async () => {
     const { call } = setup();
     await call("/v1/admin/promos", { code: "easter25", percentOff: 25, plans: ["premium"], maxUses: 2 }, { authorization: "Bearer secret" });

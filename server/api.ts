@@ -90,6 +90,10 @@ type Checkout = {
   account?: string | null;
 };
 type Trial = { device: string; startedAt: number; endsAt: number; promo: string | null };
+/** A signed-in person's trial: one per account, whichever computers they use. */
+type AccountTrial = { device: string; startedAt: number; endsAt: number };
+/** New trials one network address may start in a day (a church office shares one address). */
+export const TRIALS_PER_ADDRESS = 5;
 type Subscription = { id: string; license: string; plan: LicensePlan; interval: Interval; email: string; renewsAt: number; status: "active" | "refunded" };
 /** Per license: what it is paid through (moved on by each renewal), whatever date its key carries. */
 type LicenseRecord = { sub: string | null; email: string; paidUntil: number; test: boolean };
@@ -190,7 +194,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     case "/v1/hello":
       return hello(config, input);
     case "/v1/trial":
-      return trial(config, input);
+      return trial(config, input, request.headers.get("cf-connecting-ip"));
     case "/v1/promo": {
       const plan = input.plan === "premium" || input.plan === "church" ? input.plan : null;
       const interval = input.interval === "monthly" || input.interval === "yearly" ? input.interval : null;
@@ -302,16 +306,33 @@ function lease(config: ApiConfig, fields: { kind: LeaseKind; plan: LicensePlan; 
 
 // --- Trials --------------------------------------------------------------------------------
 
-async function trial(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
+async function trial(config: ApiConfig, input: Record<string, unknown>, address: string | null = null): Promise<Response> {
   const device = text(input.device, 80);
   if (!device) return json(400, { error: "Which computer?" });
   const now = config.now();
   const key = `trial:${device}`;
   const saved = await getJson<Trial>(config.store, key);
+  const account = input.token ? await accountOf(config, text(input.token, 80)) : null;
   if (saved) {
+    if (account) await noteAccountTrial(config, account.id, saved);
     // The same running trial again (a reinstall, a second request); never a second trial.
     if (saved.endsAt > now) return json(200, { lease: lease(config, { kind: "trial", plan: "premium", device, license: null, holder: "", endsAt: saved.endsAt }), endsAt: saved.endsAt });
     return json(403, { used: true, error: "The free trial has been used on this computer." });
+  }
+  // Signed in: one trial per person too. A second computer shares the days left of the first.
+  const mine = account ? await getJson<AccountTrial>(config.store, `trialacct:${account.id}`) : null;
+  if (mine) {
+    if (mine.endsAt <= now) return json(403, { used: true, error: "The free trial has been used on this account." });
+    await putJson(config.store, key, { device, startedAt: now, endsAt: mine.endsAt, promo: null } satisfies Trial, { startedAt: now, endsAt: mine.endsAt });
+    await noteDevice(config, device, { plan: "trial", trial: now });
+    return json(200, { lease: lease(config, { kind: "trial", plan: "premium", device, license: null, holder: "", endsAt: mine.endsAt }), endsAt: mine.endsAt });
+  }
+  // A new trial: a few a day from one network address, so new computer ids cannot farm them.
+  if (address) {
+    const counter = `trialip:${address}:${new Date(now).toISOString().slice(0, 10)}`;
+    const started = Number(await config.store.get(counter)) || 0;
+    if (started >= TRIALS_PER_ADDRESS) return json(429, { error: "Too many trials started from this network today. Try again tomorrow, or write to us." });
+    await config.store.put(counter, String(started + 1), undefined, 2 * 86_400);
   }
   const code = input.promo ? normalizeCode(text(input.promo, 40)) : null;
   const promo = code ? checkPromo(await getJson<Promo>(config.store, `promo:${code}`), "premium", null, now) : null;
@@ -320,7 +341,14 @@ async function trial(config: ApiConfig, input: Record<string, unknown>): Promise
   await putJson(config.store, key, record, { startedAt: record.startedAt, endsAt: record.endsAt });
   if (promo?.ok && promo.trialDays) await usePromo(config, promo.code);
   await noteDevice(config, device, { plan: "trial", trial: now });
+  if (account) await noteAccountTrial(config, account.id, record);
   return json(200, { lease: lease(config, { kind: "trial", plan: "premium", device, license: null, holder: "", endsAt: record.endsAt }), endsAt: record.endsAt, days });
+}
+
+/** Tie a computer's trial to the person signed in on it (the first one counts; it never grows). */
+export async function noteAccountTrial(config: ApiConfig, user: string, trial: Pick<Trial, "device" | "startedAt" | "endsAt">): Promise<void> {
+  if (await config.store.get(`trialacct:${user}`)) return;
+  await putJson(config.store, `trialacct:${user}`, { device: trial.device, startedAt: trial.startedAt, endsAt: trial.endsAt } satisfies AccountTrial, { endsAt: trial.endsAt });
 }
 
 // --- Checkout ------------------------------------------------------------------------------

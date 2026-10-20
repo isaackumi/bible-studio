@@ -234,6 +234,25 @@ const STARTS_KEY = "church-studio.section-starts";
 const DEFAULTS_KEY = "church-studio.service-defaults";
 /** The name lower third that shows who leads the part now (set in Overlays like any other). */
 const LEADER_OVERLAY = "service-leader";
+/** A trial setup should have started (it was offline then). */
+const AUTO_TRIAL_KEY = "cs-auto-trial";
+/** The last sign-in reminder given during the trial ("halfway", "ending"). */
+const TRIAL_NUDGE_KEY = "cs-trial-nudge";
+function readFlag(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeFlag(key: string, value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: the flag lasts until the app closes.
+  }
+}
 
 function uid(): string {
   return crypto.randomUUID();
@@ -4687,6 +4706,8 @@ class Session {
   finishOnboarding = () => {
     this.workspace = { ...this.workspace, onboarded: true };
     this.persistSoon();
+    // Finishing setup, or skipping it, starts the Premium trial on this computer.
+    void this.autoStartTrial();
     // The logo slide on Program now carries the church name (and theme) chosen in setup.
     // While held at startup it is redrawn on the desk only.
     if (this.live.program.model.layout === "logo") {
@@ -4877,7 +4898,65 @@ class Session {
     // started again on the server (one per computer, so it cannot repeat).
     const old = this.workspace.entitlement.trialEndsAt;
     if (this.ent.plan === "free" && this.ent.kind === null && old && Date.parse(old) > Date.now()) await this.startTrial();
+    // Setup finished offline: the trial it should have started starts now.
+    if (readFlag(AUTO_TRIAL_KEY) === "pending") await this.autoStartTrial();
+    this.nudgeTrialSignin();
   };
+
+  /**
+   * The trial that comes with a new install: started when setup ends (finished or skipped). Offline,
+   * it waits for the next start with an internet connection. Never on a computer with a plan, or
+   * one whose trial was used.
+   */
+  private autoStartTrial = async () => {
+    if (this.plan !== "free" || this.workspace.entitlement.trialUsed) {
+      writeFlag(AUTO_TRIAL_KEY, null);
+      return;
+    }
+    writeFlag(AUTO_TRIAL_KEY, "pending");
+    const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", this.trialRequest());
+    if (!answer.ok) {
+      if (answer.status === 403 || answer.status === 429) {
+        writeFlag(AUTO_TRIAL_KEY, null);
+        if (answer.status === 403) {
+          this.workspace = { ...this.workspace, entitlement: { ...this.workspace.entitlement, trialUsed: true } };
+          this.persistSoon();
+        }
+      }
+      return;
+    }
+    writeFlag(AUTO_TRIAL_KEY, null);
+    if (!(await this.keepLease(answer.data.lease))) return;
+    this.workspace = { ...this.workspace, entitlement: { ...this.workspace.entitlement, trialUsed: true } };
+    this.persistSoon();
+    const days = answer.data.days ?? TRIAL_DAYS;
+    this.notify(t("Premium is yours free for {n} days", { n: days }), {
+      detail: t("Everything is unlocked on this computer. Sign in to keep your trial and plans with you."),
+      ms: 20_000,
+      actions: this.workspace.profile?.token ? [] : [{ label: t("Sign in"), run: () => { void this.startAccountSignin(); this.dismissToast(); } }],
+    });
+  };
+
+  /** What a trial request carries: this computer, and the account when signed in (one trial a person). */
+  private trialRequest = (promo?: string) => ({ device: this.deviceId, name: this.deviceName(), ...(this.workspace.profile?.token ? { token: this.workspace.profile.token } : {}), ...(promo ? { promo } : {}) });
+
+  /**
+   * On trial and not signed in: a reminder halfway through, and again two days before it ends, that
+   * signing in keeps the trial and anything bought with this person (each said once).
+   */
+  private nudgeTrialSignin() {
+    if (this.ent.kind !== "trial" || !this.ent.endsAt || this.workspace.profile?.token) return;
+    const left = (this.ent.endsAt - Date.now()) / 86_400_000;
+    const stage = left <= 2 ? "ending" : left <= TRIAL_DAYS / 2 ? "halfway" : null;
+    if (!stage || readFlag(TRIAL_NUDGE_KEY) === stage || (stage === "halfway" && readFlag(TRIAL_NUDGE_KEY) === "ending")) return;
+    writeFlag(TRIAL_NUDGE_KEY, stage);
+    const days = Math.max(1, Math.ceil(left));
+    this.notify(stage === "ending" ? tn(days, "Your trial ends in {n} day", "Your trial ends in {n} days") : tn(days, "{n} day left in your trial", "{n} days left in your trial"), {
+      detail: t("Sign in so your trial, and any plan you choose, follow you to every computer."),
+      ms: 30_000,
+      actions: [{ label: t("Sign in"), run: () => { void this.startAccountSignin(); this.dismissToast(); } }],
+    });
+  }
 
   /** Renew the license key's lease when it is due (or now, with force). */
   checkActivation = async (force = false) => {
@@ -5123,13 +5202,14 @@ class Session {
 
   /** Start the free trial: one per computer, given by the server. Returns an error to show, or null. */
   startTrial = async (promo?: string): Promise<string | null> => {
-    const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", { device: this.deviceId, name: this.deviceName(), ...(promo ? { promo } : {}) });
+    const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", this.trialRequest(promo));
     if (!answer.ok) {
       if (answer.status === 403) {
         this.workspace = { ...this.workspace, entitlement: { ...this.workspace.entitlement, trialUsed: true } };
         this.persistSoon();
-        return t("The free trial has already been used on this computer.");
+        return /account/.test(answer.error) ? t("The free trial has already been used on this account.") : t("The free trial has already been used on this computer.");
       }
+      if (answer.status === 429) return t("Too many trials started from this network today. Try again tomorrow.");
       return answer.offline ? t("Connect to the internet to start the trial.") : answer.error;
     }
     if (!(await this.keepLease(answer.data.lease))) return this.message;

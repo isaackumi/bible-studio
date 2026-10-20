@@ -17,7 +17,7 @@
 //   GET  /signin/:id   POST /signin/:id/confirm|cancel   (the browser pages)
 
 import { readLicense, type LicensePlan } from "../src/lib/domain/license.ts";
-import { activateDevice, readAnyLicense, type ApiConfig } from "./api.ts";
+import { activateDevice, noteAccountTrial, readAnyLicense, type ApiConfig } from "./api.ts";
 import { signinPage } from "./pages.ts";
 import { getJson, putJson } from "./store.ts";
 
@@ -159,6 +159,9 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
   const account = await accountOf(config, text(input.token, 80));
   if (!account) return json(401, { signedOut: true, error: "Sign in again." });
   const device = text(input.device, 80);
+  // A trial started on this computer before signing in now belongs to the account too.
+  const deviceTrial = device ? await getJson<{ device: string; startedAt: number; endsAt: number }>(config.store, `trial:${device}`) : null;
+  if (deviceTrial) await noteAccountTrial(config, account.id, deviceTrial);
   const licenses = account.licenses
     .map((entry) => ({ entry, license: readAnyLicense(config, entry.key)?.license ?? readLicense(entry.key) }))
     .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license> } => !!item.license)

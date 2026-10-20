@@ -6,7 +6,8 @@ export type Listed = { key: string; meta: Record<string, unknown> | null };
 
 export type Store = {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string, meta?: Record<string, unknown>): Promise<void>;
+  /** `ttl`: seconds until the record goes by itself (at least 60, Cloudflare's floor). */
+  put(key: string, value: string, meta?: Record<string, unknown>, ttl?: number): Promise<void>;
   delete(key: string): Promise<void>;
   list(prefix: string): Promise<Listed[]>;
 };
@@ -14,7 +15,7 @@ export type Store = {
 /** Cloudflare KV as a Store (metadata carries the summary; list pages through every key). */
 export type KvNamespace = {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { metadata?: unknown }): Promise<void>;
+  put(key: string, value: string, options?: { metadata?: unknown; expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
   list(options: { prefix: string; cursor?: string }): Promise<{ keys: Array<{ name: string; metadata?: unknown }>; list_complete: boolean; cursor?: string }>;
 };
@@ -22,7 +23,7 @@ export type KvNamespace = {
 export function kvStore(kv: KvNamespace): Store {
   return {
     get: (key) => kv.get(key),
-    put: (key, value, meta) => kv.put(key, value, meta ? { metadata: meta } : undefined),
+    put: (key, value, meta, ttl) => kv.put(key, value, meta || ttl ? { ...(meta ? { metadata: meta } : {}), ...(ttl ? { expirationTtl: Math.max(60, Math.round(ttl)) } : {}) } : undefined),
     delete: (key) => kv.delete(key),
     async list(prefix) {
       const out: Listed[] = [];

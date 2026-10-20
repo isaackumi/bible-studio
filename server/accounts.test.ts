@@ -196,3 +196,36 @@ describe("accounts with Better Auth", () => {
     expect(done).toMatchObject({ status: "done", account: { email: "pastor@grace.org" } });
   });
 });
+
+describe("trials and accounts", () => {
+  async function signedIn(call: ReturnType<typeof setup>["call"], page: ReturnType<typeof setup>["page"], signInAs: (who: Person | null) => void, device: string) {
+    const start = (await call("/v1/signin/start", { device })).data;
+    signInAs(alice);
+    await page(`/signin/${start.id}/confirm`, { number: String(start.number) });
+    return (await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data.token as string;
+  }
+
+  it("gives one trial per person: a second computer shares the days left, and none after it ends", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, advance } = setup(identity);
+    const token = await signedIn(call, page, signInAs, "mac-1");
+    const first = await call("/v1/trial", { device: "mac-1", token });
+    advance(4 * 86_400_000);
+    const second = await call("/v1/trial", { device: "pc-2", token });
+    expect(second.status).toBe(200);
+    expect(second.data.endsAt).toBe(first.data.endsAt);
+    advance(11 * 86_400_000);
+    expect(await call("/v1/trial", { device: "laptop-3", token })).toMatchObject({ status: 403, data: { used: true } });
+  });
+
+  it("counts a trial started before signing in as the account's", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, advance } = setup(identity);
+    const first = await call("/v1/trial", { device: "mac-1" });
+    const token = await signedIn(call, page, signInAs, "mac-1");
+    await call("/v1/account", { token, device: "mac-1" });
+    advance(15 * 86_400_000);
+    expect(first.status).toBe(200);
+    expect((await call("/v1/trial", { device: "pc-2", token })).status).toBe(403);
+  });
+});

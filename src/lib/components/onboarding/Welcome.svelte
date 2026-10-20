@@ -206,6 +206,9 @@
     tested = true;
   }
 
+  /** Why signing in could not start (offline, or accounts off on the server). */
+  let accountError = $state("");
+
   /** Why the Production Desk trial could not start (offline, or already used here). */
   let trialError = $state("");
 
@@ -403,6 +406,26 @@
                   <li class:pending={!session.output.online}><Icon name="cast" size={15} /><span>{session.output.online ? t("Audience window open") : t("Audience screen: open it from the desk when the projector is on")}</span></li>
                   <li class="pending"><Icon name="mic" size={15} /><span>{t("Voice: press Listen on the desk when you want it")}</span></li>
                 </ul>
+                {#if session.plan === "free" && !session.workspace.entitlement.trialUsed}
+                  <p class="trial-note"><Icon name="sparkles" size={14} /> {t("Premium is free for {n} days, from when you open your desk. No card needed.", { n: TRIAL_DAYS })}</p>
+                {/if}
+                <div class="account-card" aria-live="polite">
+                  {#if session.workspace.profile?.token}
+                    <Icon name="check" size={15} />
+                    <span><strong>{t("Signed in as {name}", { name: session.workspace.profile.name || session.workspace.profile.email })}</strong><em>{t("Your trial and plans follow you to every computer.")}</em></span>
+                  {:else if session.accountSignin?.status === "waiting"}
+                    <Icon name="globe" size={15} />
+                    <span><strong>{t("In your browser, tap {number}", { number: session.accountSignin.number })}</strong><em>{t("Sign in there, then tap the number this screen shows.")}</em></span>
+                    <span class="account-actions">
+                      <button type="button" class="btn quiet small" onclick={() => session.reopenAccountSignin()}>{t("Open the page again")}</button>
+                      <button type="button" class="btn quiet small" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
+                    </span>
+                  {:else}
+                    <Icon name="user" size={15} />
+                    <span><strong>{t("Keep your trial with you")} <small>{t("Optional")}</small></strong><em>{accountError || session.accountSignin?.message || t("Sign in with Google, Microsoft, Apple or an email link. Your trial and any plan follow you to every computer.")}</em></span>
+                    <span class="account-actions"><button type="button" class="btn quiet small" onclick={async () => (accountError = (await session.startAccountSignin()) ?? "")}>{t("Sign in")}</button></span>
+                  {/if}
+                </div>
                 <div class="desk-pick" role="radiogroup" aria-label={t("Desk")}>
                   <button type="button" role="radio" aria-checked={desk === "pewbeam"} class:on={desk === "pewbeam"} onclick={() => (deskChoice = "pewbeam")}>
                     <Icon name="pew" size={16} /><span><strong>{t("Presenter Desk")}</strong><em>{t("Scripture, songs and sermons")}</em></span>
@@ -603,6 +626,17 @@
   .tour-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .tour-link:hover { text-decoration: underline; }
   .screen-note { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 55%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 10%, transparent); font-size: 13px; line-height: 1.4; }
+  .trial-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
+  .trial-note :global(svg) { color: var(--accent); flex: none; }
+  .account-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 60%, transparent); }
+  .account-card > :global(svg) { flex: none; color: var(--muted); }
+  .account-card > span:not(.account-actions) { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .account-card strong { font-size: 13px; font-weight: 700; }
+  .account-card small { margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 10%, transparent); font-size: 10.5px; font-weight: 650; color: var(--muted); }
+  .account-card em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .account-actions { display: flex; gap: 4px; flex: none; }
+  .account-actions .btn.small { height: 32px; padding: 0 12px; font-size: 13px; border-color: var(--line); background: var(--field); color: var(--ink); }
+  .account-actions .btn.small:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
   .trial-error { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 60%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 12%, transparent); font-size: 13px; line-height: 1.4; }
   .btn:disabled { opacity: 0.5; cursor: default; }
 
