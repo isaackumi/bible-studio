@@ -765,6 +765,8 @@ class Session {
 
   // Macros: one button, several steps in order.
   macrosOpen = $state(false);
+  /** Go to anything (⌘K): pages, the service, songs, verses, settings and actions. */
+  commandOpen = $state(false);
   /** The macro running now and the step it is on (for the button's progress). */
   runningMacro = $state<{ id: string; step: number } | null>(null);
 
@@ -3843,8 +3845,9 @@ class Session {
         this.timeUp = { sectionId: running, nextId: next?.id ?? null, since: deadline.endsAt };
         chime();
         const part = service.sections[index]!;
-        // Seen on any page of the desk, not only the Service page.
-        this.notify(t("{part}'s time is up.", { part: part.name }), {
+        // The Service page and the Presenter pages' service strip say so themselves; elsewhere (the
+        // Production Desk) a note does.
+        if (this.workspace.appearance.desk !== "pewbeam") this.notify(t("{part}'s time is up.", { part: part.name }), {
           detail: next ? t("Next: {next}", { next: next.name }) : t("This is the last part."),
           ms: 60_000,
           actions: [

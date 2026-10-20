@@ -36,7 +36,11 @@
     {/if}
     {#if session.presenterPartId === part.id}<span class="tag" title={t("This part runs here, on the Presenter page. What goes LIVE counts as this part.")}>{t("On the Presenter page")}</span>{/if}
     <span class="grow"></span>
-    {#if next}
+    {#if session.timeUp && session.timeUp.sectionId === part.id}
+      <span class="up" role="alert"><Icon name="timer" size={13} /> {t("{part}'s time is up", { part: part.name })}</span>
+      <button type="button" class="btn" onclick={() => session.snoozeTimeUp(5)}>{t("5 more min")}</button>
+      {#if next}<button type="button" class="btn primary" onclick={() => void session.moveOn(part.id)}>{t("Move on now")} <Icon name="chevron-right" size={13} /></button>{/if}
+    {:else if next}
       <button type="button" class="btn" title={t("Begin {part}: its first item goes up", { part: next.name })} onclick={() => void session.moveOn(part.id)}>{t("Next part: {part}", { part: next.name })} <Icon name="chevron-right" size={13} /></button>
     {/if}
     <button type="button" class="btn back" title={t("The running order")} onclick={() => session.returnToService()}><Icon name="list" size={13} /> {t("Back to the service")}</button>
@@ -61,5 +65,7 @@
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
   .btn:hover { background: var(--field); }
   .btn.back { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .btn.primary { border-color: transparent; background: #e5484d; color: #fff; }
+  .up { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #ff8b8e; white-space: nowrap; }
   @media (max-width: 900px) { .what em, .tag { display: none; } }
 </style>

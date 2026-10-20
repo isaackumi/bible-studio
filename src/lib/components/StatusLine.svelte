@@ -32,10 +32,9 @@
 <style>
   .status-line {
     position: fixed;
-    left: 50%;
-    bottom: 18px;
+    left: 20px;
+    bottom: 20px;
     z-index: 870;
-    translate: -50% 0;
     max-width: min(640px, calc(100vw - 48px));
     padding: 8px 14px;
     border: 1px solid var(--line);

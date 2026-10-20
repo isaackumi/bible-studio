@@ -4,13 +4,13 @@
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
 
-  // A short note after an action, top right under the bar: what happened, where, and one or two buttons.
+  // A short note after an action, bottom right (clear of the bar, the service strip and Preview): what happened, where, and one or two buttons.
   const toast = $derived(session.toast);
 </script>
 
 {#if toast}
   {#key toast.id}
-    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: -10, duration: 180 }}>
+    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: 10, duration: 180 }}>
       <span class="tick"><Icon name="check" size={14} /></span>
       <div class="copy">
         <strong>{toast.text}</strong>
@@ -28,7 +28,7 @@
   .toast {
     position: fixed;
     right: 20px;
-    top: 66px;
+    bottom: 20px;
     z-index: 900;
     display: flex;
     align-items: center;

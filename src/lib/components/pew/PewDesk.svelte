@@ -730,6 +730,7 @@
       </span>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
+      <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={t("Go to a page, song, verse, part or setting (⌘K)")} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
       <ToolMenu label={t("View")} tip={t("Panels, monitors and focus")} tour="view">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}

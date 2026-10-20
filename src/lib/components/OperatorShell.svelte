@@ -2,6 +2,7 @@
   import RemoteApproval from "./RemoteApproval.svelte";
   import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
+  import CommandPalette from "./CommandPalette.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
   import WhatsNew from "./WhatsNew.svelte";
@@ -165,6 +166,7 @@
     <RemoteApproval />
     <Paywall />
     <Toast />
+    <CommandPalette />
     <UpdateNotice />
     <StatusLine />
     <WhatsNew />
