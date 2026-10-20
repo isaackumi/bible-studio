@@ -10,11 +10,13 @@
 //   POST /v1/release    {key, device}                          → {ok, seats, devices}
 //   POST /v1/devices    {key, device?}                         → {ok, seats, devices}
 //   GET  /pay/:session  POST /pay/:session[/cancel]            (the mock provider's checkout page)
+//   Accounts (optional; see accounts.ts): /v1/signin/*, /v1/account*, /signin/:id, /auth/*
 //   GET  /admin                                                (the admin page; asks for the admin token)
 //   GET  /v1/admin/stats, GET|POST /v1/admin/promos, POST /v1/admin/refund   (Authorization: Bearer ADMIN_TOKEN)
 
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
+import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
 import type { Provider } from "./billing.ts";
 import { adminPage, payPage } from "./pages.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
@@ -32,6 +34,8 @@ export type ApiConfig = {
    */
   testSigningKey?: string;
   provider: Provider;
+  /** Who is signed in (accounts.ts); missing: accounts are off and everything else still works. */
+  identity?: Identity;
   adminToken?: string;
   /** Days a computer may stay offline before it must check in (a lease's reach). */
   leaseDays: number;
@@ -77,6 +81,8 @@ type Checkout = {
   key?: string;
   license?: string;
   reference?: string | null;
+  /** The account that bought it, when the buyer was signed in. */
+  account?: string | null;
 };
 type Trial = { device: string; startedAt: number; endsAt: number; promo: string | null };
 type Subscription = { id: string; license: string; plan: LicensePlan; interval: Interval; email: string; renewsAt: number; status: "active" | "refunded" };
@@ -94,7 +100,7 @@ const testSigner = (config: ApiConfig): Signer => {
 };
 
 /** Read a key with the real key, else the test key; the signer that made it signs its leases too. */
-function readAnyLicense(config: ApiConfig, text: string): { license: License; signer: Signer } | null {
+export function readAnyLicense(config: ApiConfig, text: string): { license: License; signer: Signer } | null {
   for (const signer of [realSigner(config), testSigner(config)]) {
     const license = readLicense(text, signer.public);
     if (license) return { license, signer };
@@ -128,6 +134,9 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (path === "/admin" && request.method === "GET") return html(200, adminPage());
   const pay = path.match(/^\/pay\/([A-Za-z0-9_]+)(\/cancel)?$/);
   if (pay) return payRoute(request, config, pay[1]!, !!pay[2]);
+  const signin = path.match(/^\/signin\/([0-9a-f]{24})(?:\/(confirm|cancel))?$/);
+  if (signin) return signinRoute(request, config, signin[1]!, signin[2]);
+  if (path.startsWith("/auth/")) return config.identity ? config.identity.handler(request) : json(404, { error: "Accounts are not set up on this server yet." });
 
   // Admin.
   if (path.startsWith("/v1/admin/")) {
@@ -183,7 +192,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     case "/v1/devices":
       return seats(config, path, input);
     default:
-      return json(404, { error: "Not found" });
+      return (await accountApi(config, path, input, origin)) ?? json(404, { error: "Not found" });
   }
 }
 
@@ -304,7 +313,8 @@ async function trial(config: ApiConfig, input: Record<string, unknown>): Promise
 async function startCheckout(config: ApiConfig, input: Record<string, unknown>, origin: string): Promise<Response> {
   const plan = input.plan === "premium" || input.plan === "church" ? input.plan : null;
   const interval = input.interval === "monthly" || input.interval === "yearly" ? input.interval : null;
-  const email = text(input.email, 120);
+  const account = input.token ? await accountOf(config, text(input.token, 80)) : null;
+  const email = text(input.email, 120) || account?.email || "";
   if (!plan || !interval) return json(400, { error: "Which plan and billing?" });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { error: "An email address is needed for the receipt and the key." });
   const code = input.promo ? normalizeCode(text(input.promo, 40)) : null;
@@ -327,6 +337,7 @@ async function startCheckout(config: ApiConfig, input: Record<string, unknown>, 
     device: text(input.device, 80) || null,
     status: "pending",
     createdAt: config.now(),
+    account: account?.id ?? null,
   };
   let link: { url: string; reference: string | null };
   try {
@@ -375,6 +386,8 @@ export async function completeCheckout(config: ApiConfig, sessionId: string, sub
   await putJson(config.store, `sub:${subId}`, sub, { status: sub.status, plan: sub.plan, interval: sub.interval });
   await putJson(config.store, `license:${license}`, { sub: subId, email: order.email, paidUntil, test: signer.test } satisfies LicenseRecord);
   await usePromo(config, order.promo);
+  await noteLicenseEmail(config, order.email, { id: license, key });
+  if (order.account) await linkLicense(config, order.account, { id: license, key });
   if (order.device) {
     const trialRecord = await getJson<Trial>(config.store, `trial:${order.device}`);
     if (trialRecord) await putJson(config.store, `trial:${order.device}`, trialRecord, { startedAt: trialRecord.startedAt, endsAt: trialRecord.endsAt, converted: true });
@@ -454,7 +467,7 @@ async function keyEnds(config: ApiConfig, license: License): Promise<number | nu
   return start + license.days * DAY;
 }
 
-async function activateDevice(config: ApiConfig, keyText: string, device: string, name: string): Promise<{ status: number; body: Record<string, unknown>; lease?: string }> {
+export async function activateDevice(config: ApiConfig, keyText: string, device: string, name: string): Promise<{ status: number; body: Record<string, unknown>; lease?: string }> {
   const read = readAnyLicense(config, keyText);
   if (!read) return { status: 401, body: { error: "That license key is not valid." } };
   const { license, signer } = read;

@@ -6,7 +6,7 @@ import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-pl
 import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
-import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult } from "../domain/billing";
+import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SigninPoll, type SigninStart } from "../domain/billing";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -4448,6 +4448,8 @@ class Session {
       }
     }
     await this.checkActivation();
+    // Signed in, but not on a license yet (a plan bought on another computer): pick it up.
+    if (this.workspace.profile?.token && this.ent.kind !== "license") await this.syncAccount();
     // Moving from a build that kept the trial on the computer: a trial still running there is
     // started again on the server (one per computer, so it cannot repeat).
     const old = this.workspace.entitlement.trialEndsAt;
@@ -4547,7 +4549,7 @@ class Session {
     return false;
   };
 
-  /** Local sign-in: name and email on this computer until accounts are online. */
+  /** Local sign-in: a name and email on this computer only (the development test user). */
   signIn = (name: string, email: string): string | null => {
     if (!validEmail(email)) return "Type a valid email address.";
     this.workspace = { ...this.workspace, profile: sanitizeProfile({ name, email }) };
@@ -4557,9 +4559,97 @@ class Session {
   };
 
   signOut = () => {
+    const token = this.workspace.profile?.token;
+    if (token) void serverCall("/v1/account/signout", { token });
+    this.cancelAccountSignin();
     this.workspace = { ...this.workspace, profile: null };
     this.persistSoon();
     this.message = t("Signed out. Your library stays on this computer.");
+  };
+
+  // Signing in to an account: the browser does the signing in (Google, Microsoft, Apple or an
+  // emailed link); the app shows a number to tap there, then collects its account token. The plan
+  // follows the account, so a second computer needs no key.
+
+  /** A sign-in waiting in the browser. */
+  accountSignin = $state<{ id: string; url: string; number: number; status: "waiting" | "error"; message?: string } | null>(null);
+  private signinTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Open the sign-in page in the browser and wait for it. Returns an error to show, or null. */
+  startAccountSignin = async (): Promise<string | null> => {
+    const answer = await serverCall<SigninStart>("/v1/signin/start", { device: this.deviceId, name: this.deviceName() });
+    if (!answer.ok) return answer.offline ? t("Connect to the internet to sign in.") : answer.error;
+    this.accountSignin = { id: answer.data.id, url: answer.data.url, number: answer.data.number, status: "waiting" };
+    await openExternal(answer.data.url).catch(() => {});
+    this.watchSignin(answer.data.id, answer.data.secret, answer.data.expiresAt);
+    return null;
+  };
+
+  private watchSignin(id: string, secret: string, expiresAt: number) {
+    clearTimeout(this.signinTimer);
+    this.signinTimer = setTimeout(async () => {
+      if (this.accountSignin?.id !== id) return;
+      const answer = await serverCall<SigninPoll>("/v1/signin/poll", { id, secret });
+      if (this.accountSignin?.id !== id) return;
+      if (answer.ok && answer.data.status === "done" && answer.data.token && answer.data.account) {
+        this.accountSignin = null;
+        this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...answer.data.account, token: answer.data.token }) };
+        this.persistSoon();
+        this.message = t("Signed in as {name}.", { name: this.workspace.profile?.name });
+        await this.syncAccount();
+        return;
+      }
+      const ended = answer.ok && answer.data.status !== "pending";
+      if (ended || Date.now() > expiresAt) {
+        this.accountSignin = { ...this.accountSignin, status: "error", message: t("That sign-in ended before it finished. Try again.") };
+        return;
+      }
+      this.watchSignin(id, secret, expiresAt);
+    }, 2000);
+  }
+
+  /** Open the waiting sign-in page again. */
+  reopenAccountSignin = () => {
+    if (this.accountSignin?.url) void openExternal(this.accountSignin.url).catch(() => {});
+  };
+
+  cancelAccountSignin = () => {
+    clearTimeout(this.signinTimer);
+    this.accountSignin = null;
+  };
+
+  /**
+   * Ask the account for its plans: the best one with a free seat comes to this computer, with no
+   * key to type. A computer already on its own license key keeps it. Returns what happened, to show.
+   */
+  syncAccount = async (): Promise<string | null> => {
+    const token = this.workspace.profile?.token;
+    if (!token) return null;
+    const answer = await serverCall<AccountStatus>("/v1/account", { token, device: this.deviceId, name: this.deviceName() });
+    if (!answer.ok) {
+      if ((answer.data as { signedOut?: boolean }).signedOut && this.workspace.profile) {
+        const { token: _dropped, ...rest } = this.workspace.profile;
+        this.workspace = { ...this.workspace, profile: rest };
+        this.persistSoon();
+        return t("Your account signed out on this computer. Sign in again to use its plan.");
+      }
+      return answer.offline ? null : answer.error;
+    }
+    const { account, lease, activation } = answer.data;
+    this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...account, token }) };
+    this.persistSoon();
+    if (this.workspace.entitlement.source === "license" && this.ent.kind === "license" && this.plan !== "free") return null;
+    if (lease && activation?.key) {
+      const entitlement = redeemCode(this.workspace.entitlement, activation.key, { now: Date.now() });
+      if (entitlement.ok) this.workspace = { ...this.workspace, entitlement: entitlement.entitlement };
+      this.persistSoon();
+      await this.keepLease(lease);
+      await this.checkActivation(true);
+      this.message = t("Your account's {plan} plan is on this computer.", { plan: this.plan === "church" ? "Church" : "Premium" });
+      return null;
+    }
+    if (activation?.status === 409) return t("Your account's plan is in use on all the computers it covers. Release one, then sign in again.");
+    return answer.data.licenses.length ? null : t("No plan on this account yet.");
   };
 
   /**
@@ -4640,7 +4730,8 @@ class Session {
 
   /** Open a checkout for a plan; the app then waits for the payment. Returns an error, or null. */
   buy = async (input: { plan: "premium" | "church"; interval: Interval; email: string; name: string; promo?: string }): Promise<string | null> => {
-    const answer = await serverCall<CheckoutStart>("/v1/checkout", { ...input, device: this.deviceId });
+    const token = this.workspace.profile?.token;
+    const answer = await serverCall<CheckoutStart>("/v1/checkout", { ...input, device: this.deviceId, ...(token ? { token } : {}) });
     if (!answer.ok) return answer.error;
     this.billingTest = answer.data.test;
     this.checkout = { session: answer.data.session, url: answer.data.url, plan: input.plan, status: "waiting" };

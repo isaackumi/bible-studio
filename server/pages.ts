@@ -170,3 +170,103 @@ async function refund(form) {
 load();
 </script></body></html>`;
 }
+
+type SigninState = "choose" | "confirm" | "done" | "wrong" | "expired" | "missing";
+type SigninView = { state: SigninState; id: string; device?: string; email?: string; methods?: string[]; choices?: number[] };
+
+const METHOD_LABELS: Record<string, { label: string; icon: string }> = {
+  google: { label: "Continue with Google", icon: `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.7-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1C3.4 21.4 7.4 24 12 24z"/><path fill="#FBBC05" d="M5.4 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.6.4-2.4V6.5h-4C.5 8.2 0 10 0 12s.5 3.8 1.4 5.5l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.4 0 3.4 2.6 1.4 6.5l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>` },
+  microsoft: { label: "Continue with Microsoft", icon: `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#F25022" d="M3 3h8.5v8.5H3z"/><path fill="#7FBA00" d="M12.5 3H21v8.5h-8.5z"/><path fill="#00A4EF" d="M3 12.5h8.5V21H3z"/><path fill="#FFB900" d="M12.5 12.5H21V21h-8.5z"/></svg>` },
+  apple: { label: "Continue with Apple", icon: `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1-2.8-4.1zM14 5.1c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>` },
+};
+
+/** The browser side of signing the app in: choose how, then tap the number the app shows. */
+export function signinPage({ state, id, device, email, methods = [], choices = [] }: SigninView): string {
+  const social = methods.filter((method) => METHOD_LABELS[method]);
+  const body =
+    state === "missing"
+      ? `<h1>Sign-in not found</h1><p class="muted">This link has ended or was mistyped. Choose <b>Sign in</b> in Church Studio to start again.</p>`
+      : state === "expired"
+        ? `<h1>This sign-in has ended</h1><p class="muted">Nothing was signed in. Choose <b>Sign in</b> in Church Studio to start again.</p>`
+        : state === "wrong"
+          ? `<h1>That number didn't match</h1><p class="muted">For your safety this sign-in has ended and nothing was signed in. Choose <b>Sign in</b> in Church Studio to try again.</p>`
+          : state === "done"
+            ? `<div class="done"><span class="tick">✓</span></div><h1>You're signed in</h1><p class="muted">Church Studio is signed in${email ? ` as <b>${escape(email)}</b>` : ""}. You can close this tab and go back to the app.</p>`
+            : state === "confirm"
+              ? `
+      <p class="eyebrow">Step 2 of 2</p>
+      <h1>Which number is on your screen?</h1>
+      <p class="muted">Tap the number Church Studio shows on <b>${escape(device ?? "your computer")}</b>. This makes sure you are signing in your own computer.</p>
+      <form method="post" action="/signin/${escape(id)}/confirm" class="numbers">
+        ${choices.map((choice) => `<button type="submit" name="number" value="${choice}">${choice}</button>`).join("")}
+      </form>
+      <p class="who">Signed in as <b>${escape(email ?? "")}</b> · <button type="button" class="link" onclick="switchAccount()">Use another account</button></p>
+      <form method="post" action="/signin/${escape(id)}/cancel"><button type="submit" class="cancel">This wasn't me · cancel</button></form>`
+              : `
+      <p class="eyebrow">Step 1 of 2</p>
+      <h1>Sign in to Church Studio</h1>
+      <p class="muted">Signing in <b>${escape(device ?? "your computer")}</b>. Your plan follows your account, so another computer only needs you to sign in. No password to remember.</p>
+      <div class="methods">
+        ${social.map((method) => `<button type="button" class="method" onclick="social('${method}')">${METHOD_LABELS[method]!.icon}<span>${METHOD_LABELS[method]!.label}</span></button>`).join("")}
+      </div>
+      ${
+        methods.includes("email")
+          ? `${social.length ? `<div class="or"><span>or</span></div>` : ""}
+      <form class="email" onsubmit="event.preventDefault(); emailLink(this)">
+        <input name="email" type="email" required autocomplete="email" placeholder="you@church.org" aria-label="Email" />
+        <button type="submit">Email me a sign-in link</button>
+      </form>`
+          : ""
+      }
+      <p id="msg" class="msg" role="status"></p>
+      <form method="post" action="/signin/${escape(id)}/cancel"><button type="submit" class="cancel">Cancel</button></form>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in · Church Studio</title>
+<style>${BASE_CSS}
+  main { width: min(420px, calc(100% - 32px)); margin: 8vh auto; padding: 30px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 60px rgb(0 0 0 / .12); }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-weight: 750; }
+  .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 0 0 10px; font-size: 23px; letter-spacing: -.015em; line-height: 1.25; }
+  .muted { margin: 0 0 22px; color: var(--muted); }
+  .methods { display: grid; gap: 10px; }
+  .method { display: flex; align-items: center; justify-content: center; gap: 10px; height: 46px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-weight: 650; cursor: pointer; transition: border-color .15s, transform .1s; }
+  .method:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); } .method:active { transform: scale(.99); }
+  .or { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--muted); font-size: 13px; } .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .email { display: grid; gap: 10px; }
+  .email input { height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
+  .email input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
+  .email button { height: 46px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } .email button:hover { filter: brightness(1.06); }
+  .msg { min-height: 20px; margin: 14px 0 0; font-size: 14px; color: var(--muted); } .msg.good { color: var(--good); font-weight: 650; }
+  .numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .numbers button { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, transform .1s; }
+  .numbers button:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); } .numbers button:active { transform: scale(.97); }
+  .who { margin: 0; font-size: 13px; color: var(--muted); }
+  .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+  .cancel { width: 100%; margin-top: 14px; height: 38px; border: 0; background: none; color: var(--muted); cursor: pointer; }
+  .done { display: grid; place-items: center; margin: 4px 0 18px; } .tick { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--good); color: #fff; font-size: 32px; font-weight: 900; animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } }
+  footer { margin-top: 20px; text-align: center; font-size: 12px; color: var(--muted); }
+</style></head><body><main>
+  <header><span class="mark"><i></i><i></i><i></i><i></i></span>Church Studio</header>
+  ${body}
+  <footer>An account is optional. Church Studio works without one.</footer>
+</main>
+<script>
+const here = location.origin + location.pathname;
+const msg = (text, good) => { const el = document.getElementById("msg"); if (el) { el.textContent = text; el.className = good ? "msg good" : "msg"; } };
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.message || data.error || "Something went wrong. Try again.");
+  return data;
+}
+async function social(provider) {
+  msg("Opening " + provider[0].toUpperCase() + provider.slice(1) + "…");
+  try { const data = await post("/auth/sign-in/social", { provider, callbackURL: here }); if (data.url) location.href = data.url; } catch (e) { msg(e.message); }
+}
+async function emailLink(form) {
+  const email = form.email.value.trim();
+  try { await post("/auth/sign-in/magic-link", { email, callbackURL: here }); msg("Check " + email + " for the sign-in link, and open it on this device.", true); } catch (e) { msg(e.message); }
+}
+async function switchAccount() { try { await post("/auth/sign-out", {}); } catch {} location.href = here; }
+</script></body></html>`;
+}

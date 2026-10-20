@@ -572,8 +572,8 @@ export type Workspace = {
   entitlement: import("./plans").Entitlement;
   /** First-run setup finished or skipped. */
   onboarded: boolean;
-  /** Who is signed in on this computer (local until accounts are online). */
-  profile: { name: string; email: string } | null;
+  /** Who is signed in: an online account (with its token), or a name kept on this computer. */
+  profile: import("./plans").Profile | null;
 };
 
 /** Voice command preferences. Program-changing commands still need Live voice commands each launch. */

@@ -58,6 +58,36 @@ npx wrangler deploy
 (pages say TEST MODE). Deploy the server before shipping an app build that uses it: the app asks
 for leases, which older servers do not give.
 
+## Accounts (optional sign-in)
+
+Nobody has to sign in to use the app. Signing in ties plans to a person, so a second computer
+activates by signing in instead of copying a key. `accounts.ts` has the flow; `auth.ts` is Better
+Auth (Google, Microsoft, Apple, emailed link) with its users in a D1 database.
+
+The app signs in like a TV app: it opens `/signin/<id>` in the browser, the person signs in there
+and taps the number the app shows, and the app collects an account token. A plan bought with an
+email turns up on the account of whoever signs in with that email, once the email is verified.
+
+Accounts stay off until the database is set up. Once, from this folder:
+
+```
+npx wrangler d1 create church-studio-auth
+```
+
+Add what it prints to `wrangler.jsonc` with `"binding": "AUTH_DB"`, then run `./server/deploy.sh`.
+That makes the accounts secret (`~/.church-studio/auth-secret.txt`) and the tables (`auth-schema.sql`).
+Email sign-in links need `RESEND_API_KEY`. Each other method appears once its two secrets are set:
+
+| Method | Secrets | Redirect URL to register |
+| --- | --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://license.heitechinc.com/auth/callback/google` |
+| Microsoft | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | `https://license.heitechinc.com/auth/callback/microsoft` |
+| Apple | `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET` | `https://license.heitechinc.com/auth/callback/apple` |
+
+Locally, `npm run server:dev` has accounts on: sign-in links print in its terminal, and setting
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (and so on) before starting it adds those buttons.
+After changing the plugins in `auth.ts`, run `node server/auth-schema.ts` to remake the tables file.
+
 ## Choosing a payment provider later
 
 Set `BILLING_PROVIDER` and that provider's secrets; the app does not change.

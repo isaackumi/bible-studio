@@ -342,9 +342,8 @@
   let codeBusy = $state(false);
   let trialBusy = $state(false);
   let trialError = $state("");
-  let signInName = $state("");
-  let signInEmail = $state("");
   let signInError = $state("");
+  let accountBusy = $state(false);
   const visibleGroups = $derived.by(() => {
     const needle = search.trim().toLowerCase();
     return groups
@@ -1437,31 +1436,47 @@
         {@const current = planById(session.plan)}
         {@const ent = session.workspace.entitlement}
         {@const profile = session.workspace.profile}
+        {@const signin = session.accountSignin}
         <section class="rows">
-          {#if profile}
+          {#if signin}
+            <div class="row stack signin-wait" role="status" aria-live="polite">
+              {#if signin.status === "waiting"}
+                <div class="row-copy"><strong>{t("Finish signing in in your browser")}</strong><span>{t("When the page asks, tap this number:")}</span></div>
+                <div class="signin-number" aria-label={t("Sign-in number {number}", { number: signin.number })}>{signin.number}</div>
+                <div class="sign-in">
+                  <button type="button" class="btn" onclick={() => session.reopenAccountSignin()}>{t("Open the page again")}</button>
+                  <button type="button" class="btn" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
+                </div>
+              {:else}
+                <div class="row-copy"><strong>{t("Sign in")}</strong><span>{signin.message}</span></div>
+                <div class="sign-in">
+                  <button type="button" class="btn primary" onclick={async () => { signInError = (await session.startAccountSignin()) ?? ""; }}>{t("Try again")}</button>
+                  <button type="button" class="btn" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
+                </div>
+              {/if}
+            </div>
+          {:else if profile}
             <div class="row">
               <div class="row-lead">
                 <span class="avatar" style:background={current.color}>{initials(profile.name)}</span>
-                <div class="row-copy"><strong>{profile.name}</strong><span>{t("{email} · signed in on this computer", { email: profile.email })}</span></div>
+                <div class="row-copy"><strong>{profile.name}</strong><span>{profile.token ? t("{email} · your plan follows this account", { email: profile.email }) : t("{email} · signed in on this computer", { email: profile.email })}</span></div>
               </div>
               <div class="row-end">
                 <span class="pill" style:background={`color-mix(in srgb, ${current.color} 20%, transparent)`} style:color={current.color}>{current.name}</span>
+                {#if profile.token}
+                  <button type="button" class="btn" disabled={accountBusy} onclick={async () => { accountBusy = true; signInError = (await session.syncAccount()) ?? ""; accountBusy = false; }}>{t("Check plan")}</button>
+                {:else}
+                  <button type="button" class="btn primary" onclick={async () => { signInError = (await session.startAccountSignin()) ?? ""; }}>{t("Sign in to your account")}</button>
+                {/if}
                 <button type="button" class="btn" onclick={() => session.signOut()}>{t("Sign out")}</button>
               </div>
             </div>
+            {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
           {:else}
-            <form
-              class="row stack"
-              onsubmit={(event) => {
-                event.preventDefault();
-                signInError = session.signIn(signInName, signInEmail) ?? "";
-              }}
-            >
-              <div class="row-copy"><strong>{t("Sign in")}</strong><span>{t("Your name and email, kept on this computer. Online accounts arrive with purchasing and cloud sync.")}</span></div>
+            <div class="row stack">
+              <div class="row-copy"><strong>{t("Sign in")}</strong><span>{t("Optional. Your plan follows your account, so another computer only needs you to sign in. Google, Microsoft, Apple or an email link, in your browser.")}</span></div>
               <div class="sign-in">
-                <input class="field grow" aria-label={t("Your name")} placeholder={t("Your name")} autocomplete="name" bind:value={signInName} />
-                <input class="field grow" aria-label={t("Email")} placeholder="you@church.org" type="email" autocomplete="email" bind:value={signInEmail} />
-                <button type="submit" class="btn primary" disabled={!signInEmail.trim()}>{t("Sign in")}</button>
+                <button type="button" class="btn primary" onclick={async () => { signInError = (await session.startAccountSignin()) ?? ""; }}>{t("Sign in with your browser")}</button>
               </div>
               {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
               {#if import.meta.env.DEV}
@@ -1474,7 +1489,7 @@
                   }}
                 >{t("Development: sign in as a Premium test user")}</button>
               {/if}
-            </form>
+            </div>
           {/if}
         </section>
 
@@ -1837,7 +1852,7 @@
   .avatar-mark { border-radius: 50%; }
   .plan-chip { font-weight: 700; }
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
-  .sign-in .field { min-width: 160px; }
+  .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
   .license-field { width: 280px; letter-spacing: 0.02em; }
 

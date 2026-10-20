@@ -4,24 +4,36 @@
   "name": "church-studio-keys",
   "main": "paddle.ts",
   "compatibility_date": "2026-09-01",
+  // Better Auth (accounts) uses Node's AsyncLocalStorage.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // The address the app talks to (src/lib/domain/billing.ts). Named for the company, not the app,
+  // so it can stay when the app is renamed. The workers.dev address is off: this is the only one.
+  "routes": [{ "pattern": "license.heitechinc.com", "custom_domain": true }],
   "vars": {
     // "sandbox" while testing with Paddle's sandbox; "live" when selling for real.
     "PADDLE_ENV": "sandbox",
     // Which Paddle price grants which plan. PLACEHOLDER: put your price ids here.
     "PADDLE_PRICES": "pri_premium_monthly:premium,pri_premium_yearly:premium,pri_church_monthly:church,pri_church_yearly:church",
-    // The sender of the key email; the domain must be verified in Resend. PLACEHOLDER.
-    "MAIL_FROM": "Church Studio <keys@example.com>",
+    // The sender of key emails and sign-in links. mail.heitechinc.com is verified in Resend (a
+    // subdomain, so this mail never touches the company's own). Change the name with the app's.
+    "MAIL_FROM": "Church Studio <account@mail.heitechinc.com>",
     "GRACE_DAYS": "7",
     // "mock" runs the built-in test checkout (no money moves); "paddle" sells for real through Paddle.
     // Changing provider later is this one line (plus that provider's secrets).
     "BILLING_PROVIDER": "mock",
     // Free trial length, and how long a computer may stay offline before it must check in.
     "TRIAL_DAYS": "14",
-    "LEASE_DAYS": "30"
+    "LEASE_DAYS": "30",
+    // This server's own address, for sign-in callbacks (accounts).
+    "PUBLIC_URL": "https://license.heitechinc.com"
   },
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }
+  ],
+  "d1_databases": [
+    // Accounts (auth.ts): Better Auth's users, sessions and sign-in links. Tables: auth-schema.sql.
+    { "binding": "AUTH_DB", "database_name": "church-studio-auth", "database_id": "74ed8554-fac2-4318-bf45-0d01e95f57e6" }
   ]
 }

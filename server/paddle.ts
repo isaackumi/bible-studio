@@ -6,6 +6,8 @@
 // makes the very same key instead of a second one.
 
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
+import type { Identity } from "./accounts.ts";
+import { betterAuthIdentity } from "./auth.ts";
 import { completeCheckout, handleApi, licenseOfSubscription, renewLicense, revoke, type ApiConfig } from "./api.ts";
 import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
 import { getJson, kvStore, type KvNamespace } from "./store.ts";
@@ -38,7 +40,38 @@ export type Env = {
   LEASE_DAYS?: string;
   /** Free trial length (default 14). */
   TRIAL_DAYS?: string;
+  /** Accounts (optional): the D1 database for Better Auth's users and sessions, and its secret. */
+  AUTH_DB?: unknown;
+  BETTER_AUTH_SECRET?: string;
+  /** This server's own address, for sign-in callbacks. */
+  PUBLIC_URL?: string;
+  /** Sign-in methods: each is offered only when both its values are set. Email links need RESEND_API_KEY. */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  APPLE_CLIENT_ID?: string;
+  APPLE_CLIENT_SECRET?: string;
 };
+
+type Mail = (to: string, subject: string, text: string) => Promise<void>;
+
+/**
+ * Better Auth, made for each request: Workers do not let one request wait on a promise begun in
+ * another, and Better Auth sets itself up lazily, so an instance kept between requests hangs them.
+ */
+function identityOf(env: Env, mail: Mail | undefined): Identity | undefined {
+  if (!env.AUTH_DB || !env.BETTER_AUTH_SECRET || !env.PUBLIC_URL) return undefined;
+  return betterAuthIdentity({
+    database: env.AUTH_DB,
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.PUBLIC_URL,
+    google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+    microsoft: { clientId: env.MICROSOFT_CLIENT_ID, clientSecret: env.MICROSOFT_CLIENT_SECRET },
+    apple: { clientId: env.APPLE_CLIENT_ID, clientSecret: env.APPLE_CLIENT_SECRET },
+    mail,
+  });
+}
 
 /** Everything the API needs, from the Worker's settings. */
 export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
@@ -47,6 +80,16 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     env.BILLING_PROVIDER === "paddle"
       ? paddleProvider({ apiKey: env.PADDLE_API_KEY, sandbox: env.PADDLE_ENV === "sandbox", prices: paddlePriceMap(env.PADDLE_PRICES ?? ""), discounts: codeMap(env.PADDLE_DISCOUNTS ?? "") }, http)
       : mockProvider;
+  const mail: Mail | undefined = env.RESEND_API_KEY
+    ? async (to, subject, text) => {
+        const response = await http("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+          body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+        });
+        if (!response.ok) throw new Error(`Email failed: ${response.status}`);
+      }
+    : undefined;
   return {
     store: kvStore(env.ACTIVATIONS),
     signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
@@ -55,16 +98,8 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     leaseDays: Number(env.LEASE_DAYS ?? 30) || 30,
     trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
     graceDays: Number(env.GRACE_DAYS ?? 7) || 7,
-    mail: env.RESEND_API_KEY
-      ? async (to, subject, text) => {
-          const response = await http("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-            body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
-          });
-          if (!response.ok) throw new Error(`Email failed: ${response.status}`);
-        }
-      : undefined,
+    identity: identityOf(env, mail),
+    mail,
     now: () => Date.now(),
   };
 }

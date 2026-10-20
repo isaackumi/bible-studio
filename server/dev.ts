@@ -4,12 +4,19 @@
 //
 // It signs with the real key from ~/.church-studio/license-signing.key (or CHURCH_STUDIO_SIGNING_KEY),
 // so the app accepts its leases. The admin page is http://localhost:8787/admin (token: dev).
+//
+// Accounts work too: sign-in links are printed here instead of emailed, and Google, Microsoft or
+// Apple sign-in is offered when GOOGLE_CLIENT_ID/SECRET (and so on) are set. Users and sessions are
+// in server/.dev-auth.sqlite.
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { getMigrations } from "better-auth/db/migration";
 import { handleApi } from "./api.ts";
+import { authOptions, betterAuthIdentity, type AuthSettings } from "./auth.ts";
 import { mockProvider } from "./billing.ts";
 import { memoryStore } from "./store.ts";
 
@@ -30,15 +37,29 @@ if (existsSync(DATA)) {
 }
 const save = () => writeFileSync(DATA, JSON.stringify(Object.fromEntries(store.dump()), null, 1));
 
+const mail = async (to: string, subject: string, text: string) => console.log(`\n✉️  To ${to}: ${subject}\n${text}\n`);
+const env = process.env;
+const authSettings: AuthSettings = {
+  database: new DatabaseSync(join(import.meta.dirname ?? ".", ".dev-auth.sqlite")),
+  secret: env.BETTER_AUTH_SECRET ?? "church-studio-development-secret-not-for-production",
+  baseURL: `http://localhost:${PORT}`,
+  google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+  microsoft: { clientId: env.MICROSOFT_CLIENT_ID, clientSecret: env.MICROSOFT_CLIENT_SECRET },
+  apple: { clientId: env.APPLE_CLIENT_ID, clientSecret: env.APPLE_CLIENT_SECRET },
+  mail,
+};
+await (await getMigrations(authOptions(authSettings))).runMigrations();
+
 const config = {
   store,
+  identity: betterAuthIdentity(authSettings),
   signingKey,
   provider: mockProvider,
   adminToken: process.env.ADMIN_TOKEN ?? "dev",
   leaseDays: 30,
   trialDays: 14,
   graceDays: 7,
-  mail: async (to: string, subject: string, text: string) => console.log(`\n✉️  To ${to}: ${subject}\n${text}\n`),
+  mail,
   now: () => Date.now(),
 };
 

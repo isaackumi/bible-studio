@@ -5,7 +5,7 @@
 import type { LicensePlan } from "./license";
 
 /** The license server's address (the Worker in server/); VITE_LICENSE_SERVER points development at `npm run server:dev`. */
-export const SERVER_URL: string = (import.meta.env?.VITE_LICENSE_SERVER as string | undefined) || "https://church-studio-keys.heitech-inc.workers.dev";
+export const SERVER_URL: string = (import.meta.env?.VITE_LICENSE_SERVER as string | undefined) || "https://license.heitechinc.com";
 
 export type Interval = "monthly" | "yearly";
 
@@ -69,3 +69,16 @@ export type CheckoutPoll = { status: "pending" | "paid" | "cancelled"; key?: str
 
 /** How long the app waits for a checkout opened in the browser. */
 export const CHECKOUT_WAIT_MS = 45 * 60_000;
+
+// Signing in to an account (server/accounts.ts): the app opens a page in the browser, shows a
+// number, and collects an account token once the person has signed in there and tapped it.
+export type SigninStart = { id: string; secret: string; number: number; url: string; expiresAt: number; methods: string[] };
+export type SigninPoll = { status: "pending" | "done" | "cancelled" | "expired" | "collected"; token?: string; account?: { email: string; name: string } };
+export type AccountStatus = {
+  account: { email: string; name: string };
+  licenses: Array<{ license: string; plan: LicensePlan; revoked: boolean }>;
+  lease?: string;
+  activation?: { key?: string; seats?: number; devices?: unknown[]; status?: number; error?: string };
+};
+/** An account token, as the server makes them. */
+export const ACCOUNT_TOKEN = /^cst_[0-9a-f]{64}$/;

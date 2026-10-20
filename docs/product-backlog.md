@@ -10,6 +10,13 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 
 ---
 
+## To do before launch
+
+- [ ] **Rename the app.** The churchstudio domain is taken, so "Church Studio" is a working name. Choose a name with a free domain, then change it everywhere: the window title and `productName` in `src-tauri/tauri.conf.json`, the bundle identifier, `package.json`, the i18n strings (English and French), the README, the plans page and emails (`server/pages.ts`, the key email in `server/api.ts`), and `MAIL_FROM` in `server/wrangler.jsonc`. The license key prefixes (`CS1-`, `CSL1.`) can stay: users never read them as the name.
+- [ ] **Redraw the logo to match the new name** if the Multiview mark no longer fits (`docs/brand`, `src-tauri/icons` via `tauri icon`, the favicon, `BrandMark.svelte`).
+- [ ] **Turn on accounts:** create the D1 database (`npx wrangler d1 create church-studio-auth`, binding `AUTH_DB` in `server/wrangler.jsonc`), set `RESEND_API_KEY` for email links, and register Google, Microsoft and Apple sign-in apps with their redirect URLs (`server/README.md`, Accounts). Until then the app's **Sign in** button says accounts are not set up.
+- [ ] **License server address:** `license.heitechinc.com` for now (named for the company, so it can stay after the rename). If it moves to the new brand's domain, update `SERVER_URL` in `src/lib/domain/billing.ts` *before* that build ships, and keep the old address answering for the copies already installed.
+
 ## Index
 
 | ID | Capability | Priority | Status | Phase |

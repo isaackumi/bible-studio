@@ -258,7 +258,8 @@ export function yearlyDeal(price: PlanPrice): { perMonth: number; savePercent: n
   return { perMonth: Math.round((price.yearly / 12) * 100) / 100, savePercent: Math.round((1 - price.yearly / (price.monthly * 12)) * 100) };
 }
 
-export type Profile = { name: string; email: string };
+/** Who is signed in. With a token, an online account (server/accounts.ts); without, a name kept on this computer. */
+export type Profile = { name: string; email: string; token?: string };
 
 export function sanitizeProfile(value: unknown): Profile | null {
   if (!value || typeof value !== "object") return null;
@@ -266,7 +267,8 @@ export function sanitizeProfile(value: unknown): Profile | null {
   const name = typeof record.name === "string" ? record.name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
   const email = typeof record.email === "string" ? record.email.trim().toLowerCase().slice(0, 120) : "";
   if (!name && !email) return null;
-  return { name: name || email.split("@")[0] || "Operator", email };
+  const token = typeof record.token === "string" && /^cst_[0-9a-f]{64}$/.test(record.token) ? record.token : undefined;
+  return { name: name || email.split("@")[0] || "Operator", email, ...(token ? { token } : {}) };
 }
 
 export function validEmail(email: string): boolean {

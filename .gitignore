@@ -18,3 +18,5 @@ sweep/
 
 # Local license server data (npm run server:dev)
 server/.dev-store.json
+server/.dev-auth.sqlite
+server/.wrangler/
