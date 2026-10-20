@@ -1595,6 +1595,15 @@ export const fr: Readonly<Record<string, string>> = {
   "This song has unsaved changes. Click again to discard them, or press Save.": "Ce chant a des modifications non enregistrées. Cliquez à nouveau pour les abandonner, ou appuyez sur Enregistrer.",
   "Discard changes": "Abandonner les modifications",
   Account: "Compte",
+  // 0.2.3
+  "Undo on Program": "Annuler sur Programme",
+  "Cleared or blacked the screen by mistake? Press Undo, or Command-Z (Ctrl+Z on Windows), and it comes back.": "Écran effacé ou mis au noir par erreur ? Appuyez sur Annuler, ou Commande-Z (Ctrl+Z sous Windows), et il revient.",
+  "Keys for song parts": "Des touches pour les parties des chants",
+  "Press 1 to 9 for a part, or Shift with V, C or B for the next verse, chorus or bridge.": "Appuyez sur 1 à 9 pour une partie, ou Maj avec V, C ou B pour le couplet, le refrain ou le pont suivant.",
+  "The desk tells you what happened": "Le pupitre vous dit ce qui s’est passé",
+  "A short line at the bottom explains when something could not be done, in amber when it matters.": "Une courte ligne en bas explique quand quelque chose n’a pas pu être fait, en ambre quand c’est important.",
+  "Safer by default": "Plus sûr par défaut",
+  "Clearing the queue takes two clicks and can be undone, unsaved song edits ask first, and Preview buttons stay on Preview.": "Vider la file demande deux clics et peut être annulé, les modifications de chant non enregistrées demandent d’abord, et les boutons d’aperçu restent sur l’aperçu.",
   // 0.2.2
   "Walk-in with a countdown": "L’accueil avec un compte à rebours",
   "Start walk-in from Audio: the countdown goes on the screen, the music plays, and it fades by itself when the service starts.": "Lancez l’accueil depuis Audio : le compte à rebours passe à l’écran, la musique joue et s’estompe d’elle-même au début du culte.",

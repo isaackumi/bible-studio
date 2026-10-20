@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.3",
+    date: "2026-10-20",
+    highlights: [
+      { icon: "reset", title: msg("Undo on Program"), text: msg("Cleared or blacked the screen by mistake? Press Undo, or Command-Z (Ctrl+Z on Windows), and it comes back.") },
+      { icon: "lyrics", title: msg("Keys for song parts"), text: msg("Press 1 to 9 for a part, or Shift with V, C or B for the next verse, chorus or bridge.") },
+      { icon: "alerts", title: msg("The desk tells you what happened"), text: msg("A short line at the bottom explains when something could not be done, in amber when it matters.") },
+      { icon: "check", title: msg("Safer by default"), text: msg("Clearing the queue takes two clicks and can be undone, unsaved song edits ask first, and Preview buttons stay on Preview.") },
+    ],
+  },
+  {
     version: "0.2.2",
     date: "2026-10-20",
     highlights: [
