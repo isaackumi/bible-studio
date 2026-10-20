@@ -179,6 +179,9 @@
       </footer>
     </div>
   {/if}
+  {#snippet footer()}
+    <button type="button" class="btn" onclick={onclose}>{t("Close")}</button>
+  {/snippet}
 </DeskDialog>
 
 <style>

@@ -445,6 +445,9 @@
           </button>
           <button type="button" class="desk-btn end" class:armed={armedEnd} title={t("Stop the clock: the countdown leaves the screen and the times are kept in Report")} onclick={endService}><Icon name="square" size={12} /> {armedEnd ? t("End now?") : t("End service")}</button>
         {:else if service.sections.length > 0}
+          {#if service.runs?.length}
+            <button type="button" class="desk-btn" title={t("Planned and used time per part")} onclick={() => (reportOpen = true)}><Icon name="clock" size={12} /> {t("Report")}</button>
+          {/if}
           <button type="button" class="desk-btn start" title={t("Begin the service: checks the time against the planned start first")} onclick={() => (startOpen = true)}><Icon name="play" size={12} /> {t("Start service")}</button>
         {/if}
       </header>

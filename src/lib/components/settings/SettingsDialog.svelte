@@ -1883,9 +1883,10 @@
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
   .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
-  .contrast-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+  .contrast-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; cursor: pointer; font-size: inherit; font-weight: inherit; color: var(--ink); }
+  .contrast-row > span { flex: 1; min-width: 0; }
   .contrast-row h3 { margin: 0 0 4px; }
-  .contrast-note { display: block; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .contrast-note { display: block; max-width: 60ch; font-size: 13px; font-weight: 400; color: var(--muted); line-height: 1.45; }
   .license-field { width: 280px; letter-spacing: 0.02em; }
 
   /* Plans */
