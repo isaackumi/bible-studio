@@ -2,7 +2,7 @@
   import InlineRich from "./InlineRich.svelte";
   import type { RichDoc } from "../domain/rich-text";
   import type { PaintedOverlay } from "../domain/screen-overlays";
-  import { formatCountdown } from "../domain/timer";
+  import { clockCount } from "../domain/schedule";
 
   // Overlays painted over Program, in frame pixels (1080 tall), so they scale with every screen.
   let { overlays, still = false }: { overlays: PaintedOverlay[]; still?: boolean } = $props();
@@ -16,10 +16,10 @@
   });
   const time = $derived(now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
 
-  /** Time left as 00:12:04; it stops at 00:00:00 and flashes there. */
+  /** Time left as 12:04 (1:02:05 past an hour); it stops at 0:00 and flashes there. */
   function left(endsAt: number): { text: string; over: boolean; short: boolean } {
     const ms = endsAt - now.getTime();
-    return { text: formatCountdown(ms), over: ms <= 0, short: ms > 0 && ms <= 5 * 60_000 };
+    return { text: clockCount(ms), over: ms <= 0, short: ms > 0 && ms <= 5 * 60_000 };
   }
   const SPEED: Record<1 | 2 | 3, number> = { 1: 40, 2: 26, 3: 16 };
   // Corner overlays move clear of a ticker or banner on the same edge.
@@ -89,7 +89,7 @@
   .ov-track.still { animation: none; padding-left: 60px; }
   @keyframes ov-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 
-  .ov-count { position: absolute; display: grid; justify-items: center; gap: 2px; padding: 0.35em 0.7em 0.4em; border-radius: 0.3em; background: rgba(5, 5, 5, 0.72); border-bottom: 0.12em solid var(--accent-bar); color: #fff; font-size: 56px; line-height: 1; }
+  .ov-count { position: absolute; display: grid; justify-items: center; gap: 0.12em; padding: 0.32em 0.6em 0.36em; min-width: 3.4em; border-radius: 0.3em; background: rgba(5, 5, 5, 0.72); border-bottom: 0.12em solid var(--accent-bar); color: #fff; font-size: 56px; line-height: 1; }
   .ov-count.size-s { font-size: 40px; }
   .ov-count.size-l { font-size: 84px; }
   .ov-count.size-xl { font-size: 128px; }
@@ -102,7 +102,7 @@
   .ov-count.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
   .bar-top .ov-count.top, .bar-top .ov-count.top-left, .bar-top .ov-count.top-right { top: 124px; }
   .bar-bottom .ov-count.bottom, .bar-bottom .ov-count.bottom-left, .bar-bottom .ov-count.bottom-right { bottom: 124px; }
-  .ov-count-label { font-size: 0.36em; font-weight: 650; opacity: 0.85; white-space: nowrap; max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
+  .ov-count-label { font-size: 0.42em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; white-space: nowrap; max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
   .ov-count-time { font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
   .ov-count.short { border-bottom-color: #f5a524; }
   .ov-count.short .ov-count-time { color: #ffd27a; }
