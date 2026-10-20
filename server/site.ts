@@ -141,6 +141,7 @@ export function privacyPage(site: Site): string {
   <h2>What we receive</h2>
   <ul>
     <li><b>Check-ins.</b> Once a day the app sends an anonymous computer identifier (a one-way hash, not your hardware serial), the app version, the operating system and the plan in use. We use this to count active computers and to keep one free trial per computer. You can turn it off in Settings › Privacy. License activation needs a check-in at least once every 30 days on paid plans.</li>
+    <li><b>Error reports.</b> When something goes wrong, the app sends the error and where in the app it happened, with the app version, the operating system and the same anonymous computer identifier. Personal details such as email addresses and file paths are removed first, and no songs, sermons or screen content are included. The same switch in Settings › Privacy turns this off.</li>
     <li><b>Purchases.</b> Your email address and church name, the plan bought, and the license issued. Payments are handled by Paddle; we never see your card details.</li>
     <li><b>Accounts (optional).</b> Your name and email address from your sign-in method (email link, Google, Microsoft or Apple), and which computers are signed in.</li>
     <li><b>Support.</b> What you send us when you write, including any problem report you choose to attach.</li>
@@ -153,11 +154,11 @@ export function privacyPage(site: Site): string {
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
   </ul>
   <h2>Who processes data for us</h2>
-  <p>Paddle (payments, invoices and tax), Cloudflare (hosting our servers and database), Resend (sending emails such as license keys and sign-in links), and GitHub (serving downloads and updates). Each processes data only to provide its service.</p>
+  <p>Paddle (payments, invoices and tax), Cloudflare (hosting our servers and database), Resend (sending emails such as license keys and sign-in links), Sentry (collecting error reports), and GitHub (serving downloads and updates). Each processes data only to provide its service.</p>
   <h2>Why we may use it</h2>
   <p>To provide what you asked for (licenses, accounts, updates and support), to meet legal and tax obligations, and, for the anonymous check-ins, our legitimate interest in keeping trials fair and the product working. We do not sell personal data or use it for advertising.</p>
   <h2>How long we keep it</h2>
-  <p>Purchase and license records for as long as the law requires for tax (usually up to 7 years). Account data until you ask us to delete the account. Check-in records for up to 24 months.</p>
+  <p>Purchase and license records for as long as the law requires for tax (usually up to 7 years). Account data until you ask us to delete the account. Check-in records for up to 24 months, and error reports for up to 90 days.</p>
   <h2>Your rights</h2>
   <p>You can ask to see, correct, export or delete your personal data, or object to how we use it, by writing to <a href="mailto:${mail}">${mail}</a>. You may also complain to your local data protection authority.</p>
   <h2>Contact</h2>

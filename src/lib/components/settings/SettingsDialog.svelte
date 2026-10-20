@@ -148,47 +148,20 @@
   /** A media file whose Delete was pressed once. */
   let armedMedia = $state<string | null>(null);
 
-  // Updates (desktop): signed releases from GitHub.
+  // Updates (desktop): signed releases from GitHub, checked and installed by the session.
   let updateNote = $state("");
-  let updateBusy = $state(false);
-  let updateReady = $state<string | null>(null);
-  let pendingUpdate: { downloadAndInstall: () => Promise<void> } | null = null;
+  let checkingUpdate = $state(false);
+  const updateReady = $derived(session.availableUpdate?.version ?? null);
+  const updateBusy = $derived(session.updateBusy || checkingUpdate);
 
   async function checkUpdate() {
-    updateBusy = true;
-    updateNote = "";
-    try {
-      const { check } = await import("@tauri-apps/plugin-updater");
-      const update = await check();
-      if (update) {
-        pendingUpdate = update;
-        updateReady = update.version;
-        updateNote = `Church Studio ${update.version} is ready.${update.body ? ` ${update.body.split("\n")[0]}` : ""} Install it after the service.`;
-      } else {
-        updateNote = t("You have the latest version.");
-      }
-    } catch (error) {
-      updateNote = `${t("Updates could not be checked.")} ${error instanceof Error ? error.message : String(error)}`;
-    } finally {
-      updateBusy = false;
-    }
+    checkingUpdate = true;
+    updateNote = await session.checkForUpdate();
+    checkingUpdate = false;
   }
 
   async function installUpdate() {
-    if (!pendingUpdate) return;
-    if (session.output.online && session.live.program.model.layout !== "empty") {
-      updateNote = t("Something is live on the audience screen. Clear it, then install, so the screen does not go dark mid-service.");
-      return;
-    }
-    updateBusy = true;
-    try {
-      await pendingUpdate.downloadAndInstall();
-      const { relaunch } = await import("@tauri-apps/plugin-process");
-      await relaunch();
-    } catch (error) {
-      updateNote = `${t("The update could not be installed.")} ${error instanceof Error ? error.message : String(error)}`;
-      updateBusy = false;
-    }
+    updateNote = await session.installUpdate();
   }
   let backupNote = $state("");
 
@@ -1589,7 +1562,7 @@
         <p class="section-label">{t("Privacy")}</p>
         <section class="rows">
           <label class="row">
-            <div class="row-copy"><strong>{t("Share anonymous usage")}</strong><span>{t("Once a day: the app version, the computer's system and your plan. No names, songs or sermons. It helps us see what to improve.")}</span></div>
+            <div class="row-copy"><strong>{t("Share anonymous usage and error reports")}</strong><span>{t("Once a day: the app version, the computer's system and your plan. When something goes wrong: the error and where in the app it happened. No names, songs or sermons. It helps us fix problems quickly.")}</span></div>
             <input type="checkbox" role="switch" checked={session.workspace.shareUsage !== false} onchange={(event) => session.setShareUsage(event.currentTarget.checked)} />
           </label>
         </section>

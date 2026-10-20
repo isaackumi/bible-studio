@@ -193,6 +193,8 @@ import {
 } from "../voice/listen";
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
+import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
+import { whatsNewFor, type Release } from "../domain/changelog";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { aspectFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
 import {
@@ -505,6 +507,8 @@ class Session {
       this.booted = true;
       if (this.workspace.switcher.kind !== "none" && this.workspace.switcher.autoConnect) void this.connectSwitcher();
       void this.bootEntitlement();
+      this.noteVersion();
+      this.watchUpdates();
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
@@ -4439,6 +4443,7 @@ class Session {
   private bootEntitlement = async () => {
     this.deviceId = await api.entitlementDevice().catch(() => "");
     await this.refreshEntitlement();
+    void this.startErrorReports();
     if (this.workspace.shareUsage !== false) {
       const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), plan: this.plan });
       if (hello.ok) {
@@ -4782,6 +4787,88 @@ class Session {
   setShareUsage = (on: boolean) => {
     this.workspace = { ...this.workspace, shareUsage: on };
     this.persistSoon();
+    setReportsAllowed(on);
+  };
+
+  /** Anonymous error reports (telemetry.ts), under the same Privacy switch as the check-in. */
+  private startErrorReports = async () => {
+    const allowed = this.workspace.shareUsage !== false;
+    await startReports({ version: APP_VERSION, device: this.deviceId, os: this.osName(), allowed });
+    if (allowed && this.desktop()) reportCrashLog(await invoke<string>("crash_log").catch(() => ""));
+  };
+
+  // Updates: checked quietly after start and every six hours; the desk offers one when it is ready,
+  // and installing waits until nothing is live on the audience screen.
+
+  /** An update downloaded from the release feed, waiting for the operator. */
+  availableUpdate = $state<{ version: string; notes: string } | null>(null);
+  /** The operator chose Later for this version: the desk stops offering it until next start. */
+  updateDismissed = $state<string | null>(null);
+  updateBusy = $state(false);
+  private pendingUpdate: { version: string; downloadAndInstall: () => Promise<void> } | null = null;
+
+  /** Ask the release feed. Returns what to show (quiet checks show nothing when up to date). */
+  checkForUpdate = async (quiet = false): Promise<string> => {
+    if (!this.desktop()) return "";
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (!update) return quiet ? "" : t("You have the latest version.");
+      this.pendingUpdate = update;
+      this.availableUpdate = { version: update.version, notes: update.body ?? "" };
+      return t("Church Studio {version} is ready. Install it after the service.", { version: update.version });
+    } catch (error) {
+      return quiet ? "" : `${t("Updates could not be checked.")} ${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
+
+  /** Install the waiting update and restart. Returns an error to show, or never returns (restart). */
+  installUpdate = async (): Promise<string> => {
+    if (!this.pendingUpdate) return "";
+    if (this.output.online && this.live.program.model.layout !== "empty") {
+      return t("Something is live on the audience screen. Clear it, then install, so the screen does not go dark mid-service.");
+    }
+    this.updateBusy = true;
+    try {
+      await this.flushSave();
+      await this.pendingUpdate.downloadAndInstall();
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+      return "";
+    } catch (error) {
+      this.updateBusy = false;
+      return `${t("The update could not be installed.")} ${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
+
+  dismissUpdate = () => {
+    this.updateDismissed = this.availableUpdate?.version ?? null;
+  };
+
+  private watchUpdates() {
+    if (!this.desktop() || typeof window === "undefined") return;
+    setTimeout(() => void this.checkForUpdate(true), 30_000);
+    setInterval(() => void this.checkForUpdate(true), 6 * 60 * 60_000);
+  }
+
+  // What's new: this version's highlights, once, the first time it opens after an update.
+
+  whatsNew = $state<Release | null>(null);
+
+  private noteVersion() {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const seen = localStorage.getItem("cs-seen-version");
+      // Setup introduces a first install; an update shows its highlights once.
+      this.whatsNew = this.workspace.onboarded ? whatsNewFor(APP_VERSION, seen) : null;
+      localStorage.setItem("cs-seen-version", APP_VERSION);
+    } catch {
+      // Storage blocked: no card.
+    }
+  }
+
+  dismissWhatsNew = () => {
+    this.whatsNew = null;
   };
 
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
