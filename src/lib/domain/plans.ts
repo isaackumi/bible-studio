@@ -62,9 +62,9 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   "song-packs": { label: msg("Song packs") },
   "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
   "cloud-sync": { label: msg("Cloud sync across computers"), soon: true },
-  ndi: { label: msg("NDI out with sound, and NDI cameras in"), soon: true },
-  streaming: { label: msg("Stream to YouTube and Facebook"), soon: true },
-  recording: { label: msg("Record the service"), soon: true },
+  ndi: { label: msg("NDI out with sound, and NDI cameras in") },
+  streaming: { label: msg("Stream to YouTube and Facebook") },
+  recording: { label: msg("Record the service") },
   "priority-support": { label: msg("Priority support") },
 };
 
