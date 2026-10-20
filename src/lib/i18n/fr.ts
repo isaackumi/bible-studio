@@ -1561,6 +1561,17 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // 0.2.2
+  "Walk-in with a countdown": "L’accueil avec un compte à rebours",
+  "Start walk-in from Audio: the countdown goes on the screen, the music plays, and it fades by itself when the service starts.": "Lancez l’accueil depuis Audio : le compte à rebours passe à l’écran, la musique joue et s’estompe d’elle-même au début du culte.",
+  "Music that sounds right": "Une musique qui sonne juste",
+  "Tracks play at an even volume and fade into each other, and playlists can shuffle.": "Les pistes jouent à un volume égal et s’enchaînent en fondu, et les listes peuvent être jouées en aléatoire.",
+  "A sound pad": "Un pad sonore",
+  "Play an offering bell or an intro sting with one click, over everything else.": "Jouez une cloche d’offrande ou un jingle d’introduction d’un clic, par-dessus le reste.",
+  "Backing tracks for songs": "Des pistes d’accompagnement pour les chants",
+  "Give a song a backing track in the song editor, and it plays when the song goes live.": "Donnez une piste d’accompagnement à un chant dans l’éditeur : elle joue quand le chant passe en direct.",
+  "Music from your phone": "La musique depuis votre téléphone",
+  "The phone remote can play, skip and fade the music.": "La télécommande sur téléphone peut lancer, passer et estomper la musique.",
   // 0.2.1
   "Songs line by line": "Les chants ligne par ligne",
   "Choose how many lines show at once with Lines on the song desk. The arrows step through them, and listening follows the line being sung.": "Choisissez combien de lignes s’affichent à la fois avec Lignes sur le pupitre des chants. Les flèches les font défiler et l’écoute suit la ligne chantée.",

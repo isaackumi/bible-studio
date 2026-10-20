@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.2",
+    date: "2026-10-20",
+    highlights: [
+      { icon: "timer", title: msg("Walk-in with a countdown"), text: msg("Start walk-in from Audio: the countdown goes on the screen, the music plays, and it fades by itself when the service starts.") },
+      { icon: "audio", title: msg("Music that sounds right"), text: msg("Tracks play at an even volume and fade into each other, and playlists can shuffle.") },
+      { icon: "keys", title: msg("A sound pad"), text: msg("Play an offering bell or an intro sting with one click, over everything else.") },
+      { icon: "lyrics", title: msg("Backing tracks for songs"), text: msg("Give a song a backing track in the song editor, and it plays when the song goes live.") },
+      { icon: "phone", title: msg("Music from your phone"), text: msg("The phone remote can play, skip and fade the music.") },
+    ],
+  },
+  {
     version: "0.2.1",
     date: "2026-10-20",
     highlights: [
