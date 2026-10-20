@@ -5,7 +5,7 @@
 import { richIsEmpty, richLines } from "./rich-text";
 import type { PresentationModel, Theme } from "./types";
 
-export type AnnouncementDesign = "classic" | "card" | "banner" | "split" | "bulletin" | "lower";
+export type AnnouncementDesign = "classic" | "card" | "banner" | "split" | "bulletin" | "lower" | "spotlight" | "poster" | "ticket" | "corner";
 
 export const ANNOUNCEMENT_DESIGNS: Array<{ id: AnnouncementDesign; name: string; hint: string }> = [
   { id: "card", name: "Card", hint: "A panel in the middle, for most notices" },
@@ -14,6 +14,10 @@ export const ANNOUNCEMENT_DESIGNS: Array<{ id: AnnouncementDesign; name: string;
   { id: "split", name: "Split", hint: "The small line in a colour panel beside the words" },
   { id: "bulletin", name: "Bulletin", hint: "A list of details, one per line" },
   { id: "lower", name: "Lower bar", hint: "A bar along the bottom, over a picture" },
+  { id: "spotlight", name: "Spotlight", hint: "Left aligned with a bold accent bar, for a strong headline" },
+  { id: "poster", name: "Poster", hint: "A big heading on a wash of the colour, like a printed poster" },
+  { id: "ticket", name: "Ticket", hint: "An event card: the heading on one side, the details on the other" },
+  { id: "corner", name: "Top corner", hint: "A small card at the top left, so a picture stays in view" },
 ];
 
 /** Ready-made lines for above the heading; the church can type anything else. */

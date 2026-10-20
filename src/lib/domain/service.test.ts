@@ -107,3 +107,14 @@ describe("parts left out this time", () => {
     expect(runParts(service, run, 60_000).map((part) => part.sectionId)).toEqual(["a", "c"]);
   });
 });
+
+describe("where a part runs", () => {
+  it("puts preaching on the Presenter page unless the part says otherwise", async () => {
+    const { partDesk } = await import("./service");
+    expect(partDesk({ name: "Sermon" })).toBe("presenter");
+    expect(partDesk({ name: "The Word" })).toBe("presenter");
+    expect(partDesk({ name: "Worship" })).toBe("service");
+    expect(partDesk({ name: "Preaching", desk: "service" })).toBe("service");
+    expect(partDesk({ name: "Offering", desk: "presenter" })).toBe("presenter");
+  });
+});

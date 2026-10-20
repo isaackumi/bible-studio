@@ -21,6 +21,16 @@
       <h2 class="ann-heading">{paint.heading}</h2>
       {#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}{/if}
     </div>
+  {:else if paint.design === "ticket"}
+    <div class="ticket">
+      <div class="ticket-main">
+        {#if paint.label}<span class="ann-label">{paint.label}</span>{/if}
+        <h2 class="ann-heading">{paint.heading}</h2>
+      </div>
+      {#if paint.body.length || paint.rich}
+        <div class="ticket-stub">{#if paint.rich}<div class="ann-body ann-rich"><RichView doc={paint.rich} base="1em" /></div>{:else}{#each paint.body as line, n (n)}<p class="ann-body">{line}</p>{/each}{/if}</div>
+      {/if}
+    </div>
   {:else if paint.design === "banner"}
     <div class="banner-band">
       {#if paint.label}<span class="ann-label">{paint.label}</span>{/if}
@@ -111,7 +121,7 @@
     background: var(--accent);
     color: var(--on-accent);
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     padding: 7cqmin 5cqmin;
   }
   .split-label { font-size: calc(8cqmin * var(--k)); font-weight: 700; line-height: 1.05; overflow-wrap: anywhere; }
@@ -147,4 +157,34 @@
   .ann-lower .ann-heading { font-size: calc(7.6cqmin * var(--k)); }
   .ann-lower .ann-body { font-size: calc(4.6cqmin * var(--k)); margin-top: 0.6cqmin; }
   .ann-lower .ann-label { font-size: calc(3.6cqmin * var(--k)); }
+
+  /* Spotlight: left aligned, a thick accent bar beside a big heading. */
+  .ann-spotlight { align-items: flex-start; padding: 0 10cqw; }
+  .ann-spotlight .ann-box { max-width: 78cqw; padding-left: 5cqmin; border-left: 1.6cqmin solid var(--accent); }
+  .ann-spotlight .ann-label { text-transform: uppercase; letter-spacing: 0.14em; }
+  .ann-spotlight .ann-heading { font-size: calc(12.5cqmin * var(--k)); line-height: 1.02; }
+
+  /* Poster: a wash of the colour over the background, a huge centred heading, details under a rule. */
+  .ann-poster { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 55%, transparent), color-mix(in srgb, var(--accent) 12%, transparent) 70%); }
+  .ann-poster .ann-box { max-width: 86cqw; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .ann-poster .ann-label { padding: 0.8cqmin 2.4cqmin; border: 0.4cqmin solid currentColor; border-radius: 99cqmin; color: inherit; text-transform: uppercase; letter-spacing: 0.18em; font-size: calc(3.6cqmin * var(--k)); margin-bottom: 3cqmin; }
+  .ann-poster .ann-heading { font-size: calc(15cqmin * var(--k)); line-height: 0.98; text-transform: uppercase; letter-spacing: -0.02em; }
+  .ann-poster .ann-body { margin-top: 2cqmin; }
+  .ann-poster .ann-body:first-of-type { padding-top: 3cqmin; border-top: 0.4cqmin solid color-mix(in srgb, currentColor 40%, transparent); }
+
+  /* Ticket: a card in two parts with a perforated edge between them. */
+  .ticket { display: flex; align-items: stretch; width: min(86cqw, 150cqh); border-radius: 2.4cqmin; overflow: hidden; box-shadow: 0 2cqmin 6cqmin rgb(0 0 0 / 0.35); color: #fff; }
+  .ticket-main { flex: 1.3; display: flex; flex-direction: column; justify-content: center; padding: 6cqmin; background: var(--accent); color: var(--on-accent); min-width: 0; }
+  .ticket-main .ann-label { color: inherit; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.12em; }
+  .ticket-main .ann-heading { font-size: calc(9.5cqmin * var(--k)); }
+  .ticket-stub { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 5cqmin 5.5cqmin; background: color-mix(in srgb, #0c0f16 82%, transparent); border-left: 0.5cqmin dashed color-mix(in srgb, #fff 45%, transparent); min-width: 0; }
+  .ticket-stub .ann-body { font-size: calc(4.8cqmin * var(--k)); margin-top: 0.8cqmin; }
+  .ticket-stub .ann-body:first-child { margin-top: 0; }
+
+  /* Top corner: a compact card at the top left, out of the way of a picture. */
+  .ann-corner { justify-content: flex-start; align-items: flex-start; padding: 6cqh 5cqw; }
+  .ann-corner .ann-box { max-width: 52cqw; padding: 3.4cqmin 4cqmin; border-radius: 1.6cqmin; background: color-mix(in srgb, #0c0f16 80%, transparent); border-top: 0.8cqmin solid var(--accent); color: #fff; }
+  .ann-corner .ann-label { font-size: calc(3.4cqmin * var(--k)); margin-bottom: 0.8cqmin; }
+  .ann-corner .ann-heading { font-size: calc(6.6cqmin * var(--k)); }
+  .ann-corner .ann-body { font-size: calc(4cqmin * var(--k)); margin-top: 0.5cqmin; }
 </style>

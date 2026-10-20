@@ -261,6 +261,8 @@ export type ServiceSection = {
   leader?: string;
   /** Left out this time (no confession today): no time in the plan, passed over on the day, not in the report. */
   skip?: boolean;
+  /** Where it runs: the Presenter page with every tool (preaching, by default), or the Service page. */
+  desk?: "presenter" | "service";
   /** Where its card sits on the flow canvas; none means its tidy place. */
   canvas?: { x: number; y: number };
 };
@@ -293,6 +295,8 @@ export type Service = {
   warnMinutes?: number;
   /** Verses per screen for readings added to this service; missing: all at once. */
   versesPerScreen?: number;
+  /** Readings open on the Presenter page (its Bible, verse list and search) instead of the Service page. */
+  readingsOn?: "presenter" | "service";
   /** Seconds a leader's name stays on the screen. */
   leaderSeconds?: number;
 };

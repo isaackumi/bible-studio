@@ -114,13 +114,20 @@
         </div>
       {:else if topic === "readings"}
         <h3>{t("Readings")}</h3>
-        <p class="intro">{t("How many verses each screen shows for readings added from now on. Next shows the next verses. Each reading can still be changed on its row.")}</p>
+        <p class="intro">{t("How many verses each screen shows for readings. Auto splits readings longer than three verses. Each reading can still be changed on its row.")}</p>
         <div class="steps big" role="radiogroup" aria-label={t("Verses per screen")}>
           {#each [0, 1, 2, 3, 4, 5, 6] as n (n)}
             <button type="button" role="radio" aria-checked={verses === n} onclick={() => session.setServiceSettings({ versesPerScreen: n || undefined })}>
-              <strong>{n || t("All")}</strong><small>{n ? tn(n, "verse", "verses") : t("at once")}</small>
+              <strong>{n || t("Auto")}</strong><small>{n ? tn(n, "verse", "verses") : t("long ones split")}</small>
             </button>
           {/each}
+        </div>
+        <div class="field">
+          <span class="field-copy"><strong>{t("Readings open on")}</strong><em>{t("The Presenter page gives its Bible, verse list and search for readings; the service keeps time either way.")}</em></span>
+          <div class="steps" role="radiogroup" aria-label={t("Readings open on")}>
+            <button type="button" role="radio" aria-checked={(service.readingsOn ?? "service") === "service"} onclick={() => session.setServiceSettings({ readingsOn: undefined })}>{t("Service page")}</button>
+            <button type="button" role="radio" aria-checked={service.readingsOn === "presenter"} onclick={() => session.setServiceSettings({ readingsOn: "presenter" })}>{t("Presenter page")}</button>
+          </div>
         </div>
       {:else if topic === "screen"}
         <h3>{t("On the screen")}</h3>

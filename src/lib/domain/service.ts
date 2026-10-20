@@ -96,3 +96,11 @@ export function serviceSummary(service: Service): ServiceSummary {
     lastRunAt: service.runs?.at(-1)?.startedAt ?? null,
   };
 }
+
+/** Parts that are preaching run on the Presenter page by default: anything may be needed then. */
+const PREACHING = /\b(sermon|preach|preaching|message|word|homily|teaching|exhortation)\b/i;
+
+/** Where a part runs: its own choice, else the Presenter page for preaching and the Service page otherwise. */
+export function partDesk(section: Pick<ServiceSection, "name" | "desk">): "presenter" | "service" {
+  return section.desk ?? (PREACHING.test(section.name) ? "presenter" : "service");
+}

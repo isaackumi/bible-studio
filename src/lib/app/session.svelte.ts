@@ -134,7 +134,7 @@ import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceT
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
-import { findItem, moveInList, nextPart, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type ServiceSummary } from "../domain/service";
+import { findItem, moveInList, nextPart, partDesk, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type ServiceSummary } from "../domain/service";
 import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
@@ -2934,6 +2934,14 @@ class Session {
       this.persistSoon();
       const section = this.service.sections.find((entry) => entry.id === id);
       if (this.leaderTo === "screen" && section?.leader?.trim() && before !== id) this.showLeader(id);
+      // A part that runs on the Presenter page (preaching, by default) opens it as it begins.
+      if (section && before !== id && partDesk(section) === "presenter") {
+        this.presenterPartId = id;
+        if (this.deskPage === "service") {
+          this.pageRequest = "scriptures";
+          this.message = t("{part} has begun. The Presenter page is open with every tool; the service keeps time.", { part: section.name });
+        }
+      } else if (before !== id && this.presenterPartId && this.presenterPartId !== id) this.presenterPartId = null;
     }
     this.publishStage();
     this.refreshCountdown();
@@ -3014,6 +3022,7 @@ class Session {
     this.timeUp = null;
     this.service = endRun(this.service, Date.now());
     this.sectionStarts = {};
+    this.presenterPartId = null;
     try {
       localStorage.removeItem(STARTS_KEY);
     } catch {
@@ -3787,7 +3796,7 @@ class Session {
   };
 
   /** Change this service's own settings (Service settings). */
-  setServiceSettings = (patch: Partial<Pick<Service, "liveOnClick" | "autoAdvance" | "advanceGrace" | "warnMinutes" | "versesPerScreen" | "leaderSeconds">>) => {
+  setServiceSettings = (patch: Partial<Pick<Service, "liveOnClick" | "autoAdvance" | "advanceGrace" | "warnMinutes" | "versesPerScreen" | "leaderSeconds" | "readingsOn">>) => {
     if (!this.service) return;
     const next: Service = { ...this.service, ...patch };
     for (const key of Object.keys(patch) as Array<keyof typeof patch>) if (next[key] === undefined || next[key] === null) delete next[key];
@@ -4707,7 +4716,10 @@ class Session {
   booted = $state(false);
 
   /** What each Presenter Desk page last staged on Preview, so every page keeps its own. */
-  private pageStage: Partial<Record<PewPage, { preview: LiveFrame; songFocus: Session["songFocus"]; sermonFocus: Session["sermonFocus"]; previewBible: BibleItem | null; lookOnPreview: Composition | null }>> = {};
+  private pageStage: Partial<Record<PewPage, { preview: LiveFrame; songFocus: Session["songFocus"]; sermonFocus: Session["sermonFocus"]; previewBible: BibleItem | null; lookOnPreview: Composition | null; previewFree: boolean }>> = {};
+
+  /** The page of the desk open now (Scriptures, Songs, Sermon or Service). */
+  deskPage = $state<PewPage>("scriptures");
 
   /**
    * Leaving one page for another: put away this page's Preview and bring back the other's
@@ -4721,14 +4733,59 @@ class Session {
       sermonFocus: this.sermonFocus,
       previewBible: this.previewBible,
       lookOnPreview: this.lookOnPreview,
+      previewFree: this.previewFree,
     };
+    this.deskPage = to;
     const saved = this.pageStage[to];
     this.live = { ...this.live, preview: saved?.preview ?? { transition: "cut", sourceId: null, model: emptyModel(this.theme()) } };
     this.songFocus = saved?.songFocus ?? null;
     this.sermonFocus = saved?.sermonFocus ?? null;
     this.previewBible = saved?.previewBible ?? null;
     this.lookOnPreview = saved?.lookOnPreview ?? null;
+    this.previewFree = saved?.previewFree ?? false;
     return !!saved;
+  };
+
+  // Running a part on the Presenter page: its Bible, songs and everything else, while the service's
+  // clock, countdown and report carry on. Preaching does this by default; readings when asked.
+
+  /** The part being run from the Presenter page (what goes LIVE there counts as this part). */
+  presenterPartId = $state<string | null>(null);
+  /** A passage the Presenter page should open (its book, chapter and verses), then clears. */
+  passageRequest = $state<BibleItem | null>(null);
+
+  /** Where a part runs: the Presenter page or the Service page. */
+  setPartDesk = (sectionId: string, desk: "presenter" | "service") => {
+    if (!this.service) return;
+    this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk } : section)) };
+    this.persistSoon();
+    const part = this.service.sections.find((section) => section.id === sectionId);
+    this.message = desk === "presenter" ? t("{part} runs on the Presenter page, with every tool.", { part: part?.name ?? "" }) : t("{part} runs on the Service page.", { part: part?.name ?? "" });
+  };
+
+  /** Whether a reading opens on the Presenter page (the service's choice, or its part runs there). */
+  readingOnPresenter = (itemId: string): boolean => {
+    if (!this.service) return false;
+    const found = findItem(this.service, itemId);
+    if (!found?.item.bible) return false;
+    return this.service.readingsOn === "presenter" || partDesk(found.section) === "presenter";
+  };
+
+  /** Open a reading from the running order on the Presenter page: its passage, the first screen on Preview. */
+  openReadingOnPresenter = (itemId: string) => {
+    if (!this.service) return;
+    const found = findItem(this.service, itemId);
+    if (!found?.item.bible) return;
+    this.cursor = { sectionId: found.section.id, itemId };
+    this.presenterPartId = found.section.id;
+    this.passageRequest = { ...found.item.bible };
+    this.pageRequest = "scriptures";
+  };
+
+  /** Back to the Service page from the Presenter page. */
+  returnToService = () => {
+    this.presenterPartId = null;
+    this.pageRequest = "service";
   };
 
   /** The screen tour running now, if any, and the step (in the full list) it starts from. */
@@ -6161,8 +6218,9 @@ class Session {
       this.videoEnded = null;
     }
     // The section of what went live has begun (the first time today).
-    if ((action === "take" || action === "cut") && this.service && this.cursor.itemId && this.live.program.sourceId === this.cursor.itemId) {
-      const section = this.service.sections.find((entry) => entry.items.some((item) => item.id === this.cursor.itemId));
+    const fromPresenter = this.deskPage !== "service" && this.presenterPartId !== null;
+    if ((action === "take" || action === "cut") && this.service && ((this.cursor.itemId && this.live.program.sourceId === this.cursor.itemId) || fromPresenter)) {
+      const section = fromPresenter ? this.service.sections.find((entry) => entry.id === this.presenterPartId) : this.service.sections.find((entry) => entry.items.some((item) => item.id === this.cursor.itemId));
       const today = new Date().toDateString();
       if (section && (this.sectionStartsDay !== today || this.sectionStarts[section.id] === undefined)) this.startSection(section.id);
     }

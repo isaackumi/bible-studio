@@ -132,34 +132,6 @@
               <button type="button" class="ann-chip" aria-pressed={(announcement.label ?? "") === suggestion} onclick={() => setAnnouncement({ label: suggestion })}>{suggestion}</button>
             {/each}
           </div>
-          <div class="field-row">
-            <span>{t("Design")}</span>
-            <div class="ann-designs" role="radiogroup" aria-label={t("Announcement design")}>
-              {#each designThumbs as design (design.id)}
-                <button
-                  type="button"
-                  class="ann-design"
-                  role="radio"
-                  aria-checked={(announcement.design ?? "classic") === design.id}
-                  title={design.hint}
-                  onclick={() => setAnnouncement({ design: design.id })}
-                >
-                  <span class="ann-thumb"><Screen model={design.model} still /></span>
-                  <span class="ann-design-name">{design.name}</span>
-                </button>
-              {/each}
-            </div>
-          </div>
-          <div class="field-row">
-            <span>{t("Accent colour")}</span>
-            <div class="ann-swatches" role="radiogroup" aria-label={t("Accent colour")}>
-              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title={t("The theme's colour")} style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>{t("Theme")}</button>
-              {#each ACCENT_SWATCHES as color (color)}
-                <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label={t("Accent {color}", { color })} style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
-              {/each}
-              <input type="color" aria-label={t("Pick any accent colour")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
-            </div>
-          </div>
         {/if}
         <label class="field-row">
           <span>{t("Picture behind the words")}</span>
@@ -258,6 +230,38 @@
     <figure class="preview">
       <figcaption>{t("Preview of this item")}</figcaption>
       <div class="screen"><Screen model={preview} /></div>
+      {#if announcement}
+        <div class="ann-look">
+          <div class="field-row">
+            <span>{t("Design")}</span>
+            <div class="ann-designs" role="radiogroup" aria-label={t("Announcement design")}>
+              {#each designThumbs as design (design.id)}
+                <button
+                  type="button"
+                  class="ann-design"
+                  role="radio"
+                  aria-checked={(announcement.design ?? "classic") === design.id}
+                  title={design.hint}
+                  onclick={() => setAnnouncement({ design: design.id })}
+                >
+                  <span class="ann-thumb"><Screen model={design.model} still /></span>
+                  <span class="ann-design-name">{design.name}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+          <div class="field-row">
+            <span>{t("Accent colour")}</span>
+            <div class="ann-swatches" role="radiogroup" aria-label={t("Accent colour")}>
+              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title={t("The theme's colour")} style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>{t("Theme")}</button>
+              {#each ACCENT_SWATCHES as color (color)}
+                <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label={t("Accent {color}", { color })} style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
+              {/each}
+              <input type="color" aria-label={t("Pick any accent colour")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
+            </div>
+          </div>
+        </div>
+      {/if}
     </figure>
   </div>
 
@@ -285,11 +289,12 @@
   .ann-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
   .ann-chip { height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: 12px; }
   .ann-chip[aria-pressed="true"] { border-color: var(--accent, #4f8cff); background: color-mix(in srgb, var(--accent, #4f8cff) 16%, var(--field)); }
-  .ann-designs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ann-look { display: grid; gap: 12px; margin-top: 8px; }
+  .ann-designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
   .ann-design { display: grid; gap: 4px; padding: 4px; border-radius: 9px; border: 1px solid var(--line); background: var(--field); color: var(--ink); text-align: left; }
   .ann-design[aria-checked="true"] { border-color: var(--accent, #4f8cff); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #4f8cff) 45%, transparent); }
   .ann-thumb { display: block; border-radius: 6px; overflow: hidden; background: #000; pointer-events: none; }
-  .ann-design-name { font-size: 12px; font-weight: 600; padding: 0 2px 2px; }
+  .ann-design-name { font-size: 11.5px; font-weight: 600; padding: 0 2px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ann-swatches { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ann-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--swatch); }
   .ann-swatch.theme { width: auto; border-radius: 14px; padding: 0 10px; font-size: 12px; color: var(--ink); background: linear-gradient(90deg, var(--swatch) 0 8px, var(--field) 8px); padding-left: 16px; }

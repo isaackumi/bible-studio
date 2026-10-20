@@ -3,7 +3,7 @@
 
 import type { Service } from "./types";
 
-export const SETTING_KEYS = ["liveOnClick", "autoAdvance", "advanceGrace", "warnMinutes", "versesPerScreen", "leaderSeconds", "leaderTo", "countdownTo"] as const;
+export const SETTING_KEYS = ["liveOnClick", "autoAdvance", "advanceGrace", "warnMinutes", "versesPerScreen", "leaderSeconds", "leaderTo", "countdownTo", "readingsOn"] as const;
 export type ServiceSettingsValues = Partial<Pick<Service, (typeof SETTING_KEYS)[number]>>;
 
 /** The settings a service has changed from the built-in behaviour. */
@@ -36,6 +36,7 @@ export function cleanSettings(value: unknown): ServiceSettingsValues {
   if (verses) out.versesPerScreen = verses;
   const seconds = minutes(record.leaderSeconds, 120);
   if (seconds) out.leaderSeconds = seconds;
+  if (record.readingsOn === "presenter" || record.readingsOn === "service") out.readingsOn = record.readingsOn;
   for (const key of ["leaderTo", "countdownTo"] as const) {
     const dest = record[key];
     if (dest === "screen" || dest === "preview" || dest === "off") out[key] = dest;

@@ -27,7 +27,7 @@
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
   import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
-  import { serviceSummary } from "../../domain/service";
+  import { partDesk, serviceSummary } from "../../domain/service";
   import { screenStarts } from "../../bible/passage";
   import QuickVerse from "./QuickVerse.svelte";
   import { planSchedule } from "../../domain/schedule";
@@ -330,7 +330,9 @@
 
   function open(item: PresentationItem, event: MouseEvent) {
     (event.currentTarget as HTMLElement).blur();
-    void session.chooseItem(item.id);
+    // A reading set to run on the Presenter page opens there, with its verses picked out.
+    if (session.readingOnPresenter(item.id)) session.openReadingOnPresenter(item.id);
+    else void session.chooseItem(item.id);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -562,6 +564,11 @@
                 <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" showLeft={false} />
               {/if}
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
+              {#if partDesk(section) === "presenter"}
+                <button type="button" class="desk-tag" title={t("This part runs on the Presenter page: its Bible, songs and every tool, while the service keeps time. Click to run it here instead.")} onclick={() => session.setPartDesk(section.id, "service")}><Icon name="layout" size={12} /> {t("Presenter page")}</button>
+              {:else}
+                <button type="button" class="skip-toggle desk-toggle" title={t("Run this part on the Presenter page, with every tool (the service keeps time)")} onclick={() => session.setPartDesk(section.id, "presenter")}><Icon name="layout" size={13} /><span class="skip-label">{t("Use Presenter")}</span></button>
+              {/if}
               <button
                 type="button"
                 class="skip-toggle"
@@ -644,6 +651,7 @@
                           {#if reading.live}<b class="at-live">{reading.live}</b>{/if}{#if reading.preview && reading.preview !== reading.live}<b class="at-preview">{reading.preview}</b>{/if}<span>{t("of {n}", { n: reading.count })}</span>
                         </span>
                       {/if}
+                      <button type="button" class="row-tool" aria-label={t("Open {title} on the Presenter page", { title: item.title })} title={t("Open on the Presenter page: its Bible, verse list and search. The service keeps time.")} onclick={() => session.openReadingOnPresenter(item.id)}><Icon name="expand" size={13} /></button>
                       {#if span > 1}
                         <label class="per-screen" title={t("How many verses each screen shows; Next steps to the next ones")}>
                           <select aria-label={t("Verses per screen for {title}", { title: item.title })} value={item.bible.perScreen === undefined ? "auto" : String(item.bible.perScreen)} onchange={(event) => void session.setVersesPerScreen(item.id, event.currentTarget.value === "auto" ? null : Number(event.currentTarget.value))}>
@@ -952,6 +960,8 @@
   .block:hover .skip-toggle, .block:focus-within .skip-toggle, .skip-toggle.on { opacity: 1; }
   .skip-toggle:hover { background: var(--field); color: var(--ink); border-color: var(--line); }
   .skip-toggle.on { border-color: var(--line); background: var(--field); color: var(--ink); }
+  .desk-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+  .desk-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   @media (hover: none) { .skip-toggle { opacity: 1; } }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }

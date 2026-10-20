@@ -9,6 +9,8 @@
   import SwitcherMenu from "../SwitcherMenu.svelte";
   import BroadcastMenu from "../BroadcastMenu.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
+  import GoLive from "./GoLive.svelte";
+  import ServiceStrip from "./ServiceStrip.svelte";
   import TimerControls from "../TimerControls.svelte";
   import { findItem } from "../../domain/service";
   import { inPassages, preferService, serviceFirst, servicePassages } from "../../domain/service-first";
@@ -550,6 +552,22 @@
     session.pageRequest = null;
   });
 
+  // A reading from the running order opened here: its book and chapter, its verses picked out, and
+  // its first screen on Preview (then the verse list, search and arrows work as always).
+  $effect(() => {
+    const wanted = session.passageRequest;
+    if (!wanted) return;
+    untrack(() => {
+      session.passageRequest = null;
+      if (session.translations.some((entry) => entry.id === wanted.translationId)) translationId = wanted.translationId;
+      bookOrd = wanted.bookOrd;
+      chapter = wanted.chapter;
+      anchor = wanted.startVerse;
+      const per = session.perScreenOf(wanted);
+      void showPassage(wanted.startVerse, per ? Math.min(wanted.endVerse, wanted.startVerse + per - 1) : wanted.endVerse);
+    });
+  });
+
   /** Change page; each page keeps its own Preview (Program stays as it is). */
   function setMode(next: Mode): boolean {
     const restored = session.switchPage(mode, next);
@@ -775,6 +793,7 @@
     </nav>
   </header>
 
+  {#if mode !== "service" && session.service && (session.serviceRunning || session.presenterPartId)}<ServiceStrip />{/if}
   {#if mode === "service"}
     <ServiceDesk />
   {:else if mode === "sermon"}
@@ -1070,7 +1089,7 @@
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
                   <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span></header>
-                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /></div>
+                  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
 
@@ -1508,6 +1527,8 @@
   .verse.picked { border-color: var(--accent); }
   .display { padding: 12px; }
   .monitor {
+    position: relative;
+    --go-live-inset: 22px;
     flex: 1;
     min-height: 0;
     container-type: size;

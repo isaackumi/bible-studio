@@ -3,6 +3,7 @@
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
   import VideoControls from "../VideoControls.svelte";
+  import GoLive from "./GoLive.svelte";
   import type { PewPage } from "../../domain/types";
   import { t } from "../../i18n/core";
 
@@ -28,7 +29,7 @@
       </span>
     {/if}
   </figcaption>
-  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /></div>
+  <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
 </figure>
 {/if}
 {#if shown.program}
@@ -67,6 +68,6 @@
   .steps { display: flex; gap: 2px; }
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
   .row-tool:hover { background: var(--panel); color: var(--ink); }
-  .monitor { container-type: inline-size; background: #000; }
+  .monitor { position: relative; container-type: inline-size; background: #000; }
   .loop-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 24px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--live) 50%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--live) 12%, transparent); color: var(--live); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 </style>
