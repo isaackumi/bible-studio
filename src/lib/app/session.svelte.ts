@@ -2773,6 +2773,7 @@ class Session {
     if (!this.service) return;
     this.service = { ...this.service, startTime: /^\d{2}:\d{2}$/.test(time) ? time : undefined };
     this.persistSoon();
+    this.refreshCountdown();
   };
 
   setSectionTiming = (id: string, change: { minutes?: number | null; until?: string | null }) => {
@@ -2970,14 +2971,69 @@ class Session {
     return this.service?.countdownTo === "preview" ? "preview" : "off";
   }
 
-  setCountdownTo = (dest: ScreenDest) => {
+  setCountdownTo = (dest: ScreenDest) => this.setCountdownMode(dest === "screen" ? "corner" : dest === "preview" ? "full" : "off");
+
+  /** The countdown on the audience screen: a card in a corner, the whole screen (in front of the slide), or off. */
+  get countdownMode(): "corner" | "full" | "off" {
+    const overlay = this.countdownOverlay();
+    return overlay?.on ? (overlay.cover ? "full" : "corner") : "off";
+  }
+
+  private countdownOverlay = () => this.workspace.overlays.find((overlay) => overlay.kind === "countdown");
+
+  setCountdownMode = (mode: "corner" | "full" | "off") => {
     if (this.service) {
-      this.service = { ...this.service, countdownTo: dest };
+      this.service = { ...this.service, countdownTo: mode === "off" ? "off" : "screen" };
       this.persistSoon();
     }
-    if ((dest === "screen") !== this.countdownOverlayOn) this.toggleCountdownOverlay();
-    if (dest === "preview") this.showCountdown();
-    else if (dest === "off") this.message = t("The countdown stays off the screen.");
+    this.setCountdownLook({ on: mode !== "off", cover: mode === "full" || undefined });
+    this.message =
+      mode === "off"
+        ? t("The countdown stays off the screen.")
+        : !this.serviceRunning && !this.screenCountdown()
+          ? t("The countdown shows once the service starts.")
+          : mode === "full"
+            ? t("The countdown fills the screen, in front of the slide.")
+            : t("The countdown is in the corner of the screen.");
+  };
+
+  /** Change how the countdown looks (made the first time), keeping whether it is on. */
+  setCountdownLook = (patch: Partial<ScreenOverlay>) => {
+    const existing = this.countdownOverlay();
+    if (existing) {
+      this.updateOverlay(existing.id, patch);
+      return;
+    }
+    void this.setOverlays(sanitizeOverlays([...this.workspace.overlays, { ...newOverlay("countdown"), ...patch }]));
+  };
+
+  /** How the leader's name card looks (its colour, box, and whether the part's name shows under it). */
+  get leaderLook(): ScreenOverlay {
+    return this.workspace.overlays.find((overlay) => overlay.id === LEADER_OVERLAY) ?? newOverlay("lower-third", "", LEADER_OVERLAY);
+  }
+
+  setLeaderLook = (patch: Partial<ScreenOverlay>) => {
+    const existing = this.workspace.overlays.find((overlay) => overlay.id === LEADER_OVERLAY);
+    if (existing) {
+      this.updateOverlay(LEADER_OVERLAY, patch);
+      return;
+    }
+    void this.setOverlays(sanitizeOverlays([...this.workspace.overlays, { ...newOverlay("lower-third", "", LEADER_OVERLAY), text: "", subtitle: "", ...patch, on: false }]));
+  };
+
+  /**
+   * What the countdown counts to now: the end of the running part; before the service begins (today,
+   * within six hours), its start time.
+   */
+  screenCountdown = (): { name: string; endsAt: number } | null => {
+    const running = this.runningDeadline();
+    if (running || !this.service || this.serviceRunning) return running;
+    const start = parseClock(this.service.startTime);
+    if (start === null) return null;
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+    const at = day.getTime() + start * 60_000;
+    return at > Date.now() && at - Date.now() < 6 * 3_600_000 ? { name: t("Service starts in"), endsAt: at } : null;
   };
 
   private leaderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -5643,7 +5699,7 @@ class Session {
 
   /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
   private withScreenOverlays = (model: PresentationModel): PresentationModel => {
-    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.runningDeadline() : null);
+    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.screenCountdown() : null);
     if (painted.length === 0) {
       if (!model.overlays) return model;
       const { overlays: _gone, ...rest } = model;

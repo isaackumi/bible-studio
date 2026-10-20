@@ -33,7 +33,16 @@ export type ScreenOverlay = {
   /** Countdown: where it sits, and how big. */
   spot: OverlaySpot;
   size: OverlaySize;
+  /** Countdown: fills the whole screen, in front of what is showing. */
+  cover?: boolean;
+  /** Countdown: the part's name above the time; lower third: the second line. False shows the time (or name) only. */
+  showLabel?: boolean;
+  /** The box behind it: dark glass (the default), filled with its colour, or none (words only). */
+  fill?: OverlayFill;
 };
+
+export type OverlayFill = "dark" | "color" | "clear";
+export const OVERLAY_FILLS: OverlayFill[] = ["dark", "color", "clear"];
 
 /** What travels to the screens: only overlays that are on, with the logo picture resolved. */
 export type PaintedOverlay = Omit<ScreenOverlay, "on" | "assetId"> & {
@@ -118,6 +127,9 @@ export function sanitizeOverlays(value: unknown): ScreenOverlay[] {
       color: typeof record.color === "string" && HEX.test(record.color) ? record.color.toLowerCase() : base.color,
       spot: SPOTS.has(record.spot as OverlaySpot) ? (record.spot as OverlaySpot) : base.spot,
       size: record.size === "s" || record.size === "l" || record.size === "xl" ? record.size : "m",
+      ...(record.cover === true ? { cover: true } : {}),
+      ...(record.showLabel === false ? { showLabel: false } : {}),
+      ...(record.fill === "color" || record.fill === "clear" ? { fill: record.fill } : {}),
       ...cleanRich("rich", record.rich),
       ...cleanRich("subtitleRich", record.subtitleRich),
     });

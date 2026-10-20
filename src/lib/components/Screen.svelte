@@ -60,7 +60,7 @@
   {#if hint && fit < 0.7}
     <p class="fit-note" title={t("Long text is shrunk to fit the screen. Split it for bigger words: fewer verses, or a song part in two.")}>{t("Text at {percent}% to fit", { percent: Math.round(fit * 100) })}</p>
   {/if}
-  {#if hint && model.layout === "empty"}
+  {#if hint && model.layout === "empty" && !model.overlays?.some((overlay) => overlay.kind === "countdown" && overlay.cover && overlay.endsAt)}
     <p class="screen-hint" style:font-size="{Math.max(10, Math.min(14, scale * canvas.width * 0.028))}px">{hint}</p>
   {/if}
   {@render overlay?.()}

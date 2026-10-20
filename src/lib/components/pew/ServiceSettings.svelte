@@ -30,11 +30,12 @@
   const modeName = $derived(t(MODES.find((entry) => entry.id === mode)!.name));
   const verses = $derived(service.versesPerScreen ?? 0);
 
+  const COUNT_MODES: Array<["corner" | "full" | "off", string]> = [["corner", msg("In the corner")], ["full", msg("Full screen")], ["off", msg("Off")]];
   const TOPICS = $derived<Array<{ id: Topic; icon: string; name: string; value: string }>>([
     { id: "live", icon: "play", name: t("Going live"), value: liveOnClick ? t("Auto LIVE") : t("Preview first") },
     { id: "moving", icon: "chevron-right", name: t("When time is up"), value: modeName },
     { id: "readings", icon: "bible", name: t("Readings"), value: verses ? tn(verses, "{n} verse a screen", "{n} verses a screen") : t("All verses") },
-    { id: "screen", icon: "screens", name: t("On the screen"), value: `${t("Countdown")} ${destName(session.countdownTo)} · ${t("Names")} ${destName(session.leaderTo)}` },
+    { id: "screen", icon: "screens", name: t("On the screen"), value: `${t("Countdown")} ${t(COUNT_MODES.find(([id]) => id === session.countdownMode)![1])} · ${t("Names")} ${destName(session.leaderTo)}` },
     { id: "warnings", icon: "alerts", name: t("Warnings"), value: service.warnMinutes ? t("{n} min before", { n: service.warnMinutes }) : t("Last fifth") },
   ]);
 
@@ -57,7 +58,7 @@
         <span class="chip" class:on={liveOnClick}><Icon name="play" size={11} />{liveOnClick ? t("Auto LIVE") : t("Preview first")}</span>
         <span class="chip" class:on={mode !== "off"}><Icon name="timer" size={11} />{modeName}</span>
         {#if verses}<span class="chip on"><Icon name="bible" size={11} />{tn(verses, "{n} verse a screen", "{n} verses a screen")}</span>{/if}
-        {#if session.countdownTo !== "off"}<span class="chip on"><Icon name="clock" size={11} />{t("Countdown")}</span>{/if}
+        {#if session.countdownMode !== "off"}<span class="chip on"><Icon name="clock" size={11} />{t("Countdown")}</span>{/if}
         {#if session.leaderTo !== "off"}<span class="chip on"><Icon name="user" size={11} />{t("Names")}</span>{/if}
       </span>
     </p>
@@ -125,7 +126,7 @@
         <div class="field">
           <span class="field-copy"><strong>{t("Countdown")}</strong><em>{t("Time left in the part now.")}</em></span>
           <div class="steps" role="radiogroup" aria-label={t("Countdown")}>
-            {#each DESTS as [dest, name] (dest)}<button type="button" role="radio" aria-checked={session.countdownTo === dest} onclick={() => session.setCountdownTo(dest)}>{t(name)}</button>{/each}
+            {#each COUNT_MODES as [id, name] (id)}<button type="button" role="radio" aria-checked={session.countdownMode === id} onclick={() => session.setCountdownMode(id)}>{t(name)}</button>{/each}
           </div>
         </div>
         <div class="field">

@@ -70,6 +70,7 @@
   import X from "@lucide/svelte/icons/x";
   import Eye from "@lucide/svelte/icons/eye";
   import EyeOff from "@lucide/svelte/icons/eye-off";
+  import PanelRight from "@lucide/svelte/icons/panel-right";
   import GripVertical from "@lucide/svelte/icons/grip-vertical";
   import Lock from "@lucide/svelte/icons/lock";
   import LockOpen from "@lucide/svelte/icons/lock-open";
@@ -136,6 +137,8 @@
     focus: Focus,
     eye: Eye,
     "eye-off": EyeOff,
+    "panel-left": PanelLeft,
+    "panel-right": PanelRight,
     grip: GripVertical,
     lock: Lock,
     "lock-open": LockOpen,

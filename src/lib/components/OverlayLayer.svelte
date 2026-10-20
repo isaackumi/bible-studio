@@ -49,15 +49,15 @@
     {:else if overlay.kind === "countdown"}
       {#if overlay.endsAt}
         {@const view = left(overlay.endsAt)}
-        <div class="ov-count {overlay.spot} size-{overlay.size}" class:over={view.over} class:short={view.short} style:--accent-bar={overlay.color}>
-          <span class="ov-count-label">{#if overlay.rich}<InlineRich doc={overlay.rich} />{:else}{overlay.text || overlay.section}{/if}</span>
+        <div class="ov-count {overlay.cover ? 'cover' : overlay.spot} size-{overlay.size} fill-{overlay.fill ?? 'dark'}" class:over={view.over} class:short={view.short} style:--accent-bar={overlay.color}>
+          {#if overlay.showLabel !== false}<span class="ov-count-label">{#if overlay.rich}<InlineRich doc={overlay.rich} />{:else}{overlay.text || overlay.section}{/if}</span>{/if}
           <span class="ov-count-time">{view.text}</span>
         </div>
       {/if}
     {:else if overlay.kind === "lower-third"}
-      <div class="ov-lower" style:--accent-bar={overlay.color}>
+      <div class="ov-lower fill-{overlay.fill ?? 'dark'}" style:--accent-bar={overlay.color}>
         <strong>{@render words(overlay.text, overlay.rich)}</strong>
-        {#if overlay.subtitle || overlay.subtitleRich}<span>{@render words(overlay.subtitle, overlay.subtitleRich)}</span>{/if}
+        {#if overlay.showLabel !== false && (overlay.subtitle || overlay.subtitleRich)}<span>{@render words(overlay.subtitle, overlay.subtitleRich)}</span>{/if}
       </div>
     {/if}
   {/each}
@@ -104,6 +104,19 @@
   .bar-bottom .ov-count.bottom, .bar-bottom .ov-count.bottom-left, .bar-bottom .ov-count.bottom-right { bottom: 124px; }
   .ov-count-label { font-size: 0.42em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; white-space: nowrap; max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
   .ov-count-time { font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  /* Box styles: filled with its colour, or no box at all (words only, with a shadow to read on anything). */
+  .ov-count.fill-color { background: var(--accent-bar); border-bottom-color: rgb(0 0 0 / 0.25); }
+  .ov-count.fill-clear { background: none; border-bottom: 0; text-shadow: 0 0.04em 0.18em rgb(0 0 0 / 0.75); }
+  /* Full screen: in front of whatever is showing, the time as big as the screen allows. */
+  .ov-count.cover { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.06em; padding: 0; border: 0; border-radius: 0; background: #050505; font-size: 300px; z-index: 2; }
+  .ov-count.cover.size-s { font-size: 200px; }
+  .ov-count.cover.size-l { font-size: 400px; }
+  .ov-count.cover.size-xl { font-size: 500px; }
+  .ov-count.cover .ov-count-label { font-size: 0.22em; max-width: 80%; }
+  .ov-count.cover.fill-color { background: var(--accent-bar); }
+  .ov-count.cover.fill-clear { background: rgb(0 0 0 / 0.55); }
+  .ov-count.cover::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 0.035em; background: var(--accent-bar); }
+  .ov-count.cover.fill-color::after, .ov-count.cover.fill-clear::after { display: none; }
   .ov-count.short { border-bottom-color: #f5a524; }
   .ov-count.short .ov-count-time { color: #ffd27a; }
   .ov-count.over { border-bottom-color: #e5484d; background: rgba(120, 10, 20, 0.82); }
@@ -112,6 +125,8 @@
   @media (prefers-reduced-motion: reduce) { .ov-count.over .ov-count-time { animation: none; } }
 
   .ov-lower { position: absolute; left: 96px; bottom: 120px; display: grid; gap: 4px; padding: 22px 40px 24px 34px; border-left: 12px solid var(--accent-bar); border-radius: 6px; background: rgba(5, 5, 5, 0.85); color: #fff; max-width: 60%; }
+  .ov-lower.fill-color { background: var(--accent-bar); border-left-color: rgb(0 0 0 / 0.25); }
+  .ov-lower.fill-clear { background: none; border-left: 0; padding-left: 0; text-shadow: 0 2px 12px rgb(0 0 0 / 0.8); }
   .ov-lower strong { font-size: 46px; font-weight: 700; line-height: 1.1; }
   .ov-lower span { font-size: 28px; opacity: 0.8; }
 

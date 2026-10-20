@@ -27,3 +27,14 @@ describe("screen overlays", () => {
     expect(clean[0]).toMatchObject({ id: "x", on: true, speed: 2, color: "#fa4f00" });
   });
 });
+
+describe("how a countdown or name card looks", () => {
+  it("keeps full screen, time only and the box style, and drops anything else", () => {
+    const [kept] = sanitizeOverlays([{ ...newOverlay("countdown", "", "c"), cover: true, showLabel: false, fill: "color" }]);
+    expect(kept).toMatchObject({ cover: true, showLabel: false, fill: "color" });
+    const [plain] = sanitizeOverlays([{ ...newOverlay("countdown", "", "d"), cover: "yes", showLabel: true, fill: "neon" }]);
+    expect(plain!.cover).toBeUndefined();
+    expect(plain!.showLabel).toBeUndefined();
+    expect(plain!.fill).toBeUndefined();
+  });
+});

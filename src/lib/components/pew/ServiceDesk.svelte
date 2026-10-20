@@ -413,15 +413,16 @@
   <div class="sheet">
     {#if service}
       <header class="head">
+        <button type="button" class="desk-btn icon panel-toggle" aria-pressed={listHidden !== true} aria-label={listHidden ? t("Show the services list") : t("Hide the services list")} title={listHidden ? t("Show the services list") : t("Hide the services list, for more room")} onclick={() => (listHidden = !listHidden)}><Icon name="panel-left" size={15} /></button>
         <div class="title">
           <input class="name" aria-label={t("Service name")} value={service.name} onchange={(event) => session.renameService(event.currentTarget.value)} />
         </div>
         <div class="views" role="radiogroup" aria-label={t("View")}>
           <button type="button" role="radio" aria-checked={view === "list"} aria-label={t("List")} title={t("The running order as a list")} onclick={() => setView("list")}><Icon name="list" size={14} /><span class="view-name">{t("List")}</span></button>
-          <button type="button" role="radio" aria-checked={view === "canvas"} aria-label={t("Canvas")} title={t("The service as a flow on a canvas: drag parts, wire the order")} onclick={() => setView("canvas")}><Icon name="layers" size={14} /><span class="view-name">{t("Canvas")}</span></button>
+          <button type="button" role="radio" aria-checked={view === "canvas"} aria-label={t("Flow")} title={t("The service as a flow chart: drag parts, wire the order")} onclick={() => setView("canvas")}><Icon name="layers" size={14} /><span class="view-name">{t("Flow")}</span></button>
         </div>
-        <button type="button" class="desk-btn icon more" aria-label={t("Service settings")} title={t("Service settings: Auto LIVE, moving on when time is up, readings, screen, warnings")} onclick={() => (settingsOpen = true)}><Icon name="settings" size={15} /></button>
-        <ToolMenu label={t("More for this service")} className="desk-btn icon more">
+        <button type="button" class="desk-btn labelled" title={t("Service settings: Auto LIVE, moving on when time is up, readings, screen, warnings")} onclick={() => (settingsOpen = true)}><Icon name="settings" size={14} /> <span class="lbl">{t("Settings")}</span></button>
+        <ToolMenu label={t("More: report, outline, save as template, fold parts")} className="desk-btn icon more">
           {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
           {#snippet children(close)}
             <button type="button" role="menuitem" onclick={() => { reportOpen = true; close(); }}><Icon name="clock" size={13} /> {t("Report")}<span class="menu-hint">{t("Planned and used time per part")}</span></button>
@@ -438,8 +439,8 @@
             <button type="button" role="menuitem" onclick={() => { foldAll(true); close(); }}><Icon name="chevron-up" size={13} /> {t("Fold all parts")}</button>
             <button type="button" role="menuitem" onclick={() => { foldAll(false); close(); }}><Icon name="chevron-down" size={13} /> {t("Unfold all parts")}</button>
             <div class="menu-sep"></div>
-            <button type="button" role="menuitemcheckbox" aria-checked={!stageHidden} onclick={() => { setStage(!stageHidden); close(); }}><Icon name="eye" size={13} /> {t("Monitors")}</button>
-            <button type="button" role="menuitemcheckbox" aria-checked={wide} onclick={() => { toggleWide(); close(); }}><Icon name={wide ? "columns" : "expand"} size={13} /> {t("Wide view")}</button>
+            <button type="button" role="menuitemcheckbox" aria-checked={!stageHidden} onclick={() => { setStage(!stageHidden); close(); }}><Icon name="panel-right" size={13} /> {t("Preview and Program")}</button>
+            <button type="button" role="menuitemcheckbox" aria-checked={wide} onclick={() => { toggleWide(); close(); }}><Icon name={wide ? "columns" : "expand"} size={13} /> {t("Hide both side panels")}</button>
             <div class="menu-sep"></div>
             <button type="button" role="menuitem" onclick={() => { void session.closeService(); close(); }}><Icon name="close" size={13} /> {session.serviceRunning ? t("End and close") : t("Close service")}</button>
           {/snippet}
@@ -461,6 +462,7 @@
           {/if}
           <button type="button" class="desk-btn start" title={t("Begin the service: checks the time against the planned start first")} onclick={() => (startOpen = true)}><Icon name="play" size={12} /> {t("Start service")}</button>
         {/if}
+        <button type="button" class="desk-btn icon panel-toggle" aria-pressed={!stageHidden} aria-label={stageHidden ? t("Show Preview and Program") : t("Hide Preview and Program")} title={stageHidden ? t("Show Preview and Program") : t("Hide Preview and Program, for more room")} onclick={() => setStage(!stageHidden)}><Icon name="panel-right" size={15} /></button>
       </header>
 
       {#if session.serviceRunning}
@@ -815,7 +817,20 @@
   .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
   .title { flex: 1 1 160px; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
   .name { flex: 0 1 auto; width: 100%; min-width: 120px; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; text-overflow: ellipsis; }
-  .head :global(.more) { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; }
+  .head :global(.more), .panel-toggle { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; }
+  .panel-toggle { color: var(--muted); }
+  .panel-toggle[aria-pressed="false"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  /* A narrow middle pane: the header keeps one row, buttons keep their icon and tooltip. */
+  .sheet { container-type: inline-size; }
+  @container (max-width: 820px) {
+    .views .view-name, .labelled .lbl { display: none; }
+    .views button { padding: 0 8px; }
+    .labelled { width: 32px; padding: 0; justify-content: center; }
+  }
+  @container (max-width: 640px) {
+    .auto-live { font-size: 0; gap: 0; }
+  }
+  .labelled { display: inline-flex; align-items: center; gap: 6px; height: 30px; flex: none; }
   .head :global(.menu .menu-hint) { margin-left: auto; padding-left: 14px; font-size: 11px; color: var(--muted); }
   .head :global(.menu button) { display: flex; align-items: center; gap: 8px; }
   .name:hover, .name:focus { border-color: var(--line); background: var(--field); }
@@ -953,8 +968,6 @@
   }
   .views { display: inline-flex; flex: none; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; }
   .views button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
-  .views .view-name { display: none; }
-  .views button[aria-checked="true"] .view-name { display: inline; }
   .views button[aria-checked="true"] { background: var(--field); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
   .running-clock { display: inline-flex; align-items: center; gap: 5px; color: #30a46c !important; font-weight: 700; font-variant-numeric: tabular-nums; }
   .running-clock i { width: 6px; height: 6px; border-radius: 50%; background: #30a46c; }
