@@ -552,6 +552,16 @@
     session.pageRequest = null;
   });
 
+  /** Scroll the verse list to the picked verses once the chapter has loaded (a reading opened here). */
+  let revealPicked = $state(false);
+  $effect(() => {
+    if (!revealPicked || verses.length === 0 || mode !== "scriptures") return;
+    const first = start;
+    if (first === null || !verses.some((verse) => verse.verse === first)) return;
+    revealPicked = false;
+    requestAnimationFrame(() => document.querySelector(".verse-list .verse.picked")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  });
+
   // A reading from the running order opened here: its book and chapter, its verses picked out, and
   // its first screen on Preview (then the verse list, search and arrows work as always).
   $effect(() => {
@@ -563,6 +573,7 @@
       bookOrd = wanted.bookOrd;
       chapter = wanted.chapter;
       anchor = wanted.startVerse;
+      revealPicked = true;
       const per = session.perScreenOf(wanted);
       void showPassage(wanted.startVerse, per ? Math.min(wanted.endVerse, wanted.startVerse + per - 1) : wanted.endVerse);
     });
