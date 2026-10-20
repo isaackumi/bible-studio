@@ -1561,6 +1561,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // Chords
+  "Chords for the stage screen": "Accords pour l’écran de scène",
+  Key: "Tonalité",
+  "Chords down a semitone": "Accords un demi-ton plus bas",
+  "Chords up a semitone": "Accords un demi-ton plus haut",
   // Microphone messages
   "macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.": "macOS a bloqué le micro. Dans Réglages Système → Confidentialité et sécurité → Micro, activez Church Studio.",
   "macOS blocked Speech Recognition. In System Settings → Privacy & Security → Speech Recognition, turn on Church Studio.": "macOS a bloqué la reconnaissance vocale. Dans Réglages Système → Confidentialité et sécurité → Reconnaissance vocale, activez Church Studio.",

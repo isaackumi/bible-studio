@@ -52,6 +52,16 @@
   const clock = $derived(new Date(now).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
   const stale = $derived(!snapshot || now - snapshot.at > 6 * 60 * 60 * 1000);
   const layout = $derived(snapshot?.layout ?? defaultStageLayout());
+  /** A chord line split where its chords start: [{ chord, text }]. */
+  function segments(line: { lyric: string; chords: Array<{ at: number; chord: string }> }): Array<{ chord: string; text: string }> {
+    const marks = [...line.chords].sort((a, b) => a.at - b.at);
+    if (!marks.length) return [{ chord: "", text: line.lyric }];
+    const parts: Array<{ chord: string; text: string }> = [];
+    if (marks[0]!.at > 0) parts.push({ chord: "", text: line.lyric.slice(0, marks[0]!.at) });
+    marks.forEach((mark, n) => parts.push({ chord: mark.chord, text: line.lyric.slice(mark.at, marks[n + 1]?.at ?? line.lyric.length) }));
+    return parts;
+  }
+
   /** Minutes left in the running section of the service (negative: over). */
   const sectionLeft = $derived(snapshot?.section ? Math.round((snapshot.section.endsAt - now) / 60_000) : null);
 </script>
@@ -75,9 +85,18 @@
   {/if}
   <section class="now" aria-live="polite">
     <p class="cue">{cue(snapshot?.program) || (stale ? t("Waiting for the desk") : "")}</p>
-    {#each current as line, index (index)}
-      <p class="line">{line}</p>
-    {/each}
+    {#if layout.chords && snapshot?.chords?.length}
+      <!-- Chords for the band: each chord sits over the words it starts on. -->
+      {#each snapshot.chords as line, index (index)}
+        <p class="line chorded">
+          {#each segments(line) as part, n (n)}<span class="seg"><b class="chord">{part.chord || " "}</b><span>{part.text || " "}</span></span>{/each}
+        </p>
+      {/each}
+    {:else}
+      {#each current as line, index (index)}
+        <p class="line">{line}</p>
+      {/each}
+    {/if}
   </section>
   {#if layout.notes && snapshot?.notes}
     <section class="notes"><p class="label">{t("Notes")}</p>{#if snapshot.notesRich}<div class="rich-notes"><RichView doc={snapshot.notesRich} base="3vh" /></div>{:else}<p>{snapshot.notes}</p>{/if}</section>
@@ -116,6 +135,9 @@
   .now { overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .cue { margin: 0 0 1.5vh; font-size: 3vh; color: #f5c451; font-weight: 700; letter-spacing: 0.04em; }
   .line { margin: 0 0 1vh; font-size: 6.4vh; line-height: 1.18; font-weight: 600; }
+  .line.chorded { display: flex; flex-wrap: wrap; align-items: flex-end; white-space: pre; }
+  .seg { display: inline-flex; flex-direction: column; }
+  .chord { font-size: 0.6em; line-height: 1.1; font-weight: 800; color: #f5c451; min-height: 1.1em; padding-right: 0.4em; }
   .stage-message { margin: 0; padding: 2vh 2vw; border-radius: 12px; background: #ffd60a; color: #000; font-size: 6vh; font-weight: 800; text-align: center; animation: call 1.2s ease-in-out infinite alternate; }
   @keyframes call { from { box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.7); } to { box-shadow: 0 0 0 1.2vh rgba(255, 214, 10, 0); } }
   .notes { padding: 1.5vh 1.5vw; border: 1px dashed #444; border-radius: 10px; color: #e8e8e8; }

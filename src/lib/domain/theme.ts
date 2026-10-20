@@ -299,7 +299,7 @@ export function defaultWorkspace(): Workspace {
     onlineBibles: { key: "", bibles: [] },
     songUses: [],
     parallelTranslationId: null,
-    stageLayout: { next: true, clock: true, notes: true, size: "m" },
+    stageLayout: { next: true, clock: true, notes: true, chords: true, size: "m" },
     pco: { appId: "", secret: "" },
     ai: emptyAiSettings(),
     backup: { folder: "", lastAt: "" },

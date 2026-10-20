@@ -124,6 +124,7 @@ import { addTracks, MAX_CROSSFADE, moveTrack, removeTrackAt, type AudioSettings,
 import { AudioDeck, SoundPad, canChooseOutput } from "../audio/deck.svelte";
 import { evenGain, measureUrl } from "../audio/loudness";
 import { readBibleFile, verseCount } from "../bible/import";
+import { stageChords, type ChordLine } from "../domain/chords";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
 import type { ShortcutAction } from "../domain/types";
@@ -5549,6 +5550,7 @@ class Session {
       ...(focused?.notesRich ? { notesRich: focused.notesRich } : {}),
       layout: this.workspace.stageLayout,
       section: this.stageSection(),
+      ...(this.workspace.stageLayout.chords ? { chords: this.programChords() } : {}),
     };
     try {
       publishStageLocal(snapshot);
@@ -5556,6 +5558,29 @@ class Session {
       // Storage full or blocked: the stage keeps its last frame.
     }
     if (isDesktop()) void emit("stage-frame", JSON.stringify(snapshot)).catch(() => {});
+  };
+
+  /** Chords for the song part on Program (the screen showing, line by line), transposed. */
+  private programChords(): ChordLine[] {
+    const match = /^song:([^:#]+):([^#]+)(?:#(\d+))?$/.exec(this.live.program.sourceId ?? "");
+    if (!match) return [];
+    const song = this.songs.find((entry) => entry.id === match[1]);
+    const section = song?.sections.find((entry) => entry.id === match[2]);
+    if (!song || !section?.chords) return [];
+    const range = match[3] !== undefined ? this.songScreens(section)[Number(match[3])] : undefined;
+    return stageChords(section, song.transpose ?? 0, range, song.sections.flatMap((entry) => entry.chords ?? []));
+  }
+
+  /** Move a song's chords up or down for the band (the audience screen never shows chords). */
+  setSongTranspose = async (songId: string, semitones: number) => {
+    const song = this.songs.find((entry) => entry.id === songId);
+    if (!song) return;
+    // Twelve semitones is the same key again, so it comes round to no change.
+    const transpose = Math.round(semitones) % 12;
+    const clean = sanitizeSong({ ...song, transpose });
+    await api.songSave(clean);
+    this.songs = await api.songList();
+    this.publishStage();
   };
 
   stageOpen = $state(false);

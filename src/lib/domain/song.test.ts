@@ -310,3 +310,22 @@ describe("songs in two languages", () => {
     expect(lyricsFor(plain, "v", "", "second").lines.map((line) => line.text)).toEqual(["first line one", "first line two"]);
   });
 });
+
+describe("chords kept for the band", () => {
+  it("keeps ChordPro chords beside the words, which stay clean", () => {
+    const parsed = parseLyrics("{title: Grace}\n{soc}\n[G]Amazing [C]grace\nHow sweet the sound\n{eoc}");
+    expect(parsed.sections[0]!.lines).toEqual(["Amazing grace", "How sweet the sound"]);
+    expect(parsed.sections[0]!.chords).toEqual(["[G]Amazing [C]grace", ""]);
+    expect(parseLyrics("Just words\nNo chords").sections[0]!.chords).toBeUndefined();
+  });
+
+  it("drops chords once the words are edited, and keeps a transpose only with chords", () => {
+    const base = { id: "s", title: "Grace", author: "", transpose: 2 };
+    const kept = sanitizeSong({ ...base, sections: [{ id: "c", kind: "chorus", label: "Chorus", lines: ["Amazing grace"], chords: ["[G]Amazing [C]grace"] }] } as Song);
+    expect(kept.sections[0]!.chords).toEqual(["[G]Amazing [C]grace"]);
+    expect(kept.transpose).toBe(2);
+    const edited = sanitizeSong({ ...base, sections: [{ id: "c", kind: "chorus", label: "Chorus", lines: ["Amazing love"], chords: ["[G]Amazing [C]grace"] }] } as Song);
+    expect(edited.sections[0]!.chords).toBeUndefined();
+    expect(edited.transpose).toBeUndefined();
+  });
+});

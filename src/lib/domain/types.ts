@@ -313,6 +313,8 @@ export type SongSection = {
   second?: string[];
   /** The lyrics formatted, one block per line (the Formatted tab); `lines` keeps them plain. */
   rich?: import("./rich-text").RichDoc;
+  /** Chords for the band: line n of `lines` in ChordPro ("[G]Amazing [C]grace"), "" where none. Stage only. */
+  chords?: string[];
 };
 
 export type Song = {
@@ -332,6 +334,8 @@ export type Song = {
   secondLanguage?: string;
   /** A backing track (media id of an audio file) that plays when the song goes live. */
   trackId?: string;
+  /** Semitones the stage screen moves the chords (-11 to 11). */
+  transpose?: number;
 };
 
 export type SermonSection = {

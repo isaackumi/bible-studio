@@ -9,6 +9,7 @@
   import { buildSongIndex, chooseSung, screenForSung, type SungMatch } from "../../voice/song-detect";
   import { SONG_LINE_CHOICES } from "../../domain/song-screens";
   import { partForKey, SONG_PART_LETTERS } from "../../domain/song-keys";
+  import { firstChord, prefersFlats, transposeChord } from "../../domain/chords";
   import { invoke } from "@tauri-apps/api/core";
   import { isDesktop } from "../../platform/runtime";
   import { readPro6, readPro7, type ImportedSong } from "../../import/propresenter";
@@ -1036,6 +1037,18 @@
           {/each}
         </div>
       {/if}
+      {#if selected.sections.some((section) => section.chords)}
+        {@const allChords = selected.sections.flatMap((section) => section.chords ?? [])}
+        {@const key = firstChord(allChords)}
+        {@const shift = selected.transpose ?? 0}
+        <!-- Chords for the band: only the stage screen shows them; this moves them up or down. -->
+        <div class="click-mode transpose" role="group" aria-label={t("Chords for the stage screen")}>
+          <span>{t("Key")}</span>
+          <button type="button" aria-label={t("Chords down a semitone")} onclick={() => void session.setSongTranspose(selected.id, shift - 1)}>−</button>
+          <strong class="key">{key ? (shift ? `${key} → ${transposeChord(key, shift, prefersFlats(key, shift))}` : key) : "—"}{shift ? ` (${shift > 0 ? "+" : ""}${shift})` : ""}</strong>
+          <button type="button" aria-label={t("Chords up a semitone")} onclick={() => void session.setSongTranspose(selected.id, shift + 1)}>+</button>
+        </div>
+      {/if}
       <div class="click-mode" role="radiogroup" aria-label={t("Lines on the screen")}>
         <span>{t("Lines")}</span>
         {#each SONG_LINE_CHOICES as lines (lines)}
@@ -1363,6 +1376,7 @@
   .hint { margin: 0; font-size: 12px; color: var(--muted); }
   .hint b { color: var(--ink); font-weight: 600; }
   .keys-hint { display: block; margin-top: 2px; font-size: 11px; opacity: 0.8; }
+  .transpose .key { padding: 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .hint.on-screen { color: var(--ink); }
   .hint.on-screen b { color: var(--live); }
   .hint .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 1px; }

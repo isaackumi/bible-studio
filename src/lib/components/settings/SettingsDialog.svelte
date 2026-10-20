@@ -1081,10 +1081,10 @@
         <StageLinks />
         <p class="section-label">{t("What the stage screen shows")}</p>
         <section class="rows">
-          {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."]] as [key, title, detail] (key)}
+          {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."], ["chords", "Chords", "Chords above the words for the band, when a song has them (from ChordPro files). Transpose on the song desk."]] as [key, title, detail] (key)}
             <div class="row">
               <div class="row-copy"><strong>{title}</strong><span>{detail}</span></div>
-              <input type="checkbox" class="switch" role="switch" aria-label={title} checked={session.workspace.stageLayout[key as "next" | "clock" | "notes"]} onchange={(event) => session.setStageLayout({ [key]: event.currentTarget.checked })} />
+              <input type="checkbox" class="switch" role="switch" aria-label={title} checked={session.workspace.stageLayout[key as "next" | "clock" | "notes" | "chords"]} onchange={(event) => session.setStageLayout({ [key]: event.currentTarget.checked })} />
             </div>
           {/each}
           <div class="row">

@@ -1,3 +1,4 @@
+import { hasChords } from "./chords";
 import { sanitizeRich } from "./rich-text";
 import { isOpenLyrics, parseOpenLyrics } from "./openlyrics";
 import { cleanOrder } from "./song-order";
@@ -26,7 +27,12 @@ export function sanitizeSong(song: Song): Song {
     const rich = formatted && trim(formatted.blocks.map((block) => block.runs.map((run) => run.text).join(""))) === trim(lines) ? formatted : null;
     const label = section.label?.trim() || defaultLabel(kind, sections);
     const second = Array.isArray(section.second) ? section.second.map((line) => String(line)) : [];
-    sections.push({ id: section.id, kind, label, lines, ...(second.some((line) => line.trim()) ? { second } : {}), ...(rich ? { rich } : {}) });
+    // Chords are kept only while their words still match the lines (editing the words drops them).
+    const chords = Array.isArray(section.chords) && section.chords.length === lines.length && section.chords.some(hasChords)
+      && section.chords.every((chord, n) => chord === "" || stripChords(String(chord)) === lines[n]!.trim())
+      ? section.chords.map((chord) => String(chord))
+      : null;
+    sections.push({ id: section.id, kind, label, lines, ...(second.some((line) => line.trim()) ? { second } : {}), ...(rich ? { rich } : {}), ...(chords ? { chords } : {}) });
   }
   const folder = cleanFolder(song.folder);
   const ccli = cleanCcli(song.ccli);
@@ -34,6 +40,7 @@ export function sanitizeSong(song: Song): Song {
   const order = cleanOrder(song.order, sections);
   const secondLanguage = typeof song.secondLanguage === "string" ? song.secondLanguage.trim().slice(0, 40) : "";
   const trackId = typeof song.trackId === "string" ? song.trackId.trim().slice(0, 80) : "";
+  const transpose = typeof song.transpose === "number" && Number.isInteger(song.transpose) && song.transpose !== 0 && Math.abs(song.transpose) <= 11 ? song.transpose : 0;
   return {
     id: song.id,
     title: song.title.trim(),
@@ -45,6 +52,7 @@ export function sanitizeSong(song: Song): Song {
     ...(order ? { order } : {}),
     ...(secondLanguage ? { secondLanguage } : {}),
     ...(trackId ? { trackId } : {}),
+    ...(transpose && sections.some((section) => section.chords) ? { transpose } : {}),
   };
 }
 
@@ -281,7 +289,7 @@ export function parseLyrics(
   let author: string | undefined;
   let ccli: string | undefined;
   let copyright: string | undefined;
-  const blocks: Array<{ header: { kind: SongSectionKind; label: string } | null; lines: string[] }> = [];
+  const blocks: Array<{ header: { kind: SongSectionKind; label: string } | null; lines: string[]; chords?: string[] }> = [];
   let current: (typeof blocks)[number] | null = null;
   const close = () => {
     if (current && current.lines.length) blocks.push(current);
@@ -329,7 +337,12 @@ export function parseLyrics(
     }
     current ??= { header: null, lines: [] };
     const lyric = stripChords(line);
-    if (lyric) current.lines.push(lyric);
+    if (lyric) {
+      current.lines.push(lyric);
+      // Chords are kept beside the line for the band (the audience screen gets the words only).
+      if (hasChords(line)) (current.chords ??= Array(current.lines.length - 1).fill("")).push(line);
+      else current.chords?.push("");
+    }
   }
   close();
 
@@ -344,7 +357,7 @@ export function parseLyrics(
     const label = block.header?.label && !(kind === "verse" && /^verse$/i.test(block.header.label))
       ? block.header.label
       : defaultLabel(kind, sections);
-    sections.push({ id: newId(), kind, label, lines: block.lines });
+    sections.push({ id: newId(), kind, label, lines: block.lines, ...(block.chords ? { chords: block.chords } : {}) });
   }
   return { ...(title ? { title } : {}), ...(author ? { author } : {}), ...(ccli ? { ccli } : {}), ...(copyright ? { copyright } : {}), sections };
 }

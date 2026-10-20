@@ -1,3 +1,4 @@
+import type { ChordLine } from "../domain/chords";
 import { sanitizeRich, type RichDoc } from "../domain/rich-text";
 import type { PresentationModel, ProgramPacket } from "../domain/types";
 
@@ -158,17 +159,19 @@ export type StageSnapshot = {
   layout?: StageLayout;
   /** The section of the service running now and when it should end (epoch ms). */
   section?: { name: string; endsAt: number } | null;
+  /** Chords for the band: the live song part's lines, transposed (stage only). */
+  chords?: ChordLine[];
 };
 
-export type StageLayout = { next: boolean; clock: boolean; notes: boolean; size: "s" | "m" | "l" };
+export type StageLayout = { next: boolean; clock: boolean; notes: boolean; chords: boolean; size: "s" | "m" | "l" };
 
 export function defaultStageLayout(): StageLayout {
-  return { next: true, clock: true, notes: true, size: "m" };
+  return { next: true, clock: true, notes: true, chords: true, size: "m" };
 }
 
 export function sanitizeStageLayout(value: unknown): StageLayout {
   const record = value && typeof value === "object" ? (value as Partial<StageLayout>) : {};
-  return { next: record.next !== false, clock: record.clock !== false, notes: record.notes !== false, size: record.size === "s" || record.size === "l" ? record.size : "m" };
+  return { next: record.next !== false, clock: record.clock !== false, notes: record.notes !== false, chords: record.chords !== false, size: record.size === "s" || record.size === "l" ? record.size : "m" };
 }
 
 export function parseStage(raw: string | null): StageSnapshot | null {
@@ -185,6 +188,9 @@ export function parseStage(raw: string | null): StageSnapshot | null {
       notes: typeof value.notes === "string" ? value.notes.slice(0, 2000) : "",
       ...(value.notesRich ? { notesRich: sanitizeRich(value.notesRich) ?? undefined } : {}),
       layout: sanitizeStageLayout(value.layout),
+      ...(Array.isArray(value.chords)
+        ? { chords: value.chords.slice(0, 24).map((line) => ({ lyric: String(line?.lyric ?? ""), chords: (Array.isArray(line?.chords) ? line.chords : []).slice(0, 40).map((placed) => ({ at: Number(placed?.at) || 0, chord: String(placed?.chord ?? "").slice(0, 12) })) })) }
+        : {}),
       ...(value.section && typeof value.section.name === "string" && typeof value.section.endsAt === "number"
         ? { section: { name: value.section.name.slice(0, 60), endsAt: value.section.endsAt } }
         : {}),
