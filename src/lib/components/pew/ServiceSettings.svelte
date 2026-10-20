@@ -182,7 +182,7 @@
   .topic:hover { background: var(--field); }
   .topic.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--field)); }
   .topic-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--field); color: var(--muted); }
-  .topic.on .topic-icon { background: var(--accent); color: #fff; }
+  .topic.on .topic-icon { background: var(--accent); color: var(--on-accent); }
   .topic-copy { display: grid; gap: 1px; min-width: 0; }
   .topic-copy strong { font-size: 13px; }
   .topic-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -217,7 +217,7 @@
 
   .steps { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; }
   .steps button { min-width: 44px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-  .steps button[aria-checked="true"] { background: var(--accent); color: #fff; }
+  .steps button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
   .steps button:disabled { cursor: default; }
   .steps.big { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; padding: 0; border: 0; }
   .steps.big button { display: grid; justify-items: center; gap: 1px; height: auto; padding: 10px 6px; border: 1px solid var(--line); border-radius: 10px; }
@@ -239,7 +239,7 @@
   .foot-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
   .foot-btn.ghost { margin-right: auto; background: none; color: var(--muted); }
   .foot-btn.armed { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
-  .foot-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .foot-btn.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
   @media (max-width: 720px) {
     .layout { grid-template-columns: 1fr; }
     .topics { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

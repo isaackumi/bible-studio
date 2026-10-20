@@ -330,7 +330,7 @@
   .list-title:hover, .list-title:focus { border-color: var(--line); background: var(--field); }
   .loop { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .btn.ghost { background: none; }
   .btn.danger { color: var(--danger, #e5484d); }
   .btn:disabled { opacity: 0.5; }
@@ -339,7 +339,7 @@
   .track { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); }
   .track.now { border-color: var(--accent); }
   .track-play { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--ink); display: grid; place-items: center; flex: none; }
-  .track.now .track-play { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .track.now .track-play { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .track-n { width: 18px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
   .track-name { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .track-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
@@ -354,10 +354,12 @@
   .now-playing span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .controls { display: flex; align-items: center; gap: 6px; }
   .round { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--field); color: var(--ink); display: grid; place-items: center; }
-  .round.big { width: 40px; height: 40px; background: var(--accent); border-color: var(--accent); color: #fff; }
+  .round.big { width: 40px; height: 40px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .round:disabled { opacity: 0.45; }
   .transport .round { padding: 0; min-width: 0; flex: none; }
-  .transport .btn { white-space: nowrap; flex: none; }
+  .transport .btn { white-space: nowrap; flex: none; align-self: center; margin: 0; }
+  /* Sliders in the desk's accent, not the browser's blue. */
+  .audio input[type="range"], .transport input[type="range"] { accent-color: var(--accent); }
   .scrub { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 180px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .scrub input { flex: 1; }
   .volume { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }

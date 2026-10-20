@@ -328,7 +328,13 @@
             (!needle || `${item.title} ${item.about} ${t(item.title)} ${t(item.about)} ${item.keywords} ${group.label}`.toLowerCase().includes(needle)),
         ),
       }))
-      .filter((group) => group.items.length > 0);
+      .filter((group) => group.items.length > 0)
+      // Plan & account lives on the profile card, but searching "license" or "trial" must find it.
+      .concat(
+        needle && `${ACCOUNT.title} ${ACCOUNT.about} ${t(ACCOUNT.title)} ${t(ACCOUNT.about)} ${ACCOUNT.keywords}`.toLowerCase().includes(needle)
+          ? [{ label: msg("Account"), items: [ACCOUNT] }]
+          : [],
+      );
   });
 
   const sections: SettingsEntry[] = [...groups.flatMap((group) => group.items), ACCOUNT];
@@ -1898,7 +1904,7 @@
     cursor: pointer;
   }
   .settings-body :global(.btn:hover:not(:disabled)), .settings-body :global(.actions button:not(.text):not(.link):hover:not(:disabled)) { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
-  .settings-body :global(.btn.primary), .settings-body :global(.actions button.primary), .settings-body :global(button.primary) { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .settings-body :global(.btn.primary), .settings-body :global(.actions button.primary), .settings-body :global(button.primary) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .settings-body :global(.btn.danger) { color: var(--live, #e5484d); }
   .settings-body :global(.btn:disabled), .settings-body :global(.actions button:disabled) { opacity: 0.4; cursor: default; }
 

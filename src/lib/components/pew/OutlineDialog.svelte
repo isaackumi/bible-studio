@@ -97,7 +97,7 @@
   .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
   .actions { margin-top: auto; }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .btn.ghost { background: none; }
   .note { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
   .paper-wrap { min-height: 0; overflow: auto; padding: 18px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, var(--panel)); display: flex; justify-content: center; }

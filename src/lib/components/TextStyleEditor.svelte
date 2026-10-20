@@ -114,7 +114,7 @@
   .size { width: 76px; }
   .color input { width: 36px; height: var(--control-h, 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: none; cursor: pointer; }
   .toggle { min-width: 34px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 600 13px/1 var(--font-ui); cursor: pointer; }
-  .toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .toggle.italic { font-style: italic; font-family: Georgia, serif; }
   .toggle.underline { text-decoration: underline; }
   .toggle.shadow { text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9); }

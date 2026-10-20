@@ -623,7 +623,7 @@
                       </button>
                     {/if}
                     <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
-                    <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Delete")} onclick={() => session.removeItem(item.id)}><Icon name="trash" size={14} /></button>
+                    <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Delete")} onclick={() => session.deleteItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>
                 </li>
               {/each}
@@ -882,7 +882,7 @@
   .next-none { font-size: 15px; }
   .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .next-copy strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .next-btn { border-color: var(--accent); background: var(--accent); color: #fff; height: 40px; font-weight: 750; }
+  .next-btn { border-color: var(--accent); background: var(--accent); color: var(--on-accent); height: 40px; font-weight: 750; }
   .next-btn:disabled { opacity: 0.45; }
   .more-tools { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); padding: 8px 10px; }
   .more-tools summary { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }

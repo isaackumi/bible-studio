@@ -46,9 +46,13 @@
       ? t("Unlock {feature}", { feature: short(feature) })
       : t("Run every service with confidence"),
   );
+  const current = $derived(session.plan);
+  const canTrial = $derived(current === "free" && !session.trialUsed);
   const subline = $derived(
     feature && wanted
-      ? t("{feature} is part of {plan}. Try it free for {days} days, or choose the plan that fits your church.", { feature: short(feature), plan: t(wanted.name), days: TRIAL_DAYS })
+      ? canTrial
+        ? t("{feature} is part of {plan}. Try it free for {days} days, or choose the plan that fits your church.", { feature: short(feature), plan: t(wanted.name), days: TRIAL_DAYS })
+        : t("{feature} is part of {plan}. Choose the plan that fits your church.", { feature: short(feature), plan: t(wanted.name) })
       : t("Production, voice, broadcast and more, for churches of every size. Start free, upgrade when you are ready."),
   );
 
@@ -74,8 +78,6 @@
     return plan.features.filter((entry) => !below.includes(entry) && (plan.id === "free" || !BASE.includes(entry)));
   }
 
-  const current = $derived(session.plan);
-  const canTrial = $derived(current === "free" && !session.trialUsed);
 
   async function applyPromo() {
     const code = promoText.trim();
@@ -220,7 +222,7 @@
           <h1>{headline}</h1>
           <p class="lede">{subline}</p>
           <ul class="trust">
-            <li><Icon name="check" size={13} /> {t("{days}-day free trial", { days: TRIAL_DAYS })}</li>
+            {#if canTrial}<li><Icon name="check" size={13} /> {t("{days}-day free trial", { days: TRIAL_DAYS })}</li>{/if}
             <li><Icon name="check" size={13} /> {t("Cancel any time")}</li>
             <li><Icon name="check" size={13} /> {t("Works offline on Sunday")}</li>
           </ul>
@@ -306,7 +308,7 @@
               <tbody>
                 {#each Object.keys(FEATURE_LABELS) as entry (entry)}
                   <tr class:hit={entry === feature}>
-                    <td>{t(FEATURE_LABELS[entry as PlanFeature].label)}</td>
+                    <td>{t(FEATURE_LABELS[entry as PlanFeature].label)}{#if FEATURE_LABELS[entry as PlanFeature].soon}<em class="soon-tag">{t("soon")}</em>{/if}</td>
                     {#each PLANS as plan (plan.id)}<td class="mark">{#if plan.features.includes(entry as PlanFeature)}<Icon name="check" size={14} />{:else}<span class="dash">—</span>{/if}</td>{/each}
                   </tr>
                 {/each}
@@ -369,6 +371,7 @@
   .lede { margin: 0 auto; max-width: 620px; font-size: 16px; line-height: 1.55; color: var(--muted); }
   .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 13px; font-weight: 650; }
   .trust li { display: inline-flex; align-items: center; gap: 6px; }
+  .soon-tag { margin-left: 6px; padding: 0 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-style: normal; color: var(--muted); }
   .trust :global(svg) { color: #30a46c; }
 
   .key-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 560px; margin: 0 auto 22px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }

@@ -227,7 +227,7 @@
   .chip { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 13px; background: none; color: var(--ink); font: inherit; font-size: 12px; }
   .grow { flex: 1; }
   .btn { height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .btn.danger { color: var(--danger, #e5484d); background: none; }
   @media (max-width: 720px) {
     .tpl { grid-template-columns: 1fr; }

@@ -199,11 +199,23 @@
     tested = true;
   }
 
+  /** Why the Production Desk trial could not start (offline, or already used here). */
+  let trialError = $state("");
+
   /** Finish setup; with `tour`, start the tour of the desk they land on. */
-  function finish(tour = false) {
+  async function finish(tour = false) {
     if (step === "church") go(index);
-    const trial = desk === "obs" && !session.entitled("production");
-    if (trial) session.startTrial();
+    if (desk === "obs" && !session.entitled("production")) {
+      // The trial gives the Production Desk; if it cannot start, say why and stay here to choose.
+      const error = await session.startTrial();
+      if (error) {
+        trialError = error;
+        deskChoice = "pewbeam";
+        return;
+      }
+    }
+    // The Bible chosen here is the one the desk opens on.
+    if (translation) session.setDeskTranslation(translation);
     session.setAppearance({ desk });
     session.finishOnboarding();
     if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
@@ -217,7 +229,7 @@
     const target = event.target as HTMLElement | null;
     if (event.key === "Enter" && !target?.closest("button, textarea, select")) {
       event.preventDefault();
-      if (step === "ready") finish(false);
+      if (step === "ready") void finish(false);
       else go(index + 1);
     }
   }
@@ -239,7 +251,7 @@
       <section class="ask" aria-labelledby="step-title">
         <header class="ob-top">
           <span class="ob-brand"><BrandMark size={28} tone="current" />{t("Church Studio")}</span>
-          <button type="button" class="skip" onclick={() => finish()}>{t("Skip setup")}</button>
+          <button type="button" class="skip" onclick={() => void finish()}>{t("Skip setup")}</button>
         </header>
 
         <div class="where">
@@ -334,7 +346,8 @@
                       disabled={busy}
                       onclick={async () => {
                         if (!installed) await session.installBible(entry.id);
-                        translation = entry.id;
+                        // Only a Bible that is actually here can be chosen (a download can fail).
+                        if (session.translations.some((item) => item.id === entry.id)) translation = entry.id;
                       }}
                     >
                       <span class="abbr">{entry.abbreviation}</span>
@@ -387,7 +400,8 @@
                     <Icon name="obs" size={16} /><span><strong>{t("Production Desk")}</strong><em>{session.entitled("production") ? t("Cameras, scenes and video") : `Premium, free for ${TRIAL_DAYS} days`}</em></span>
                   </button>
                 </div>
-                <button type="button" class="tour-link" onclick={() => finish(true)}>{t("New to this? Show me around first")}</button>
+                {#if trialError}<p class="trial-error" role="alert">{t("The Production Desk trial could not start: {reason} You can start on the Presenter Desk and try again from Settings › Plan & account.", { reason: trialError })}</p>{/if}
+                <button type="button" class="tour-link" onclick={() => void finish(true)}>{t("New to this? Show me around first")}</button>
               {/if}
             </div>
           {/key}
@@ -397,7 +411,7 @@
           {#if index > 0}<button type="button" class="btn quiet" onclick={() => go(index - 1)}>{t("Back")}</button>{:else}<span></span>{/if}
           {#if step === "ready"}
             <span class="ready-buttons">
-              <button type="button" class="btn primary" onclick={() => finish(false)}>{t("Open my desk")}</button>
+              <button type="button" class="btn primary" onclick={() => void finish(false)}>{t("Open my desk")}</button>
             </span>
           {:else}
             <button type="button" class="btn primary" onclick={() => go(index + 1)}>{step === "welcome" ? t("Get started") : t("Continue")}</button>
@@ -577,6 +591,7 @@
   .ready-buttons { display: flex; gap: 8px; }
   .tour-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .tour-link:hover { text-decoration: underline; }
+  .trial-error { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 60%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 12%, transparent); font-size: 13px; line-height: 1.4; }
   .btn:disabled { opacity: 0.5; cursor: default; }
 
   .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

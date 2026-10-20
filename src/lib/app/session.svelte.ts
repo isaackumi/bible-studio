@@ -3425,10 +3425,39 @@ class Session {
 
   removeSection = (id: string) => {
     if (!this.service) return;
-    this.service = { ...this.service, sections: this.service.sections.filter((section) => section.id !== id) };
-    if (this.cursor.sectionId === id) this.cursor = { sectionId: null, itemId: null };
-    this.persistSoon();
+    const removed = this.service.sections.find((section) => section.id === id);
+    this.withUndo(removed ? t("{name} removed", { name: removed.name }) : t("Part removed"), () => {
+      if (!this.service) return;
+      this.service = { ...this.service, sections: this.service.sections.filter((section) => section.id !== id) };
+      if (this.cursor.sectionId === id) this.cursor = { sectionId: null, itemId: null };
+    });
   };
+
+  /** Delete one item from the Service page, with Undo. */
+  deleteItem = (itemId: string) => {
+    const item = this.service?.sections.flatMap((section) => section.items).find((entry) => entry.id === itemId);
+    this.withUndo(item ? t("{title} removed", { title: item.title }) : t("Item removed"), () => this.removeItem(itemId));
+  };
+
+  /** Change the open service, then offer Undo (back to how it was) for ten seconds. */
+  private withUndo(label: string, change: () => void) {
+    const before = this.service;
+    const cursor = this.cursor;
+    if (!before) return;
+    change();
+    this.persistSoon();
+    this.notify(label, {
+      actions: [{ label: t("Undo"), run: () => {
+        if (this.service?.id === before.id) {
+          this.service = before;
+          this.cursor = cursor;
+          this.persistSoon();
+        }
+        this.dismissToast();
+      } }],
+      ms: 10_000,
+    });
+  }
 
   private insertItem(sectionId: string, item: PresentationItem) {
     if (!this.service) return;
@@ -4323,13 +4352,27 @@ class Session {
 
   clearQueue = () => {
     if (!this.service) return;
+    // Every section's items go; Undo puts them back (one click must never lose a service).
+    const before = this.service;
+    const cursor = this.cursor;
     this.service = {
       ...this.service,
       sections: this.service.sections.map((section) => ({ ...section, items: [] })),
     };
     this.cursor = { sectionId: this.service.sections[0]?.id ?? null, itemId: null };
     this.persistSoon();
-    this.message = t("Queue cleared.");
+    this.notify(t("Queue cleared"), {
+      detail: before.name,
+      actions: [{ label: t("Undo"), run: () => {
+        if (this.service?.id === before.id) {
+          this.service = before;
+          this.cursor = cursor;
+          this.persistSoon();
+        }
+        this.dismissToast();
+      } }],
+      ms: 10_000,
+    });
   };
 
   removeItem = (itemId: string) => {

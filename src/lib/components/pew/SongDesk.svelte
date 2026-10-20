@@ -33,6 +33,8 @@
   let folder = $state<string | null>(null);
   let selectedId = $state<string | null>(null);
   let draft = $state<Draft | null>(null);
+  /** The song as it was when editing began, to tell whether there is anything to lose. */
+  let draftStart = "";
   let pasteText = $state("");
   let note = $state("");
   let newFolder = $state<string | null>(null);
@@ -251,6 +253,8 @@
       const sameScreenOf = focus?.songId === match.songId && focus.sectionId === match.sectionId ? (focus.screen ?? 0) : 0;
       const screen = screenForSung(text, section.lines, session.songScreens(section), sameScreenOf);
       if (focus?.songId === match.songId && focus.sectionId === match.sectionId && (focus.screen ?? 0) === screen) return;
+      // Following the singing fills Preview only ("LIVE still sends Program"), even when the song is live.
+      previewOnly = true;
       session.previewSongSection(song, match.sectionId, undefined, screen);
       session.voice.message = `${match.label} on Preview. LIVE still sends Program.`;
     });
@@ -268,7 +272,7 @@
   }
 
   function pick(song: Song) {
-    draft = null;
+    if (!leaveDraft()) return;
     selectedId = song.id;
   }
 
@@ -286,7 +290,9 @@
   function showDetected() {
     const match = detected;
     const song = match ? session.songs.find((entry) => entry.id === match.songId) : null;
-    if (match && song) show(song, match.sectionId);
+    if (!match || !song) return;
+    previewOnly = true;
+    show(song, match.sectionId);
   }
 
   // Folders
@@ -433,6 +439,7 @@
       trackId: "",
       isNew: true,
     };
+    draftStart = JSON.stringify(asSong(draft));
     pasteText = "";
   }
 
@@ -450,7 +457,19 @@
       trackId: song.trackId ?? "",
       isNew: false,
     };
+    draftStart = JSON.stringify(asSong(draft));
     pasteText = "";
+  }
+
+  /** Leave the editor. With unsaved changes, the first try only warns; the second discards them. */
+  function leaveDraft(): boolean {
+    if (!draft) return true;
+    if (JSON.stringify(asSong(draft)) !== draftStart && !arm("discard-draft")) {
+      note = t("This song has unsaved changes. Click again to discard them, or press Save.");
+      return false;
+    }
+    draft = null;
+    return true;
   }
 
   function asSong(value: Draft): Song {
@@ -741,7 +760,7 @@
           <h2>{draft.isNew ? t("New song") : t("Edit song")}</h2>
           <div class="row-actions">
             <button type="button" class="desk-btn" onclick={() => draft && session.previewSongSection(asSong(draft), draft.sections[0]?.id ?? null)}>{t("Preview")}</button>
-            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>{t("Cancel")}</button>
+            <button type="button" class="desk-btn ghost" onclick={() => leaveDraft()}>{armed === "discard-draft" ? t("Discard changes") : t("Cancel")}</button>
             <button type="submit" class="desk-btn primary">{t("Save")}</button>
           </div>
         </div>
@@ -890,7 +909,7 @@
           </p>
         </div>
         <div class="row-actions">
-          <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => selected.sections[0] && show(selected, selected.sections[0].id)}><Icon name="play" size={14} /> {t("Start")}</button>
+          <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => { if (!selected.sections[0]) return; previewOnly = true; show(selected, selected.sections[0].id); }}><Icon name="play" size={14} /> {t("Start")}</button>
           <AddToService onadd={(sectionId) => session.addSongToService(selected, sectionId)} />
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
           <ToolMenu label={t("More for this song")} tip={t("Folder, save as a file, delete")}>
@@ -1021,7 +1040,7 @@
 
   <!-- Monitors and detection -->
   {#if finding}
-    <SongFinder {clickLive} onclose={() => (finding = false)} onopen={(id) => { draft = null; selectedId = id; }} />
+    <SongFinder {clickLive} onclose={() => (finding = false)} onopen={(id) => { if (leaveDraft()) selectedId = id; }} />
   {/if}
 
   <aside class="stage">

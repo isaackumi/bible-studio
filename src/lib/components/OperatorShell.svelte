@@ -3,6 +3,7 @@
   import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
+  import StatusLine from "./StatusLine.svelte";
   import WhatsNew from "./WhatsNew.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
@@ -157,6 +158,7 @@
     <Paywall />
     <Toast />
     <UpdateNotice />
+    <StatusLine />
     <WhatsNew />
     {#if session.tourHubOpen}<TourHub />{/if}
     {#if session.tour}<TourGuide />{/if}

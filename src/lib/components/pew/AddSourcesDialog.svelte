@@ -531,7 +531,7 @@
   .makers { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
   .make { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
   .make:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-  .make.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .make.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
   .make.ai { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .make:disabled { opacity: 0.6; cursor: default; }
   .busy { font-size: 12px; color: var(--muted); }

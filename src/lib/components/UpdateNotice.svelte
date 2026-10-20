@@ -47,7 +47,7 @@
   .copy span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .act { flex: none; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; }
   .act:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
-  .act.primary { border-color: transparent; background: var(--accent); color: #fff; }
+  .act.primary { border-color: transparent; background: var(--accent); color: var(--on-accent); }
   .act:disabled { opacity: 0.6; }
   @media (max-width: 640px) { .update { flex-wrap: wrap; } .copy { flex-basis: calc(100% - 40px); } }
 </style>

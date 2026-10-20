@@ -208,7 +208,7 @@
   .chip:hover { background: var(--field); }
   .grow { flex: 1; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .btn.primary:disabled { opacity: 0.5; }
   .btn.danger { color: var(--danger, #e5484d); background: none; }
   @media (max-width: 760px) {

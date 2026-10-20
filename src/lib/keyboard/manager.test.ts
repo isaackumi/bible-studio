@@ -93,6 +93,18 @@ describe("keyboard manager", () => {
     expect(seen).toEqual(["focus"]);
     expect(slash.prevented()).toBe(false);
   });
+
+  it("leaves Alt+arrow to the page (moving a service item), so the desk does not also step", () => {
+    const seen: string[] = [];
+    const manager = createKeyboardManager(defaultShortcuts, { next: () => seen.push("next"), previous: () => seen.push("previous") });
+    const plain = press("ArrowRight");
+    manager.onKeyDown(plain.event);
+    const withAlt = press("ArrowDown");
+    withAlt.event.modified = true;
+    manager.onKeyDown(withAlt.event);
+    expect(seen).toEqual(["next"]);
+    expect(withAlt.prevented()).toBe(false);
+  });
 });
 
 describe("changing shortcuts", () => {

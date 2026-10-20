@@ -101,7 +101,7 @@
   .seg button[aria-checked="true"] { background: var(--panel); color: var(--ink); }
   .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
   .presets button { height: 30px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
-  .presets button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .presets button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .stepper { display: flex; align-items: center; gap: 6px; }
   .stepper > button { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); display: grid; place-items: center; }
   .stepper label { flex: 1; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); font-size: 12px; color: var(--muted); }
@@ -114,5 +114,5 @@
   .ghost { border: 0; background: none; color: var(--muted); }
   .ghost:hover { color: var(--ink); }
   .ghost.start { color: #30a46c; }
-  .done { margin-left: auto; border: 0; background: var(--accent); color: #fff; }
+  .done { margin-left: auto; border: 0; background: var(--accent); color: var(--on-accent); }
 </style>

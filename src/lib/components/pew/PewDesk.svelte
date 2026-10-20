@@ -15,6 +15,7 @@
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
+  import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
   import { api } from "../../db/api";
@@ -51,6 +52,10 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let detections = $state<SearchHit[]>([]);
+  /** The key for a desk action, as set in Settings › Keyboard. */
+  const keyOf = (action: "take" | "black" | "clear") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
+  /** The queue's Clear all was pressed once. */
+  let clearArmed = $state(false);
   // The transcript follows the newest words as they are heard.
   let transcriptEl = $state<HTMLDivElement | undefined>();
   $effect(() => {
@@ -605,13 +610,13 @@
         class="desk-btn live"
         class:on-air={displayLive}
         aria-label={displayLive ? t("On air. Send Preview to Program") : t("Go live: send Preview to Program")}
-        data-tip={displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")}
+        data-tip={`${displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")} (${keyOf("take")})`}
         onclick={() => session.take()}
       ><span class="pip"></span>{displayLive ? t("ON AIR") : t("LIVE")}</button>
-      <button type="button" class="desk-btn danger" data-tip={t("Black program")} onclick={() => session.black()}>{t("BLACK")}</button>
+      <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
       <span class="clear-pair">
         <button type="button" class="desk-btn ghost" data-tip={t("Clear the words; the background, camera or video stays (W)")} aria-label={t("Clear words")} onclick={() => void session.clearWords()}><span class="wide-only">{t("CLEAR")} </span>{t("WORDS")}</button>
-        <button type="button" class="desk-btn ghost" data-tip={t("Clear everything back to the theme (Backspace)")} onclick={() => session.clear()}>{t("CLEAR")}</button>
+        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
@@ -941,12 +946,17 @@
                       <span>{t("Queue")}</span>
                       <span class="queue-actions">
                         <button type="button" class="quiet" onclick={() => void queuePassage()}><Icon name="plus" size={14} /> {t("Add")}</button>
-                        <button type="button" class="quiet" onclick={() => session.clearQueue()}><Icon name="close" size={14} /> {t("Clear all")}</button>
+                        {#if queue.length}
+                          <!-- Two clicks: the first arms it (it empties the whole service; Undo follows). -->
+                          <button type="button" class="quiet" class:armed={clearArmed} onclick={() => { if (!clearArmed) { clearArmed = true; setTimeout(() => (clearArmed = false), 3000); return; } clearArmed = false; session.clearQueue(); }}><Icon name="close" size={14} /> {clearArmed ? t("Click again to clear") : t("Clear all")}</button>
+                        {/if}
                       </span>
                     </header>
                     <div class="pb-body queue">
                       {#each queue as item (item.id)}
                         <button type="button" class:on={session.cursor.itemId === item.id} onclick={(event) => { event.currentTarget.blur(); open(item); }}>{item.title}</button>
+                      {:else}
+                        <p class="queue-empty">{t("Nothing queued. Add puts the verse on Preview into the service, to show later in order.")}</p>
                       {/each}
                     </div>
                   </section>
@@ -1372,6 +1382,8 @@
   .steppers { display: flex; gap: 6px; }
   .steppers button { width: 32px; padding: 0; justify-content: center; }
   .queue button { padding: 8px 10px; }
+  .queue-empty { margin: 4px 2px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+  .quiet.armed { color: var(--live, #e5484d); font-weight: 700; }
   .queue button.on { border-color: var(--accent); }
   .sheet {
     position: absolute;

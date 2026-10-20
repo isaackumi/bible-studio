@@ -571,7 +571,7 @@
   .understood span { opacity: 0.7; }
   .translations { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); max-width: 46%; overflow-x: auto; scrollbar-width: none; }
   .translations button { flex: none; height: 44px; min-width: 50px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
-  .translations button[aria-checked="true"] { background: var(--accent); color: #fff; }
+  .translations button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
   .translations button:hover:not([aria-checked="true"]) { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
   .translations .more { min-width: 36px; padding: 0; display: grid; place-items: center; }
 
@@ -615,7 +615,7 @@
   .chapter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; overflow: auto; min-height: 0; align-content: start; }
   .chapter-grid button { height: 34px; border: 1px solid var(--line); border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .chapter-grid button:hover { background: var(--field); }
-  .chapter-grid button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chapter-grid button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
   .results { overflow: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 4px; min-height: 0; }
   .section { display: flex; align-items: center; gap: 8px; margin: 10px 4px 3px; font-size: 12px; font-weight: 650; color: var(--muted); }
@@ -624,7 +624,7 @@
   .row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 7px 10px 7px 12px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; flex: none; }
   .row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
   .vnum { flex: none; min-width: 30px; height: 22px; padding: 0 7px; border-radius: 11px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-grid; place-items: center; }
-  .row.on .vnum { background: var(--accent); color: #fff; }
+  .row.on .vnum { background: var(--accent); color: var(--on-accent); }
   .row strong { flex: none; font-size: 14px; font-variant-numeric: tabular-nums; }
   .row.verse strong { width: 46px; color: var(--muted); font-weight: 650; }
   .row .text { min-width: 0; color: color-mix(in srgb, var(--ink) 78%, transparent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

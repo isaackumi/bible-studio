@@ -55,6 +55,6 @@
   li div { display: grid; gap: 2px; }
   li strong { font-size: 14px; }
   li span { font-size: 13px; line-height: 1.45; color: var(--muted); }
-  .ok { width: 100%; height: 42px; border: 0; border-radius: 11px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; font-weight: 750; }
+  .ok { width: 100%; height: 42px; border: 0; border-radius: 11px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 14px; font-weight: 750; }
   .ok:hover { filter: brightness(1.06); }
 </style>

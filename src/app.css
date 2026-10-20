@@ -478,6 +478,8 @@ button { cursor: pointer; }
 }
 
 :root {
+  /* Native sliders, checkboxes and radios take the desk's accent, not the browser's blue. */
+  accent-color: var(--accent);
   --chrome-h: 52px;
   --ui-scale: 1;
   --panel-pad: 12px;
