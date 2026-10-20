@@ -17,15 +17,24 @@ export function findItem(service: Service, itemId: string): { section: ServiceSe
   return null;
 }
 
+/** Next and Previous pass over the items of parts left out this time. */
 export function stepCursor(service: Service, cursor: Cursor, direction: 1 | -1): Cursor {
   const items = flatten(service);
   if (items.length === 0) return { sectionId: null, itemId: null };
+  const skipped = new Set(service.sections.filter((section) => section.skip).map((section) => section.id));
   const index = items.findIndex((entry) => entry.item.id === cursor.itemId);
-  const next = index === -1 ? (direction > 0 ? 0 : items.length - 1) : index + direction;
+  let next = index === -1 ? (direction > 0 ? 0 : items.length - 1) : index + direction;
+  while (next >= 0 && next < items.length && skipped.has(items[next]!.sectionId)) next += direction;
   if (next < 0 || next >= items.length) return cursor;
   const entry = items[next];
   if (!entry) return cursor;
   return { sectionId: entry.sectionId, itemId: entry.item.id };
+}
+
+/** The part after `fromId` that is not left out (the first such part when `fromId` is null). */
+export function nextPart(service: Service, fromId: string | null): ServiceSection | null {
+  const from = fromId === null ? -1 : service.sections.findIndex((section) => section.id === fromId);
+  return service.sections.slice(from + 1).find((section) => !section.skip) ?? null;
 }
 
 export function moveInList<T>(list: T[], index: number, direction: 1 | -1): T[] {
@@ -69,5 +78,21 @@ export function moveItemTo(service: Service, itemId: string, sectionId: string, 
       const at = Math.max(0, Math.min(without.length, place));
       return { ...section, items: [...without.slice(0, at), item, ...without.slice(at)] };
     }),
+  };
+}
+
+/** A service as the services list shows it, without opening it (the desktop builds the same in Rust). */
+export type ServiceSummary = { id: string; name: string; updatedAt: string; startTime?: string | null; parts?: number; skipped?: number; lastRunAt?: number | null };
+
+export function serviceSummary(service: Service): ServiceSummary {
+  const skipped = service.sections.filter((section) => section.skip).length;
+  return {
+    id: service.id,
+    name: service.name,
+    updatedAt: service.updatedAt,
+    startTime: service.startTime ?? null,
+    parts: service.sections.length - skipped,
+    skipped,
+    lastRunAt: service.runs?.at(-1)?.startedAt ?? null,
   };
 }

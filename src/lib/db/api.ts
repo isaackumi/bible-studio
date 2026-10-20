@@ -5,6 +5,7 @@ import { cleanVerse } from "../bible/clean";
 import { BUNDLED_TRANSLATIONS, bundledBooks, bundledChapter, bundledPassage, bundledSearch, browserInstalledBibles, browserInstallBible, browserRemoveBible } from "../bible/texts";
 import { browserMedia } from "../platform/browser-media";
 import { browserLibrary } from "../platform/browser-store";
+import { serviceSummary, type ServiceSummary } from "../domain/service";
 import type { LibrarySnapshot } from "../platform/library";
 import { isDesktop } from "../platform/runtime";
 import { webDevice, webEntitlement } from "../platform/web-entitlement";
@@ -68,9 +69,9 @@ export const api = {
     desktop() ? invoke<void>("sermon_save", { document }) : browserLibrary.saveSermon(document),
   sermonDelete: (id: string) => (desktop() ? invoke<void>("sermon_delete", { id }) : browserLibrary.deleteSermon(id)),
   serviceList: async () => {
-    if (desktop()) return invoke<Array<{ id: string; name: string; updatedAt: string }>>("service_list");
+    if (desktop()) return invoke<ServiceSummary[]>("service_list");
     const services = await browserLibrary.services();
-    return services.map((service) => ({ id: service.id, name: service.name, updatedAt: service.updatedAt }));
+    return services.map(serviceSummary);
   },
   serviceGet: (id: string) => (desktop() ? invoke<Service | null>("service_get", { id }) : browserLibrary.getService(id)),
   serviceSave: (document: Service) => (desktop() ? invoke<void>("service_save", { document }) : browserLibrary.saveService(document)),

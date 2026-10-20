@@ -27,7 +27,8 @@
   import { screenful } from "../../bible/passage";
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
-  import { clockLabel, minutesOfDay } from "../../domain/schedule";
+  import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
+  import { serviceSummary } from "../../domain/service";
   import { planSchedule } from "../../domain/schedule";
   import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
   import { msg, t, tn } from "../../i18n/core";
@@ -359,20 +360,30 @@
     {/snippet}
     <div class="list">
       {#if session.services.length === 0}<p class="empty">{t("No services yet. Start one to plan the order.")}</p>{/if}
-      {#if session.services.length > 8}
+      {#if session.services.length > 5}
         <label class="svc-find"><Icon name="search" size={13} /><input type="search" aria-label={t("Find a service")} placeholder={t("Find a service")} bind:value={serviceQuery} /></label>
       {/if}
       {#each serviceGroups as group (group.id)}
       <p class="svc-group">{t(group.label)}</p>
       {#each group.entries as entry (entry.id)}
+        {@const info = service?.id === entry.id ? serviceSummary(service) : entry}
+        {@const when = new Date(info.lastRunAt ?? entry.updatedAt)}
+        {@const liveHere = service?.id === entry.id && runStartedAt !== null}
         <div class="svc" class:on={service?.id === entry.id}>
-          <button type="button" class="row" class:on={service?.id === entry.id} onclick={() => void session.openService(entry.id)}>
-            <strong>{entry.name}</strong>
-            {#if service?.id === entry.id && runStartedAt !== null}
-              <span class="running-clock" title={t("Running since {time}", { time: new Date(runStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) })}><i aria-hidden="true"></i>{t("LIVE")} · {clockCount(clockNow - runStartedAt)}</span>
-            {:else}
-              <span>{new Date(entry.updatedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
-            {/if}
+          <button type="button" class="row" class:on={service?.id === entry.id} class:live={liveHere} onclick={() => void session.openService(entry.id)}>
+            <span class="svc-date" aria-hidden="true">
+              <small>{when.toLocaleDateString(undefined, { weekday: "short" })}</small>
+              <b>{when.getDate()}</b>
+            </span>
+            <span class="svc-copy">
+              <strong>{entry.name}</strong>
+              {#if liveHere && runStartedAt !== null}
+                <span class="running-clock" title={t("Running since {time}", { time: new Date(runStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) })}><i aria-hidden="true"></i>{t("LIVE")} · {clockCount(clockNow - runStartedAt)}</span>
+              {:else}
+                <span class="svc-meta">{[info.startTime ? clockLabel(parseClock(info.startTime) ?? 0) : "", tn(info.parts ?? 0, "{n} part", "{n} parts")].filter(Boolean).join(" · ")}{#if info.skipped}<em>{` · ${tn(info.skipped, "{n} skipped", "{n} skipped")}`}</em>{/if}</span>
+              {/if}
+              <span class="svc-when">{info.lastRunAt ? t("Last ran {date}", { date: when.toLocaleDateString(undefined, { day: "numeric", month: "short" }) }) : t("Edited {date}", { date: when.toLocaleDateString(undefined, { day: "numeric", month: "short" }) })}</span>
+            </span>
           </button>
           <span class="svc-tools">
             <button type="button" class="row-tool" aria-label={t("Duplicate {name}", { name: entry.name })} title={t("Duplicate")} onclick={() => void session.duplicateService(entry.id)}><Icon name="copy" size={13} /></button>
@@ -500,6 +511,7 @@
             aria-label={section.name}
             class:target={session.cursor.sectionId === section.id}
             class:running={session.runningSectionId === section.id}
+            class:skipped={section.skip}
             class:dragging={dragSection === section.id}
             class:folded={folded.has(section.id)}
             class:drop-before={dragSection !== null && dropSection === sectionIndex && dragSection !== section.id}
@@ -537,8 +549,21 @@
               <span class="dot" aria-hidden="true"></span>
               <input class="section-name" aria-label={t("Section name")} value={section.name} onchange={(event) => session.renameSection(section.id, event.currentTarget.value)} onfocus={() => (session.cursor = { sectionId: section.id, itemId: session.cursor.itemId })} />
               {#if session.runningSectionId === section.id}<span class="now-tag">{t("Now")}</span>{/if}
-              <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" showLeft={false} />
+              {#if section.skip}
+                <span class="skip-tag" title={t("Takes no time, Next passes over it, and it is not in the report")}><Icon name="eye-off" size={12} /> {t("Skipped this time")}</span>
+              {:else}
+                <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" showLeft={false} />
+              {/if}
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
+              <button
+                type="button"
+                class="skip-toggle"
+                class:on={section.skip}
+                aria-pressed={!!section.skip}
+                aria-label={section.skip ? t("Bring back {name}", { name: section.name }) : t("Skip {name} this time", { name: section.name })}
+                title={section.skip ? t("Put this part back in the service") : t("Leave this part out this time: no time in the plan, Next passes over it, not in the report")}
+                onclick={() => session.setSectionSkip(section.id, !section.skip)}
+              ><Icon name={section.skip ? "eye" : "eye-off"} size={13} /><span class="skip-label">{section.skip ? t("Bring back") : t("Skip")}</span></button>
               <span class="tools">
                 <button type="button" class="row-tool del" aria-label={t("Remove section")} title={t("Delete this part")} onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
               </span>
@@ -767,11 +792,25 @@
 
   .list { margin: 0; padding: 0 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .list > :global(*) { flex: none; }
-  .row { width: 100%; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
-  .row strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row span { font-size: 11px; color: var(--muted); }
+  .row { position: relative; width: 100%; display: flex; align-items: center; gap: 11px; padding: 9px 10px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
   .row:hover { background: var(--field); }
-  .row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .row.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
+  .row.on::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .row.live { border-color: color-mix(in srgb, #30a46c 55%, var(--line)); background: color-mix(in srgb, #30a46c 9%, var(--panel)); }
+  .row.live::before { background: #30a46c; }
+  /* A small calendar leaf: the day it last ran (or was edited). */
+  .svc-date { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 38px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); line-height: 1; }
+  .svc-date small { font-size: 9px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .svc-date b { margin-top: 3px; font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .row.on .svc-date { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .row.on .svc-date small { color: var(--accent); }
+  .row.live .svc-date small { color: #30a46c; }
+  .svc-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .svc-copy strong { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .svc-meta, .svc-when, .svc-copy .running-clock { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .svc-meta { color: var(--ink); opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .svc-meta em { font-style: normal; color: var(--muted); }
+  .svc-when { color: var(--muted); }
 
   .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex: none; }
   .title { flex: 1 1 160px; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
@@ -862,6 +901,19 @@
   .tile:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
   .tile:hover:not(:disabled) :global(svg) { color: var(--accent); }
   .tile:disabled { opacity: 0.45; cursor: default; }
+  /* A part left out this time: still in the order (to bring back), but quiet and dashed. */
+  .block.skipped { border-style: dashed; background: transparent; }
+  .block.skipped .block-head { border-bottom-style: dashed; }
+  .block.skipped .section-name { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+  .block.skipped .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
+  .block.skipped .part-body, .block.skipped .head-meta, .block.skipped .fold-summary { opacity: 0.45; }
+  .block.skipped .part-add { display: none; }
+  .skip-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
+  .skip-toggle { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; opacity: 0; transition: opacity 0.15s ease, background 0.15s ease; }
+  .block:hover .skip-toggle, .block:focus-within .skip-toggle, .skip-toggle.on { opacity: 1; }
+  .skip-toggle:hover { background: var(--field); color: var(--ink); border-color: var(--line); }
+  .skip-toggle.on { border-color: var(--line); background: var(--field); color: var(--ink); }
+  @media (hover: none) { .skip-toggle { opacity: 1; } }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
   .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -945,8 +997,9 @@
   .svc-group { margin: 8px 6px 2px; font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
   .svc-find { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); }
   .svc-find input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
-  .svc .row { padding-right: 64px; }
-  .svc-tools { position: absolute; top: 8px; right: 6px; display: none; gap: 2px; }
+  .svc .row { padding-right: 10px; }
+  .svc:hover .row, .svc:focus-within .row { padding-right: 64px; }
+  .svc-tools { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: none; gap: 2px; }
   .svc:hover .svc-tools, .svc:focus-within .svc-tools, .svc-tools:has(.armed) { display: inline-flex; }
   .svc-tools .armed { width: auto; padding: 0 8px; color: var(--danger, #e5484d); font-size: 12px; font-weight: 700; }
   .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }

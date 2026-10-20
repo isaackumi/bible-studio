@@ -258,7 +258,10 @@ export type ServiceSection = {
   /** Or: runs until this clock time ("11:00"). */
   until?: string;
   /** Who leads this part ("Kojo Mensah"), shown on the desk and as a name lower third. */
-  leader?: string;  /** Where its card sits on the flow canvas; none means its tidy place. */
+  leader?: string;
+  /** Left out this time (no confession today): no time in the plan, passed over on the day, not in the report. */
+  skip?: boolean;
+  /** Where its card sits on the flow canvas; none means its tidy place. */
   canvas?: { x: number; y: number };
 };
 

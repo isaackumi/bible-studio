@@ -334,6 +334,7 @@
         aria-label={section.name}
         class:selected={session.cursor.sectionId === section.id}
         class:running={section.id === session.runningSectionId}
+        class:skipped={section.skip}
         class:past={runningIndex >= 0 && index < runningIndex}
         class:lifted={moving?.id === section.id}
         class:target={wiring?.over === section.id}
@@ -473,6 +474,8 @@
   .insert:hover, .insert:focus-visible { opacity: 1 !important; color: var(--ink); border-color: var(--accent); }
 
   .node { position: absolute; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 8px 24px rgb(0 0 0 / 0.2); cursor: default; transition: box-shadow 0.15s, border-color 0.15s; }
+  .node.skipped { border-style: dashed; opacity: 0.5; box-shadow: none; }
+  .node.skipped .node-name { text-decoration: line-through; }
   .node::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; border-radius: 14px 14px 0 0; background: var(--tone); }
   .node.selected { border-color: color-mix(in srgb, var(--accent) 70%, var(--line)); }
   .node.running { border-color: #30a46c; box-shadow: 0 0 0 3px color-mix(in srgb, #30a46c 30%, transparent), 0 10px 30px rgb(0 0 0 / 0.25); }

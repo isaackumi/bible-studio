@@ -73,16 +73,18 @@ export function runParts(service: Service, run: ServiceRun, now: number): RunPar
   const used = usedBySection(run, now);
   const first = new Map<string, number>();
   for (const mark of run.marks) if (!first.has(mark.sectionId)) first.set(mark.sectionId, mark.at);
-  return service.sections.map((section, index) => {
+  // Parts left out this time are not in the report (unless something from them ran after all).
+  return service.sections.flatMap((section, index) => {
     const slot = plan.slots[index];
-    return {
+    if (section.skip && !used.get(section.id)) return [];
+    return [{
       sectionId: section.id,
       name: section.name,
       leader: section.leader?.trim() ?? "",
       planned: slot && !slot.untimed ? slot.minutes : null,
       usedMs: used.get(section.id) ?? 0,
       startedAt: first.get(section.id) ?? null,
-    };
+    }];
   });
 }
 

@@ -46,8 +46,10 @@ export type SlotPlan = {
   minutes: number;
   /** Ends at a clock time rather than after a length. */
   until: boolean;
-  /** No time given yet. */
+  /** No time given yet (or left out this time). */
   untimed: boolean;
+  /** Left out this time: takes no time, and the parts after it move up. */
+  skipped?: boolean;
 };
 
 export type SchedulePlan = { start: number; end: number; slots: SlotPlan[] };
@@ -60,6 +62,7 @@ export function planSchedule(service: Pick<Service, "sections" | "startTime">): 
   const start = parseClock(service.startTime) ?? (parseClock(DEFAULT_START) as number);
   let at = start;
   const slots = service.sections.map((section): SlotPlan => {
+    if (section.skip) return { sectionId: section.id, name: section.name, start: at, end: at, minutes: 0, until: false, untimed: true, skipped: true };
     const until = parseClock(section.until);
     const own = typeof section.minutes === "number" && Number.isFinite(section.minutes) ? Math.max(0, Math.round(section.minutes)) : null;
     const end = until !== null ? Math.max(at, until) : at + (own ?? 0);

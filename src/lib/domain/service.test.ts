@@ -65,3 +65,45 @@ describe("dragging in the running order", () => {
     expect(ids(moveItemTo(service, "4", "a", 1))).toEqual(["1423", ""]);
   });
 });
+
+describe("parts left out this time", () => {
+  const item = (id: string) => ({ id, kind: "text", title: id }) as never;
+  const service = {
+    id: "s",
+    name: "Sunday",
+    updatedAt: "",
+    startTime: "09:00",
+    sections: [
+      { id: "a", name: "Welcome", minutes: 10, items: [item("a1")] },
+      { id: "b", name: "Confession", minutes: 15, skip: true, items: [item("b1"), item("b2")] },
+      { id: "c", name: "Sermon", minutes: 30, items: [item("c1")] },
+    ],
+  };
+
+  it("passes over their items with Next and Previous", async () => {
+    const { stepCursor } = await import("./service");
+    expect(stepCursor(service, { sectionId: "a", itemId: "a1" }, 1)).toEqual({ sectionId: "c", itemId: "c1" });
+    expect(stepCursor(service, { sectionId: "c", itemId: "c1" }, -1)).toEqual({ sectionId: "a", itemId: "a1" });
+  });
+
+  it("moves on to the next part that is not left out", async () => {
+    const { nextPart } = await import("./service");
+    expect(nextPart(service, "a")?.id).toBe("c");
+    expect(nextPart(service, null)?.id).toBe("a");
+    expect(nextPart(service, "c")).toBeNull();
+  });
+
+  it("gives them no time, so the parts after move up", async () => {
+    const { planSchedule } = await import("./schedule");
+    const plan = planSchedule(service);
+    expect(plan.slots[1]).toMatchObject({ minutes: 0, untimed: true, skipped: true });
+    expect(plan.slots[2]!.start).toBe(9 * 60 + 10);
+    expect(plan.end).toBe(9 * 60 + 40);
+  });
+
+  it("leaves them out of the report", async () => {
+    const { runParts } = await import("./service-run");
+    const run = { id: "r", startedAt: 0, endedAt: 60_000, marks: [{ sectionId: "a", at: 0 }] };
+    expect(runParts(service, run, 60_000).map((part) => part.sectionId)).toEqual(["a", "c"]);
+  });
+});

@@ -134,7 +134,7 @@ import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceT
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
-import { findItem, moveInList, sectionIdForInsert, stepCursor, moveTo, moveItemTo } from "../domain/service";
+import { findItem, moveInList, nextPart, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type ServiceSummary } from "../domain/service";
 import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
@@ -373,7 +373,7 @@ class Session {
     void this.applyDisplays().catch((error) => console.error(error));
   }
   previewBible = $state<BibleItem | null>(null);
-  services = $state<Array<{ id: string; name: string; updatedAt: string }>>([]);
+  services = $state<ServiceSummary[]>([]);
   service = $state<Service | null>(null);
   cursor = $state<Cursor>({ sectionId: null, itemId: null });
   #live = $state<LiveState>(createLiveState(defaultTheme()));
@@ -792,8 +792,8 @@ class Session {
         return;
       case "start-part": {
         if (!service?.sections.length) throw new Error(t("this service has no parts"));
-        const running = service.sections.findIndex((section) => section.id === this.runningSectionId);
-        const target = step.which === "first" || running < 0 ? service.sections[0]! : service.sections[Math.min(service.sections.length - 1, running + 1)]!;
+        const running = this.runningSectionId && service.sections.some((section) => section.id === this.runningSectionId) ? this.runningSectionId : null;
+        const target = (step.which === "first" || !running ? nextPart(service, null) : (nextPart(service, running) ?? service.sections.find((section) => section.id === running))) ?? service.sections[0]!;
         this.startSection(target.id);
         this.cursor = { sectionId: target.id, itemId: this.cursor.itemId };
         return;
@@ -3407,6 +3407,21 @@ class Session {
     this.persistSoon();
   };
 
+  /**
+   * Leave a part out this time (or bring it back): it takes no time in the plan, Next and moving on
+   * pass over it, and it is not in the report. Leaving out the running part moves on to the next.
+   */
+  setSectionSkip = (id: string, skip: boolean) => {
+    const section = this.service?.sections.find((entry) => entry.id === id);
+    if (!this.service || !section) return;
+    this.service = { ...this.service, sections: this.service.sections.map((entry) => (entry.id === id ? { ...entry, skip: skip || undefined } : entry)) };
+    this.persistSoon();
+    this.publishStage();
+    this.refreshCountdown();
+    if (skip && this.runningSectionId === id && this.serviceRunning && nextPart(this.service, id)) void this.moveOn(id);
+    this.message = skip ? t("{name} is left out this time. The parts after it move up.", { name: section.name }) : t("{name} is back in the service.", { name: section.name });
+  };
+
   moveSection = (id: string, direction: 1 | -1) => {
     if (!this.service) return;
     const index = this.service.sections.findIndex((section) => section.id === id);
@@ -3636,7 +3651,7 @@ class Session {
     const deadline = sectionDeadline(planSchedule(service), running, this.sectionStarts[running] ?? null);
     if (!deadline || Date.now() < deadline.endsAt + (service.advanceGrace ?? 0) * 60_000) return;
     const index = service.sections.findIndex((section) => section.id === running);
-    const next = service.sections[index + 1] ?? null;
+    const next = nextPart(service, running);
     if (mode === "remind") {
       if ((this.snoozed.get(running) ?? 0) > Date.now()) return;
       const chime = () => {
@@ -3669,9 +3684,8 @@ class Session {
   moveOn = async (fromId: string | null = this.runningSectionId, offerStay = false) => {
     const service = this.service;
     if (!service || !fromId) return;
-    const index = service.sections.findIndex((section) => section.id === fromId);
-    const from = service.sections[index];
-    const next = service.sections[index + 1];
+    const from = service.sections.find((section) => section.id === fromId);
+    const next = nextPart(service, fromId);
     this.timeUp = null;
     if (!from || !next) return;
     const previousItem = this.cursor.itemId;

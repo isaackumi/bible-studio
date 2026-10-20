@@ -234,17 +234,40 @@ pub fn song_search(conn: &Connection, query: &str) -> Result<Vec<Value>, String>
     Ok(out)
 }
 
+/// What the services list shows without opening a service: its start time, how many parts it
+/// has (and how many are left out this time), and when it last ran (epoch ms).
+fn service_summary(document: &Value) -> Value {
+    let sections = document.get("sections").and_then(Value::as_array);
+    let skipped = sections
+        .map(|list| list.iter().filter(|section| section.get("skip").and_then(Value::as_bool) == Some(true)).count())
+        .unwrap_or(0);
+    let parts = sections.map(|list| list.len()).unwrap_or(0) - skipped;
+    let last_run = document
+        .get("runs")
+        .and_then(Value::as_array)
+        .and_then(|runs| runs.last())
+        .and_then(|run| run.get("startedAt"))
+        .and_then(Value::as_f64);
+    serde_json::json!({
+        "startTime": document.get("startTime").and_then(Value::as_str),
+        "parts": parts,
+        "skipped": skipped,
+        "lastRunAt": last_run,
+    })
+}
+
 pub fn service_list(conn: &Connection) -> Result<Vec<Value>, String> {
     let mut stmt = conn
-        .prepare("SELECT id, name, updated_at FROM services ORDER BY updated_at DESC")
+        .prepare("SELECT id, name, updated_at, document FROM services ORDER BY updated_at DESC")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, String>(0)?,
-                "name": row.get::<_, String>(1)?,
-                "updatedAt": row.get::<_, String>(2)?,
-            }))
+            let document: Value = serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or(Value::Null);
+            let mut summary = service_summary(&document);
+            summary["id"] = Value::from(row.get::<_, String>(0)?);
+            summary["name"] = Value::from(row.get::<_, String>(1)?);
+            summary["updatedAt"] = Value::from(row.get::<_, String>(2)?);
+            Ok(summary)
         })
         .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
@@ -522,6 +545,23 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         migrate(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn lists_services_with_their_start_parts_and_last_run() {
+        let conn = test_db();
+        service_save(&conn, &serde_json::json!({
+            "id": "s1", "name": "Sunday", "updatedAt": "2026-10-20", "startTime": "09:00",
+            "sections": [{ "id": "a" }, { "id": "b", "skip": true }, { "id": "c" }],
+            "runs": [{ "startedAt": 1000.0 }, { "startedAt": 2000.0 }]
+        }))
+        .unwrap();
+        let list = service_list(&conn).unwrap();
+        assert_eq!(list[0]["name"], "Sunday");
+        assert_eq!(list[0]["startTime"], "09:00");
+        assert_eq!(list[0]["parts"], 2);
+        assert_eq!(list[0]["skipped"], 1);
+        assert_eq!(list[0]["lastRunAt"], 2000.0);
     }
 
     #[test]
