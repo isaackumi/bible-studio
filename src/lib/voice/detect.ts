@@ -198,10 +198,10 @@ function skeleton(word: string): string {
   return word.replace(/[aeiou]/g, "").replace(/(.)\1+/g, "$1");
 }
 
-function sameWord(heard: string, verse: string): boolean {
+function sameWord(heard: string, verse: string, heardSkeleton?: string, verseSkeleton?: string): boolean {
   if (heard === verse) return true;
   if (heard.length < 4 || verse.length < 4) return false;
-  if (skeleton(heard) === skeleton(verse)) return true;
+  if ((heardSkeleton ?? skeleton(heard)) === (verseSkeleton ?? skeleton(verse))) return true;
   // A clipped word: "strength" heard for "strengtheneth", "rejoice" for "rejoiceth".
   return heard.length >= 5 && verse.length > heard.length && verse.startsWith(heard);
 }
@@ -225,6 +225,8 @@ function contentWords(text: string): string[] {
 export type QuoteIndex = {
   catalog: QuoteVerse[];
   words: string[][];
+  /** Each word without its vowels ("" for short words), worked out once: comparing is then a lookup. */
+  skeletons: string[][];
   postings: Map<string, number[]>;
   /** Every distinct word, built on first typed search that needs spelling help. */
   vocabulary?: string[];
@@ -232,27 +234,43 @@ export type QuoteIndex = {
 
 export function buildQuoteIndex(catalog: QuoteVerse[]): QuoteIndex {
   const words = catalog.map((verse) => contentWords(verse.normalized));
+  const skeletons = words.map((tokens) => tokens.map(skeletonOf));
   const postings = new Map<string, number[]>();
   const add = (key: string, index: number) => {
     const list = postings.get(key);
-    if (list) list.push(index);
-    else postings.set(key, [index]);
+    if (list) {
+      if (list[list.length - 1] !== index) list.push(index);
+    } else postings.set(key, [index]);
   };
   words.forEach((tokens, index) => {
-    for (const token of new Set(tokens)) {
+    tokens.forEach((token, at) => {
       add(token, index);
-      if (token.length >= 4) add(skeleton(token), index);
-    }
+      if (token.length >= 4) add(skeletons[index]![at]!, index);
+    });
   });
-  return { catalog, words, postings };
+  return { catalog, words, skeletons, postings };
 }
 
+/** A word's skeleton when it is long enough to have one worth comparing, else "". */
+function skeletonOf(word: string): string {
+  return word.length >= 4 ? skeleton(word) : "";
+}
+
+/** Indexes already built for a plain list of verses, so passing the same list again costs nothing. */
+const builtFor = new WeakMap<QuoteVerse[], QuoteIndex>();
+
 function asIndex(source: QuoteVerse[] | QuoteIndex): QuoteIndex {
-  return "postings" in source ? source : buildQuoteIndex(source);
+  if ("postings" in source) return source;
+  let index = builtFor.get(source);
+  if (!index) {
+    index = buildQuoteIndex(source);
+    builtFor.set(source, index);
+  }
+  return index;
 }
 
 /** How many spoken content words appear in order inside one verse, and over how many words. */
-function inOrder(needle: string[], verse: string[]): { hits: number; span: number } {
+function inOrder(needle: string[], verse: string[], needleSkeletons?: string[], verseSkeletons?: string[]): { hits: number; span: number } {
   let from = 0;
   let hits = 0;
   let start = -1;
@@ -260,7 +278,7 @@ function inOrder(needle: string[], verse: string[]): { hits: number; span: numbe
   for (let index = 0; index < verse.length && from < needle.length; index += 1) {
     let at = -1;
     for (let needleIndex = from; needleIndex < needle.length; needleIndex += 1) {
-      if (sameWord(needle[needleIndex], verse[index])) {
+      if (sameWord(needle[needleIndex]!, verse[index]!, needleSkeletons?.[needleIndex], verseSkeletons?.[index])) {
         at = needleIndex;
         break;
       }
@@ -275,8 +293,8 @@ function inOrder(needle: string[], verse: string[]): { hits: number; span: numbe
 }
 
 /** In order and close together, with enough words to trust it. */
-function alignment(needle: string[], verse: string[]): { hits: number; span: number } | null {
-  const { hits, span } = inOrder(needle, verse);
+function alignment(needle: string[], verse: string[], needleSkeletons?: string[], verseSkeletons?: string[]): { hits: number; span: number } | null {
+  const { hits, span } = inOrder(needle, verse, needleSkeletons, verseSkeletons);
   if (hits < 3 || span > hits * 3) return null;
   return { hits, span };
 }
@@ -318,31 +336,62 @@ function passageFor(verse: QuoteVerse, translationId: string): BibleItem {
   };
 }
 
+/** The last answer for each index: partial phrases often end with the same words as the one before. */
+const lastQuote = new WeakMap<QuoteIndex, { key: string; match: SpokenMatch | null }>();
+/** At most this many verses get the word-by-word check, the ones sharing the most words. */
+const MAX_ALIGNED = 1500;
+
 /** Link spoken words to one verse. Extra or missing words are allowed. A vague sentence is not. */
 export function matchQuote(heard: string, source: QuoteVerse[] | QuoteIndex, translationId: string): SpokenMatch | null {
   const index = asIndex(source);
   const needle = contentWords(heard).slice(-8);
   if (needle.length < 3 || index.catalog.length === 0) return null;
-  const lists = needle
-    .map((word) => index.postings.get(word) ?? (word.length >= 4 ? index.postings.get(skeleton(word)) : undefined))
-    .filter((list): list is number[] => !!list && list.length > 0)
-    .sort((a, b) => a.length - b.length);
-  if (lists.length === 0) return null;
+  const key = `${translationId}|${needle.join(" ")}`;
+  const remembered = lastQuote.get(index);
+  if (remembered?.key === key) return remembered.match;
+  const match = findQuote(needle, index, translationId);
+  lastQuote.set(index, { key, match });
+  return match;
+}
+
+function findQuote(needle: string[], index: QuoteIndex, translationId: string): SpokenMatch | null {
+  const needleSkeletons = needle.map(skeletonOf);
+  // Count how many of the heard words each verse has (a word or its vowel-less form). Only verses
+  // sharing enough of them are checked word by word: dozens, not the thousands with "god" in them.
+  const counts = new Map<number, number>();
+  let unindexed = 0;
+  const distinct = [...new Map(needle.map((word, at) => [word, needleSkeletons[at]!])).entries()];
+  for (const [word, skeletonWord] of distinct) {
+    const direct = index.postings.get(word);
+    const loose = skeletonWord ? index.postings.get(skeletonWord) : undefined;
+    if (!direct && !loose) {
+      // Not a Bible word as heard (often clipped: "strength" for "strengtheneth"); alignment may still place it.
+      unindexed += 1;
+      continue;
+    }
+    const counted = new Set<number>();
+    for (const list of [direct, loose]) {
+      for (const verseIndex of list ?? []) {
+        if (counted.has(verseIndex)) continue;
+        counted.add(verseIndex);
+        counts.set(verseIndex, (counts.get(verseIndex) ?? 0) + 1);
+      }
+    }
+  }
+  if (counts.size === 0) return null;
+  // Alignment needs three words in order; two counted words leave room for one clipped or misheard.
+  const need = Math.max(1, 2 - unindexed);
+  let candidates = [...counts].filter(([, count]) => count >= need);
+  if (candidates.length > MAX_ALIGNED) candidates = candidates.sort((a, b) => b[1] - a[1]).slice(0, MAX_ALIGNED);
   const rank = (score: { hits: number; span: number }) => score.hits * 1000 - score.span;
   let best: { verse: QuoteVerse; hits: number; span: number } | null = null;
   let runner: { hits: number; span: number } | null = null;
-  // Candidates from the three rarest words, so one misheard word does not lose the verse.
-  const candidates = new Set<number>();
-  for (const list of lists.slice(0, 3)) {
-    if (candidates.size > 0 && candidates.size + list.length > 6000) break;
-    for (const verseIndex of list) candidates.add(verseIndex);
-  }
-  for (const verseIndex of candidates) {
-    const aligned = alignment(needle, index.words[verseIndex]);
+  for (const [verseIndex] of candidates) {
+    const aligned = alignment(needle, index.words[verseIndex]!, needleSkeletons, index.skeletons[verseIndex]);
     if (!aligned) continue;
     if (!best || rank(aligned) > rank(best)) {
       if (best && (!runner || rank(best) > rank(runner))) runner = { hits: best.hits, span: best.span };
-      best = { verse: index.catalog[verseIndex], ...aligned };
+      best = { verse: index.catalog[verseIndex]!, ...aligned };
     } else if (!runner || rank(aligned) > rank(runner)) {
       runner = aligned;
     }
@@ -467,11 +516,12 @@ export function searchQuotes(query: string, source: QuoteIndex, limit = 30): Quo
     for (const verseIndex of verses) counts.set(verseIndex, (counts.get(verseIndex) ?? 0) + 1);
   }
   const need = needle.length <= 2 ? needle.length : Math.ceil(needle.length * 0.6);
+  const needleSkeletons = needle.map(skeletonOf);
   const scored: Array<{ index: number; score: number }> = [];
   for (const [index, count] of counts) {
     if (count < need) continue;
     const words = source.words[index]!;
-    const order = inOrder(needle, words);
+    const order = inOrder(needle, words, needleSkeletons, source.skeletons[index]);
     // More words, then words in order and close, then the shorter (denser) verse.
     scored.push({ index, score: count * 100 + order.hits * 10 - order.span - words.length * 0.5 });
   }

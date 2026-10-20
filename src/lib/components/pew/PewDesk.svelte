@@ -526,9 +526,12 @@
     }
     anchor = hit.startVerse;
     session.voice.message = `${hit.reference} is on Preview. LIVE still sends Program.`;
+    // A verse heard again moves to the top instead of being listed twice (a repeated key stops the
+    // list from drawing).
+    const again = (entry: SearchHit) => entry.bookOrd === hit.bookOrd && entry.chapter === hit.chapter && entry.verse === hit.startVerse;
     detections = [
       { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text: match.text },
-      ...detections,
+      ...detections.filter((entry) => !again(entry)),
     ].slice(0, 12);
     // A pending arrow-key Take must never carry a spoken verse to Program.
     takeAfterPreview = false;

@@ -615,6 +615,17 @@ pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     voice::relaunch_inside_bundle();
     tauri::Builder::default()
+        // One copy at a time. A second copy (opened again from the Dock or Finder, or the
+        // development build beside the installed one) kept its own stale copy of the workspace and
+        // saved it over this one's, emptying playlists. Opening again now brings this desk forward.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
