@@ -27,9 +27,10 @@
   const recent = $derived(voice.command && Date.now() - voice.command.at < 15_000 ? voice.command : null);
 </script>
 
-<div class="voice" class:compact data-status={voice.status} role="status" aria-live="polite">
+<!-- Only the status is announced (Listening, Off, Permission denied), never every word heard. -->
+<div class="voice" class:compact data-status={voice.status}>
   <div class="row">
-    <span class="chip">
+    <span class="chip" role="status" aria-live="polite">
       <span class="dot"></span>
       {label}
     </span>
@@ -49,8 +50,8 @@
       {recent.outcome === "executed" ? t("Done") : recent.outcome === "blocked" ? t("Blocked") : t("Failed")}: {recent.label}
     </p>
   {/if}
-  {#if voice.message && !compact}
-    <p class="note">{voice.message}</p>
+  {#if voice.message && (!compact || voice.status === "error")}
+    <p class="note" role={voice.status === "error" ? "alert" : undefined}>{voice.message}</p>
   {/if}
   {#if voice.status === "error" && voice.error === "denied" && isDesktop()}
     <button type="button" class="desk-btn" onclick={session.openVoicePrivacy}>{t("Open Privacy settings")}</button>

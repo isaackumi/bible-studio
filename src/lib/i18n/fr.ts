@@ -1561,6 +1561,13 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // Microphone messages
+  "macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.": "macOS a bloqué le micro. Dans Réglages Système → Confidentialité et sécurité → Micro, activez Church Studio.",
+  "macOS blocked Speech Recognition. In System Settings → Privacy & Security → Speech Recognition, turn on Church Studio.": "macOS a bloqué la reconnaissance vocale. Dans Réglages Système → Confidentialité et sécurité → Reconnaissance vocale, activez Church Studio.",
+  "The microphone or speech recognition is blocked for this site. Allow it in the browser's site settings (or System Settings → Privacy & Security), then listen again.": "Le micro ou la reconnaissance vocale est bloqué pour ce site. Autorisez-le dans les réglages du site du navigateur (ou Réglages Système → Confidentialité et sécurité), puis écoutez de nouveau.",
+  "No microphone is available. Connect one, then listen again.": "Aucun micro n’est disponible. Branchez-en un, puis écoutez de nouveau.",
+  "This browser cannot turn speech into words. Use Chrome or Edge, or the Church Studio desktop app.": "Ce navigateur ne sait pas transformer la parole en texte. Utilisez Chrome ou Edge, ou l’application de bureau Church Studio.",
+  "The microphone is blocked for this window. Allow it in the browser's site settings (or System Settings → Privacy & Security → Microphone), then listen again.": "Le micro est bloqué pour cette fenêtre. Autorisez-le dans les réglages du site du navigateur (ou Réglages Système → Confidentialité et sécurité → Micro), puis écoutez de nouveau.",
   // Setup end, plan changes
   "John 3:16 is on Preview": "Jean 3:16 est sur l’aperçu",
   "Press LIVE (Space) to show it on the big screen. Then pick any verse, song or slide.": "Appuyez sur DIRECT (Espace) pour l’afficher sur le grand écran. Puis choisissez un verset, un chant ou une diapositive.",

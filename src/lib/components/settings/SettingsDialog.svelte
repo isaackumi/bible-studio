@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { modalFocus } from "../../ui/modal-focus";
   import StageLinks from "./StageLinks.svelte";
   import SwitcherSettings from "./SwitcherSettings.svelte";
   import BroadcastSettings from "./BroadcastSettings.svelte";
@@ -522,7 +523,7 @@
 
 <div class="settings-layer">
   <button type="button" class="settings-backdrop" aria-label={t("Close settings")} onclick={close}></button>
-  <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="settings-title">
+  <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-label={t("Settings")} use:modalFocus={'input[type="search"]'}>
     <nav class="settings-nav" aria-label={t("Settings")}>
       <button type="button" class="account-card" class:active={section === "account"} onclick={() => (section = "account")}>
         {#if session.workspace.profile}
@@ -531,7 +532,7 @@
           <span class="set-brand-mark app-tile"><BrandMark size={22} /></span>
         {/if}
         <span class="account-copy">
-          <strong id="settings-title">{session.workspace.profile?.name || session.workspace.churchName || "Church Studio"}</strong>
+          <strong>{session.workspace.profile?.name || session.workspace.churchName || "Church Studio"}</strong>
           <span>
             <b class="plan-chip" style:color={planById(session.plan).color}>{planById(session.plan).name}{session.trialDays > 0 && session.workspace.entitlement.plan === "free" ? ` ${t("trial")}` : ""}</b>
             · {session.workspace.profile ? session.workspace.churchName || t("Plan & account") : t("Sign in")}

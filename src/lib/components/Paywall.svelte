@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { modalFocus } from "../ui/modal-focus";
   import { fade, fly, scale } from "svelte/transition";
   import { cubicOut, backOut } from "svelte/easing";
   import { session } from "../app/session.svelte";
@@ -171,7 +172,7 @@
 <svelte:window onkeydown={onKey} />
 
 {#if open}
-  <div class="paywall" role="dialog" aria-modal="true" aria-label={t("Plans")} transition:fade={{ duration: 180 }}>
+  <div class="paywall" role="dialog" aria-modal="true" aria-label={t("Plans")} transition:fade={{ duration: 180 }} use:modalFocus>
     <div class="glow one" aria-hidden="true"></div>
     <div class="glow two" aria-hidden="true"></div>
 
@@ -233,7 +234,7 @@
             <Icon name="key" size={16} />
             <input aria-label={t("License key")} placeholder="CS1-…" bind:value={keyText} />
             <button type="submit" class="cta small" disabled={keyBusy || !keyText.trim()}>{keyBusy ? t("Checking…") : t("Add key")}</button>
-            {#if keyError}<p class="error">{keyError}</p>{/if}
+            {#if keyError}<p class="error" role="alert">{keyError}</p>{/if}
           </form>
         {/if}
 
@@ -294,7 +295,7 @@
               <input aria-label={t("Promo code")} placeholder={t("Promo code")} bind:value={promoText} />
               <button type="submit" class="cta small" disabled={promoBusy || !promoText.trim()}>{promoBusy ? t("Checking…") : t("Apply")}</button>
             </form>
-            {#if promoNote}<p class="error">{promoNote}</p>{/if}
+            {#if promoNote}<p class="error" role="alert">{promoNote}</p>{/if}
           {:else}
             <button type="button" class="link" onclick={() => (promoOpen = true)}>{t("Have a promo code?")}</button>
           {/if}
@@ -339,7 +340,7 @@
           <label>{t("Email for the receipt and key")}<input type="email" required bind:value={email} placeholder="office@yourchurch.org" /></label>
           <label>{t("Church or name on the license")}<input bind:value={name} maxlength="40" placeholder={t("Grace Chapel")} /></label>
         </div>
-        {#if error}<p class="error">{error}</p>{/if}
+        {#if error}<p class="error" role="alert">{error}</p>{/if}
         <button type="submit" class="cta big" disabled={busy || !email.trim()}>{busy ? t("Opening checkout…") : t("Continue to secure checkout")} <Icon name="lock" size={14} /></button>
         <p class="fine">{session.billingTest ? t("Test mode: a test checkout opens and nothing is charged.") : t("You finish paying on our payment provider's secure page. Cancel any time.")}</p>
       </form>

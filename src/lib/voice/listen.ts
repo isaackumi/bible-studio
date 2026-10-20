@@ -2,6 +2,7 @@ import type { NoiseFilter } from "../domain/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "../platform/runtime";
+import { t } from "../i18n/core";
 
 export type ListenAccess = { microphone: string; speech: string };
 
@@ -22,10 +23,10 @@ export const NETWORK_RETRIES = 3;
 
 export function accessMessage(access: ListenAccess): string | null {
   if (access.microphone === "denied") {
-    return "macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.";
+    return t("macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.");
   }
   if (access.speech === "denied") {
-    return "macOS blocked Speech Recognition. In System Settings → Privacy & Security → Speech Recognition, turn on Church Studio.";
+    return t("macOS blocked Speech Recognition. In System Settings → Privacy & Security → Speech Recognition, turn on Church Studio.");
   }
   return null;
 }
@@ -150,7 +151,7 @@ export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilt
     } else if (message.kind === "status" && message.message) {
       handlers.onStatus?.(message.message);
     } else if (message.kind === "error") {
-      const text = message.message || "Listening stopped.";
+      const text = message.message || t("Listening stopped.");
       handlers.onError(text, /denied|not authori[sz]ed|privacy/i.test(text) ? "denied" : "failed");
       end();
     } else if (message.kind === "end") {
@@ -267,11 +268,11 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
       }
       if (!shouldRestartListening("error", event.error)) {
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          fail("The microphone or speech recognition is blocked for this site. Allow it in the browser's site settings (or System Settings → Privacy & Security), then listen again.", "denied");
+          fail(t("The microphone or speech recognition is blocked for this site. Allow it in the browser's site settings (or System Settings → Privacy & Security), then listen again."), "denied");
         } else if (event.error === "audio-capture") {
-          fail("No microphone is available. Connect one, then listen again.", "no-mic");
+          fail(t("No microphone is available. Connect one, then listen again."), "no-mic");
         } else {
-          fail("Listening stopped.", "failed");
+          fail(t("Listening stopped."), "failed");
         }
       }
     };
@@ -318,7 +319,7 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
   // Without a recognizer, a level meter alone would look like listening. Say so and stop.
   if (!engine()) {
     handlers.onError(
-      "This browser cannot turn speech into words. Use Chrome or Edge, or the Church Studio desktop app.",
+      t("This browser cannot turn speech into words. Use Chrome or Edge, or the Church Studio desktop app."),
       "unsupported",
     );
     handlers.onEnd();
@@ -345,9 +346,9 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
         stopped = true;
         stopTracks();
         if (name === "NotFoundError" || name === "OverconstrainedError") {
-          handlers.onError("No microphone is available. Connect one, then listen again.", "no-mic");
+          handlers.onError(t("No microphone is available. Connect one, then listen again."), "no-mic");
         } else {
-          handlers.onError("The microphone is blocked for this window. Allow it in the browser's site settings (or System Settings → Privacy & Security → Microphone), then listen again.", "denied");
+          handlers.onError(t("The microphone is blocked for this window. Allow it in the browser's site settings (or System Settings → Privacy & Security → Microphone), then listen again."), "denied");
         }
         handlers.onEnd();
       });

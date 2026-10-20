@@ -92,6 +92,13 @@
   function onKey(event: KeyboardEvent) {
     // While the tour is open no desk shortcut runs (Space would otherwise go live).
     if (event.key === "Tab" || event.metaKey || event.ctrlKey) return;
+    // Enter or Space on one of the tour's own buttons (Skip, All tours) presses that button; it
+    // still never reaches the desk, where Space would go live.
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if ((event.key === " " || event.key === "Enter") && target?.closest(".card button")) {
+      event.stopPropagation();
+      return;
+    }
     if (event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
