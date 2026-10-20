@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ScreenCardEditor from "./ScreenCardEditor.svelte";
   import { session } from "../../app/session.svelte";
   import type { ScreenDest, Service } from "../../domain/types";
   import DeskDialog from "../sources/DeskDialog.svelte";
@@ -22,6 +23,7 @@
 
   const liveOnClick = $derived(service.liveOnClick !== false);
   const mode = $derived(service.autoAdvance ?? "remind");
+  let screenTab = $state<"countdown" | "leader">("countdown");
   const MODES: Array<{ id: "remind" | "next" | "off"; name: string; hint: string }> = [
     { id: "remind", name: msg("Remind me"), hint: msg("The desk asks you to move on, and chimes. Nothing moves until you say.") },
     { id: "next", name: msg("Move on by itself"), hint: msg("The next part begins and its first item goes up. A message lets you stay.") },
@@ -122,29 +124,8 @@
         </div>
       {:else if topic === "screen"}
         <h3>{t("On the screen")}</h3>
-        <p class="intro">{t("Extras the service can put on the screen. Preview means they wait for LIVE.")}</p>
-        <div class="field">
-          <span class="field-copy"><strong>{t("Countdown")}</strong><em>{t("Time left in the part now.")}</em></span>
-          <div class="steps" role="radiogroup" aria-label={t("Countdown")}>
-            {#each COUNT_MODES as [id, name] (id)}<button type="button" role="radio" aria-checked={session.countdownMode === id} onclick={() => session.setCountdownMode(id)}>{t(name)}</button>{/each}
-          </div>
-        </div>
-        <div class="field">
-          <span class="field-copy"><strong>{t("Led by")}</strong><em>{t("The leader's name as a lower third.")}</em></span>
-          <div class="steps" role="radiogroup" aria-label={t("Led by")}>
-            {#each DESTS as [dest, name] (dest)}<button type="button" role="radio" aria-checked={session.leaderTo === dest} onclick={() => session.setLeaderTo(dest)}>{t(name)}</button>{/each}
-          </div>
-        </div>
-        <div class="field" class:dim={session.leaderTo !== "screen"}>
-          <span class="field-copy"><strong>{t("Name stays on the screen for")}</strong></span>
-          <div class="steps" role="radiogroup" aria-label={t("Name stays on the screen for")}>
-            {#each [5, 10, 15, 30] as seconds (seconds)}<button type="button" role="radio" aria-checked={(service.leaderSeconds ?? 10) === seconds} onclick={() => session.setServiceSettings({ leaderSeconds: seconds })}>{seconds} s</button>{/each}
-          </div>
-        </div>
-        <div class="field">
-          <span class="field-copy"><strong>{t("Timer sounds")}</strong><em>{t("Beeps at the warning times and at 00:00:00.")}</em></span>
-          <input type="checkbox" role="switch" aria-label={t("Timer sounds")} checked={session.workspace.timerSounds.on} onchange={(event) => session.setTimerSounds({ on: event.currentTarget.checked })} />
-        </div>
+        <p class="intro">{t("The countdown and the leaders' names: where each shows, and how it looks.")}</p>
+        <ScreenCardEditor bind:tab={screenTab} />
       {:else}
         <h3>{t("Warnings")}</h3>
         <p class="intro">{t("When a part shows “Ending soon” (amber) on its row and on the timeline, before its time is up.")}</p>
@@ -232,10 +213,6 @@
   .sample-pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 8px; background: color-mix(in srgb, #f5a524 26%, transparent); color: #f5a524; font-size: 12px; font-weight: 650; }
   .sample-pill i { width: 7px; height: 7px; border-radius: 50%; background: #f5a524; }
 
-  input[type="checkbox"][role="switch"] { appearance: none; flex: none; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 10px; background: color-mix(in srgb, var(--ink) 22%, transparent); cursor: pointer; transition: background 0.15s; }
-  input[type="checkbox"][role="switch"]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
-  input[type="checkbox"][role="switch"]:checked { background: var(--accent); }
-  input[type="checkbox"][role="switch"]:checked::after { transform: translateX(16px); }
 
   .foot-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
   .foot-btn.ghost { margin-right: auto; background: none; color: var(--muted); }

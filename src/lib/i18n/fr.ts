@@ -3320,4 +3320,9 @@ export const fr: Readonly<Record<string, string>> = {
   "Sign in with Google, Microsoft, Apple or an email link. Your trial and any plan follow you to every computer.": "Connectez-vous avec Google, Microsoft, Apple ou un lien par e-mail. Votre essai et toute formule vous suivent sur chaque ordinateur.",
   "Signed in as {name}": "Connecté en tant que {name}",
   "Your trial and plans follow you to every computer.": "Votre essai et vos formules vous suivent sur chaque ordinateur.",
+  "No part has a leader yet. Add one under a part's name.": "Aucune partie n’a encore de responsable. Ajoutez-en un sous le nom d’une partie.",
+  "Off: nothing on the screen": "Désactivé : rien à l’écran",
+  "Where it shows": "Où il s’affiche",
+  "{n} parts have a leader. Their name shows when their part begins.": "{n} parties ont un responsable. Son nom s’affiche quand sa partie commence.",
+  "The countdown and the leaders' names: where each shows, and how it looks.": "Le compte à rebours et les noms des responsables : où chacun s’affiche, et son apparence.",
 };

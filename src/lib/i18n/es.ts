@@ -3239,4 +3239,9 @@ export const es: Readonly<Record<string, string>> = {
   "Sign in with Google, Microsoft, Apple or an email link. Your trial and any plan follow you to every computer.": "Inicie sesión con Google, Microsoft, Apple o un enlace por correo. Su prueba y cualquier plan le siguen a cada computadora.",
   "Signed in as {name}": "Sesión iniciada como {name}",
   "Your trial and plans follow you to every computer.": "Su prueba y sus planes le siguen a cada computadora.",
+  "No part has a leader yet. Add one under a part's name.": "Ninguna parte tiene quien la dirija todavía. Agregue uno bajo el nombre de una parte.",
+  "Off: nothing on the screen": "Apagado: nada en pantalla",
+  "Where it shows": "Dónde aparece",
+  "{n} parts have a leader. Their name shows when their part begins.": "{n} partes tienen quien las dirija. Su nombre aparece cuando empieza su parte.",
+  "The countdown and the leaders' names: where each shows, and how it looks.": "La cuenta regresiva y los nombres de quienes dirigen: dónde aparece cada uno y cómo se ve.",
 };
