@@ -52,8 +52,8 @@
     {:else}
       <span class="hint">{t("Give each section a time (the clock on its heading) to see the whole morning here.")}</span>
     {/if}
-    <ScreenExtras />
-    {#if status}
+    <span class="extras-slot"><ScreenExtras /></span>
+    {#if status && compact}
       <span class="live" class:over={status.left < 0} class:soon={status.left >= 0 && partState(status.minutes, status.left * 60_000, service.warnMinutes) === "soon"}>
         <i class="pulse" aria-hidden="true"></i>
         <strong>{runningName}</strong> · {leftLabel(status.left)}
@@ -99,15 +99,20 @@
         {/if}
       {/each}
     </div>
-    <div class="ticks" aria-hidden="true">
-      <span>{clockLabel(plan.start)}</span>
-      <span>{clockLabel(plan.end)}</span>
+    <div class="ticks">
+      <span aria-hidden="true">{clockLabel(plan.start)}</span>
+      {#if session.serviceRunning && status && status.behind !== null && Math.abs(status.behind) < 180}
+        <span class="pace" class:late={status.behind >= 2} class:early={status.behind <= -2} role="status">
+          {Math.abs(status.behind) < 2 ? t("On time") : status.behind > 0 ? t("{behind} behind", { behind: lengthLabel(status.behind) }) : t("{behind} ahead", { behind: lengthLabel(-status.behind) })}
+        </span>
+      {/if}
+      <span aria-hidden="true">{clockLabel(plan.end)}</span>
     </div>
   {/if}
 </div>
 
 <style>
-  .timeline { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--field) 50%, transparent); }
+  .timeline { container-type: inline-size; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--field) 50%, transparent); }
   .summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-height: 32px; }
   .start { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; color: var(--muted); }
   .start input { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -141,5 +146,15 @@
   .tl-dot { display: none; }
   .block-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
   .now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #e5484d; border-radius: 1px; pointer-events: none; }
-  .ticks { display: flex; justify-content: space-between; min-height: 14px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ticks { display: flex; justify-content: space-between; align-items: center; min-height: 14px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pace { padding: 1px 8px; border-radius: 8px; background: color-mix(in srgb, #30a46c 16%, transparent); color: var(--ink); font-weight: 650; }
+  .pace.late { background: color-mix(in srgb, #f5a524 24%, transparent); }
+  .pace.early { background: color-mix(in srgb, #3b82f6 18%, transparent); }
+  .extras-slot { margin-left: auto; display: inline-flex; }
+  /* Narrow: the countdown and names buttons keep their icon and what they are set to (tooltips say the rest). */
+  @container (max-width: 820px) {
+    .extras-slot :global(.trigger .what) { display: none; }
+    .summary { gap: 10px; }
+    .fact.items { display: none; }
+  }
 </style>

@@ -328,6 +328,21 @@
   const live = (item: PresentationItem) =>
     session.live.program.sourceId === item.id || (item.kind === "composition" && session.live.program.sourceId?.includes(item.composition?.compositionId ?? "~"));
 
+  /** A part whose "who leads it" line was asked for (parts without a leader keep it hidden). */
+  let leaderOpen = $state<string | null>(null);
+  function openLeader(sectionId: string) {
+    leaderOpen = sectionId;
+  }
+  /** Put the cursor in the leader field when its line was just asked for. */
+  function focusLeader(node: HTMLElement, wanted: boolean) {
+    if (wanted) requestAnimationFrame(() => node.querySelector("input")?.focus());
+    const away = (event: FocusEvent) => {
+      if (!node.contains(event.relatedTarget as Node | null) && leaderOpen && !node.querySelector("input")?.value.trim()) leaderOpen = null;
+    };
+    node.addEventListener("focusout", away);
+    return { destroy: () => node.removeEventListener("focusout", away) };
+  }
+
   function open(item: PresentationItem, event: MouseEvent) {
     (event.currentTarget as HTMLElement).blur();
     // A reading set to run on the Presenter page opens there, with its verses picked out.
@@ -564,25 +579,27 @@
                 <SectionTime {section} {slot} {plan} tone="var(--slot-{sectionIndex % 8})" showLeft={false} />
               {/if}
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
-              {#if partDesk(section) === "presenter"}
+              {#if section.skip}
+                <button type="button" class="desk-tag" title={t("Put this part back in the service")} onclick={() => session.setSectionSkip(section.id, false)}><Icon name="eye" size={12} /> {t("Bring back")}</button>
+              {:else if partDesk(section) === "presenter"}
                 <button type="button" class="desk-tag" title={t("This part runs on the Presenter page: its Bible, songs and every tool, while the service keeps time. Click to run it here instead.")} onclick={() => session.setPartDesk(section.id, "service")}><Icon name="layout" size={12} /> {t("Presenter page")}</button>
-              {:else}
-                <button type="button" class="skip-toggle desk-toggle" title={t("Run this part on the Presenter page, with every tool (the service keeps time)")} onclick={() => session.setPartDesk(section.id, "presenter")}><Icon name="layout" size={13} /><span class="skip-label">{t("Use Presenter")}</span></button>
               {/if}
-              <button
-                type="button"
-                class="skip-toggle"
-                class:on={section.skip}
-                aria-pressed={!!section.skip}
-                aria-label={section.skip ? t("Bring back {name}", { name: section.name }) : t("Skip {name} this time", { name: section.name })}
-                title={section.skip ? t("Put this part back in the service") : t("Leave this part out this time: no time in the plan, Next passes over it, not in the report")}
-                onclick={() => session.setSectionSkip(section.id, !section.skip)}
-              ><Icon name={section.skip ? "eye" : "eye-off"} size={13} /><span class="skip-label">{section.skip ? t("Bring back") : t("Skip")}</span></button>
-              <span class="tools">
-                <button type="button" class="row-tool del" aria-label={t("Remove section")} title={t("Delete this part")} onclick={() => session.removeSection(section.id)}><Icon name="trash" size={14} /></button>
-              </span>
+              <ToolMenu label={t("More for {part}", { part: section.name })} className="row-tool part-menu">
+                {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
+                {#snippet children(close)}
+                  {#if !section.leader?.trim()}
+                    <button type="button" role="menuitem" onclick={() => { close(); openLeader(section.id); }}><Icon name="user" size={13} /> {t("Add who leads it")}</button>
+                  {/if}
+                  <button type="button" role="menuitemcheckbox" aria-checked={partDesk(section) === "presenter"} onclick={() => { session.setPartDesk(section.id, partDesk(section) === "presenter" ? "service" : "presenter"); close(); }}><Icon name="layout" size={13} /> {t("Run on the Presenter page")}<span class="menu-hint">{t("Every tool; the service keeps time")}</span></button>
+                  <button type="button" role="menuitemcheckbox" aria-checked={!!section.skip} onclick={() => { session.setSectionSkip(section.id, !section.skip); close(); }}><Icon name="eye-off" size={13} /> {t("Skip this time")}<span class="menu-hint">{t("No time, not in the report")}</span></button>
+                  <div class="menu-sep"></div>
+                  <button type="button" role="menuitem" class="danger" onclick={() => { session.removeSection(section.id); close(); }}><Icon name="trash" size={13} /> {t("Delete this part")}</button>
+                {/snippet}
+              </ToolMenu>
               </div>
-              <div class="head-meta"><PartLeader {section} {slot} {plan} /></div>
+              {#if section.leader?.trim() || session.runningSectionId === section.id || leaderOpen === section.id}
+                <div class="head-meta" use:focusLeader={leaderOpen === section.id}><PartLeader {section} {slot} {plan} /></div>
+              {/if}
               {#if folded.has(section.id)}
                 <button type="button" class="fold-summary" onclick={() => toggleFold(section.id)} title={t("Show what is in this part")}>
                   {#if section.items.length === 0}
@@ -897,6 +914,11 @@
   .part-body { overflow: hidden; }
   @media (prefers-reduced-motion: reduce) { .fold :global(svg) { transition: none; } }
   .head-meta { padding: 0 0 2px 36px; min-width: 0; }
+  .head-main :global(.part-menu) { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; }
+  .head-main :global(.part-menu:hover) { background: var(--field); color: var(--ink); }
+  .head-main :global(.menu button) { display: flex; align-items: center; gap: 8px; }
+  .head-main :global(.menu .menu-hint) { margin-left: auto; padding-left: 14px; font-size: 11px; color: var(--muted); }
+  .head-main :global(.menu .danger) { color: var(--danger, #e5484d); }
   .section-name { flex: 1 1 120px; min-width: 80px; height: 30px; border-color: transparent; background: none; font-size: 14px; font-weight: 750; letter-spacing: 0; color: var(--ink); text-overflow: ellipsis; }
   .section-name:focus { border-color: var(--line); background: var(--field); color: var(--ink); }
   .tools { display: flex; gap: 2px; flex: none; }
@@ -906,13 +928,18 @@
   .drop-hint { display: flex; align-items: center; gap: 6px; width: calc(100% - 12px); height: 30px; margin: 4px 6px 6px; padding: 0 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
   .drop-hint:hover, .drop-hint:focus-visible { border-color: var(--line); color: var(--ink); background: var(--field); }
   .items { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; }
+  .items :global(.item-thumb) { width: 68px; }
+  /* Edit and delete show on the row in hand (hovered, selected or live), not on every row. */
+  .item .row-tool { opacity: 0; transition: opacity 0.12s ease; }
+  .item:hover .row-tool, .item:focus-within .row-tool, .item.on .row-tool, .item.live .row-tool { opacity: 1; }
+  @media (hover: none) { .item .row-tool { opacity: 1; } }
   .item { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; }
   .item:hover { background: var(--field); }
   .item.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); box-shadow: inset 4px 0 0 var(--accent); }
   .item.live { border-color: color-mix(in srgb, var(--live, #e5484d) 55%, transparent); background: color-mix(in srgb, var(--live, #e5484d) 11%, var(--panel)); box-shadow: inset 4px 0 0 var(--live, #e5484d); }
   .item.live .item-copy strong { font-weight: 750; }
   .next-hint { justify-self: start; margin-top: 2px; padding: 1px 7px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font-size: 11px; font-weight: 650; white-space: nowrap; }
-  .item-main { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .item-main { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 5px 8px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .item-copy { flex: 1; display: grid; gap: 1px; min-width: 0; }
   .item-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mini-map { display: flex; gap: 2px; overflow: hidden; }
@@ -956,13 +983,8 @@
   .block.skipped .part-body, .block.skipped .head-meta, .block.skipped .fold-summary { opacity: 0.45; }
   .block.skipped .part-add { display: none; }
   .skip-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
-  .skip-toggle { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; opacity: 0; transition: opacity 0.15s ease, background 0.15s ease; }
-  .block:hover .skip-toggle, .block:focus-within .skip-toggle, .skip-toggle.on { opacity: 1; }
-  .skip-toggle:hover { background: var(--field); color: var(--ink); border-color: var(--line); }
-  .skip-toggle.on { border-color: var(--line); background: var(--field); color: var(--ink); }
   .desk-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
   .desk-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-  @media (hover: none) { .skip-toggle { opacity: 1; } }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
   .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -1005,7 +1027,8 @@
   .views button[aria-checked="true"] { background: var(--field); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); }
   .running-clock { display: inline-flex; align-items: center; gap: 5px; color: #30a46c !important; font-weight: 700; font-variant-numeric: tabular-nums; }
   .running-clock i { width: 6px; height: 6px; border-radius: 50%; background: #30a46c; }
-  .key-hints { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 14px 0; font-size: 11px; color: var(--muted); }
+  .key-hints { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px 14px; margin: 6px 14px 0; font-size: 11px; color: var(--muted); opacity: 0.75; mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .key-hints:hover { opacity: 1; }
   .key-hints span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .key-hints kbd { min-width: 18px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--field); color: var(--ink); font: inherit; font-size: 10px; font-weight: 700; text-align: center; }
   .time-up { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 10px 14px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, #f5a524 60%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #f5a524 14%, var(--panel)); animation: time-up-in 0.3s cubic-bezier(0.22, 1, 0.36, 1); }

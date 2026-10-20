@@ -3294,4 +3294,11 @@ export const es: Readonly<Record<string, string>> = {
   "On the Presenter page": "En la página Presentador",
   "The service": "El servicio",
   "This part runs here, on the Presenter page. What goes LIVE counts as this part.": "Esta parte se lleva aquí, en la página Presentador. Lo que va EN VIVO cuenta para esta parte.",
+  "Add who leads it": "Agregar quién la dirige",
+  "Every tool; the service keeps time": "Todas las herramientas; el servicio lleva el tiempo",
+  "More for {part}": "Más para {part}",
+  "No time, not in the report": "Sin tiempo, fuera del informe",
+  "Run on the Presenter page": "Llevar en la página Presentador",
+  "Skip this time": "Omitir esta vez",
+  "On time": "A tiempo",
 };
