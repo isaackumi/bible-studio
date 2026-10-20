@@ -27,7 +27,7 @@
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
   import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
-  import { partDesk, serviceSummary } from "../../domain/service";
+  import { serviceSummary, type PartDesk, type PresenterPage } from "../../domain/service";
   import { screenStarts } from "../../bible/passage";
   import QuickVerse from "./QuickVerse.svelte";
   import { planSchedule } from "../../domain/schedule";
@@ -328,6 +328,15 @@
   const live = (item: PresentationItem) =>
     session.live.program.sourceId === item.id || (item.kind === "composition" && session.live.program.sourceId?.includes(item.composition?.compositionId ?? "~"));
 
+  /** Where a part can run (the part's ⋯ menu). The service keeps time on any of them. */
+  const RUNS: Array<{ key: string; desk: PartDesk; page?: PresenterPage; label: string; hint: string; icon: string }> = [
+    { key: "service", desk: "service", label: msg("Running order"), hint: msg("Its items, here"), icon: "list" },
+    { key: "scriptures", desk: "presenter", page: "scriptures", label: msg("Presenter · Scriptures"), hint: msg("Bible and every tool"), icon: "bible" },
+    { key: "songs", desk: "presenter", page: "songs", label: msg("Presenter · Songs"), hint: msg("Songs and every tool"), icon: "lyrics" },
+    { key: "sermon", desk: "presenter", page: "sermon", label: msg("Presenter · Sermon"), hint: msg("Notes and every tool"), icon: "book" },
+    { key: "production", desk: "production", label: msg("Production desk"), hint: msg("Cameras and scenes"), icon: "obs" },
+  ];
+
   /** A part whose "who leads it" line was asked for (parts without a leader keep it hidden). */
   let leaderOpen = $state<string | null>(null);
   function openLeader(sectionId: string) {
@@ -581,8 +590,9 @@
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
               {#if section.skip}
                 <button type="button" class="desk-tag" title={t("Put this part back in the service")} onclick={() => session.setSectionSkip(section.id, false)}><Icon name="eye" size={12} /> {t("Bring back")}</button>
-              {:else if partDesk(section) === "presenter"}
-                <button type="button" class="desk-tag" title={t("This part runs on the Presenter page: its Bible, songs and every tool, while the service keeps time. Click to run it here instead.")} onclick={() => session.setPartDesk(section.id, "service")}><Icon name="layout" size={12} /> {t("Presenter page")}</button>
+              {:else if session.partRunOf(section).desk !== "service"}
+                {@const run = session.partRunOf(section)}
+                <button type="button" class="desk-tag" class:production={run.desk === "production"} title={t("When this part begins, the desk opens there with every tool; the service keeps time. Click to open it now.")} onclick={() => session.openPartDesk(section, run)}><Icon name={run.desk === "production" ? "obs" : "layout"} size={12} /> {session.partRunLabel(run)}</button>
               {/if}
               <ToolMenu label={t("More for {part}", { part: section.name })} className="row-tool part-menu">
                 {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
@@ -590,7 +600,12 @@
                   {#if !section.leader?.trim()}
                     <button type="button" role="menuitem" onclick={() => { close(); openLeader(section.id); }}><Icon name="user" size={13} /> {t("Add who leads it")}</button>
                   {/if}
-                  <button type="button" role="menuitemcheckbox" aria-checked={partDesk(section) === "presenter"} onclick={() => { session.setPartDesk(section.id, partDesk(section) === "presenter" ? "service" : "presenter"); close(); }}><Icon name="layout" size={13} /> {t("Run on the Presenter page")}<span class="menu-hint">{t("Every tool; the service keeps time")}</span></button>
+                  {@const run = session.partRunOf(section)}
+                  <p class="menu-note">{t("Where it runs")}</p>
+                  {#each RUNS as option (option.key)}
+                    <button type="button" role="menuitemradio" aria-checked={run.desk === option.desk && (option.desk !== "presenter" || (run.page ?? "scriptures") === option.page)} onclick={() => { session.setPartDesk(section.id, option.desk, option.page); close(); }}><Icon name={option.icon} size={13} /> {t(option.label)}<span class="menu-hint">{t(option.hint)}</span></button>
+                  {/each}
+                  <div class="menu-sep"></div>
                   <button type="button" role="menuitemcheckbox" aria-checked={!!section.skip} onclick={() => { session.setSectionSkip(section.id, !section.skip); close(); }}><Icon name="eye-off" size={13} /> {t("Skip this time")}<span class="menu-hint">{t("No time, not in the report")}</span></button>
                   <div class="menu-sep"></div>
                   <button type="button" role="menuitem" class="danger" onclick={() => { session.removeSection(section.id); close(); }}><Icon name="trash" size={13} /> {t("Delete this part")}</button>
@@ -985,6 +1000,8 @@
   .skip-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
   .desk-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
   .desk-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .desk-tag.production { border-color: color-mix(in srgb, #a855f7 50%, var(--line)); background: color-mix(in srgb, #a855f7 12%, transparent); }
+  .head-main :global(.menu .menu-note) { margin: 6px 10px 2px; font-size: 10.5px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
   .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }

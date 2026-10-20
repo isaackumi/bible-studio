@@ -97,10 +97,46 @@ export function serviceSummary(service: Service): ServiceSummary {
   };
 }
 
-/** Parts that are preaching run on the Presenter page by default: anything may be needed then. */
-const PREACHING = /\b(sermon|preach|preaching|message|word|homily|teaching|exhortation)\b/i;
+export type PartDesk = "service" | "presenter" | "production";
+export type PresenterPage = "scriptures" | "songs" | "sermon";
+/** Where a part runs: the running order, a page of the Presenter desk, or the Production desk. */
+export type PartRun = { desk: PartDesk; page?: PresenterPage };
 
-/** Where a part runs: its own choice, else the Presenter page for preaching and the Service page otherwise. */
-export function partDesk(section: Pick<ServiceSection, "name" | "desk">): "presenter" | "service" {
-  return section.desk ?? (PREACHING.test(section.name) ? "presenter" : "service");
+/** A part's name as the church's own words are kept ("Ministration", "  word " → "word"). */
+export const partKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
+
+/**
+ * Where a part runs: its own choice, else what the church chose for parts of that name, else the
+ * running order. Nothing is guessed from the name; `chosen` says whether anyone decided.
+ */
+export function partRun(section: Pick<ServiceSection, "name" | "desk" | "page">, learned: Record<string, PartRun> = {}): PartRun & { chosen: boolean } {
+  if (section.desk) return { desk: section.desk, ...(section.page ? { page: section.page } : {}), chosen: true };
+  const kept = learned[partKey(section.name)];
+  return kept ? { ...kept, chosen: true } : { desk: "service", chosen: false };
+}
+
+export function partDesk(section: Pick<ServiceSection, "name" | "desk" | "page">, learned: Record<string, PartRun> = {}): PartDesk {
+  return partRun(section, learned).desk;
+}
+
+const DESKS = new Set<PartDesk>(["service", "presenter", "production"]);
+const PAGES = new Set<PresenterPage>(["scriptures", "songs", "sermon"]);
+
+/** One part's run, cleaned (null when it is not a known desk). */
+export function cleanPartRun(value: unknown): PartRun | null {
+  const record = value && typeof value === "object" ? (value as Partial<PartRun>) : null;
+  if (!record || !DESKS.has(record.desk as PartDesk)) return null;
+  return { desk: record.desk as PartDesk, ...(record.desk === "presenter" && PAGES.has(record.page as PresenterPage) ? { page: record.page } : {}) };
+}
+
+/** What the church chose for parts by name, cleaned (at most 100 names). */
+export function sanitizePartDesks(value: unknown): Record<string, PartRun> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Record<string, PartRun> = {};
+  for (const [name, run] of Object.entries(value as Record<string, unknown>).slice(0, 100)) {
+    const key = partKey(name).slice(0, 60);
+    const clean = cleanPartRun(run);
+    if (key && clean) out[key] = clean;
+  }
+  return out;
 }

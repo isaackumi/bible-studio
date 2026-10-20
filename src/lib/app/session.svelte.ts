@@ -134,7 +134,7 @@ import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceT
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
-import { findItem, moveInList, nextPart, partDesk, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type ServiceSummary } from "../domain/service";
+import { findItem, moveInList, nextPart, partKey, partRun, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type PartDesk, type PartRun, type PresenterPage, type ServiceSummary } from "../domain/service";
 import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
@@ -2936,14 +2936,7 @@ class Session {
       this.persistSoon();
       const section = this.service.sections.find((entry) => entry.id === id);
       if (this.leaderTo === "screen" && section?.leader?.trim() && before !== id) this.showLeader(id);
-      // A part that runs on the Presenter page (preaching, by default) opens it as it begins.
-      if (section && before !== id && partDesk(section) === "presenter") {
-        this.presenterPartId = id;
-        if (this.deskPage === "service") {
-          this.pageRequest = "scriptures";
-          this.message = t("{part} has begun. The Presenter page is open with every tool; the service keeps time.", { part: section.name });
-        }
-      } else if (before !== id && this.presenterPartId && this.presenterPartId !== id) this.presenterPartId = null;
+      if (section && before !== id) this.partBegan(section);
     }
     this.publishStage();
     this.refreshCountdown();
@@ -4757,13 +4750,89 @@ class Session {
   /** A passage the Presenter page should open (its book, chapter and verses), then clears. */
   passageRequest = $state<BibleItem | null>(null);
 
-  /** Where a part runs: the Presenter page or the Service page. */
-  setPartDesk = (sectionId: string, desk: "presenter" | "service") => {
+  /** Where a part runs: its own choice, else the church's choice for parts of that name, else the running order. */
+  partRunOf = (section: ServiceSection) => partRun(section, this.workspace.partDesks);
+
+  /** In words: "Running order", "Presenter · Songs", "Production desk". */
+  partRunLabel = (run: PartRun): string =>
+    run.desk === "production" ? t("Production desk") : run.desk === "presenter" ? t("Presenter · {page}", { page: t(run.page === "songs" ? "Songs" : run.page === "sermon" ? "Sermon" : "Scriptures") }) : t("Running order");
+
+  /**
+   * Set where a part runs. Then offer to do the same for every part with that name (the church's own
+   * word for it), so new services and templates follow without anyone choosing again.
+   */
+  setPartDesk = (sectionId: string, desk: PartDesk, page?: PresenterPage) => {
     if (!this.service) return;
-    this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk } : section)) };
+    const run: PartRun = { desk, ...(desk === "presenter" ? { page: page ?? "scriptures" } : {}) };
+    this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk: run.desk, page: run.page } : section)) };
     this.persistSoon();
     const part = this.service.sections.find((section) => section.id === sectionId);
-    this.message = desk === "presenter" ? t("{part} runs on the Presenter page, with every tool.", { part: part?.name ?? "" }) : t("{part} runs on the Service page.", { part: part?.name ?? "" });
+    if (!part) return;
+    const label = this.partRunLabel(run);
+    const kept = this.workspace.partDesks?.[partKey(part.name)];
+    const same = kept ? kept.desk === run.desk && kept.page === run.page : run.desk === "service";
+    this.notify(t("{part} runs on: {where}", { part: part.name, where: label }), {
+      detail: same ? t("The service keeps time wherever it runs.") : t("Every part called {part} can do the same, in new services too.", { part: part.name }),
+      actions: same ? [] : [{ label: t("Same for every {part}", { part: part.name }), run: () => { this.learnPartDesk(part.name, run); this.dismissToast(); } }],
+    });
+  };
+
+  /** Remember where parts of this name run (the church's word for it). Running order forgets it. */
+  learnPartDesk = (name: string, run: PartRun) => {
+    const key = partKey(name);
+    if (!key) return;
+    const { [key]: _old, ...rest } = this.workspace.partDesks ?? {};
+    this.workspace = { ...this.workspace, partDesks: run.desk === "service" ? rest : { ...rest, [key]: run } };
+    this.persistSoon();
+    this.message = run.desk === "service" ? t("Parts called {part} run in the running order.", { part: name }) : t("Every part called {part} runs on: {where}.", { part: name, where: this.partRunLabel(run) });
+  };
+
+  /** Parts already asked about today ("Nothing is planned here…"), so the question comes once. */
+  private askedOpenParts = new Set<string>();
+
+  /**
+   * A part begins: one set to run on a desk opens it (the service keeps time there). One that runs
+   * in the running order but has nothing planned asks, once, whether to open the Presenter desk.
+   * Leaving a part that took the operator to a desk brings them back to the running order.
+   */
+  private partBegan = (section: ServiceSection) => {
+    const run = this.partRunOf(section);
+    const cameFromDesk = this.presenterPartId !== null && this.presenterPartId !== section.id;
+    if (run.desk === "presenter" || run.desk === "production") {
+      this.openPartDesk(section, run);
+      return;
+    }
+    if (cameFromDesk) {
+      this.presenterPartId = null;
+      if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
+      this.pageRequest = "service";
+    }
+    const planned = section.items.length > 0;
+    if (!planned && !run.chosen && !this.askedOpenParts.has(section.id)) {
+      this.askedOpenParts.add(section.id);
+      this.notify(t("Nothing is planned for {part}", { part: section.name }), {
+        detail: t("Open the Presenter desk with every tool? The service keeps time."),
+        ms: 30_000,
+        actions: [
+          { label: t("Open it"), run: () => { this.openPartDesk(section, { desk: "presenter", page: "scriptures" }); this.dismissToast(); } },
+          { label: t("Always for {part}", { part: section.name }), run: () => { this.learnPartDesk(section.name, { desk: "presenter", page: "scriptures" }); this.openPartDesk(section, { desk: "presenter", page: "scriptures" }); this.dismissToast(); } },
+        ],
+      });
+    }
+  };
+
+  /** Open the desk a part runs on, noting the part so what goes LIVE there counts as it. */
+  openPartDesk = (section: ServiceSection, run: PartRun) => {
+    this.presenterPartId = section.id;
+    if (run.desk === "production") {
+      if (!this.requireFeature("production")) return;
+      this.setAppearance({ desk: "obs" });
+      this.message = t("{part} has begun on the Production desk. The service keeps time.", { part: section.name });
+      return;
+    }
+    if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
+    this.pageRequest = run.page ?? "scriptures";
+    this.message = t("{part} has begun. The Presenter desk is open with every tool; the service keeps time.", { part: section.name });
   };
 
   /** Whether a reading opens on the Presenter page (the service's choice, or its part runs there). */
@@ -4771,7 +4840,7 @@ class Session {
     if (!this.service) return false;
     const found = findItem(this.service, itemId);
     if (!found?.item.bible) return false;
-    return this.service.readingsOn === "presenter" || partDesk(found.section) === "presenter";
+    return this.service.readingsOn === "presenter" || this.partRunOf(found.section).desk === "presenter";
   };
 
   /** Open a reading from the running order on the Presenter page: its passage, the first screen on Preview. */
@@ -4788,6 +4857,7 @@ class Session {
   /** Back to the Service page from the Presenter page. */
   returnToService = () => {
     this.presenterPartId = null;
+    if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
     this.pageRequest = "service";
   };
 
@@ -6221,7 +6291,7 @@ class Session {
       this.videoEnded = null;
     }
     // The section of what went live has begun (the first time today).
-    const fromPresenter = this.deskPage !== "service" && this.presenterPartId !== null;
+    const fromPresenter = this.presenterPartId !== null && (this.deskPage !== "service" || this.workspace.appearance.desk !== "pewbeam");
     if ((action === "take" || action === "cut") && this.service && ((this.cursor.itemId && this.live.program.sourceId === this.cursor.itemId) || fromPresenter)) {
       const section = fromPresenter ? this.service.sections.find((entry) => entry.id === this.presenterPartId) : this.service.sections.find((entry) => entry.items.some((item) => item.id === this.cursor.itemId));
       const today = new Date().toDateString();

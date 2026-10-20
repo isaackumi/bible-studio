@@ -109,12 +109,18 @@ describe("parts left out this time", () => {
 });
 
 describe("where a part runs", () => {
-  it("puts preaching on the Presenter page unless the part says otherwise", async () => {
-    const { partDesk } = await import("./service");
-    expect(partDesk({ name: "Sermon" })).toBe("presenter");
-    expect(partDesk({ name: "The Word" })).toBe("presenter");
-    expect(partDesk({ name: "Worship" })).toBe("service");
-    expect(partDesk({ name: "Preaching", desk: "service" })).toBe("service");
-    expect(partDesk({ name: "Offering", desk: "presenter" })).toBe("presenter");
+  it("never guesses from the name: the part's choice, else the church's choice for that name, else the running order", async () => {
+    const { partRun } = await import("./service");
+    expect(partRun({ name: "Sermon" })).toEqual({ desk: "service", chosen: false });
+    expect(partRun({ name: "Offering", desk: "production" })).toEqual({ desk: "production", chosen: true });
+    expect(partRun({ name: "Word", desk: "presenter", page: "songs" })).toEqual({ desk: "presenter", page: "songs", chosen: true });
+    const learned = { ministration: { desk: "presenter" as const, page: "scriptures" as const } };
+    expect(partRun({ name: "  Ministration " }, learned)).toEqual({ desk: "presenter", page: "scriptures", chosen: true });
+    expect(partRun({ name: "Ministration", desk: "service" }, learned).desk).toBe("service");
+  });
+
+  it("keeps only known desks and pages when reading the church's choices", async () => {
+    const { sanitizePartDesks } = await import("./service");
+    expect(sanitizePartDesks({ " Word ": { desk: "presenter", page: "sermon" }, x: { desk: "moon" }, y: { desk: "production", page: "songs" } })).toEqual({ word: { desk: "presenter", page: "sermon" }, y: { desk: "production" } });
   });
 });

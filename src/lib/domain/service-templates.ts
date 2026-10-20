@@ -4,8 +4,9 @@
 
 import { clockValue, parseClock } from "./schedule";
 import type { Service } from "./types";
+import { cleanPartRun } from "./service";
 
-export type TemplatePart = { name: string; minutes?: number; until?: string };
+export type TemplatePart = { name: string; minutes?: number; until?: string; desk?: "service" | "presenter" | "production"; page?: "scriptures" | "songs" | "sermon" };
 
 export type ServiceTemplate = {
   id: string;
@@ -42,10 +43,13 @@ function cleanPart(value: unknown): TemplatePart | null {
   const record = value && typeof value === "object" ? (value as Partial<TemplatePart>) : null;
   const name = typeof record?.name === "string" ? record.name.trim().slice(0, 60) : "";
   if (!name) return null;
+  // Where the part runs travels with the template, so a church sets it once.
+  const run = cleanPartRun(record);
+  const where = run ? { desk: run.desk, ...(run.page ? { page: run.page } : {}) } : {};
   const until = parseClock(record?.until);
-  if (until !== null) return { name, until: clockValue(until) };
+  if (until !== null) return { name, until: clockValue(until), ...where };
   const minutes = typeof record?.minutes === "number" && Number.isFinite(record.minutes) ? Math.min(600, Math.max(0, Math.round(record.minutes))) : undefined;
-  return minutes === undefined ? { name } : { name, minutes };
+  return minutes === undefined ? { name, ...where } : { name, minutes, ...where };
 }
 
 export function sanitizeTemplates(value: unknown): ServiceTemplate[] {
@@ -81,6 +85,8 @@ export function serviceFromTemplate(template: ServiceTemplate, name: string, new
       name: part.name,
       items: [],
       ...(part.until ? { until: part.until } : part.minutes !== undefined ? { minutes: part.minutes } : {}),
+      ...(part.desk ? { desk: part.desk } : {}),
+      ...(part.page ? { page: part.page } : {}),
     })),
   };
 }
@@ -91,7 +97,7 @@ export function templateFromService(service: Service, name: string, id: string):
     id,
     name: name.trim().slice(0, 60) || service.name || "Service",
     startTime: service.startTime ?? "09:00",
-    parts: service.sections.map((section) => cleanPart({ name: section.name, minutes: section.minutes, until: section.until })).filter((part): part is TemplatePart => part !== null),
+    parts: service.sections.map((section) => cleanPart({ name: section.name, minutes: section.minutes, until: section.until, desk: section.desk, page: section.page })).filter((part): part is TemplatePart => part !== null),
   };
 }
 

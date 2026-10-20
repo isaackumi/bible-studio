@@ -34,7 +34,10 @@
     {#if left !== null}
       <span class="time">{left >= 0 ? t("{time} left", { time: clockCount(left) }) : t("{time} over", { time: clockCount(-left) })}</span>
     {/if}
-    {#if session.presenterPartId === part.id}<span class="tag" title={t("This part runs here, on the Presenter page. What goes LIVE counts as this part.")}>{t("On the Presenter page")}</span>{/if}
+    {#if session.presenterPartId === part.id}
+      {@const run = session.partRunOf(part)}
+      <span class="tag" title={t("This part runs here. What goes LIVE counts as this part.")}>{run.desk === "service" ? t("Opened here") : session.partRunLabel(run)}</span>
+    {/if}
     <span class="grow"></span>
     {#if session.timeUp && session.timeUp.sectionId === part.id}
       <span class="up" role="alert"><Icon name="timer" size={13} /> {t("{part}'s time is up", { part: part.name })}</span>

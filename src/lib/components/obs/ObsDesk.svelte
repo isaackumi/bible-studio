@@ -3,6 +3,7 @@
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import LookScripture from "./LookScripture.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
+  import ServiceStrip from "../pew/ServiceStrip.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
@@ -456,6 +457,9 @@
       </ToolMenu>
     </nav>
   </header>
+
+  <!-- The service while a part runs here: its time, the next part and the way back (empty otherwise). -->
+  <div class="strip-slot">{#if session.service && (session.serviceRunning || session.presenterPartId)}<ServiceStrip />{/if}</div>
 
   {#if looksOpen}
     <div class="prod-looks">
@@ -945,14 +949,15 @@
     min-height: 0;
     min-width: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     background: var(--desk);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: 12px;
     overflow: hidden;
   }
-  .prod.focus, .prod.looks { grid-template-rows: auto minmax(0, 1fr); }
+  .prod.focus, .prod.looks { grid-template-rows: auto auto minmax(0, 1fr); }
+  .strip-slot { min-width: 0; }
   .prod-looks {
     min-height: 0;
     min-width: 0;

@@ -1,5 +1,6 @@
 import { sanitizeSongLines } from "../domain/song-screens";
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
+import { sanitizePartDesks } from "../domain/service";
 import { sanitizeUiLanguage } from "../i18n/core";
 import { sanitizeTimerSounds } from "../domain/timer-cues";
 import { sanitizeSwitcher } from "../integrations/switcher";
@@ -150,6 +151,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
     songLines: sanitizeSongLines(value.songLines),
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
+    partDesks: sanitizePartDesks(value.partDesks),
     timerSounds: sanitizeTimerSounds(value.timerSounds),
     ndiAudio: value.ndiAudio !== false,
     shareUsage: value.shareUsage !== false,

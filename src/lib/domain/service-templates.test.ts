@@ -28,3 +28,16 @@ describe("service templates", () => {
     ]);
   });
 });
+
+describe("templates keep where each part runs", () => {
+  it("carries the desk and page from a service to its template and back", async () => {
+    const { templateFromService, serviceFromTemplate } = await import("./service-templates");
+    const service = { id: "s", name: "Sunday", updatedAt: "", startTime: "09:00", sections: [{ id: "a", name: "Ministration", minutes: 40, desk: "presenter" as const, page: "sermon" as const, items: [] }, { id: "b", name: "Praise", items: [] }] };
+    const template = templateFromService(service, "Sunday", "t1");
+    expect(template.parts[0]).toEqual({ name: "Ministration", minutes: 40, desk: "presenter", page: "sermon" });
+    let n = 0;
+    const again = serviceFromTemplate(template, "Next Sunday", () => `id${n++}`, new Date(2026, 9, 25));
+    expect(again.sections[0]).toMatchObject({ name: "Ministration", desk: "presenter", page: "sermon" });
+    expect(again.sections[1]!.desk).toBeUndefined();
+  });
+});

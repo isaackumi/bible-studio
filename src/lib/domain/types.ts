@@ -261,8 +261,10 @@ export type ServiceSection = {
   leader?: string;
   /** Left out this time (no confession today): no time in the plan, passed over on the day, not in the report. */
   skip?: boolean;
-  /** Where it runs: the Presenter page with every tool (preaching, by default), or the Service page. */
-  desk?: "presenter" | "service";
+  /** Where it runs: the running order (Service page), the Presenter desk, or the Production desk. Set by the church, never guessed. */
+  desk?: "service" | "presenter" | "production";
+  /** On the Presenter desk: the page it opens. */
+  page?: "scriptures" | "songs" | "sermon";
   /** Where its card sits on the flow canvas; none means its tidy place. */
   canvas?: { x: number; y: number };
 };
@@ -573,6 +575,8 @@ export type Workspace = {
   recentAlerts: string[];
   /** The translation the Scriptures page was last on. */
   deskTranslationId: string | null;
+  /** Where parts run, by their name, as the church chose ("ministration" → Presenter desk). */
+  partDesks?: Record<string, import("./service").PartRun>;
   /** Songs with two languages: which to show on the screen. */
   songLanguage: import("./song").SongLanguage;
   /** Song lines on the screen at once (song-screens.ts); 0 shows the whole part. */
