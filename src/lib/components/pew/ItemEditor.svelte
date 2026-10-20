@@ -140,7 +140,7 @@
             {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
           </select>
         </label>
-        <TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label={t("Text style for this item")} />
+        {#if !announcement}<TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label={t("Text style for this item")} />{/if}
       {:else if draft.kind === "bible" && draft.bible}
         <form class="field-row" onsubmit={(event) => { event.preventDefault(); applyReference(); }}>
           <span>{t("Reference")}</span>
@@ -260,6 +260,7 @@
               <input type="color" aria-label={t("Pick any accent colour")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
             </div>
           </div>
+          <TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label={t("Text style for this item")} />
         </div>
       {/if}
     </figure>
@@ -284,6 +285,8 @@
   .check input { height: auto; }
   .note { margin: 0; font-size: 12px; color: var(--muted); font-style: normal; }
   .preview { position: sticky; top: 0; margin: 0; display: grid; gap: 6px; }
+  /* With the design, colours and text style beside it, the column scrolls with the dialog. */
+  .preview:has(.ann-look) { position: static; }
   .preview figcaption { font-size: 12px; font-weight: 650; color: var(--muted); }
   .screen { container-type: inline-size; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; }
   .ann-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
