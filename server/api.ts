@@ -99,7 +99,7 @@ const RELEASES_PER_30_DAYS = 3;
 
 type Signer = { secret: string; public: string; test: boolean };
 const realSigner = (config: ApiConfig): Signer => ({ secret: config.signingKey, public: config.publicKey ?? LICENSE_PUBLIC_KEY, test: false });
-const DEFAULT_SITE: Site = { company: "HeiTech Inc.", contact: "support@heitechinc.com" };
+const DEFAULT_SITE: Site = { company: "HeiTech", contact: "support@heitechinc.com" };
 
 const testSigner = (config: ApiConfig): Signer => {
   const secret = config.testSigningKey ?? TEST_LICENSE_SECRET;

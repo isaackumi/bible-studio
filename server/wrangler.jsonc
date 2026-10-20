@@ -26,7 +26,7 @@
     "TRIAL_DAYS": "14",
     "LEASE_DAYS": "30",
     // The public pages (home, terms, privacy, refunds): who sells, and an inbox someone reads.
-    "COMPANY_NAME": "HeiTech Inc.",
+    "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",
     // This server's own address, for sign-in callbacks (accounts).
     "PUBLIC_URL": "https://license.heitechinc.com"
