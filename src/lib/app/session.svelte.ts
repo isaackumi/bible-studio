@@ -4761,13 +4761,13 @@ class Session {
    * Set where a part runs. Then offer to do the same for every part with that name (the church's own
    * word for it), so new services and templates follow without anyone choosing again.
    */
-  setPartDesk = (sectionId: string, desk: PartDesk, page?: PresenterPage) => {
+  setPartDesk = (sectionId: string, desk: PartDesk, page?: PresenterPage, quiet = false) => {
     if (!this.service) return;
     const run: PartRun = { desk, ...(desk === "presenter" ? { page: page ?? "scriptures" } : {}) };
     this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk: run.desk, page: run.page } : section)) };
     this.persistSoon();
     const part = this.service.sections.find((section) => section.id === sectionId);
-    if (!part) return;
+    if (!part || quiet) return;
     const label = this.partRunLabel(run);
     const kept = this.workspace.partDesks?.[partKey(part.name)];
     const same = kept ? kept.desk === run.desk && kept.page === run.page : run.desk === "service";

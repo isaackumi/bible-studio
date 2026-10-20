@@ -27,9 +27,10 @@
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
   import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
-  import { serviceSummary, type PartDesk, type PresenterPage } from "../../domain/service";
+  import { serviceSummary } from "../../domain/service";
   import { screenStarts } from "../../bible/passage";
   import QuickVerse from "./QuickVerse.svelte";
+  import PartRunPicker from "./PartRunPicker.svelte";
   import { planSchedule } from "../../domain/schedule";
   import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
   import { msg, t, tn } from "../../i18n/core";
@@ -328,14 +329,8 @@
   const live = (item: PresentationItem) =>
     session.live.program.sourceId === item.id || (item.kind === "composition" && session.live.program.sourceId?.includes(item.composition?.compositionId ?? "~"));
 
-  /** Where a part can run (the part's ⋯ menu). The service keeps time on any of them. */
-  const RUNS: Array<{ key: string; desk: PartDesk; page?: PresenterPage; label: string; hint: string; icon: string }> = [
-    { key: "service", desk: "service", label: msg("Running order"), hint: msg("Its items, here"), icon: "list" },
-    { key: "scriptures", desk: "presenter", page: "scriptures", label: msg("Presenter · Scriptures"), hint: msg("Bible and every tool"), icon: "bible" },
-    { key: "songs", desk: "presenter", page: "songs", label: msg("Presenter · Songs"), hint: msg("Songs and every tool"), icon: "lyrics" },
-    { key: "sermon", desk: "presenter", page: "sermon", label: msg("Presenter · Sermon"), hint: msg("Notes and every tool"), icon: "book" },
-    { key: "production", desk: "production", label: msg("Production desk"), hint: msg("Cameras and scenes"), icon: "obs" },
-  ];
+  /** The part whose "Where it runs" window is open. */
+  let runPicker = $state<string | null>(null);
 
   /** A part whose "who leads it" line was asked for (parts without a leader keep it hidden). */
   let leaderOpen = $state<string | null>(null);
@@ -592,7 +587,7 @@
                 <button type="button" class="desk-tag" title={t("Put this part back in the service")} onclick={() => session.setSectionSkip(section.id, false)}><Icon name="eye" size={12} /> {t("Bring back")}</button>
               {:else if session.partRunOf(section).desk !== "service"}
                 {@const run = session.partRunOf(section)}
-                <button type="button" class="desk-tag" class:production={run.desk === "production"} title={t("When this part begins, the desk opens there with every tool; the service keeps time. Click to open it now.")} onclick={() => session.openPartDesk(section, run)}><Icon name={run.desk === "production" ? "obs" : "layout"} size={12} /> {session.partRunLabel(run)}</button>
+                <button type="button" class="desk-tag" class:production={run.desk === "production"} title={t("When this part begins, the desk opens there with every tool; the service keeps time. Click to change.")} onclick={() => (runPicker = section.id)}><Icon name={run.desk === "production" ? "obs" : "layout"} size={12} /> {session.partRunLabel(run)}</button>
               {/if}
               <ToolMenu label={t("More for {part}", { part: section.name })} className="row-tool part-menu">
                 {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
@@ -600,12 +595,7 @@
                   {#if !section.leader?.trim()}
                     <button type="button" role="menuitem" onclick={() => { close(); openLeader(section.id); }}><Icon name="user" size={13} /> {t("Add who leads it")}</button>
                   {/if}
-                  {@const run = session.partRunOf(section)}
-                  <p class="menu-note">{t("Where it runs")}</p>
-                  {#each RUNS as option (option.key)}
-                    <button type="button" role="menuitemradio" aria-checked={run.desk === option.desk && (option.desk !== "presenter" || (run.page ?? "scriptures") === option.page)} onclick={() => { session.setPartDesk(section.id, option.desk, option.page); close(); }}><Icon name={option.icon} size={13} /> {t(option.label)}<span class="menu-hint">{t(option.hint)}</span></button>
-                  {/each}
-                  <div class="menu-sep"></div>
+                  <button type="button" role="menuitem" onclick={() => { close(); runPicker = section.id; }}><Icon name="layout" size={13} /> {t("Where it runs")}<span class="menu-hint">{session.partRunLabel(session.partRunOf(section))}</span></button>
                   <button type="button" role="menuitemcheckbox" aria-checked={!!section.skip} onclick={() => { session.setSectionSkip(section.id, !section.skip); close(); }}><Icon name="eye-off" size={13} /> {t("Skip this time")}<span class="menu-hint">{t("No time, not in the report")}</span></button>
                   <div class="menu-sep"></div>
                   <button type="button" role="menuitem" class="danger" onclick={() => { session.removeSection(section.id); close(); }}><Icon name="trash" size={13} /> {t("Delete this part")}</button>
@@ -812,6 +802,10 @@
   </aside>
   {/if}
 </section>
+
+{#if runPicker}
+  <PartRunPicker sectionId={runPicker} onclose={() => (runPicker = null)} />
+{/if}
 
 {#if addOpen}
   <AddSourcesDialog sectionId={addOpen.sectionId} kind={addOpen.kind} onclose={() => (addOpen = null)} />
