@@ -880,3 +880,9 @@ input.switch:focus-visible { outline: 2px solid var(--focus, var(--accent)); out
 .frame .web-card { display: grid; place-items: center; align-content: center; gap: 12px; width: 100%; height: 100%; background: linear-gradient(160deg, #0b2a4a, #04101e); color: #fff; font-family: var(--font-ui, Inter, sans-serif); }
 .frame .web-card span { font-size: 40px; opacity: 0.7; }
 .frame .web-card strong { font-size: 64px; }
+
+/* Settings › Appearance › Stronger borders: lines at least 3:1 against the panels, in every desk theme. */
+:root[data-contrast] { --line: #6b665f; }
+:root[data-contrast][data-theme="vespers"] { --line: #75695c; }
+:root[data-contrast][data-theme="nave"] { --line: #5c7194; }
+:root[data-contrast][data-theme="light"] { --line: #858079; }

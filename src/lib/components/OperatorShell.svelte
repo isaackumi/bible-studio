@@ -80,6 +80,7 @@
     uiLanguage.current = appearance.language ?? "en";
     root.lang = uiLanguage.current;
     root.toggleAttribute("data-calm", appearance.calm === true);
+    root.toggleAttribute("data-contrast", appearance.contrast === true);
     root.style.setProperty("--accent", appearance.accent);
     root.style.setProperty("--on-accent", readableOn(appearance.accent));
     root.style.setProperty("--brass", appearance.accent);

@@ -47,3 +47,24 @@ describe("monitors per page", () => {
     expect(samePew(pew, defaultPewDesk())).toBe(false);
   });
 });
+
+describe("moving the scripture page's panels", () => {
+  it("swaps two panels, keeping every place filled", async () => {
+    const { defaultSlots, swapPanels } = await import("./pew");
+    const moved = swapPanels(undefined, "preview", "transcript");
+    expect(moved.transcript).toBe("preview");
+    expect(moved.preview).toBe("transcript");
+    expect(new Set(Object.values(moved)).size).toBe(7);
+    // Dragging back restores the start.
+    expect(swapPanels(moved, "transcript", "preview")).toEqual(defaultSlots());
+  });
+
+  it("keeps only a real arrangement, and forgets one that is the default", async () => {
+    const { normalizePew, swapPanels } = await import("./pew");
+    const moved = swapPanels(undefined, "queue", "reading");
+    expect(normalizePew({ slots: moved }).slots).toEqual(moved);
+    expect(normalizePew({ slots: { ...moved, lists: "queue" } }).slots).toBeUndefined();
+    expect(normalizePew({ slots: { transcript: "transcript" } }).slots).toBeUndefined();
+    expect(normalizePew({ slots: swapPanels(moved, "reading", "queue") }).slots).toBeUndefined();
+  });
+});

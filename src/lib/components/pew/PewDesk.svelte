@@ -19,7 +19,7 @@
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
   import { api } from "../../db/api";
-  import type { BibleItem, PresentationItem, SearchHit, Sermon, SermonSection, TextStyle, VerseText } from "../../domain/types";
+  import type { BibleItem, PewPanel, PresentationItem, SearchHit, Sermon, SermonSection, TextStyle, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
@@ -37,7 +37,7 @@
   import OutputType from "../OutputType.svelte";
   import Screen from "../Screen.svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
-  import { LIBRARY_PANEL, QUEUE_PANEL, mergeColumns, mergeSplit, panelOpen } from "../../workspace/pew";
+  import { LIBRARY_PANEL, QUEUE_PANEL, defaultSlots, mergeColumns, mergeSplit, panelOpen, swapPanels } from "../../workspace/pew";
   import { t } from "../../i18n/core";
 
   type Mode = "scriptures" | "songs" | "sermon" | "service";
@@ -79,7 +79,33 @@
     seenDetections = count;
   });
   let note = $state(t("Loading scripture…"));
-  let sheet = $state<"help" | "lexicon" | "type" | null>(null);
+  let sheet = $state<"help" | "versions" | "type" | null>(null);
+
+  // Versions: the verse on Program in every installed Bible, side by side. Choosing one shows it on
+  // the screen in that version at once (the same passage, so nothing else changes).
+  let versions = $state<Array<{ id: string; name: string; abbreviation: string; text: string }>>([]);
+  let versionsFor = $state("");
+  const programReference = $derived(session.live.program.model.layout === "scripture" ? (session.live.program.model.reference ?? "") : "");
+  const programVersion = $derived(session.live.program.model.attribution ?? "");
+  $effect(() => {
+    if (sheet !== "versions") return;
+    const reference = programReference;
+    if (!reference || reference === versionsFor) return;
+    const parsed = parseReference(reference);
+    if (!parsed?.startVerse) {
+      versions = [];
+      return;
+    }
+    versionsFor = reference;
+    void Promise.all(
+      session.translations.map(async (entry) => {
+        const verses = await api.passage(entry.id, parsed.bookOrd, parsed.chapter, parsed.startVerse!, parsed.endVerse ?? parsed.startVerse!).catch(() => []);
+        return { id: entry.id, name: entry.name, abbreviation: entry.abbreviation, text: verses.map((verse) => verse.text).join(" ") };
+      }),
+    ).then((list) => {
+      if (versionsFor === reference) versions = list.filter((entry) => entry.text.trim());
+    });
+  });
   let wrapVerses = $state(false);
   let chapterToken = 0;
   let seededChapterPreview = false;
@@ -126,6 +152,50 @@
   const showPreview = $derived(focus || session.workspace.pew.monitors.scriptures.preview);
   const showProgram = $derived(focus || session.workspace.pew.monitors.scriptures.program);
   const showRight = $derived(showProgram || showQueue);
+
+  // Panels can be dragged onto each other on the scripture page: each place shows the panel
+  // assigned to it (saved with the desk). Focus mode always uses the starting places, so Preview
+  // and Program stay where focus expects them.
+  const slots = $derived<Record<PewPanel, PewPanel>>(focus ? defaultSlots() : (session.workspace.pew.slots ?? defaultSlots()));
+  /** Whether a panel shows (the View menu's switches follow the panel, wherever it sits). */
+  const panelShown = (panel: PewPanel) => (panel === "reading" ? showReading : panel === "preview" ? showPreview : panel === "program" ? showProgram : panel === "queue" ? showQueue : true);
+  const placeReading = $derived(panelShown(slots.reading));
+  const placePreview = $derived(panelShown(slots.preview));
+  const placeProgram = $derived(panelShown(slots.program));
+  const placeQueue = $derived(panelShown(slots.queue));
+  const placeRight = $derived(placeProgram || placeQueue);
+  const movedPanels = $derived(!!session.workspace.pew.slots);
+  let dragging = $state<PewPanel | null>(null);
+  let dropPlace = $state<PewPanel | null>(null);
+
+  function dragPanel(event: DragEvent, panel: PewPanel) {
+    // Only a drag that starts on the title bar itself (not one of its buttons or tabs) moves the panel.
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (focus || (target && target.closest("button, input, select, a") && !target.matches("header"))) {
+      event.preventDefault();
+      return;
+    }
+    dragging = panel;
+    event.dataTransfer?.setData("application/x-church-panel", panel);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+  function overPlace(event: DragEvent, place: PewPanel) {
+    if (!dragging) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    dropPlace = place;
+  }
+  function dropOnPlace(event: DragEvent, place: PewPanel) {
+    if (!dragging) return;
+    event.preventDefault();
+    const target = slots[place];
+    if (target !== dragging) session.savePew({ slots: swapPanels(session.workspace.pew.slots, dragging, target) });
+    endPanelDrag();
+  }
+  function endPanelDrag() {
+    dragging = null;
+    dropPlace = null;
+  }
   let epoch = $state(0);
   let frozen = $state(session.workspace.pew);
   let applying = false;
@@ -614,10 +684,14 @@
         data-tip={`${displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")} (${keyOf("take")})`}
         onclick={() => session.take()}
       ><span class="pip"></span>{displayLive ? t("ON AIR") : t("LIVE")}</button>
-      <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
-      <span class="clear-pair">
-        <button type="button" class="desk-btn ghost" data-tip={t("Clear the words; the background, camera or video stays (W)")} aria-label={t("Clear words")} onclick={() => void session.clearWords()}><span class="wide-only">{t("CLEAR")} </span>{t("WORDS")}</button>
-        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
+      <!-- CLEAR shows; hovering (or tabbing to) it slides out CLEAR WORDS and BLACK, and they fold
+           away again after. Their keys (W, B) work whether or not they show. -->
+      <span class="clears" role="group" aria-label={t("Clear and black")}>
+        <span class="clears-more">
+          <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
+          <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (W)`} aria-label={t("Clear words")} onclick={() => void session.clearWords()}>{t("CLEAR WORDS")}</button>
+        </span>
+        <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
@@ -642,6 +716,11 @@
             <Icon name="cast" size={16} /> {t("Program monitor")}
           </button>
           <div class="menu-sep"></div>
+          {#if movedPanels}
+            <button type="button" role="menuitem" onclick={() => { session.savePew({ slots: undefined }); close(); }}>
+              <Icon name="layout" size={16} /> {t("Put panels back")}
+            </button>
+          {/if}
           <button type="button" role="menuitem" onclick={() => { session.resetActiveLayout(); close(); }}>
             <Icon name="reset" size={16} /> {t("Reset workspace")}
           </button>
@@ -713,8 +792,100 @@
               <PaneGroup direction="vertical" onLayoutChange={onLibrarySplit}>
                 <Pane defaultSize={frozen.librarySplit} minSize={20} order={1}>
                   <div class="pb-split">
+{@render place("transcript")}
+{@render place("lists")}
+        </div>
+                </Pane>
+                <PaneResizer />
+                <Pane defaultSize={100 - frozen.librarySplit} minSize={24} order={2}>
+{@render place("scriptures")}
+                </Pane>
+              </PaneGroup>
+            </div>
+          </Pane>
+          <PaneResizer />
+        {/if}
+        <Pane defaultSize={!placeRight ? (showLibrary ? frozen.columns[1] + frozen.columns[2] : 100) : showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
+          <div class="fill">
+            <PaneGroup direction="vertical" onLayoutChange={onStageSplit}>
+              {#if placeReading}
+                <Pane defaultSize={placePreview ? frozen.stageSplit : 100} minSize={20} order={1}>
+{@render place("reading")}
+                </Pane>
+                {#if placePreview}<PaneResizer />{/if}
+              {/if}
+              {#if placePreview}
+              <Pane defaultSize={placeReading ? 100 - frozen.stageSplit : 100} minSize={placeReading ? 24 : 20} order={2}>
+{@render place("preview")}
+              </Pane>
+              {/if}
+            </PaneGroup>
+          </div>
+        </Pane>
+        {#if placeRight}
+        <PaneResizer />
+        <Pane defaultSize={showLibrary ? frozen.columns[2] : share(frozen.columns[2], frozen.columns[1])} minSize={showLibrary ? 22 : 32} order={3}>
+          <div class="fill">
+            <PaneGroup direction="vertical" onLayoutChange={onProgramSplit}>
+              {#if placeProgram}
+              <Pane defaultSize={placeQueue ? frozen.programSplit : 100} minSize={placeQueue ? 28 : 20} order={1}>
+{@render place("program")}
+              </Pane>
+              {/if}
+              {#if placeQueue}
+                {#if placeProgram}<PaneResizer />{/if}
+                <Pane defaultSize={placeProgram ? 100 - frozen.programSplit : 100} minSize={18} order={2}>
+{@render place("queue")}
+                </Pane>
+              {/if}
+            </PaneGroup>
+          </div>
+        </Pane>
+        {/if}
+      </PaneGroup>
+      </div>
+    </div>
+    {/key}
+  {/if}
+  {#if sheet}
+    <div class="sheet" role="dialog" aria-label={sheet}>
+      <header>
+        <strong>{sheet === "help" ? t("How this desk works") : sheet === "type" ? t("Theme") : t("Versions")}</strong>
+        <button type="button" aria-label={t("Close")} onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
+      </header>
+      {#if sheet === "help"}
+        <p>{t("Click a verse to put it on Preview. Shift-click a second verse to select a range.")}</p>
+        <p>{t("LIVE copies Preview onto Program. BLACK and CLEAR change Program only.")}</p>
+        <p>{t("The arrow keys and the arrows on Preview step Preview. The Live arrows under Program change the screen at once.")}</p>
+        <p>{t("{key} undoes the last change to Program: LIVE, CLEAR, BLACK or LOGO.", { key: undoKey })}</p>
+        <p>{t("Search a reference such as John 3:16, or a phrase such as “in the beginning”.")}</p>
+        <p>{t("Listen matches spoken scripture on Preview. It never takes Program by itself.")}</p>
+        <p>{t("F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.")}</p>
+      {:else if sheet === "type"}
+        <OutputType />
+      {:else if !programReference}
+        <p class="sheet-ref">{t("Put a verse on Program to compare it in every installed Bible.")}</p>
+      {:else}
+        <p class="sheet-ref">{t("{reference} on the screen. Pick a version to show it in that version at once.", { reference: programReference })}</p>
+        <div class="versions">
+          {#each versions as entry (entry.id)}
+            {@const showing = programVersion === entry.name}
+            <button type="button" class="version" class:on={showing} aria-pressed={showing} onclick={() => void session.refreshProgramTranslation(entry.id).then(() => (versionsFor = ""))}>
+              <span class="version-head"><b>{entry.abbreviation}</b><span>{entry.name}</span>{#if showing}<em>{t("On screen")}</em>{/if}</span>
+              <span class="version-text">{entry.text}</span>
+            </button>
+          {:else}
+            <p class="sheet-ref">{t("Reading the versions…")}</p>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+</div>
+
+{#snippet panel_transcript()}
           <section class="pb-panel">
-            <header class="pb-head">
+            <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "transcript")} ondragend={endPanelDrag}>
               <span>{t("Live transcript")}</span>
               {#if session.captions.lines.length}
                 <button type="button" class="quiet" title={t("Clear what was heard")} onclick={() => session.clearCaptions()}><Icon name="close" size={14} /> {t("Clear")}</button>
@@ -741,8 +912,11 @@
               <button type="button" class="go" onclick={() => void findInScripture()}>{@render icon("wave")} {t("Find")}</button>
             </footer>
           </section>
+{/snippet}
+
+{#snippet panel_lists()}
           <section class="pb-panel">
-            <header class="pb-head">
+            <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "lists")} ondragend={endPanelDrag}>
               <div class="side-tabs" role="tablist" aria-label={t("Scripture lists")}>
                 <button type="button" role="tab" aria-selected={sideTab === "live"} onclick={() => (sideTab = "live")}>{t("Gone live")}{#if goneCount}<em>{goneCount}</em>{/if}</button>
                 <button type="button" role="tab" aria-selected={sideTab === "detections"} onclick={() => (sideTab = "detections")}>{t("Detections")}{#if detections.length}<em>{detections.length}</em>{/if}</button>
@@ -773,13 +947,13 @@
               <div class="pb-body gone"><GoneLiveList /></div>
             {/if}
           </section>
-        </div>
-                </Pane>
-                <PaneResizer />
-                <Pane defaultSize={100 - frozen.librarySplit} minSize={24} order={2}>
+{/snippet}
+
+{#snippet panel_scriptures()}
         {#if mode === "scriptures"}
           <section class="pb-panel scriptures">
             <form class="script-bar" onsubmit={lookup}>
+              {#if !focus}<span class="grip" role="group" aria-label={t("Drag to move this panel")} title={t("Drag to move this panel")} draggable="true" ondragstart={(event) => dragPanel(event, "scriptures")} ondragend={endPanelDrag}></span>{/if}
               <select
                 value={translationId}
                 aria-label={t("Translation")}
@@ -869,19 +1043,11 @@
             </div>
           </section>
         {/if}
-                </Pane>
-              </PaneGroup>
-            </div>
-          </Pane>
-          <PaneResizer />
-        {/if}
-        <Pane defaultSize={!showRight ? (showLibrary ? frozen.columns[1] + frozen.columns[2] : 100) : showLibrary ? frozen.columns[1] : share(frozen.columns[1], frozen.columns[2])} minSize={showLibrary ? 24 : 32} order={2}>
-          <div class="fill">
-            <PaneGroup direction="vertical" onLayoutChange={onStageSplit}>
-              {#if showReading}
-                <Pane defaultSize={showPreview ? frozen.stageSplit : 100} minSize={20} order={1}>
+{/snippet}
+
+{#snippet panel_reading()}
                   <section class="pb-panel">
-                    <header class="pb-head"><span class="kicker plain">{t("Scripture reading")}</span></header>
+                    <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "reading")} ondragend={endPanelDrag}><span class="kicker plain">{t("Scripture reading")}</span></header>
           <div class="pb-body display">
             {#if mode === "scriptures"}
               <article class="reading">
@@ -893,29 +1059,18 @@
             {/if}
           </div>
         </section>
-                </Pane>
-                {#if showPreview}<PaneResizer />{/if}
-              {/if}
-              {#if showPreview}
-              <Pane defaultSize={showReading ? 100 - frozen.stageSplit : 100} minSize={showReading ? 24 : 20} order={2}>
+{/snippet}
+
+{#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head"><span class="kicker">{t("Preview")}</span></header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span></header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /></div>
                 </section>
-              </Pane>
-              {/if}
-            </PaneGroup>
-          </div>
-        </Pane>
-        {#if showRight}
-        <PaneResizer />
-        <Pane defaultSize={showLibrary ? frozen.columns[2] : share(frozen.columns[2], frozen.columns[1])} minSize={showLibrary ? 22 : 32} order={3}>
-          <div class="fill">
-            <PaneGroup direction="vertical" onLayoutChange={onProgramSplit}>
-              {#if showProgram}
-              <Pane defaultSize={showQueue ? frozen.programSplit : 100} minSize={showQueue ? 28 : 20} order={1}>
+{/snippet}
+
+{#snippet panel_program()}
                 <section class="pb-panel output" class:on-air={displayLive}>
-                  <header class="pb-head">
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "program")} ondragend={endPanelDrag}>
                     <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
                     {#if programSet && !displayLive}<span class="unseen" role="status">{t("The audience can't see this")}</span>{/if}
                     <button
@@ -931,7 +1086,7 @@
                   <TimerControls compact />
                   <VideoControls />
                   <footer class="output-tools">
-                    <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} {t("Lexicon")}</button>
+                    <button type="button" class="lex" data-tip={t("The verse on Program in every installed Bible; pick one to show it in that version")} onclick={() => (sheet = sheet === "versions" ? null : "versions")}>{@render icon("bible")} {t("Versions")}</button>
                     <!-- On Program, these change the screen at once (the arrow keys only change Preview). -->
                     <span class="steppers live-steps">
                       <span class="steps-label">{t("Live")}</span>
@@ -940,13 +1095,11 @@
                     </span>
                   </footer>
                 </section>
-              </Pane>
-              {/if}
-              {#if showQueue}
-                {#if showProgram}<PaneResizer />{/if}
-                <Pane defaultSize={showProgram ? 100 - frozen.programSplit : 100} minSize={18} order={2}>
+{/snippet}
+
+{#snippet panel_queue()}
                   <section class="pb-panel">
-                    <header class="pb-head">
+                    <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "queue")} ondragend={endPanelDrag}>
                       <span>{t("Queue")}</span>
                       <span class="queue-actions">
                         <button type="button" class="quiet" onclick={() => void queuePassage()}><Icon name="plus" size={14} /> {t("Add")}</button>
@@ -964,42 +1117,22 @@
                       {/each}
                     </div>
                   </section>
-                </Pane>
-              {/if}
-            </PaneGroup>
-          </div>
-        </Pane>
-        {/if}
-      </PaneGroup>
-      </div>
-    </div>
-    {/key}
-  {/if}
-  {#if sheet}
-    <div class="sheet" role="dialog" aria-label={sheet}>
-      <header>
-        <strong>{sheet === "help" ? t("How this desk works") : sheet === "type" ? t("Theme") : t("Lexicon")}</strong>
-        <button type="button" aria-label={t("Close")} onclick={() => (sheet = null)}><Icon name="close" size={16} /></button>
-      </header>
-      {#if sheet === "help"}
-        <p>{t("Click a verse to put it on Preview. Shift-click a second verse to select a range.")}</p>
-        <p>{t("LIVE copies Preview onto Program. BLACK and CLEAR change Program only.")}</p>
-        <p>{t("The arrow keys and the arrows on Preview step Preview. The Live arrows under Program change the screen at once.")}</p>
-        <p>{t("{key} undoes the last change to Program: LIVE, CLEAR, BLACK or LOGO.", { key: undoKey })}</p>
-        <p>{t("Search a reference such as John 3:16, or a phrase such as “in the beginning”.")}</p>
-        <p>{t("Listen matches spoken scripture on Preview. It never takes Program by itself.")}</p>
-        <p>{t("F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.")}</p>
-      {:else if sheet === "type"}
-        <OutputType />
-      {:else}
-        {#each reading as verse (verse.verse)}
-          <p><sup>{verse.verse}</sup> {verse.text}</p>
-        {/each}
-        <p class="sheet-ref">{passage()?.reference ?? ""} · {translationId.toUpperCase()}</p>
-      {/if}
-    </div>
-  {/if}
-</div>
+{/snippet}
+
+{#snippet place(name: PewPanel)}
+  <!-- A place on the scripture page: it shows whichever panel is assigned to it; dropping another
+       panel's title here swaps the two (the layout keeps its shape). -->
+  {@const panel = slots[name]}
+  <div class="place" class:drop={dropPlace === name && dragging !== panel} role="presentation" ondragover={(event) => overPlace(event, name)} ondragleave={() => (dropPlace = dropPlace === name ? null : dropPlace)} ondrop={(event) => dropOnPlace(event, name)}>
+    {#if panel === "transcript"}{@render panel_transcript()}
+    {:else if panel === "lists"}{@render panel_lists()}
+    {:else if panel === "scriptures"}{@render panel_scriptures()}
+    {:else if panel === "reading"}{@render panel_reading()}
+    {:else if panel === "preview"}{@render panel_preview()}
+    {:else if panel === "program"}{@render panel_program()}
+    {:else}{@render panel_queue()}{/if}
+  </div>
+{/snippet}
 
 {#snippet icon(name: string)}
   <Icon {name} size={16} />
@@ -1249,6 +1382,32 @@
     font-size: 13px;
   }
   .pb-head { justify-content: space-between; }
+  /* Panels move by their title bar; the wrapper adds no box, so the layout keeps its shape. */
+  .place { display: contents; }
+  .pb-head[draggable="true"] { cursor: grab; }
+  .pb-head[draggable="true"]:active { cursor: grabbing; }
+  .pb-head[draggable="true"] > span:first-child::before,
+  .grip::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 10px;
+    margin-right: 7px;
+    vertical-align: -1px;
+    opacity: 0;
+    background: radial-gradient(circle, currentColor 1px, transparent 1.4px) 0 0 / 3px 3.4px;
+    transition: opacity 0.15s ease;
+  }
+  .pb-head[draggable="true"]:hover > span:first-child::before,
+  .grip:hover::before,
+  .script-bar:hover .grip::before { opacity: 0.7; }
+  .grip { flex: none; display: flex; align-items: center; align-self: stretch; padding: 0 2px; margin-right: -4px; cursor: grab; color: var(--muted); }
+  .grip::before { margin-right: 0; }
+  .place.drop > :global(.pb-panel),
+  .place.drop > :global(*) > :global(.pb-panel) {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+  }
   .pb-body { flex: 1; min-height: 0; }
   .quiet, .mini, .go, .lex {
     border: 0;
@@ -1316,7 +1475,7 @@
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
   .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .reading sup, .sheet sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
+  .reading sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
@@ -1390,7 +1549,22 @@
     padding: 0 10px;
   }
   .steppers { display: flex; gap: 6px; }
+  .clears { display: inline-flex; align-items: center; gap: 6px; }
+  .clears-more { display: inline-flex; align-items: center; gap: 6px; max-width: 0; overflow: hidden; opacity: 0; transform: translateX(8px); transition: max-width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .clears:hover .clears-more, .clears:focus-within .clears-more { max-width: 320px; opacity: 1; transform: none; }
+  .clears-main { position: relative; }
+  .clears-main::after { content: ""; position: absolute; right: 3px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: currentColor; opacity: 0.45; transition: opacity 160ms ease; }
+  .clears:hover .clears-main::after, .clears:focus-within .clears-main::after { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) { .clears-more { transition: none; } }
   .live-steps { align-items: center; }
+  .versions { display: grid; gap: 8px; max-height: 56vh; overflow: auto; }
+  .version { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .version:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .version.on { border-color: var(--live, #e5484d); box-shadow: 0 0 0 1px var(--live, #e5484d); }
+  .version-head { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--muted); }
+  .version-head b { color: var(--accent); font-size: 12px; letter-spacing: 0.04em; }
+  .version-head em { margin-left: auto; font-style: normal; font-weight: 700; color: var(--live, #e5484d); }
+  .version-text { font-size: 14px; line-height: 1.45; }
   .unseen { font-size: 11px; font-weight: 650; color: #f5a524; white-space: nowrap; }
   .live-steps .steps-label { font-size: 11px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--live, #e5484d); }
   .live-steps button { border-color: color-mix(in srgb, var(--live, #e5484d) 45%, var(--line)); }
@@ -1436,7 +1610,7 @@
   @media (max-width: 1180px) {
     .pb-bar { gap: 6px; }
     .pb-left { gap: 6px; }
-    .clear-pair .desk-btn { padding-inline: 8px; }
+    .clears .desk-btn { padding-inline: 8px; }
     .pb-modes button { padding-inline: 9px; }
     .pb-bar :global(.output-trigger) { max-width: 128px; }
   }

@@ -1,4 +1,4 @@
-import type { PewDeskState, PewMonitors, PewPage, WorkspaceLayout } from "../domain/types";
+import type { PewPanel, PewDeskState, PewMonitors, PewPage, WorkspaceLayout } from "../domain/types";
 
 /** Bible panel visibility is the scripture library. Service panel visibility is the queue. */
 export const LIBRARY_PANEL = "bible";
@@ -47,7 +47,36 @@ export function normalizePew(value: unknown): PewDeskState {
     librarySplit: split(record.librarySplit, base.librarySplit),
     stageSplit: split(record.stageSplit, base.stageSplit),
     programSplit: split(record.programSplit, base.programSplit),
+    ...(sanitizeSlots(record.slots) ? { slots: sanitizeSlots(record.slots)! } : {}),
   };
+}
+
+/** The scripture page's panels, in their starting places. */
+export const PEW_PANELS: readonly PewPanel[] = ["transcript", "lists", "scriptures", "reading", "preview", "program", "queue"];
+
+export function defaultSlots(): Record<PewPanel, PewPanel> {
+  return Object.fromEntries(PEW_PANELS.map((panel) => [panel, panel])) as Record<PewPanel, PewPanel>;
+}
+
+/** A saved arrangement only when every place holds a different panel; else null (the default). */
+export function sanitizeSlots(value: unknown): Record<PewPanel, PewPanel> | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const placed = PEW_PANELS.map((place) => record[place]);
+  if (!placed.every((panel): panel is PewPanel => PEW_PANELS.includes(panel as PewPanel)) || new Set(placed).size !== PEW_PANELS.length) return null;
+  const slots = Object.fromEntries(PEW_PANELS.map((place, n) => [place, placed[n]])) as Record<PewPanel, PewPanel>;
+  return PEW_PANELS.every((place) => slots[place] === place) ? null : slots;
+}
+
+/** Swap two panels' places (dragging one onto the other). The layout's shape stays the same. */
+export function swapPanels(slots: Record<PewPanel, PewPanel> | undefined, a: PewPanel, b: PewPanel): Record<PewPanel, PewPanel> {
+  const next = { ...(slots ?? defaultSlots()) };
+  const placeOfA = PEW_PANELS.find((place) => next[place] === a);
+  const placeOfB = PEW_PANELS.find((place) => next[place] === b);
+  if (!placeOfA || !placeOfB || a === b) return next;
+  next[placeOfA] = b;
+  next[placeOfB] = a;
+  return next;
 }
 
 export function panelOpen(layout: WorkspaceLayout | undefined, panelId: typeof LIBRARY_PANEL | typeof QUEUE_PANEL): boolean {
@@ -83,6 +112,7 @@ export function samePew(left: PewDeskState, right: PewDeskState): boolean {
     near(left.librarySplit, right.librarySplit) &&
     near(left.stageSplit, right.stageSplit) &&
     near(left.programSplit, right.programSplit) &&
-    left.columns.every((size, index) => near(size, right.columns[index]))
+    left.columns.every((size, index) => near(size, right.columns[index])) &&
+    PEW_PANELS.every((panel) => (left.slots?.[panel] ?? panel) === (right.slots?.[panel] ?? panel))
   );
 }

@@ -455,7 +455,12 @@ export type PewDeskState = {
   librarySplit: number;
   stageSplit: number;
   programSplit: number;
+  /** Which panel each place of the scripture page shows (panels can be dragged onto each other). */
+  slots?: Record<PewPanel, PewPanel>;
 };
+
+/** The scripture page's panels; each is also the name of the place it starts in. */
+export type PewPanel = "transcript" | "lists" | "scriptures" | "reading" | "preview" | "program" | "queue";
 
 export type ProductionLayout = {
   stage: [number, number, number];
@@ -475,6 +480,8 @@ export type AppearanceSettings = {
   desk: DeskStyle;
   /** Hold animated theme backgrounds still on this computer, for slower projector machines. */
   calm?: boolean;
+  /** Stronger borders and control edges (at least 3:1 against the panels), for easier reading. */
+  contrast?: boolean;
   /** The audience screen's shape: "auto" fills whatever screen the output is on. */
   screenShape?: "auto" | "16:9" | "16:10" | "4:3" | "21:9" | "9:16";
   /** Width ÷ height the audience window last measured, so the desk matches it before it opens. */

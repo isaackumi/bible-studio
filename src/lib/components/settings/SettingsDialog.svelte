@@ -648,6 +648,12 @@
             </label>
           </div>
         </section>
+        <section class="card">
+          <label class="contrast-row">
+            <span><h3>{t("Stronger borders")}</h3><span class="contrast-note">{t("Lines around panels, fields and buttons drawn brighter, so the desk is easier to read in a bright room or for tired eyes.")}</span></span>
+            <input type="checkbox" class="switch" role="switch" checked={session.workspace.appearance.contrast === true} onchange={(event) => session.setAppearance({ contrast: event.currentTarget.checked })} />
+          </label>
+        </section>
         <section class="card split">
           <div>
             <h3>{t("Spacing")}</h3>
@@ -1877,6 +1883,9 @@
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
   .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
+  .contrast-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+  .contrast-row h3 { margin: 0 0 4px; }
+  .contrast-note { display: block; font-size: 13px; color: var(--muted); line-height: 1.45; }
   .license-field { width: 280px; letter-spacing: 0.02em; }
 
   /* Plans */
