@@ -134,3 +134,24 @@ export function chooseSung(phrases: string[], index: SongIndex, current: string 
   }
   return best;
 }
+
+/**
+ * Line by line: which screen of a part holds what was just sung. Recent words count most, so the
+ * follow moves on as the singing does; a tie keeps the screen already showing.
+ */
+export function screenForSung(heard: string, lines: string[], screens: Array<{ from: number; to: number }>, current = 0): number {
+  if (screens.length < 2) return 0;
+  const sung = words(heard).slice(-10).map(stem);
+  if (!sung.length) return current;
+  let best = current;
+  let bestScore = -1;
+  screens.forEach((screen, at) => {
+    const here = new Set(words(lines.slice(screen.from, screen.to).join(" ")).map(stem));
+    const score = sung.reduce((sum, word, n) => sum + (here.has(word) ? n + 1 : 0), 0);
+    if (score > bestScore || (score === bestScore && at === current)) {
+      best = at;
+      bestScore = score;
+    }
+  });
+  return bestScore > 0 ? best : current;
+}

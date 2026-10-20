@@ -6,7 +6,8 @@
   import { cleanFolder, filterSongs, moveSongSection, parseSongFile, removeSongSection, sectionShort, sectionTone, songCredit, songFolders } from "../../domain/song";
   import { chorusAfterVerses, hasOwnOrder, songOrder, songSlots } from "../../domain/song-order";
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
-  import { buildSongIndex, chooseSung, type SungMatch } from "../../voice/song-detect";
+  import { buildSongIndex, chooseSung, screenForSung, type SungMatch } from "../../voice/song-detect";
+  import { SONG_LINE_CHOICES } from "../../domain/song-screens";
   import { preferService, serviceSongIds } from "../../domain/service-first";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
@@ -166,6 +167,14 @@
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  /** A part is on the screen: whole, or (line by line) any of its screens ("song:id:part#2"). */
+  const partLive = (songId: string, sectionId: string) => {
+    const base = `song:${songId}:${sectionId}`;
+    return programLive && (programSource === base || programSource.startsWith(`${base}#`));
+  };
+  const screenLive = (songId: string, sectionId: string, screen: number) => programLive && programSource === `song:${songId}:${sectionId}#${screen}`;
+  const screenOnPreview = (songId: string, sectionId: string, screen: number) =>
+    onPreview?.songId === songId && onPreview.sectionId === sectionId && (onPreview.screen ?? 0) === screen;
   /** Live mode: a part goes straight to the screen when chosen (click, chips, arrows, follow singing). */
   const CLICK_KEY = "church-studio:songs-click-live";
   let clickLive = $state(readClickLive());
@@ -191,7 +200,7 @@
   /** Set for a Preview that must stay on Preview (opening a song from search). */
   let previewOnly = false;
   $effect(() => {
-    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}:${onPreview.slot ?? ""}` : null;
+    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}:${onPreview.slot ?? ""}:${onPreview.screen ?? 0}` : null;
     const was = lastPreview;
     lastPreview = now;
     const quiet = previewOnly;
@@ -235,10 +244,14 @@
       detected = match;
       if (!follow) return;
       const focus = session.songFocus;
-      if (focus?.songId === match.songId && focus.sectionId === match.sectionId) return;
       const song = session.songs.find((entry) => entry.id === match.songId);
-      if (!song) return;
-      session.previewSongSection(song, match.sectionId);
+      const section = song?.sections.find((entry) => entry.id === match.sectionId);
+      if (!song || !section) return;
+      // Line by line, follow the screen holding the words just sung.
+      const sameScreenOf = focus?.songId === match.songId && focus.sectionId === match.sectionId ? (focus.screen ?? 0) : 0;
+      const screen = screenForSung(text, section.lines, session.songScreens(section), sameScreenOf);
+      if (focus?.songId === match.songId && focus.sectionId === match.sectionId && (focus.screen ?? 0) === screen) return;
+      session.previewSongSection(song, match.sectionId, undefined, screen);
       session.voice.message = `${match.label} on Preview. LIVE still sends Program.`;
     });
   });
@@ -260,13 +273,13 @@
   }
 
   /** Option-click (Alt-click) puts a part on Preview only, even when its song is on the screen. */
-  function show(song: Song, sectionId: string, event?: MouseEvent, slot?: number) {
+  function show(song: Song, sectionId: string, event?: MouseEvent, slot?: number, screen?: number) {
     if (event?.altKey) previewOnly = true;
-    session.previewSongSection(song, sectionId, slot);
+    session.previewSongSection(song, sectionId, slot, screen);
   }
 
-  async function showAndTake(song: Song, sectionId: string, slot?: number) {
-    session.previewSongSection(song, sectionId, slot);
+  async function showAndTake(song: Song, sectionId: string, slot?: number, screen?: number) {
+    session.previewSongSection(song, sectionId, slot, screen);
     if (!clickLive) await session.take();
   }
 
@@ -899,7 +912,7 @@
             type="button"
             style:--tone="var(--sec-{sectionTone(section)})"
             class:on={here}
-            class:live={here && programLive && programSource === `song:${selected.id}:${section.id}`}
+            class:live={here && partLive(selected.id, section.id)}
             title={t("{label} · {n} of {total}", { label: section.label, n: slot + 1, total: songOrder(selected).length })}
             aria-label={t("{label}, part {n}", { label: section.label, n: slot + 1 })}
             onclick={(event) => show(selected, section.id, event, slot)}
@@ -915,6 +928,19 @@
           {/each}
         </div>
       {/if}
+      <div class="click-mode" role="radiogroup" aria-label={t("Lines on the screen")}>
+        <span>{t("Lines")}</span>
+        {#each SONG_LINE_CHOICES as lines (lines)}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={session.workspace.songLines === lines}
+            class:on={session.workspace.songLines === lines}
+            data-tip={lines === 0 ? t("The whole part on the screen at once") : tn(lines, "{n} line on the screen at a time; the arrows step line by line", "{n} lines on the screen at a time; the arrows step through them")}
+            onclick={() => session.setSongLines(lines)}
+          >{lines === 0 ? t("All") : lines}</button>
+        {/each}
+      </div>
       <div class="click-mode" role="radiogroup" aria-label={t("When you click a part")}>
         <span>{t("Click")}</span>
         <button type="button" role="radio" aria-checked={!clickLive} class:on={!clickLive} data-tip={t("Click puts a part on Preview; double-click or LIVE shows it")} onclick={() => setClickLive(false)}>{t("Preview")}</button>
@@ -928,27 +954,53 @@
       </p>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
-          {@const isLive = programLive && programSource === `song:${selected.id}:${section.id}`}
-          <button
-            type="button"
-            class="section"
-            style:--tone="var(--sec-{sectionTone(section)})"
-            class:live={isLive}
-            class:on={onPreview?.songId === selected.id && onPreview.sectionId === section.id}
-            class:heard={detected?.songId === selected.id && detected.sectionId === section.id}
-            onclick={(event) => show(selected, section.id, event)}
-            ondblclick={() => void showAndTake(selected, section.id)}
-          >
+          {@const isLive = partLive(selected.id, section.id)}
+          {@const screens = session.songScreens(section)}
+          {@const onThis = onPreview?.songId === selected.id && onPreview.sectionId === section.id}
+          {@const heardHere = detected?.songId === selected.id && detected.sectionId === section.id}
+          {#snippet partLabel()}
             <span class="label">
               <i>{n + 1}</i>{section.label}
               <span class="tags">
-                {#if detected?.songId === selected.id && detected.sectionId === section.id}<em class="badge heard">{t("Heard")}</em>{/if}
+                {#if heardHere}<em class="badge heard">{t("Heard")}</em>{/if}
                 {#if isLive}<em class="badge live">{t("Live")}</em>{/if}
-                {#if onPreview?.songId === selected.id && onPreview.sectionId === section.id}<em class="badge">{t("Preview")}</em>{/if}
+                {#if onThis}<em class="badge">{t("Preview")}</em>{/if}
               </span>
             </span>
-            {#each section.lines.filter((line) => line.trim()) as line, l (l)}<span class="line">{line}</span>{/each}
-          </button>
+          {/snippet}
+          {#if screens.length > 1}
+            <!-- Line by line: the part's screens, each one clickable. -->
+            <div class="section split" style:--tone="var(--sec-{sectionTone(section)})" class:live={isLive} class:on={onThis} class:heard={heardHere}>
+              {@render partLabel()}
+              {#each screens as screen, k (k)}
+                <button
+                  type="button"
+                  class="screen"
+                  class:on={screenOnPreview(selected.id, section.id, k)}
+                  class:live={screenLive(selected.id, section.id, k)}
+                  aria-label={t("{label}, lines {n} of {total}", { label: section.label, n: k + 1, total: screens.length })}
+                  onclick={(event) => show(selected, section.id, event, undefined, k)}
+                  ondblclick={() => void showAndTake(selected, section.id, undefined, k)}
+                >
+                  {#each section.lines.slice(screen.from, screen.to).filter((line) => line.trim()) as line, l (l)}<span class="line">{line}</span>{/each}
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="section"
+              style:--tone="var(--sec-{sectionTone(section)})"
+              class:live={isLive}
+              class:on={onThis}
+              class:heard={heardHere}
+              onclick={(event) => show(selected, section.id, event)}
+              ondblclick={() => void showAndTake(selected, section.id)}
+            >
+              {@render partLabel()}
+              {#each section.lines.filter((line) => line.trim()) as line, l (l)}<span class="line">{line}</span>{/each}
+            </button>
+          {/if}
         {/each}
       </div>
     {:else}
@@ -1252,6 +1304,13 @@
   .section .label i { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: color-mix(in srgb, var(--tone, var(--muted)) 26%, var(--panel)); color: var(--ink); letter-spacing: 0; }
   .section .tags { margin-left: auto; display: flex; gap: 4px; }
   .section .line { font-size: 14px; line-height: 1.4; }
+  /* Line by line: a part's screens, stacked inside it. */
+  .section.split { gap: 6px; }
+  .section.split .screen { display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .section.split .screen:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .section.split .screen.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .section.split .screen.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
+  .section.split .screen .line { font-size: 13px; }
   .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
   .blank p { margin: 0; }
 

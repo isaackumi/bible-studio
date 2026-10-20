@@ -190,17 +190,22 @@ export function lyricsFor(
   sectionId: string,
   fallbackTitle: string,
   language: SongLanguage = "first",
+  /** One screen of the part (song-screens.ts); missing: the whole part. */
+  range?: { from: number; to: number },
 ): { label: string; lines: PresentationLine[] } {
   const section = song?.sections.find((entry) => entry.id === sectionId);
   if (!song || !section) return { label: fallbackTitle || "Song", lines: [{ text: "This section is missing." }] };
+  const inRange = (n: number) => !range || (n >= range.from && n < range.to);
   // First-language lines carry their formatting (block n of `rich` is line n).
   const first: PresentationLine[] = section.lines
-    .map((text, n): PresentationLine => {
+    .map((text, n): PresentationLine | null => {
+      if (!inRange(n)) return null;
       const runs = section.rich?.blocks[n]?.runs;
       return runs?.some((run) => Object.keys(run).length > 1) ? { text, runs } : { text };
     })
-    .filter((line) => line.text.trim());
-  const second = (section.second ?? []).filter((line) => line.trim());
+    .filter((line): line is PresentationLine => !!line && !!line.text.trim());
+  // The second language's line n goes with the first language's line n.
+  const second = (section.second ?? []).filter((line, n) => inRange(n) && line.trim());
   if (!first.length && !second.length) return { label: section.label, lines: [{ text: "This section is empty." }] };
   if (!second.length || language === "first") return { label: section.label, lines: first.length ? first : second.map((text) => ({ text })) };
   if (language === "second" || !first.length) return { label: section.label, lines: second.map((text) => ({ text })) };

@@ -1,3 +1,4 @@
+import { sanitizeSongLines } from "../domain/song-screens";
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { sanitizeUiLanguage } from "../i18n/core";
 import { sanitizeTimerSounds } from "../domain/timer-cues";
@@ -146,6 +147,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     recentAlerts: Array.isArray(value.recentAlerts) ? value.recentAlerts.filter((text): text is string => typeof text === "string" && text.trim().length > 0).map((text) => text.slice(0, 200)).slice(0, 12) : [],
     macros: sanitizeMacros(value.macros),
     songLanguage: value.songLanguage === "first" || value.songLanguage === "second" ? value.songLanguage : "both",
+    songLines: sanitizeSongLines(value.songLines),
     deskTranslationId: typeof value.deskTranslationId === "string" && value.deskTranslationId ? value.deskTranslationId.slice(0, 120) : null,
     timerSounds: sanitizeTimerSounds(value.timerSounds),
     ndiAudio: value.ndiAudio !== false,

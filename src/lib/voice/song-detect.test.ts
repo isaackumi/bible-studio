@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Song } from "../domain/types";
-import { buildSongIndex, chooseSung, matchSung } from "./song-detect";
+import { buildSongIndex, chooseSung, matchSung, screenForSung } from "./song-detect";
 
 const amazing: Song = {
   id: "amazing",
@@ -45,5 +45,18 @@ describe("song detection", () => {
 
   it("keeps the strongest recognizer alternative", () => {
     expect(chooseSung(["hello there friends", "how great thou art how great thou art"], index)).toMatchObject({ songId: "how-great", sectionId: "c" });
+  });
+});
+
+describe("following a song line by line", () => {
+  const lines = ["Amazing grace how sweet the sound", "That saved a wretch like me", "I once was lost but now am found", "Was blind but now I see"];
+  const screens = [{ from: 0, to: 2 }, { from: 2, to: 4 }];
+  it("picks the screen with the words just sung", () => {
+    expect(screenForSung("amazing grace how sweet the sound", lines, screens)).toBe(0);
+    expect(screenForSung("that saved a wretch like me i once was lost but now am found", lines, screens)).toBe(1);
+  });
+  it("keeps the screen showing when the words say nothing", () => {
+    expect(screenForSung("hallelujah hallelujah", lines, screens, 1)).toBe(1);
+    expect(screenForSung("anything", lines, [{ from: 0, to: 4 }])).toBe(0);
   });
 });

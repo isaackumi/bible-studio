@@ -114,6 +114,7 @@ import { captionsDevice, controllerDevice, stageDevice } from "../domain/remote"
 import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
+import { clampScreen, sanitizeSongLines, screensOf, type SongLines, type SongScreen } from "../domain/song-screens";
 import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
 import { AudioDeck } from "../audio/deck.svelte";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
@@ -289,7 +290,8 @@ class Session {
   themes = $state<Theme[]>([defaultTheme()]);
   songs = $state<Song[]>([]);
   /** The song part on Preview; `slot` is its place in the song's order (a chorus is sung several times). */
-  songFocus = $state<{ songId: string; sectionId: string; slot?: number } | null>(null);
+  /** The song part on Preview: its place in the song's order, and (line by line) which screen of it. */
+  songFocus = $state<{ songId: string; sectionId: string; slot?: number; screen?: number } | null>(null);
   findOpen = $state(false);
   findQuery = $state("");
   findHits = $state<SongHit[]>([]);
@@ -714,12 +716,24 @@ class Session {
   };
 
   /** Songs in two languages: first, second or both on the screen. Re-shows the part on Preview. */
+  /** Song lines on the screen at once (0: the whole part). The part on Preview starts again at its first screen. */
+  setSongLines = (lines: SongLines) => {
+    this.workspace = { ...this.workspace, songLines: sanitizeSongLines(lines) };
+    this.persistSoon();
+    const focus = this.songFocus;
+    const song = focus ? this.songs.find((entry) => entry.id === focus.songId) : undefined;
+    if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot, 0);
+  };
+
+  /** The screens a part is shown in, with the current lines setting. */
+  songScreens = (section: { lines: string[] }): SongScreen[] => screensOf(section.lines, this.workspace.songLines);
+
   setSongLanguage = (language: "first" | "second" | "both") => {
     this.workspace = { ...this.workspace, songLanguage: language };
     this.persistSoon();
     const focus = this.songFocus;
     const song = focus ? this.songs.find((entry) => entry.id === focus.songId) : undefined;
-    if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot);
+    if (focus && song) this.previewSongSection(song, focus.sectionId, focus.slot, focus.screen);
   };
 
   // Macros: one button, several steps in order.
@@ -4168,7 +4182,7 @@ class Session {
     this.message = t("{title} queued. Preview it, then LIVE.", { title: hit.title });
   };
 
-  previewSongSection = (song: Song, sectionId: string | null, slot?: number) => {
+  previewSongSection = (song: Song, sectionId: string | null, slot?: number, screen = 0) => {
     const clean = sanitizeSong(song);
     const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
     if (!section) {
@@ -4177,16 +4191,20 @@ class Session {
     }
     const current = this.songFocus?.songId === clean.id ? (this.songFocus.slot ?? null) : null;
     const place = slot !== undefined && songOrder(clean)[slot] === section.id ? slot : slotFor(clean, section.id, current);
-    this.songFocus = { songId: clean.id, sectionId: section.id, slot: place };
+    const screens = this.songScreens(section);
+    const shown = clampScreen(screen, screens.length);
+    this.songFocus = { songId: clean.id, sectionId: section.id, slot: place, screen: shown };
     this.previewBible = null;
     this.recentSongs = rememberSongRecent(this.recentSongs, { songId: clean.id, sectionId: section.id });
     this.library = "songs";
     const theme = this.theme();
     const backgroundImageUrl = theme.background.type === "image" ? this.mediaSrc(theme.background.assetId) : null;
-    const lyrics = lyricsFor(clean, section.id, clean.title, this.workspace.songLanguage);
+    const split = screens.length > 1;
+    const lyrics = lyricsFor(clean, section.id, clean.title, this.workspace.songLanguage, split ? screens[shown] : undefined);
     this.previewModel(
       this.withBackdrop(presentLyrics({ theme, backgroundImageUrl, label: lyrics.label, lines: lyrics.lines, credit: creditFor(clean, section.id, this.workspace.ccliLicense) })),
-      `song:${clean.id}:${section.id}`,
+      // Line by line, each screen is its own source, so the desk can mark which one is live.
+      split ? `song:${clean.id}:${section.id}#${shown}` : `song:${clean.id}:${section.id}`,
     );
   };
 
@@ -4200,10 +4218,20 @@ class Session {
       this.previewModel(emptyModel(this.theme()), null);
       return false;
     }
+    // Line by line: the next screen of this part first.
+    const section = song.sections.find((entry) => entry.id === focus.sectionId);
+    const screens = section ? this.songScreens(section) : [];
+    const screen = focus.screen ?? 0;
+    if (section && screen + direction >= 0 && screen + direction < screens.length) {
+      this.previewSongSection(song, section.id, focus.slot, screen + direction);
+      return true;
+    }
     // Through the song's order (a repeated chorus included); at either end there is nowhere further.
     const next = stepSlot(song, focus.slot ?? slotFor(song, focus.sectionId), direction);
     if (!next) return false;
-    this.previewSongSection(song, next.section.id, next.slot);
+    // Going back lands on the last screen of the part before.
+    const landing = direction < 0 ? this.songScreens(next.section).length - 1 : 0;
+    this.previewSongSection(song, next.section.id, next.slot, landing);
     return true;
   };
 
@@ -4215,7 +4243,10 @@ class Session {
     const slots = songSlots(song);
     const slot = focus.slot ?? slotFor(song, focus.sectionId);
     const section = slots[slot];
-    return section ? `${section.label} · ${slot + 1} of ${slots.length}` : "";
+    if (!section) return "";
+    const screens = this.songScreens(section).length;
+    const part = `${section.label} · ${slot + 1} of ${slots.length}`;
+    return screens > 1 ? `${part} · ${t("lines {n} of {total}", { n: (focus.screen ?? 0) + 1, total: screens })}` : part;
   };
 
   saveSong = async (song: Song): Promise<boolean> => {

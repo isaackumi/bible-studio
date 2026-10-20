@@ -342,6 +342,7 @@ export function defaultWorkspace(): Workspace {
     recentAlerts: [],
     deskTranslationId: null,
     songLanguage: "both",
+    songLines: 0,
     macros: defaultMacros(),
   };
 }

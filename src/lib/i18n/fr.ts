@@ -1518,6 +1518,13 @@ export const fr: Readonly<Record<string, string>> = {
   "Translation removed. Download it again any time.": "Traduction retirée. Vous pouvez la télécharger à nouveau à tout moment.",
   "Signed in as {name}.": "Connecté en tant que {name}.",
   "Signed out. Your library stays on this computer.": "Déconnecté. Votre bibliothèque reste sur cet ordinateur.",
+  // Songs line by line
+  "lines {n} of {total}": "lignes {n} sur {total}",
+  "Lines on the screen": "Lignes à l’écran",
+  "The whole part on the screen at once": "Toute la partie à l’écran en une fois",
+  "{label}, lines {n} of {total}": "{label}, lignes {n} sur {total}",
+  "{n} line on the screen at a time; the arrows step line by line": "{n} ligne à l’écran à la fois ; les flèches avancent ligne par ligne",
+  "{n} lines on the screen at a time; the arrows step through them": "{n} lignes à l’écran à la fois ; les flèches les font défiler",
   // Updates, What's new and error reports
   "Share anonymous usage and error reports": "Partager l’utilisation anonyme et les rapports d’erreur",
   "Once a day: the app version, the computer's system and your plan. When something goes wrong: the error and where in the app it happened. No names, songs or sermons. It helps us fix problems quickly.": "Une fois par jour : la version de l’application, le système de l’ordinateur et votre abonnement. En cas de problème : l’erreur et l’endroit de l’application où elle s’est produite. Aucun nom, chant ni sermon. Cela nous aide à corriger les problèmes rapidement.",

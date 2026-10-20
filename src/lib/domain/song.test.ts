@@ -87,6 +87,16 @@ describe("song sections", () => {
     });
     expect(lyricsFor(hymn, "gone", "Morning light").lines).toEqual([{ text: "This section is missing." }]);
   });
+
+  it("shows one screen of a part, with the second language's matching lines", () => {
+    const song = {
+      ...hymn,
+      sections: [{ id: "v", label: "Verse 1", lines: ["One", "Two", "", "Three"], second: ["Un", "Deux", "", "Trois"] }],
+    } as Song;
+    expect(lyricsFor(song, "v", "", "first", { from: 1, to: 2 }).lines).toEqual([{ text: "Two" }]);
+    expect(lyricsFor(song, "v", "", "both", { from: 3, to: 4 }).lines).toEqual([{ text: "Three", alt: "Trois" }]);
+    expect(lyricsFor(song, "v", "", "first").lines.map((line) => line.text)).toEqual(["One", "Two", "Three"]);
+  });
 });
 
 describe("paste-to-song lyric import", () => {

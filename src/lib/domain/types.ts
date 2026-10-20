@@ -555,6 +555,8 @@ export type Workspace = {
   deskTranslationId: string | null;
   /** Songs with two languages: which to show on the screen. */
   songLanguage: import("./song").SongLanguage;
+  /** Song lines on the screen at once (song-screens.ts); 0 shows the whole part. */
+  songLines: import("./song-screens").SongLines;
   /** Macros: one button for several steps. */
   macros: import("./macros").Macro[];
   voice: VoiceSettings;
