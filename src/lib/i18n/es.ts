@@ -3356,4 +3356,11 @@ export const es: Readonly<Record<string, string>> = {
   "Desks for {part}": "Escritorios para {part}",
   "Go to the {desk}": "Ir al {desk}",
   "running order": "orden del servicio",
+  "Add the stream server address first.": "Agregue primero la dirección del servidor de transmisión.",
+  "Add your stream key first.": "Agregue primero su clave de transmisión.",
+  "Open Screen Recording settings": "Abrir ajustes de grabación de pantalla",
+  "Stream & record settings": "Ajustes de Transmitir y grabar",
+  "Streaming and recording did not start": "La transmisión y la grabación no empezaron",
+  "Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.": "Active Church Studio en Grabación de pantalla y audio del sistema. Tras una actualización, desactívelo y vuelva a activarlo.",
+  "macOS needs your permission to capture the audience window.": "macOS necesita su permiso para capturar la ventana del público.",
 };

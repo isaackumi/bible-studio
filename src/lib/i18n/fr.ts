@@ -3437,4 +3437,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Desks for {part}": "Pupitres pour {part}",
   "Go to the {desk}": "Aller au {desk}",
   "running order": "déroulé",
+  "Add the stream server address first.": "Ajoutez d’abord l’adresse du serveur de diffusion.",
+  "Add your stream key first.": "Ajoutez d’abord votre clé de diffusion.",
+  "Open Screen Recording settings": "Ouvrir les réglages d’enregistrement de l’écran",
+  "Stream & record settings": "Réglages Diffuser et enregistrer",
+  "Streaming and recording did not start": "La diffusion et l’enregistrement n’ont pas démarré",
+  "Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.": "Activez Church Studio dans Enregistrement de l’écran et de l’audio du système. Après une mise à jour, désactivez-le puis réactivez-le.",
+  "macOS needs your permission to capture the audience window.": "macOS a besoin de votre autorisation pour capturer la fenêtre du public.",
 };

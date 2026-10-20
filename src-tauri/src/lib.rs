@@ -317,8 +317,8 @@ fn request_listen_access() -> Result<voice::ListenAccess, String> {
 }
 
 #[tauri::command]
-fn open_privacy_settings() -> Result<(), String> {
-    voice::open_privacy_settings()
+fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
+    voice::open_privacy_settings(pane.as_deref())
 }
 
 #[tauri::command]
@@ -357,6 +357,12 @@ fn start_broadcast(app: tauri::AppHandle, options: broadcast::Options, stamp: St
 #[tauri::command]
 fn stop_broadcast() {
     broadcast::stop();
+}
+
+/// Whether the audience window may be captured for streaming and recording (asking once, if `ask`).
+#[tauri::command]
+fn screen_capture_allowed(ask: bool) -> bool {
+    broadcast::screen_capture_allowed(ask)
 }
 
 #[tauri::command]
@@ -725,6 +731,7 @@ pub fn run() {
             stop_ndi,
             vmix_get,
             start_broadcast,
+            screen_capture_allowed,
             stop_broadcast,
             start_ndi_key,
             stop_ndi_key,

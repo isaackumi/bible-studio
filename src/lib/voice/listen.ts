@@ -41,9 +41,10 @@ export async function prepareListening(): Promise<string | null> {
   }
 }
 
-export async function openPrivacySettings(): Promise<void> {
+/** System Settings › Privacy at the microphone, or (`screen`) at Screen & System Audio Recording. */
+export async function openPrivacySettings(pane: "microphone" | "screen" = "microphone"): Promise<void> {
   if (!isDesktop()) return;
-  await invoke("open_privacy_settings");
+  await invoke("open_privacy_settings", { pane });
 }
 
 type SpeechRec = {

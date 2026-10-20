@@ -7,17 +7,22 @@ pub struct ListenAccess {
     pub speech: String,
 }
 
-pub fn open_privacy_settings() -> Result<(), String> {
+/// Open System Settings › Privacy at the microphone, or (`screen`) at Screen & System Audio Recording.
+pub fn open_privacy_settings(pane: Option<&str>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        let anchor = if pane == Some("screen") { "Privacy_ScreenCapture" } else { "Privacy_Microphone" };
         std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+            .arg(format!("x-apple.systempreferences:com.apple.preference.security?{anchor}"))
             .spawn()
             .map_err(|e| e.to_string())?;
         return Ok(());
     }
     #[cfg(not(target_os = "macos"))]
-    Err("Privacy settings are opened on macOS.".into())
+    {
+        let _ = pane;
+        Err("Privacy settings are opened on macOS.".into())
+    }
 }
 
 /// `tauri dev` starts a bare binary whose privacy keys TCC ignores when Cursor is the parent.

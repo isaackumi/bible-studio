@@ -128,6 +128,33 @@ pub fn start(app: tauri::AppHandle, options: Options, stamp: String) -> Result<O
 }
 
 /// Stop: the helper finishes the recording (so the file plays) and leaves the stream cleanly.
+/// Whether macOS lets this app capture the audience window (Screen & System Audio Recording). With
+/// `ask`, the first time shows macOS's own question; after that only System Settings can change it.
+pub fn screen_capture_allowed(ask: bool) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        #[link(name = "CoreGraphics", kind = "framework")]
+        unsafe extern "C" {
+            fn CGPreflightScreenCaptureAccess() -> bool;
+            fn CGRequestScreenCaptureAccess() -> bool;
+        }
+        unsafe {
+            if CGPreflightScreenCaptureAccess() {
+                return true;
+            }
+            if ask {
+                return CGRequestScreenCaptureAccess();
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = ask;
+        false
+    }
+}
+
 pub fn stop() {
     #[cfg(target_os = "macos")]
     {

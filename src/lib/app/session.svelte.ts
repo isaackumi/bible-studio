@@ -4134,7 +4134,7 @@ class Session {
   startBroadcast = async (options: { stream: boolean; record: boolean; pattern?: boolean }) => {
     if (!this.requireFeature(options.stream ? "streaming" : "recording")) return false;
     if (!this.desktop()) {
-      this.broadcastState = { ...this.broadcastState, status: "error", message: t("Streaming and recording work in the Church Studio app for Mac.") };
+      this.broadcastFailed(t("Streaming and recording work in the Church Studio app for Mac."));
       return false;
     }
     const settings = this.workspace.broadcast;
@@ -4142,10 +4142,16 @@ class Session {
     if (options.stream) {
       const target = streamTarget(settings);
       if ("missing" in target) {
-        this.broadcastState = { ...this.broadcastState, status: "error", message: target.missing === "key" ? t("Add the stream key first: Settings › Stream & record.") : t("Add the stream server address first: Settings › Stream & record.") };
+        this.broadcastFailed(target.missing === "key" ? t("Add your stream key first.") : t("Add the stream server address first."), "settings");
         return false;
       }
       rtmp = target.url;
+    }
+    // macOS must allow capturing the audience window. The first time it asks; after that (and after
+    // an update, until the app is signed by Apple) it is switched on in System Settings.
+    if (!options.pattern && !(await invoke<boolean>("screen_capture_allowed", { ask: true }).catch(() => true))) {
+      this.broadcastFailed(t("macOS needs your permission to capture the audience window."), "permission");
+      return false;
     }
     if (!this.broadcastUnlisten) this.broadcastUnlisten = await listen<{ line: string }>("broadcast-status", (event) => this.onBroadcastLine(event.payload.line));
     const quality = QUALITIES[settings.quality];
@@ -4159,9 +4165,28 @@ class Session {
       this.broadcastState = { ...this.broadcastState, saved: saved ?? null };
       return true;
     } catch (error) {
-      this.broadcastState = { ...this.broadcastState, status: "error", message: error instanceof Error ? error.message : String(error) };
+      this.broadcastFailed(error instanceof Error ? error.message : String(error));
       return false;
     }
+  };
+
+  /**
+   * Streaming or recording could not start (or stopped): said where it is seen, with the one thing to
+   * do about it, not only inside the closed menu.
+   */
+  private broadcastFailed = (message: string, fix: "permission" | "settings" | null = null) => {
+    this.broadcastState = { ...this.broadcastState, status: "error", message };
+    const actions: Array<{ label: string; run: () => void }> = [];
+    if (fix === "permission") {
+      actions.push({ label: t("Open Screen Recording settings"), run: () => { void openPrivacySettings("screen").catch(() => {}); this.dismissToast(); } });
+    } else if (fix === "settings") {
+      actions.push({ label: t("Stream & record settings"), run: () => { this.openSettings("broadcast"); this.dismissToast(); } });
+    }
+    this.notify(t("Streaming and recording did not start"), {
+      detail: fix === "permission" ? t("Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.") : message,
+      ms: 30_000,
+      actions,
+    });
   };
 
   stopBroadcast = async () => {
@@ -4185,7 +4210,7 @@ class Session {
     else if (message.kind === "saved" && message.path) {
       this.broadcastState = { ...state, saved: message.path };
       this.notify(t("Recording saved"), { detail: message.path, actions: this.desktop() ? [{ label: t("Show in Finder"), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(message.path!)).catch(() => {}) }] : [] });
-    } else if (message.kind === "error") this.broadcastState = { ...state, status: "error", message: message.message ?? t("Streaming stopped.") };
+    } else if (message.kind === "error") this.broadcastFailed(message.message ?? t("Streaming stopped."), (message as { code?: string }).code === "permission" ? "permission" : null);
     else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
   };
 

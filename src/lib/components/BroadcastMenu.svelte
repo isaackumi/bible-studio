@@ -48,8 +48,8 @@
       {:else}
         {#if status.status === "error"}<p class="menu-note error">{status.message}</p>{/if}
         {#if status.status === "off" && status.message}<p class="menu-note">{status.message}</p>{/if}
-        <button type="button" role="menuitem" disabled={!ready} onclick={() => { void session.startBroadcast({ stream: true, record: true }); close(); }}><Icon name="video" size={16} /> {t("Go live and record")}</button>
-        <button type="button" role="menuitem" disabled={!ready} onclick={() => { void session.startBroadcast({ stream: true, record: false }); close(); }}><Icon name="cast" size={16} /> {t("Go live only")}</button>
+        <button type="button" role="menuitem" onclick={() => { void session.startBroadcast({ stream: true, record: true }); close(); }}><Icon name="video" size={16} /> {t("Go live and record")}</button>
+        <button type="button" role="menuitem" onclick={() => { void session.startBroadcast({ stream: true, record: false }); close(); }}><Icon name="cast" size={16} /> {t("Go live only")}</button>
         <button type="button" role="menuitem" onclick={() => { void session.startBroadcast({ stream: false, record: true }); close(); }}><Icon name="download" size={16} /> {t("Record only")}</button>
         {#if !ready}<p class="menu-note">{t("Add your stream key in Settings › Stream & record to stream.")}</p>{/if}
       {/if}

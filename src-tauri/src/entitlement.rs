@@ -269,7 +269,9 @@ pub fn require(app: &AppHandle, need: &str, feature: &str) -> Result<(), String>
         "premium" => 1,
         _ => 0,
     };
-    if rank(&plan) >= rank(need) {
+    // Development builds take the desk's test codes (PREMIUM-TEST, CHURCH-TEST), which never reach
+    // this core, so paid native features can be tried there; release builds check the lease.
+    if rank(&plan) >= rank(need) || cfg!(debug_assertions) {
         Ok(())
     } else {
         Err(format!("{feature} is part of the {} plan.", if need == "church" { "Church" } else { "Premium" }))
