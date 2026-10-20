@@ -4606,6 +4606,13 @@ class Session {
   };
 
   /** First-run setup is done (or skipped). Settings > Updates can run it again. */
+  /** The end of setup: John 3:16 on Preview, and a note saying LIVE shows it. */
+  showFirstVerse = async (translationId: string) => {
+    const translation = this.translations.some((entry) => entry.id === translationId) ? translationId : (this.translations[0]?.id ?? "kjv");
+    await this.previewPassage({ translationId: translation, bookOrd: 43, chapter: 3, startVerse: 16, endVerse: 16, reference: "John 3:16" });
+    this.notify(t("John 3:16 is on Preview"), { detail: t("Press LIVE (Space) to show it on the big screen. Then pick any verse, song or slide."), ms: 15_000 });
+  };
+
   finishOnboarding = () => {
     this.workspace = { ...this.workspace, onboarded: true };
     this.persistSoon();
@@ -4718,10 +4725,42 @@ class Session {
     try {
       this.ent = await api.entitlementStatus();
       if (this.ent.device) this.deviceId = this.ent.device;
+      this.notePlanChange();
     } catch (error) {
       console.error(error);
     }
   };
+
+  /** Set when the operator chose Free, so the change is not announced as an ending. */
+  private planDropChosen = false;
+
+  /**
+   * A paid plan or trial ending on this computer is said once, with the way back (a trial runs
+   * out, a license is refunded or not renewed). The last plan seen is kept across restarts.
+   */
+  private notePlanChange() {
+    if (typeof localStorage === "undefined") return;
+    const plan = this.plan;
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem("cs-last-plan");
+      localStorage.setItem("cs-last-plan", `${plan}:${this.ent.kind ?? ""}`);
+    } catch {
+      return;
+    }
+    const [lastPlan, lastKind] = (last ?? "").split(":");
+    if (!lastPlan || lastPlan === "free" || plan !== "free") return;
+    if (this.planDropChosen) {
+      this.planDropChosen = false;
+      return;
+    }
+    const wasTrial = lastKind === "trial";
+    this.notify(wasTrial ? t("Your Premium trial has ended") : t("Your plan is no longer active on this computer"), {
+      detail: t("You are on Free now. Your songs, services and settings are all still here."),
+      actions: [{ label: t("See plans"), run: () => { this.openPlans(); this.dismissToast(); } }],
+      ms: 20_000,
+    });
+  }
 
   /** Keep a lease from the server (verified by the native core). */
   private keepLease = async (token: string): Promise<boolean> => {
@@ -4752,6 +4791,15 @@ class Session {
       }
     }
     await this.checkActivation();
+    // Offline too long: a paid plan must check in before its lease runs out; say so a week ahead.
+    const renewBy = this.ent.kind === "license" ? (this.ent.renewBy ?? 0) : 0;
+    const daysLeft = renewBy ? Math.ceil((renewBy - Date.now()) / 86_400_000) : Infinity;
+    if (this.activation.status === "offline" && daysLeft <= 7 && daysLeft > 0) {
+      this.notify(tn(daysLeft, "Connect to the internet within {n} day", "Connect to the internet within {n} days"), {
+        detail: t("Church Studio checks your plan online now and then. Without it, this computer goes back to Free until it can check."),
+        ms: 20_000,
+      });
+    }
     // Signed in, but not on a license yet (a plan bought on another computer): pick it up.
     if (this.workspace.profile?.token && this.ent.kind !== "license") await this.syncAccount();
     // Moving from a build that kept the trial on the computer: a trial still running there is
@@ -4992,6 +5040,7 @@ class Session {
 
   /** Return to Free: removes a license key (or test code) from this computer. */
   useFreePlan = async () => {
+    this.planDropChosen = true;
     const key = this.workspace.entitlement.license;
     if (key) void serverCall("/v1/release", { key, device: this.deviceId });
     this.workspace = { ...this.workspace, entitlement: dropToFree(this.workspace.entitlement) };

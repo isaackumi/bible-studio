@@ -3,6 +3,7 @@
   import { session } from "../../app/session.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { api } from "../../db/api";
+  import { isDesktop } from "../../platform/runtime";
   import { TRIAL_DAYS } from "../../domain/plans";
   import { presentLyrics, presentScripture, presentText } from "../../domain/present";
   import { presentCamera } from "../../domain/camera";
@@ -190,9 +191,15 @@
     showing = on ? id : "name";
   }
 
+  /** Why the audience window did not open (shown on the step, not lost). */
+  let screenNote = $state("");
   async function openScreen() {
+    screenNote = "";
     await session.openAudience();
+    if (!session.output.online) screenNote = session.output.message || session.message || t("The audience window did not open. Check the projector is connected, then press Open again.");
   }
+  /** Only this computer's own screen is connected. */
+  const oneScreen = $derived(isDesktop() && session.output.displays.length === 1);
 
   async function sendTest() {
     await session.testOutput();
@@ -218,6 +225,8 @@
     if (translation) session.setDeskTranslation(translation);
     session.setAppearance({ desk });
     session.finishOnboarding();
+    // End on a first verse ready to show: John 3:16 on Preview, and what to press next.
+    if (!tour && desk === "pewbeam") void session.showFirstVerse(translation);
     if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
   }
 
@@ -367,6 +376,8 @@
                     <div class="screen-copy"><strong>{t("Open the audience window")}</strong><span>{session.output.online ? t("It is open. Move it to the projector if it opened here.") : t("It opens on the second screen when there is one.")}</span></div>
                     {#if !session.output.online}<button type="button" class="btn" onclick={() => void openScreen()}><Icon name="cast" size={15} /> {t("Open")}</button>{/if}
                   </div>
+                  {#if screenNote}<p class="screen-note" role="alert">{screenNote}</p>{/if}
+                  {#if oneScreen && !session.output.online}<p class="screen-note" role="status">{t("Only one screen is connected. Plug in the projector or TV; without one, the audience window opens on this screen.")}</p>{/if}
                   <div class="screen-row" class:done={tested} class:off={!session.output.online}>
                     <span class="num">{#if tested}<Icon name="check" size={14} />{:else}2{/if}</span>
                     <div class="screen-copy"><strong>{t("Check it from the back row")}</strong><span>{t("A test pattern flashes on the audience screen. Nothing live changes.")}</span></div>
@@ -591,6 +602,7 @@
   .ready-buttons { display: flex; gap: 8px; }
   .tour-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .tour-link:hover { text-decoration: underline; }
+  .screen-note { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 55%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 10%, transparent); font-size: 13px; line-height: 1.4; }
   .trial-error { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 60%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 12%, transparent); font-size: 13px; line-height: 1.4; }
   .btn:disabled { opacity: 0.5; cursor: default; }
 

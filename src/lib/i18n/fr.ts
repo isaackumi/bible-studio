@@ -1561,6 +1561,17 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // Setup end, plan changes
+  "John 3:16 is on Preview": "Jean 3:16 est sur l’aperçu",
+  "Press LIVE (Space) to show it on the big screen. Then pick any verse, song or slide.": "Appuyez sur DIRECT (Espace) pour l’afficher sur le grand écran. Puis choisissez un verset, un chant ou une diapositive.",
+  "Your Premium trial has ended": "Votre essai Premium est terminé",
+  "Your plan is no longer active on this computer": "Votre abonnement n’est plus actif sur cet ordinateur",
+  "You are on Free now. Your songs, services and settings are all still here.": "Vous êtes maintenant en Gratuit. Vos chants, cultes et réglages sont toujours là.",
+  "Church Studio checks your plan online now and then. Without it, this computer goes back to Free until it can check.": "Church Studio vérifie votre abonnement en ligne de temps en temps. Sans cela, cet ordinateur repasse en Gratuit jusqu’à la prochaine vérification.",
+  "Connect to the internet within {n} day": "Connectez-vous à Internet d’ici {n} jour",
+  "Connect to the internet within {n} days": "Connectez-vous à Internet d’ici {n} jours",
+  "The audience window did not open. Check the projector is connected, then press Open again.": "La fenêtre de l’assemblée ne s’est pas ouverte. Vérifiez que le projecteur est branché, puis appuyez de nouveau sur Ouvrir.",
+  "Only one screen is connected. Plug in the projector or TV; without one, the audience window opens on this screen.": "Un seul écran est branché. Branchez le projecteur ou la télévision ; sinon, la fenêtre de l’assemblée s’ouvre sur cet écran.",
   // Bible file import
   "Importing a Bible file needs the desktop app.": "L’importation d’un fichier Bible nécessite l’application de bureau.",
   "Church Studio can't read this file as a Bible. Use a Zefania, OSIS or OpenSong XML file.": "Church Studio ne peut pas lire ce fichier comme une Bible. Utilisez un fichier XML Zefania, OSIS ou OpenSong.",
