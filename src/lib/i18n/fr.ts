@@ -3432,4 +3432,9 @@ export const fr: Readonly<Record<string, string>> = {
   "The service keeps time wherever it runs: the countdown, Next part and the report all carry on.": "Le culte garde le temps où qu’il se déroule : le compte à rebours, Partie suivante et le rapport continuent.",
   "Where {part} runs": "Où se déroule {part}",
   "When this part begins, the desk opens there with every tool; the service keeps time. Click to change.": "Quand cette partie commence, le pupitre s’y ouvre avec tous les outils ; le culte garde le temps. Cliquez pour changer.",
+  "Opens first": "S’ouvre d’abord",
+  "Tick every desk this part uses. One opens when the part begins; the service strip goes between them.": "Cochez chaque pupitre que cette partie utilise. L’un s’ouvre quand la partie commence ; la bande du culte passe de l’un à l’autre.",
+  "Desks for {part}": "Pupitres pour {part}",
+  "Go to the {desk}": "Aller au {desk}",
+  "running order": "déroulé",
 };

@@ -124,3 +124,13 @@ describe("where a part runs", () => {
     expect(sanitizePartDesks({ " Word ": { desk: "presenter", page: "sermon" }, x: { desk: "moon" }, y: { desk: "production", page: "songs" } })).toEqual({ word: { desk: "presenter", page: "sermon" }, y: { desk: "production" } });
   });
 });
+
+describe("a part on more than one desk", () => {
+  it("keeps the desk it opens on first and the others it uses, without repeats or unknown desks", async () => {
+    const { partRun, partDesks, cleanPartRun } = await import("./service");
+    const run = partRun({ name: "Ministration", desk: "presenter", page: "songs", also: ["production", "presenter", "service"] });
+    expect(run).toEqual({ desk: "presenter", page: "songs", also: ["production", "service"], chosen: true });
+    expect(partDesks(run)).toEqual(["presenter", "production", "service"]);
+    expect(cleanPartRun({ desk: "production", also: ["moon", "presenter"], page: "sermon" })).toEqual({ desk: "production", page: "sermon", also: ["presenter"] });
+  });
+});

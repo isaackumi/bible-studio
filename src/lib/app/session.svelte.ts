@@ -134,7 +134,7 @@ import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceT
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
-import { findItem, moveInList, nextPart, partKey, partRun, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type PartDesk, type PartRun, type PresenterPage, type ServiceSummary } from "../domain/service";
+import { findItem, moveInList, nextPart, partDesks, partKey, partRun, sectionIdForInsert, stepCursor, moveTo, moveItemTo, type PartDesk, type PartRun, type PresenterPage, type ServiceSummary } from "../domain/service";
 import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonError, stepSermonSection } from "../domain/sermon";
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
@@ -4754,23 +4754,45 @@ class Session {
   partRunOf = (section: ServiceSection) => partRun(section, this.workspace.partDesks);
 
   /** In words: "Running order", "Presenter · Songs", "Production desk". */
-  partRunLabel = (run: PartRun): string =>
-    run.desk === "production" ? t("Production desk") : run.desk === "presenter" ? t("Presenter · {page}", { page: t(run.page === "songs" ? "Songs" : run.page === "sermon" ? "Sermon" : "Scriptures") }) : t("Running order");
+  partRunLabel = (run: PartRun): string => {
+    const one = (desk: PartDesk, short = false) =>
+      desk === "production" ? (short ? t("Production") : t("Production desk")) : desk === "presenter" ? t("Presenter · {page}", { page: t(run.page === "songs" ? "Songs" : run.page === "sermon" ? "Sermon" : "Scriptures") }) : short ? t("Order") : t("Running order");
+    const desks = partDesks(run);
+    return desks.length === 1 ? one(run.desk) : desks.map((desk, index) => one(desk, index > 0)).join(" + ");
+  };
+
+  /** The desk the operator is on now, in the same words as a part's desks. */
+  get currentDesk(): PartDesk {
+    return this.workspace.appearance.desk !== "pewbeam" ? "production" : this.deskPage === "service" ? "service" : "presenter";
+  }
+
+  /** Go to one of the desks a part uses (the service strip's switches). The part keeps counting. */
+  goToDesk = (desk: PartDesk, page: PresenterPage = "scriptures") => {
+    if (desk === "production") {
+      if (!this.requireFeature("production")) return;
+      this.setAppearance({ desk: "obs" });
+      return;
+    }
+    if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
+    this.pageRequest = desk === "service" ? "service" : page;
+  };
 
   /**
    * Set where a part runs. Then offer to do the same for every part with that name (the church's own
    * word for it), so new services and templates follow without anyone choosing again.
    */
-  setPartDesk = (sectionId: string, desk: PartDesk, page?: PresenterPage, quiet = false) => {
+  setPartDesk = (sectionId: string, desk: PartDesk, page?: PresenterPage, quiet = false, also: PartDesk[] = []) => {
     if (!this.service) return;
-    const run: PartRun = { desk, ...(desk === "presenter" ? { page: page ?? "scriptures" } : {}) };
-    this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk: run.desk, page: run.page } : section)) };
+    const others = [...new Set(also.filter((entry) => entry !== desk))];
+    const usesPresenter = desk === "presenter" || others.includes("presenter");
+    const run: PartRun = { desk, ...(usesPresenter ? { page: page ?? "scriptures" } : {}), ...(others.length ? { also: others } : {}) };
+    this.service = { ...this.service, sections: this.service.sections.map((section) => (section.id === sectionId ? { ...section, desk: run.desk, page: run.page, also: run.also } : section)) };
     this.persistSoon();
     const part = this.service.sections.find((section) => section.id === sectionId);
     if (!part || quiet) return;
     const label = this.partRunLabel(run);
     const kept = this.workspace.partDesks?.[partKey(part.name)];
-    const same = kept ? kept.desk === run.desk && kept.page === run.page : run.desk === "service";
+    const same = kept ? kept.desk === run.desk && kept.page === run.page && (kept.also ?? []).join() === (run.also ?? []).join() : run.desk === "service" && !run.also;
     this.notify(t("{part} runs on: {where}", { part: part.name, where: label }), {
       detail: same ? t("The service keeps time wherever it runs.") : t("Every part called {part} can do the same, in new services too.", { part: part.name }),
       actions: same ? [] : [{ label: t("Same for every {part}", { part: part.name }), run: () => { this.learnPartDesk(part.name, run); this.dismissToast(); } }],
@@ -4782,7 +4804,7 @@ class Session {
     const key = partKey(name);
     if (!key) return;
     const { [key]: _old, ...rest } = this.workspace.partDesks ?? {};
-    this.workspace = { ...this.workspace, partDesks: run.desk === "service" ? rest : { ...rest, [key]: run } };
+    this.workspace = { ...this.workspace, partDesks: run.desk === "service" && !run.also?.length ? rest : { ...rest, [key]: run } };
     this.persistSoon();
     this.message = run.desk === "service" ? t("Parts called {part} run in the running order.", { part: name }) : t("Every part called {part} runs on: {where}.", { part: name, where: this.partRunLabel(run) });
   };
@@ -4800,6 +4822,12 @@ class Session {
     const cameFromDesk = this.presenterPartId !== null && this.presenterPartId !== section.id;
     if (run.desk === "presenter" || run.desk === "production") {
       this.openPartDesk(section, run);
+      return;
+    }
+    // Opens in the running order but uses other desks too: the strip offers them while it runs.
+    if (run.also?.length) {
+      this.presenterPartId = section.id;
+      if (cameFromDesk) this.goToDesk("service");
       return;
     }
     if (cameFromDesk) {

@@ -27,7 +27,7 @@
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
   import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
-  import { serviceSummary } from "../../domain/service";
+  import { partDesks, serviceSummary } from "../../domain/service";
   import { screenStarts } from "../../bible/passage";
   import QuickVerse from "./QuickVerse.svelte";
   import PartRunPicker from "./PartRunPicker.svelte";
@@ -585,7 +585,16 @@
               <button type="button" class="part-add" title={t("Add songs, scripture, slides and more to {part} (A adds to the selected part)", { part: section.name })} onclick={() => (addOpen = { sectionId: section.id, kind: "song" })}><Icon name="plus" size={13} /> {t("Add")}</button>
               {#if section.skip}
                 <button type="button" class="desk-tag" title={t("Put this part back in the service")} onclick={() => session.setSectionSkip(section.id, false)}><Icon name="eye" size={12} /> {t("Bring back")}</button>
-              {:else if session.partRunOf(section).desk !== "service"}
+              {:else if session.runningSectionId === section.id && partDesks(session.partRunOf(section)).length > 1}
+                {@const run = session.partRunOf(section)}
+                <!-- Running and using other desks too: one click to each (the part keeps counting). -->
+                <span class="desk-jump" role="group" aria-label={t("Desks for {part}", { part: section.name })}>
+                  {#each partDesks(run).filter((desk) => desk !== "service") as desk (desk)}
+                    <button type="button" class="desk-tag" class:production={desk === "production"} title={t("Go to the {desk}", { desk: desk === "production" ? t("Production desk") : t("Presenter desk") })} onclick={() => session.goToDesk(desk, run.page)}><Icon name={desk === "production" ? "obs" : "layout"} size={12} /> {desk === "production" ? t("Production") : t("Presenter")}</button>
+                  {/each}
+                  <button type="button" class="row-tool" aria-label={t("Where it runs")} title={t("Where it runs")} onclick={() => (runPicker = section.id)}><Icon name="settings" size={13} /></button>
+                </span>
+              {:else if session.partRunOf(section).desk !== "service" || session.partRunOf(section).also?.length}
                 {@const run = session.partRunOf(section)}
                 <button type="button" class="desk-tag" class:production={run.desk === "production"} title={t("When this part begins, the desk opens there with every tool; the service keeps time. Click to change.")} onclick={() => (runPicker = section.id)}><Icon name={run.desk === "production" ? "obs" : "layout"} size={12} /> {session.partRunLabel(run)}</button>
               {/if}
@@ -994,6 +1003,7 @@
   .skip-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
   .desk-tag { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 26px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
   .desk-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .desk-jump { display: inline-flex; align-items: center; gap: 4px; flex: none; }
   .desk-tag.production { border-color: color-mix(in srgb, #a855f7 50%, var(--line)); background: color-mix(in srgb, #a855f7 12%, transparent); }
   .head-main :global(.menu .menu-note) { margin: 6px 10px 2px; font-size: 10.5px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }

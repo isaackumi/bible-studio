@@ -265,6 +265,8 @@ export type ServiceSection = {
   desk?: "service" | "presenter" | "production";
   /** On the Presenter desk: the page it opens. */
   page?: "scriptures" | "songs" | "sermon";
+  /** Other desks the part uses too, a click away in the service strip (`desk` opens first). */
+  also?: Array<"service" | "presenter" | "production">;
   /** Where its card sits on the flow canvas; none means its tidy place. */
   canvas?: { x: number; y: number };
 };

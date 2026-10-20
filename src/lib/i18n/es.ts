@@ -3351,4 +3351,9 @@ export const es: Readonly<Record<string, string>> = {
   "The service keeps time wherever it runs: the countdown, Next part and the report all carry on.": "El servicio lleva el tiempo dondequiera que se lleve: la cuenta regresiva, Siguiente parte y el informe continúan.",
   "Where {part} runs": "Dónde se lleva {part}",
   "When this part begins, the desk opens there with every tool; the service keeps time. Click to change.": "Cuando empieza esta parte, el escritorio se abre allí con todas las herramientas; el servicio lleva el tiempo. Haga clic para cambiar.",
+  "Opens first": "Se abre primero",
+  "Tick every desk this part uses. One opens when the part begins; the service strip goes between them.": "Marque cada escritorio que usa esta parte. Uno se abre cuando empieza la parte; la franja del servicio pasa entre ellos.",
+  "Desks for {part}": "Escritorios para {part}",
+  "Go to the {desk}": "Ir al {desk}",
+  "running order": "orden del servicio",
 };

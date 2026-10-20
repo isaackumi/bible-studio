@@ -1,9 +1,9 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
   import { clockCount, partState } from "../../domain/schedule";
-  import { nextPart } from "../../domain/service";
+  import { nextPart, partDesks, type PartDesk } from "../../domain/service";
   import Icon from "../Icon.svelte";
-  import { t } from "../../i18n/core";
+  import { msg, t } from "../../i18n/core";
 
   // The service while working on the Presenter page: the part running and its time, what comes
   // next, and the way back. The clock, countdown and report keep going here as on the Service page.
@@ -21,6 +21,8 @@
   });
   const left = $derived(deadline ? deadline.endsAt - now : null);
   const tone = $derived(left === null || !part ? "ok" : partState(deadline ? (deadline.endsAt - (session.sectionStarts[part.id] ?? now)) / 60_000 : 0, left, service?.warnMinutes));
+  const DESK_SHORT: Record<PartDesk, string> = { service: msg("Running order"), presenter: msg("Presenter"), production: msg("Production") };
+  const DESK_NAME: Record<PartDesk, string> = { service: msg("running order"), presenter: msg("Presenter desk"), production: msg("Production desk") };
   const next = $derived(service && runningId ? nextPart(service, runningId) : null);
 </script>
 
@@ -36,7 +38,19 @@
     {/if}
     {#if session.presenterPartId === part.id}
       {@const run = session.partRunOf(part)}
-      <span class="tag" title={t("This part runs here. What goes LIVE counts as this part.")}>{run.desk === "service" ? t("Opened here") : session.partRunLabel(run)}</span>
+      {@const desks = partDesks(run)}
+      {#if desks.length > 1}
+        <!-- The desks this part uses: one click to go between them; the part keeps counting. -->
+        <span class="switch" role="group" aria-label={t("Desks for {part}", { part: part.name })}>
+          {#each desks as desk (desk)}
+            <button type="button" aria-pressed={session.currentDesk === desk} title={t("Go to the {desk}", { desk: t(DESK_NAME[desk]) })} onclick={() => session.goToDesk(desk, run.page)}>
+              <Icon name={desk === "production" ? "obs" : desk === "presenter" ? "layout" : "list"} size={12} /> {t(DESK_SHORT[desk])}
+            </button>
+          {/each}
+        </span>
+      {:else}
+        <span class="tag" title={t("This part runs here. What goes LIVE counts as this part.")}>{run.desk === "service" ? t("Opened here") : session.partRunLabel(run)}</span>
+      {/if}
     {/if}
     <span class="grow"></span>
     {#if session.timeUp && session.timeUp.sectionId === part.id}
@@ -65,6 +79,10 @@
   .time { font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tag { padding: 2px 8px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 10%, transparent); font-size: 11px; font-weight: 650; color: var(--muted); white-space: nowrap; }
   .grow { flex: 1; }
+  .switch { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+  .switch button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+  .switch button:hover { color: var(--ink); }
+  .switch button[aria-pressed="true"] { background: var(--field); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
   .btn:hover { background: var(--field); }
   .btn.back { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }

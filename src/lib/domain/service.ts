@@ -99,8 +99,11 @@ export function serviceSummary(service: Service): ServiceSummary {
 
 export type PartDesk = "service" | "presenter" | "production";
 export type PresenterPage = "scriptures" | "songs" | "sermon";
-/** Where a part runs: the running order, a page of the Presenter desk, or the Production desk. */
-export type PartRun = { desk: PartDesk; page?: PresenterPage };
+/** Where a part runs: the desk it opens on first (the running order, a Presenter page or the Production desk), and others it uses too. */
+export type PartRun = { desk: PartDesk; page?: PresenterPage; also?: PartDesk[] };
+
+/** Every desk a part uses, the one it opens on first leading. */
+export const partDesks = (run: PartRun): PartDesk[] => [run.desk, ...(run.also ?? []).filter((desk) => desk !== run.desk)];
 
 /** A part's name as the church's own words are kept ("Ministration", "  word " → "word"). */
 export const partKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
@@ -109,13 +112,13 @@ export const partKey = (name: string) => name.trim().toLowerCase().replace(/\s+/
  * Where a part runs: its own choice, else what the church chose for parts of that name, else the
  * running order. Nothing is guessed from the name; `chosen` says whether anyone decided.
  */
-export function partRun(section: Pick<ServiceSection, "name" | "desk" | "page">, learned: Record<string, PartRun> = {}): PartRun & { chosen: boolean } {
-  if (section.desk) return { desk: section.desk, ...(section.page ? { page: section.page } : {}), chosen: true };
+export function partRun(section: Pick<ServiceSection, "name" | "desk" | "page" | "also">, learned: Record<string, PartRun> = {}): PartRun & { chosen: boolean } {
+  if (section.desk) return { ...(cleanPartRun(section) ?? { desk: section.desk }), chosen: true };
   const kept = learned[partKey(section.name)];
   return kept ? { ...kept, chosen: true } : { desk: "service", chosen: false };
 }
 
-export function partDesk(section: Pick<ServiceSection, "name" | "desk" | "page">, learned: Record<string, PartRun> = {}): PartDesk {
+export function partDesk(section: Pick<ServiceSection, "name" | "desk" | "page" | "also">, learned: Record<string, PartRun> = {}): PartDesk {
   return partRun(section, learned).desk;
 }
 
@@ -126,7 +129,10 @@ const PAGES = new Set<PresenterPage>(["scriptures", "songs", "sermon"]);
 export function cleanPartRun(value: unknown): PartRun | null {
   const record = value && typeof value === "object" ? (value as Partial<PartRun>) : null;
   if (!record || !DESKS.has(record.desk as PartDesk)) return null;
-  return { desk: record.desk as PartDesk, ...(record.desk === "presenter" && PAGES.has(record.page as PresenterPage) ? { page: record.page } : {}) };
+  const desk = record.desk as PartDesk;
+  const also = Array.isArray(record.also) ? [...new Set(record.also.filter((entry): entry is PartDesk => DESKS.has(entry as PartDesk) && entry !== desk))] : [];
+  const usesPresenter = desk === "presenter" || also.includes("presenter");
+  return { desk, ...(usesPresenter && PAGES.has(record.page as PresenterPage) ? { page: record.page } : {}), ...(also.length ? { also } : {}) };
 }
 
 /** What the church chose for parts by name, cleaned (at most 100 names). */
