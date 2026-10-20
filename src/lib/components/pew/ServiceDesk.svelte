@@ -24,11 +24,12 @@
   import ServiceSettings from "./ServiceSettings.svelte";
   import ToolMenu from "../ToolMenu.svelte";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
-  import { screenful } from "../../bible/passage";
   import { activeRun } from "../../domain/service-run";
   import { clockCount } from "../../domain/schedule";
   import { clockLabel, minutesOfDay, parseClock } from "../../domain/schedule";
   import { serviceSummary } from "../../domain/service";
+  import { screenStarts } from "../../bible/passage";
+  import QuickVerse from "./QuickVerse.svelte";
   import { planSchedule } from "../../domain/schedule";
   import AddSourcesDialog, { type AddKind } from "./AddSourcesDialog.svelte";
   import { msg, t, tn } from "../../i18n/core";
@@ -259,6 +260,8 @@
   const service = $derived(session.service);
   const count = $derived(service?.sections.reduce((total, section) => total + section.items.length, 0) ?? 0);
   const upNext = $derived(session.nextItem());
+  /** The reading selected, as screens: Next goes through its verses before the next item. */
+  const reading = $derived(session.readingNow());
   const current = $derived(service && session.cursor.itemId ? service.sections.flatMap((section) => section.items).find((item) => item.id === session.cursor.itemId) : null);
   const barPart = $derived(service?.sections.find((section) => section.id === session.cursor.sectionId)?.id ?? service?.sections[0]?.id ?? null);
 
@@ -289,7 +292,12 @@
       const deck = session.decks.find((entry) => entry.id === item.deck?.deckId);
       return deck ? tn(deck.pages.length, "{n} page", "{n} pages") : t("Deck not found");
     }
-    if (item.kind === "bible" && item.bible) return session.translations.find((entry) => entry.id === item.bible?.translationId)?.abbreviation ?? "";
+    if (item.kind === "bible" && item.bible) {
+      const abbreviation = session.translations.find((entry) => entry.id === item.bible?.translationId)?.abbreviation ?? "";
+      const per = session.perScreenOf(item.bible);
+      const screens = per ? screenStarts(item.bible, per).length : 1;
+      return screens > 1 ? `${abbreviation} · ${tn(screens, "{n} screen", "{n} screens")}` : abbreviation;
+    }
     if (item.kind === "announcement") return item.announcement?.body.split("\n")[0] ?? "";
     return kindOf(item).label;
   }
@@ -298,13 +306,10 @@
   function hint(item: PresentationItem): string {
     const active = live(item) || session.cursor.itemId === item.id;
     if (!active) return "";
-    if (item.kind === "bible" && item.bible?.perScreen) {
-      const step = session.bibleStep?.itemId === item.id ? session.bibleStep : null;
-      if (!step) return "";
-      const now = screenful(item.bible, step.start, item.bible.perScreen);
-      if (now.end >= item.bible.endVerse) return t("Last verses · Next moves on");
-      const next = screenful(item.bible, now.end + 1, item.bible.perScreen);
-      return t("v{range} next", { range: next.end > next.start ? `${next.start}–${next.end}` : String(next.start) });
+    if (item.kind === "bible" && item.bible && session.cursor.itemId === item.id) {
+      const reading = session.readingNow();
+      if (!reading || reading.itemId !== item.id) return "";
+      return reading.next ? t("Next: {reference}", { reference: reading.next }) : t("Last verses · Next moves on");
     }
     if (item.kind === "deck" && item.deck) {
       const deck = session.decks.find((entry) => entry.id === item.deck?.deckId);
@@ -631,15 +636,18 @@
                   </button>
                   <span class="tools">
                     {#if item.kind === "bible" && item.bible}
-                      {@const step = session.bibleStep?.itemId === item.id ? session.bibleStep : null}
                       {@const span = item.bible.endVerse - item.bible.startVerse + 1}
-                      {#if step && item.bible.perScreen}
-                        {@const shown = screenful(item.bible, step.start, item.bible.perScreen)}
-                        <span class="verse-at" title={t("The verses on Preview or LIVE now. Next shows the next ones.")}>v{shown.start}{shown.end > shown.start ? `–${shown.end}` : ""} · {t("of {n}", { n: span })}</span>
+                      {@const per = session.perScreenOf(item.bible)}
+                      {@const reading = session.cursor.itemId === item.id || live(item) ? session.readingNow() : null}
+                      {#if reading && reading.itemId === item.id && reading.count > 1}
+                        <span class="verse-at" title={t("Screen on LIVE and on Preview. Next shows the next verses.")}>
+                          {#if reading.live}<b class="at-live">{reading.live}</b>{/if}{#if reading.preview && reading.preview !== reading.live}<b class="at-preview">{reading.preview}</b>{/if}<span>{t("of {n}", { n: reading.count })}</span>
+                        </span>
                       {/if}
                       {#if span > 1}
                         <label class="per-screen" title={t("How many verses each screen shows; Next steps to the next ones")}>
-                          <select aria-label={t("Verses per screen for {title}", { title: item.title })} value={String(item.bible.perScreen ?? 0)} onchange={(event) => void session.setVersesPerScreen(item.id, Number(event.currentTarget.value) || null)}>
+                          <select aria-label={t("Verses per screen for {title}", { title: item.title })} value={item.bible.perScreen === undefined ? "auto" : String(item.bible.perScreen)} onchange={(event) => void session.setVersesPerScreen(item.id, event.currentTarget.value === "auto" ? null : Number(event.currentTarget.value))}>
+                            <option value="auto">{per ? t("Auto · {n} a screen", { n: per }) : t("Auto · one screen")}</option>
                             <option value="0">{t("All verses")}</option>
                             {#each [1, 2, 3, 4, 5, 6, 8, 10].filter((n) => n < span) as n (n)}<option value={String(n)}>{tn(n, "{n} verse a screen", "{n} verses a screen")}</option>{/each}
                           </select>
@@ -719,10 +727,21 @@
     </aside>
   {:else}
   <aside class="stage">
+    <QuickVerse />
     <MonitorPair page="service" place={current?.title ?? ""} onstep={(direction) => void session.step(direction)} />
     <div class="next">
-      <span class="kicker">{t("Up next")}</span>
-      {#if upNext}
+      <span class="kicker">{reading?.next ? t("Next verses") : t("Up next")}</span>
+      {#if reading?.next}
+        <div class="next-card reading-next">
+          <span class="screen-dots" aria-hidden="true">
+            {#each Array.from({ length: Math.min(reading.count, 12) }, (_, i) => i + 1) as n (n)}<i class:done={reading.live !== null && n <= reading.live} class:next={n === reading.nextIndex}></i>{/each}
+          </span>
+          <span class="next-copy">
+            <strong>{reading.next}</strong>
+            <em>{t("Screen {n} of {count}", { n: reading.nextIndex ?? 1, count: reading.count })}{upNext ? ` · ${t("then {title}", { title: upNext.title })}` : ""}</em>
+          </span>
+        </div>
+      {:else if upNext}
         {@const kind = kindOf(upNext)}
         {@const nextPart = service?.sections.find((section) => section.items.some((entry) => entry.id === upNext.id))}
         <div class="next-card">
@@ -737,8 +756,13 @@
       {/if}
       <div class="item-steps">
         <button type="button" class="desk-btn" disabled={!service} onclick={() => void session.stepItem(-1)} title={t("Previous item (Page Up)")}><Icon name="chevron-left" size={15} /> {t("Previous")}</button>
-        <button type="button" class="desk-btn next-btn" disabled={!upNext} onclick={() => void session.stepItem(1)} title={t("Next item (Page Down)")}>{session.liveOnClick ? t("Next to LIVE") : t("Next item")} <Icon name="chevron-right" size={15} /></button>
+        {#if reading?.next}
+          <button type="button" class="desk-btn next-btn" onclick={() => void session.step(1)} title={t("The next verses (→). Page Down skips to the next item.")}>{reading.live !== null || session.liveOnClick ? t("Next verses to LIVE") : t("Next verses")} <Icon name="chevron-right" size={15} /></button>
+        {:else}
+          <button type="button" class="desk-btn next-btn" disabled={!upNext} onclick={() => void session.stepItem(1)} title={t("Next item (Page Down)")}>{session.liveOnClick ? t("Next to LIVE") : t("Next item")} <Icon name="chevron-right" size={15} /></button>
+        {/if}
       </div>
+      {#if reading?.next && upNext}<button type="button" class="skip-reading" onclick={() => void session.stepItem(1)} title={t("Leave the reading and go to the next item (Page Down)")}>{t("Skip to {title}", { title: upNext.title })} <Icon name="chevron-right" size={12} /></button>{/if}
     </div>
     <details class="more-tools">
       <summary><Icon name="chevron-right" size={13} /> {t("More tools")}<span class="muted">{t("Follow the sermon, macros")}</span></summary>
@@ -992,7 +1016,17 @@
   .auto-live.on .switch { background: var(--live, #fa4f00); }
   .auto-live.on .switch i { transform: translateX(11px); }
   .per-screen select { height: 24px; max-width: 132px; padding: 0 4px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 11px; }
-  .verse-at { padding: 1px 7px; border-radius: 7px; background: color-mix(in srgb, #30a46c 18%, transparent); font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .verse-at { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 8%, transparent); font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .verse-at b { min-width: 16px; padding: 0 4px; border-radius: 5px; text-align: center; color: #fff; }
+  .verse-at .at-live { background: var(--live, #e5484d); }
+  .verse-at .at-preview { background: #30a46c; }
+  .verse-at span { color: var(--muted); }
+  .screen-dots { display: grid; grid-template-columns: repeat(4, 8px); gap: 4px; flex: none; padding: 6px; }
+  .screen-dots i { width: 8px; height: 8px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+  .screen-dots i.done { background: color-mix(in srgb, var(--live, #e5484d) 70%, transparent); }
+  .screen-dots i.next { background: #30a46c; box-shadow: 0 0 0 2px color-mix(in srgb, #30a46c 35%, transparent); }
+  .skip-reading { justify-self: end; display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .skip-reading:hover { color: var(--ink); text-decoration: underline; }
   .end { flex: none; height: 30px; font-size: 12px; border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); background: none; }
   .end.armed { background: var(--danger, #e5484d); color: #fff; }
   .start { flex: none; height: 30px; font-size: 12px; border-color: #30a46c; background: #30a46c; color: #fff; }

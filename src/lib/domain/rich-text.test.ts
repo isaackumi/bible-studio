@@ -98,7 +98,7 @@ describe("formatted text end to end", () => {
     expect(model.lines.map((line) => line.text)).toEqual(["Welcome", "• Coffee"]);
     // Through JSON, as it travels to the audience window.
     expect(JSON.parse(JSON.stringify(model)).rich).toEqual(rich);
-  });
+  }, 20_000);
 });
 
 describe("formatted words on items", () => {

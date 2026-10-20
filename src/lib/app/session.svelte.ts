@@ -16,7 +16,7 @@ import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { screenful, shiftPassage, stepScreenful, stepVerse } from "../bible/passage";
+import { screenful, screenStarts, shiftPassage, stepScreenful, stepVerse, versesPerScreen } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
 import type { CommandId } from "../commands/registry";
 import { api, mediaUrl } from "../db/api";
@@ -1968,7 +1968,7 @@ class Session {
     });
   }
 
-  selectItem = async (itemId: string) => {
+  selectItem = async (itemId: string, at: "resume" | "exact" | "first" | "last" = "resume") => {
     if (!this.service) return;
     const found = findItem(this.service, itemId);
     if (!found) return;
@@ -1996,64 +1996,159 @@ class Session {
       this.persistSoon();
       return;
     }
-    // A passage shown a few verses at a time starts at its first screenful.
-    // (A reading still on LIVE keeps its place while something else is on Preview.)
-    if (found.item.bible?.perScreen) {
-      if (this.bibleStep?.itemId !== itemId || this.live.program.sourceId !== itemId) this.bibleStep = { itemId, start: found.item.bible.startVerse };
-    } else if (this.bibleStep && this.live.program.sourceId !== this.bibleStep.itemId) this.bibleStep = null;
+    // A reading shown a few verses at a time: on LIVE, Preview shows the screen after the one up;
+    // otherwise it picks up where it was left (from the top once finished), or at its last screen
+    // when stepping back into it.
+    const bible = found.item.bible;
+    const per = bible ? this.perScreenOf(bible) : null;
+    if (bible && per) {
+      const starts = screenStarts(bible, per);
+      const last = starts[starts.length - 1]!;
+      const live = this.liveReading?.itemId === itemId && this.live.program.sourceId === itemId ? this.liveReading : null;
+      const saved = this.readingAt[itemId];
+      const start = live ? (stepScreenful(bible, live.start, per, 1) ?? live.start) : at === "last" ? last : at === "exact" && saved !== undefined ? saved : at === "resume" && saved !== undefined && saved < last ? saved : bible.startVerse;
+      this.previewReading = { itemId, start };
+      this.readingAt = { ...this.readingAt, [itemId]: start };
+    } else this.previewReading = null;
     const model = await this.modelFor(this.screenfulItem(found.item));
     if (token !== this.selectToken) return;
     this.lookOnPreview = null;
     this.live = setPreview(this.live, frame(model, itemId, "cut"));
+    this.previewFree = false;
     this.persistSoon();
   };
 
-  /** Where a passage shown a few verses at a time has got to (the item and its screenful's first verse). */
-  bibleStep = $state<{ itemId: string; start: number } | null>(null);
+  /** The screen of a reading on Preview (the item and that screen's first verse). */
+  previewReading = $state<{ itemId: string; start: number } | null>(null);
+  /** The screen of a reading on LIVE, kept apart from Preview so neither moves the other. */
+  liveReading = $state<{ itemId: string; start: number } | null>(null);
+  /** Where each reading was left on Preview, so coming back to it picks up there. */
+  private readingAt = $state<Record<string, number>>({});
+  /** A verse searched or heard onto Preview, outside the running order. */
+  previewFree = $state(false);
 
-  /** The item as its current screenful (a scripture item with verses per screen), else as it is. */
-  private screenfulItem(item: PresentationItem): PresentationItem {
+  /** The reading on Preview (for the running order's position marks). */
+  get bibleStep(): { itemId: string; start: number } | null {
+    return this.previewReading;
+  }
+
+  /** Verses a screen for a reading: its own setting, else long readings a few at a time. */
+  perScreenOf = (bible: BibleItem): number | null => versesPerScreen(bible, this.service?.versesPerScreen);
+
+  /** The item as one screen (a reading shown a few verses at a time), else as it is. */
+  private screenfulItem(item: PresentationItem, at?: number): PresentationItem {
     const bible = item.bible;
-    if (!bible?.perScreen) return item;
-    const start = this.bibleStep?.itemId === item.id ? this.bibleStep.start : bible.startVerse;
-    const shown = screenful(bible, start, bible.perScreen);
+    const per = bible ? this.perScreenOf(bible) : null;
+    if (!bible || !per) return item;
+    const start = at ?? (this.previewReading?.itemId === item.id ? this.previewReading.start : bible.startVerse);
+    const shown = screenful(bible, start, per);
     const book = this.books.find((entry) => entry.ord === bible.bookOrd);
     const reference = formatReference(book?.name ?? bible.reference.replace(/\s*\d+(:.*)?$/, ""), bible.chapter, shown.start, shown.end, book?.chapters ?? 1);
     return { ...item, bible: { ...bible, startVerse: shown.start, endVerse: shown.end, reference } };
   }
 
-  /**
-   * Next / previous screenful of the scripture item on Preview. When that item is live, the new
-   * screenful goes to LIVE too, so the reader can be followed verse by verse. False at either end.
-   */
-  private stepScreenful = async (direction: 1 | -1): Promise<boolean> => {
-    const step = this.bibleStep;
-    if (!this.service || !step || step.itemId !== this.cursor.itemId) return false;
-    const item = findItem(this.service, step.itemId)?.item;
-    if (!item?.bible?.perScreen) return false;
-    const next = stepScreenful(item.bible, step.start, item.bible.perScreen, direction);
-    if (next === null) return false;
-    const wasLive = this.live.program.sourceId === item.id;
-    this.bibleStep = { itemId: item.id, start: next };
-    const shown = this.screenfulItem(item);
-    const model = await this.modelFor(shown);
+  /** Verses heard while on the Service page, offered beside Preview instead of replacing it (newest first). */
+  heardVerses = $state<BibleItem[]>([]);
+
+  offerHeardVerse = (passage: BibleItem) => {
+    this.heardVerses = [passage, ...this.heardVerses.filter((entry) => entry.reference !== passage.reference)].slice(0, 3);
+  };
+
+  dismissHeardVerse = (reference: string | null = null) => {
+    this.heardVerses = reference === null ? [] : this.heardVerses.filter((entry) => entry.reference !== reference);
+  };
+
+  /** Back from a verse searched or heard: the running order's selected item on Preview again. */
+  backToService = async () => {
+    if (this.cursor.itemId) await this.selectItem(this.cursor.itemId, "exact");
+    else {
+      this.previewFree = false;
+      this.message = t("Pick an item in the running order.");
+    }
+  };
+
+  /** Put one screen of a reading on Preview. */
+  private showReadingScreen = async (item: PresentationItem, start: number) => {
+    this.previewReading = { itemId: item.id, start };
+    this.readingAt = { ...this.readingAt, [item.id]: start };
+    const model = await this.modelFor(this.screenfulItem(item, start));
     this.lookOnPreview = null;
     this.live = setPreview(this.live, frame(model, item.id, "cut"));
-    if (wasLive || this.liveOnClick) await this.take();
-    this.message = t("{reference} is on {where}.", { reference: shown.bible!.reference, where: wasLive || this.liveOnClick ? t("LIVE") : t("Preview") });
+    this.previewFree = false;
+  };
+
+  /**
+   * Next / previous screen of the reading selected. When it is on LIVE, the next screen goes up
+   * (and Preview moves on to the one after); otherwise Preview moves (LIVE too with Auto LIVE).
+   * False at either end, so the step moves on through the running order.
+   */
+  private stepScreenful = async (direction: 1 | -1): Promise<boolean> => {
+    if (!this.service || !this.cursor.itemId) return false;
+    const item = findItem(this.service, this.cursor.itemId)?.item;
+    const bible = item?.bible;
+    const per = bible ? this.perScreenOf(bible) : null;
+    if (!item || !bible || !per) return false;
+    const live = this.liveReading?.itemId === item.id && this.live.program.sourceId === item.id ? this.liveReading : null;
+    const from = live ? live.start : this.previewReading?.itemId === item.id ? this.previewReading.start : bible.startVerse;
+    const next = stepScreenful(bible, from, per, direction);
+    if (next === null) return false;
+    await this.showReadingScreen(item, next);
+    if (live || this.liveOnClick) await this.take();
+    else this.message = t("{reference} is on Preview.", { reference: this.screenfulItem(item, next).bible!.reference });
     return true;
   };
 
-  /** Show a scripture item a few verses at a time (null: all at once), from its first screenful. */
+  /** After LIVE: note the reading screen that went up, and run Preview one screen ahead of it. */
+  private followReading = async () => {
+    const shown = this.previewReading;
+    const programId = this.live.program.sourceId;
+    if (!shown || programId !== shown.itemId || !this.service) {
+      if (this.liveReading && programId !== this.liveReading.itemId) this.liveReading = null;
+      return;
+    }
+    this.liveReading = { ...shown };
+    const item = findItem(this.service, shown.itemId)?.item;
+    const bible = item?.bible;
+    const per = bible ? this.perScreenOf(bible) : null;
+    const ahead = bible && per ? stepScreenful(bible, shown.start, per, 1) : null;
+    if (item && ahead !== null) await this.showReadingScreen(item, ahead);
+  };
+
+  /** The reading selected, as screens: which is on Preview and LIVE, and what Next shows. */
+  readingNow = (): { itemId: string; count: number; preview: number | null; live: number | null; next: string | null; nextIndex: number | null } | null => {
+    if (!this.service || !this.cursor.itemId) return null;
+    const item = findItem(this.service, this.cursor.itemId)?.item;
+    const bible = item?.bible;
+    const per = bible ? this.perScreenOf(bible) : null;
+    if (!item || !bible || !per) return null;
+    const starts = screenStarts(bible, per);
+    const live = this.liveReading?.itemId === item.id && this.live.program.sourceId === item.id ? this.liveReading.start : null;
+    const preview = this.previewReading?.itemId === item.id ? this.previewReading.start : null;
+    // Next sends the screen after the one on LIVE; with nothing of it up, it moves Preview on.
+    const nextStart = stepScreenful(bible, live ?? preview ?? bible.startVerse, per, 1);
+    const index = (start: number | null) => (start === null ? null : starts.indexOf(start) + 1 || null);
+    return {
+      itemId: item.id,
+      count: starts.length,
+      preview: index(preview),
+      live: index(live),
+      next: nextStart === null ? null : this.screenfulItem(item, nextStart).bible!.reference,
+      nextIndex: index(nextStart),
+    };
+  };
+
+  /** Verses a screen for a reading: a number, 0 for all at once, or null for the automatic choice. */
   setVersesPerScreen = async (itemId: string, perScreen: number | null) => {
     if (!this.service) return;
     const found = findItem(this.service, itemId);
     if (!found?.item.bible) return;
     const bible = { ...found.item.bible };
-    if (perScreen && perScreen > 0) bible.perScreen = Math.min(20, Math.round(perScreen));
+    if (perScreen !== null && perScreen >= 0) bible.perScreen = Math.min(20, Math.round(perScreen));
     else delete bible.perScreen;
     this.updateItem({ ...found.item, bible });
-    if (this.cursor.itemId === itemId) await this.selectItem(itemId);
+    const { [itemId]: _dropped, ...rest } = this.readingAt;
+    this.readingAt = rest;
+    if (this.cursor.itemId === itemId) await this.selectItem(itemId, "first");
   };
 
   /** While the service runs, choosing an item sends it straight to LIVE (unless turned off for this service). */
@@ -2069,9 +2164,11 @@ class Session {
   };
 
   /** Choose an item from the running order: Preview, and LIVE too while the service runs (if on). */
-  chooseItem = async (itemId: string) => {
-    await this.selectItem(itemId);
-    if (this.liveOnClick && this.cursor.itemId === itemId && this.live.preview.model.layout !== "empty") await this.take();
+  chooseItem = async (itemId: string, at: "resume" | "first" | "last" = "resume") => {
+    // A reading already on LIVE stays where it is: Preview holds its next verses until Next or LIVE.
+    const readingUp = this.liveReading?.itemId === itemId && this.live.program.sourceId === itemId;
+    await this.selectItem(itemId, at);
+    if (this.liveOnClick && !readingUp && this.cursor.itemId === itemId && this.live.preview.model.layout !== "empty") await this.take();
   };
 
   step = async (direction: 1 | -1) => {
@@ -2094,11 +2191,7 @@ class Session {
       }
     }
     // A verse searched or spoken onto Preview (not the selected service item) steps by verse.
-    const cursorItem = this.service && this.cursor.itemId ? findItem(this.service, this.cursor.itemId)?.item : null;
-    const freeVerse =
-      this.live.preview.model.layout === "scripture" &&
-      this.previewBible !== null &&
-      cursorItem?.bible?.reference !== this.previewBible.reference;
+    const freeVerse = this.previewFree && this.live.preview.model.layout === "scripture" && this.previewBible !== null;
     if (freeVerse && (await this.stepPreviewScripture(direction))) return;
     // A look with a scripture region on Preview steps its verse.
     if (this.lookVerse("preview") && (await this.stepLookVerse("preview", direction))) return;
@@ -2106,11 +2199,13 @@ class Session {
     if (await this.stepScreenful(direction)) return;
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
-    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId);
+    // Back into a reading lands on its last screen; forward, on its first.
+    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId, direction < 0 ? "last" : "first");
   };
 
   previewModel = (model: PresentationModel, sourceId: string | null) => {
     this.lookOnPreview = null;
+    this.previewFree = false;
     this.live = setPreview(this.live, frame(model, sourceId, "cut"));
   };
 
@@ -2715,6 +2810,7 @@ class Session {
     const item: PresentationItem = { id: "preview", kind: "bible", title: passage.reference, bible: passage };
     const model = await this.modelFor(item);
     this.previewModel(model, null);
+    this.previewFree = true;
     this.remember(passage);
   };
 
@@ -3585,7 +3681,7 @@ class Session {
   stepItem = async (direction: 1 | -1) => {
     if (!this.service) return;
     const next = stepCursor(this.service, this.cursor, direction);
-    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId);
+    if (next.itemId && next.itemId !== this.cursor.itemId) await this.chooseItem(next.itemId, "first");
   };
 
   /** The item after the selected one, for "Up next". */
@@ -6065,7 +6161,7 @@ class Session {
       this.videoEnded = null;
     }
     // The section of what went live has begun (the first time today).
-    if ((action === "take" || action === "cut") && this.service && this.cursor.itemId) {
+    if ((action === "take" || action === "cut") && this.service && this.cursor.itemId && this.live.program.sourceId === this.cursor.itemId) {
       const section = this.service.sections.find((entry) => entry.items.some((item) => item.id === this.cursor.itemId));
       const today = new Date().toDateString();
       if (section && (this.sectionStartsDay !== today || this.sectionStarts[section.id] === undefined)) this.startSection(section.id);
@@ -6086,6 +6182,8 @@ class Session {
       }
     }
     void this.followSongTrack();
+    if (action === "take" || action === "cut") await this.followReading();
+    else this.liveReading = null;
     // Remember the look that went live, so its verse can step on Program.
     this.lookOnProgram = action === "take" || action === "cut" ? this.lookAt("program") : null;
     await this.pushProgram();

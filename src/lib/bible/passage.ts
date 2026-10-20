@@ -60,3 +60,29 @@ export function stepScreenful(passage: Pick<BibleItem, "startVerse" | "endVerse"
   if (direction < 0 && current.start <= passage.startVerse) return null;
   return Math.max(passage.startVerse, next);
 }
+
+/** Verses a screen when a reading has no setting of its own and is long. */
+export const AUTO_PER_SCREEN = 2;
+
+/**
+ * How many verses each screen of a reading shows: its own setting (0: all at once), else a long
+ * reading (more than three verses) goes a few at a time, the service's default or two. Null: one screen.
+ */
+export function versesPerScreen(passage: Pick<BibleItem, "startVerse" | "endVerse" | "perScreen">, fallback?: number | null): number | null {
+  if (passage.perScreen === 0) return null;
+  if (passage.perScreen && passage.perScreen > 0) return Math.floor(passage.perScreen);
+  const length = passage.endVerse - passage.startVerse + 1;
+  const auto = fallback && fallback > 0 ? Math.floor(fallback) : AUTO_PER_SCREEN;
+  return length > Math.max(3, auto) ? auto : null;
+}
+
+/** The first verse of every screen of a reading, in order. */
+export function screenStarts(passage: Pick<BibleItem, "startVerse" | "endVerse">, perScreen: number | null): number[] {
+  const starts: number[] = [];
+  let at: number | null = passage.startVerse;
+  while (at !== null && starts.length < 200) {
+    starts.push(at);
+    at = stepScreenful(passage, at, perScreen, 1);
+  }
+  return starts;
+}

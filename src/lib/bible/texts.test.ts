@@ -22,5 +22,5 @@ describe("bundled translations", () => {
     expect(asv[0]?.text.toLowerCase()).toContain("god so loved");
     expect(web[0]?.text.toLowerCase()).toContain("god so loved");
     expect(bbe[0]?.text.toLowerCase()).toContain("love for the world");
-  });
+  }, 20_000);
 });

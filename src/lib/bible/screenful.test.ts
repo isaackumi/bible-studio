@@ -19,3 +19,16 @@ describe("a passage a few verses at a time", () => {
     expect(stepScreenful(psalm, 4, 3, -1)).toBe(1);
   });
 });
+
+describe("verses per screen for a reading", () => {
+  it("uses the reading's own setting, all at once for 0, and splits long readings by itself", async () => {
+    const { versesPerScreen, screenStarts } = await import("./passage");
+    expect(versesPerScreen({ startVerse: 1, endVerse: 12, perScreen: 3 })).toBe(3);
+    expect(versesPerScreen({ startVerse: 1, endVerse: 12, perScreen: 0 })).toBeNull();
+    expect(versesPerScreen({ startVerse: 16, endVerse: 18 })).toBeNull();
+    expect(versesPerScreen({ startVerse: 1, endVerse: 12 })).toBe(2);
+    expect(versesPerScreen({ startVerse: 1, endVerse: 12 }, 4)).toBe(4);
+    expect(screenStarts({ startVerse: 1, endVerse: 7 }, 3)).toEqual([1, 4, 7]);
+    expect(screenStarts({ startVerse: 16, endVerse: 18 }, null)).toEqual([16]);
+  });
+});

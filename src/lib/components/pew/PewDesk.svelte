@@ -611,6 +611,12 @@
     ].slice(0, 12);
     // A pending arrow-key Take must never carry a spoken verse to Program.
     takeAfterPreview = false;
+    // On the Service page the running order keeps Preview: the verse heard is offered beside it.
+    if (mode === "service") {
+      session.offerHeardVerse({ ...hit, translationId: hit.translationId || translationId });
+      session.voice.message = `${hit.reference} heard. It waits beside Preview.`;
+      return;
+    }
     void showPassage(hit.startVerse, hit.endVerse);
   }
 

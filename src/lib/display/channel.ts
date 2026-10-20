@@ -75,7 +75,8 @@ export function publishTo(store: PacketStore, packet: ProgramPacket): boolean {
 export function publishLocal(packet: ProgramPacket): boolean {
   if (!publishTo(localStorage, packet)) return false;
   const channel = new BroadcastChannel(NAME);
-  channel.postMessage(packet);
+  // A plain copy: the desk's live state is reactive, and a channel can only carry plain data.
+  channel.postMessage(JSON.parse(JSON.stringify(packet)));
   channel.close();
   return true;
 }
