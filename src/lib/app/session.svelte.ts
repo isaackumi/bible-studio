@@ -71,7 +71,12 @@ import {
   type SharedSource,
   type SourceFields,
 } from "../domain/sources";
-import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, setPreview, withoutWords } from "../domain/live";
+import { applyProgramAction, createLiveState, frame, programPacket, replaceProgramModel, restoreProgram, setPreview, withoutWords } from "../domain/live";
+
+/** The Undo key as this computer writes it. */
+function shortcutLabelForUndo(): string {
+  return typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘Z" : "Ctrl+Z";
+}
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo } from "../domain/present";
 import {
   cameraDeviceId,
@@ -5733,6 +5738,44 @@ class Session {
     }
   }
 
+  // Undo for Program: what it showed before the last LIVE, Cut, Clear, Clear words, Black or Logo.
+  // ⌘Z (Ctrl+Z) puts it back; pressing it again swaps back, so an undo can be undone.
+
+  private programBefore: { program: LiveState["program"]; held: boolean; look: Composition | null } | null = null;
+  /** There is a Program change to undo. */
+  canUndoProgram = $state(false);
+
+  private rememberProgram() {
+    this.programBefore = { program: this.live.program, held: this.programHeld, look: this.lookOnProgram };
+    this.canUndoProgram = true;
+  }
+
+  undoProgram = async () => {
+    const before = this.programBefore;
+    if (!before) {
+      this.message = t("Nothing to undo on Program.");
+      return;
+    }
+    if (!this.desktop() && !this.controlsAudience) {
+      this.message = t("This window is not sending to the audience.");
+      return;
+    }
+    if (this.deckLoop) this.stopDeckLoop();
+    // Keep what is showing now, so pressing Undo again brings it back.
+    this.programBefore = { program: this.live.program, held: this.programHeld, look: this.lookOnProgram };
+    this.live = restoreProgram(this.live, before.program);
+    this.programHeld = before.held;
+    this.lookOnProgram = before.look;
+    await this.pushProgram();
+    this.message = t("Program is back to what it showed before. Undo again to swap back.");
+  };
+
+  /** After a change that empties or blacks out the screen: a note with Undo. */
+  private offerProgramUndo(label: string) {
+    const key = shortcutLabelForUndo();
+    this.notify(label, { detail: t("Undo puts back what was showing ({key}).", { key }), actions: [{ label: t("Undo"), run: () => { void this.undoProgram(); this.dismissToast(); } }] });
+  }
+
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {
     if (!this.desktop() && !this.controlsAudience) {
       this.message = t("This window is not sending to the audience.");
@@ -5745,6 +5788,7 @@ class Session {
     }
     // The operator taking over Program ends a running loop.
     if (this.deckLoop) this.stopDeckLoop();
+    this.rememberProgram();
     this.releaseHold();
     const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
     const themeTransition = this.theme().transition;
@@ -5790,6 +5834,8 @@ class Session {
     // Remember the look that went live, so its verse can step on Program.
     this.lookOnProgram = action === "take" || action === "cut" ? this.lookAt("program") : null;
     await this.pushProgram();
+    if (action === "clear") this.offerProgramUndo(t("Program cleared"));
+    else if (action === "black") this.offerProgramUndo(t("Program is black"));
     this.message =
       action === "take"
         ? takeTransition?.type === "cut"
@@ -5820,9 +5866,10 @@ class Session {
       return;
     }
     if (this.deckLoop) this.stopDeckLoop();
+    this.rememberProgram();
     this.live = replaceProgramModel(this.live, model, "fade");
     await this.pushProgram();
-    this.message = t("Words cleared. The background stays.");
+    this.offerProgramUndo(t("Words cleared. The background stays."));
   };
   black = () => this.act("black");
   logo = () => this.act("logo");

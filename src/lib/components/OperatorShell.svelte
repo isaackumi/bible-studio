@@ -103,6 +103,13 @@
     // Inside a modal dialog, keys belong to the dialog (Space presses its button, never Take).
     // Escape still reaches the desk, which closes Find.
     if (target?.closest('[aria-modal="true"]') && event.code !== "Escape") return;
+    // ⌘Z / Ctrl+Z outside text fields undoes the last Program change (text fields keep their own undo).
+    const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
+    if (event.code === "KeyZ" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && !typing) {
+      event.preventDefault();
+      void session.undoProgram();
+      return;
+    }
     createKeyboardManager(session.workspace.shortcuts ?? defaultShortcuts, {
       take: () => void session.run("take"),
       cut: () => void session.run("cut"),

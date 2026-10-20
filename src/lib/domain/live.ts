@@ -26,6 +26,11 @@ export function replaceProgramModel(state: LiveState, model: PresentationModel, 
   };
 }
 
+/** Put an earlier Program frame back (Undo), cut in, as a new revision so every screen follows. */
+export function restoreProgram(state: LiveState, program: LiveState["program"]): LiveState {
+  return { preview: state.preview, program: { ...program, transition: "cut" }, revision: state.revision + 1 };
+}
+
 export function applyProgramAction(
   state: LiveState,
   action: ProgramAction,

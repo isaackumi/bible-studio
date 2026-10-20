@@ -52,6 +52,7 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let detections = $state<SearchHit[]>([]);
+  const undoKey = typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘Z" : "Ctrl+Z";
   /** The key for a desk action, as set in Settings › Keyboard. */
   const keyOf = (action: "take" | "black" | "clear") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   /** The queue's Clear all was pressed once. */
@@ -916,6 +917,7 @@
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head">
                     <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
+                    {#if programSet && !displayLive}<span class="unseen" role="status">{t("The audience can't see this")}</span>{/if}
                     <button
                       type="button"
                       class="style-name"
@@ -930,9 +932,11 @@
                   <VideoControls />
                   <footer class="output-tools">
                     <button type="button" class="lex" onclick={() => (sheet = sheet === "lexicon" ? null : "lexicon")}>{@render icon("book")} {t("Lexicon")}</button>
-                    <span class="steppers">
-                      <button type="button" aria-label={t("Previous")} onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
-                      <button type="button" aria-label={t("Next")} onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
+                    <!-- On Program, these change the screen at once (the arrow keys only change Preview). -->
+                    <span class="steppers live-steps">
+                      <span class="steps-label">{t("Live")}</span>
+                      <button type="button" aria-label={t("Previous, straight to the screen")} data-tip={t("Previous, straight to the screen (the ← key only changes Preview)")} onclick={() => void stepOutput(-1)}>{@render icon("chevron-left")}</button>
+                      <button type="button" aria-label={t("Next, straight to the screen")} data-tip={t("Next, straight to the screen (the → key only changes Preview)")} onclick={() => void stepOutput(1)}>{@render icon("chevron-right")}</button>
                     </span>
                   </footer>
                 </section>
@@ -980,6 +984,8 @@
       {#if sheet === "help"}
         <p>{t("Click a verse to put it on Preview. Shift-click a second verse to select a range.")}</p>
         <p>{t("LIVE copies Preview onto Program. BLACK and CLEAR change Program only.")}</p>
+        <p>{t("The arrow keys and the arrows on Preview step Preview. The Live arrows under Program change the screen at once.")}</p>
+        <p>{t("{key} undoes the last change to Program: LIVE, CLEAR, BLACK or LOGO.", { key: undoKey })}</p>
         <p>{t("Search a reference such as John 3:16, or a phrase such as “in the beginning”.")}</p>
         <p>{t("Listen matches spoken scripture on Preview. It never takes Program by itself.")}</p>
         <p>{t("F focuses Preview and Program. [ hides the library. ] hides the queue. / searches. None of these change Program.")}</p>
@@ -1366,6 +1372,10 @@
     font-size: 10px;
     letter-spacing: 0.12em;
     cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .output-tools { justify-content: space-between; padding-bottom: 10px; flex: none; position: relative; z-index: 1; }
   .lex, .steppers button {
@@ -1380,6 +1390,10 @@
     padding: 0 10px;
   }
   .steppers { display: flex; gap: 6px; }
+  .live-steps { align-items: center; }
+  .unseen { font-size: 11px; font-weight: 650; color: #f5a524; white-space: nowrap; }
+  .live-steps .steps-label { font-size: 11px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--live, #e5484d); }
+  .live-steps button { border-color: color-mix(in srgb, var(--live, #e5484d) 45%, var(--line)); }
   .steppers button { width: 32px; padding: 0; justify-content: center; }
   .queue button { padding: 8px 10px; }
   .queue-empty { margin: 4px 2px; font-size: 12px; line-height: 1.45; color: var(--muted); }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import VideoControls from "../VideoControls.svelte";
+  import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import LookScripture from "./LookScripture.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
@@ -121,6 +122,11 @@
   const displayLive = $derived(
     session.output.online && !session.programHeld && session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty",
   );
+  /** Something is on Program but the audience window is closed (or held): say so. */
+  const programUnseen = $derived(
+    !displayLive && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black",
+  );
+  const keyOf = (action: "take" | "cut" | "clear" | "clear-words" | "black" | "logo") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   const focus = $derived(session.workspace.pew.focus);
   const activeLayout = $derived(
     session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
@@ -399,10 +405,10 @@
       {/if}
       <OutputMenu />
       {#if looksOpen}
-        <button type="button" class="desk-btn live" data-tip={t("Show Preview to the audience, with the chosen transition")} onclick={() => void transition()}>
+        <button type="button" class="desk-btn live" data-tip={`${t("Show Preview to the audience, with the chosen transition")} (${keyOf("take")})`} onclick={() => void transition()}>
           <Icon name="play" size={16} /> {t("GO LIVE")}
         </button>
-        <button type="button" class="desk-btn" data-tip={t("Switch instantly, no transition")} onclick={() => session.cut()}>
+        <button type="button" class="desk-btn" data-tip={`${t("Switch instantly, no transition")} (${keyOf("cut")})`} onclick={() => session.cut()}>
           <Icon name="scissors" size={16} /> {t("CUT")}
         </button>
       {/if}
@@ -490,13 +496,16 @@
         {t("FADE")}
       </button>
       <div class="resets">
-        <button type="button" class="desk-btn ghost" data-tip={t("Clear Program")} onclick={() => session.clear()}>
+        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (${keyOf("clear-words")})`} onclick={() => void session.clearWords()}>
+          {t("CLEAR WORDS")}
+        </button>
+        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>
           <Icon name="square" size={16} /> {t("CLEAR")}
         </button>
-        <button type="button" class="desk-btn danger" data-tip={t("Black Program")} onclick={() => session.black()}>
+        <button type="button" class="desk-btn danger" data-tip={`${t("Black Program")} (${keyOf("black")})`} onclick={() => session.black()}>
           <Icon name="moon" size={16} /> {t("BLACK")}
         </button>
-        <button type="button" class="desk-btn" data-tip={t("Logo on Program")} onclick={() => session.logo()}>
+        <button type="button" class="desk-btn" data-tip={`${t("Logo on Program")} (${keyOf("logo")})`} onclick={() => session.logo()}>
           <Icon name="logo" size={16} /> {t("LOGO")}
         </button>
       </div>
@@ -510,6 +519,7 @@
     <section class="pane program" class:on-air={displayLive}>
       <header>
         <span class="kicker program">{#if displayLive}<span class="pip"></span>{/if}{t("Program")}</span>
+        {#if programUnseen}<span class="unseen" role="status">{t("The audience can't see this")}</span>{/if}
         <span class="meta">{programLabel}</span>
       </header>
       <div class="well"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. GO LIVE sends Preview here.")} /></div>
@@ -1021,6 +1031,7 @@
   }
   .kicker.program { color: var(--pigment-live-ink); display: inline-flex; align-items: center; gap: 6px; }
   .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .unseen { margin-right: auto; margin-left: 10px; font-size: 12px; font-weight: 650; color: #f5a524; white-space: nowrap; }
   .pip {
     width: 7px;
     height: 7px;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyProgramAction, createLiveState, frame, replaceProgramModel, sameProgram, setPreview } from "./live";
+import { applyProgramAction, createLiveState, frame, replaceProgramModel, restoreProgram, sameProgram, setPreview } from "./live";
 import { defaultTheme } from "./theme";
 import type { PresentationModel } from "./types";
 import { PROGRAM_ACTIONS } from "./types";
@@ -132,5 +132,18 @@ describe("clearing a lower-third theme", () => {
     expect(words.layout).toBe("empty");
     expect(words.reference).toBeNull();
     expect(words.lines).toEqual([]);
+  });
+});
+
+describe("undoing a Program change", () => {
+  it("puts the earlier frame back as a new revision, cut in", () => {
+    const theme = defaultTheme();
+    const before = applyProgramAction(createLiveState(theme), "logo", theme, { title: "Grace", imageUrl: null });
+    const cleared = applyProgramAction(before, "clear", theme, { title: "Grace", imageUrl: null });
+    const undone = restoreProgram(cleared, before.program);
+    expect(undone.program.model).toEqual(before.program.model);
+    expect(undone.program.transition).toBe("cut");
+    expect(undone.revision).toBe(cleared.revision + 1);
+    expect(undone.preview).toBe(cleared.preview);
   });
 });

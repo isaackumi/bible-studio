@@ -8,6 +8,7 @@
   import type { Song, SongSection, SongSectionKind } from "../../domain/types";
   import { buildSongIndex, chooseSung, screenForSung, type SungMatch } from "../../voice/song-detect";
   import { SONG_LINE_CHOICES } from "../../domain/song-screens";
+  import { partForKey, SONG_PART_LETTERS } from "../../domain/song-keys";
   import { preferService, serviceSongIds } from "../../domain/service-first";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
@@ -161,6 +162,29 @@
     };
   });
   const selected = $derived(session.songs.find((song) => song.id === selectedId) ?? null);
+
+  // Song-part hot keys (domain/song-keys.ts): 1–9 the numbered part, Shift+V/C/B/P/T/I/E by kind.
+  // Caught before the desk's own keys, so Shift+B never blacks the screen; text fields and dialogs
+  // keep their keys.
+  $effect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const song = selected;
+      if (!song || draft || event.metaKey || event.ctrlKey || event.altKey || session.settingsOpen) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable || target.closest('[aria-modal="true"]'))) return;
+      const digit = !event.shiftKey && /^Digit[1-9]$/.test(event.code) ? Number(event.code.slice(5)) : undefined;
+      const code = event.shiftKey && SONG_PART_LETTERS.includes(event.code) ? event.code : undefined;
+      if (digit === undefined && !code) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const current = onPreview?.songId === song.id ? onPreview.sectionId : null;
+      const part = partForKey(song.sections, { digit, code }, current);
+      if (part) show(song, part.id);
+      else note = t("This song has no such part.");
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
   const onPreview = $derived(session.songFocus);
   const index = $derived(buildSongIndex(session.songs));
   // The open service's songs are matched first; the whole library when the service lacks the song.
@@ -977,6 +1001,7 @@
         {#if clickLive}<b>{t("Live:")}</b> {t("a part you click, or reach with the arrow keys, shows on the screen at once.")}
         {:else if programLive && programSource.startsWith(`song:${selected.id}:`)}<span class="dot"></span><b>{t("On the screen.")}</b> {t("Click a part, or use the arrow keys, to change it. Option-click to preview only.")}
         {:else}{t("Click a part for Preview, double-click to show it. Once it is on the screen, the next click changes the screen.")}{/if}
+        <span class="keys-hint">{t("Keys: 1–9 a part · Shift+V verse · Shift+C chorus · Shift+B bridge")}</span>
       </p>
       <div class="sections">
         {#each selected.sections as section, n (section.id)}
@@ -1279,6 +1304,7 @@
   .row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); }
   .hint b { color: var(--ink); font-weight: 600; }
+  .keys-hint { display: block; margin-top: 2px; font-size: 11px; opacity: 0.8; }
   .hint.on-screen { color: var(--ink); }
   .hint.on-screen b { color: var(--live); }
   .hint .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 1px; }

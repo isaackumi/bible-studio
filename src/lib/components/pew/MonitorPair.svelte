@@ -23,8 +23,8 @@
     <span class="place">{place || (session.live.preview.model.layout === "empty" ? t("Nothing on Preview") : "")}</span>
     {#if onstep}
       <span class="steps">
-        <button type="button" class="row-tool" aria-label={t("Previous section")} title={t("Previous section")} onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>
-        <button type="button" class="row-tool" aria-label={t("Next section")} title={t("Next section")} onclick={() => onstep(1)}><Icon name="chevron-right" size={14} /></button>
+        <button type="button" class="row-tool" aria-label={t("Previous on Preview")} title={t("Previous on Preview (←); LIVE shows it")} onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>
+        <button type="button" class="row-tool" aria-label={t("Next on Preview")} title={t("Next on Preview (→); LIVE shows it")} onclick={() => onstep(1)}><Icon name="chevron-right" size={14} /></button>
       </span>
     {/if}
   </figcaption>
