@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { licenseKeyPair, readLicense } from "../src/lib/domain/license";
-import { handle, licenseFor, verifySignature, type Env } from "./paddle";
+import { handle, inCidrs, licenseFor, paddleWebhookIps, verifySignature, type Env } from "./paddle";
 import { mockProvider } from "./billing";
 import { memoryStore, putJson } from "./store";
 import type { ApiConfig } from "./api";
@@ -32,6 +32,7 @@ function network(emailStatus = 200) {
   const sent: { to: string[]; subject: string; text: string }[] = [];
   const http = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url === "https://sandbox-api.paddle.com/ips") return Response.json({ data: { ipv4_cidrs: [PADDLE_IP + "/32", "34.194.127.46/32"] } });
     if (url === "https://sandbox-api.paddle.com/customers/ctm_01") return Response.json({ data: { email: "pastor@grace.org", name: "Grace Chapel" } });
     if (url === "https://api.resend.com/emails") {
       sent.push(JSON.parse(String(init?.body)));
@@ -42,8 +43,9 @@ function network(emailStatus = 200) {
   return { http, sent };
 }
 
-const post = async (body: string, signature?: string) =>
-  new Request("https://keys.example.org/paddle/webhook", { method: "POST", body, headers: { "paddle-signature": signature ?? (await sign(body)) } });
+const PADDLE_IP = "34.232.58.13";
+const post = async (body: string, signature?: string, ip = PADDLE_IP) =>
+  new Request("https://keys.example.org/paddle/webhook", { method: "POST", body, headers: { "paddle-signature": signature ?? (await sign(body)), "cf-connecting-ip": ip } });
 
 describe("Paddle license server", () => {
   it("checks Paddle's signature and its age", async () => {
@@ -53,6 +55,20 @@ describe("Paddle license server", () => {
     expect(await verifySignature(body, await sign(body, "wrong"), env.PADDLE_WEBHOOK_SECRET, NOW)).toBe(false);
     expect(await verifySignature(body, await sign(body), env.PADDLE_WEBHOOK_SECRET, NOW + 10 * 60_000)).toBe(false);
     expect(await verifySignature(body, null, env.PADDLE_WEBHOOK_SECRET, NOW)).toBe(false);
+  });
+
+  it("takes webhooks only from Paddle's addresses, as Paddle lists them", async () => {
+    expect(inCidrs("34.232.58.13", ["34.232.58.13/32"])).toBe(true);
+    expect(inCidrs("34.232.58.14", ["34.232.58.13/32"])).toBe(false);
+    expect(inCidrs("10.0.3.7", ["10.0.0.0/16"])).toBe(true);
+    expect(inCidrs("not-an-ip", ["0.0.0.0/0"])).toBe(false);
+    const net = network();
+    expect(await paddleWebhookIps(env, net.http, NOW)).toContain("34.232.58.13/32");
+    // A correctly signed webhook from anywhere else is refused before it is read.
+    expect((await handle(await post(completed(), undefined, "203.0.113.9"), env, net.http, NOW)).status).toBe(403);
+    expect(net.sent).toHaveLength(0);
+    const noAddress = new Request("https://keys.example.org/paddle/webhook", { method: "POST", body: completed(), headers: { "paddle-signature": await sign(completed()) } });
+    expect((await handle(noAddress, env, net.http, NOW)).status).toBe(403);
   });
 
   it("maps prices to plans and adds grace to a paid period", () => {

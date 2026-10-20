@@ -160,4 +160,30 @@ describe("server API", () => {
       expect(PRICES[plan].yearly).toBe(shown.price.yearly * 100);
     }
   });
+
+  it("serves the public pages, with the prices checkout charges and the policies Paddle reviews", async () => {
+    const { call, config } = setup();
+    config.site = { company: "Grace Software Ltd", contact: "help@grace.example" };
+    const home = String((await call("/")).data.html);
+    for (const plan of ["premium", "church"] as const) {
+      expect(home).toContain(`$${PRICES[plan].monthly / 100} <small>/ month</small>`);
+      expect(home).toContain(`or $${PRICES[plan].yearly / 100} a year`);
+    }
+    expect(home).toContain("mailto:help@grace.example");
+    expect(home).toContain('href="/terms"');
+    for (const path of ["/terms", "/privacy", "/refunds"]) {
+      const page = await call(path);
+      expect(page.status).toBe(200);
+      expect(String(page.data.html)).toContain("Grace Software Ltd");
+    }
+    expect(String((await call("/terms")).data.html)).toContain("Paddle.com is the Merchant of Record");
+    // The checkout page exists only with a Paddle client token, and says which Paddle it talks to.
+    expect((await call("/checkout")).status).toBe(404);
+    config.paddleClient = { token: "test_abc", sandbox: true };
+    const checkout = String((await call("/checkout")).data.html);
+    expect(checkout).toContain('Paddle.Environment.set("sandbox")');
+    expect(checkout).toContain('token: "test_abc"');
+    config.paddleClient = { token: "live_abc", sandbox: false };
+    expect(String((await call("/checkout")).data.html)).not.toContain("Environment.set");
+  });
 });

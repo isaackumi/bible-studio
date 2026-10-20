@@ -92,10 +92,23 @@ After changing the plugins in `auth.ts`, run `node server/auth-schema.ts` to rem
 
 Set `BILLING_PROVIDER` and that provider's secrets; the app does not change.
 
-- **Paddle** (built in): merchant of record, so it handles sales tax and VAT worldwide. Set
-  `BILLING_PROVIDER` to `paddle`, `PADDLE_PRICES` to `pri_x:premium:monthly,pri_y:premium:yearly,…`,
-  the secrets `PADDLE_API_KEY` and `PADDLE_WEBHOOK_SECRET`, and point Paddle's notifications (for
-  `transaction.completed` and `adjustment.updated`) at `https://<worker>/paddle/webhook`.
+- **Paddle** (built in): merchant of record, so it handles sales tax and VAT worldwide. Do it in
+  sandbox first (`PADDLE_ENV` `sandbox`), then again in live with live values:
+  1. Products and prices for Premium and Church, monthly and yearly, at the prices in `pricing.ts`.
+     Put their ids in `PADDLE_PRICES`: `pri_a:premium:monthly,pri_b:premium:yearly,…`.
+  2. A client-side token (Developer tools › Authentication; `test_…` in sandbox, `live_…` in live)
+     in `PADDLE_CLIENT_TOKEN`, and an API key: `npx wrangler secret put PADDLE_API_KEY`.
+  3. A notification destination at `https://license.heitechinc.com/paddle/webhook` for
+     `transaction.completed` and `adjustment.updated`; its secret key:
+     `npx wrangler secret put PADDLE_WEBHOOK_SECRET`. Webhooks are accepted only from Paddle's
+     addresses, read from Paddle's `/ips` and kept for an hour.
+  4. Checkout › Checkout settings › default payment link: `https://license.heitechinc.com/checkout`.
+     Paddle sends buyers there and Paddle.js opens the checkout. For live, the domain must be
+     approved (Settings › Website approval).
+  5. `BILLING_PROVIDER` to `paddle`, then `./server/deploy.sh`.
+
+  The public pages Paddle reviews are on the same server: `/` (product, pricing, contact),
+  `/terms`, `/privacy` and `/refunds`, from `site.ts`, with `COMPANY_NAME` and `CONTACT_EMAIL`.
 - **Lemon Squeezy / Polar**: also merchants of record, with built-in license keys; add a provider
   in `billing.ts` (create checkout) and a webhook route that calls `completeCheckout`.
 - **Stripe**: cheapest fees but you handle tax (Stripe Tax helps). Same shape: Checkout Session in

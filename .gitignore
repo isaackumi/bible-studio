@@ -20,3 +20,4 @@ sweep/
 server/.dev-store.json
 server/.dev-auth.sqlite
 server/.wrangler/
+server/.dev.vars

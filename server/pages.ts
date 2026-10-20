@@ -270,3 +270,39 @@ async function emailLink(form) {
 async function switchAccount() { try { await post("/auth/sign-out", {}); } catch {} location.href = here; }
 </script></body></html>`;
 }
+
+/**
+ * Paddle's default payment link: Paddle sends buyers here with ?_ptxn=<transaction>, and Paddle.js
+ * opens that transaction's checkout over the page. Set it in Paddle › Checkout › Checkout settings
+ * (https://<this server>/checkout); the domain must be approved for live checkouts.
+ */
+export function checkoutPage({ token, sandbox }: { token: string; sandbox: boolean }): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Checkout · Church Studio</title>
+<style>${BASE_CSS}
+  main { width: min(440px, calc(100% - 32px)); margin: 10vh auto; padding: 30px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 60px rgb(0 0 0 / .12); text-align: center; }
+  header { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 22px; font-weight: 750; }
+  h1 { margin: 0 0 10px; font-size: 22px; letter-spacing: -.01em; } p { margin: 0; color: var(--muted); }
+  .spin { width: 28px; height: 28px; margin: 4px auto 18px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .tick { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 50%; background: var(--good); color: #fff; font-size: 32px; font-weight: 900; }
+  footer { margin-top: 20px; font-size: 12px; color: var(--muted); } footer a { color: inherit; }
+</style></head><body><main>
+  <header><span class="mark"><i></i><i></i><i></i><i></i></span>Church Studio</header>
+  <div id="state"><div class="spin"></div><h1>Opening secure checkout…</h1><p>Payments are handled by Paddle, our reseller.</p></div>
+  <footer><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/refunds">Refunds</a></footer>
+</main>
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script>
+const state = document.getElementById("state");
+const show = (html) => { state.innerHTML = html; };
+if (!new URLSearchParams(location.search).get("_ptxn")) show("<h1>Nothing to pay here</h1><p>Start your purchase from Church Studio, under Plans.</p>");
+${sandbox ? 'Paddle.Environment.set("sandbox");\n' : ""}Paddle.Initialize({
+  token: ${JSON.stringify(token)},
+  eventCallback(event) {
+    if (event.name === "checkout.completed") show('<div class="tick">✓</div><h1>Payment complete</h1><p>Church Studio is activating on your computer now. You can close this tab and go back to the app. Your receipt and license key are on their way by email.</p>');
+    if (event.name === "checkout.closed" && !event.data?.status?.includes("completed")) show("<h1>Checkout closed</h1><p>Nothing was charged. Go back to Church Studio to try again.</p>");
+    if (event.name === "checkout.error") show("<h1>Checkout could not open</h1><p>Go back to Church Studio and try again. If it keeps happening, the contact address is on our home page.</p>");
+  },
+});
+</script></body></html>`;
+}

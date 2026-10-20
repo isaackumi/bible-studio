@@ -18,7 +18,8 @@ import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
 import type { Provider } from "./billing.ts";
-import { adminPage, payPage } from "./pages.ts";
+import { adminPage, checkoutPage, payPage } from "./pages.ts";
+import { homePage, privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
 
@@ -34,6 +35,10 @@ export type ApiConfig = {
    */
   testSigningKey?: string;
   provider: Provider;
+  /** The public pages' business name and contact address. */
+  site?: Site;
+  /** Paddle.js for the checkout page (/checkout, Paddle's default payment link): a client-side token. */
+  paddleClient?: { token: string; sandbox: boolean };
   /** Who is signed in (accounts.ts); missing: accounts are off and everything else still works. */
   identity?: Identity;
   adminToken?: string;
@@ -94,6 +99,8 @@ const RELEASES_PER_30_DAYS = 3;
 
 type Signer = { secret: string; public: string; test: boolean };
 const realSigner = (config: ApiConfig): Signer => ({ secret: config.signingKey, public: config.publicKey ?? LICENSE_PUBLIC_KEY, test: false });
+const DEFAULT_SITE: Site = { company: "HeiTech Inc.", contact: "support@heitechinc.com" };
+
 const testSigner = (config: ApiConfig): Signer => {
   const secret = config.testSigningKey ?? TEST_LICENSE_SECRET;
   return { secret, public: publicKeyOf(secret), test: true };
@@ -132,6 +139,14 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
 
   // Pages.
   if (path === "/admin" && request.method === "GET") return html(200, adminPage());
+  if (request.method === "GET") {
+    const site = config.site ?? DEFAULT_SITE;
+    if (path === "/") return html(200, homePage(site));
+    if (path === "/terms") return html(200, termsPage(site));
+    if (path === "/privacy") return html(200, privacyPage(site));
+    if (path === "/refunds") return html(200, refundsPage(site));
+    if (path === "/checkout") return config.paddleClient ? html(200, checkoutPage(config.paddleClient)) : html(404, homePage(site));
+  }
   const pay = path.match(/^\/pay\/([A-Za-z0-9_]+)(\/cancel)?$/);
   if (pay) return payRoute(request, config, pay[1]!, !!pay[2]);
   const signin = path.match(/^\/signin\/([0-9a-f]{24})(?:\/(confirm|cancel))?$/);

@@ -40,6 +40,11 @@ export type Env = {
   LEASE_DAYS?: string;
   /** Free trial length (default 14). */
   TRIAL_DAYS?: string;
+  /** Paddle client-side token (test_… in sandbox, live_… in live) for the checkout page. */
+  PADDLE_CLIENT_TOKEN?: string;
+  /** The public pages: the selling business's legal name and a contact inbox someone reads. */
+  COMPANY_NAME?: string;
+  CONTACT_EMAIL?: string;
   /** Accounts (optional): the D1 database for Better Auth's users and sessions, and its secret. */
   AUTH_DB?: unknown;
   BETTER_AUTH_SECRET?: string;
@@ -99,6 +104,8 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
     graceDays: Number(env.GRACE_DAYS ?? 7) || 7,
     identity: identityOf(env, mail),
+    site: env.COMPANY_NAME && env.CONTACT_EMAIL ? { company: env.COMPANY_NAME, contact: env.CONTACT_EMAIL } : undefined,
+    paddleClient: env.PADDLE_CLIENT_TOKEN ? { token: env.PADDLE_CLIENT_TOKEN, sandbox: env.PADDLE_ENV === "sandbox" } : undefined,
     mail,
     now: () => Date.now(),
   };
@@ -122,6 +129,8 @@ export default {
 export async function handle(request: Request, env: Env, http: Fetch = fetch, now = Date.now(), api: ApiConfig | null = null): Promise<Response> {
   const url = new URL(request.url);
   if (request.method !== "POST" || url.pathname !== "/paddle/webhook") return new Response("Not found", { status: 404 });
+  // Only Paddle's own servers may call: their addresses come from Paddle (GET /ips), not a list kept here.
+  if (!(await fromPaddle(request, env, http, now))) return new Response("Not from Paddle", { status: 403 });
   const body = await request.text();
   if (!(await verifySignature(body, request.headers.get("paddle-signature"), env.PADDLE_WEBHOOK_SECRET, now))) {
     return new Response("Bad signature", { status: 401 });
@@ -191,6 +200,61 @@ export type PaddleEvent = {
     transaction_id?: string;
   };
 };
+
+// Paddle's webhook addresses, read from Paddle and kept for an hour. Only the finished list is
+// kept between requests (never a pending fetch: Workers do not share promises across requests).
+const IPS_TTL_MS = 60 * 60_000;
+let paddleIps: { base: string; at: number; cidrs: string[] } | null = null;
+
+/** Paddle's current webhook addresses (data.ipv4_cidrs), or null when Paddle cannot be reached. */
+export async function paddleWebhookIps(env: Env, http: Fetch, now = Date.now()): Promise<string[] | null> {
+  const base = env.PADDLE_ENV === "sandbox" ? "https://sandbox-api.paddle.com" : "https://api.paddle.com";
+  if (paddleIps && paddleIps.base === base && now - paddleIps.at < IPS_TTL_MS) return paddleIps.cidrs;
+  try {
+    const response = await http(`${base}/ips`);
+    if (!response.ok) return paddleIps?.base === base ? paddleIps.cidrs : null;
+    const { data } = (await response.json()) as { data?: { ipv4_cidrs?: unknown } };
+    const cidrs = Array.isArray(data?.ipv4_cidrs) ? data.ipv4_cidrs.filter((cidr): cidr is string => typeof cidr === "string") : [];
+    if (cidrs.length === 0) return paddleIps?.base === base ? paddleIps.cidrs : null;
+    paddleIps = { base, at: now, cidrs };
+    return cidrs;
+  } catch {
+    // Paddle unreachable: the last list if there is one; otherwise refuse, and Paddle retries later.
+    return paddleIps?.base === base ? paddleIps.cidrs : null;
+  }
+}
+
+/** True when an IPv4 address is inside one of the CIDR ranges ("34.232.58.13/32"). */
+export function inCidrs(ip: string, cidrs: string[]): boolean {
+  const number = (text: string): number | null => {
+    const parts = text.split(".");
+    if (parts.length !== 4) return null;
+    let value = 0;
+    for (const part of parts) {
+      if (!/^\d{1,3}$/.test(part) || Number(part) > 255) return null;
+      value = value * 256 + Number(part);
+    }
+    return value;
+  };
+  const address = number(ip.trim());
+  if (address === null) return false;
+  return cidrs.some((cidr) => {
+    const [range, bitsText = "32"] = cidr.split("/");
+    const start = number(range ?? "");
+    const bits = Number(bitsText);
+    if (start === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+    const size = 2 ** (32 - bits);
+    return Math.floor(address / size) === Math.floor(start / size);
+  });
+}
+
+/** The caller's address (Cloudflare sets cf-connecting-ip) is one of Paddle's. */
+async function fromPaddle(request: Request, env: Env, http: Fetch, now: number): Promise<boolean> {
+  const ip = request.headers.get("cf-connecting-ip");
+  if (!ip) return false;
+  const cidrs = await paddleWebhookIps(env, http, now);
+  return !!cidrs && inCidrs(ip, cidrs);
+}
 
 /** Paddle-Signature: "ts=1700000000;h1=<hex HMAC-SHA256 of `${ts}:${body}`>". */
 export async function verifySignature(body: string, header: string | null, secret: string, now = Date.now()): Promise<boolean> {
