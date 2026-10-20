@@ -25,7 +25,7 @@
   // that follows the room while it sings. Nothing here changes Program; LIVE does.
 
   /** `order`: section ids as sung (repeats allowed); empty means the sections as written. */
-  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; order: string[]; secondLanguage: string; isNew: boolean };
+  type Draft = { id: string; title: string; author: string; folder: string; ccli: string; copyright: string; sections: SongSection[]; order: string[]; secondLanguage: string; trackId: string; isNew: boolean };
 
   /** The song search window. */
   let finding = $state(false);
@@ -430,6 +430,7 @@
       sections: [{ id: crypto.randomUUID(), kind: "verse", label: t("Verse 1"), lines: [""] }],
       order: [],
       secondLanguage: "",
+      trackId: "",
       isNew: true,
     };
     pasteText = "";
@@ -446,6 +447,7 @@
       sections: song.sections.map((section) => ({ ...section, lines: [...section.lines] })),
       order: [...(song.order ?? [])],
       secondLanguage: song.secondLanguage ?? "",
+      trackId: song.trackId ?? "",
       isNew: false,
     };
     pasteText = "";
@@ -462,6 +464,7 @@
       sections: value.sections,
       ...(value.order.length ? { order: value.order } : {}),
       ...(value.secondLanguage.trim() ? { secondLanguage: value.secondLanguage.trim() } : {}),
+      ...(value.trackId ? { trackId: value.trackId } : {}),
     };
   }
 
@@ -749,6 +752,10 @@
           <input aria-label={t("CCLI song number")} placeholder={t("CCLI song # (optional)")} inputmode="numeric" bind:value={draft.ccli} />
           <input class="wide" aria-label={t("Copyright")} placeholder={t("Copyright, e.g. 2015 Publisher (blank for public domain)")} bind:value={draft.copyright} />
           <input aria-label={t("Second language")} placeholder={t("Second language, e.g. Twi (optional)")} maxlength="40" bind:value={draft.secondLanguage} />
+          <select aria-label={t("Backing track")} title={t("Plays when this song goes live (audio files from Audio)")} bind:value={draft.trackId}>
+            <option value="">{t("No backing track")}</option>
+            {#each session.audioTracks as track (track.id)}<option value={track.id}>{t("Backing track: {name}", { name: track.name.replace(/\.[a-z0-9]+$/i, "") })}</option>{/each}
+          </select>
           <datalist id="song-folder-names">
             {#each folders as entry (entry.name)}<option value={entry.name}></option>{/each}
           </datalist>
@@ -1318,6 +1325,7 @@
   .editor { display: flex; flex-direction: column; gap: 10px; }
   .fields { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; }
   .fields .wide { grid-column: span 2; }
+  .fields select { min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; font-size: 13px; }
   .credit { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
   .paste { display: flex; flex-direction: column; gap: 8px; }
   .paste summary { cursor: pointer; font-size: 13px; color: var(--muted); }

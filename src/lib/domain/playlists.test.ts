@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTracks, formatDuration, moveTrack, nextTrackIndex, removeTrackAt, sanitizeAudioSettings, sanitizePlaylists } from "./playlists";
+import { addTracks, formatDuration, moveTrack, nextTrackIndex, removeTrackAt, sanitizeAudioSettings, sanitizePlaylists, shuffledOrder } from "./playlists";
 
 describe("playlists", () => {
   it("starts with walk-in music and reads back only valid lists", () => {
@@ -26,9 +26,27 @@ describe("playlists", () => {
   });
 
   it("keeps volume in range and times readable", () => {
-    expect(sanitizeAudioSettings({ volume: 3, fadeOnLive: false })).toEqual({ volume: 1, fadeOnLive: false });
-    expect(sanitizeAudioSettings(null)).toEqual({ volume: 0.8, fadeOnLive: true });
+    expect(sanitizeAudioSettings({ volume: 3, fadeOnLive: false })).toMatchObject({ volume: 1, fadeOnLive: false });
+    expect(sanitizeAudioSettings(null)).toMatchObject({ volume: 0.8, fadeOnLive: true });
     expect(formatDuration(187)).toBe("3:07");
     expect(formatDuration(3725)).toBe("1:02:05");
+  });
+});
+
+describe("music settings", () => {
+  it("reads back only sensible values, with good defaults", () => {
+    const clean = sanitizeAudioSettings({ crossfade: 99, shuffle: true, outputId: "usb-1", levels: { a: -12.34, b: 5, c: "x" }, pad: [{ id: "p1", assetId: "bell", label: "  Offering bell  " }, { id: "p1", assetId: "x" }, { id: "p2" }] });
+    expect(clean).toMatchObject({ crossfade: 12, shuffle: true, outputId: "usb-1", even: true, stopTrackWithSong: true, levels: { a: -12.3 } });
+    expect(clean.pad).toEqual([{ id: "p1", assetId: "bell", label: "Offering bell" }]);
+    expect(sanitizeAudioSettings(undefined)).toMatchObject({ volume: 0.8, crossfade: 3, shuffle: false, even: true, pad: [] });
+  });
+
+  it("shuffles every track once, starting with the chosen one", () => {
+    let seed = 7;
+    const random = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    const order = shuffledOrder(6, 2, random);
+    expect(order[0]).toBe(2);
+    expect([...order].sort()).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(shuffledOrder(0)).toEqual([]);
   });
 });

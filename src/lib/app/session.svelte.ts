@@ -115,8 +115,9 @@ import { keyWords } from "../domain/ndi";
 import { presentAnnouncement, type AnnouncementDesign } from "../domain/announcement";
 import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { clampScreen, sanitizeSongLines, screensOf, type SongLines, type SongScreen } from "../domain/song-screens";
-import { addTracks, moveTrack, removeTrackAt, type Playlist } from "../domain/playlists";
-import { AudioDeck } from "../audio/deck.svelte";
+import { addTracks, MAX_CROSSFADE, moveTrack, removeTrackAt, type AudioSettings, type Playlist } from "../domain/playlists";
+import { AudioDeck, SoundPad, canChooseOutput } from "../audio/deck.svelte";
+import { evenGain, measureUrl } from "../audio/loudness";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
 import type { ShortcutAction } from "../domain/types";
@@ -455,7 +456,7 @@ class Session {
         this.services = await api.serviceList();
       }
       this.workspace = await this.loadWorkspace();
-      this.audio.setVolume(this.workspace.audio.volume);
+      this.applyAudioSettings();
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
@@ -1198,11 +1199,13 @@ class Session {
       this.message = t("Add music to this playlist first.");
       return;
     }
+    void this.measureTracks(tracks);
+    this.backingSongId = null;
     await this.audio.play(tracks, index, { playlistId: id, loop: list.loop });
   };
 
   /** Add audio files (paths from the desktop picker, or browser files), optionally to a playlist. */
-  importAudio = async (sources: Array<string | File>, playlistId: string | null): Promise<number> => {
+  importAudio = async (sources: Array<string | File>, playlistId: string | null): Promise<string[]> => {
     const added: string[] = [];
     for (const source of sources) {
       const asset = await this.importImage(source);
@@ -1211,7 +1214,8 @@ class Session {
     }
     if (playlistId && added.length) this.addToPlaylist(playlistId, added);
     if (added.length) this.message = tn(added.length, "{n} track added.", "{n} tracks added.");
-    return added.length;
+    void this.measureTracks(this.audioTracks.filter((track) => added.includes(track.id)));
+    return added;
   };
 
   setAudioVolume = (volume: number) => {
@@ -1223,6 +1227,190 @@ class Session {
   setFadeOnLive = (fadeOnLive: boolean) => {
     this.workspace = { ...this.workspace, audio: { ...this.workspace.audio, fadeOnLive } };
     this.persistSoon();
+  };
+
+  private setAudio(patch: Partial<AudioSettings>) {
+    this.workspace = { ...this.workspace, audio: { ...this.workspace.audio, ...patch } };
+    this.persistSoon();
+  }
+
+  /** The saved music settings onto the deck and the pad (at start, and after a change). */
+  private applyAudioSettings() {
+    const audio = this.workspace.audio;
+    this.audio.gainFor = (track) => (this.workspace.audio.even ? evenGain(this.workspace.audio.levels[track.id]) : 1);
+    this.audio.setVolume(audio.volume);
+    this.audio.setCrossfade(audio.crossfade);
+    this.audio.setShuffle(audio.shuffle);
+    if (audio.outputId) {
+      void this.audio.setOutput(audio.outputId);
+      this.soundPad.setOutput(audio.outputId);
+    }
+    // Tracks not measured yet are measured quietly, one at a time, a little after start.
+    if (typeof window !== "undefined") setTimeout(() => void this.measureTracks(this.audioTracks), 20_000);
+  }
+
+  // Even volume: each track's loudness, measured once and kept with the workspace.
+
+  private measuring = false;
+  private measureQueue: MediaAsset[] = [];
+
+  private measureTracks = async (tracks: MediaAsset[]) => {
+    const known = this.workspace.audio.levels;
+    this.measureQueue.push(...tracks.filter((track) => track.kind === "audio" && known[track.id] === undefined && !this.measureQueue.includes(track)));
+    if (this.measuring) return;
+    this.measuring = true;
+    try {
+      for (let track = this.measureQueue.shift(); track; track = this.measureQueue.shift()) {
+        if (this.workspace.audio.levels[track.id] !== undefined) continue;
+        const url = mediaUrl(track);
+        const level = url ? await measureUrl(url) : null;
+        if (level === null) continue;
+        this.setAudio({ levels: { ...this.workspace.audio.levels, [track.id]: level } });
+        this.audio.refreshLevels();
+      }
+    } finally {
+      this.measuring = false;
+    }
+  };
+
+  setEvenVolume = (even: boolean) => {
+    this.setAudio({ even });
+    this.audio.refreshLevels();
+    if (even) void this.measureTracks(this.audioTracks);
+  };
+
+  setCrossfade = (seconds: number) => {
+    const crossfade = Math.min(MAX_CROSSFADE, Math.max(0, Math.round(seconds)));
+    this.setAudio({ crossfade });
+    this.audio.setCrossfade(crossfade);
+  };
+
+  setShuffle = (shuffle: boolean) => {
+    this.setAudio({ shuffle });
+    this.audio.setShuffle(shuffle);
+  };
+
+  setStopTrackWithSong = (stopTrackWithSong: boolean) => this.setAudio({ stopTrackWithSong });
+
+  // Sound output: which device the music plays through (the mixer's USB interface, say).
+
+  /** Sound outputs this computer offers; empty until asked for, or where they cannot be chosen. */
+  audioOutputs = $state<Array<{ id: string; label: string }>>([]);
+  readonly canChooseAudioOutput = canChooseOutput();
+
+  loadAudioOutputs = async () => {
+    const media = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+    if (!media?.enumerateDevices || !this.canChooseAudioOutput) return;
+    const devices = await media.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+    const outputs = devices.filter((device) => device.kind === "audiooutput" && device.deviceId && device.deviceId !== "default");
+    this.audioOutputs = outputs.map((device, n) => ({ id: device.deviceId, label: device.label || t("Sound output {n}", { n: n + 1 }) }));
+  };
+
+  setAudioOutput = async (deviceId: string): Promise<string | null> => {
+    this.setAudio({ outputId: deviceId });
+    this.soundPad.setOutput(deviceId);
+    const ok = await this.audio.setOutput(deviceId);
+    return ok || !deviceId ? null : t("This computer could not switch the music to that output. Choose it in the computer's sound settings instead.");
+  };
+
+  // Backing tracks: a song with one plays it when the song goes live.
+
+  /** The song whose backing track the deck is playing. */
+  private backingSongId: string | null = null;
+
+  /** After Program changes: start the live song's backing track, or let one go when its song left. */
+  private followSongTrack = async () => {
+    const songId = this.live.program.sourceId?.match(/^song:([^:#]+):/)?.[1] ?? null;
+    if (songId && songId === this.backingSongId) return;
+    const song = songId ? this.songs.find((entry) => entry.id === songId) : undefined;
+    const track = song?.trackId ? this.audioTracks.find((entry) => entry.id === song.trackId) : undefined;
+    if (song && track) {
+      this.backingSongId = song.id;
+      this.walkIn = null;
+      void this.measureTracks([track]);
+      await this.audio.play([track], 0, { playlistId: null, loop: false });
+      this.message = t("{name}: its backing track is playing.", { name: song.title });
+      return;
+    }
+    if (this.backingSongId && this.workspace.audio.stopTrackWithSong && this.audio.playing && this.audio.playlistId === null) this.audio.fadeOut(3);
+    this.backingSongId = null;
+  };
+
+  // Walk-in: the "Service starts in" countdown on the screen while walk-in music plays, and the
+  // music fades by itself when the countdown reaches zero.
+
+  walkIn = $state<{ endsAt: number } | null>(null);
+  private walkInTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Start walk-in: to the service's start time (when it is ahead today), else in `minutes`. */
+  startWalkIn = async (minutes = 10): Promise<string | null> => {
+    const list = this.workspace.playlists.find((entry) => entry.id === "walk-in" && entry.trackIds.length) ?? this.workspace.playlists.find((entry) => this.playlistTracks(entry.id).length);
+    if (!list || !this.playlistTracks(list.id).length) return t("Add music to the Walk-in playlist first.");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = this.service ? parseClock(this.service.startTime) : null;
+    const serviceAt = start !== null ? today.getTime() + start * 60_000 : 0;
+    const now = Date.now();
+    const endsAt = serviceAt > now + 60_000 && serviceAt - now < 4 * 60 * 60_000 ? serviceAt : now + Math.max(1, minutes) * 60_000;
+    const timer = { ...createTimer({ name: t("Service starts in"), mode: "target", targetAt: endsAt, label: t("Service starts in"), warningMs: 60_000 }), running: true };
+    const theme = { ...this.theme(), fontSize: this.workspace.countdownSize };
+    this.previewModel(presentTimer(timer, theme, now), "countdown:walk-in");
+    await this.take();
+    // After the take (which fades walk-in music), so the music starts fresh.
+    this.backingSongId = null;
+    await this.playPlaylist(list.id);
+    this.walkIn = { endsAt };
+    if (this.walkInTimer) clearInterval(this.walkInTimer);
+    this.walkInTimer = setInterval(() => this.checkWalkIn(), 1000);
+    this.message = t("Walk-in started: the countdown is on the screen and the music fades at zero.");
+    return null;
+  };
+
+  private checkWalkIn() {
+    const walk = this.walkIn;
+    if (!walk) {
+      if (this.walkInTimer) clearInterval(this.walkInTimer);
+      this.walkInTimer = null;
+      return;
+    }
+    if (Date.now() < walk.endsAt) return;
+    this.audio.fadeOut(8);
+    this.walkIn = null;
+    this.message = t("The countdown reached zero; the walk-in music is fading out.");
+  }
+
+  /** End walk-in early: the music fades; the countdown stays until something else goes live. */
+  stopWalkIn = () => {
+    this.walkIn = null;
+    this.audio.fadeOut(4);
+  };
+
+  // The sound pad: short clips with one click (an offering bell, an intro sting).
+
+  soundPad = new SoundPad();
+
+  addPadSounds = (assetIds: string[]) => {
+    const tracks = this.audioTracks.filter((track) => assetIds.includes(track.id));
+    const added = tracks.map((track) => ({ id: uid(), assetId: track.id, label: track.name.replace(/\.[a-z0-9]{2,4}$/i, "").slice(0, 30) }));
+    this.setAudio({ pad: [...this.workspace.audio.pad, ...added].slice(0, 24) });
+    void this.measureTracks(tracks);
+  };
+
+  removePadSound = (id: string) => this.setAudio({ pad: this.workspace.audio.pad.filter((button) => button.id !== id) });
+
+  renamePadSound = (id: string, label: string) =>
+    this.setAudio({ pad: this.workspace.audio.pad.map((button) => (button.id === id ? { ...button, label: label.trim().slice(0, 30) || button.label } : button)) });
+
+  pressPad = (id: string) => {
+    const button = this.workspace.audio.pad.find((entry) => entry.id === id);
+    const track = button ? this.audioTracks.find((entry) => entry.id === button.assetId) : undefined;
+    const url = track ? mediaUrl(track) : null;
+    if (!button || !track || !url) {
+      this.message = t("That sound is no longer in the media library.");
+      return;
+    }
+    const gain = this.workspace.audio.even ? evenGain(this.workspace.audio.levels[track.id]) : 1;
+    void this.soundPad.press(id, url, this.workspace.audio.volume * gain);
   };
 
   // A second audience screen (lobby, overflow room) with its own look.
@@ -1591,11 +1779,27 @@ class Session {
       scenes: JSON.stringify(scenes.slice(0, 100)),
       live: REMOTE_LIVE_COMMANDS.join(","),
       timer: this.programTimerState,
+      music: this.audio.current ? (this.audio.playing && !this.audio.fading ? "playing" : "paused") : "",
+      track: this.audio.current?.name ?? "",
     };
   };
 
   /** Next/Previous move Preview only (songs, sermon sections, verses, then the rundown). */
-  private runFromRemote = async (command: CommandId | "next-item" | "previous-item") => {
+  private runFromRemote = async (command: CommandId | "next-item" | "previous-item" | "music-toggle" | "music-next" | "music-fade") => {
+    if (command === "music-toggle") {
+      if (this.audio.current) await this.audio.toggle();
+      else await this.playPlaylist(this.workspace.playlists.find((list) => list.trackIds.length)?.id ?? "walk-in");
+      return;
+    }
+    if (command === "music-next") {
+      await this.audio.step(1);
+      return;
+    }
+    if (command === "music-fade") {
+      this.walkIn = null;
+      this.audio.fadeOut(4);
+      return;
+    }
     if (command === "next-item" || command === "previous-item") {
       await this.stepItem(command === "next-item" ? 1 : -1);
       return;
@@ -5539,6 +5743,7 @@ class Session {
         }
       }
     }
+    void this.followSongTrack();
     // Remember the look that went live, so its verse can step on Program.
     this.lookOnProgram = action === "take" || action === "cut" ? this.lookAt("program") : null;
     await this.pushProgram();

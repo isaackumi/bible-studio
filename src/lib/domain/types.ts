@@ -330,6 +330,8 @@ export type Song = {
   order?: string[];
   /** The name of the song's second language ("Twi", "Français"), when it has one. */
   secondLanguage?: string;
+  /** A backing track (media id of an audio file) that plays when the song goes live. */
+  trackId?: string;
 };
 
 export type SermonSection = {

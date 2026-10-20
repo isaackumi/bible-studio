@@ -33,6 +33,7 @@ export function sanitizeSong(song: Song): Song {
   const copyright = cleanCopyright(song.copyright);
   const order = cleanOrder(song.order, sections);
   const secondLanguage = typeof song.secondLanguage === "string" ? song.secondLanguage.trim().slice(0, 40) : "";
+  const trackId = typeof song.trackId === "string" ? song.trackId.trim().slice(0, 80) : "";
   return {
     id: song.id,
     title: song.title.trim(),
@@ -43,6 +44,7 @@ export function sanitizeSong(song: Song): Song {
     ...(copyright ? { copyright } : {}),
     ...(order ? { order } : {}),
     ...(secondLanguage ? { secondLanguage } : {}),
+    ...(trackId ? { trackId } : {}),
   };
 }
 

@@ -58,6 +58,8 @@
   .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .row .btn { min-height: 48px; font-size: 14px; }
   .timer-row { grid-template-columns: 1fr 1fr; }
+  .music-row { grid-template-columns: 1.4fr 1fr 1fr; }
+  .music-now { margin: -4px 2px 8px; font-size: 13px; color: #9aa7b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .flash { outline: 2px solid var(--gilt); }
   .tabs { display: flex; gap: 6px; }
   .tabs button { flex: 1; min-height: 44px; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
@@ -150,6 +152,12 @@
       <button class="btn" id="timerToggle" data-timer="timer-pause" type="button">Pause timer</button>
       <button class="btn" data-cmd="timer-reset" type="button">Reset timer</button>
     </div>
+    <div class="row music-row" id="musicRow">
+      <button class="btn" id="musicToggle" data-cmd="music-toggle" type="button">Play music</button>
+      <button class="btn" data-cmd="music-next" type="button">Next track</button>
+      <button class="btn" data-cmd="music-fade" type="button">Fade out</button>
+    </div>
+    <p class="music-now" id="musicNow"></p>
     <p class="msg" id="padMsg"></p>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" id="tabItems" aria-selected="true">Service</button>
@@ -318,6 +326,8 @@
     const toggle = $("timerToggle");
     toggle.dataset.timer = payload.timer === "running" ? "timer-pause" : "timer-resume";
     toggle.textContent = payload.timer === "running" ? "Pause timer" : "Start timer";
+    $("musicToggle").textContent = payload.music === "playing" ? "Pause music" : "Play music";
+    $("musicNow").textContent = payload.track ? (payload.music === "playing" ? "♪ " : "Paused: ") + payload.track : "";
     last = payload;
     renderList();
   }
