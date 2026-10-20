@@ -9,6 +9,10 @@
   import { buildSongIndex, chooseSung, screenForSung, type SungMatch } from "../../voice/song-detect";
   import { SONG_LINE_CHOICES } from "../../domain/song-screens";
   import { partForKey, SONG_PART_LETTERS } from "../../domain/song-keys";
+  import { invoke } from "@tauri-apps/api/core";
+  import { isDesktop } from "../../platform/runtime";
+  import { readPro6, readPro7, type ImportedSong } from "../../import/propresenter";
+  import { songFromEasyWorship, songFromImport, type EasyWorshipRow } from "../../import/songs";
   import { preferService, serviceSongIds } from "../../domain/service-first";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
@@ -345,38 +349,57 @@
 
   // Import
 
-  const LYRIC_FILE = /\.(txt|cho|chordpro|chopro|crd|pro|md|usr|xml)$/i;
+  const LYRIC_FILE = /\.(txt|cho|chordpro|chopro|crd|pro|md|usr|xml|pro6|pro5)$/i;
+  /** ProPresenter: .pro6/.pro5 are XML, .pro is ProPresenter 7 (binary) unless it reads as ChordPro text. */
+  const PROPRESENTER_FILE = /\.(pro|pro6|pro5)$/i;
+
+  /** A ProPresenter song from a file's bytes, or null (then it is read as a lyric file). */
+  function readProPresenter(name: string, bytes: Uint8Array): ImportedSong | null {
+    if (!PROPRESENTER_FILE.test(name)) return null;
+    const title = name.replace(/\.[^.]+$/, "");
+    if (/\.pro$/i.test(name)) return bytes.subarray(0, 512).includes(0) || bytes[0] === 0x0a ? readPro7(bytes, title) : null;
+    return readPro6(new TextDecoder().decode(bytes), title);
+  }
 
   /** Lyric files from a pick: plain files as they are, and the lyric files inside any .zip. */
-  async function readLyricFiles(list: File[]): Promise<{ files: { name: string; text: string; dir: string }[]; zipName: string | null }> {
+  async function readLyricFiles(list: File[]): Promise<{ files: { name: string; text: string; dir: string }[]; pro: { name: string; song: ImportedSong; dir: string }[]; zipName: string | null }> {
     const files: { name: string; text: string; dir: string }[] = [];
+    const pro: { name: string; song: ImportedSong; dir: string }[] = [];
     let zipName: string | null = null;
     const decoder = new TextDecoder();
     for (const file of list) {
-      if (/\.zip$/i.test(file.name)) {
-        zipName ??= file.name.replace(/\.zip$/i, "");
+      if (/\.(zip|probundle)$/i.test(file.name)) {
+        zipName ??= file.name.replace(/\.(zip|probundle)$/i, "");
         try {
           for (const entry of await readZip(new Uint8Array(await file.arrayBuffer()))) {
             const parts = entry.name.split("/").filter(Boolean);
             const name = parts.pop() ?? entry.name;
             // A song in a sub-folder of the zip (Hymns/…) goes to that library folder.
             const dir = parts.length && !parts[0]!.startsWith("__") ? parts[parts.length - 1]! : "";
-            if (LYRIC_FILE.test(name) && !name.startsWith(".") && entry.data.length <= 512 * 1024) files.push({ name, text: decoder.decode(entry.data), dir });
+            if (name.startsWith(".") || entry.data.length > 4 * 1024 * 1024) continue;
+            const song = readProPresenter(name, entry.data);
+            if (song) pro.push({ name, song, dir });
+            else if (LYRIC_FILE.test(name) && entry.data.length <= 512 * 1024) files.push({ name, text: decoder.decode(entry.data), dir });
           }
         } catch (error) {
           note = error instanceof Error ? `${file.name}: ${error.message}` : `${file.name} could not be opened.`;
         }
+      } else if (PROPRESENTER_FILE.test(file.name) && file.size <= 4 * 1024 * 1024) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const song = readProPresenter(file.name, bytes);
+        if (song) pro.push({ name: file.name, song, dir: "" });
+        else if (file.size <= 512 * 1024) files.push({ name: file.name, text: decoder.decode(bytes), dir: "" });
       } else if ((LYRIC_FILE.test(file.name) || file.type === "text/plain") && file.size <= 512 * 1024) {
         files.push({ name: file.name, text: await file.text(), dir: "" });
       }
     }
-    return { files, zipName };
+    return { files, pro, zipName };
   }
 
   async function importFiles(list: FileList | null, into: string) {
-    const { files, zipName } = await readLyricFiles([...(list ?? [])]);
-    if (files.length === 0) {
-      note ||= t("No lyric files found. Use .txt, ChordPro, SongSelect (.usr) or OpenLyrics (.xml / .zip) files.");
+    const { files, pro, zipName } = await readLyricFiles([...(list ?? [])]);
+    if (files.length === 0 && pro.length === 0) {
+      note ||= t("No lyric files found. Use .txt, ChordPro, SongSelect (.usr), OpenLyrics (.xml / .zip) or ProPresenter (.pro, .pro6, .proBundle) files.");
       return;
     }
     // The open folder wins; otherwise a zip's own sub-folders, then the zip's name (a "Songs" export has none).
@@ -388,7 +411,20 @@
     }
     let added = 0;
     const skipped: string[] = [];
+    // ProPresenter songs are read already; they go in as songs.
+    const proGroups = new Map<string, Song[]>();
+    for (const entry of pro) {
+      const target = into || entry.dir || fallback;
+      const song = songFromImport(entry.song, target);
+      if (song) proGroups.set(target, [...(proGroups.get(target) ?? []), song]);
+      else skipped.push(entry.name);
+    }
+    for (const [target, songs] of proGroups) {
+      added += await session.importSongs(songs, target);
+      if (!groups.has(target)) groups.set(target, []);
+    }
     for (const [target, group] of groups) {
+      if (!group.length) continue;
       const result = await session.importSongFiles(group, target);
       added += result.added;
       skipped.push(...result.skipped);
@@ -431,6 +467,24 @@
     const zip = createZip(entries);
     save(`${nested ? "Songs" : safe(listTitle) || "Songs"}.zip`, zip.slice().buffer, "application/zip");
     note = `${entries.length} song${entries.length === 1 ? "" : "s"} exported as OpenLyrics (.zip).`;
+  }
+
+  /** EasyWorship 6/7: pick its Data folder; the desktop core reads the two databases. */
+  async function importEasyWorship() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const folderPath = await open({ directory: true, multiple: false, title: t("Choose EasyWorship's Data folder") });
+    if (typeof folderPath !== "string") return;
+    note = t("Reading EasyWorship songs…");
+    try {
+      const rows = await invoke<EasyWorshipRow[]>("easyworship_songs", { folder: folderPath });
+      const target = targetFolder || "EasyWorship";
+      const songs = rows.map((row) => songFromEasyWorship(row, target)).filter((song): song is Song => !!song);
+      const added = await session.importSongs(songs, target);
+      note = tn(added, "{n} song imported from EasyWorship.", "{n} songs imported from EasyWorship.") + (rows.length > added ? ` ${tn(rows.length - added, "{n} had no words.", "{n} had no words.")}` : "");
+      if (added) folder = target;
+    } catch (error) {
+      note = error instanceof Error ? error.message : String(error);
+    }
   }
 
   async function onFiles(event: Event) {
@@ -612,8 +666,12 @@
         {#snippet trigger()}<Icon name="download" size={14} /> {t("Import")}{/snippet}
         {#snippet children(close)}
           <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> {t("Lyric files…")}</button>
-          <p class="menu-note">{t("Plain text, ChordPro, SongSelect, or OpenLyrics (.xml, .zip) from OpenLP, FreeShow and others.")}</p>
+          <p class="menu-note">{t("Plain text, ChordPro, SongSelect, OpenLyrics (.xml, .zip) from OpenLP and FreeShow, or ProPresenter (.pro, .pro6, .proBundle).")}</p>
           <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> {t("A whole folder…")}</button>
+          {#if isDesktop()}
+            <button type="button" role="menuitem" onclick={() => { close(); void importEasyWorship(); }}><Icon name="library" size={16} /> {t("From EasyWorship…")}</button>
+            <p class="menu-note">{t("Choose EasyWorship's Data folder (with Songs.db and SongWords.db). EasyWorship 6 and 7.")}</p>
+          {/if}
           {#if packs.length > 0}
             <div class="menu-sep"></div>
             <button type="button" role="menuitem" onclick={() => { showPacks = true; close(); }}><Icon name="library" size={16} /> {t("Song packs ({length})", { length: packs.length })}</button>
@@ -720,7 +778,7 @@
       <button type="button" class="export-list" disabled={visible.length === 0} data-tip={tn(visible.length, "Save this song as an OpenLyrics file (.zip), for backup or another computer", "Save these {n} songs as one OpenLyrics file (.zip), for backup or another computer")} onclick={exportList}>
         <Icon name="files" size={13} /> {t("Save these")}
       </button>
-      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.md,.usr,.xml,.zip,text/plain" hidden onchange={onFiles} />
+      <input bind:this={fileInput} type="file" multiple accept=".txt,.cho,.chordpro,.chopro,.crd,.pro,.pro6,.pro5,.probundle,.md,.usr,.xml,.zip,text/plain" hidden onchange={onFiles} />
       <input bind:this={dirInput} type="file" multiple hidden webkitdirectory onchange={onDirectory} />
     </div>
 

@@ -1,3 +1,4 @@
+mod easyworship;
 mod bible;
 mod entitlement;
 mod db;
@@ -492,6 +493,14 @@ fn record_panics(app: &tauri::AppHandle) {
     }));
 }
 
+/// Songs from an EasyWorship 6 or 7 library folder (read-only), words as RTF.
+#[tauri::command]
+async fn easyworship_songs(folder: String) -> Result<Vec<easyworship::EasyWorshipSong>, String> {
+    tauri::async_runtime::spawn_blocking(move || easyworship::read_songs(&folder))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 /// GET JSON from Planning Center for the Services import. Only that API host is allowed, and
 /// the response is returned as text whatever the status (its error bodies explain the problem).
 #[tauri::command]
@@ -650,6 +659,7 @@ pub fn run() {
             entitlement::entitlement_clear,
             entitlement::entitlement_device,
             pco_get,
+            easyworship_songs,
             ai_post,
             crash_log,
             backup_write,

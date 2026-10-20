@@ -257,7 +257,7 @@ const HEADERS: Array<[RegExp, SongSectionKind, string | null]> = [
 ];
 
 /** "[Verse 1]" / "Chorus:" / "(Bridge)" → a known section header, else null. */
-function readHeader(line: string): { kind: SongSectionKind; label: string } | null {
+export function readHeader(line: string): { kind: SongSectionKind; label: string } | null {
   const bare = line.trim().replace(/^[[(]\s*|\s*[\])]$/g, "").replace(/:$/, "").trim();
   if (!bare || bare.length > 24) return null;
   for (const [pattern, kind, label] of HEADERS) {

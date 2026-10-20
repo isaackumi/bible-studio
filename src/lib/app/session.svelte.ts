@@ -5247,6 +5247,21 @@ class Session {
     return { added, skipped };
   };
 
+  /** Save songs already read (ProPresenter, EasyWorship) into a folder. Returns how many were added. */
+  importSongs = async (songs: Song[], folder: string): Promise<number> => {
+    const clean = cleanFolder(folder);
+    if (clean) this.createSongFolder(clean);
+    let added = 0;
+    for (const song of songs) {
+      const ready = sanitizeSong({ ...song, folder: clean });
+      if (songError(ready)) continue;
+      await api.songSave(ready);
+      added += 1;
+    }
+    this.songs = await api.songList();
+    return added;
+  };
+
   deleteSong = async (id: string) => {
     await api.songDelete(id);
     this.songs = await api.songList();

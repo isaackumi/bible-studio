@@ -1561,6 +1561,16 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // ProPresenter and EasyWorship import
+  "No lyric files found. Use .txt, ChordPro, SongSelect (.usr), OpenLyrics (.xml / .zip) or ProPresenter (.pro, .pro6, .proBundle) files.": "Aucun fichier de paroles trouvé. Utilisez des fichiers .txt, ChordPro, SongSelect (.usr), OpenLyrics (.xml / .zip) ou ProPresenter (.pro, .pro6, .proBundle).",
+  "Choose EasyWorship's Data folder": "Choisissez le dossier Data d’EasyWorship",
+  "Reading EasyWorship songs…": "Lecture des chants EasyWorship…",
+  "Plain text, ChordPro, SongSelect, OpenLyrics (.xml, .zip) from OpenLP and FreeShow, or ProPresenter (.pro, .pro6, .proBundle).": "Texte brut, ChordPro, SongSelect, OpenLyrics (.xml, .zip) d’OpenLP et FreeShow, ou ProPresenter (.pro, .pro6, .proBundle).",
+  "From EasyWorship…": "Depuis EasyWorship…",
+  "Choose EasyWorship's Data folder (with Songs.db and SongWords.db). EasyWorship 6 and 7.": "Choisissez le dossier Data d’EasyWorship (avec Songs.db et SongWords.db). EasyWorship 6 et 7.",
+  "{n} song imported from EasyWorship.": "{n} chant importé depuis EasyWorship.",
+  "{n} songs imported from EasyWorship.": "{n} chants importés depuis EasyWorship.",
+  "{n} had no words.": "{n} sans paroles.",
   // Undo on Program, steppers, song part keys
   "Nothing to undo on Program.": "Rien à annuler sur Programme.",
   "Program is back to what it showed before. Undo again to swap back.": "Programme affiche de nouveau ce qu’il montrait avant. Annulez encore pour revenir.",
