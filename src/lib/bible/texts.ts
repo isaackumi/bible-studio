@@ -80,7 +80,16 @@ function load(id: string): Promise<SourceBook[]> {
   const existing = cache.get(id);
   if (existing) return existing;
   const loader = LOADERS[id];
-  if (!loader) return Promise.resolve([]);
+  // A Bible the church imported lives only in the desktop database: ask the core for its text.
+  if (!loader) {
+    if (!id.startsWith("user-") || !(globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) return Promise.resolve([]);
+    const pending = import("@tauri-apps/api/core")
+      .then(({ invoke }) => invoke<string[][][]>("bible_source", { translationId: id }))
+      .then((books) => books.map((chapters) => ({ chapters })))
+      .catch(() => [] as SourceBook[]);
+    cache.set(id, pending);
+    return pending;
+  }
   const pending = loader().then((mod) => {
     const data = (mod as { default?: SourceBook[] }).default ?? (mod as SourceBook[]);
     return data;

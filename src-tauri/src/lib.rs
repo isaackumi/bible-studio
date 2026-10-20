@@ -265,6 +265,18 @@ fn bible_install(app: AppHandle, db: State<Db>, id: String) -> Result<(), String
     with_db(&db, |conn| bible::install_translation(conn, &resources, &id))
 }
 
+/// Install a Bible read from a church's own file. Returns its id.
+#[tauri::command]
+fn bible_import(db: State<Db>, bible: bible::ImportedBible) -> Result<String, String> {
+    with_db(&db, |conn| bible::import_translation(conn, &bible))
+}
+
+/// A translation's whole text (books of chapters of verses), for the voice word index.
+#[tauri::command]
+fn bible_source(db: State<Db>, translation_id: String) -> Result<Vec<Vec<Vec<String>>>, String> {
+    with_db(&db, |conn| bible::source_books(conn, &translation_id))
+}
+
 #[tauri::command]
 fn bible_remove(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| bible::remove_translation(conn, &id))
@@ -697,6 +709,8 @@ pub fn run() {
             import_media_bytes,
             bible_translations,
             bible_install,
+            bible_import,
+            bible_source,
             bible_remove,
             bible_books,
             bible_verses,

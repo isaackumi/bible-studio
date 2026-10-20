@@ -1561,6 +1561,14 @@ export const fr: Readonly<Record<string, string>> = {
   "Plays when this song goes live (audio files from Audio)": "Joue quand ce chant passe en direct (fichiers audio de la section Audio)",
   "No backing track": "Aucune piste d’accompagnement",
   "Backing track: {name}": "Piste d’accompagnement : {name}",
+  // Bible file import
+  "Importing a Bible file needs the desktop app.": "L’importation d’un fichier Bible nécessite l’application de bureau.",
+  "Church Studio can't read this file as a Bible. Use a Zefania, OSIS or OpenSong XML file.": "Church Studio ne peut pas lire ce fichier comme une Bible. Utilisez un fichier XML Zefania, OSIS ou OpenSong.",
+  "{name} is ready: {n} verses in {books} books.": "{name} est prête : {n} versets dans {books} livres.",
+  "Imported from a Bible file": "Importée depuis un fichier Bible",
+  "Import a Bible file": "Importer un fichier Bible",
+  "A Bible in your church's language, offline: Zefania, OSIS or OpenSong XML files (from OpenLP, FreeShow, SWORD and others).": "Une Bible dans la langue de votre église, hors ligne : fichiers XML Zefania, OSIS ou OpenSong (d’OpenLP, FreeShow, SWORD et d’autres).",
+  "Reading…": "Lecture…",
   // ProPresenter and EasyWorship import
   "No lyric files found. Use .txt, ChordPro, SongSelect (.usr), OpenLyrics (.xml / .zip) or ProPresenter (.pro, .pro6, .proBundle) files.": "Aucun fichier de paroles trouvé. Utilisez des fichiers .txt, ChordPro, SongSelect (.usr), OpenLyrics (.xml / .zip) ou ProPresenter (.pro, .pro6, .proBundle).",
   "Choose EasyWorship's Data folder": "Choisissez le dossier Data d’EasyWorship",

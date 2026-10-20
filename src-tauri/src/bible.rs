@@ -152,6 +152,105 @@ fn seed_translation_if_needed(
     Ok(())
 }
 
+/// A Bible read from a church's own file (Zefania, OSIS, OpenSong: src/lib/bible/import.ts).
+#[derive(Deserialize)]
+pub struct ImportedBook {
+    ord: i32,
+    name: String,
+    chapters: Vec<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct ImportedBible {
+    name: String,
+    abbreviation: String,
+    books: Vec<ImportedBook>,
+}
+
+/// Install an imported Bible as its own translation ("user-…" id). Returns the new id.
+pub fn import_translation(conn: &Connection, bible: &ImportedBible) -> Result<String, String> {
+    let name = bible.name.trim();
+    let abbreviation = bible.abbreviation.trim();
+    if name.is_empty() || bible.books.is_empty() {
+        return Err("That file has no Bible books in it.".into());
+    }
+    let slug: String = abbreviation
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .take(12)
+        .collect();
+    let base = format!("user-{}", if slug.is_empty() { "bible".to_string() } else { slug });
+    let mut id = base.clone();
+    let mut n = 2;
+    while conn
+        .query_row("SELECT COUNT(*) FROM bible_translations WHERE id = ?1", params![id], |row| row.get::<_, i64>(0))
+        .map_err(|e| e.to_string())?
+        > 0
+    {
+        id = format!("{base}-{n}");
+        n += 1;
+    }
+    let canon: Vec<CanonBook> =
+        serde_json::from_str(include_str!("../../src/lib/bible/canon.json")).map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "INSERT INTO bible_translations (id, name, abbreviation, license_note, source) VALUES (?1, ?2, ?3, '', 'imported')",
+        params![id, name, if abbreviation.is_empty() { name } else { abbreviation }],
+    )
+    .map_err(|e| e.to_string())?;
+    {
+        let mut insert_book = tx
+            .prepare("INSERT INTO bible_books (translation_id, ord, name, abbreviation) VALUES (?1, ?2, ?3, ?4)")
+            .map_err(|e| e.to_string())?;
+        let mut insert_verse = tx
+            .prepare("INSERT INTO bible_verses (translation_id, book_ord, chapter, verse, text) VALUES (?1, ?2, ?3, ?4, ?5)")
+            .map_err(|e| e.to_string())?;
+        for book in &bible.books {
+            let Some(meta) = canon.iter().find(|entry| entry.ord == book.ord) else { continue };
+            let book_name = if book.name.trim().is_empty() { meta.name.as_str() } else { book.name.trim() };
+            insert_book.execute(params![id, meta.ord, book_name, meta.abbr]).map_err(|e| e.to_string())?;
+            for (chapter_index, chapter) in book.chapters.iter().enumerate() {
+                for (verse_index, text) in chapter.iter().enumerate() {
+                    if text.trim().is_empty() {
+                        continue;
+                    }
+                    insert_verse
+                        .execute(params![id, meta.ord, (chapter_index + 1) as i32, (verse_index + 1) as i32, text])
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+/// A translation's whole text, as books of chapters of verses in canon order (empty where it has
+/// none), for the voice detector's word index.
+pub fn source_books(conn: &Connection, translation_id: &str) -> Result<Vec<Vec<Vec<String>>>, String> {
+    let mut books: Vec<Vec<Vec<String>>> = vec![Vec::new(); 66];
+    let mut statement = conn
+        .prepare("SELECT book_ord, chapter, verse, text FROM bible_verses WHERE translation_id = ?1 ORDER BY book_ord, chapter, verse")
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![translation_id], |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, String>(3)?)))
+        .map_err(|e| e.to_string())?;
+    for (book, chapter, verse, text) in rows.filter_map(Result::ok) {
+        let Some(chapters) = usize::try_from(book - 1).ok().and_then(|at| books.get_mut(at)) else { continue };
+        let (c, v) = (chapter.max(1) as usize, verse.max(1) as usize);
+        if chapters.len() < c {
+            chapters.resize(c, Vec::new());
+        }
+        let verses = &mut chapters[c - 1];
+        if verses.len() < v {
+            verses.resize(v, String::new());
+        }
+        verses[v - 1] = text;
+    }
+    Ok(books)
+}
+
 pub fn translations(conn: &Connection) -> Result<Vec<serde_json::Value>, String> {
     let mut stmt = conn
         .prepare(

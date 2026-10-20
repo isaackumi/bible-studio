@@ -1,3 +1,4 @@
+import type { ImportedBible } from "../bible/import";
 import { isOnlineTranslation, onlineChapter, onlinePassage, onlineTranslations, WORDS_TRANSLATION } from "../bible/online-bibles";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { cleanVerse } from "../bible/clean";
@@ -106,6 +107,8 @@ export const api = {
     ).then((bundled) => [...bundled, ...onlineTranslations()]),
   bibleInstall: (id: string) => (desktop() ? invoke<void>("bible_install", { id }) : browserInstallBible(id)),
   bibleRemove: (id: string) => (desktop() ? invoke<void>("bible_remove", { id }) : Promise.resolve(browserRemoveBible(id))),
+  /** Install a Bible read from a church's own file (desktop). Returns its id. */
+  bibleImport: (bible: ImportedBible) => invoke<string>("bible_import", { bible }),
   books: (translationId: string): Promise<BookInfo[]> =>
     isOnlineTranslation(translationId)
       ? api.books(WORDS_TRANSLATION)

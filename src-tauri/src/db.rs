@@ -524,6 +524,26 @@ mod tests {
         conn
     }
 
+    #[test]
+    fn imports_a_church_bible_and_reads_it_back() {
+        let conn = test_db();
+        let bible: crate::bible::ImportedBible = serde_json::from_value(serde_json::json!({
+            "name": "Nkwa Asɛm", "abbreviation": "TWI-2",
+            "books": [{ "ord": 43, "name": "Yohane", "chapters": [[], [], ["", "Na Onyankopɔn dɔ wiase"]] }]
+        }))
+        .unwrap();
+        let id = crate::bible::import_translation(&conn, &bible).unwrap();
+        assert_eq!(id, "user-twi2");
+        // A second import of the same file gets its own id.
+        assert_eq!(crate::bible::import_translation(&conn, &bible).unwrap(), "user-twi2-2");
+        let books = crate::bible::books(&conn, &id).unwrap();
+        assert_eq!(books[0]["name"], "Yohane");
+        let source = crate::bible::source_books(&conn, &id).unwrap();
+        assert_eq!(source.len(), 66);
+        assert_eq!(source[42][2][1], "Na Onyankopɔn dɔ wiase");
+        assert!(source[0].is_empty());
+    }
+
     fn count(conn: &Connection, table: &str) -> i64 {
         conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
             .unwrap()

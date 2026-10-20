@@ -62,6 +62,30 @@
 
   let audioNote = $state("");
 
+  // Settings › Bible: import a Bible file (Zefania, OSIS, OpenSong XML).
+  let bibleImportNote = $state("");
+  let bibleImportOk = $state(false);
+  let bibleImportBusy = $state(false);
+  let bibleFile = $state<HTMLInputElement | undefined>();
+  async function importBible(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    bibleImportBusy = true;
+    bibleImportNote = "";
+    try {
+      const error = await session.importBibleFile(await file.text(), file.name);
+      bibleImportOk = !error;
+      bibleImportNote = error ?? session.message;
+    } catch (error) {
+      bibleImportOk = false;
+      bibleImportNote = error instanceof Error ? error.message : String(error);
+    } finally {
+      bibleImportBusy = false;
+    }
+  }
+
   async function allowMicrophone() {
     audioNote = "macOS may ask for the microphone…";
     const blocked = await prepareListening();
@@ -1184,6 +1208,25 @@
               </div>
             </div>
           {/each}
+          {#each session.translations.filter((entry) => entry.id.startsWith("user-")) as entry (entry.id)}
+            <div class="row">
+              <div class="row-lead">
+                <span class="bible-badge">{entry.abbreviation}</span>
+                <div class="row-copy"><strong>{entry.name}</strong><span>{t("Imported from a Bible file")}</span></div>
+              </div>
+              <div class="row-end">
+                <span class="pill ok"><Icon name="check" size={11} /> {t("Installed")}</span>
+                <button type="button" class="btn icon-btn" aria-label={t("Remove {name}", { name: entry.name })} title={t("Remove from this computer")} onclick={() => void session.removeBible(entry.id)}><Icon name="trash" size={14} /></button>
+              </div>
+            </div>
+          {/each}
+          {#if isDesktop()}
+            <div class="row">
+              <div class="row-copy"><strong>{t("Import a Bible file")}</strong><span class:form-error={!!bibleImportNote && !bibleImportOk} role="status">{bibleImportNote || t("A Bible in your church's language, offline: Zefania, OSIS or OpenSong XML files (from OpenLP, FreeShow, SWORD and others).")}</span></div>
+              <button type="button" class="btn" disabled={bibleImportBusy} onclick={() => bibleFile?.click()}>{bibleImportBusy ? t("Reading…") : t("Import…")}</button>
+              <input bind:this={bibleFile} type="file" accept=".xml,.osis,.zefania,application/xml,text/xml" hidden onchange={(event) => void importBible(event)} />
+            </div>
+          {/if}
         </section>
         {#if BIBLE_CATALOG.some((entry) => !installedIds.includes(entry.id))}
           <p class="section-label">{t("Available to download")}</p>

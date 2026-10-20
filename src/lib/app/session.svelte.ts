@@ -123,6 +123,7 @@ import { clampScreen, sanitizeSongLines, screensOf, type SongLines, type SongScr
 import { addTracks, MAX_CROSSFADE, moveTrack, removeTrackAt, type AudioSettings, type Playlist } from "../domain/playlists";
 import { AudioDeck, SoundPad, canChooseOutput } from "../audio/deck.svelte";
 import { evenGain, measureUrl } from "../audio/loudness";
+import { readBibleFile, verseCount } from "../bible/import";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
 import type { ShortcutAction } from "../domain/types";
@@ -4643,6 +4644,21 @@ class Session {
       this.message = error instanceof Error ? error.message : "That translation could not be downloaded.";
     } finally {
       this.bibleBusy = this.bibleBusy.filter((entry) => entry !== id);
+    }
+  };
+
+  /** Install a Bible from a church's own file (Zefania, OSIS or OpenSong XML). Returns an error, or null. */
+  importBibleFile = async (text: string, fileName: string): Promise<string | null> => {
+    if (!this.desktop()) return t("Importing a Bible file needs the desktop app.");
+    const bible = readBibleFile(text, fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim());
+    if (!bible) return t("Church Studio can't read this file as a Bible. Use a Zefania, OSIS or OpenSong XML file.");
+    try {
+      await api.bibleImport(bible);
+      this.translations = await api.translations();
+      this.message = t("{name} is ready: {n} verses in {books} books.", { name: bible.name, n: verseCount(bible), books: bible.books.length });
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
     }
   };
 
