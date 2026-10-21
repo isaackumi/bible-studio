@@ -151,7 +151,7 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
     let candidates = monitors
         .iter()
         .map(|monitor| DisplayCandidate {
-            key: display_key_of(monitor),
+            key: display_key_in(monitor, &monitors),
             primary: Some(monitor_key(monitor).as_str()) == primary_key.as_deref(),
         })
         .collect::<Vec<_>>();
@@ -159,12 +159,12 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
     let operator_key = app
         .get_webview_window("main")
         .and_then(|window| window.current_monitor().ok().flatten())
-        .map(|monitor| display_key_of(&monitor));
+        .map(|monitor| display_key_in(&monitor, &monitors));
     let chosen_index = choose_index(&candidates, assigned.as_deref(), operator_key.as_deref());
     let displays = monitors
         .iter()
         .enumerate()
-        .map(|(index, monitor)| display_info(monitor, primary_key.as_deref(), chosen_index == Some(index)))
+        .map(|(index, monitor)| display_info(monitor, &monitors, primary_key.as_deref(), chosen_index == Some(index)))
         .collect::<Vec<_>>();
     let mode = lock(&output.mode).clone();
     let fullscreen = mode == "fullscreen";
@@ -242,8 +242,8 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
         }
         // An assigned audience display the operator window was dragged onto: the desk moves to
         // another display first, so the audience does not cover it.
-        if operator_key.as_deref() == Some(display_key_of(monitor).as_str()) {
-            if let Some(other) = monitors.iter().find(|other| display_key_of(other) != display_key_of(monitor)) {
+        if operator_key.as_deref() == Some(display_key_in(monitor, &monitors).as_str()) {
+            if let Some(other) = monitors.iter().find(|other| display_key_in(other, &monitors) != display_key_in(monitor, &monitors)) {
                 move_operator(app, other);
                 log::info!("OPERATOR_MOVED_OFF_AUDIENCE to={}", monitor_name(other));
             }
@@ -698,7 +698,7 @@ pub fn place_operator_on(app: &AppHandle, key: Option<&str>) {
         return;
     };
     let monitors = app.available_monitors().unwrap_or_default();
-    let target = key.and_then(|key| monitors.iter().find(|monitor| display_key_of(monitor) == key));
+    let target = key.and_then(|key| monitors.iter().find(|monitor| display_key_in(monitor, &monitors) == key));
     let primary = app.primary_monitor().ok().flatten();
     let monitor = target.or(primary.as_ref());
     if let Some(monitor) = monitor {
@@ -760,6 +760,23 @@ fn display_key(name: &str, width: u32, height: u32, scale: f64) -> String {
 fn display_key_of(monitor: &Monitor) -> String {
     let size = monitor.size();
     display_key(&raw_monitor_name(monitor), size.width, size.height, monitor.scale_factor())
+}
+
+/// A monitor's key among the ones connected: its name, size and scale, and where it sits only
+/// when another connected monitor is the same model (two identical projectors), so every key is
+/// unique and a single monitor keeps the key it always had.
+fn display_key_in(monitor: &Monitor, all: &[Monitor]) -> String {
+    let base = display_key_of(monitor);
+    let twins = all.iter().filter(|other| display_key_of(other) == base).count();
+    if twins <= 1 {
+        return base;
+    }
+    let position = monitor.position();
+    with_position(&base, position.x, position.y)
+}
+
+fn with_position(base: &str, x: i32, y: i32) -> String {
+    format!("{base}@{x},{y}")
 }
 
 fn raw_monitor_name(monitor: &Monitor) -> String {
@@ -846,11 +863,11 @@ fn monitor_key(monitor: &Monitor) -> String {
     )
 }
 
-fn display_info(monitor: &Monitor, primary_key: Option<&str>, audience: bool) -> DisplayInfo {
+fn display_info(monitor: &Monitor, all: &[Monitor], primary_key: Option<&str>, audience: bool) -> DisplayInfo {
     let key = monitor_key(monitor);
     let (x, y, width, height) = logical_frame(monitor);
     DisplayInfo {
-        key: display_key_of(monitor),
+        key: display_key_in(monitor, all),
         name: monitor_name(monitor),
         x: x.round() as i32,
         y: y.round() as i32,
@@ -898,6 +915,8 @@ mod tests {
     #[test]
     fn display_key_is_stable() {
         assert_eq!(display_key("DELL U2415", 1920, 1200, 1.0), "DELL U2415|1920x1200|1.00");
+        // Two identical projectors are told apart by where they sit.
+        assert_eq!(with_position("Epson|1920x1080|1.00", 1920, 0), "Epson|1920x1080|1.00@1920,0");
         assert_eq!(display_key("Name|Odd", 100, 100, 2.0), "Name/Odd|100x100|2.00");
     }
 

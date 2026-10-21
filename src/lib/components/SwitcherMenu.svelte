@@ -43,7 +43,7 @@
       {:else}
         <p class="menu-label">{config.kind === "vmix" ? t("Inputs: click to put on air") : t("Scenes: click to put on air")}</p>
         <div class="scenes">
-          {#each live.scenes as scene (scene)}
+          {#each live.scenes as scene, index (`${index}:${scene}`)}
             <button type="button" role="menuitemradio" aria-checked={live.program === scene} class:preview={live.preview === scene} onclick={() => void session.switchScene(scene)}>
               <span class="tally" class:on={live.program === scene} class:pv={live.preview === scene && live.program !== scene}></span>{scene}
             </button>

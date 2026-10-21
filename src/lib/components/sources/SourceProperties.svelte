@@ -371,7 +371,7 @@
           >
             <option value="">{ndiSources === null ? t("NDI is not available here") : ndiSources.length ? t("Choose a source…") : t("Looking for sources…")}</option>
             {#if fields.name && !(ndiSources ?? []).includes(fields.name)}<option value={fields.name}>{t("{name} (not seen now)", { name: fields.name })}</option>{/if}
-            {#each ndiSources ?? [] as name (name)}<option value={name}>{name}</option>{/each}
+            {#each ndiSources ?? [] as name, index (`${index}:${name}`)}<option value={name}>{name}</option>{/each}
           </select>
           <button type="button" class="choice" onclick={() => void refreshNdi()}>{t("Refresh")}</button>
         </span>

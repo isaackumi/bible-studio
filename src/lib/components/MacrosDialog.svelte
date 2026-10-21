@@ -135,7 +135,7 @@
                     {#if session.switcherState.scenes.length}
                       <select aria-label={t("Scene")} value={step.scene} onchange={(event) => setStep(index, { ...step, scene: event.currentTarget.value })}>
                         {#if !session.switcherState.scenes.includes(step.scene)}<option value={step.scene}>{step.scene || t("Pick a scene")}</option>{/if}
-                        {#each session.switcherState.scenes as scene (scene)}<option value={scene}>{scene}</option>{/each}
+                        {#each session.switcherState.scenes as scene, index (`${index}:${scene}`)}<option value={scene}>{scene}</option>{/each}
                       </select>
                     {:else}
                       <input class="text" aria-label={t("Scene")} placeholder={t("Scene name, as in the app")} value={step.scene} onchange={(event) => setStep(index, { ...step, scene: event.currentTarget.value })} />
