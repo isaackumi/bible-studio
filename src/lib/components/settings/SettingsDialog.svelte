@@ -1619,7 +1619,7 @@
         <section class="rows">
           <label class="row">
             <div class="row-copy"><strong>{t("Share anonymous usage and error reports")}</strong><span>{t("Once a day: the app version, the computer's system and your plan. When something goes wrong: the error and where in the app it happened. No names, songs or sermons. It helps us fix problems quickly.")}</span></div>
-            <input type="checkbox" role="switch" checked={session.workspace.shareUsage !== false} onchange={(event) => session.setShareUsage(event.currentTarget.checked)} />
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Share anonymous usage and error reports")} checked={session.workspace.shareUsage !== false} onchange={(event) => session.setShareUsage(event.currentTarget.checked)} />
           </label>
         </section>
       {:else}
@@ -1766,7 +1766,7 @@
   .nav-empty { margin: 12px 10px; font-size: 12px; color: var(--muted); }
 
   /* Page */
-  .settings-body { min-width: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 36px 44px; }
+  .settings-body { min-width: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 36px 44px; }
   /* Pages read best at a steady width on wide windows. */
   .settings-body > :global(*:not(.set-head)) { width: 100%; max-width: 820px; }
   .set-head {
@@ -1807,7 +1807,7 @@
   /* Rows: label and help on the left, control on the right */
   .settings-body :global(.rows) { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in srgb, var(--field) 75%, var(--panel)); overflow: hidden; flex: none; }
   .settings-body :global(.rows.inset) { background: var(--panel); }
-  .settings-body :global(.row) { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 60px; padding: 12px 18px; }
+  .settings-body :global(.row) { display: flex; flex-direction: row; align-items: center; font-size: inherit; font-weight: inherit; color: inherit; justify-content: space-between; gap: 24px; min-height: 60px; padding: 12px 18px; }
   .settings-body :global(.row + .row) { border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent); }
   .settings-body :global(.row.stack) { flex-direction: column; align-items: stretch; gap: 10px; }
   .settings-body :global(.row.dim) { opacity: 0.55; }

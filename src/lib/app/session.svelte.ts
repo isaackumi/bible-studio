@@ -483,6 +483,7 @@ class Session {
         this.services = await api.serviceList();
       }
       this.workspace = await this.loadWorkspace();
+      this.workspaceLoaded = true;
       this.applyAudioSettings();
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
@@ -903,7 +904,18 @@ class Session {
     }, 250);
   };
 
+  /**
+   * Settings are read from disk while the libraries load. A save asked for before that (the audience
+   * window reporting its shape, a guessed language) would write the defaults over the saved settings,
+   * so it waits until they are in.
+   */
+  private workspaceLoaded = false;
+
   private persist = async () => {
+    if (!this.workspaceLoaded) {
+      this.persistSoon();
+      return;
+    }
     this.workspace = { ...this.workspace, cursor: this.cursor, lastServiceId: this.service?.id ?? null };
     try {
       await this.saveWorkspaceDocument(this.workspace);
