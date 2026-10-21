@@ -5089,7 +5089,9 @@ class Session {
 
   private osName(): string {
     const platform = typeof navigator === "undefined" ? "" : navigator.platform;
-    return /mac/i.test(platform) ? "macos" : /win/i.test(platform) ? "windows" : /linux/i.test(platform) ? "linux" : "other";
+    const os = /mac/i.test(platform) ? "macos" : /win/i.test(platform) ? "windows" : /linux/i.test(platform) ? "linux" : "other";
+    // The browser demo counts apart from installed apps in the server's numbers.
+    return this.desktop() ? os : `web-${os}`;
   }
 
   /** Read the plan again from the native core (each minute, and after any change). */
@@ -5189,6 +5191,9 @@ class Session {
    * one whose trial was used.
    */
   private autoStartTrial = async () => {
+    // The browser is a demo: a browser has no lasting identity (clearing it makes a "new computer"),
+    // so the trial is given only to the installed app.
+    if (!this.desktop()) return;
     if (this.plan !== "free" || this.workspace.entitlement.trialUsed) {
       writeFlag(AUTO_TRIAL_KEY, null);
       return;
@@ -5218,7 +5223,7 @@ class Session {
   };
 
   /** What a trial request carries: this computer, and the account when signed in (one trial a person). */
-  private trialRequest = (promo?: string) => ({ device: this.deviceId, name: this.deviceName(), ...(this.workspace.profile?.token ? { token: this.workspace.profile.token } : {}), ...(promo ? { promo } : {}) });
+  private trialRequest = (promo?: string) => ({ device: this.deviceId, name: this.deviceName(), os: this.osName(), ...(this.workspace.profile?.token ? { token: this.workspace.profile.token } : {}), ...(promo ? { promo } : {}) });
 
   /**
    * On trial and not signed in: a reminder halfway through, and again two days before it ends, that
@@ -5501,6 +5506,7 @@ class Session {
 
   /** Start the free trial: one per computer, given by the server. Returns an error to show, or null. */
   startTrial = async (promo?: string): Promise<string | null> => {
+    if (!this.desktop()) return t("The free Premium trial is in the desktop app. Download it from church-studio.heitechinc.com to try Premium.");
     const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", this.trialRequest(promo));
     if (!answer.ok) {
       if (answer.status === 403) {

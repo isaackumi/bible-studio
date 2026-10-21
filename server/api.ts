@@ -353,6 +353,9 @@ function lease(config: ApiConfig, fields: { kind: LeaseKind; plan: LicensePlan; 
 async function trial(config: ApiConfig, input: Record<string, unknown>, address: string | null = null): Promise<Response> {
   const device = text(input.device, 80);
   if (!device) return json(400, { error: "Which computer?" });
+  // The browser demo gets no trial: a browser has no lasting identity, so each cleared one would be
+  // a "new computer". The trial is for the installed app.
+  if (text(input.os, 20).startsWith("web")) return json(403, { web: true, error: "The free trial is in the desktop app." });
   const now = config.now();
   const key = `trial:${device}`;
   const saved = await getJson<Trial>(config.store, key);

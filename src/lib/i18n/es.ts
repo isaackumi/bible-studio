@@ -3369,4 +3369,8 @@ export const es: Readonly<Record<string, string>> = {
   "Your Premium trial is kept with your account: {n} days left.": "Su prueba Premium se guarda con su cuenta: quedan {n} días.",
   "This computer uses a test code; the account itself has no plan yet.": "Esta computadora usa un código de prueba; la cuenta aún no tiene plan.",
   "No plan on this account yet. Plans has Premium and Church.": "Esta cuenta aún no tiene plan. Planes ofrece Premium e Iglesia.",
+  "The free Premium trial is in the desktop app. Download it from church-studio.heitechinc.com to try Premium.": "La prueba gratuita de Premium está en la aplicación de escritorio. Descárguela en church-studio.heitechinc.com para probar Premium.",
+  "Browser demo": "Demo en el navegador",
+  "Get the app": "Obtener la aplicación",
+  "This is the browser demo. Download the app for the Premium trial, the audience screen on a projector, voice, streaming and more.": "Esta es la demo en el navegador. Descargue la aplicación para la prueba Premium, la pantalla del público en un proyector, la voz, la transmisión y más.",
 };

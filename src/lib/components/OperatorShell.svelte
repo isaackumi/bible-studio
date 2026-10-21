@@ -16,6 +16,7 @@
   import { outputShape } from "../display/output-shape.svelte";
   import { AUDIENCE_ASPECT_KEY, aspectFor, sanitizeScreenShape } from "../display/shape";
   import { isDesktop } from "../platform/runtime";
+  import { t } from "../i18n/core";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
   import FindOverlay from "./FindOverlay.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
@@ -166,6 +167,12 @@
     <RemoteApproval />
     <Paywall />
     <Toast />
+    {#if !isDesktop() && !import.meta.env.DEV}
+      <!-- The browser version is a demo: Premium and the trial are in the installed app. -->
+      <a class="demo-badge" href="https://church-studio.heitechinc.com/#download" target="_blank" rel="noopener" title={t("This is the browser demo. Download the app for the Premium trial, the audience screen on a projector, voice, streaming and more.")}>
+        <i aria-hidden="true"></i>{t("Browser demo")} · <b>{t("Get the app")}</b>
+      </a>
+    {/if}
     <CommandPalette />
     <UpdateNotice />
     <StatusLine />

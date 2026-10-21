@@ -63,6 +63,12 @@ describe("server API", () => {
     expect(await call("/v1/trial", { device: "mac-1" })).toMatchObject({ status: 403, data: { used: true } });
   });
 
+  it("gives no trial to the browser demo", async () => {
+    const { call } = setup();
+    expect(await call("/v1/trial", { device: "browser-1", os: "web-macos" })).toMatchObject({ status: 403, data: { web: true } });
+    expect((await call("/v1/trial", { device: "mac-1", os: "macos" })).status).toBe(200);
+  });
+
   it("starts only a few new trials a day from one network address", async () => {
     const { call, advance } = setup();
     const from = { "cf-connecting-ip": "203.0.113.9" };
