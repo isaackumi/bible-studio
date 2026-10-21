@@ -562,10 +562,22 @@ async function richDetails(config: ApiConfig) {
       .sort((a, b) => b.meta.last - a.meta.last)
       .slice(0, 300)
       .map(({ device, meta }) => ({ ...meta, id: device.length > 10 ? `${device.slice(0, 8)}…` : device, device, setup: setupOf(meta), account: meta.account ? (emails.get(meta.account) ?? null) : null, accountId: meta.account ?? null })),
-    accounts: (base.accounts as Array<{ email: string; createdAt: number }>).map((account) => {
-      const id = accountIds.get(account.email) ?? null;
-      return { ...account, id, setups: id ? [...(byAccount.get(id) ?? [])] : [] };
-    }),
+    accounts: await Promise.all(
+      (base.accounts as Array<{ email: string; createdAt: number }>).map(async (account) => {
+        const id = accountIds.get(account.email) ?? null;
+        const record = id ? await getJson<Account>(config.store, `acct:${id}`) : null;
+        const computers = id ? devices.filter((item) => item.meta.account === id) : [];
+        return {
+          ...account,
+          id,
+          name: record?.name ?? "",
+          licenses: record?.licenses.length ?? 0,
+          computers: computers.length,
+          lastSeen: Math.max(0, ...computers.map((item) => item.meta.last)),
+          setups: id ? [...(byAccount.get(id) ?? [])] : [],
+        };
+      }),
+    ),
   };
 }
 

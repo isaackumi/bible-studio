@@ -338,6 +338,12 @@ export async function stats(config: ApiConfig) {
     plans: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.plan)),
     versions: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.version)).slice(0, 8),
     systems: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.os)),
+    // The web version by browser ("Edge", "Safari"…), and each system as app or browser, over 30 days.
+    browsers: count(devices.filter((meta) => now - meta.last < 30 * DAY && meta.os.startsWith("web")).map((meta) => (meta.browser ?? "").replace(/\s+\d.*$/, "") || "Other")),
+    platforms: (["macos", "windows", "linux"] as const).map((os) => {
+      const recent = devices.filter((meta) => now - meta.last < 30 * DAY);
+      return { os, app: recent.filter((meta) => meta.os === os).length, web: recent.filter((meta) => meta.os === `web-${os}`).length };
+    }),
     trials: { started: trials.length, running: trials.filter((entry) => entry.endsAt > now).length, converted: trials.filter((entry) => entry.converted).length },
     sales: {
       checkouts: checkouts.length,
