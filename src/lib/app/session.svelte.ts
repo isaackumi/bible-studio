@@ -2878,7 +2878,10 @@ class Session {
 
   refreshAccurate = async () => {
     try {
-      this.accurate = { ...this.accurate, model: await accurateModel() };
+      // Await first: spreading before the await would keep a stale progress and, read inside an
+      // effect, make that effect depend on (and loop on) `accurate`.
+      const model = await accurateModel();
+      this.accurate = { ...this.accurate, model };
     } catch {
       this.accurate = { ...this.accurate, model: { installed: false, downloading: false, bytes: 0, unsupported: true } };
     }

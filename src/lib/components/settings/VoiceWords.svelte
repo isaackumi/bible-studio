@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { CANON } from "../../bible/reference";
   import { BUILT_IN_FIXES, nearMisses } from "../../voice/words";
@@ -18,7 +19,7 @@
   const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`;
 
   $effect(() => {
-    if (isDesktop()) void session.refreshAccurate();
+    if (isDesktop()) untrack(() => void session.refreshAccurate());
   });
 
   let heard = $state("");

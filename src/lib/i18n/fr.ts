@@ -35,6 +35,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Planning Center": "Planning Center",
   "Bring upcoming plans in as services.": "Importer les prochains plans comme cultes.",
   Backup: "Sauvegarde",
+  "Storage & backup": "Espace et sauvegarde",
+  "Space on this computer, and export or import the whole library.": "L’espace sur cet ordinateur, et exporter ou importer toute la bibliothèque.",
   "Export or import the whole library.": "Exporter ou importer toute la bibliothèque.",
   "Sound & voice": "Son et voix",
   "Microphone, listening and voice commands.": "Micro, écoute et commandes vocales.",

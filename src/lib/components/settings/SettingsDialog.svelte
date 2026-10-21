@@ -134,7 +134,7 @@
         { id: "bible", title: msg("Bible"), icon: "bible", color: "#a07a52", about: msg("Scripture translations on this computer."), keywords: "translation kjv scripture" },
         { id: "lyrics", title: msg("Songs"), icon: "lyrics", color: "#e93d82", about: msg("Songs, folders, imports and copyright."), keywords: "lyrics hymns ccli songselect openlyrics" },
         { id: "media", title: msg("Media"), icon: "media", color: "#12a5b8", about: msg("Pictures and videos for backgrounds and the logo."), keywords: "images video background logo camera" },
-        { id: "storage", title: msg("Backup"), icon: "files", color: "#2f80ed", about: msg("Export or import the whole library."), keywords: "export import backup files library" },
+        { id: "storage", title: msg("Storage & backup"), icon: "files", color: "#2f80ed", about: msg("Space on this computer, and export or import the whole library."), keywords: "storage space disk size cache compact unused media export import backup files library" },
       ],
     },
     {
