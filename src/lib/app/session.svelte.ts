@@ -207,6 +207,7 @@ import {
   type AccurateModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
+import { MAX_SCREENS, newScreen, placeScreens, screenLetter, switchRole, writeScreensLocal, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
@@ -492,6 +493,9 @@ class Session {
       this.workspace = await this.loadWorkspace();
       this.workspaceLoaded = true;
       this.applyAudioSettings();
+      // Screens from last time come back on their monitors (after the display list is in).
+      writeScreensLocal(this.workspace.screens ?? []);
+      setTimeout(() => void this.placeScreenWindows(), 1500);
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
@@ -580,6 +584,8 @@ class Session {
     this.output = await api.outputStatus();
     this.unlisten = await listen<OutputStatus>("output-status", (event) => {
       this.output = event.payload;
+      // A monitor came or went: screens follow their own monitors.
+      void this.placeScreenWindows();
     });
     this.unlistenAudienceCamera = await listen<{ id?: unknown; error?: unknown }>("audience-camera", (event) => {
       const id = typeof event.payload?.id === "string" ? event.payload.id : "";
@@ -6160,7 +6166,7 @@ class Session {
 
   /** Stage (confidence) display: Program now, Preview as next. Separate from the audience packet. */
   private publishStage = () => {
-    if (typeof window === "undefined" || !this.stageOpen) return;
+    if (typeof window === "undefined" || (!this.stageOpen && !this.screensNeedStage())) return;
     const sermon = this.sermonFocus && this.sermons.find((entry) => entry.id === this.sermonFocus?.sermonId);
     const focused = sermon ? sermon.sections.find((section) => section.id === this.sermonFocus?.sectionId) : undefined;
     const notes = focused?.notes ?? "";
@@ -6319,6 +6325,110 @@ class Session {
   private audienceScreen: ScreenLike | null = null;
 
   /** Open the stage display: a popup in the browser, a separate window on desktop. Never Program. */
+  // --- Screens: extra monitors, each with a job (Settings › Screens) ---------------------------
+
+  /** Where each screen is now: showing on its monitor, waiting for it, or blocked. */
+  screenPlaces = () => placeScreens(this.workspace.screens ?? [], this.output.displays, this.output.operatorKey);
+
+  private screensNeedStage = () => (this.workspace.screens ?? []).some((screen) => screen.role === "stage" || screen.role === "timer");
+
+  private saveScreens(screens: ScreenOutput[]) {
+    this.workspace = { ...this.workspace, screens };
+    this.persistSoon();
+    writeScreensLocal(screens);
+    if (isDesktop()) void emit("screens-config", screens).catch(() => {});
+    this.publishStage();
+    void this.placeScreenWindows();
+  }
+
+  addScreen = () => {
+    if (!this.requireFeature("screens")) return;
+    const screens = this.workspace.screens ?? [];
+    if (screens.length >= MAX_SCREENS) return;
+    const id = Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+    this.saveScreens([...screens, newScreen(screens, this.output.displays, this.output.operatorKey, id)]);
+  };
+
+  removeScreen = (id: string) => this.saveScreens((this.workspace.screens ?? []).filter((screen) => screen.id !== id));
+
+  renameScreen = (id: string, name: string) => this.saveScreens((this.workspace.screens ?? []).map((screen) => (screen.id === id ? { ...screen, name: name.trim().slice(0, 40) } : screen)));
+
+  setScreenDisplay = (id: string, displayKey: string | null) => this.saveScreens((this.workspace.screens ?? []).map((screen) => (screen.id === id ? { ...screen, displayKey } : screen)));
+
+  /** Give a screen a job. A locked screen says so instead of changing. */
+  setScreenRole = (id: string, role: ScreenRole): boolean => {
+    const screens = this.workspace.screens ?? [];
+    const index = screens.findIndex((screen) => screen.id === id);
+    const target = screens[index];
+    if (!target) return false;
+    if (target.locked) {
+      this.message = t("{name} is locked. Unlock it to change what it shows.", { name: target.name || t("Screen {letter}", { letter: screenLetter(index) }) });
+      return false;
+    }
+    this.saveScreens(switchRole(screens, id, role));
+    return true;
+  };
+
+  lockScreen = (id: string, locked: boolean) => this.saveScreens((this.workspace.screens ?? []).map((screen) => (screen.id === id ? { ...screen, locked } : screen)));
+
+  /** Show each screen's letter and name on it for a few seconds. */
+  identifyScreens = () => {
+    if (isDesktop()) void emit("screens-identify").catch(() => {});
+  };
+
+  /** Open, move or close each screen's window to match its monitor. */
+  private placingScreens = false;
+  private placeScreenWindows = async () => {
+    if (!isDesktop() || this.placingScreens) return;
+    this.placingScreens = true;
+    try {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const { LogicalPosition, LogicalSize } = await import("@tauri-apps/api/dpi");
+      const screens = this.workspace.screens ?? [];
+      const places = this.screenPlaces();
+      const allowed = this.entitled("screens");
+      for (const window of await WebviewWindow.getAll()) {
+        if (!window.label.startsWith("screen-")) continue;
+        const id = window.label.slice("screen-".length);
+        if (!allowed || places.get(id)?.state !== "showing") await window.destroy().catch(() => {});
+      }
+      if (!allowed) return;
+      writeScreensLocal(screens);
+      for (const screen of screens) {
+        const place = places.get(screen.id);
+        if (place?.state !== "showing") continue;
+        const { x, y, width, height } = place.display;
+        const existing = await WebviewWindow.getByLabel(`screen-${screen.id}`);
+        if (existing) {
+          await existing.setPosition(new LogicalPosition(x, y)).catch(() => {});
+          await existing.setSize(new LogicalSize(width, height)).catch(() => {});
+          continue;
+        }
+        const opened = new WebviewWindow(`screen-${screen.id}`, {
+          url: `/?screen=${screen.id}`,
+          title: screen.name || "Screen",
+          x,
+          y,
+          width,
+          height,
+          decorations: false,
+          resizable: false,
+          skipTaskbar: true,
+          alwaysOnTop: true,
+          focus: false,
+          shadow: false,
+        });
+        opened.once("tauri://error", (event) => {
+          this.message = t("A screen could not open: {payload}", { payload: String(event.payload) });
+        });
+      }
+    } catch (error) {
+      console.error("Screens could not be placed", error);
+    } finally {
+      this.placingScreens = false;
+    }
+  };
+
   openStage = async () => {
     if (!this.requireFeature("stage-display")) return;
     this.stageOpen = true;

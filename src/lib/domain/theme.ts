@@ -300,6 +300,7 @@ export function defaultWorkspace(): Workspace {
     songUses: [],
     parallelTranslationId: null,
     stageLayout: { next: true, clock: true, notes: true, chords: true, size: "m" },
+    screens: [],
     pco: { appId: "", secret: "" },
     ai: emptyAiSettings(),
     backup: { folder: "", lastAt: "" },

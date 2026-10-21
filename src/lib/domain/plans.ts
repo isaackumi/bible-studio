@@ -23,6 +23,7 @@ export type PlanFeature =
   | "song-detection"
   | "phone-remote"
   | "stage-display"
+  | "screens"
   | "song-packs"
   | "theme-library"
   | "cloud-sync"
@@ -59,6 +60,7 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   "song-detection": { label: msg("Song detection that follows the singing") },
   "phone-remote": { label: msg("Phone remote") },
   "stage-display": { label: msg("Stage display") },
+  screens: { label: msg("Extra screens with their own job: timer, scripture, lyrics or stage") },
   "song-packs": { label: msg("Song packs") },
   "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
   "cloud-sync": { label: msg("Cloud sync across computers"), soon: true },
@@ -69,7 +71,7 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
 };
 
 const FREE: PlanFeature[] = ["presenter", "scripture", "songs", "sermon", "slides", "media", "audience-output"];
-const PREMIUM: PlanFeature[] = [...FREE, "production", "voice", "song-detection", "phone-remote", "stage-display", "song-packs", "theme-library"];
+const PREMIUM: PlanFeature[] = [...FREE, "production", "voice", "song-detection", "phone-remote", "stage-display", "screens", "song-packs", "theme-library"];
 const CHURCH: PlanFeature[] = [...PREMIUM, "ndi", "streaming", "recording", "priority-support", "cloud-sync"];
 
 export const PLANS: Plan[] = [

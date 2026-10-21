@@ -5,6 +5,7 @@
   import BroadcastSettings from "./BroadcastSettings.svelte";
   import CaptionsSettings from "./CaptionsSettings.svelte";
   import VoiceWords from "./VoiceWords.svelte";
+  import ScreensSettings from "./ScreensSettings.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -45,6 +46,7 @@
     | "themes"
     | "displays"
     | "stage"
+    | "screens"
     | "captions"
     | "remote"
     | "switcher"
@@ -114,6 +116,7 @@
         { id: "displays", title: msg("Displays"), icon: "screens", color: "#0a84ff", about: msg("Which screen is the desk, and which is the audience."), keywords: "monitor screen profile second assign" },
         { id: "themes", title: msg("Themes"), icon: "themes", color: "#c2410c", about: msg("How verses, songs and slides look on the screen."), keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
         { id: "stage", title: msg("Stage display"), icon: "stage", color: "#ff9f0a", about: msg("A private confidence screen for the people on stage."), keywords: "confidence platform next clock" },
+        { id: "screens", title: msg("Screens"), icon: "screens", color: "#0ea5e9", about: msg("Extra monitors, each with its own job: timer, scripture, lyrics or stage."), keywords: "monitors multiple screens outputs timer scripture lyrics lock assign" },
         { id: "captions", title: msg("Captions"), icon: "captions", color: "#0f9d8a", about: msg("Live captions on the screen and on phones, translated."), keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
       ],
     },
@@ -1055,6 +1058,8 @@
             </div>
           </section>
         {/if}
+      {:else if section === "screens"}
+        <ScreensSettings />
       {:else if section === "stage"}
         <section class="rows">
           <div class="row">

@@ -532,6 +532,8 @@ export type Workspace = {
   ai: import("../ai/summarize").AiSettings;
   /** What the stage (confidence) screen shows. */
   stageLayout: import("../display/channel").StageLayout;
+  /** Extra screens, each on its own monitor with a job (Settings › Screens). */
+  screens: import("../display/screens").ScreenOutput[];
   /** A second translation shown beside the first on scripture slides, or null. */
   parallelTranslationId: string | null;
   /** Songs shown live, once per day, for CCLI copy reporting. */

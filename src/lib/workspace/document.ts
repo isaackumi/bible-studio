@@ -1,4 +1,5 @@
 import { sanitizeSongLines } from "../domain/song-screens";
+import { sanitizeScreens } from "../display/screens";
 import type { AppearanceSettings, Cursor, DisplayProfile, OperatorTheme, ShortcutMap, Workspace, WorkspaceLayout } from "../domain/types";
 import { sanitizePartDesks } from "../domain/service";
 import { sanitizeUiLanguage } from "../i18n/core";
@@ -179,6 +180,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     onlineBibles: sanitizeOnlineBibles(value.onlineBibles),
     songUses: sanitizeSongUses(value.songUses),
     stageLayout: sanitizeStageLayout(value.stageLayout),
+    screens: sanitizeScreens(value.screens),
     backup: {
       folder: typeof value.backup?.folder === "string" ? value.backup.folder.slice(0, 1000) : "",
       lastAt: typeof value.backup?.lastAt === "string" ? value.backup.lastAt : "",

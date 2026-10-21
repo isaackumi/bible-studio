@@ -6,7 +6,8 @@
     "main",
     "audience",
     "stage",
-    "second"
+    "second",
+    "screen-*"
   ],
   "permissions": [
     "core:default",

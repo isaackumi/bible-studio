@@ -5,9 +5,10 @@
   import RemotePad from "$lib/components/RemotePad.svelte";
   import StageOutput from "$lib/components/StageOutput.svelte";
   import SecondOutput from "$lib/components/SecondOutput.svelte";
+  import ScreenOutput from "$lib/components/ScreenOutput.svelte";
   import { isDesktop } from "$lib/platform/runtime";
 
-  type Surface = "operator" | "audience" | "remote" | "stage" | "second";
+  type Surface = "operator" | "audience" | "remote" | "stage" | "second" | "screen";
 
   function markedAudience(): boolean {
     if (typeof window === "undefined") return false;
@@ -33,6 +34,8 @@
     if (params.get("remote") === "1") return "remote";
     if (params.get("stage") === "1" || tauriWindowLabel() === "stage") return "stage";
     if (params.get("second") === "1" || tauriWindowLabel() === "second") return "second";
+    // Extra screens (Settings › Screens): ?screen=<id>, or a window labelled screen-<id>.
+    if (params.get("screen") || tauriWindowLabel()?.startsWith("screen-")) return "screen";
     if (params.get("display") === "1" || markedAudience()) return "audience";
     if (isDesktop() && tauriWindowLabel() === "audience") return "audience";
     return "operator";
@@ -54,6 +57,8 @@
   <StageOutput />
 {:else if surface === "second"}
   <SecondOutput />
+{:else if surface === "screen"}
+  <ScreenOutput id={new URLSearchParams(window.location.search).get("screen") || (tauriWindowLabel() ?? "").replace(/^screen-/, "")} />
 {:else}
   <OperatorShell />
 {/if}
