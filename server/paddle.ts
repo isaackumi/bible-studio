@@ -320,7 +320,7 @@ async function keyId(transactionId: string): Promise<Uint8Array> {
 
 // --- Email ----------------------------------------------------------------------------------
 
-export function keyEmail(key: string, issued: Issued, base = "https://license.heitechinc.com"): { subject: string; text: string; html: string } {
+export function keyEmail(key: string, issued: Issued, base = "https://church-studio.heitechinc.com"): { subject: string; text: string; html: string } {
   return licenseKeyEmail({ key, plan: issued.plan === "church" ? "church" : "premium", until: issued.until }, base);
 }
 

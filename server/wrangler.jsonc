@@ -7,9 +7,13 @@
   // Better Auth (accounts) uses Node's AsyncLocalStorage.
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
-  // The address the app talks to (src/lib/domain/billing.ts). Named for the company, not the app,
-  // so it can stay when the app is renamed. The workers.dev address is off: this is the only one.
-  "routes": [{ "pattern": "license.heitechinc.com", "custom_domain": true }],
+  // church-studio.heitechinc.com is the address people see: sign-in, checkout and the links in emails.
+  // license.heitechinc.com is the address apps already installed talk to (src/lib/domain/billing.ts);
+  // it stays, answering the same. The workers.dev address is off.
+  "routes": [
+    { "pattern": "church-studio.heitechinc.com", "custom_domain": true },
+    { "pattern": "license.heitechinc.com", "custom_domain": true }
+  ],
   "vars": {
     // "sandbox" while testing with Paddle's sandbox; "live" when selling for real.
     "PADDLE_ENV": "sandbox",
@@ -28,8 +32,8 @@
     // The public pages (home, terms, privacy, refunds): who sells, and an inbox someone reads.
     "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",
-    // This server's own address, for sign-in callbacks (accounts).
-    "PUBLIC_URL": "https://license.heitechinc.com"
+    // The address people see: sign-in pages, sign-in callbacks, checkout and the links in emails.
+    "PUBLIC_URL": "https://church-studio.heitechinc.com"
   },
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.

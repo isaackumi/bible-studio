@@ -26,7 +26,7 @@ import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter
 import { getJson, putJson, type Store } from "./store.ts";
 
 /** Where the server lives when no address is set (links and the logo in emails). */
-const DEFAULT_PUBLIC_URL = "https://license.heitechinc.com";
+const DEFAULT_PUBLIC_URL = "https://church-studio.heitechinc.com";
 
 export type ApiConfig = {
   store: Store;
@@ -146,7 +146,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
   const path = url.pathname;
-  const origin = url.origin;
+  // Links people open (sign-in, checkout) use the public address, whichever address the app called.
+  const origin = config.publicUrl?.replace(/\/+$/, "") || url.origin;
 
   // Pages.
   if (path === "/admin" && request.method === "GET") return html(200, adminPage());

@@ -212,10 +212,18 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
       ${
         methods.includes("email")
           ? `${social.length ? `<div class="or"><span>or</span></div>` : ""}
-      <form class="email" onsubmit="event.preventDefault(); emailLink(this)">
+      <form class="email" id="email-form" onsubmit="event.preventDefault(); emailLink(this.email.value)">
         <input name="email" type="email" required autocomplete="email" placeholder="you@church.org" aria-label="Email" />
         <button type="submit">Email me a sign-in link</button>
-      </form>`
+      </form>
+      <div class="sent" id="sent" hidden>
+        <div class="envelope" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+        <h2>Check your email</h2>
+        <p class="muted">We sent a sign-in link to <b id="sent-to"></b>. Open it on this device. It works once, for 15 minutes.</p>
+        <button type="button" class="resend" id="resend" onclick="resend()">Resend email</button>
+        <button type="button" class="link" onclick="changeEmail()">Use a different email</button>
+        <p class="hint">Nothing yet? Check spam or promotions, or resend.</p>
+      </div>`
           : ""
       }
       <p id="msg" class="msg" role="status"></p>
@@ -235,6 +243,17 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
   .email input { height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
   .email input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
   .email button { height: 46px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } .email button:hover { filter: brightness(1.06); }
+  .sent { display: grid; justify-items: center; gap: 4px; text-align: center; }
+  .sent[hidden], .methods[hidden], .or[hidden], .email[hidden] { display: none; }
+  .envelope { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 10px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .sent h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.01em; }
+  .sent .muted { margin-bottom: 16px; }
+  .resend { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-weight: 700; cursor: pointer; }
+  .resend:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+  .resend:disabled { color: var(--muted); cursor: default; }
+  .sent .link { margin-top: 10px; }
+  .hint { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+  .email button:disabled { opacity: .7; cursor: default; }
   .msg { min-height: 20px; margin: 14px 0 0; font-size: 14px; color: var(--muted); } .msg.good { color: var(--good); font-weight: 650; }
   .numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
   .numbers button { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, transform .1s; }
@@ -263,9 +282,55 @@ async function social(provider) {
   msg("Opening " + provider[0].toUpperCase() + provider.slice(1) + "…");
   try { const data = await post("/auth/sign-in/social", { provider, callbackURL: here }); if (data.url) location.href = data.url; } catch (e) { msg(e.message); }
 }
-async function emailLink(form) {
-  const email = form.email.value.trim();
-  try { await post("/auth/sign-in/magic-link", { email, callbackURL: here }); msg("Check " + email + " for the sign-in link, and open it on this device.", true); } catch (e) { msg(e.message); }
+// The email link: sent, then "Check your email" with Resend (after a short wait) and a way back.
+let sentTo = "";
+let wait = null;
+async function emailLink(value) {
+  const email = String(value || "").trim();
+  if (!email) return;
+  const button = document.querySelector("#email-form button");
+  if (button) { button.disabled = true; button.textContent = "Sending…"; }
+  try {
+    await post("/auth/sign-in/magic-link", { email, callbackURL: here });
+    sentTo = email;
+    showSent();
+  } catch (e) { msg(e.message); }
+  finally { if (button) { button.disabled = false; button.textContent = "Email me a sign-in link"; } }
+}
+function showSent() {
+  msg("");
+  document.querySelectorAll(".methods, .or, #email-form").forEach((el) => (el.hidden = true));
+  document.getElementById("sent").hidden = false;
+  document.getElementById("sent-to").textContent = sentTo;
+  countdown(30);
+}
+function countdown(seconds) {
+  const button = document.getElementById("resend");
+  clearInterval(wait);
+  let left = seconds;
+  const tick = () => {
+    button.disabled = left > 0;
+    button.textContent = left > 0 ? "Resend email in " + left + "s" : "Resend email";
+    left -= 1;
+    if (left < -1) clearInterval(wait);
+  };
+  tick();
+  wait = setInterval(tick, 1000);
+}
+async function resend() {
+  const button = document.getElementById("resend");
+  button.disabled = true;
+  button.textContent = "Sending…";
+  try { await post("/auth/sign-in/magic-link", { email: sentTo, callbackURL: here }); msg("Sent again to " + sentTo + ".", true); countdown(30); }
+  catch (e) { msg(e.message); countdown(5); }
+}
+function changeEmail() {
+  clearInterval(wait);
+  document.getElementById("sent").hidden = true;
+  document.querySelectorAll(".methods, .or, #email-form").forEach((el) => (el.hidden = false));
+  const input = document.querySelector("#email-form input");
+  if (input) { input.value = sentTo; input.focus(); input.select(); }
+  msg("");
 }
 async function switchAccount() { try { await post("/auth/sign-out", {}); } catch {} location.href = here; }
 </script></body></html>`;
