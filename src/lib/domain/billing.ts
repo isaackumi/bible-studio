@@ -5,6 +5,8 @@
 import type { LicensePlan } from "./license";
 
 /** The license server's address (the Worker in server/); VITE_LICENSE_SERVER points development at `npm run server:dev`. */
+/** The public website: plans, downloads and the policies (terms, privacy, licenses). */
+export const SITE_URL = "https://church-studio.heitechinc.com";
 export const SERVER_URL: string = (import.meta.env?.VITE_LICENSE_SERVER as string | undefined) || "https://license.heitechinc.com";
 
 export type Interval = "monthly" | "yearly";

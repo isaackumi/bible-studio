@@ -17,6 +17,7 @@
   import type { ShortcutAction } from "../../domain/types";
   import { canUse } from "../../platform/capabilities";
   import { APP_VERSION, isDesktop, openExternal } from "../../platform/runtime";
+  import { SITE_URL } from "../../domain/billing";
   import { openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import BrandMark from "../BrandMark.svelte";
@@ -1432,7 +1433,7 @@
       {:else if section === "updates"}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{t("Church Studio 0.1.0")}</strong><span>{t("The copy you launched is the one that is running.")}</span></div>
+            <div class="row-copy"><strong>Church Studio {APP_VERSION}</strong><span>{t("The copy you launched is the one that is running.")}</span></div>
             <span class="pill">{t("Current")}</span>
           </div>
           <div class="row">
@@ -1459,6 +1460,15 @@
               {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>{t("Clear")}</button>{/if}
             </div>
           </div>
+        </section>
+        <p class="section-label">{t("Legal")}</p>
+        <section class="rows">
+          {#each [["terms", msg("Terms of Service")], ["privacy", msg("Privacy Policy")], ["refunds", msg("Refunds and cancellation")], ["licenses", msg("Open-source licenses")], ["security", msg("Report a security problem")]] as [page, label] (page)}
+            <div class="row">
+              <div class="row-copy"><strong>{t(label)}</strong></div>
+              <button type="button" class="btn" onclick={() => void openExternal(`${SITE_URL}/${page}`)}>{t("Open")}</button>
+            </div>
+          {/each}
         </section>
         <p class="note stand">{t("Church Studio can send video over NDI®. NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
       {:else if section === "account"}

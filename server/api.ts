@@ -23,7 +23,7 @@ import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
 import { checkoutPage, payPage } from "./pages.ts";
 import { adminRoute, type AdminSettings } from "./admin.ts";
-import { privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
+import { licensesPage, privacyPage, refundsPage, securityPage, securityTxt, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
 
@@ -189,6 +189,9 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
     if (path === "/refunds") return html(200, refundsPage(site));
+    if (path === "/licenses") return html(200, licensesPage(site));
+    if (path === "/security") return html(200, securityPage(site));
+    if (path === "/.well-known/security.txt" || path === "/security.txt") return new Response(securityTxt(site, origin, config.now()), { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
     if (path === "/checkout") return config.paddleClient ? html(200, checkoutPage(config.paddleClient)) : html(404, landingPage(site, null));
   }
   const pay = path.match(/^\/pay\/([A-Za-z0-9_]+)(\/cancel)?$/);

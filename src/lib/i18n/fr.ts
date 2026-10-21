@@ -3459,4 +3459,10 @@ export const fr: Readonly<Record<string, string>> = {
   "Edge colour": "Couleur des bords",
   "White": "Blanc",
   "Another colour": "Autre couleur",
+  "Legal": "Mentions légales",
+  "Terms of Service": "Conditions d’utilisation",
+  "Privacy Policy": "Politique de confidentialité",
+  "Refunds and cancellation": "Remboursements et résiliation",
+  "Open-source licenses": "Licences open source",
+  "Report a security problem": "Signaler un problème de sécurité",
 };

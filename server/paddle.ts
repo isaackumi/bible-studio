@@ -57,6 +57,9 @@ export type Env = {
   /** The public pages: the selling business's legal name and a contact inbox someone reads. */
   COMPANY_NAME?: string;
   CONTACT_EMAIL?: string;
+  /** The business's postal address and the country whose law governs the terms (shown in the policies). */
+  COMPANY_ADDRESS?: string;
+  COMPANY_COUNTRY?: string;
   /** Accounts (optional): the D1 database for Better Auth's users and sessions, and its secret. */
   AUTH_DB?: unknown;
   BETTER_AUTH_SECRET?: string;
@@ -121,7 +124,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
     graceDays: Number(env.GRACE_DAYS ?? 7) || 7,
     identity: identityOf(env, mail),
-    site: env.COMPANY_NAME && env.CONTACT_EMAIL ? { company: env.COMPANY_NAME, contact: env.CONTACT_EMAIL } : undefined,
+    site: env.COMPANY_NAME && env.CONTACT_EMAIL ? { company: env.COMPANY_NAME, contact: env.CONTACT_EMAIL, address: env.COMPANY_ADDRESS || undefined, country: env.COMPANY_COUNTRY || undefined } : undefined,
     paddleClient: env.PADDLE_CLIENT_TOKEN ? { token: env.PADDLE_CLIENT_TOKEN, sandbox: env.PADDLE_ENV === "sandbox" } : undefined,
     mail,
     publicUrl: env.PUBLIC_URL,

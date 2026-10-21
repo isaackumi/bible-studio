@@ -7,15 +7,20 @@
 // for the countries you sell in before going live.
 
 import { TRIAL_DAYS } from "../src/lib/domain/plans.ts";
+import { THIRD_PARTY } from "./third-party.ts";
 
 export type Site = {
   /** The legal name of the business that sells Church Studio (COMPANY_NAME). */
   company: string;
   /** An inbox someone reads (CONTACT_EMAIL). */
   contact: string;
+  /** The business's postal address (COMPANY_ADDRESS), shown as the data controller's address. */
+  address?: string;
+  /** The country whose law governs the terms (COMPANY_COUNTRY), e.g. "Ghana". */
+  country?: string;
 };
 
-const UPDATED = "20 October 2026";
+const UPDATED = "21 October 2026";
 const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
 function layout(title: string, site: Site, body: string): string {
@@ -52,6 +57,9 @@ function layout(title: string, site: Site, body: string): string {
   .plan ul { margin: 0; padding: 0; list-style: none; font-size: 15px; } .plan li { padding: 4px 0; } .plan li::before { content: "✓  "; color: var(--accent); font-weight: 800; }
   .plan li em { margin-left: 6px; font-size: 12px; font-style: normal; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; }
   .note { color: var(--muted); font-size: 14px; }
+  .doc table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; } .doc th, .doc td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; } .doc th { color: var(--muted); font-weight: 650; }
+  .doc details { margin: 8px 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); } .doc summary { cursor: pointer; font-weight: 650; } .doc .names { margin: 10px 0 2px; font-size: 13px; color: var(--muted); line-height: 1.8; }
+  .doc .toc { padding: 12px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-size: 15px; } .doc .toc ol { margin: 6px 0 0; padding-left: 20px; }
   .doc { max-width: 760px; padding: 24px 0 48px; } .doc h1 { font-size: 34px; letter-spacing: -.02em; margin: 10px 0 4px; } .doc h2 { font-size: 20px; margin: 30px 0 8px; } .doc p, .doc li { color: var(--ink); }
   footer { margin-top: 30px; padding: 26px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; } footer a { color: var(--muted); }
@@ -63,35 +71,54 @@ function layout(title: string, site: Site, body: string): string {
 <main class="wrap">${body}</main>
 <footer><div class="wrap">
   <span>© 2026 ${escape(site.company)} · <a href="mailto:${mail}">${mail}</a></span>
-  <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/refunds">Refunds &amp; cancellation</a></span>
+  <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/refunds">Refunds &amp; cancellation</a> · <a href="/licenses">Open-source licenses</a> · <a href="/security">Security</a></span>
 </div></footer>
 </body></html>`;
 }
 
+/** Who we are, as the policies name us: the company, and its address when one is set. */
+const controller = (site: Site) => `${escape(site.company)}${site.address ? `, ${escape(site.address)}` : ""}`;
+
 export function termsPage(site: Site): string {
   const c = escape(site.company);
   const mail = escape(site.contact);
+  const law = site.country ? `the laws of ${escape(site.country)}` : `the laws of the country where ${c} is registered`;
   return layout("Terms of Service · Church Studio", site, `<article class="doc">
   <h1>Terms of Service</h1><p class="note">Last updated ${UPDATED}</p>
-  <p>These terms are an agreement between you and ${c} ("we", "us") about your use of Church Studio, the desktop application and the services that come with it (license activation, accounts and updates). By installing or using Church Studio you agree to them.</p>
+  <p>These terms are an agreement between you and ${controller(site)} ("we", "us") about your use of Church Studio: the desktop application, the browser version, and the services that come with them (license activation, accounts, updates and support). By installing or using Church Studio you agree to them. If you use it for a church or organisation, you confirm you may accept these terms for it.</p>
   <h2>1. Using Church Studio</h2>
-  <p>We grant you a non-exclusive, non-transferable license to install and use Church Studio under the plan you have: Free, Premium or Church. Each plan covers the number of computers shown on our pricing page. You may not resell, sublicense, reverse engineer or remove license checks from the software, except where the law allows it regardless of these terms.</p>
-  <h2>2. Plans, trials and payment</h2>
-  <p>Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns. Prices are shown on our pricing page; taxes are added at checkout where they apply. A paid plan is a subscription that renews each month or year until you cancel. The Premium trial lasts ${TRIAL_DAYS} days, once per computer, and needs no payment details.</p>
-  <h2>3. Cancelling and refunds</h2>
+  <p>We grant you a non-exclusive, non-transferable license to install and use Church Studio under the plan you have: Free, Premium or Church. Each plan covers the number of computers shown on our pricing page. The browser version at church-studio.heitechinc.com/app is a demo of the app; your work there is kept only in that browser.</p>
+  <h2>2. What you may not do</h2>
+  <ul>
+    <li>Resell, rent or sublicense Church Studio, or share a license beyond the computers its plan covers.</li>
+    <li>Remove, bypass or tamper with license checks, or reverse engineer the software, except where the law allows it regardless of these terms.</li>
+    <li>Use our servers in a way that harms them or other people, such as automated abuse, attempts to get trials or licenses you are not entitled to, or attempts to reach data that is not yours.</li>
+    <li>Use Church Studio to show or stream anything unlawful, or anything you do not have the rights to show.</li>
+  </ul>
+  <h2>3. Plans, trials and payment</h2>
+  <p>Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns. Paddle's buyer terms apply to your purchase. Prices are shown on our pricing page; taxes are added at checkout where they apply. A paid plan is a subscription that renews each month or year until you cancel. The Premium trial lasts ${TRIAL_DAYS} days, once per computer, in the desktop app, and needs no payment details.</p>
+  <h2>4. Cancelling and refunds</h2>
   <p>You can cancel at any time; your plan keeps working until the end of the period you paid for. Refunds are described in our <a href="/refunds">Refund and Cancellation Policy</a>.</p>
-  <h2>4. Your content</h2>
-  <p>Your songs, services, notes and media stay on your computer and remain yours. You are responsible for having the rights to what you show, including song licenses (for example CCLI) and Bible translation permissions.</p>
-  <h2>5. Accounts</h2>
-  <p>An account is optional. If you create one, keep access to your email or sign-in provider secure; you are responsible for activity on your account.</p>
-  <h2>6. Availability and changes</h2>
-  <p>Church Studio works offline once activated, but activation, trials and updates need our servers. We may change or improve the software. If we make a change that materially reduces what a paid plan includes, you may cancel and receive a pro-rata refund for the unused period.</p>
-  <h2>7. Warranty and liability</h2>
-  <p>Church Studio is provided "as is" to the extent the law allows. We are not liable for indirect or consequential losses, and our total liability is limited to the amount you paid us in the 12 months before the claim. Nothing in these terms limits rights you have as a consumer that cannot be limited by law.</p>
-  <h2>8. Ending</h2>
-  <p>You may stop using Church Studio at any time. We may suspend a license that is used in breach of these terms, for example shared beyond its computers, after telling you why.</p>
-  <h2>9. Contact</h2>
-  <p>${c} · <a href="mailto:${mail}">${mail}</a></p>
+  <h2>5. Your content</h2>
+  <p>Your songs, services, notes and media stay on your computer and remain yours. You are responsible for having the rights to what you show and stream, including song licenses (for example CCLI), Bible translation permissions, images, videos and music. The Bible texts that come with the app are in the public domain or openly licensed, as listed on our <a href="/licenses">licenses page</a>.</p>
+  <h2>6. Other services you connect</h2>
+  <p>Some features use services you choose to connect, such as an AI provider with your own key, API.Bible, Planning Center or a streaming platform. Your use of them is under their terms, and they are responsible for them. AI output can be wrong: check summaries and translations before you rely on them or show them.</p>
+  <h2>7. Accounts</h2>
+  <p>An account is optional. If you create one, keep access to your email or sign-in provider secure; you are responsible for activity on your account. You can ask us to delete it at any time.</p>
+  <h2>8. Updates, availability and changes</h2>
+  <p>Church Studio works offline once activated, but activation, trials, accounts and updates need our servers. Updates are signed by us, and the app installs only signed updates. We may change or improve the software. If we make a change that materially reduces what a paid plan includes, you may cancel and receive a pro-rata refund for the unused period.</p>
+  <h2>9. Our software and names</h2>
+  <p>Church Studio, its design and its code belong to us or our licensors. These terms do not give you any right to our names or logos. Church Studio includes open-source software; each component is under its own license, listed on our <a href="/licenses">licenses page</a>, and nothing in these terms limits what those licenses allow. If you send us feedback or ideas, we may use them without obligation to you.</p>
+  <h2>10. Warranty and liability</h2>
+  <p>Church Studio is provided "as is" to the extent the law allows. We do not promise it will be free of errors or always available, so keep backups of what matters and have a plan for a live service. We are not liable for indirect or consequential losses, and our total liability is limited to the amount you paid us in the 12 months before the claim. Nothing in these terms limits rights you have as a consumer that cannot be limited by law, or our liability where the law does not allow it to be limited.</p>
+  <h2>11. Ending</h2>
+  <p>You may stop using Church Studio at any time. We may suspend a license that is used in breach of these terms, for example shared beyond its computers, after telling you why. Sections 5, 9, 10 and 13 continue after these terms end.</p>
+  <h2>12. Changes to these terms</h2>
+  <p>We may update these terms. For a change that matters, we will tell you on our website or in the app at least 30 days before it applies. If you do not agree, you may cancel and receive a pro-rata refund for the unused period of a paid plan.</p>
+  <h2>13. Law and disputes</h2>
+  <p>These terms are governed by ${law}. If you are a consumer, you keep the protection of the mandatory laws of the country where you live, and you may bring a claim in its courts. Please write to us first: most problems are solved quickly that way. If any part of these terms cannot be enforced, the rest still applies. These terms, with the policies they link to, are the whole agreement about Church Studio.</p>
+  <h2>14. Contact</h2>
+  <p>${controller(site)} · <a href="mailto:${mail}">${mail}</a></p>
   </article>`);
 }
 
@@ -100,35 +127,139 @@ export function privacyPage(site: Site): string {
   const mail = escape(site.contact);
   return layout("Privacy Policy · Church Studio", site, `<article class="doc">
   <h1>Privacy Policy</h1><p class="note">Last updated ${UPDATED}</p>
-  <p>${c} makes Church Studio. This policy explains what information we handle and why. In short: your library stays on your computer, and we keep only what we need to run licenses, accounts and support.</p>
-  <h2>What stays on your computer</h2>
-  <p>Songs, services, sermons, notes, media, settings and church details are stored on your computer. We do not receive them.</p>
-  <h2>What we receive</h2>
+  <p>${c} makes Church Studio. This policy explains what information we handle, why, and what you can do about it. In short: <b>your library stays on your computer</b>, we keep only what we need to run licenses, accounts and support, and we never sell personal data or use it for advertising.</p>
+  <nav class="toc"><b>Contents</b><ol>
+    <li><a href="#who">Who we are</a></li><li><a href="#local">What stays with you</a></li><li><a href="#receive">What we receive</a></li><li><a href="#features">Features that use other services</a></li>
+    <li><a href="#cookies">Cookies and storage</a></li><li><a href="#processors">Who processes data for us</a></li><li><a href="#why">Why we use it</a></li><li><a href="#keep">How long we keep it</a></li>
+    <li><a href="#safe">How we protect it</a></li><li><a href="#rights">Your rights</a></li><li><a href="#children">Children</a></li><li><a href="#changes">Changes</a></li>
+  </ol></nav>
+
+  <h2 id="who">1. Who we are</h2>
+  <p>The controller of the personal data described here is ${controller(site)}. For anything about privacy, write to <a href="mailto:${mail}">${mail}</a>. For purchases, Paddle.com, our reseller and Merchant of Record, is a separate controller of the payment data it collects, under <a href="https://www.paddle.com/legal/privacy" rel="noopener">Paddle's privacy policy</a>.</p>
+
+  <h2 id="local">2. What stays with you</h2>
+  <p>Songs, services, sermons, notes, media, settings, church details and connected-service keys (AI, streaming, Planning Center) are stored on your computer. We do not receive them. In the browser version they are stored in that browser, and clearing the browser's site data removes them.</p>
+
+  <h2 id="receive">3. What we receive</h2>
   <ul>
-    <li><b>Check-ins.</b> Once a day the app sends an anonymous computer identifier (a one-way hash, not your hardware serial), the app version, the operating system and the plan in use (and, in the browser version, the browser's name and version, such as "Edge 129"). If you are signed in, the check-in is tied to your account, so we can help you with the computers you use. We use this to count active computers, to keep one free trial per computer and for support. You can turn it off in Settings › Privacy. License activation needs a check-in at least once every 30 days on paid plans.</li>
-    <li><b>Error reports.</b> When something goes wrong, the app sends the error and where in the app it happened, with the app version, the operating system and the same anonymous computer identifier. Personal details such as email addresses and file paths are removed first, and no songs, sermons or screen content are included. The same switch in Settings › Privacy turns this off.</li>
-    <li><b>Purchases.</b> Your email address and church name, the plan bought, and the license issued. Payments are handled by Paddle; we never see your card details.</li>
-    <li><b>Accounts (optional).</b> Your name and email address from your sign-in method (email link, Google, Microsoft or Apple), and which computers are signed in.</li>
+    <li><b>Daily check-in.</b> Once a day the app sends a computer identifier (a one-way hash, not your hardware serial), the app version, the operating system and the plan in use; in the browser version also the browser's name and version (such as "Edge 129"). If you are signed in, the check-in is linked to your account. We note the days a computer was used. We use this to count active computers, keep one free trial per computer, and help with support. You can turn it off in Settings › Plan &amp; account › Privacy. Paid plans still check their license online at least once every 30 days.</li>
+    <li><b>Trials.</b> The computer identifier and when the trial started and ends. To stop trials being farmed from one place, we count new trials per network (IP) address for two days, then the count is deleted.</li>
+    <li><b>Licenses.</b> The license, the email it was bought with, and the computers using it, by the name you give them (for example "Sanctuary Mac") and when they last checked in.</li>
+    <li><b>Purchases.</b> Your email address and church name, the plan bought, the price and any promo code. Payments are handled by Paddle; we never see your card details.</li>
+    <li><b>Accounts (optional).</b> Your name and email address from your sign-in method (email link, Google, Microsoft or Apple), your sign-in sessions, and which computers are signed in.</li>
+    <li><b>Error reports.</b> When something goes wrong, the app sends the error and where in the app it happened, with the app version, the operating system and the computer identifier. Email addresses and file paths are removed first, and no songs, sermons or screen content are included. The same Privacy switch turns this off.</li>
     <li><b>Support.</b> What you send us when you write, including any problem report you choose to attach.</li>
+    <li><b>Website and servers.</b> Our hosting provider, Cloudflare, processes the IP address and browser details of every visit to keep the service secure and working; we do not use them to track you.</li>
   </ul>
-  <h2>Features that use other services, when you turn them on</h2>
+  <p>Only a few authorised people at ${c} can see this data, through a sign-in protected admin page that records every change they make.</p>
+
+  <h2 id="features">4. Features that use other services, when you turn them on</h2>
   <ul>
-    <li><b>Voice and captions</b> use your computer's speech recognition (on a Mac, Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy).</li>
+    <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. We do not receive the audio or the words.</li>
     <li><b>AI summaries and translation</b> send the text involved to the AI provider whose key you enter (for example OpenAI or Anthropic), under that provider's terms.</li>
     <li><b>Online Bibles</b> are fetched from API.Bible, which receives the passages requested and anonymous usage counts required by the publishers.</li>
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
+    <li><b>Streaming</b> sends your program straight from your computer to the platform you choose (for example YouTube or Facebook), under its terms.</li>
+    <li><b>The phone remote and NDI®</b> work on your local network; nothing goes through our servers.</li>
+    <li><b>Updates</b> are checked and downloaded from GitHub, which sees your IP address.</li>
   </ul>
-  <h2>Who processes data for us</h2>
-  <p>Paddle (payments, invoices and tax), Cloudflare (hosting our servers and database), Resend (sending emails such as license keys and sign-in links), Sentry (collecting error reports), and GitHub (serving downloads and updates). Each processes data only to provide its service.</p>
-  <h2>Why we may use it</h2>
-  <p>To provide what you asked for (licenses, accounts, updates and support), to meet legal and tax obligations, and, for the anonymous check-ins, our legitimate interest in keeping trials fair and the product working. We do not sell personal data or use it for advertising.</p>
-  <h2>How long we keep it</h2>
-  <p>Purchase and license records for as long as the law requires for tax (usually up to 7 years). Account data until you ask us to delete the account. Check-in records for up to 24 months, and error reports for up to 90 days.</p>
-  <h2>Your rights</h2>
-  <p>You can ask to see, correct, export or delete your personal data, or object to how we use it, by writing to <a href="mailto:${mail}">${mail}</a>. You may also complain to your local data protection authority.</p>
-  <h2>Contact</h2>
-  <p>${c} · <a href="mailto:${mail}">${mail}</a></p>
+
+  <h2 id="cookies">5. Cookies and storage</h2>
+  <p>We do not use advertising or analytics cookies, and no third-party trackers run on our website or in the app. When you sign in, we set a session cookie that keeps you signed in. Cloudflare may set a cookie needed for security. Paddle's checkout sets the cookies it needs to take a payment. The browser version keeps your library and settings in your browser's storage. Because these are needed for what you asked for, they do not need your consent; you can clear them in your browser at any time.</p>
+
+  <h2 id="processors">6. Who processes data for us</h2>
+  <table><thead><tr><th>Service</th><th>What for</th><th>Where</th></tr></thead><tbody>
+    <tr><td>Paddle</td><td>Checkout, payments, invoices, tax (Merchant of Record)</td><td>UK, EU, US</td></tr>
+    <tr><td>Cloudflare</td><td>Hosting our servers, database and website; security</td><td>Global</td></tr>
+    <tr><td>Resend</td><td>Sending emails (license keys, sign-in links, receipts from us)</td><td>US</td></tr>
+    <tr><td>Sentry</td><td>Collecting error reports</td><td>US</td></tr>
+    <tr><td>GitHub</td><td>Serving downloads and updates</td><td>US</td></tr>
+    <tr><td>Google, Microsoft, Apple</td><td>Only if you choose them to sign in</td><td>US</td></tr>
+  </tbody></table>
+  <p>Each processes data only to provide its service to us. Where data leaves your country, for example from the EU, UK, Ghana or Nigeria to the US, we rely on the safeguards the law requires, such as the European Commission's standard contractual clauses or an adequacy decision.</p>
+
+  <h2 id="why">7. Why we use it</h2>
+  <p>To provide what you asked for: licenses, trials, accounts, updates and support (performing our contract with you). To meet legal and tax obligations. For check-ins, error reports, trial limits and security, our legitimate interest in keeping the product working, fair and safe, which you can switch off where noted. Where we ask for consent, you can withdraw it at any time.</p>
+
+  <h2 id="keep">8. How long we keep it</h2>
+  <table><tbody>
+    <tr><td>Purchase and license records</td><td>As long as the law requires for tax, usually up to 7 years</td></tr>
+    <tr><td>Accounts</td><td>Until you ask us to delete the account</td></tr>
+    <tr><td>Check-ins and computer records</td><td>Up to 24 months after the computer was last seen</td></tr>
+    <tr><td>Trial records</td><td>As long as needed to keep one trial per computer</td></tr>
+    <tr><td>Trial counts per network address</td><td>2 days</td></tr>
+    <tr><td>Sign-in links</td><td>15 minutes, or until used</td></tr>
+    <tr><td>Error reports</td><td>90 days</td></tr>
+    <tr><td>Record of staff changes</td><td>24 months</td></tr>
+    <tr><td>Support emails</td><td>As long as needed to help you, up to 3 years</td></tr>
+  </tbody></table>
+
+  <h2 id="safe">9. How we protect it</h2>
+  <p>Data travels encrypted (HTTPS). Licenses and updates are cryptographically signed, so they cannot be forged. Staff access is limited to a few people, protected by sign-in through Cloudflare Access, and every change is recorded. We collect as little as we can: your library never leaves your computer. If a breach affecting your data happens, we will tell you and the authorities as the law requires. To report a security problem, see our <a href="/security">security page</a>.</p>
+
+  <h2 id="rights">10. Your rights</h2>
+  <p>Depending on where you live, you can ask to see the personal data we hold about you, correct it, delete it, get a copy to take elsewhere, restrict or object to how we use it, and withdraw consent. Write to <a href="mailto:${mail}">${mail}</a> from the email involved; we may ask you to confirm it is you, and we answer within 30 days. To delete an account, write to the same address. We do not sell or "share" personal data as the California Consumer Privacy Act defines it.</p>
+  <p>You may also complain to a data protection authority, for example Ghana's Data Protection Commission, the Nigeria Data Protection Commission, the authority in your EU country, or the UK Information Commissioner's Office. We would like the chance to help first.</p>
+
+  <h2 id="children">11. Children</h2>
+  <p>Church Studio is made for churches and the adults who run their services. It is not directed at children, and we do not knowingly collect personal data from children under 13 (or 16 where the law requires). If you think a child has given us personal data, write to us and we will delete it.</p>
+
+  <h2 id="changes">12. Changes</h2>
+  <p>We will update this policy when what we do changes, and change the date at the top. For a change that matters, we will tell you on our website or in the app before it applies.</p>
+  <p>${controller(site)} · <a href="mailto:${mail}">${mail}</a></p>
   </article>`);
+}
+
+/** The open-source software inside Church Studio, by license, from scripts/third-party.mjs. */
+export function licensesPage(site: Site): string {
+  const groups = new Map<string, Array<readonly ["js" | "rust", string, string, string]>>();
+  for (const item of THIRD_PARTY) groups.set(item[3], [...(groups.get(item[3]) ?? []), item]);
+  const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  const link = (item: readonly ["js" | "rust", string, string, string]) =>
+    `<a href="${item[0] === "js" ? `https://www.npmjs.com/package/${escape(item[1])}` : `https://crates.io/crates/${escape(item[1])}`}" rel="noopener">${escape(item[1])}</a> ${escape(item[2])}`;
+  return layout("Open-source licenses · Church Studio", site, `<article class="doc">
+  <h1>Open-source licenses</h1><p class="note">Last updated ${UPDATED}</p>
+  <p>Church Studio is built with ${THIRD_PARTY.length} open-source components: ${THIRD_PARTY.filter((item) => item[0] === "js").length} JavaScript packages and ${THIRD_PARTY.filter((item) => item[0] === "rust").length} Rust crates. We are grateful to their authors. Each component is under its own license, listed below with a link to its page, where its full license text and source code are published.</p>
+  <h2>Bible texts</h2>
+  <table><thead><tr><th>Translation</th><th>License</th></tr></thead><tbody>
+    <tr><td>King James Version, American Standard Version, World English Bible, Bible in Basic English</td><td>Public domain</td></tr>
+    <tr><td>Akuapem Twi Bible (Nkwa Asɛm)</td><td>© 1996, 2020 Biblica, Inc. Licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener">CC BY-SA 4.0</a>, from <a href="https://ebible.org/details.php?id=twi" rel="noopener">eBible.org</a>, unchanged. Church Studio is not affiliated with or endorsed by Biblica, Inc.</td></tr>
+  </tbody></table>
+  <p>Other translations come from API.Bible under each publisher's license, when you choose them.</p>
+  <h2>Fonts</h2>
+  <p>Inter, Figtree, Instrument Sans and Instrument Serif are licensed under the <a href="https://openfontlicense.org" rel="noopener">SIL Open Font License 1.1</a>.</p>
+  <h2>Software components</h2>
+  <p class="note">Components under the Mozilla Public License 2.0 are used unchanged; their source code is available at the links below.</p>
+  ${sorted.map(([license, items]) => `<details><summary>${escape(license)} · ${items.length}</summary><p class="names">${items.map(link).join(" · ")}</p></details>`).join("\n  ")}
+  <h2>Trademarks</h2>
+  <p>NDI® is a registered trademark of Vizrt NDI AB. Other names are the trademarks of their owners and are used only to describe compatibility.</p>
+  </article>`);
+}
+
+export function securityPage(site: Site): string {
+  const mail = escape(site.contact);
+  return layout("Security · Church Studio", site, `<article class="doc">
+  <h1>Security</h1><p class="note">Last updated ${UPDATED}</p>
+  <h2>Reporting a problem</h2>
+  <p>If you find a security weakness in Church Studio, its website or its servers, please write to <a href="mailto:${mail}?subject=Security">${mail}</a> with "Security" in the subject. Tell us what you found, how to reproduce it and what it could affect. We reply within 5 working days, keep you updated, and credit you if you wish once it is fixed.</p>
+  <p>Please give us a reasonable time to fix a problem before telling others, do not access or change data that is not yours, and do not disrupt the service or other people. If you act in good faith within these rules, we will not take legal action against you.</p>
+  <h2>How Church Studio is protected</h2>
+  <ul>
+    <li>Your library stays on your computer; our servers never receive your songs, sermons or notes.</li>
+    <li>Updates are signed, and the app installs only updates signed by us.</li>
+    <li>Licenses and plan leases are signed with Ed25519 keys, so they cannot be forged or edited.</li>
+    <li>Everything travels over HTTPS.</li>
+    <li>Staff access is limited, protected by Cloudflare Access sign-in, capped, and every change is recorded and reported.</li>
+    <li>Payments are taken by Paddle; we never see card details.</li>
+  </ul>
+  </article>`);
+}
+
+/** /.well-known/security.txt (RFC 9116): where to report a security problem. */
+export function securityTxt(site: Site, origin: string, now: number): string {
+  // Kept within a year, as the standard asks, by counting from today.
+  const expires = new Date(now + 300 * 86_400_000).toISOString().slice(0, 10) + "T00:00:00.000Z";
+  return `Contact: mailto:${site.contact}\nExpires: ${expires}\nPreferred-Languages: en\nPolicy: ${origin}/security\nCanonical: ${origin}/.well-known/security.txt\n`;
 }
 
 export function refundsPage(site: Site): string {

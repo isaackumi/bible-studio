@@ -36,6 +36,10 @@
     // The public pages (home, terms, privacy, refunds): who sells, and an inbox someone reads.
     "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",
+    // Shown in the policies as the data controller's address, and the law the terms follow.
+    // PLACEHOLDERS until HeiTech's registered details are confirmed (see docs/launch-checklist.md).
+    "COMPANY_ADDRESS": "",
+    "COMPANY_COUNTRY": "",
     // The address people see: sign-in pages, sign-in callbacks, checkout and the links in emails.
     "PUBLIC_URL": "https://church-studio.heitechinc.com",
     // Cloudflare Access in front of /admin (README › Admin): the team domain and the application's

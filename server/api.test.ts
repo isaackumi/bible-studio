@@ -197,8 +197,19 @@ describe("server API", () => {
 
   it("serves the public pages, with the prices checkout charges and the policies Paddle reviews", async () => {
     const { call, config } = setup();
-    config.site = { company: "Grace Software Ltd", contact: "help@grace.example" };
+    config.site = { company: "Grace Software Ltd", contact: "help@grace.example", address: "1 Mission Road, Accra", country: "Ghana" };
     const home = String((await call("/")).data.html);
+    // The launch pages: every policy names the company, its address and its contact.
+    const privacy = String((await call("/privacy")).data.html);
+    expect(privacy).toContain("Grace Software Ltd, 1 Mission Road, Accra");
+    expect(privacy).toContain("Data Protection Commission");
+    expect(String((await call("/terms")).data.html)).toContain("the laws of Ghana");
+    const licenses = String((await call("/licenses")).data.html);
+    expect(licenses).toContain("Open-source licenses");
+    expect(licenses).toContain("CC BY-SA 4.0");
+    expect(String((await call("/security")).data.html)).toContain("Reporting a problem");
+    const txt = await handleApi(new Request("https://keys.test/.well-known/security.txt"), config);
+    expect(await txt.text()).toMatch(/^Contact: mailto:help@grace\.example\nExpires: 2027-/);
     for (const plan of ["premium", "church"] as const) {
       expect(home).toContain(`>$${PRICES[plan].monthly / 100}</span><small>/ month</small>`);
       expect(home).toContain(`$${PRICES[plan].yearly / 100} billed yearly`);

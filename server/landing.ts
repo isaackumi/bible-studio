@@ -459,7 +459,7 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
 
 <footer><div class="wrap">
   <span>© ${new Date().getFullYear()} ${escape(site.company)} · Church Studio is made by ${escape(site.company)} · <a href="mailto:${mail}">${mail}</a></span>
-  <nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a></nav>
+  <nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a><a href="/licenses">Open-source licenses</a><a href="/security">Security</a></nav>
 </div></footer>
 
 <script>

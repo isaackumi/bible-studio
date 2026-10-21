@@ -3378,4 +3378,10 @@ export const es: Readonly<Record<string, string>> = {
   "Edge colour": "Color de los bordes",
   "White": "Blanco",
   "Another colour": "Otro color",
+  "Legal": "Legal",
+  "Terms of Service": "Términos del servicio",
+  "Privacy Policy": "Política de privacidad",
+  "Refunds and cancellation": "Reembolsos y cancelación",
+  "Open-source licenses": "Licencias de código abierto",
+  "Report a security problem": "Informar de un problema de seguridad",
 };
