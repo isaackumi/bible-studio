@@ -9,6 +9,8 @@ mod noise;
 mod broadcast;
 mod ndi;
 mod voice;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod whisper;
 
 use serde_json::Value;
 use std::sync::Arc;
@@ -322,8 +324,54 @@ fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>) -> Result<(), String> {
-    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default())
+fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>, engine: Option<String>) -> Result<(), String> {
+    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default(), engine.as_deref() == Some("accurate"))
+}
+
+/// Accurate listening's model: whether it is here, and getting or removing it.
+#[tauri::command]
+fn whisper_status(app: tauri::AppHandle) -> serde_json::Value {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        serde_json::to_value(whisper::status(&app)).unwrap_or_default()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = app;
+        serde_json::json!({ "installed": false, "downloading": false, "bytes": 0, "unsupported": true })
+    }
+}
+
+#[tauri::command]
+fn whisper_download(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        whisper::download(app)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = app;
+        Err("Accurate listening runs on macOS and Windows.".into())
+    }
+}
+
+#[tauri::command]
+fn whisper_cancel() {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    whisper::cancel_download();
+}
+
+#[tauri::command]
+fn whisper_delete(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        whisper::delete(&app)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = app;
+        Ok(())
+    }
 }
 
 /// Mic check: room and cleaned levels arrive as `noise-test` events until stopped.
@@ -725,6 +773,10 @@ pub fn run() {
             request_listen_access,
             open_privacy_settings,
             start_sermon_listen,
+            whisper_status,
+            whisper_download,
+            whisper_cancel,
+            whisper_delete,
             stop_sermon_listen,
             start_noise_test,
             start_ndi,

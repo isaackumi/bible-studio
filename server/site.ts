@@ -155,7 +155,7 @@ export function privacyPage(site: Site): string {
 
   <h2 id="features">4. Features that use other services, when you turn them on</h2>
   <ul>
-    <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. We do not receive the audio or the words.</li>
+    <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. If you choose <b>Accurate</b> listening, Whisper runs entirely on your computer and audio never leaves it; its model is downloaded once from Hugging Face, which sees your IP address. We do not receive the audio or the words.</li>
     <li><b>AI summaries and translation</b> send the text involved to the AI provider whose key you enter (for example OpenAI or Anthropic), under that provider's terms.</li>
     <li><b>Online Bibles</b> are fetched from API.Bible, which receives the passages requested and anonymous usage counts required by the publishers.</li>
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
@@ -226,6 +226,8 @@ export function licensesPage(site: Site): string {
     <tr><td>Akuapem Twi Bible (Nkwa Asɛm)</td><td>© 1996, 2020 Biblica, Inc. Licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener">CC BY-SA 4.0</a>, from <a href="https://ebible.org/details.php?id=twi" rel="noopener">eBible.org</a>, unchanged. Church Studio is not affiliated with or endorsed by Biblica, Inc.</td></tr>
   </tbody></table>
   <p>Other translations come from API.Bible under each publisher's license, when you choose them.</p>
+  <h2>Speech model</h2>
+  <p>Accurate listening uses <a href="https://github.com/openai/whisper" rel="noopener">OpenAI Whisper</a> through <a href="https://github.com/ggml-org/whisper.cpp" rel="noopener">whisper.cpp</a>, both under the MIT License. The model is downloaded only when you turn it on.</p>
   <h2>Fonts</h2>
   <p>Inter, Figtree, Instrument Sans and Instrument Serif are licensed under the <a href="https://openfontlicense.org" rel="noopener">SIL Open Font License 1.1</a>.</p>
   <h2>Software components</h2>

@@ -200,6 +200,11 @@ import {
   startListening,
   startNativeListening,
   type ListenErrorKind,
+  accurateModel,
+  cancelAccurateModel,
+  deleteAccurateModel,
+  downloadAccurateModel,
+  type AccurateModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
@@ -2577,7 +2582,7 @@ class Session {
       message: t("Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”."),
     };
     const filter = this.workspace.voice.noiseFilter ?? "off";
-    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, expectedWords(this.workspace.voice.words ?? [])) : startListening(handlers, filter);
+    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, expectedWords(this.workspace.voice.words ?? []), this.workspace.voice.engine ?? "system") : startListening(handlers, filter);
   };
 
   stopVoice = (message = t("Listening stopped.")) => {
@@ -2822,6 +2827,57 @@ class Session {
       return;
     }
     this.stopVoice(`Noise filter ${names[noiseFilter]}. Listening again…`);
+    await this.startVoice();
+  };
+
+  // --- Accurate listening (Whisper on this computer) -------------------------------------------
+
+  /** The model's state: unknown until asked, then here or not, and a download's progress (0..1). */
+  accurate = $state<{ model: AccurateModel | null; progress: number | null; error: string | null }>({ model: null, progress: null, error: null });
+
+  refreshAccurate = async () => {
+    try {
+      this.accurate = { ...this.accurate, model: await accurateModel() };
+    } catch {
+      this.accurate = { ...this.accurate, model: { installed: false, downloading: false, bytes: 0, unsupported: true } };
+    }
+  };
+
+  downloadAccurate = async () => {
+    this.accurate = { ...this.accurate, progress: 0, error: null };
+    let stop: (() => void) | null = null;
+    try {
+      stop = await downloadAccurateModel((progress) => {
+        if (!progress.done) {
+          this.accurate = { ...this.accurate, progress: progress.total ? progress.received / progress.total : 0 };
+          return;
+        }
+        stop?.();
+        this.accurate = { ...this.accurate, progress: null, error: progress.error };
+        void this.refreshAccurate().then(() => {
+          // Downloaded on purpose: start using it.
+          if (!progress.error) void this.setVoiceEngine("accurate");
+        });
+      });
+    } catch (error) {
+      stop?.();
+      this.accurate = { ...this.accurate, progress: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  cancelAccurate = () => void cancelAccurateModel();
+
+  deleteAccurate = async () => {
+    if (this.workspace.voice.engine === "accurate") await this.setVoiceEngine("system");
+    await deleteAccurateModel().catch(() => {});
+    await this.refreshAccurate();
+  };
+
+  /** Which recognizer listens. While listening, restarts it so the change is heard at once. */
+  setVoiceEngine = async (engine: "system" | "accurate") => {
+    this.saveVoiceSettings({ engine });
+    if (this.voice.status !== "listening") return;
+    this.stopVoice(engine === "accurate" ? t("Accurate listening on. Listening again…") : t("System listening on. Listening again…"));
     await this.startVoice();
   };
 

@@ -3,6 +3,7 @@
   import { CANON } from "../../bible/reference";
   import { BUILT_IN_FIXES, nearMisses } from "../../voice/words";
   import { t, tn } from "../../i18n/core";
+  import { isDesktop } from "../../platform/runtime";
 
   // Words the recognizer mishears in this church (accents, names), put right before verses are
   // found. Learned from the operator, added here, or taught in Practice.
@@ -11,6 +12,14 @@
   const words = $derived(session.workspace.voice.words ?? []);
   const practice = $derived(session.voicePractice);
   const listening = $derived(session.voice.status === "listening");
+
+  const engine = $derived(session.workspace.voice.engine ?? "system");
+  const model = $derived(session.accurate.model);
+  const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`;
+
+  $effect(() => {
+    if (isDesktop()) void session.refreshAccurate();
+  });
 
   let heard = $state("");
   let means = $state("");
@@ -36,6 +45,45 @@
     session.nextPractice();
   }
 </script>
+
+{#if isDesktop() && !model?.unsupported}
+  <p class="section-label">{t("Recognizer")}</p>
+  <section class="rows">
+    <div class="row stack">
+      <div class="row-copy">
+        <strong>{t("Which recognizer listens")}</strong>
+        <span>{t("The system recognizer is built into the computer. Accurate uses Whisper on this computer: it hears accents and Bible names better, needs a one-time download, and uses more of the computer while listening. Accurate never sends audio off this computer.")}</span>
+      </div>
+      <div class="choices" role="radiogroup" aria-label={t("Recognizer")}>
+        <button type="button" role="radio" class="choice" class:on={engine === "system"} aria-checked={engine === "system"} onclick={() => void session.setVoiceEngine("system")}>
+          <b>{t("System")}</b><span>{t("Built in, light on the computer")}</span>
+        </button>
+        <button type="button" role="radio" class="choice" class:on={engine === "accurate"} aria-checked={engine === "accurate"} disabled={!model?.installed} onclick={() => void session.setVoiceEngine("accurate")}>
+          <b>{t("Accurate")}</b><span>{model?.installed ? t("Whisper, on this computer") : t("Download it first")}</span>
+        </button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-copy">
+        <strong>{t("Accurate listening model")}</strong>
+        <span>
+          {#if session.accurate.progress !== null}{t("Downloading… {percent}%", { percent: Math.round(session.accurate.progress * 100) })}
+          {:else if session.accurate.error}{session.accurate.error}
+          {:else if model?.installed}{t("Downloaded ({size}). It stays on this computer.", { size: megabytes(model.bytes) })}
+          {:else}{t("A one-time download of {size}, kept on this computer.", { size: megabytes(model?.bytes || 59_721_011) })}{/if}
+        </span>
+        {#if session.accurate.progress !== null}<progress max="1" value={session.accurate.progress}></progress>{/if}
+      </div>
+      {#if session.accurate.progress !== null}
+        <button type="button" class="btn" onclick={() => session.cancelAccurate()}>{t("Cancel")}</button>
+      {:else if model?.installed}
+        <button type="button" class="btn" onclick={() => void session.deleteAccurate()}>{t("Remove")}</button>
+      {:else}
+        <button type="button" class="btn primary" onclick={() => void session.downloadAccurate()}>{t("Download")}</button>
+      {/if}
+    </div>
+  </section>
+{/if}
 
 <p class="section-label">{t("Words")}</p>
 <section class="rows">
@@ -112,6 +160,12 @@
 </section>
 
 <style>
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choice { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .choice span { font-size: 12px; color: var(--muted); }
+  .choice.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .choice:disabled { opacity: .55; cursor: default; }
+  progress { width: 100%; height: 6px; margin-top: 8px; accent-color: var(--accent); }
   .stack { flex-direction: column; align-items: stretch !important; gap: 10px; }
   .card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .say { display: flex; align-items: baseline; gap: 10px; } .say span, .heard span { min-width: 64px; font-size: 12px; font-weight: 650; color: var(--muted); }

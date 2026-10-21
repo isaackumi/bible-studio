@@ -92,6 +92,8 @@ export const BUILT_IN_FIXES: ReadonlyArray<readonly [string, string, boolean?]> 
   ["kolosians", "Colossians"], ["colosseans", "Colossians"], ["tessalonians", "Thessalonians"], ["tesalonians", "Thessalonians"], ["dessalonians", "Thessalonians"],
   ["timoti", "Timothy"], ["timothi", "Timothy"], ["taitus", "Titus"], ["filimon", "Philemon"], ["hibrus", "Hebrews"], ["hebrus", "Hebrews"],
   ["jems", "James"], ["pitah", "Peter"], ["peeta", "Peter"], ["rebelation", "Revelation"], ["revalation", "Revelation"], ["revilation", "Revelation"],
+  // Whisper (accurate listening) sometimes drops letters at the end of a long name.
+  ["habakkk", "Habakkuk"], ["habakkah", "Habakkuk"], ["habak", "Habakkuk"], ["zeck and rive", "Zechariah"], ["zeck and riah", "Zechariah"], ["ecclesiast", "Ecclesiastes"], ["ecclesias", "Ecclesiastes"], ["deuteronom", "Deuteronomy"], ["thessalon", "Thessalonians"],
   // The words around a reference: "chapta 4", "vas 16".
   ["chapta", "chapter"], ["chapto", "chapter"], ["chepter", "chapter"], ["vas", "verse"], ["veses", "verses"],
   // "First Corinthians" heard as "fast Corinthians", and so on for every numbered book.

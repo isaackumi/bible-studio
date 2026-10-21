@@ -196,6 +196,7 @@ export function sanitizeVoiceSettings(value: unknown): {
   wakeChosen: boolean;
   custom: CustomVoiceCommand[];
   noiseFilter: "off" | "light" | "strong";
+  engine: "system" | "accurate";
   words: WordFix[];
 } {
   const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -226,5 +227,5 @@ export function sanitizeVoiceSettings(value: unknown): {
     heardSeen.add(heard);
     words.push({ heard, means, source: item.source === "learned" ? "learned" : "yours", uses: Number.isFinite(item.uses) ? Math.max(0, Math.round(item.uses!)) : 0, ...(Number.isFinite(item.at) ? { at: item.at } : {}) });
   }
-  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, words: words.slice(0, 300) };
+  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, engine: record.engine === "accurate" ? "accurate" : "system", words: words.slice(0, 300) };
 }

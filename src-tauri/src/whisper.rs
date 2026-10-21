@@ -1,0 +1,332 @@
+//! Accurate listening: Whisper (whisper.cpp) on this computer, instead of the system recognizer.
+//! It hears accents (Ghanaian, Nigerian and others) better, and is told the 66 book names and the
+//! church's own words before it listens. Nothing leaves the computer.
+//!
+//! The model (60 MB) is downloaded once, only when the church turns this on, from a pinned
+//! version on Hugging Face, and checked against its SHA-256 before use. Listening reuses the
+//! microphone capture of the noise filter (16 kHz mono), decodes the last few seconds about once a
+//! second, and sends the same `listen-phrase` lines as the system helpers: a partial phrase while
+//! someone speaks, a final one at each pause.
+
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use tauri::{Emitter, Manager};
+
+/// Whisper base (English), 5-bit: quick enough to follow speech on an ordinary laptop.
+const MODEL_FILE: &str = "ggml-base.en-q5_1.bin";
+const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en-q5_1.bin";
+const MODEL_SHA256: &str = "4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f";
+pub const MODEL_BYTES: u64 = 59_721_011;
+
+const RATE: usize = 16_000;
+/// Decode about this often while someone speaks.
+const STEP: Duration = Duration::from_millis(800);
+/// The longest stretch decoded at once; a longer one is sent as final and started again.
+const LONGEST: usize = RATE * 12;
+/// Quiet this long ends a phrase.
+const PAUSE: usize = RATE * 7 / 10;
+/// Loudness (RMS, 0..1) below which audio counts as quiet.
+const QUIET: f32 = 0.006;
+
+const BOOKS: &str = "Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Joshua, Judges, Ruth, 1 Samuel, 2 Samuel, 1 Kings, 2 Kings, 1 Chronicles, 2 Chronicles, Ezra, Nehemiah, Esther, Job, Psalms, Proverbs, Ecclesiastes, Song of Solomon, Isaiah, Jeremiah, Lamentations, Ezekiel, Daniel, Hosea, Joel, Amos, Obadiah, Jonah, Micah, Nahum, Habakkuk, Zephaniah, Haggai, Zechariah, Malachi, Matthew, Mark, Luke, John, Acts, Romans, 1 Corinthians, 2 Corinthians, Galatians, Ephesians, Philippians, Colossians, 1 Thessalonians, 2 Thessalonians, 1 Timothy, 2 Timothy, Titus, Philemon, Hebrews, James, 1 Peter, 2 Peter, 1 John, 2 John, 3 John, Jude, Revelation";
+
+#[derive(Clone, Serialize)]
+pub struct ModelStatus {
+    pub installed: bool,
+    pub downloading: bool,
+    pub bytes: u64,
+}
+
+#[derive(Clone, Serialize)]
+struct Progress {
+    received: u64,
+    total: u64,
+    done: bool,
+    error: Option<String>,
+}
+
+static DOWNLOADING: AtomicBool = AtomicBool::new(false);
+static CANCEL: AtomicBool = AtomicBool::new(false);
+
+fn model_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("models");
+    Ok(dir.join(MODEL_FILE))
+}
+
+pub fn status(app: &tauri::AppHandle) -> ModelStatus {
+    let installed = model_path(app).ok().and_then(|path| std::fs::metadata(path).ok()).is_some_and(|meta| meta.len() == MODEL_BYTES);
+    ModelStatus { installed, downloading: DOWNLOADING.load(Ordering::SeqCst), bytes: MODEL_BYTES }
+}
+
+pub fn delete(app: &tauri::AppHandle) -> Result<(), String> {
+    stop();
+    *CONTEXT.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
+    let path = model_path(app)?;
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|error| format!("Could not remove the model. {error}"))?;
+    }
+    Ok(())
+}
+
+pub fn cancel_download() {
+    CANCEL.store(true, Ordering::SeqCst);
+}
+
+/// Download the model on its own thread; `whisper-download` events report progress and the end.
+pub fn download(app: tauri::AppHandle) -> Result<(), String> {
+    if DOWNLOADING.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    CANCEL.store(false, Ordering::SeqCst);
+    let path = model_path(&app)?;
+    std::thread::spawn(move || {
+        let result = fetch(&app, &path);
+        DOWNLOADING.store(false, Ordering::SeqCst);
+        let error = result.err();
+        let _ = app.emit("whisper-download", Progress { received: if error.is_none() { MODEL_BYTES } else { 0 }, total: MODEL_BYTES, done: true, error });
+    });
+    Ok(())
+}
+
+fn fetch(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
+    let dir = path.parent().ok_or("No folder for the model.")?;
+    std::fs::create_dir_all(dir).map_err(|error| format!("Could not make the models folder. {error}"))?;
+    let part = path.with_extension("part");
+    let response = ureq::get(MODEL_URL).call().map_err(|error| format!("The download could not start. Check the internet connection. ({error})"))?;
+    let mut body = response.into_body().into_reader();
+    let mut file = std::fs::File::create(&part).map_err(|error| format!("Could not save the model. {error}"))?;
+    let mut hash = Sha256::new();
+    let mut buffer = vec![0u8; 256 * 1024];
+    let mut received = 0u64;
+    let mut last = Instant::now();
+    loop {
+        if CANCEL.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = std::fs::remove_file(&part);
+            return Err("Download cancelled.".into());
+        }
+        let read = body.read(&mut buffer).map_err(|error| format!("The download stopped. Try again. ({error})"))?;
+        if read == 0 {
+            break;
+        }
+        hash.update(&buffer[..read]);
+        file.write_all(&buffer[..read]).map_err(|error| format!("Could not save the model. Is the disk full? ({error})"))?;
+        received += read as u64;
+        if last.elapsed() >= Duration::from_millis(250) {
+            let _ = app.emit("whisper-download", Progress { received, total: MODEL_BYTES, done: false, error: None });
+            last = Instant::now();
+        }
+    }
+    file.flush().map_err(|error| error.to_string())?;
+    drop(file);
+    let digest = hash.finalize().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    if digest != MODEL_SHA256 || received != MODEL_BYTES {
+        let _ = std::fs::remove_file(&part);
+        return Err("The downloaded model did not match the published one, so it was not used. Try again.".into());
+    }
+    std::fs::rename(&part, path).map_err(|error| format!("Could not save the model. {error}"))?;
+    Ok(())
+}
+
+// --- Listening ------------------------------------------------------------------------------------
+
+/// The loaded model, kept between listens (loading takes a second or two).
+static CONTEXT: Mutex<Option<Arc<whisper_rs::WhisperContext>>> = Mutex::new(None);
+
+struct Running {
+    stop: Arc<AtomicBool>,
+    feed: Option<crate::noise::Feed>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+
+static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
+
+fn context(app: &tauri::AppHandle) -> Result<Arc<whisper_rs::WhisperContext>, String> {
+    let mut guard = CONTEXT.lock().unwrap_or_else(|poison| poison.into_inner());
+    if let Some(context) = guard.as_ref() {
+        return Ok(context.clone());
+    }
+    if !status(app).installed {
+        return Err("Accurate listening needs its model. Download it in Settings › Sound & voice.".into());
+    }
+    whisper_rs::install_logging_hooks();
+    let mut params = whisper_rs::WhisperContextParameters::default();
+    params.use_gpu(true);
+    let context = whisper_rs::WhisperContext::new_with_params(model_path(app)?, params).map_err(|error| format!("The model could not be loaded. Download it again in Settings › Sound & voice. ({error})"))?;
+    let context = Arc::new(context);
+    *guard = Some(context.clone());
+    Ok(context)
+}
+
+/// Start listening with Whisper. `mix` is the noise filter's share of cleaned signal (0 = off).
+pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(), String> {
+    stop();
+    let context = context(&app)?;
+    let prompt = prompt_for(words);
+    let audio: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
+    let sink_audio = audio.clone();
+    let levels_app = app.clone();
+    let feed = crate::noise::start(
+        mix,
+        move |bytes| {
+            let mut buffer = sink_audio.lock().unwrap_or_else(|poison| poison.into_inner());
+            buffer.extend(bytes.chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0));
+            true
+        },
+        move |_room, clean| {
+            let line = format!(r#"{{"kind":"level","value":{:.3}}}"#, (clean * 4.0).min(1.0));
+            let _ = levels_app.emit("listen-phrase", crate::voice::ListenLine { run, line });
+        },
+    )?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let flag = stop.clone();
+    let worker_app = app.clone();
+    let worker = std::thread::spawn(move || listen(worker_app, run, context, audio, flag, prompt));
+    emit(&app, run, serde_json::json!({ "kind": "status", "message": "Listening (accurate). Speak a reference or read a verse." }));
+    *RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(Running { stop, feed: Some(feed), worker: Some(worker) });
+    Ok(())
+}
+
+pub fn stop() {
+    let running = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()).take();
+    let Some(mut running) = running else { return };
+    running.stop.store(true, Ordering::SeqCst);
+    if let Some(feed) = running.feed.take() {
+        feed.stop();
+    }
+    if let Some(worker) = running.worker.take() {
+        let _ = worker.join();
+    }
+}
+
+fn emit(app: &tauri::AppHandle, run: u64, value: serde_json::Value) {
+    let _ = app.emit("listen-phrase", crate::voice::ListenLine { run, line: value.to_string() });
+}
+
+fn loudness(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt()
+}
+
+/// What Whisper writes for silence, music or noise, never a phrase to show.
+fn is_noise(text: &str) -> bool {
+    let plain = text.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    plain.is_empty()
+        || text.trim().starts_with('[')
+        || text.trim().starts_with('(')
+        || ["thank you", "thanks for watching", "you", "bye", "thank you for watching"].contains(&plain.as_str())
+}
+
+/// The words in `samples` (16 kHz mono), or None when Whisper failed. Shared by listening and tests.
+fn transcribe(state: &mut whisper_rs::WhisperState, samples: &[f32], prompt: &str, threads: i32) -> Option<String> {
+    let mut params = whisper_rs::FullParams::new(whisper_rs::SamplingStrategy::Greedy { best_of: 1 });
+    params.set_language(Some("en"));
+    params.set_n_threads(threads);
+    params.set_no_context(true);
+    params.set_no_timestamps(true);
+    params.set_suppress_blank(true);
+    params.set_suppress_nst(true);
+    params.set_temperature(0.0);
+    params.set_print_progress(false);
+    params.set_print_realtime(false);
+    params.set_print_special(false);
+    params.set_print_timestamps(false);
+    params.set_initial_prompt(prompt);
+    state.full(params, samples).ok()?;
+    let mut text = String::new();
+    for index in 0..state.full_n_segments() {
+        if let Some(segment) = state.get_segment(index) {
+            if segment.no_speech_probability() > 0.6 {
+                continue;
+            }
+            if let Ok(piece) = segment.to_str_lossy() {
+                text.push_str(&piece);
+            }
+        }
+    }
+    Some(text.trim().to_string())
+}
+
+fn prompt_for(words: &str) -> String {
+    let extra = words.lines().map(str::trim).filter(|word| !word.is_empty()).collect::<Vec<_>>().join(", ");
+    // The prompt shows the recognizer the words to expect and how references are written.
+    format!("Bible reading. {BOOKS}. Chapter 3, verse 16. John 3:16.{}", if extra.is_empty() { String::new() } else { format!(" {extra}.") })
+}
+
+fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperContext>, audio: Arc<Mutex<Vec<f32>>>, stop: Arc<AtomicBool>, prompt: String) {
+    let mut state = match context.create_state() {
+        Ok(state) => state,
+        Err(error) => {
+            emit(&app, run, serde_json::json!({ "kind": "error", "message": format!("Accurate listening could not start. ({error})") }));
+            emit(&app, run, serde_json::json!({ "kind": "end" }));
+            return;
+        }
+    };
+    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 6) as i32;
+    let mut last_text = String::new();
+    let mut decoded_len = 0usize;
+    while !stop.load(Ordering::SeqCst) {
+        std::thread::sleep(STEP);
+        let window: Vec<f32> = {
+            let mut buffer = audio.lock().unwrap_or_else(|poison| poison.into_inner());
+            // Long quiet before anything was said: drop it, keeping a moment for the first word.
+            if buffer.len() > RATE * 2 && loudness(&buffer) < QUIET {
+                let keep = buffer.len() - RATE / 4;
+                buffer.drain(..keep);
+                decoded_len = 0;
+            }
+            buffer.clone()
+        };
+        if window.len() < RATE || window.len() - decoded_len.min(window.len()) < RATE / 2 {
+            continue;
+        }
+        let paused = window.len() > PAUSE + RATE && loudness(&window[window.len() - PAUSE..]) < QUIET;
+        let full = window.len() >= LONGEST;
+        let take = &window[window.len().saturating_sub(LONGEST)..];
+        let Some(text) = transcribe(&mut state, take, &prompt, threads) else { continue };
+        decoded_len = window.len();
+        let final_phrase = paused || full;
+        if !is_noise(&text) && (final_phrase || text != last_text) {
+            emit(&app, run, serde_json::json!({ "kind": "phrase", "text": text, "final": final_phrase, "alternatives": [] }));
+            last_text = text;
+        }
+        if final_phrase {
+            // Start the next phrase from here, keeping a moment so a word cut in half is heard whole.
+            let mut buffer = audio.lock().unwrap_or_else(|poison| poison.into_inner());
+            let used = window.len().min(buffer.len());
+            let keep_from = used.saturating_sub(RATE / 5);
+            buffer.drain(..keep_from);
+            decoded_len = 0;
+            last_text.clear();
+        }
+    }
+    emit(&app, run, serde_json::json!({ "kind": "end" }));
+}
+
+#[cfg(test)]
+mod tests {
+    /// Decode spoken WAV files (16 kHz mono 16-bit) with the real model. Run by hand:
+    /// WHISPER_MODEL=path/model.bin WHISPER_WAVS=a.wav,b.wav cargo test whisper -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn hears_references() {
+        let (Ok(model), Ok(wavs)) = (std::env::var("WHISPER_MODEL"), std::env::var("WHISPER_WAVS")) else { return };
+        let context = whisper_rs::WhisperContext::new_with_params(&model, whisper_rs::WhisperContextParameters::default()).expect("model");
+        let mut state = context.create_state().expect("state");
+        for wav in wavs.split(',') {
+            let bytes = std::fs::read(wav).expect("wav");
+            let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
+            let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0).collect();
+            let started = std::time::Instant::now();
+            let text = super::transcribe(&mut state, &samples, &super::prompt_for(""), 4).unwrap_or_default();
+            println!("{wav}: {text}  ({} ms)", started.elapsed().as_millis());
+        }
+    }
+}

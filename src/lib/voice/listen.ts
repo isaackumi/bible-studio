@@ -118,7 +118,7 @@ export function stitchTranscript(
 }
 
 /** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
-export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off", words: string[] = []): () => void {
+export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off", words: string[] = [], engine: "system" | "accurate" = "system"): () => void {
   let detach = () => {};
   let stopped = false;
   let ended = false;
@@ -165,7 +165,7 @@ export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilt
       if (stopped) unlisten();
       else detach = unlisten;
       if (stopped) return;
-      return invoke("start_sermon_listen", { run, filter, words });
+      return invoke("start_sermon_listen", { run, filter, words, engine });
     })
     .catch((error: unknown) => {
       handlers.onError(error instanceof Error ? error.message : String(error), "unsupported");
@@ -363,3 +363,22 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
     stopTracks();
   };
 }
+
+/** Accurate listening's model (Whisper, on this computer): installed, downloading, its size. */
+export type AccurateModel = { installed: boolean; downloading: boolean; bytes: number; unsupported?: boolean };
+export type AccurateProgress = { received: number; total: number; done: boolean; error: string | null };
+
+export async function accurateModel(): Promise<AccurateModel> {
+  if (!isDesktop()) return { installed: false, downloading: false, bytes: 0, unsupported: true };
+  return invoke<AccurateModel>("whisper_status");
+}
+
+/** Download the model; `onProgress` hears each step and the end (with an error, if it failed). */
+export async function downloadAccurateModel(onProgress: (progress: AccurateProgress) => void): Promise<() => void> {
+  const unlisten = await listen<AccurateProgress>("whisper-download", (event) => onProgress(event.payload));
+  await invoke("whisper_download");
+  return unlisten;
+}
+
+export const cancelAccurateModel = () => invoke("whisper_cancel");
+export const deleteAccurateModel = () => invoke("whisper_delete");

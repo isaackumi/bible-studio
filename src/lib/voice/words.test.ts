@@ -22,6 +22,17 @@ describe("misheard words", () => {
     expect(fixHeard("i ran fast corinthians were watching").text).toBe("i ran fast corinthians were watching");
   });
 
+  it("finds the verse in what accurate listening (Whisper) writes", () => {
+    const heard: Array<[string, string, number, number]> = [
+      ["Turn with me to Ephesians 4, verse 1.", "Ephesians", 4, 1],
+      ["Let us read Philippians 4.13.", "Philippians", 4, 13],
+      ["Open your Bibles to Habakkk, chapter 2, verse 2.", "Habakkuk", 2, 2],
+      ["1 Thessalonians 5 16.", "1 Thessalonians", 5, 16],
+      ["Ecclesiast 3.1.", "Ecclesiastes", 3, 1],
+    ];
+    for (const [text, bookName, chapter, startVerse] of heard) expect(spokenReference(fixHeard(text).text), text).toMatchObject({ bookName, chapter, startVerse });
+  });
+
   it("asks more of everyday words that sound like a book", () => {
     expect(fixHeard("some 20 people came").text).toBe("some 20 people came");
     expect(fixHeard("some 23 verse 1").text).toBe("Psalms 23 verse 1");
