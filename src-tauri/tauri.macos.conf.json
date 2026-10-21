@@ -1,5 +1,12 @@
 {
   "bundle": {
-    "externalBin": ["binaries/church-studio-transcribe", "binaries/church-studio-ndi", "binaries/church-studio-broadcast"]
+    "externalBin": [
+      "binaries/church-studio-transcribe",
+      "binaries/church-studio-ndi",
+      "binaries/church-studio-broadcast"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
   }
 }
