@@ -91,7 +91,10 @@ export function readOsis(xml: string): ImportedBible | null {
     place(books, OSIS_BOOKS.indexOf(book ?? "") + 1, "", Number(c), Number(v), words(text));
   };
   // Container verses: <verse osisID="Gen.1.1">words</verse>.
-  for (const verse of xml.matchAll(/<verse\b([^>]*?)(?<!\/)>([\s\S]*?)<\/verse>/g)) {
+  // (A self-closing <verse …/> is a milestone, skipped here; checked without a lookbehind, which
+  // older Safari cannot read.)
+  for (const verse of xml.matchAll(/<verse\b([^>]*)>([\s\S]*?)<\/verse>/g)) {
+    if (verse[1]!.trimEnd().endsWith("/")) continue;
     const id = attr(verse[1]!, "osisID");
     if (id && !attr(verse[1]!, "sID")) put(id.split(/\s+/)[0]!, verse[2]!);
   }
