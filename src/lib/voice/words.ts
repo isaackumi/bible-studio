@@ -80,6 +80,26 @@ export const BUILT_IN_FIXES: ReadonlyArray<readonly [string, string, boolean?]> 
   ["pita", "Peter"], ["peta", "Peter"],
   ["dude", "Jude", true],
   ["revolution", "Revelation"], ["revelation's", "Revelation"],
+  // West African English: "th" said as "t" or "d", "v" as "b", endings shortened, vowels moved.
+  ["levitikus", "Leviticus"], ["numba", "Numbers"], ["numbas", "Numbers"], ["jodges", "Judges"], ["samwel", "Samuel"],
+  ["kronicles", "Chronicles"], ["cronicles", "Chronicles"], ["estah", "Esther"], ["psams", "Psalms"], ["provabs", "Proverbs"],
+  ["eklesiastes", "Ecclesiastes"], ["ecclesiates", "Ecclesiastes"], ["aizaya", "Isaiah"], ["izaya", "Isaiah"], ["jeremiar", "Jeremiah"],
+  ["lamentashons", "Lamentations"], ["ezikiel", "Ezekiel"], ["ezekeel", "Ezekiel"], ["hosia", "Hosea"], ["jowel", "Joel"], ["obadia", "Obadiah"],
+  ["maika", "Micah"], ["nehum", "Nahum"], ["habakook", "Habakkuk"], ["sefaniah", "Zephaniah"], ["sephaniah", "Zephaniah"], ["hagai", "Haggai"],
+  ["zakaria", "Zechariah"], ["sakaria", "Zechariah"], ["malakay", "Malachi"], ["matiu", "Matthew"], ["mattew", "Matthew"], ["jon", "John"],
+  ["rumans", "Romans"], ["korinthians", "Corinthians"], ["corintians", "Corinthians"], ["galeshians", "Galatians"], ["galasians", "Galatians"],
+  ["efesian", "Ephesians"], ["efizians", "Ephesians"], ["ifeshans", "Ephesians"], ["filipians", "Philippians"], ["pilipians", "Philippians"],
+  ["kolosians", "Colossians"], ["colosseans", "Colossians"], ["tessalonians", "Thessalonians"], ["tesalonians", "Thessalonians"], ["dessalonians", "Thessalonians"],
+  ["timoti", "Timothy"], ["timothi", "Timothy"], ["taitus", "Titus"], ["filimon", "Philemon"], ["hibrus", "Hebrews"], ["hebrus", "Hebrews"],
+  ["jems", "James"], ["pitah", "Peter"], ["peeta", "Peter"], ["rebelation", "Revelation"], ["revalation", "Revelation"], ["revilation", "Revelation"],
+  // The words around a reference: "chapta 4", "vas 16".
+  ["chapta", "chapter"], ["chapto", "chapter"], ["chepter", "chapter"], ["vas", "verse"], ["veses", "verses"],
+  // "First Corinthians" heard as "fast Corinthians", and so on for every numbered book.
+  ...(["Samuel", "Kings", "Chronicles", "Corinthians", "Thessalonians", "Timothy", "Peter", "John"] as const).flatMap((book) =>
+    ([["fast", 1], ["farst", 1], ["secon", 2], ["sekon", 2], ["tird", 3], ["thud", 3]] as const)
+      .filter(([, volume]) => volume < 3 || book === "John")
+      .map(([said, volume]) => [`${said} ${book.toLowerCase()}`, `${volume} ${book}`] as const),
+  ),
 ];
 
 /** Ordinary words never learned as a book on their own, however often they come before a number. */

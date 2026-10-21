@@ -13,6 +13,15 @@ describe("misheard words", () => {
     expect(fixHeard("my friends in the philippines").text).toBe("my friends in the philippines");
   });
 
+  it("hears West African English: Tessalonians, Rebelation, fast Corinthians, chapta", () => {
+    expect(spokenReference(fixHeard("fast corinthians chapta 13 vas 4").text)).toMatchObject({ bookName: "1 Corinthians", chapter: 13, startVerse: 4 });
+    expect(spokenReference(fixHeard("sekon timothy 1 7").text)).toMatchObject({ bookName: "2 Timothy", chapter: 1, startVerse: 7 });
+    expect(spokenReference(fixHeard("tessalonians 5 16").text)).toMatchObject({ bookName: "1 Thessalonians" });
+    expect(fixHeard("rebelation 21 4").text).toBe("Revelation 21 4");
+    // Not a reference: the words stay.
+    expect(fixHeard("i ran fast corinthians were watching").text).toBe("i ran fast corinthians were watching");
+  });
+
   it("asks more of everyday words that sound like a book", () => {
     expect(fixHeard("some 20 people came").text).toBe("some 20 people came");
     expect(fixHeard("some 23 verse 1").text).toBe("Psalms 23 verse 1");
@@ -49,6 +58,7 @@ describe("misheard words", () => {
 
   it("every built-in fix names a real book, and tells the recognizer the church's own words", () => {
     for (const [heard, book] of BUILT_IN_FIXES) {
+      if (book === "chapter" || book === "verse" || book === "verses") continue;
       expect(bookNamed(book), heard).toBe(book);
       expect(bookNamed(heard), `${heard} is already a book name`).toBeNull();
     }
