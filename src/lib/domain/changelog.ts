@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.8",
+    date: "2026-10-21",
+    highlights: [
+      { icon: "bible", title: msg("Bibles in Ewe, Yorùbá, Igbo, Hausa and Asante Twi"), text: msg("Five more openly licensed Bibles in Settings › Bible, downloaded only when you choose one, then offline.") },
+      { icon: "folder", title: msg("Space on this computer"), text: msg("Settings › Storage shows what Church Studio uses, finds pictures and videos nothing uses, and clears the cache or compacts the library.") },
+      { icon: "audio", title: msg("Lighter Accurate listening"), text: msg("The speech model leaves memory a few minutes after you stop listening.") },
+    ],
+  },
+  {
     version: "0.2.7",
     date: "2026-10-21",
     highlights: [

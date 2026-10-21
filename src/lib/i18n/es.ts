@@ -3516,4 +3516,10 @@ export const es: Readonly<Record<string, string>> = {
   "Removing…": "Eliminando…",
   "Click again to remove {count} files ({size})": "Haga clic de nuevo para eliminar {count} archivos ({size})",
   "Remove {count} files ({size})": "Eliminar {count} archivos ({size})",
+  // 0.2.8
+  "Bibles in Ewe, Yorùbá, Igbo, Hausa and Asante Twi": "Biblias en ewe, yoruba, igbo, hausa y twi asante",
+  "Five more openly licensed Bibles in Settings › Bible, downloaded only when you choose one, then offline.": "Cinco Biblias más con licencia abierta en Ajustes › Biblia, descargadas solo cuando elige una, y luego sin conexión.",
+  "Settings › Storage shows what Church Studio uses, finds pictures and videos nothing uses, and clears the cache or compacts the library.": "Ajustes › Almacenamiento muestra lo que usa Church Studio, encuentra imágenes y videos que nada usa, y vacía la caché o compacta la biblioteca.",
+  "Lighter Accurate listening": "Escucha precisa más ligera",
+  "The speech model leaves memory a few minutes after you stop listening.": "El modelo de voz sale de la memoria unos minutos después de dejar de escuchar.",
 };
