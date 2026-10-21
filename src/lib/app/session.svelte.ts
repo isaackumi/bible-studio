@@ -468,8 +468,31 @@ class Session {
         ? "This window sends to the audience."
         : "Another window has the audience.";
 
+  /** Name the startup step (the loading screen shows it if starting takes too long), and finish it. */
+  private bootStep(step: string) {
+    if (typeof window !== "undefined") (window as unknown as { __csBootStep?: string }).__csBootStep = step;
+  }
+
+  /** A startup step that must never hold the desk: after `ms` it carries on without it. */
+  private async atMost<T>(step: string, work: Promise<T>, ms = 8000): Promise<T | undefined> {
+    this.bootStep(step);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => {
+        console.warn(`Startup step "${step}" took over ${ms / 1000} s; carrying on without it.`);
+        resolve(undefined);
+      }, ms);
+    });
+    try {
+      return await Promise.race([work, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   init = async () => {
     this.ready = true;
+    this.bootStep("starting");
     void this.startCameraRelay();
     if (typeof window !== "undefined")
       setInterval(() => {
@@ -481,6 +504,7 @@ class Session {
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
+      this.bootStep("reading the library");
       if (this.desktop()) await this.loadLibraries();
       else {
         await this.loadBibleCatalog();
@@ -490,6 +514,7 @@ class Session {
         this.media = await api.mediaList();
         this.services = await api.serviceList();
       }
+      this.bootStep("reading your settings");
       this.workspace = await this.loadWorkspace();
       this.workspaceLoaded = true;
       this.applyAudioSettings();
@@ -501,7 +526,8 @@ class Session {
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
-          this.service = await api.serviceGet(this.workspace.lastServiceId);
+          const last = await this.atMost("opening the last service", api.serviceGet(this.workspace.lastServiceId));
+          if (last) this.service = last;
           if (typeof window !== "undefined") this.loadSectionStarts(this.workspace.lastServiceId);
         } catch (error) {
           console.error(error);
@@ -509,14 +535,14 @@ class Session {
       }
       if (this.desktop()) {
         try {
-          await this.saveWorkspaceDocument(this.workspace);
+          await this.atMost("saving your settings", this.saveWorkspaceDocument(this.workspace));
         } catch (error) {
           console.error(error);
         }
         try {
           // A restart that kept Program live (keepOutput) carries on; otherwise the window waits.
           this.outputWaiting = !keepOutput;
-          await this.applyDisplays();
+          await this.atMost("finding the screens", this.applyDisplays());
         } catch (error) {
           console.error(error);
         }
@@ -534,7 +560,7 @@ class Session {
         try {
           this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
           this.programHeld = true;
-          await this.pushProgram();
+          await this.atMost("preparing the audience screen", this.pushProgram());
         } catch (error) {
           console.error(error);
         }
@@ -549,6 +575,7 @@ class Session {
       }
       this.ready = true;
       this.booted = true;
+      this.bootStep("ready");
       if (this.workspace.switcher.kind !== "none" && this.workspace.switcher.autoConnect) void this.connectSwitcher();
       void this.bootEntitlement();
       this.noteVersion();
@@ -569,6 +596,7 @@ class Session {
       this.message = error instanceof Error ? error.message : String(error);
       this.ready = true;
       this.booted = true;
+      this.bootStep("ready");
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       console.error(error);

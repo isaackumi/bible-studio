@@ -14,10 +14,6 @@
   <string>APPL</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
-  <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
-  <key>CFBundleVersion</key>
-  <string>0.1.0</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Church Studio listens so it can suggest the verse being read. The suggestion stays on Preview until you press LIVE.</string>
   <key>NSCameraUsageDescription</key>
