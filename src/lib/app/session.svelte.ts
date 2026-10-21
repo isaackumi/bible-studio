@@ -201,6 +201,8 @@ import {
   startNativeListening,
   type ListenErrorKind,
 } from "../voice/listen";
+import { spokenReference } from "../voice/detect";
+import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
@@ -2575,7 +2577,7 @@ class Session {
       message: t("Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”."),
     };
     const filter = this.workspace.voice.noiseFilter ?? "off";
-    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter) : startListening(handlers, filter);
+    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, expectedWords(this.workspace.voice.words ?? [])) : startListening(handlers, filter);
   };
 
   stopVoice = (message = t("Listening stopped.")) => {
@@ -2587,8 +2589,20 @@ class Session {
 
   openVoicePrivacy = () => void openPrivacySettings();
 
-  private handleVoiceHeard = (text: string, final: boolean, alternatives: string[], latest: string) => {
+  private handleVoiceHeard = (rawText: string, final: boolean, rawAlternatives: string[], rawLatest: string) => {
     if (this.voice.status !== "listening") return;
+    // Misheard words put right first (voice/words.ts), so the transcript, captions, commands and
+    // verse finding all read "Ephesians 4", not "efficient 4".
+    const words = this.workspace.voice?.words ?? [];
+    const fixedLatest = fixHeard(rawLatest, words);
+    const text = fixHeard(rawText, words).text;
+    const latest = fixedLatest.text;
+    const alternatives = rawAlternatives.map((option) => fixHeard(option, words).text);
+    if (this.voicePractice) {
+      this.notePractice(rawLatest || rawText, latest || text, fixedLatest.applied, final);
+      return;
+    }
+    if (final) this.noteWords(latest, fixedLatest.applied);
     this.voice.heard = text;
     this.voice.hearing = !final;
     const settings = this.workspace.voice;
@@ -2720,6 +2734,80 @@ class Session {
   /** Translation chosen by voice; scripture previews from the session use it. */
   voiceTranslationId = $state("");
 
+  // --- Misheard words: learned from the operator, practised in Settings › Audio & voice ----------
+
+  /** Words that sat where a book should be, in the last phrase that found no verse. */
+  private voiceMisses: { misses: NearMiss[]; at: number } | null = null;
+
+  /** After a final phrase: count fixes used, and keep near misses for the next passage put up. */
+  private noteWords(latest: string, applied: Applied[]) {
+    const words = this.workspace.voice?.words ?? [];
+    if (applied.length && words.some((word) => applied.some((item) => item.heard === word.heard))) {
+      this.saveVoiceSettings({ words: words.map((word) => (applied.some((item) => item.heard === word.heard) ? { ...word, uses: (word.uses ?? 0) + 1 } : word)) });
+    }
+    if (spokenReference(latest)) {
+      this.voiceMisses = null;
+      return;
+    }
+    const misses = nearMisses(latest);
+    if (misses.length) this.voiceMisses = { misses, at: Date.now() };
+  }
+
+  /** The operator put up a passage soon after a near miss: what was heard was that book. */
+  private learnWord(passage: BibleItem) {
+    const pending = this.voiceMisses;
+    if (!pending || Date.now() - pending.at > 30_000) return;
+    this.voiceMisses = null;
+    const words = this.workspace.voice?.words ?? [];
+    const fix = learnFix(pending.misses, passage, words);
+    if (!fix) return;
+    this.saveVoiceSettings({ words: [...words, fix] });
+    this.notify(t("Learned: “{heard}” means {means}", { heard: fix.heard, means: fix.means }), {
+      detail: t("Next time it is put right by itself. If that was wrong, remove it."),
+      actions: [{ label: t("Remove"), run: () => this.removeWord(fix.heard) }],
+      ms: 9000,
+    });
+  }
+
+  addWord = (heard: string, means: string) => {
+    const words = (this.workspace.voice?.words ?? []).filter((word) => word.heard !== heard.trim().toLowerCase());
+    this.saveVoiceSettings({ words: [...words, { heard, means, source: "yours", uses: 0, at: Date.now() }] });
+  };
+
+  removeWord = (heard: string) => {
+    this.saveVoiceSettings({ words: (this.workspace.voice?.words ?? []).filter((word) => word.heard !== heard) });
+  };
+
+  /** Practice: read a reference aloud and see what the recognizer wrote, then teach it. */
+  voicePractice = $state<{ target: string; book: string; raw: string; fixed: string; applied: Applied[]; found: string | null; final: boolean; startedVoice: boolean } | null>(null);
+  private practiceTargets = ["Ephesians 4:1", "Philippians 4:13", "Galatians 5:22", "Colossians 3:16", "Habakkuk 2:2", "Ecclesiastes 3:1", "Deuteronomy 6:5", "Leviticus 19:18", "1 Thessalonians 5:16", "Psalm 23:1", "Isaiah 40:31", "Jeremiah 29:11", "Ezekiel 37:4", "Zechariah 4:6", "Malachi 3:10", "Hebrews 11:1", "Lamentations 3:22", "Nehemiah 8:10", "Haggai 2:9", "2 Timothy 1:7", "Revelation 21:4", "Proverbs 3:5", "Matthew 6:33", "Luke 2:10", "Romans 8:28"];
+
+  startPractice = async () => {
+    const target = this.practiceTargets[Math.floor(Math.random() * this.practiceTargets.length)]!;
+    const startedVoice = this.voice.status !== "listening";
+    this.voicePractice = { target, book: target.replace(/\s+\d+:\d+$/, "").replace(/^\d\s+/, "").replace(/^Psalm$/, "Psalms"), raw: "", fixed: "", applied: [], found: null, final: false, startedVoice };
+    if (startedVoice) await this.startVoice();
+  };
+
+  nextPractice = () => {
+    if (!this.voicePractice) return;
+    const others = this.practiceTargets.filter((item) => item !== this.voicePractice!.target);
+    const target = others[Math.floor(Math.random() * others.length)]!;
+    this.voicePractice = { ...this.voicePractice, target, book: target.replace(/\s+\d+:\d+$/, "").replace(/^\d\s+/, "").replace(/^Psalm$/, "Psalms"), raw: "", fixed: "", applied: [], found: null, final: false };
+  };
+
+  stopPractice = () => {
+    const started = this.voicePractice?.startedVoice;
+    this.voicePractice = null;
+    if (started) this.stopVoice();
+  };
+
+  private notePractice(raw: string, fixed: string, applied: Applied[], final: boolean) {
+    if (!this.voicePractice) return;
+    const hit = spokenReference(fixed);
+    this.voicePractice = { ...this.voicePractice, raw, fixed, applied, final, found: hit?.startVerse ? `${hit.bookName} ${hit.chapter}:${hit.startVerse}` : hit ? `${hit.bookName} ${hit.chapter}` : null };
+  }
+
   saveVoiceSettings = (patch: Partial<VoiceSettings>) => {
     this.workspace = { ...this.workspace, voice: sanitizeVoiceSettings({ ...this.workspace.voice, ...patch }) };
     this.persistSoon();
@@ -2819,6 +2907,7 @@ class Session {
   };
 
   previewPassage = async (passage: BibleItem) => {
+    this.learnWord(passage);
     this.songFocus = null;
     this.sermonFocus = null;
     this.previewBible = passage;

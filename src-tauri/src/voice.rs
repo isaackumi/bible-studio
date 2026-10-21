@@ -40,21 +40,34 @@ pub struct ListenLine {
     pub line: String,
 }
 
-/// `filter` is the Noise filter setting: "off", "light" or "strong".
-pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str) -> Result<(), String> {
+/// `filter` is the Noise filter setting: "off", "light" or "strong". `words` are the church's own
+/// words (names, places) for the recognizer to expect, beside the book names it always expects.
+pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str, words: &[String]) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        macos::start_transcribe(app, run, crate::noise::Filter::parse(filter))
+        macos::start_transcribe(app, run, crate::noise::Filter::parse(filter), &expected(words))
     }
     #[cfg(target_os = "windows")]
     {
-        windows::start_transcribe(app, run, crate::noise::Filter::parse(filter))
+        windows::start_transcribe(app, run, crate::noise::Filter::parse(filter), &expected(words))
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (app, run, filter);
+        let _ = (app, run, filter, words);
         Err("Listening runs on macOS and Windows.".into())
     }
+}
+
+/// The words to expect, one per line for the helper's CHURCH_STUDIO_WORDS: short, plain, at most 80.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+fn expected(words: &[String]) -> String {
+    words
+        .iter()
+        .map(|word| word.chars().filter(|c| !c.is_control()).take(60).collect::<String>().trim().to_string())
+        .filter(|word| !word.is_empty())
+        .take(80)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn stop_transcribe() {
@@ -153,7 +166,7 @@ mod windows {
     use tauri::Manager;
 
     /// With the filter on, the recognizer hears audio cleaned here instead of the microphone.
-    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter) -> Result<(), String> {
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter, words: &str) -> Result<(), String> {
         let script = app
             .path()
             .resolve("resources/transcribe-windows.ps1", tauri::path::BaseDirectory::Resource)
@@ -162,6 +175,7 @@ mod windows {
             .ok_or("The Windows speech helper is missing from this install. Reinstall Church Studio.")?;
         let mut command = std::process::Command::new("powershell.exe");
         command.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
+        command.env("CHURCH_STUDIO_WORDS", words);
         if filter != crate::noise::Filter::Off {
             command.arg("-Stdin");
         }
@@ -350,13 +364,14 @@ mod macos {
     }
 
     /// With the filter on, the helper hears audio cleaned here instead of the microphone.
-    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter) -> Result<(), String> {
+    pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter, words: &str) -> Result<(), String> {
         let path = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-transcribe")))
             .filter(|path| path.exists())
             .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
         let mut command = std::process::Command::new(&path);
+        command.env("CHURCH_STUDIO_WORDS", words);
         let feed = (filter != crate::noise::Filter::Off).then(|| filter.mix());
         if feed.is_some() {
             command.env("CHURCH_STUDIO_AUDIO", "stdin");

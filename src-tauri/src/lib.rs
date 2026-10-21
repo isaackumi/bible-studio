@@ -322,8 +322,8 @@ fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>) -> Result<(), String> {
-    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"))
+fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>) -> Result<(), String> {
+    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default())
 }
 
 /// Mic check: room and cleaned levels arrive as `noise-test` events until stopped.

@@ -617,6 +617,8 @@ export type VoiceSettings = {
   custom: Array<{ phrase: string; action: string }>;
   /** Clean the microphone before listening: off, light (keeps some room) or strong. */
   noiseFilter?: NoiseFilter;
+  /** Words the recognizer mishears here, put right before anything reads them (voice/words.ts). */
+  words?: Array<{ heard: string; means: string; source: "yours" | "learned"; uses?: number; at?: number }>;
 };
 
 export type NoiseFilter = "off" | "light" | "strong";

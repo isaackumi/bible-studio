@@ -4,6 +4,7 @@
   import SwitcherSettings from "./SwitcherSettings.svelte";
   import BroadcastSettings from "./BroadcastSettings.svelte";
   import CaptionsSettings from "./CaptionsSettings.svelte";
+  import VoiceWords from "./VoiceWords.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -1423,6 +1424,7 @@
             </div>
           {/if}
         </section>
+        {#if canUse("voice-detect")}<VoiceWords />{/if}
       {:else if section === "performance"}
         <section class="rows">
           <div class="row">

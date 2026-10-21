@@ -1,5 +1,6 @@
 import { msg } from "../i18n/core";
 import { COMMANDS, type CommandId } from "../commands/registry";
+import type { WordFix } from "./words";
 
 /**
  * Spoken operator commands in plain words: "next verse", "go back", "give me King James".
@@ -195,6 +196,7 @@ export function sanitizeVoiceSettings(value: unknown): {
   wakeChosen: boolean;
   custom: CustomVoiceCommand[];
   noiseFilter: "off" | "light" | "strong";
+  words: WordFix[];
 } {
   const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const actions = new Set<string>(VOICE_ACTIONS.map((entry) => entry.id));
@@ -212,5 +214,17 @@ export function sanitizeVoiceSettings(value: unknown): {
   // The wake word is off unless the operator turned it on themselves (older saves defaulted it on).
   const wakeChosen = record.wakeChosen === true;
   const noiseFilter = record.noiseFilter === "light" || record.noiseFilter === "strong" ? record.noiseFilter : "off";
-  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter };
+  // The church's word list: short, unique by what is heard, at most 300.
+  const heardSeen = new Set<string>();
+  const words: WordFix[] = [];
+  for (const entry of Array.isArray(record.words) ? record.words : []) {
+    if (!entry || typeof entry !== "object") continue;
+    const item = entry as Partial<WordFix>;
+    const heard = typeof item.heard === "string" ? normalize(item.heard).slice(0, 40) : "";
+    const means = typeof item.means === "string" ? item.means.trim().slice(0, 60) : "";
+    if (!heard || !means || heardSeen.has(heard)) continue;
+    heardSeen.add(heard);
+    words.push({ heard, means, source: item.source === "learned" ? "learned" : "yours", uses: Number.isFinite(item.uses) ? Math.max(0, Math.round(item.uses!)) : 0, ...(Number.isFinite(item.at) ? { at: item.at } : {}) });
+  }
+  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, words: words.slice(0, 300) };
 }

@@ -23,7 +23,10 @@ private let numberedBooks: [String] = {
     return volumes.flatMap { name, ordinals in ordinals.map { "\($0) \(name)" } + [name] }
 }()
 
-private let bookNames = singleBooks + numberedBooks + ["chapter", "verse", "verses", "the Lord", "Jesus Christ"]
+/// The church's own words (names, places) from the app, one per line, beside the book names.
+private let churchWords = (ProcessInfo.processInfo.environment["CHURCH_STUDIO_WORDS"] ?? "")
+    .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.prefix(80)
+private let bookNames = singleBooks + numberedBooks + ["chapter", "verse", "verses", "the Lord", "Jesus Christ"] + churchWords
 
 private func emit(_ payload: [String: Any]) {
     guard JSONSerialization.isValidJSONObject(payload),

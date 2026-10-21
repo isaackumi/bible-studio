@@ -118,7 +118,7 @@ export function stitchTranscript(
 }
 
 /** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
-export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off"): () => void {
+export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off", words: string[] = []): () => void {
   let detach = () => {};
   let stopped = false;
   let ended = false;
@@ -165,7 +165,7 @@ export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilt
       if (stopped) unlisten();
       else detach = unlisten;
       if (stopped) return;
-      return invoke("start_sermon_listen", { run, filter });
+      return invoke("start_sermon_listen", { run, filter, words });
     })
     .catch((error: unknown) => {
       handlers.onError(error instanceof Error ? error.message : String(error), "unsupported");
