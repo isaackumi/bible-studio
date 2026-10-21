@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.7",
+    date: "2026-10-21",
+    highlights: [
+      { icon: "screens", title: msg("Screens with their own job"), text: msg("Give each extra monitor a job in Settings › Screens: a timer for the preacher, only scripture, only lyrics, or the stage view. Lock a screen so nothing changes it, or let each part of the service switch it.") },
+      { icon: "check", title: msg("A start that never hangs"), text: msg("If Church Studio takes too long to start, it says why and lets you send the details to support.") },
+    ],
+  },
+  {
     version: "0.2.6",
     date: "2026-10-21",
     highlights: [

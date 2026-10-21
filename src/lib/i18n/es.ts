@@ -3484,4 +3484,8 @@ export const es: Readonly<Record<string, string>> = {
   "Its own job ({job})": "Su propia tarea ({job})",
   "Now showing {job}: the running part asks for it.": "Ahora muestra {job}: la parte en curso lo pide.",
   "Parts of the service can give it another job while they run: choose that in Where it runs.": "Las partes del culto pueden darle otra tarea mientras se desarrollan: elíjala en Dónde se presenta.",
+  // 0.2.7
+  "Give each extra monitor a job in Settings › Screens: a timer for the preacher, only scripture, only lyrics, or the stage view. Lock a screen so nothing changes it, or let each part of the service switch it.": "Dé una tarea a cada monitor adicional en Ajustes › Pantallas: un temporizador para el predicador, solo Escrituras, solo letras o la vista de escenario. Bloquee una pantalla para que nada la cambie, o deje que cada parte del culto la cambie.",
+  "A start that never hangs": "Un inicio que nunca se queda colgado",
+  "If Church Studio takes too long to start, it says why and lets you send the details to support.": "Si Church Studio tarda demasiado en iniciar, dice por qué y le permite enviar los detalles al soporte.",
 };
