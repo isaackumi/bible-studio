@@ -3,8 +3,9 @@
   import { t } from "../i18n/core";
 
   // One phone UI for every transport: static/remote.html (LAN server and same-origin windows).
+  // Relative, so it opens beside the desk wherever it is served (the app, or the web demo under /app).
   onMount(() => {
-    location.replace("/remote.html");
+    location.replace("remote.html");
   });
 </script>
 
