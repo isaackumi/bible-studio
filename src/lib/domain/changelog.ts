@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.6",
+    date: "2026-10-21",
+    highlights: [
+      { icon: "mic", title: msg("Accurate listening"), text: msg("Choose Accurate in Settings › Sound & voice to listen with Whisper on this computer. It hears accents and Bible names better, and audio never leaves the computer. A one-time 60 MB download.") },
+      { icon: "audio", title: msg("More accents understood"), text: msg("Nearly 250 common mishearings of book names are put right, including “fast Corinthians”, “Tessalonians” and “chapta”.") },
+    ],
+  },
+  {
     version: "0.2.5",
     date: "2026-10-21",
     highlights: [

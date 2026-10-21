@@ -3517,4 +3517,9 @@ export const fr: Readonly<Record<string, string>> = {
   "Downloading… {percent}%": "Téléchargement… {percent} %",
   "Downloaded ({size}). It stays on this computer.": "Téléchargé ({size}). Il reste sur cet ordinateur.",
   "A one-time download of {size}, kept on this computer.": "Un téléchargement unique de {size}, gardé sur cet ordinateur.",
+  // 0.2.6
+  "Accurate listening": "Écoute précise",
+  "Choose Accurate in Settings › Sound & voice to listen with Whisper on this computer. It hears accents and Bible names better, and audio never leaves the computer. A one-time 60 MB download.": "Choisissez Précise dans Réglages › Son et voix pour écouter avec Whisper sur cet ordinateur. Elle comprend mieux les accents et les noms bibliques, et l’audio ne quitte jamais l’ordinateur. Un téléchargement unique de 60 Mo.",
+  "More accents understood": "Plus d’accents compris",
+  "Nearly 250 common mishearings of book names are put right, including “fast Corinthians”, “Tessalonians” and “chapta”.": "Près de 250 erreurs fréquentes sur les noms de livres sont corrigées, dont « fast Corinthians », « Tessalonians » et « chapta ».",
 };
