@@ -224,6 +224,7 @@ export function licensesPage(site: Site): string {
   <table><thead><tr><th>Translation</th><th>License</th></tr></thead><tbody>
     <tr><td>King James Version, American Standard Version, World English Bible, Bible in Basic English</td><td>Public domain</td></tr>
     <tr><td>Akuapem Twi Bible (Nkwa Asɛm)</td><td>© 1996, 2020 Biblica, Inc. Licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener">CC BY-SA 4.0</a>, from <a href="https://ebible.org/details.php?id=twi" rel="noopener">eBible.org</a>, unchanged. Church Studio is not affiliated with or endorsed by Biblica, Inc.</td></tr>
+    <tr><td>Ewe, Yorùbá, Igbo, Hausa and Asante Twi (Biblica Open), downloaded when you choose them</td><td>© Biblica, Inc. (Ewe 1988, 2006, 2020; Yorùbá 2009, 2017; Igbo 2020; Hausa 2009, 2020; Asante Twi 1996, 2020). Licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener">CC BY-SA 4.0</a>, from <a href="https://ebible.org" rel="noopener">eBible.org</a>, unchanged. Church Studio is not affiliated with or endorsed by Biblica, Inc.</td></tr>
   </tbody></table>
   <p>Other translations come from API.Bible under each publisher's license, when you choose them.</p>
   <h2>Speech model</h2>

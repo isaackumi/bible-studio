@@ -264,6 +264,12 @@ fn bible_translations(db: State<Db>) -> Result<Vec<Value>, String> {
 
 #[tauri::command]
 fn bible_install(app: AppHandle, db: State<Db>, id: String) -> Result<(), String> {
+    // A Bible that downloads on request: fetched and checked first, without holding the library.
+    if bible::is_download(&id) {
+        let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("bibles");
+        let path = bible::fetch_download(&id, &dir)?;
+        return with_db(&db, |conn| bible::install_download(conn, &id, &path));
+    }
     let resources = db::resource_dir(&app);
     with_db(&db, |conn| bible::install_translation(conn, &resources, &id))
 }

@@ -148,6 +148,25 @@ const randomId = (prefix: string) => `${prefix}_${hex(crypto.getRandomValues(new
  * GitHub (kept in Cloudflare's cache near the visitor) under its own name, so nobody is sent to
  * GitHub. With no file to hand, back to the download section of the home page.
  */
+/** The openly licensed Bibles the app downloads on request (CC BY-SA 4.0, from eBible.org). */
+const BIBLES = new Set(["ewe", "yor", "ibo", "hausa", "twiasante"]);
+const BIBLES_RELEASE = "https://github.com/isaackumi/bible-studio/releases/download/bibles-2026-10";
+
+/**
+ * A Bible file, from this address: streamed from the GitHub release that holds them (kept in
+ * Cloudflare's cache near the visitor). The app checks each file's SHA-256 before installing it.
+ */
+async function serveBible(config: ApiConfig, id: string): Promise<Response> {
+  if (!BIBLES.has(id)) return json(404, { error: "No such Bible." });
+  const http = config.fetcher ?? fetch;
+  const upstream = await http(`${BIBLES_RELEASE}/${id}.json`, { redirect: "follow", cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 604_800, "300-599": -1 } } } as RequestInit).catch(() => null);
+  if (!upstream?.ok || !upstream.body) return json(502, { error: "That Bible is not available right now. Try again later." });
+  return new Response(upstream.body, {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=86400", ...CORS, ...(upstream.headers.get("content-length") ? { "content-length": upstream.headers.get("content-length")! } : {}) },
+  });
+}
+
 async function serveDownload(config: ApiConfig, platform: Platform): Promise<Response> {
   const release = config.releases ? await config.releases().catch(() => null) : null;
   const asset = release?.assets[platform];
@@ -186,6 +205,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === "/") return html(200, landingPage(site, config.releases ? await config.releases().catch(() => null) : null));
     const download = path.match(/^\/download\/([a-z-]+)$/);
     if (download) return serveDownload(config, download[1] as Platform);
+    const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
+    if (bible) return serveBible(config, bible[1]!);
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
     if (path === "/refunds") return html(200, refundsPage(site));

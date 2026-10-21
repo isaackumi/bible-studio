@@ -1,6 +1,7 @@
 import { CANON } from "./reference";
 import type { BookInfo, SearchHit, TranslationInfo, VerseText } from "../domain/types";
 import { normalizeSpeech, type QuoteVerse } from "../voice/detect";
+import { SITE_URL } from "../domain/billing";
 
 type SourceBook = { chapters: string[][] };
 
@@ -10,7 +11,16 @@ const LOADERS: Record<string, () => Promise<{ default?: SourceBook[] } | SourceB
   web: () => import("../../../src-tauri/resources/web.json"),
   bbe: () => import("../../../src-tauri/resources/bbe.json"),
   twi: () => import("../../../src-tauri/resources/twi.json"),
+  // Downloaded only when chosen (the desktop app checks each against its SHA-256 in src-tauri/src/bible.rs).
+  ...Object.fromEntries(["ewe", "yor", "ibo", "hausa", "twiasante"].map((id) => [id, () => fetchBible(id)])),
 };
+
+/** A Bible that is not inside the app: from our site, which serves the published files. */
+async function fetchBible(id: string): Promise<SourceBook[]> {
+  const response = await fetch(`${SITE_URL}/bibles/${id}.json`);
+  if (!response.ok) throw new Error("That Bible could not be downloaded. Check the internet connection and try again.");
+  return (await response.json()) as SourceBook[];
+}
 
 const cache = new Map<string, Promise<SourceBook[]>>();
 
@@ -21,6 +31,12 @@ export const BUNDLED_TRANSLATIONS: TranslationInfo[] = [
   { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", licenseNote: "Public domain", source: "bundled" },
   // Biblica's open Akuapem Twi Bible (eBible.org), CC BY-SA 4.0: shown with this credit.
   { id: "twi", name: "Akuapem Twi (Nkwa Asɛm)", abbreviation: "TWI", licenseNote: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0", source: "bundled" },
+  // Openly licensed Bibles from eBible.org, downloaded on request (not inside the installer).
+  { id: "ewe", name: "Ewe (Biblica Open)", abbreviation: "EWE", licenseNote: "© 1988, 2006, 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
+  { id: "yor", name: "Yorùbá (Biblica Open)", abbreviation: "YOR", licenseNote: "© 2009, 2017 Biblica, Inc. CC BY-SA 4.0", source: "download" },
+  { id: "ibo", name: "Igbo (Biblica Open)", abbreviation: "IGB", licenseNote: "© 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
+  { id: "hausa", name: "Hausa (Biblica Open)", abbreviation: "HAU", licenseNote: "© 2009, 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
+  { id: "twiasante", name: "Asante Twi (Biblica Open)", abbreviation: "TWA", licenseNote: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
 ];
 
 /** Every translation the app can install. `default` ones are installed on first launch. Sizes are the download. */
@@ -32,6 +48,11 @@ export const BIBLE_CATALOG: CatalogEntry[] = [
   { ...BUNDLED_TRANSLATIONS[1]!, default: false, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[3]!, default: false, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[4]!, default: false, sizeMb: 3.8, language: "Twi (Akuapem)" },
+  { ...BUNDLED_TRANSLATIONS[9]!, default: false, sizeMb: 4.0, language: "Twi (Asante)" },
+  { ...BUNDLED_TRANSLATIONS[5]!, default: false, sizeMb: 4.2, language: "Ewe" },
+  { ...BUNDLED_TRANSLATIONS[6]!, default: false, sizeMb: 5.4, language: "Yorùbá" },
+  { ...BUNDLED_TRANSLATIONS[7]!, default: false, sizeMb: 5.1, language: "Igbo" },
+  { ...BUNDLED_TRANSLATIONS[8]!, default: false, sizeMb: 4.0, language: "Hausa" },
 ];
 
 export const DEFAULT_BIBLES = BIBLE_CATALOG.filter((entry) => entry.default).map((entry) => entry.id);

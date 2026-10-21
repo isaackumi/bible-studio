@@ -548,6 +548,19 @@ mod tests {
     }
 
     #[test]
+    fn installs_a_downloaded_bible_and_removes_its_file() {
+        let conn = test_db();
+        let file = std::env::temp_dir().join(format!("cs-download-{}.json", std::process::id()));
+        std::fs::copy(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/twi.json"), &file).unwrap();
+        crate::bible::install_download(&conn, "twiasante", &file).unwrap();
+        assert!(!file.exists());
+        let source: String = conn.query_row("SELECT source FROM bible_translations WHERE id = 'twiasante'", [], |row| row.get(0)).unwrap();
+        assert_eq!(source, "download");
+        assert_eq!(crate::bible::books(&conn, "twiasante").unwrap().len(), 66);
+        assert!(crate::bible::install_download(&conn, "nkoNT", &file).is_err());
+    }
+
+    #[test]
     fn lists_services_with_their_start_parts_and_last_run() {
         let conn = test_db();
         service_save(&conn, &serde_json::json!({

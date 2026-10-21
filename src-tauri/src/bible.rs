@@ -39,6 +39,26 @@ const BUNDLED: &[BundledTranslation] = &[
     },
 ];
 
+/// Openly licensed Bibles (CC BY-SA 4.0, from eBible.org, unchanged) that are not in the app: each
+/// downloads only when a church chooses it, from our site, and must match its SHA-256 before use.
+struct DownloadTranslation {
+    id: &'static str,
+    name: &'static str,
+    abbreviation: &'static str,
+    license: &'static str,
+    sha256: &'static str,
+}
+
+const DOWNLOAD_BASE: &str = "https://church-studio.heitechinc.com/bibles/";
+
+const DOWNLOADS: &[DownloadTranslation] = &[
+    DownloadTranslation { id: "ewe", name: "Ewe (Biblica Open)", abbreviation: "EWE", license: "© 1988, 2006, 2020 Biblica, Inc. CC BY-SA 4.0", sha256: "b3352bd130ce245f3eecf5007e8620aec5ff833af288b6bd0e408f93c7e5ce55" },
+    DownloadTranslation { id: "yor", name: "Yorùbá (Biblica Open)", abbreviation: "YOR", license: "© 2009, 2017 Biblica, Inc. CC BY-SA 4.0", sha256: "fc529c66c309da6d7e11412ebdb5dd06f25b5813683171abac395d6c38c7a31d" },
+    DownloadTranslation { id: "ibo", name: "Igbo (Biblica Open)", abbreviation: "IGB", license: "© 2020 Biblica, Inc. CC BY-SA 4.0", sha256: "2f27c8fc751c8b8b79db177fba0c46632f1630b60fc19b94638070100bfe63f2" },
+    DownloadTranslation { id: "hausa", name: "Hausa (Biblica Open)", abbreviation: "HAU", license: "© 2009, 2020 Biblica, Inc. CC BY-SA 4.0", sha256: "619d6bab639b56acea925930fd6667b1565fb4a76bc01b3d58234b34bace59a6" },
+    DownloadTranslation { id: "twiasante", name: "Asante Twi (Biblica Open)", abbreviation: "TWA", license: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0", sha256: "a31822330b6f72be58a21a97d3de7fee65b930a036b361a34b2e1212cce862d8" },
+];
+
 /// Installed on first launch. The rest are installed on request (Settings → Bible).
 const DEFAULT_IDS: &[&str] = &["kjv", "web"];
 
@@ -58,6 +78,45 @@ pub fn install_translation(conn: &Connection, resource_dir: &Path, id: &str) -> 
     seed_translation_if_needed(conn, resource_dir, translation)
 }
 
+/// Whether this id is one of the Bibles that download on request.
+pub fn is_download(id: &str) -> bool {
+    DOWNLOADS.iter().any(|t| t.id == id)
+}
+
+/// Fetch a downloadable Bible into `dir` (no database lock held), checked against its SHA-256.
+/// Returns the file to install from.
+pub fn fetch_download(id: &str, dir: &Path) -> Result<std::path::PathBuf, String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let translation = DOWNLOADS.iter().find(|t| t.id == id).ok_or_else(|| format!("{id} is not in the catalog"))?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let response = ureq::get(&format!("{DOWNLOAD_BASE}{id}.json"))
+        .call()
+        .map_err(|error| format!("{} could not be downloaded. Check the internet connection. ({error})", translation.abbreviation))?;
+    let mut bytes = Vec::new();
+    response
+        .into_body()
+        .into_reader()
+        .take(40_000_000)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("The download stopped. Try again. ({error})"))?;
+    let digest = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    if digest != translation.sha256 {
+        return Err(format!("The {} download did not match the published file, so it was not installed. Try again.", translation.abbreviation));
+    }
+    let path = dir.join(format!("{id}.json"));
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
+/// Install a downloaded Bible from its checked file, then remove the file (the verses are in the library).
+pub fn install_download(conn: &Connection, id: &str, path: &Path) -> Result<(), String> {
+    let translation = DOWNLOADS.iter().find(|t| t.id == id).ok_or_else(|| format!("{id} is not in the catalog"))?;
+    let result = seed_from(conn, Seed { id: translation.id, name: translation.name, abbreviation: translation.abbreviation, license: translation.license, origin: "download" }, path);
+    let _ = std::fs::remove_file(path);
+    result
+}
+
 /// Remove a translation's verses. The last installed translation cannot be removed.
 pub fn remove_translation(conn: &Connection, id: &str) -> Result<(), String> {
     let installed: i64 = conn
@@ -73,11 +132,26 @@ pub fn remove_translation(conn: &Connection, id: &str) -> Result<(), String> {
     tx.commit().map_err(|e| e.to_string())
 }
 
+struct Seed<'a> {
+    id: &'a str,
+    name: &'a str,
+    abbreviation: &'a str,
+    license: &'a str,
+    /// Where it came from: "bundled" (inside the app) or "download".
+    origin: &'a str,
+}
+
 fn seed_translation_if_needed(
     conn: &Connection,
     resource_dir: &Path,
     translation: &BundledTranslation,
 ) -> Result<(), String> {
+    let seed = Seed { id: translation.id, name: translation.name, abbreviation: translation.abbreviation, license: translation.license, origin: "bundled" };
+    let path = resource_dir.join(translation.file);
+    seed_from(conn, seed, &path)
+}
+
+fn seed_from(conn: &Connection, translation: Seed<'_>, path: &Path) -> Result<(), String> {
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM bible_translations WHERE id = ?1",
@@ -88,7 +162,6 @@ fn seed_translation_if_needed(
     if count > 0 {
         return Ok(());
     }
-    let path = resource_dir.join(translation.file);
     if !path.exists() {
         return Err(format!("{} source is missing at {}", translation.abbreviation, path.display()));
     }
@@ -110,8 +183,8 @@ fn seed_translation_if_needed(
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     tx.execute(
         "INSERT INTO bible_translations (id, name, abbreviation, license_note, source)
-         VALUES (?1, ?2, ?3, ?4, 'bundled')",
-        params![translation.id, translation.name, translation.abbreviation, translation.license],
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![translation.id, translation.name, translation.abbreviation, translation.license, translation.origin],
     )
     .map_err(|e| e.to_string())?;
 
@@ -388,6 +461,17 @@ mod tests {
         let books: Vec<SourceBook> =
             serde_json::from_reader(BufReader::new(File::open(path).expect(file))).expect("json");
         books[42].chapters[2][15].clone()
+    }
+
+    #[test]
+    fn downloads_are_well_formed() {
+        let mut seen = std::collections::HashSet::new();
+        for t in DOWNLOADS {
+            assert!(seen.insert(t.id), "{} twice", t.id);
+            assert!(t.sha256.len() == 64 && t.sha256.chars().all(|c| c.is_ascii_hexdigit()), "{}", t.id);
+            assert!(t.license.contains("CC BY-SA 4.0"), "{} must be openly licensed", t.id);
+            assert!(!BUNDLED.iter().any(|b| b.id == t.id), "{} is bundled too", t.id);
+        }
     }
 
     #[test]
