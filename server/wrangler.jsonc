@@ -37,7 +37,11 @@
     "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",
     // The address people see: sign-in pages, sign-in callbacks, checkout and the links in emails.
-    "PUBLIC_URL": "https://church-studio.heitechinc.com"
+    "PUBLIC_URL": "https://church-studio.heitechinc.com",
+    // Cloudflare Access in front of /admin (README › Admin): the team domain and the application's
+    // AUD tag, both shown in Zero Trust. Not secrets. Empty: the admin page only opens to look.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
   },
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.

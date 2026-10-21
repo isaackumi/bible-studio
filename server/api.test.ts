@@ -10,7 +10,8 @@ import { memoryStore } from "./store";
 const pair = licenseKeyPair();
 const DAY = 86_400_000;
 
-function setup() {
+/** `asOwner`: the admin API acts as an owner (as dev.ts does); otherwise only the old look-only token opens it. */
+function setup(asOwner = true) {
   let clock = Date.UTC(2026, 9, 19, 12);
   const mails: Array<{ to: string; subject: string; text: string }> = [];
   const config: ApiConfig = {
@@ -19,6 +20,7 @@ function setup() {
     publicKey: pair.publicKey,
     provider: mockProvider,
     adminToken: "secret",
+    admin: { users: { "owner@heitech.test": "owner" }, ...(asOwner ? { devEmail: "owner@heitech.test" } : {}) },
     leaseDays: 30,
     trialDays: 14,
     graceDays: 7,
@@ -41,11 +43,11 @@ function setup() {
 
 describe("server API", () => {
   it("counts check-ins for the admin stats, behind the admin token", async () => {
-    const { call } = setup();
+    const { call } = setup(false);
     expect((await call("/v1/hello", { device: "a", version: "0.2.0", os: "macos", plan: "free" })).data).toMatchObject({ provider: "mock", test: true });
     await call("/v1/hello", { device: "b", version: "0.2.0", os: "windows", plan: "free" });
-    expect((await call("/v1/admin/stats")).status).toBe(401);
-    const stats = (await call("/v1/admin/stats", undefined, { authorization: "Bearer secret" })).data as { computers: { total: number; active1: number } };
+    expect((await call("/admin/api/stats")).status).toBe(401);
+    const stats = (await call("/admin/api/stats", undefined, { authorization: "Bearer secret" })).data as { computers: { total: number; active1: number } };
     expect(stats.computers).toMatchObject({ total: 2, active1: 2 });
   });
 
@@ -64,11 +66,11 @@ describe("server API", () => {
   });
 
   it("lists the records behind the numbers for the admin page, behind the admin token", async () => {
-    const { call } = setup();
+    const { call } = setup(false);
     await call("/v1/hello", { device: "computer-one-long-id", version: "0.2.4", os: "macos", plan: "free" });
     await call("/v1/trial", { device: "computer-one-long-id", os: "macos" });
-    expect((await call("/v1/admin/details")).status).toBe(401);
-    const details = (await call("/v1/admin/details", undefined, { authorization: "Bearer secret" })).data as { days: string[]; series: { computers: number[]; trials: number[] }; computers: Array<{ id: string; os: string }>; trials: Array<{ state: string }>; funnel: { computers: number; trials: number } };
+    expect((await call("/admin/api/details")).status).toBe(401);
+    const details = (await call("/admin/api/details", undefined, { authorization: "Bearer secret" })).data as { days: string[]; series: { computers: number[]; trials: number[] }; computers: Array<{ id: string; os: string }>; trials: Array<{ state: string }>; funnel: { computers: number; trials: number } };
     expect(details.days).toHaveLength(30);
     expect(details.series.computers.at(-1)).toBe(1);
     expect(details.series.trials.at(-1)).toBe(1);
@@ -97,7 +99,7 @@ describe("server API", () => {
 
   it("checks promo codes and charges the discounted price", async () => {
     const { call } = setup();
-    await call("/v1/admin/promos", { code: "easter25", percentOff: 25, plans: ["premium"], maxUses: 2 }, { authorization: "Bearer secret" });
+    await call("/admin/api/action", { action: "create-promo", code: "easter25", percentOff: 25, plans: ["premium"], maxUses: 2, expiresAt: "2026-12-31T23:59:59Z" });
     expect((await call("/v1/promo", { code: "EASTER25", plan: "premium", interval: "yearly" })).data).toMatchObject({ ok: true, percentOff: 25 });
     expect((await call("/v1/promo", { code: "EASTER25", plan: "church", interval: "yearly" })).data).toMatchObject({ ok: false, reason: "not-for-plan" });
     expect((await call("/v1/promo", { code: "NOPE" })).data).toMatchObject({ ok: false, reason: "unknown" });
@@ -171,7 +173,7 @@ describe("server API", () => {
   it("refuses refunded and ended keys, and counts launch-offer days from first use on the server", async () => {
     const { call, advance } = setup();
     const refunded = signLicense({ plan: "premium", until: "2027-01-01", id: new Uint8Array([1, 2, 3, 4]) }, pair.secretKey);
-    await call("/v1/admin/refund", { license: "01020304" }, { authorization: "Bearer secret" });
+    await call("/admin/api/action", { action: "refund", license: "01020304" });
     expect(await call("/v1/activate", { key: refunded, device: "x" })).toMatchObject({ status: 403, data: { revoked: true } });
     const ended = signLicense({ plan: "premium", until: "2026-01-02" }, pair.secretKey);
     expect(await call("/v1/activate", { key: ended, device: "x" })).toMatchObject({ status: 410 });

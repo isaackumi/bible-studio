@@ -11,8 +11,7 @@
 //   POST /v1/devices    {key, device?}                         → {ok, seats, devices}
 //   GET  /pay/:session  POST /pay/:session[/cancel]            (the mock provider's checkout page)
 //   Accounts (optional; see accounts.ts): /v1/signin/*, /v1/account*, /signin/:id, /auth/*
-//   GET  /admin                                                (the admin page; asks for the admin token)
-//   GET  /v1/admin/stats, GET|POST /v1/admin/promos, POST /v1/admin/refund   (Authorization: Bearer ADMIN_TOKEN)
+//   /admin, /admin/api/*                                       (the admin console, behind Cloudflare Access: admin.ts)
 
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
@@ -22,7 +21,8 @@ import { landingPage } from "./landing.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
-import { adminPage, checkoutPage, payPage } from "./pages.ts";
+import { checkoutPage, payPage } from "./pages.ts";
+import { adminRoute, type AdminSettings } from "./admin.ts";
 import { privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
@@ -48,7 +48,10 @@ export type ApiConfig = {
   paddleClient?: { token: string; sandbox: boolean };
   /** Who is signed in (accounts.ts); missing: accounts are off and everything else still works. */
   identity?: Identity;
+  /** The old shared admin token: with Access set up it is ignored; without, it opens the admin page to look only. */
   adminToken?: string;
+  /** The admin console: Cloudflare Access, who is admin and as what, and where alerts go (admin.ts). */
+  admin?: AdminSettings;
   /** Days a computer may stay offline before it must check in (a lease's reach). */
   leaseDays: number;
   trialDays: number;
@@ -81,7 +84,7 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const html = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-type Device = { device: string; name: string; seenAt: string };
+export type Device = { device: string; name: string; seenAt: string };
 type Checkout = {
   id: string;
   plan: LicensePlan;
@@ -102,14 +105,14 @@ type Checkout = {
   /** The account that bought it, when the buyer was signed in. */
   account?: string | null;
 };
-type Trial = { device: string; startedAt: number; endsAt: number; promo: string | null };
+export type Trial = { device: string; startedAt: number; endsAt: number; promo: string | null };
 /** A signed-in person's trial: one per account, whichever computers they use. */
-type AccountTrial = { device: string; startedAt: number; endsAt: number };
+export type AccountTrial = { device: string; startedAt: number; endsAt: number };
 /** New trials one network address may start in a day (a church office shares one address). */
 export const TRIALS_PER_ADDRESS = 5;
-type Subscription = { id: string; license: string; plan: LicensePlan; interval: Interval; email: string; renewsAt: number; status: "active" | "refunded" };
+export type Subscription = { id: string; license: string; plan: LicensePlan; interval: Interval; email: string; renewsAt: number; status: "active" | "refunded" };
 /** Per license: what it is paid through (moved on by each renewal), whatever date its key carries. */
-type LicenseRecord = { sub: string | null; email: string; paidUntil: number; test: boolean };
+export type LicenseRecord = { sub: string | null; email: string; paidUntil: number; test: boolean };
 
 /** Releases a key may make in 30 days (a released computer keeps its lease until it checks in). */
 const RELEASES_PER_30_DAYS = 3;
@@ -130,14 +133,6 @@ export function readAnyLicense(config: ApiConfig, text: string): { license: Lice
     if (license) return { license, signer };
   }
   return null;
-}
-
-/** Constant-time text comparison (the admin token). */
-function sameText(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
 }
 
 /** Hex of the first 4 bytes of SHA-256(text): stable ids, so one subscription keeps one key id. */
@@ -179,7 +174,6 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   const origin = config.publicUrl?.replace(/\/+$/, "") || url.origin;
 
   // Pages.
-  if (path === "/admin" && request.method === "GET") return html(200, adminPage());
   // The app icon for emails (mail apps cannot show SVG).
   if (path === "/email/logo.png" && request.method === "GET") {
     const bytes = Uint8Array.from(atob(EMAIL_LOGO_PNG), (char) => char.charCodeAt(0));
@@ -201,35 +195,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (signin) return signinRoute(request, config, signin[1]!, signin[2]);
   if (path.startsWith("/auth/")) return config.identity ? config.identity.handler(request) : json(404, { error: "Accounts are not set up on this server yet." });
 
-  // Admin.
-  if (path.startsWith("/v1/admin/")) {
-    if (!config.adminToken) return json(503, { error: "Set ADMIN_TOKEN on the server first." });
-    if (!sameText(request.headers.get("authorization") ?? "", `Bearer ${config.adminToken}`)) return json(401, { error: "Wrong admin token." });
-    if (path === "/v1/admin/stats" && request.method === "GET") return json(200, await stats(config));
-    if (path === "/v1/admin/details" && request.method === "GET") return json(200, await details(config));
-    if (path === "/v1/admin/promos" && request.method === "GET") return json(200, { promos: await listPromos(config.store) });
-    if (path === "/v1/admin/promos" && request.method === "POST") {
-      const promo = makePromo((await body(request)) ?? {}, config.now());
-      if (!promo) return json(400, { error: "A code needs at least 3 letters and a discount or trial days." });
-      if (await config.store.get(`promo:${promo.code}`)) return json(409, { error: "That code exists already." });
-      await putJson(config.store, `promo:${promo.code}`, promo, { used: 0 });
-      return json(200, { promo });
-    }
-    if (path === "/v1/admin/renew" && request.method === "POST") {
-      // A renewal by hand (the mock provider has no renewals of its own): one more paid period.
-      const input = (await body(request)) ?? {};
-      const until = await renewLicense(config, text(input.license, 16).toLowerCase(), null);
-      return until ? json(200, { ok: true, paidUntil: until }) : json(404, { error: "No such license." });
-    }
-    if (path === "/v1/admin/refund" && request.method === "POST") {
-      const input = (await body(request)) ?? {};
-      const license = text(input.license, 16).toLowerCase();
-      if (!/^[0-9a-f]{8}$/.test(license)) return json(400, { error: "Which license id (8 hex characters)?" });
-      await revoke(config, license, text(input.reason, 80) || "refund");
-      return json(200, { ok: true });
-    }
-    return json(404, { error: "Not found" });
-  }
+  // Admin: everything under /admin, behind Cloudflare Access (admin.ts).
+  if (path === "/admin" || path.startsWith("/admin/")) return adminRoute(request, config, path, origin);
 
   if (request.method !== "POST" || !path.startsWith("/v1/")) return json(404, { error: "Not found" });
   const input = await body(request);
@@ -271,15 +238,16 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 
 // --- Check-in and stats --------------------------------------------------------------------
 
-type DeviceMeta = { first: number; last: number; plan: string; version: string; os: string; trial?: number; paid?: number };
+/** A computer as the admin page sees it: the browser ("Edge 129") for the web version, and the account signed in on it. */
+export type DeviceMeta = { first: number; last: number; plan: string; version: string; os: string; browser?: string; account?: string; trial?: number; paid?: number };
 
 async function hello(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const device = text(input.device, 80);
-  if (device) await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20) });
+  if (device) await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20), browser: text(input.browser, 24) });
   return json(200, { now: config.now(), provider: config.provider.name, test: config.provider.test });
 }
 
-async function noteDevice(config: ApiConfig, device: string, change: Partial<DeviceMeta>): Promise<void> {
+export async function noteDevice(config: ApiConfig, device: string, change: Partial<DeviceMeta>): Promise<void> {
   const key = `device:${device}`;
   const now = config.now();
   const saved = await getJson<DeviceMeta>(config.store, key);
@@ -296,7 +264,7 @@ async function noteDevice(config: ApiConfig, device: string, change: Partial<Dev
  * started, sales), and the latest computers, trials, checkouts, licenses and accounts. Computer ids
  * are shortened; emails are shown only here, behind the admin token.
  */
-async function details(config: ApiConfig) {
+export async function details(config: ApiConfig) {
   const now = config.now();
   const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
   const days = Array.from({ length: 30 }, (_, n) => dayOf(now - (29 - n) * DAY));
@@ -314,7 +282,7 @@ async function details(config: ApiConfig) {
     .map((entry) => ({ id: short(entry.key.slice("device:".length)), ...(entry.meta as DeviceMeta) }));
   const trials = (await config.store.list("trial:"))
     .filter((entry) => entry.meta)
-    .map((entry) => ({ device: short(entry.key.slice("trial:".length)), ...(entry.meta as { startedAt: number; endsAt: number; converted?: boolean }) }));
+    .map((entry) => ({ device: short(entry.key.slice("trial:".length)), deviceId: entry.key.slice("trial:".length), ...(entry.meta as { startedAt: number; endsAt: number; converted?: boolean }) }));
   const checkouts = (await config.store.list("checkout:"))
     .filter((entry) => entry.meta)
     .map((entry) => ({ id: entry.key.slice("checkout:".length), ...(entry.meta as { status: string; due: number; plan: string; interval: string; promo: string | null; paidAt?: number | null; createdAt?: number; email?: string; name?: string }) }));
@@ -327,7 +295,7 @@ async function details(config: ApiConfig) {
       const devices = (await getJson<Array<{ device: string; name: string; seenAt: string }>>(config.store, entry.key)) ?? [];
       const record = await getJson<LicenseRecord>(config.store, `license:${id}`);
       const revoked = !!(await config.store.get(`revoked:${id}`));
-      return { license: id, email: record?.email ?? "", paidUntil: record?.paidUntil ?? null, test: record?.test ?? false, revoked, devices: devices.map((device) => ({ name: device.name, seenAt: device.seenAt })) };
+      return { license: id, email: record?.email ?? "", paidUntil: record?.paidUntil ?? null, test: record?.test ?? false, revoked, devices: devices.map((device) => ({ device: device.device, name: device.name, seenAt: device.seenAt })) };
     }),
   );
   const newest = <T>(items: T[], at: (item: T) => number) => [...items].sort((a, b) => at(b) - at(a)).slice(0, 100);
@@ -347,7 +315,7 @@ async function details(config: ApiConfig) {
   };
 }
 
-async function stats(config: ApiConfig) {
+export async function stats(config: ApiConfig) {
   const now = config.now();
   const devices = (await config.store.list("device:")).map((entry) => entry.meta as DeviceMeta | null).filter((meta): meta is DeviceMeta => !!meta);
   const active = (days: number) => devices.filter((meta) => now - meta.last < days * DAY).length;
@@ -383,7 +351,7 @@ async function stats(config: ApiConfig) {
   };
 }
 
-async function listPromos(store: Store): Promise<Promo[]> {
+export async function listPromos(store: Store): Promise<Promo[]> {
   const entries = await store.list("promo:");
   const promos = await Promise.all(entries.map((entry) => getJson<Promo>(store, entry.key)));
   return promos.filter((promo): promo is Promo => !!promo).sort((a, b) => b.createdAt - a.createdAt);
@@ -445,7 +413,10 @@ async function trial(config: ApiConfig, input: Record<string, unknown>, address:
   await putJson(config.store, key, record, { startedAt: record.startedAt, endsAt: record.endsAt });
   if (promo?.ok && promo.trialDays) await usePromo(config, promo.code);
   await noteDevice(config, device, { plan: "trial", trial: now });
-  if (account) await noteAccountTrial(config, account.id, record);
+  if (account) {
+    await noteAccountTrial(config, account.id, record);
+    await noteDevice(config, device, { account: account.id });
+  }
   return json(200, { lease: lease(config, { kind: "trial", plan: "premium", device, license: null, holder: "", endsAt: record.endsAt }), endsAt: record.endsAt, days });
 }
 

@@ -49,7 +49,8 @@ an admin token there if there is none), deploys, and checks the live server. By 
 ```
 npx wrangler login
 npx wrangler secret put CHURCH_STUDIO_SIGNING_KEY   # contents of ~/.church-studio/license-signing.key
-npx wrangler secret put ADMIN_TOKEN                 # a long random string, for /admin
+npx wrangler secret put ADMIN_USERS                 # who is admin: you@x.com:owner,helper@y.com:support (see Admin)
+npx wrangler secret put ADMIN_ALERT_EMAIL           # where every admin change and approval request goes
 npx wrangler secret put RESEND_API_KEY              # optional: emails the key
 npx wrangler deploy
 ```
@@ -118,14 +119,69 @@ Set `BILLING_PROVIDER` and that provider's secrets; the app does not change.
 
 A refunded or charged-back license gets no new leases: its computers drop to Free at their next
 check-in (at most `LEASE_DAYS` later). Paddle refunds are handled by the webhook; with the mock,
-use the admin page's **Refund a license**.
+open the license on the admin page and choose **Revoke for refund**.
 
 ## Admin
 
-`/admin` shows computers, active today/week/month, trials and how many bought, subscriptions and
-monthly recurring revenue, revenue, plan mix, app versions and systems, and promo codes (create
-them there). Only anonymous check-ins are counted: the app version, system and plan, and nothing
-from a church's library. Churches can turn the daily check-in off in Settings › Plan & account ›
-Privacy; licensing checks still happen.
+`/admin` shows computers (with each one's setup: Mac app, Windows app, or the browser version with
+its system and browser), accounts and every setup each person uses, licenses and their seats,
+trials, sales, promo codes, an activity log and approvals. Click any row to open it and act on it:
+extend a license or trial, free one seat or all of them, resend the key email (only ever to the
+address that bought it), suspend and restore, revoke for a refund, and create or end promo codes.
+Only anonymous check-ins are counted (app version, system, browser for the web version, plan, and
+the account when signed in), never anything from a church's library. Churches can turn the daily
+check-in off in Settings › Plan & account › Privacy; licensing checks still happen.
+
+### Who gets in: Cloudflare Access
+
+Everything admin lives under `/admin` (the page and its API at `/admin/api/*`), so one Access
+application covers it. The Worker checks Access's signed token on every request itself, so a
+request that skips Access gets nothing. Set it up once:
+
+1. Cloudflare dashboard › **Zero Trust**. The first time, choose a team name (for example
+   `heitech`, giving `heitech.cloudflareaccess.com`) and the **Free** plan (up to 50 people).
+2. **Settings › Authentication**: One-time PIN (a code by email) is on already. Adding **Google**
+   is better: an admin's Google account with 2-Step Verification protects the admin page too.
+3. **Access › Applications › Add an application › Self-hosted**. Name: Church Studio admin.
+   Session duration: 8 hours. Add two public hostnames, both with path `admin`:
+   `church-studio.heitechinc.com` and `license.heitechinc.com`.
+4. Add a policy: Action **Allow**, Include **Emails**: the people who may open the admin page.
+   Save the application.
+5. Open the application's **Overview** and copy the **Application Audience (AUD) Tag**.
+6. In `wrangler.jsonc`, set `ACCESS_TEAM_DOMAIN` (for example `heitech.cloudflareaccess.com`) and
+   `ACCESS_AUD`. Then from this folder:
+   ```
+   npx wrangler secret put ADMIN_USERS          # you@x.com:owner,helper@y.com:support,eyes@z.com:viewer
+   npx wrangler secret put ADMIN_ALERT_EMAIL    # an inbox an owner reads
+   ```
+   and push to `main` (the pipeline deploys).
+
+With Access set up the old `ADMIN_TOKEN` is ignored. Without it, the token only opens the page to
+look: no changes can be made until Access is in front.
+
+### What stops someone who gets admin access
+
+- **Two lists to pass.** Access's list decides who reaches the page; `ADMIN_USERS` decides their
+  role. Both are set in Cloudflare, never from the admin page, so nobody can add themselves.
+- **Roles.** Viewer looks. Support frees seats, resends keys and makes small extensions. Owner does
+  the rest.
+- **Limits, whoever asks.** One extension: support 14 days (trials 7), owner 31 (trials 14). Past
+  60 days added by hand to one license in a year (14 for a trial), every extension needs approval.
+  Never more than 365 (60). Every promo code needs a number of uses (at most 1000) and an end
+  date (at most a year); codes over 50% or $15 off, over 30 trial days or over 100 uses need
+  approval. Restoring a suspended or refunded license always needs approval. At most 40 changes
+  an hour per person.
+- **Nothing of your own.** Nobody can extend, restore or free seats on a license or computer that
+  is theirs (bought with their email, on their account, or signed in to it).
+- **Approval by email.** Big changes wait; the link goes to `ADMIN_ALERT_EMAIL`, works once for an
+  hour, and must be opened by an owner signed in through Access. With two owners, nobody approves
+  their own request.
+- **Nothing deleted.** Licenses are suspended (and can be restored), codes are ended (their uses
+  kept). There is no delete.
+- **A log and an email for everything.** Every change, every refused attempt and every approval is
+  in the Activity tab, in the Worker's logs, and emailed to `ADMIN_ALERT_EMAIL`, so misuse is seen
+  the same day. The API has no way to remove log entries.
+- **Money stays in Paddle.** Refunds and charges happen there; the admin page cannot make a paid
+  license.
 
 Tests: `npx vitest run server`.

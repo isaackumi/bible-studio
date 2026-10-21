@@ -3,7 +3,7 @@
 // the app with VITE_LICENSE_SERVER=http://localhost:8787 so the app talks to it.
 //
 // It signs with the real key from ~/.church-studio/license-signing.key (or CHURCH_STUDIO_SIGNING_KEY),
-// so the app accepts its leases. The admin page is http://localhost:8787/admin (token: dev).
+// so the app accepts its leases. The admin page is http://localhost:8787/admin (you are its owner here).
 //
 // Accounts work too: sign-in links are printed here instead of emailed, and Google, Microsoft or
 // Apple sign-in is offered when GOOGLE_CLIENT_ID/SECRET (and so on) are set. Users and sessions are
@@ -55,7 +55,8 @@ const config = {
   identity: betterAuthIdentity(authSettings),
   signingKey,
   provider: mockProvider,
-  adminToken: process.env.ADMIN_TOKEN ?? "dev",
+  // The admin page as an owner without Cloudflare Access (this computer only).
+  admin: { users: { "dev@localhost": "owner" as const }, devEmail: "dev@localhost", alertEmail: "dev@localhost" },
   leaseDays: 30,
   trialDays: 14,
   graceDays: 7,
@@ -76,4 +77,4 @@ createServer(async (incoming, outgoing) => {
   outgoing.writeHead(response.status, Object.fromEntries(response.headers.entries()));
   outgoing.end(Buffer.from(await response.arrayBuffer()));
   if (incoming.method !== "GET") save();
-}).listen(PORT, () => console.log(`Church Studio license server (mock payments) on http://localhost:${PORT} · admin: /admin (token ${config.adminToken})`));
+}).listen(PORT, () => console.log(`Church Studio license server (mock payments) on http://localhost:${PORT} · admin: /admin`));

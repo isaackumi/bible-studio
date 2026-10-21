@@ -10,6 +10,7 @@ import { latestRelease } from "./downloads.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Identity } from "./accounts.ts";
 import { betterAuthIdentity } from "./auth.ts";
+import { parseAdminUsers } from "./admin.ts";
 import { completeCheckout, handleApi, licenseOfSubscription, renewLicense, revoke, type ApiConfig } from "./api.ts";
 import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
 import { getJson, kvStore, type KvNamespace } from "./store.ts";
@@ -38,8 +39,15 @@ export type Env = {
   BILLING_PROVIDER?: string;
   /** Promo codes charged through Paddle discounts: "EASTER25:dsc_01abc,…". */
   PADDLE_DISCOUNTS?: string;
-  /** Bearer token for /admin and /v1/admin/*. */
+  /** The old shared admin token: ignored once Access is set up; until then it opens /admin to look only. */
   ADMIN_TOKEN?: string;
+  /** Cloudflare Access in front of /admin: the team domain (heitech.cloudflareaccess.com) and the application's AUD tag. */
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
+  /** Who is admin, and as what: "you@x.com:owner,helper@y.com:support" (a secret). */
+  ADMIN_USERS?: string;
+  /** Where every admin change is reported and approvals are sent (a secret). */
+  ADMIN_ALERT_EMAIL?: string;
   /** Days a computer may stay offline before it must check in (default 30). */
   LEASE_DAYS?: string;
   /** Free trial length (default 14). */
@@ -104,6 +112,11 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
     provider,
     adminToken: env.ADMIN_TOKEN,
+    admin: {
+      access: env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD ? { team: env.ACCESS_TEAM_DOMAIN.replace(/^https?:\/\//, "").replace(/\/+$/, ""), aud: env.ACCESS_AUD } : undefined,
+      users: parseAdminUsers(env.ADMIN_USERS),
+      alertEmail: env.ADMIN_ALERT_EMAIL || undefined,
+    },
     leaseDays: Number(env.LEASE_DAYS ?? 30) || 30,
     trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
     graceDays: Number(env.GRACE_DAYS ?? 7) || 7,

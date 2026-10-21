@@ -17,7 +17,7 @@
 //   GET  /signin/:id   POST /signin/:id/confirm|cancel   (the browser pages)
 
 import { readLicense, type LicensePlan } from "../src/lib/domain/license.ts";
-import { activateDevice, noteAccountTrial, readAnyLicense, type ApiConfig } from "./api.ts";
+import { activateDevice, noteAccountTrial, noteDevice, readAnyLicense, type ApiConfig } from "./api.ts";
 import { signinPage } from "./pages.ts";
 import { getJson, putJson } from "./store.ts";
 
@@ -50,8 +50,8 @@ type Signin = {
   token?: string;
 };
 type AccountToken = { user: string; device: string; createdAt: number };
-type LinkedLicense = { id: string; key: string };
-type Account = { id: string; email: string; name: string; licenses: LinkedLicense[]; createdAt: number };
+export type LinkedLicense = { id: string; key: string };
+export type Account = { id: string; email: string; name: string; licenses: LinkedLicense[]; createdAt: number };
 
 const SIGNIN_MINUTES = 10;
 const PLAN_RANK: Record<LicensePlan, number> = { premium: 1, church: 2 };
@@ -162,6 +162,8 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
   // A trial started on this computer before signing in now belongs to the account too.
   const deviceTrial = device ? await getJson<{ device: string; startedAt: number; endsAt: number }>(config.store, `trial:${device}`) : null;
   if (deviceTrial) await noteAccountTrial(config, account.id, deviceTrial);
+  // The admin page shows which computers each person uses.
+  if (device) await noteDevice(config, device, { account: account.id });
   const licenses = account.licenses
     .map((entry) => ({ entry, license: readAnyLicense(config, entry.key)?.license ?? readLicense(entry.key) }))
     .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license> } => !!item.license)

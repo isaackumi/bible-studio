@@ -5106,6 +5106,19 @@ class Session {
     return this.desktop() ? os : `web-${os}`;
   }
 
+  /** The browser and its major version ("Edge 129"), for the web version only: the admin page shows who uses which. */
+  private browserName(): string {
+    if (this.desktop() || typeof navigator === "undefined") return "";
+    const agent = navigator.userAgent;
+    // Order matters: Edge and Opera also say Chrome, and Chrome also says Safari.
+    const browsers: Array<[string, RegExp]> = [["Edge", /Edg\/(\d+)/], ["Opera", /OPR\/(\d+)/], ["Firefox", /Firefox\/(\d+)/], ["Chrome", /Chrome\/(\d+)/], ["Safari", /Version\/(\d+).*Safari/]];
+    for (const [name, pattern] of browsers) {
+      const match = pattern.exec(agent);
+      if (match) return `${name} ${match[1]}`;
+    }
+    return "Other";
+  }
+
   /** Read the plan again from the native core (each minute, and after any change). */
   refreshEntitlement = async () => {
     try {
@@ -5169,7 +5182,7 @@ class Session {
     await this.refreshEntitlement();
     void this.startErrorReports();
     if (this.workspace.shareUsage !== false) {
-      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), plan: this.plan });
+      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), browser: this.browserName(), plan: this.plan });
       if (hello.ok) {
         this.billingTest = hello.data.test === true;
         // The server's clock: the native core never lets this computer's clock trail it.
