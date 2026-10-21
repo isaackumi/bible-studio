@@ -13,7 +13,8 @@ export type BrowserOutputState = {
   message: string;
 };
 
-const AUDIENCE_URL = "/?display=1";
+// Relative, so it opens beside the desk wherever it is served (the app, or the web demo under /app).
+const AUDIENCE_URL = "./?display=1";
 const AUDIENCE_NAME = "church-studio-audience";
 const AUDIENCE_FEATURES = "popup=yes,width=1280,height=720";
 

@@ -15,6 +15,8 @@ import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
 import { getJson, kvStore, type KvNamespace } from "./store.ts";
 
 export type Env = {
+  /** The web demo's files (npm run build:web → server/web), served under /app. */
+  ASSETS?: { fetch(request: Request): Promise<Response> };
   /** Paddle › Developer tools › Notifications › the endpoint's secret key. */
   PADDLE_WEBHOOK_SECRET: string;
   /** Paddle API key, to look up the buyer's email. */
@@ -122,8 +124,15 @@ type Fetch = typeof fetch;
 const MAX_AGE_SECONDS = 300;
 
 export default {
-  fetch: (request: Request, env: Env) => {
-    const path = new URL(request.url).pathname;
+  fetch: async (request: Request, env: Env) => {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    // The web demo: its files come first; any other address under /app is the app's own page.
+    if (path === "/app") return Response.redirect(`${url.origin}/app/`, 301);
+    if (path.startsWith("/app/") && env.ASSETS) {
+      const file = await env.ASSETS.fetch(request);
+      return file.status === 404 ? env.ASSETS.fetch(new Request(`${url.origin}/app/`, request)) : file;
+    }
     if (path === "/paddle/webhook") return handle(request, env, fetch, Date.now(), apiConfig(env));
     const config = apiConfig(env);
     if (!config) return new Response("The server is not set up yet (KV binding and signing key).", { status: 503 });

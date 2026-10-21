@@ -1515,7 +1515,7 @@ class Session {
       return;
     }
     this.publishSecond();
-    const opened = window.open("/?second=1", "church-studio-second", "popup=yes,width=1280,height=720");
+    const opened = window.open("./?second=1", "church-studio-second", "popup=yes,width=1280,height=720");
     this.message = opened ? `${name} screen opened. Drag it to that screen.` : "The browser blocked the window. Allow pop-ups for this site, then try again.";
   };
 
@@ -5672,7 +5672,7 @@ class Session {
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
   loadSongPacks = async () => {
     try {
-      const response = await fetch("/song-packs/index.json", { cache: "no-store" });
+      const response = await fetch("song-packs/index.json", { cache: "no-store" });
       this.songPacks = response.ok ? sanitizeSongPacks(await response.json()) : [];
     } catch {
       this.songPacks = [];
@@ -5682,7 +5682,7 @@ class Session {
   /** Install a pack into its folder. Its songs are copies the church can edit. */
   installSongPack = async (pack: SongPack): Promise<boolean> => {
     try {
-      const response = await fetch(`/song-packs/${pack.file}`);
+      const response = await fetch(`song-packs/${pack.file}`);
       if (!response.ok) throw new Error(t("{name} is not available.", { name: pack.name }));
       const decoder = new TextDecoder();
       const files = (await readZip(new Uint8Array(await response.arrayBuffer())))
@@ -6175,7 +6175,7 @@ class Session {
       return;
     }
     const placed = await this.stagePlacement();
-    const opened = window.open("/?stage=1", "church-studio-stage", placed?.features ?? "popup=yes,width=1280,height=720");
+    const opened = window.open("./?stage=1", "church-studio-stage", placed?.features ?? "popup=yes,width=1280,height=720");
     this.message = !opened
       ? "The browser blocked the stage window. Allow pop-ups for this site, then try again."
       : placed

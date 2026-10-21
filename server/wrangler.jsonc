@@ -7,6 +7,8 @@
   // Better Auth (accounts) uses Node's AsyncLocalStorage.
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // The web demo (church-studio.heitechinc.com/app): build it with `npm run build:web` before deploying.
+  "assets": { "directory": "./web", "binding": "ASSETS", "run_worker_first": true },
   // church-studio.heitechinc.com is the address people see: sign-in, checkout and the links in emails.
   // license.heitechinc.com is the address apps already installed talk to (src/lib/domain/billing.ts);
   // it stays, answering the same. The workers.dev address is off.

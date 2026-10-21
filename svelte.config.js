@@ -9,9 +9,14 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter({
-      fallback: "index.html",
-    }),
+    // WEB_BASE=/app builds the web demo served at church-studio.heitechinc.com/app (npm run build:web),
+    // into server/web/app; the desktop app's build is unchanged.
+    adapter: adapter(
+      process.env.WEB_BASE
+        ? { pages: `server/web${process.env.WEB_BASE}`, assets: `server/web${process.env.WEB_BASE}`, fallback: "index.html" }
+        : { fallback: "index.html" },
+    ),
+    paths: { base: process.env.WEB_BASE ?? "" },
   },
 };
 

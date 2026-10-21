@@ -256,6 +256,14 @@ section { padding: 130px 0 0; }
 .get small { margin-left: auto; color: var(--dim); font-weight: 500; font-size: 12.5px; }
 .get.primary { background: linear-gradient(180deg, #ff6a1f, var(--accent)); border-color: transparent; color: #fff; box-shadow: 0 10px 30px -8px rgba(250,79,0,.6); }
 .get.primary small { color: rgba(255,255,255,.75); }
+.howto { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 13.5px; color: var(--muted); }
+.howto summary { cursor: pointer; list-style: none; font-weight: 600; color: var(--ink); display: flex; justify-content: space-between; }
+.howto summary::-webkit-details-marker { display: none; }
+.howto summary::after { content: "+"; color: var(--dim); font-size: 18px; line-height: 1; transition: transform .25s; }
+.howto[open] summary::after { transform: rotate(45deg); }
+.howto ol { margin: 10px 0 6px; padding-left: 18px; display: grid; gap: 6px; }
+.howto b { color: var(--ink); font-weight: 600; } .howto code { padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.08); font-size: 12px; }
+.howto p { margin: 6px 0 0; font-size: 12.5px; color: var(--dim); }
 .release-note { margin-top: 22px; text-align: center; color: var(--dim); font-size: 13.5px; } .release-note a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Pricing */
@@ -342,7 +350,7 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
   <p class="lede reveal d2">Church Studio listens for the scripture being read, puts the words on your screens in a moment, and runs the whole service on time, from one calm desk.</p>
   <div class="ctas reveal d3">
     <a class="btn hot" href="#download" data-get-main>${icon("download", 18)}<span data-get-label>Download Church Studio</span></a>
-    <a class="btn glass" href="#features">See what it does</a>
+    <a class="btn glass" href="/app/" target="_blank" rel="noopener">${icon("globe", 18)}Try it in your browser</a>
   </div>
   <p class="fine reveal d3"><b>Free forever</b> to start · Premium free for ${TRIAL_DAYS} days · No card needed</p>
   <div class="oses reveal d3"><span>${icon("laptop", 15)} macOS · Apple silicon &amp; Intel</span><span>${icon("windows", 15)} Windows 10 &amp; 11</span><span>${icon("terminal", 15)} Linux</span></div>
@@ -408,13 +416,26 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
   <div class="platforms">
     <article class="os reveal" data-os="mac"><span class="yours-tag">Your computer</span><div class="glyph">${icon("laptop", 28)}</div><h3>macOS</h3><p class="req">macOS 13 Ventura or later</p>
       <div class="chips"><span><i></i>Apple silicon · M1 to M4</span><span><i></i>Intel Macs</span><span>One universal download</span></div>
-      <div class="gets">${getButton(release, "mac", "Download for Mac", true)}</div></article>
+      <div class="gets">${getButton(release, "mac", "Download for Mac", true)}</div>
+      <details class="howto"><summary>First time opening it?</summary><ol>
+        <li>Open the .dmg and drag Church Studio into Applications.</li>
+        <li>In Applications, Control-click Church Studio and choose <b>Open</b>, then <b>Open</b> again.</li>
+        <li>On macOS 15 or later, if it still won't open: <b>System Settings › Privacy &amp; Security</b>, scroll down, and choose <b>Open Anyway</b>.</li>
+      </ol><p>Only the first time. macOS asks because the app is not yet signed by Apple.</p></details></article>
     <article class="os reveal d1" data-os="windows"><span class="yours-tag">Your computer</span><div class="glyph">${icon("windows", 28)}</div><h3>Windows</h3><p class="req">Windows 10 and 11 · 64-bit</p>
       <div class="chips"><span><i></i>Installer</span><span><i></i>MSI for IT teams</span><span>Updates itself</span></div>
-      <div class="gets">${getButton(release, "windows", "Download for Windows", true)}${getButton(release, "windows-msi", "MSI package")}</div></article>
+      <div class="gets">${getButton(release, "windows", "Download for Windows", true)}${getButton(release, "windows-msi", "MSI package")}</div>
+      <details class="howto"><summary>First time opening it?</summary><ol>
+        <li>Run the installer you downloaded.</li>
+        <li>If Windows says it protected your PC, choose <b>More info</b>, then <b>Run anyway</b>.</li>
+      </ol><p>Only the first time. Windows asks because the installer is not yet signed by Microsoft.</p></details></article>
     <article class="os reveal d2" data-os="linux"><span class="yours-tag">Your computer</span><div class="glyph">${icon("terminal", 28)}</div><h3>Linux</h3><p class="req">Ubuntu, Debian, Fedora and more · 64-bit</p>
       <div class="chips"><span><i></i>AppImage</span><span><i></i>.deb</span><span><i></i>.rpm</span></div>
-      <div class="gets">${getButton(release, "linux", "Download AppImage", true)}${getButton(release, "linux-deb", "Ubuntu / Debian (.deb)")}${getButton(release, "linux-rpm", "Fedora (.rpm)")}</div></article>
+      <div class="gets">${getButton(release, "linux", "Download AppImage", true)}${getButton(release, "linux-deb", "Ubuntu / Debian (.deb)")}${getButton(release, "linux-rpm", "Fedora (.rpm)")}</div>
+      <details class="howto"><summary>First time opening it?</summary><ol>
+        <li><b>AppImage:</b> right-click › Properties › Permissions › <b>Allow executing as a program</b>, or run <code>chmod +x</code> on it. Then open it.</li>
+        <li><b>.deb / .rpm:</b> open it with your software installer, or <code>sudo apt install ./file.deb</code>.</li>
+      </ol></details></article>
   </div>
   <p class="release-note reveal">${version ? `Version ${version}${release?.date ? ` · released ${escape(new Date(release.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}` : ""} · ` : ""}<a href="${RELEASES_PAGE}">Release notes</a></p>
 </div></section>

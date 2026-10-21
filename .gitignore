@@ -21,3 +21,6 @@ server/.dev-store.json
 server/.dev-auth.sqlite
 server/.wrangler/
 server/.dev.vars
+
+# The web demo build (npm run build:web), deployed with the server
+server/web/
