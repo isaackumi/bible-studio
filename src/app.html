@@ -5,6 +5,19 @@
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Church Studio</title>
+    <script>
+      // After a new version is published, a page kept from before asks for code files that are gone.
+      // Load the new version once instead of showing an error (the web version at /app).
+      addEventListener("vite:preloadError", (event) => {
+        try {
+          if (sessionStorage.getItem("cs-reloaded")) return;
+          sessionStorage.setItem("cs-reloaded", "1");
+        } catch {}
+        event.preventDefault();
+        location.reload();
+      });
+      addEventListener("load", () => setTimeout(() => { try { sessionStorage.removeItem("cs-reloaded"); } catch {} }, 5000));
+    </script>
     %sveltekit.head%
     <style>
       /* Shown before any script runs, matching the app's loading screen; the app removes it. */
