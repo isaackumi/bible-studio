@@ -3605,4 +3605,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Settings › Storage shows what Church Studio uses, finds pictures and videos nothing uses, and clears the cache or compacts the library.": "Réglages › Stockage montre ce qu’utilise Church Studio, trouve les images et vidéos que rien n’utilise, et vide le cache ou compacte la bibliothèque.",
   "Lighter Accurate listening": "Une écoute précise plus légère",
   "The speech model leaves memory a few minutes after you stop listening.": "Le modèle vocal quitte la mémoire quelques minutes après la fin de l’écoute.",
+  // 0.2.9
+  "Two identical projectors work together": "Deux projecteurs identiques fonctionnent ensemble",
+  "Two monitors of the same model are kept apart in Settings, the audience choice and Screens.": "Deux écrans du même modèle sont distingués dans Réglages, le choix de l’écran du public et Écrans.",
+  "A steady Accurate listening download": "Un téléchargement stable pour l’écoute précise",
+  "Settings no longer flickers while the speech model downloads, and Cancel stops it at once.": "Les réglages ne clignotent plus pendant le téléchargement du modèle vocal, et Annuler l’arrête aussitôt.",
+  "Storage is easier to find": "Le stockage est plus facile à trouver",
+  "Space on this computer is now in Settings › Storage & backup.": "L’espace sur cet ordinateur est maintenant dans Réglages › Espace et sauvegarde.",
 };

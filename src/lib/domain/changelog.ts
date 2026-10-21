@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.9",
+    date: "2026-10-21",
+    highlights: [
+      { icon: "screens", title: msg("Two identical projectors work together"), text: msg("Two monitors of the same model are kept apart in Settings, the audience choice and Screens.") },
+      { icon: "audio", title: msg("A steady Accurate listening download"), text: msg("Settings no longer flickers while the speech model downloads, and Cancel stops it at once.") },
+      { icon: "folder", title: msg("Storage is easier to find"), text: msg("Space on this computer is now in Settings › Storage & backup.") },
+    ],
+  },
+  {
     version: "0.2.8",
     date: "2026-10-21",
     highlights: [
