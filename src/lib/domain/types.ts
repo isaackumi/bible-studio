@@ -122,6 +122,8 @@ export type PaintedLayer = {
   backing?: string;
   /** How a region's edge shows on screen: a line around it, or a framed panel with rounded corners. */
   edge?: "line" | "framed";
+  /** The line or frame's colour (CSS color); white when not set. */
+  edgeColor?: string;
   animation?: {
     entrance: string;
     exit: string;

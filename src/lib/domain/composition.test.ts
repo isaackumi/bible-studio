@@ -73,6 +73,7 @@ import {
   presentSavedLook,
   sourceRef,
   setCompositionEdges,
+  setCompositionEdgeColor,
   scriptureLayerOf,
   withLiveScripture,
 } from "./composition";
@@ -1324,6 +1325,19 @@ describe("side-by-side regions fill the screen and show their edges", () => {
     expect(right!.bounds.x + right!.bounds.w).toBeLessThan(100);
     const touching = presentComposition(setCompositionEdges(look, "touch"), ctx);
     expect(touching.layers!.every((layer) => layer.edge === undefined)).toBe(true);
+  });
+
+  it("a gap pulls regions apart with no line; the line and frame take the chosen colour", () => {
+    const look = lookTwoRegions({ left: video, right: words });
+    const [left, right] = presentComposition(setCompositionEdges(look, "gap"), ctx).layers!;
+    expect(left!.edge).toBeUndefined();
+    expect(right!.bounds.x).toBeGreaterThan(left!.bounds.x + left!.bounds.w);
+    const black = setCompositionEdgeColor(setCompositionEdges(look, "line"), "#000000");
+    expect(presentComposition(black, ctx).layers!.map((layer) => layer.edgeColor)).toEqual(["#000000", "#000000"]);
+    expect(setCompositionEdgeColor(look, "red").edgeColor).toBeUndefined();
+    const restored = restoreComposition(JSON.parse(JSON.stringify(setCompositionEdges(black, "gap"))));
+    expect(restored.edges).toBe("gap");
+    expect(restored.edgeColor).toBe("#000000");
   });
 
   it("older saved looks get filled video and keep a chosen edge setting", () => {

@@ -90,11 +90,14 @@ export type Composition = {
   canvas: { width: number; height: number };
   layers: CompositionLayer[];
   transition: { type: "cut" | "fade"; ms: number };
-  /** Where regions meet: touching, a line around each region, or framed panels with a gap. */
+  /** Where regions meet: touching, a line around each region, a clean gap, or framed panels with a gap. */
   edges?: CompositionEdges;
+  /** The colour of a region's line or frame (#rrggbb); white when not set. */
+  edgeColor?: string;
 };
 
-export type CompositionEdges = "touch" | "line" | "framed";
+export type CompositionEdges = "touch" | "line" | "gap" | "framed";
+export const EDGE_STYLES: readonly CompositionEdges[] = ["touch", "line", "gap", "framed"];
 export const DEFAULT_EDGES: CompositionEdges = "line";
 
 /** What a layout slot is for, so a layout can be filled from what is on the desk. */
@@ -663,6 +666,12 @@ const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "t
 export function setCompositionEdges(composition: Composition, edges: CompositionEdges): Composition {
   if (composition.locked) return composition;
   return { ...composition, edges };
+}
+
+/** The colour of the lines and frames between regions (#rrggbb). */
+export function setCompositionEdgeColor(composition: Composition, color: string): Composition {
+  if (composition.locked || !HEX_COLOR.test(color)) return composition;
+  return { ...composition, edgeColor: color.toLowerCase() };
 }
 
 /** Regions that get an edge: not the full screen, not an overlay, not a words bar on a backing. */
@@ -1334,7 +1343,8 @@ export function sanitizeComposition(value: unknown): Composition {
     locked: record.locked === true,
     canvas: record.canvas?.width && record.canvas?.height ? record.canvas : base.canvas,
     transition: sanitizeTransition(record.transition),
-    edges: record.edges === "touch" || record.edges === "framed" || record.edges === "line" ? record.edges : DEFAULT_EDGES,
+    edges: EDGE_STYLES.includes(record.edges as CompositionEdges) ? (record.edges as CompositionEdges) : DEFAULT_EDGES,
+    ...(typeof record.edgeColor === "string" && HEX_COLOR.test(record.edgeColor) ? { edgeColor: record.edgeColor.toLowerCase() } : {}),
     layers: layers.map((layer, index) => ({
       id: layer.id || `layer:${index}`,
       name: layer.name || `Layer ${index + 1}`,
@@ -1674,8 +1684,8 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       id: layer.id,
       zIndex: layer.zIndex,
       opacity: layer.opacity,
-      bounds: edges === "framed" && isRegion(layer) ? framedBounds(layer.bounds, composition.canvas) : layer.bounds,
-      ...(edges !== "touch" && isRegion(layer) ? { edge: edges } : {}),
+      bounds: (edges === "framed" || edges === "gap") && isRegion(layer) ? framedBounds(layer.bounds, composition.canvas) : layer.bounds,
+      ...((edges === "line" || edges === "framed") && isRegion(layer) ? { edge: edges, ...(composition.edgeColor ? { edgeColor: composition.edgeColor } : {}) } : {}),
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,
       // On a deck page the page background shows through every element.

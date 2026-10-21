@@ -59,7 +59,10 @@
     duplicateLook,
     setCompositionTransition,
     setCompositionEdges,
+    setCompositionEdgeColor,
     DEFAULT_EDGES,
+    EDGE_STYLES,
+    type CompositionEdges,
     showLayer,
     sourceRef,
     type Composition,
@@ -721,6 +724,20 @@
   function endDrag() {
     drag = null;
   }
+
+  const EDGE_NAMES: Record<CompositionEdges, () => string> = {
+    touch: () => t("None"),
+    line: () => t("Line"),
+    gap: () => t("Gap"),
+    framed: () => t("Framed"),
+  };
+  const EDGE_HINTS: Record<CompositionEdges, () => string> = {
+    touch: () => t("Regions meet with no line"),
+    line: () => t("A clear line around each region"),
+    gap: () => t("A clean gap between regions and around the screen"),
+    framed: () => t("Each region on its own panel, with a gap"),
+  };
+  const EDGE_COLORS = ["#ffffff", "#000000"];
 </script>
 
 <section class="looks-desk">
@@ -850,23 +867,10 @@
             <span>{t("ms")}</span>
           </label>
         {/if}
-        <div class="edges" role="radiogroup" aria-label={t("Where regions meet")}>
-          <span>{t("Edges")}</span>
-          {#each [["touch", msg("Touching")], ["line", msg("Line")], ["framed", msg("Framed")]] as [value, label] (value)}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={(draft.edges ?? DEFAULT_EDGES) === value}
-              class:on={(draft.edges ?? DEFAULT_EDGES) === value}
-              title={value === "touch" ? t("Regions meet with no line") : value === "line" ? t("A clear line around each region") : t("Each region on its own panel, with a gap")}
-              onclick={() => draft && touch(setCompositionEdges(draft, value as "touch" | "line" | "framed"))}
-            >{t(label)}</button>
-          {/each}
-        </div>
         <div class="head-actions">
           <button type="button" class="desk-btn" onclick={() => draft && session.previewLook(draft)}><Icon name="play" size={14} /> {t("Preview")}</button>
           <button type="button" class="desk-btn primary-soft" onclick={() => draft && session.saveLook(draft)}>{t("Save look")}</button>
-          <button type="button" class="desk-btn" title={t("Save this arrangement as a layout to start from again")} onclick={() => draft && session.saveLookLayout(draft)}>{t("Save as layout")}</button>
+          <button type="button" class="desk-btn ghost icon" title={t("Save this arrangement as a layout to start from again")} aria-label={t("Save as layout")} onclick={() => draft && session.saveLookLayout(draft)}><Icon name="layout" size={14} /></button>
           <button
             type="button"
             class="desk-btn ghost icon"
@@ -893,7 +897,61 @@
     <figure class="edit-frame">
       <figcaption>
         <span class="kicker">{t("Preview")}</span>
-        <span class="hint">{draft ? t("Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)") : t("Nothing to arrange yet")}</span>
+        {#if draft}
+          <span class="edges-label" id="edges-label">{t("Edges")}</span>
+          <div class="edges" role="radiogroup" aria-labelledby="edges-label">
+            {#each EDGE_STYLES as value (value)}
+              {@const on = (draft.edges ?? DEFAULT_EDGES) === value}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={on}
+                class:on
+                disabled={draft.locked}
+                title={EDGE_HINTS[value]()}
+                onclick={() => draft && touch(setCompositionEdges(draft, value))}
+              >
+                <svg class="edge-glyph" viewBox="0 0 22 14" aria-hidden="true">
+                  {#if value === "touch"}
+                    <rect x="1" y="1" width="10" height="12" class="fill a" /><rect x="11" y="1" width="10" height="12" class="fill b" />
+                  {:else if value === "line"}
+                    <rect x="1" y="1" width="10" height="12" class="fill a" /><rect x="11" y="1" width="10" height="12" class="fill b" />
+                    <rect x="1.75" y="1.75" width="8.5" height="10.5" class="stroke" /><rect x="11.75" y="1.75" width="8.5" height="10.5" class="stroke" />
+                  {:else if value === "gap"}
+                    <rect x="2.5" y="2.5" width="7.75" height="9" class="fill a" /><rect x="11.75" y="2.5" width="7.75" height="9" class="fill b" />
+                  {:else}
+                    <rect x="2.5" y="2.5" width="7.75" height="9" rx="2" class="fill a" /><rect x="11.75" y="2.5" width="7.75" height="9" rx="2" class="fill b" />
+                    <rect x="2.5" y="2.5" width="7.75" height="9" rx="2" class="stroke thin" /><rect x="11.75" y="2.5" width="7.75" height="9" rx="2" class="stroke thin" />
+                  {/if}
+                </svg>
+                <span>{EDGE_NAMES[value]()}</span>
+              </button>
+            {/each}
+          </div>
+          {#if (draft.edges ?? DEFAULT_EDGES) === "line" || (draft.edges ?? DEFAULT_EDGES) === "framed"}
+            <div class="edge-colors" role="radiogroup" aria-label={t("Edge colour")}>
+              {#each EDGE_COLORS as color (color)}
+                <button
+                  type="button"
+                  role="radio"
+                  class="swatch"
+                  aria-checked={(draft.edgeColor ?? "#ffffff") === color}
+                  aria-label={color === "#ffffff" ? t("White") : t("Black")}
+                  title={color === "#ffffff" ? t("White") : t("Black")}
+                  disabled={draft.locked}
+                  style:background={color}
+                  onclick={() => draft && touch(setCompositionEdgeColor(draft, color))}
+                ></button>
+              {/each}
+              <label class="swatch custom" class:on={!EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff")} title={t("Another colour")} style:background={EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff") ? undefined : draft.edgeColor}>
+                <input type="color" aria-label={t("Another colour")} disabled={draft.locked} value={draft.edgeColor ?? "#ffffff"} oninput={(event) => draft && touch(setCompositionEdgeColor(draft, event.currentTarget.value))} />
+              </label>
+            </div>
+          {/if}
+          <span class="help" title={t("Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)")} aria-label={t("Drag a layer to move it · drag a handle to resize · arrow keys nudge (Shift = 5%)")}>?</span>
+        {:else}
+          <span class="hint">{t("Nothing to arrange yet")}</span>
+        {/if}
         {#if draft && !draft.locked}
           <button type="button" class="swap-sides" title={t("Mirror the layout left to right")} onclick={() => touch(swapSides(draft!))}><Icon name="transition" size={14} /> {t("Swap sides")}</button>
         {/if}
@@ -1254,15 +1312,29 @@
   .saved-main span { font-size: 11px; color: var(--muted); }
 
   /* Editor */
-  .look-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; }
-  .look-name { flex: 1 1 200px; height: 36px; font-size: 16px; font-weight: 650; }
+  .look-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+  .look-name { flex: 1 1 120px; min-width: 0; height: 32px; font-size: 15px; font-weight: 650; }
   .inline { flex-direction: row; align-items: center; gap: 6px; }
-  .edges { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
-  .edges > span { padding: 0 8px 0 6px; font-size: 12px; font-weight: 650; color: var(--muted); }
-  .edges button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-  .edges button:hover { color: var(--ink); }
-  .edges button.on { background: var(--accent); color: var(--on-accent); }
-  .ms { width: 80px; }
+  .edges-label { margin-left: 6px; font-size: 11px; font-weight: 650; color: var(--muted); }
+  .edges { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .edges button { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .edges button:hover:not(:disabled) { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .edges button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .edges button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .edges button:disabled { cursor: default; opacity: 0.6; }
+  .edge-glyph { width: 20px; height: 13px; flex: none; }
+  .edge-glyph .fill { fill: color-mix(in srgb, currentColor 30%, transparent); }
+  .edges button.on .edge-glyph .fill.a { fill: color-mix(in srgb, var(--accent) 70%, transparent); }
+  .edges button.on .edge-glyph .fill.b { fill: color-mix(in srgb, currentColor 40%, transparent); }
+  .edge-glyph .stroke { fill: none; stroke: currentColor; stroke-width: 1.5; }
+  .edge-glyph .stroke.thin { stroke-width: 0.8; }
+  .edge-colors { display: inline-flex; align-items: center; gap: 4px; }
+  .swatch { position: relative; width: 18px; height: 18px; padding: 0; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 50%; cursor: pointer; overflow: hidden; }
+  .swatch[aria-checked="true"], .swatch.custom.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
+  .swatch.custom { background: conic-gradient(#f43f5e, #f59e0b, #22c55e, #3b82f6, #a855f7, #f43f5e); }
+  .swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  .help { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; cursor: help; }
+  .ms { width: 62px; }
   .head-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .primary-soft { border-color: var(--accent); color: var(--accent); }
   .empty-head p { margin: 0; font-size: 13px; color: var(--muted); }
@@ -1270,7 +1342,7 @@
   .edit-frame, .screen { margin: 0; flex: none; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: var(--radius-control, 8px); background: var(--field); overflow: hidden; }
   .swap-sides { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .swap-sides:hover { border-color: var(--accent); }
-  .edit-frame figcaption, .screen figcaption { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 10px; border-bottom: 1px solid var(--line); }
+  .edit-frame figcaption, .screen figcaption { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; min-height: 34px; padding: 4px 10px; border-bottom: 1px solid var(--line); }
   .edit-frame .kicker { color: var(--accent); }
   .monitor { container-type: inline-size; background: #000; }
   .preview-edit { position: relative; overflow: hidden; }

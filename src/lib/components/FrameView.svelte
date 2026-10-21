@@ -273,6 +273,7 @@
         style:opacity={layer.opacity}
         style:background={layer.backing}
         style:--layer-opacity={layer.opacity}
+        style:--edge-color={layer.edgeColor}
         style:z-index={layer.zIndex}
         style:--layer-dur="{layer.animation?.durationMs ?? 400}ms"
         style:--layer-ease={layer.animation?.easing ?? "ease-out"}

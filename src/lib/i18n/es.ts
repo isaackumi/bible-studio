@@ -3373,4 +3373,9 @@ export const es: Readonly<Record<string, string>> = {
   "Browser demo": "Demo en el navegador",
   "Get the app": "Obtener la aplicación",
   "This is the browser demo. Download the app for the Premium trial, the audience screen on a projector, voice, streaming and more.": "Esta es la demo en el navegador. Descargue la aplicación para la prueba Premium, la pantalla del público en un proyector, la voz, la transmisión y más.",
+  "Gap": "Espacio",
+  "A clean gap between regions and around the screen": "Un espacio limpio entre las zonas y alrededor de la pantalla",
+  "Edge colour": "Color de los bordes",
+  "White": "Blanco",
+  "Another colour": "Otro color",
 };
