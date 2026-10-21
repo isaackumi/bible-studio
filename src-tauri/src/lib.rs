@@ -341,6 +341,27 @@ fn storage_clear_cache(app: tauri::AppHandle) -> u64 {
 }
 
 #[tauri::command]
+fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::Unused>, String> {
+    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
+    storage::unused_media(&conn, &media)
+}
+
+/// Delete unused pictures and videos: Media entries by id, leftover files by path.
+#[tauri::command]
+fn storage_remove_unused(app: tauri::AppHandle, db: tauri::State<'_, db::Db>, ids: Vec<String>, files: Vec<String>) -> Result<(), String> {
+    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
+    for id in ids {
+        db::media_delete(&conn, &id)?;
+    }
+    for file in files {
+        storage::remove_leftover(&media, &file)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn storage_compact(db: tauri::State<'_, db::Db>) -> Result<(), String> {
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
     storage::compact(&conn)
@@ -795,6 +816,8 @@ pub fn run() {
             storage_usage,
             storage_clear_cache,
             storage_compact,
+            storage_unused_media,
+            storage_remove_unused,
             whisper_download,
             whisper_cancel,
             whisper_delete,

@@ -932,6 +932,11 @@ class Session {
   };
 
   /** Save now (the window is closing or hidden): nothing waits on the short delay. */
+  /** Read the Media list again (after files were removed from Settings › Storage). */
+  reloadMedia = async () => {
+    this.media = await api.mediaList();
+  };
+
   flushSave = async () => {
     if (!this.saveTimer) return;
     clearTimeout(this.saveTimer);
