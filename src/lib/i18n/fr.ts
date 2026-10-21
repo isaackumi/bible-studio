@@ -3559,4 +3559,10 @@ export const fr: Readonly<Record<string, string>> = {
   "Add screen": "Ajouter un écran",
   "Extra monitors, each with its own job: timer, scripture, lyrics or stage.": "Des moniteurs supplémentaires, chacun avec son rôle : minuteur, Écritures, paroles ou scène.",
   "Extra screens with their own job: timer, scripture, lyrics or stage": "Écrans supplémentaires avec leur propre rôle : minuteur, Écritures, paroles ou scène",
+  "Screens during this part": "Écrans pendant cette partie",
+  "Locked: keeps {job}": "Verrouillé : garde {job}",
+  "Job for {name} during this part": "Rôle de {name} pendant cette partie",
+  "Its own job ({job})": "Son propre rôle ({job})",
+  "Now showing {job}: the running part asks for it.": "Affiche maintenant {job} : la partie en cours le demande.",
+  "Parts of the service can give it another job while they run: choose that in Where it runs.": "Les parties du culte peuvent lui donner un autre rôle pendant qu’elles se déroulent : choisissez-le dans Où elle se déroule.",
 };

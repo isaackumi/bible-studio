@@ -67,6 +67,18 @@ export function switchRole(screens: ScreenOutput[], id: string, role: ScreenRole
   return screens.map((screen) => (screen.id === id && !screen.locked ? { ...screen, role } : screen));
 }
 
+/**
+ * Jobs right now: each screen's own job, or the one the running part gives it (Sermon: Timer,
+ * Worship: Lyrics). A locked screen always keeps its own job.
+ */
+export function screensNow(screens: ScreenOutput[], partJobs: Record<string, unknown> | undefined): ScreenOutput[] {
+  if (!partJobs) return screens;
+  return screens.map((screen) => {
+    const job = partJobs[screen.id];
+    return screen.locked || !ROLES.has(job as ScreenRole) ? screen : { ...screen, role: job as ScreenRole };
+  });
+}
+
 /** What this screen shows of Program: everything, only verses, only song words, or nothing. */
 export function programFor(role: ScreenRole, model: PresentationModel | null): PresentationModel | null {
   if (!model) return null;

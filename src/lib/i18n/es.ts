@@ -3478,4 +3478,10 @@ export const es: Readonly<Record<string, string>> = {
   "Add screen": "Añadir pantalla",
   "Extra monitors, each with its own job: timer, scripture, lyrics or stage.": "Monitores adicionales, cada uno con su tarea: temporizador, Escrituras, letras o escenario.",
   "Extra screens with their own job: timer, scripture, lyrics or stage": "Pantallas adicionales con su propia tarea: temporizador, Escrituras, letras o escenario",
+  "Screens during this part": "Pantallas durante esta parte",
+  "Locked: keeps {job}": "Bloqueada: mantiene {job}",
+  "Job for {name} during this part": "Tarea de {name} durante esta parte",
+  "Its own job ({job})": "Su propia tarea ({job})",
+  "Now showing {job}: the running part asks for it.": "Ahora muestra {job}: la parte en curso lo pide.",
+  "Parts of the service can give it another job while they run: choose that in Where it runs.": "Las partes del culto pueden darle otra tarea mientras se desarrollan: elíjala en Dónde se presenta.",
 };

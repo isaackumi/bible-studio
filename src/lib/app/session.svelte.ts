@@ -207,7 +207,7 @@ import {
   type AccurateModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
-import { MAX_SCREENS, newScreen, placeScreens, screenLetter, switchRole, writeScreensLocal, type ScreenOutput, type ScreenRole } from "../display/screens";
+import { MAX_SCREENS, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
@@ -494,8 +494,10 @@ class Session {
       this.workspaceLoaded = true;
       this.applyAudioSettings();
       // Screens from last time come back on their monitors (after the display list is in).
-      writeScreensLocal(this.workspace.screens ?? []);
-      setTimeout(() => void this.placeScreenWindows(), 1500);
+      setTimeout(() => {
+        this.broadcastScreens();
+        void this.placeScreenWindows();
+      }, 1500);
       if (keepOutput) this.rememberOutput({ outputEnabled: true });
       if (this.workspace.lastServiceId) {
         try {
@@ -6335,11 +6337,39 @@ class Session {
   private saveScreens(screens: ScreenOutput[]) {
     this.workspace = { ...this.workspace, screens };
     this.persistSoon();
-    writeScreensLocal(screens);
-    if (isDesktop()) void emit("screens-config", screens).catch(() => {});
+    this.broadcastScreens();
     this.publishStage();
     void this.placeScreenWindows();
   }
+
+  /** Each screen's job now: its own, or what the running part gives it (locked screens keep theirs). */
+  screensForNow = (): ScreenOutput[] => {
+    const part = this.runningSectionId ? this.service?.sections.find((section) => section.id === this.runningSectionId) : undefined;
+    return screensNow(this.workspace.screens ?? [], part?.screens);
+  };
+
+  /** Tell the screen windows what to show (the desk calls this as parts begin). */
+  broadcastScreens = () => {
+    const now = this.screensForNow();
+    writeScreensLocal(now);
+    if (isDesktop()) void emit("screens-config", now).catch(() => {});
+  };
+
+  /** A part's job for one screen while it runs (null: the screen's own job). */
+  setPartScreen = (sectionId: string, screenId: string, role: ScreenRole | null) => {
+    if (!this.service) return;
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => {
+        if (section.id !== sectionId) return section;
+        const { [screenId]: _old, ...rest } = section.screens ?? {};
+        const screens = role ? { ...rest, [screenId]: role } : rest;
+        return { ...section, screens: Object.keys(screens).length ? screens : undefined };
+      }),
+    };
+    this.persistSoon();
+    this.broadcastScreens();
+  };
 
   addScreen = () => {
     if (!this.requireFeature("screens")) return;
@@ -6393,7 +6423,7 @@ class Session {
         if (!allowed || places.get(id)?.state !== "showing") await window.destroy().catch(() => {});
       }
       if (!allowed) return;
-      writeScreensLocal(screens);
+      writeScreensLocal(this.screensForNow());
       for (const screen of screens) {
         const place = places.get(screen.id);
         if (place?.state !== "showing") continue;

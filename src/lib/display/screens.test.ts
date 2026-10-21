@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newScreen, placeScreens, programFor, sanitizeScreens, screenLetter, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
+import { newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
 import type { PresentationModel } from "../domain/types";
 
 const display = (key: string, extra: Partial<ScreenDisplay> = {}): ScreenDisplay => ({ key, name: key, x: 0, y: 0, width: 1920, height: 1080, primary: false, audience: false, ...extra });
@@ -40,6 +40,13 @@ describe("screens", () => {
     expect(places.get("dddd4444")).toMatchObject({ state: "taken", by: "screen" });
     expect(places.get("eeee5555")).toEqual({ state: "missing", displayKey: "unplugged" });
     expect(places.get("ffff6666")).toEqual({ state: "no-monitor" });
+  });
+
+  it("follows the running part, except locked screens", () => {
+    const screens = [screen("aaaa1111", "A", { role: "lyrics" }), screen("bbbb2222", "B", { role: "stage", locked: true }), screen("cccc3333", "C", { role: "scripture" })];
+    const now = screensNow(screens, { aaaa1111: "timer", bbbb2222: "timer", cccc3333: "nonsense" });
+    expect(now.map((item) => item.role)).toEqual(["timer", "stage", "scripture"]);
+    expect(screensNow(screens, undefined)).toBe(screens);
   });
 
   it("starts a new screen on the first free monitor, the first one as a timer", () => {

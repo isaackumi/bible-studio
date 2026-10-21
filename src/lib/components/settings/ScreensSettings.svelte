@@ -9,6 +9,7 @@
 
   const screens = $derived(session.workspace.screens ?? []);
   const places = $derived(session.screenPlaces());
+  const now = $derived(session.screensForNow());
   const displays = $derived(session.output.displays);
   const entitled = $derived(session.entitled("screens"));
 
@@ -77,7 +78,12 @@
       </select>
     </div>
     <div class="row stack">
-      <div class="row-copy"><strong>{t("Job")}</strong>{#if screen.locked}<span>{t("Locked. Unlock to switch it.")}</span>{/if}</div>
+      <div class="row-copy">
+        <strong>{t("Job")}</strong>
+        {#if screen.locked}<span>{t("Locked. Unlock to switch it.")}</span>
+        {:else if now.find((item) => item.id === screen.id)?.role !== screen.role}<span class="ok">{t("Now showing {job}: the running part asks for it.", { job: t(ROLE_TEXT[now.find((item) => item.id === screen.id)!.role].label) })}</span>
+        {:else}<span>{t("Parts of the service can give it another job while they run: choose that in Where it runs.")}</span>{/if}
+      </div>
       <div class="roles" role="radiogroup" aria-label={t("Job")}>
         {#each SCREEN_ROLES as role (role.id)}
           <button type="button" role="radio" class="role" class:on={screen.role === role.id} aria-checked={screen.role === role.id} disabled={screen.locked && screen.role !== role.id} onclick={() => session.setScreenRole(screen.id, role.id)}>

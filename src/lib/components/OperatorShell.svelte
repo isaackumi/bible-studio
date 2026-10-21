@@ -9,7 +9,7 @@
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
   import TourHub from "./tour/TourHub.svelte";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { session } from "../app/session.svelte";
   import { uiLanguage } from "../i18n/i18n.svelte";
@@ -88,6 +88,15 @@
     root.style.setProperty("--brass", appearance.accent);
     root.style.setProperty("--focus", appearance.accent);
   });
+
+  // Screens follow the service: when a part begins, unlocked screens take the job it gives them.
+  $effect(() => {
+    const now = JSON.stringify(session.screensForNow().map((screen) => [screen.id, screen.role]));
+    if (now === lastScreens) return;
+    lastScreens = now;
+    untrack(() => session.broadcastScreens());
+  });
+  let lastScreens = "";
 
   function onKeyDown(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.code === "Comma") {

@@ -4,6 +4,7 @@
   import type { ServiceSection } from "../../domain/types";
   import Icon from "../Icon.svelte";
   import DeskDialog from "../sources/DeskDialog.svelte";
+  import { SCREEN_ROLES, screenLetter, type ScreenRole } from "../../display/screens";
   import { msg, t } from "../../i18n/core";
 
   // Where one part of the service runs, chosen by the church: the running order, the Presenter desk,
@@ -16,6 +17,8 @@
   const learned = $derived(section ? session.workspace.partDesks?.[partKey(section.name)] : undefined);
   const sameForAll = $derived(!!run && !!learned && learned.desk === run.desk && learned.page === run.page && (learned.also ?? []).join() === (run.also ?? []).join());
   const chosen = $derived(run ? partDesks(run) : []);
+  const screens = $derived(session.workspace.screens ?? []);
+  const JOBS: Record<ScreenRole, string> = { program: msg("Program"), scripture: msg("Scripture"), lyrics: msg("Lyrics"), timer: msg("Timer"), stage: msg("Stage"), blank: msg("Dark") };
 
   const DESKS: Array<{ desk: PartDesk; name: string; hint: string; icon: string }> = [
     { desk: "service", name: msg("Running order"), hint: msg("Its items, one after another, from the Service page."), icon: "list" },
@@ -92,6 +95,27 @@
         </div>
       {/if}
 
+      {#if screens.length}
+        <div class="screens">
+          <span class="row-name">{t("Screens during this part")}</span>
+          {#each screens as screen, index (screen.id)}
+            {@const own = t(JOBS[screen.role])}
+            <label class="screen-row">
+              <span class="letter" class:locked={screen.locked}>{screenLetter(index)}</span>
+              <span class="screen-name">{screen.name || t("Screen {letter}", { letter: screenLetter(index) })}</span>
+              {#if screen.locked}
+                <span class="kept"><Icon name="lock" size={12} /> {t("Locked: keeps {job}", { job: own })}</span>
+              {:else}
+                <select class="field" aria-label={t("Job for {name} during this part", { name: screen.name || screenLetter(index) })} value={section.screens?.[screen.id] ?? ""} onchange={(event) => session.setPartScreen(section.id, screen.id, (event.currentTarget.value || null) as ScreenRole | null)}>
+                  <option value="">{t("Its own job ({job})", { job: own })}</option>
+                  {#each SCREEN_ROLES as role (role.id)}<option value={role.id}>{t(JOBS[role.id])}</option>{/each}
+                </select>
+              {/if}
+            </label>
+          {/each}
+        </div>
+      {/if}
+
       <label class="same" class:dim={run.desk === "service" && !run.also?.length && !learned}>
         <span class="same-copy">
           <strong>{t("Same for every part called {part}", { part: section.name })}</strong>
@@ -127,6 +151,13 @@
   .seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
   .seg button:hover { color: var(--ink); }
   .seg button[aria-checked="true"] { background: var(--field); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); }
+  .screens { display: grid; gap: 6px; }
+  .screen-row { display: flex; align-items: center; gap: 10px; }
+  .letter { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 6px; background: var(--accent); color: var(--on-accent, #fff); font-size: 12px; font-weight: 800; }
+  .letter.locked { background: var(--muted); }
+  .screen-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 650; }
+  .screen-row .field { width: 190px; flex: none; }
+  .kept { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
   .same { display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
   .same.dim { opacity: 0.55; cursor: default; }
   .same-copy { flex: 1; display: grid; gap: 2px; min-width: 0; }

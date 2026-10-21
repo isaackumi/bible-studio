@@ -267,6 +267,8 @@ export type ServiceSection = {
   desk?: "service" | "presenter" | "production";
   /** On the Presenter desk: the page it opens. */
   page?: "scriptures" | "songs" | "sermon";
+  /** Jobs for unlocked screens while this part runs, by screen id (Sermon: Timer). */
+  screens?: Record<string, import("../display/screens").ScreenRole>;
   /** Other desks the part uses too, a click away in the service strip (`desk` opens first). */
   also?: Array<"service" | "presenter" | "production">;
   /** Where its card sits on the flow canvas; none means its tidy place. */
