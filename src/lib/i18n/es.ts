@@ -3363,4 +3363,10 @@ export const es: Readonly<Record<string, string>> = {
   "Streaming and recording did not start": "La transmisión y la grabación no empezaron",
   "Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.": "Active Church Studio en Grabación de pantalla y audio del sistema. Tras una actualización, desactívelo y vuelva a activarlo.",
   "macOS needs your permission to capture the audience window.": "macOS necesita su permiso para capturar la ventana del público.",
+  "Your {plan} plan is now on your account": "Su plan {plan} ya está en su cuenta",
+  "Sign in on another computer and it comes along, with no key to type.": "Inicie sesión en otra computadora y lo acompaña, sin clave que escribir.",
+  "Your Premium trial is kept with your account: {n} day left.": "Su prueba Premium se guarda con su cuenta: queda {n} día.",
+  "Your Premium trial is kept with your account: {n} days left.": "Su prueba Premium se guarda con su cuenta: quedan {n} días.",
+  "This computer uses a test code; the account itself has no plan yet.": "Esta computadora usa un código de prueba; la cuenta aún no tiene plan.",
+  "No plan on this account yet. Plans has Premium and Church.": "Esta cuenta aún no tiene plan. Planes ofrece Premium e Iglesia.",
 };

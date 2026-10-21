@@ -3444,4 +3444,10 @@ export const fr: Readonly<Record<string, string>> = {
   "Streaming and recording did not start": "La diffusion et l’enregistrement n’ont pas démarré",
   "Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.": "Activez Church Studio dans Enregistrement de l’écran et de l’audio du système. Après une mise à jour, désactivez-le puis réactivez-le.",
   "macOS needs your permission to capture the audience window.": "macOS a besoin de votre autorisation pour capturer la fenêtre du public.",
+  "Your {plan} plan is now on your account": "Votre formule {plan} est maintenant sur votre compte",
+  "Sign in on another computer and it comes along, with no key to type.": "Connectez-vous sur un autre ordinateur et elle suit, sans clé à taper.",
+  "Your Premium trial is kept with your account: {n} day left.": "Votre essai Premium est gardé avec votre compte : {n} jour restant.",
+  "Your Premium trial is kept with your account: {n} days left.": "Votre essai Premium est gardé avec votre compte : {n} jours restants.",
+  "This computer uses a test code; the account itself has no plan yet.": "Cet ordinateur utilise un code de test ; le compte lui-même n’a pas encore de formule.",
+  "No plan on this account yet. Plans has Premium and Church.": "Pas encore de formule sur ce compte. Formules propose Premium et Église.",
 };

@@ -7,6 +7,7 @@ import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SigninPoll, type SigninStart } from "../domain/billing";
+import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -5419,7 +5420,16 @@ class Session {
     const { account, lease, activation } = answer.data;
     this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...account, token }) };
     this.persistSoon();
-    if (this.workspace.entitlement.source === "license" && this.ent.kind === "license" && this.plan !== "free") return null;
+    // A key added on this computer becomes part of the account, so signing in elsewhere brings it.
+    const key = this.workspace.entitlement.source === "license" ? this.workspace.entitlement.license : null;
+    if (key && this.ent.kind === "license" && this.plan !== "free") {
+      const id = readLicense(key)?.id ?? null;
+      const linked = answer.data.licenses.some((entry) => entry.license === id);
+      if (!linked && (await serverCall("/v1/account/link", { token, key })).ok) {
+        this.notify(t("Your {plan} plan is now on your account", { plan: this.plan === "church" ? "Church" : "Premium" }), { detail: t("Sign in on another computer and it comes along, with no key to type.") });
+      }
+      return null;
+    }
     if (lease && activation?.key) {
       const entitlement = redeemCode(this.workspace.entitlement, activation.key, { now: Date.now() });
       if (entitlement.ok) this.workspace = { ...this.workspace, entitlement: entitlement.entitlement };
@@ -5430,7 +5440,17 @@ class Session {
       return null;
     }
     if (activation?.status === 409) return t("Your account's plan is in use on all the computers it covers. Release one, then sign in again.");
-    return answer.data.licenses.length ? null : t("No plan on this account yet.");
+    if (answer.data.licenses.length) return null;
+    // No plan on the account: say what this computer has instead of a bare "no plan".
+    if (this.ent.kind === "trial" && this.ent.endsAt) {
+      const days = Math.max(1, Math.ceil((this.ent.endsAt - Date.now()) / 86_400_000));
+      this.notify(t("Signed in as {name}", { name: account.name || account.email }), { detail: tn(days, "Your Premium trial is kept with your account: {n} day left.", "Your Premium trial is kept with your account: {n} days left.") });
+    } else if (this.workspace.entitlement.source === "promo") {
+      this.notify(t("Signed in as {name}", { name: account.name || account.email }), { detail: t("This computer uses a test code; the account itself has no plan yet.") });
+    } else {
+      this.notify(t("Signed in as {name}", { name: account.name || account.email }), { detail: t("No plan on this account yet. Plans has Premium and Church."), actions: [{ label: t("See plans"), run: () => { this.upgradeFor = "production"; this.dismissToast(); } }] });
+    }
+    return null;
   };
 
   /**

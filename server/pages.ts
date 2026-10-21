@@ -205,7 +205,7 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
               : `
       <p class="eyebrow">Step 1 of 2</p>
       <h1>Sign in to Church Studio</h1>
-      <p class="muted">Signing in <b>${escape(device ?? "your computer")}</b>. Your plan follows your account, so another computer only needs you to sign in. No password to remember.</p>
+      <p class="muted intro">Signing in <b>${escape(device ?? "your computer")}</b>. Your plan follows your account, so another computer only needs you to sign in. No password to remember.</p>
       <div class="methods">
         ${social.map((method) => `<button type="button" class="method" onclick="social('${method}')">${METHOD_LABELS[method]!.icon}<span>${METHOD_LABELS[method]!.label}</span></button>`).join("")}
       </div>
@@ -217,12 +217,18 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
         <button type="submit">Email me a sign-in link</button>
       </form>
       <div class="sent" id="sent" hidden>
-        <div class="envelope" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
-        <h2>Check your email</h2>
-        <p class="muted">We sent a sign-in link to <b id="sent-to"></b>. Open it on this device. It works once, for 15 minutes.</p>
-        <button type="button" class="resend" id="resend" onclick="resend()">Resend email</button>
-        <button type="button" class="link" onclick="changeEmail()">Use a different email</button>
-        <p class="hint">Nothing yet? Check spam or promotions, or resend.</p>
+        <div class="sent-head">
+          <div class="envelope" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+          <div>
+            <h2>Check your email</h2>
+            <p class="sent-copy">We sent a sign-in link to <b id="sent-to"></b>. Open it on this device; it works once, for 15 minutes.</p>
+          </div>
+        </div>
+        <div class="sent-actions">
+          <button type="button" class="resend" id="resend" onclick="resend()">Resend email</button>
+          <button type="button" class="resend ghost" onclick="changeEmail()">Use a different email</button>
+        </div>
+        <p class="hint">Nothing yet? Check spam or promotions, then resend.</p>
       </div>`
           : ""
       }
@@ -230,7 +236,7 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
       <form method="post" action="/signin/${escape(id)}/cancel"><button type="submit" class="cancel">Cancel</button></form>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in · Church Studio</title>
 <style>${BASE_CSS}
-  main { width: min(420px, calc(100% - 32px)); margin: 8vh auto; padding: 30px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 60px rgb(0 0 0 / .12); }
+  main { width: min(520px, calc(100% - 32px)); margin: 8vh auto; padding: 30px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 60px rgb(0 0 0 / .12); }
   header { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; font-weight: 750; }
   .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
   h1 { margin: 0 0 10px; font-size: 23px; letter-spacing: -.015em; line-height: 1.25; }
@@ -243,16 +249,21 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
   .email input { height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
   .email input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
   .email button { height: 46px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } .email button:hover { filter: brightness(1.06); }
-  .sent { display: grid; justify-items: center; gap: 4px; text-align: center; }
-  .sent[hidden], .methods[hidden], .or[hidden], .email[hidden] { display: none; }
-  .envelope { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 10px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-  .sent h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.01em; }
-  .sent .muted { margin-bottom: 16px; }
-  .resend { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-weight: 700; cursor: pointer; }
-  .resend:hover:not(:disabled) { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
-  .resend:disabled { color: var(--muted); cursor: default; }
-  .sent .link { margin-top: 10px; }
-  .hint { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+  .sent { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+  .sent[hidden], .methods[hidden], .or[hidden], .email[hidden], .intro[hidden] { display: none; }
+  .sent-head { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+  .envelope { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .sent h2 { margin: 0 0 4px; font-size: 17px; letter-spacing: -.01em; }
+  .sent-copy { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); word-break: break-word; }
+  .sent-copy b { color: var(--ink); }
+  .sent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .resend { height: 42px; border: 0; border-radius: 11px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+  .resend:hover:not(:disabled) { filter: brightness(1.06); }
+  .resend:disabled { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); cursor: default; }
+  .resend.ghost { border: 1px solid var(--line); background: none; color: var(--ink); }
+  .resend.ghost:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); filter: none; }
+  .hint { margin: -4px 0 0; font-size: 12px; color: var(--muted); }
+  @media (max-width: 460px) { .sent-actions { grid-template-columns: 1fr; } }
   .email button:disabled { opacity: .7; cursor: default; }
   .msg { min-height: 20px; margin: 14px 0 0; font-size: 14px; color: var(--muted); } .msg.good { color: var(--good); font-weight: 650; }
   .numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
@@ -299,7 +310,7 @@ async function emailLink(value) {
 }
 function showSent() {
   msg("");
-  document.querySelectorAll(".methods, .or, #email-form").forEach((el) => (el.hidden = true));
+  document.querySelectorAll(".methods, .or, #email-form, .intro").forEach((el) => (el.hidden = true));
   document.getElementById("sent").hidden = false;
   document.getElementById("sent-to").textContent = sentTo;
   countdown(30);
@@ -327,7 +338,7 @@ async function resend() {
 function changeEmail() {
   clearInterval(wait);
   document.getElementById("sent").hidden = true;
-  document.querySelectorAll(".methods, .or, #email-form").forEach((el) => (el.hidden = false));
+  document.querySelectorAll(".methods, .or, #email-form, .intro").forEach((el) => (el.hidden = false));
   const input = document.querySelector("#email-form input");
   if (input) { input.value = sentTo; input.focus(); input.select(); }
   msg("");
