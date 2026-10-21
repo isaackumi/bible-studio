@@ -150,10 +150,10 @@ a { color: inherit; text-decoration: none; }
 .verse.on { border-color: rgba(250,79,0,.7); background: rgba(250,79,0,.1); color: var(--ink); transform: translateX(4px); }
 .monitors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
 .desk .bible .verses .verse:nth-child(n+5) { display: none; }
-.mon .screen { position: relative; aspect-ratio: 16 / 9; margin: 10px; border-radius: 8px; overflow: hidden; background: radial-gradient(120% 90% at 50% 120%, #4a1606, #13070a 60%, #050505); display: grid; place-items: center; text-align: center; padding: 6% 9%; }
+.mon .screen { container-type: inline-size; position: relative; aspect-ratio: 16 / 9; margin: 10px; border-radius: 8px; overflow: hidden; background: radial-gradient(120% 90% at 50% 120%, #4a1606, #13070a 60%, #050505); display: grid; place-items: center; text-align: center; padding: 6% 9%; }
 .mon .screen::after { content: ""; position: absolute; inset: 0; background: radial-gradient(60% 40% at 50% 100%, rgba(250,79,0,.25), transparent); pointer-events: none; }
-.mon .ref { display: block; font-size: clamp(8px, .9vw, 10px); letter-spacing: .2em; color: #f2b88f; margin-bottom: 8px; font-weight: 700; }
-.mon .words { margin: 0; font-size: clamp(11px, 1.45vw, 17px); line-height: 1.4; color: #fff; font-weight: 500; text-wrap: balance; }
+.mon .ref { display: block; font-size: clamp(7px, 2.6cqw, 11px); letter-spacing: .2em; color: #f2b88f; margin-bottom: 8px; font-weight: 700; }
+.mon .words { margin: 0; font-size: clamp(9px, 4.4cqw, 19px); line-height: 1.4; color: #fff; font-weight: 500; text-wrap: balance; }
 .mon .content { position: relative; z-index: 1; transition: opacity .6s, filter .6s, transform .6s; }
 .mon .content.out { opacity: 0; filter: blur(6px); transform: translateY(6px); }
 .mon.program { border-color: rgba(255,59,59,.45); box-shadow: 0 0 0 1px rgba(255,59,59,.2), 0 0 40px rgba(255,59,59,.12); }
@@ -311,6 +311,15 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
   .bento { grid-template-columns: 1fr 1fr; } .span-4, .span-3, .span-2 { grid-column: span 2; }
   .steps { grid-template-columns: 1fr 1fr; } .platforms, .plans { grid-template-columns: 1fr; }
   .desk { grid-template-columns: 1fr; } .desk .pane.bible { display: none; }
+}
+@media (max-width: 700px) {
+  .monitors { grid-template-columns: 1fr; }
+  .chrome .title, .chrome .tabs span:not(.on) { display: none; }
+  .mon h6 .onair { font-size: 0; gap: 0; } .mon h6 .onair i { width: 7px; height: 7px; }
+  .device { transform: none; }
+  .stage { margin-top: 44px; }
+  .marquee { margin-top: 64px; }
+  section { padding-top: 90px; }
 }
 @media (max-width: 560px) { .pill-long { display: none; } .pill-short { display: inline; } .hero { padding-top: 56px; } .float { display: none !important; } .steps { grid-template-columns: 1fr; } .final { padding: 60px 20px; } .nav .btn.small span { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .reveal { opacity: 1; transform: none; } .device { transform: none; } }
