@@ -10,6 +10,18 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.2.5",
+    date: "2026-10-21",
+    highlights: [
+      { icon: "audio", title: msg("Verses heard right, in your accent"), text: msg("Words the recognizer mishears, like “efficient 4” for Ephesians 4, are put right before verses are found. It learns from what you put up, and Settings › Sound & voice › Words has a Practice to teach it.") },
+      { icon: "list", title: msg("Each part runs where you choose"), text: msg("On the Service page, a part can use the running order, the Presenter desk, the Production desk or any mix, skip this week, and show a countdown or the leader’s name your way.") },
+      { icon: "search", title: msg("Go to anything"), text: msg("Press Command-K (Ctrl+K on Windows) on any page to jump to a part, a song, a verse or a setting.") },
+      { icon: "globe", title: msg("Church Studio in Spanish"), text: msg("The whole desk in Spanish, chosen in Settings or from the computer’s language.") },
+      { icon: "layout", title: msg("Cleaner looks on Production"), text: msg("Choose how regions meet (none, line, gap or framed panels) and the line’s colour, with more room for the picture.") },
+      { icon: "check", title: msg("Fixes"), text: msg("Stronger borders and other settings are kept, the Privacy switch sits beside its text, long names fit, and Settings › Updates links the terms and privacy policy.") },
+    ],
+  },
+  {
     version: "0.2.4",
     date: "2026-10-20",
     highlights: [

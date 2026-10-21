@@ -3410,4 +3410,16 @@ export const es: Readonly<Record<string, string>> = {
   "put right {n} times": "corregido {n} veces",
   "{n} built-in correction": "{n} corrección incluida",
   "{n} built-in corrections": "{n} correcciones incluidas",
+  // 0.2.5
+  "Verses heard right, in your accent": "Versículos bien entendidos, con su acento",
+  "Words the recognizer mishears, like “efficient 4” for Ephesians 4, are put right before verses are found. It learns from what you put up, and Settings › Sound & voice › Words has a Practice to teach it.": "Las palabras que el reconocimiento entiende mal, como «efficient 4» por Efesios 4, se corrigen antes de buscar versículos. Aprende de lo que usted muestra, y Ajustes › Sonido y voz › Palabras tiene una práctica para enseñarle.",
+  "Each part runs where you choose": "Cada parte se presenta donde usted elija",
+  "On the Service page, a part can use the running order, the Presenter desk, the Production desk or any mix, skip this week, and show a countdown or the leader’s name your way.": "En la página del Culto, una parte puede usar el orden, el escritorio del Presentador, el de Producción o cualquier combinación, saltarse esta semana y mostrar una cuenta regresiva o el nombre de quien dirige a su manera.",
+  "Press Command-K (Ctrl+K on Windows) on any page to jump to a part, a song, a verse or a setting.": "Pulse Comando-K (Ctrl+K en Windows) en cualquier página para ir a una parte, un canto, un versículo o un ajuste.",
+  "Church Studio in Spanish": "Church Studio en español",
+  "The whole desk in Spanish, chosen in Settings or from the computer’s language.": "Todo el escritorio en español, elegido en Ajustes o según el idioma del ordenador.",
+  "Cleaner looks on Production": "Composiciones más limpias en Producción",
+  "Choose how regions meet (none, line, gap or framed panels) and the line’s colour, with more room for the picture.": "Elija cómo se unen las regiones (ninguno, línea, espacio o paneles enmarcados) y el color de la línea, con más espacio para la imagen.",
+  "Fixes": "Correcciones",
+  "Stronger borders and other settings are kept, the Privacy switch sits beside its text, long names fit, and Settings › Updates links the terms and privacy policy.": "Los bordes reforzados y los demás ajustes se conservan, el interruptor de Privacidad está junto a su texto, los nombres largos caben y Ajustes › Actualizaciones enlaza los términos y la política de privacidad.",
 };

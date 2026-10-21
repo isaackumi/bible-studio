@@ -3491,4 +3491,16 @@ export const fr: Readonly<Record<string, string>> = {
   "put right {n} times": "corrigé {n} fois",
   "{n} built-in correction": "{n} correction intégrée",
   "{n} built-in corrections": "{n} corrections intégrées",
+  // 0.2.5
+  "Verses heard right, in your accent": "Des versets bien compris, avec votre accent",
+  "Words the recognizer mishears, like “efficient 4” for Ephesians 4, are put right before verses are found. It learns from what you put up, and Settings › Sound & voice › Words has a Practice to teach it.": "Les mots que la reconnaissance comprend mal, comme « efficient 4 » pour Éphésiens 4, sont corrigés avant la recherche des versets. Elle apprend de ce que vous affichez, et Réglages › Son et voix › Mots propose un entraînement pour lui apprendre.",
+  "Each part runs where you choose": "Chaque partie se déroule où vous voulez",
+  "On the Service page, a part can use the running order, the Presenter desk, the Production desk or any mix, skip this week, and show a countdown or the leader’s name your way.": "Sur la page Culte, une partie peut utiliser le déroulé, le pupitre Présentateur, le pupitre Production ou un mélange, être sautée cette semaine, et afficher un compte à rebours ou le nom de l’animateur à votre façon.",
+  "Press Command-K (Ctrl+K on Windows) on any page to jump to a part, a song, a verse or a setting.": "Appuyez sur Commande-K (Ctrl+K sous Windows) sur n’importe quelle page pour aller à une partie, un chant, un verset ou un réglage.",
+  "Church Studio in Spanish": "Church Studio en espagnol",
+  "The whole desk in Spanish, chosen in Settings or from the computer’s language.": "Tout le pupitre en espagnol, choisi dans les Réglages ou selon la langue de l’ordinateur.",
+  "Cleaner looks on Production": "Des looks plus nets en Production",
+  "Choose how regions meet (none, line, gap or framed panels) and the line’s colour, with more room for the picture.": "Choisissez comment les zones se rejoignent (aucun, ligne, espace ou panneaux encadrés) et la couleur de la ligne, avec plus de place pour l’image.",
+  "Fixes": "Corrections",
+  "Stronger borders and other settings are kept, the Privacy switch sits beside its text, long names fit, and Settings › Updates links the terms and privacy policy.": "Les bordures renforcées et les autres réglages sont conservés, l’interrupteur Confidentialité est à côté de son texte, les noms longs tiennent, et Réglages › Mises à jour renvoie aux conditions et à la politique de confidentialité.",
 };
