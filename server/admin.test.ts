@@ -204,6 +204,34 @@ describe("admin: who uses what", () => {
     expect(details.computers.find((item) => item.device === "web-1")).toMatchObject({ browser: "Edge 129", account: "pastor@grace.org" });
   });
 
+  it("counts real churches only: not the team's computers, dev builds or the deploy check; browsers apart; days seen", async () => {
+    const { as, config, advance } = await setup();
+    const hello = (body: Record<string, unknown>) => handleApi(new Request("https://admin.test/v1/hello", { method: "POST", body: JSON.stringify({ version: "0.2.5", plan: "free", ...body }) }), config);
+    await hello({ device: "church-mac", os: "macos" });
+    await hello({ device: "church-mac", os: "macos" });
+    await hello({ device: "web-a", os: "web-windows", browser: "Edge 129" });
+    await hello({ device: "deploy-check", os: "deploy" });
+    await hello({ device: "my-dev", os: "macos", dev: true });
+    // The owner signed in on their own Mac: the team's, so left out.
+    await putJson(config.store, "acct:o1", { id: "o1", email: "owner@heitech.test", name: "", licenses: [], createdAt: 0 }, { email: "owner@heitech.test", createdAt: 0 });
+    await hello({ device: "owner-mac", os: "macos" });
+    const meta = (await getJson<Record<string, unknown>>(config.store, "device:owner-mac"))!;
+    await putJson(config.store, "device:owner-mac", { ...meta, account: "o1" }, { ...meta, account: "o1" });
+    advance(DAY);
+    await hello({ device: "church-mac", os: "macos" });
+    const stats = (await as("eyes@heitech.test", "/admin/api/stats")).data as { computers: { total: number; returning: number }; web: { total: number }; team: number };
+    expect(await config.store.get("device:deploy-check")).toBeNull();
+    expect(await config.store.get("device:my-dev")).toBeNull();
+    expect(stats.computers).toMatchObject({ total: 1, returning: 1 });
+    expect(stats.web.total).toBe(1);
+    expect(stats.team).toBe(1);
+    // Support marks a computer as the team's; it leaves the numbers, and can be counted again.
+    expect((await as("help@heitech.test", "/admin/api/action", { action: "mark-team", device: "church-mac", team: true })).status).toBe(200);
+    expect(((await as("eyes@heitech.test", "/admin/api/stats")).data as { computers: { total: number } }).computers.total).toBe(0);
+    await as("help@heitech.test", "/admin/api/action", { action: "mark-team", device: "church-mac", team: false });
+    expect(((await as("eyes@heitech.test", "/admin/api/stats")).data as { computers: { total: number } }).computers.total).toBe(1);
+  });
+
   it("decides by role, never trusting the page", () => {
     const support: Admin = { email: "s@x", role: "support", via: "access" };
     const now = Date.now();

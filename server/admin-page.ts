@@ -128,8 +128,9 @@ export function adminPage(): string {
 <div id="app" hidden>
   <header class="top"><span class="brand"><img src="/email/logo.png" alt="">Church Studio · Admin</span><span id="mode" class="pill"></span><span class="grow"></span><span class="muted small" id="updated"></span><button class="icon sm ghost" id="refresh" title="Refresh" aria-label="Refresh"></button><span class="me"><span class="avatar" id="me-avatar"></span><span id="who"></span><span id="role" class="pill"></span></span></header>
   <section class="kpis" id="kpis"></section>
+  <p class="note" id="team-note" style="margin:-4px 2px 14px"></p>
   <section class="row2">
-    <div class="card"><h2>Last 30 days<span class="legend"><span><i style="background:var(--blue)"></i>New computers</span><span><i style="background:var(--accent)"></i>Trials</span><span><i style="background:var(--good)"></i>Sales</span></span></h2><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="axis"></div></div>
+    <div class="card"><h2>Last 30 days<span class="legend"><span><i style="background:var(--blue)"></i>New installs</span><span><i style="background:var(--accent)"></i>Trials</span><span><i style="background:var(--good)"></i>Sales</span></span></h2><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="axis"></div></div>
     <div class="card"><h2>Funnel</h2><div class="funnel" id="funnel"></div></div>
   </section>
   <section class="mix">
@@ -245,6 +246,7 @@ async function load() {
     $("mode").innerHTML = (S.test ? "" : '<span class="live-dot"></span>') + esc(S.test ? S.provider + " · test mode" : S.provider + " · live");
     $("mode").className = "pill " + (S.test ? "test" : "live");
     $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("team-note").textContent = (S.team ? "Your team’s " + S.team + (S.team === 1 ? " computer is" : " computers are") + " left out of the numbers (signed in to an admin’s account, or marked as ours). " : "") + "The browser demo counts browsers, not people: a private window is a new one.";
     kpis(); chart(); funnel(); mix();
     tabs(); draw();
     if (open) show(open.kind, open.id, true);
@@ -253,12 +255,11 @@ async function load() {
 
 function kpis() {
   const conv = S.trials.started ? Math.round((S.trials.converted / S.trials.started) * 100) : 0;
-  const web = (S.platforms || []).reduce((n, p) => n + p.web, 0), app = (S.platforms || []).reduce((n, p) => n + p.app, 0);
   const seats = D.licenses.reduce((n, l) => n + l.devices.length, 0);
   const pending = APPROVALS.filter((a) => a.status === "pending" && !a.expired).length;
   const kpi = (icon, t, v, sub, cls) => '<div class="kpi' + (cls ? " " + cls : "") + '"><h3>' + ICONS[icon] + t + "</h3><b>" + v + "</b><span>" + sub + "</span></div>";
-  $("kpis").innerHTML = kpi("monitor", "Active this week", S.computers.active7, S.computers.active1 + " today · " + S.computers.active30 + " this month")
-    + kpi("globe", "App · browser", app + " · " + web, "computers in 30 days")
+  $("kpis").innerHTML = kpi("monitor", "Installed · this week", S.computers.active7, S.computers.active1 + " today · " + S.computers.returning + " of " + S.computers.total + " came back another day")
+    + kpi("globe", "Browser demo · this week", S.web.active7, S.web.total + " browsers · " + S.web.returning + " came back another day")
     + kpi("clock", "Trials running", S.trials.running, S.trials.started + " started · " + conv + "% bought")
     + kpi("chart", "MRR", money(S.subscriptions.mrr), S.subscriptions.active + " active subscriptions")
     + kpi("card", "Revenue · 30 days", money(S.sales.revenue30), money(S.sales.revenue) + " all time · " + S.sales.paid + " sales")
@@ -279,8 +280,8 @@ function chart() {
 }
 function funnel() {
   const f = D.funnel, top = Math.max(1, f.computers);
-  const step = (label, v, color) => '<div class="step"><header><span>' + label + "</span><b>" + v + (v && label !== "Computers" ? " · " + Math.round((v / top) * 100) + "%" : "") + '</b></header><div class="track"><i style="width:' + Math.max(2, (v / top) * 100) + "%;background:" + color + '"></i></div></div>';
-  $("funnel").innerHTML = step("Computers", f.computers, "var(--blue)") + step("Trials", f.trials, "var(--accent)") + step("Paid", f.paid, "var(--good)");
+  const step = (label, v, color) => '<div class="step"><header><span>' + label + "</span><b>" + v + (v && label !== "Installed computers" ? " · " + Math.round((v / top) * 100) + "%" : "") + '</b></header><div class="track"><i style="width:' + Math.max(2, (v / top) * 100) + "%;background:" + color + '"></i></div></div>';
+  $("funnel").innerHTML = step("Installed computers", f.computers, "var(--blue)") + step("Trials", f.trials, "var(--accent)") + step("Paid", f.paid, "var(--good)");
 }
 function mix() {
   const P = S.platforms || [], top = Math.max(1, ...P.map((p) => p.app + p.web));
@@ -303,7 +304,7 @@ const outcomeTag = (o) => '<span class="tag ' + ({ done: "good", approved: "good
 const two = (a, b) => '<span class="two"><span>' + a + "</span>" + (b ? "<small>" + b + "</small>" : "") + "</span>";
 const seen = (t) => (t && Date.now() - t < 86400000 ? '<span class="live-dot" style="display:inline-block;margin-right:7px"></span>' : "") + ago(t);
 const TABLES = {
-  computers: { open: (c) => "computer:" + c.device, head: ["Computer", "Setup", "Version", "Plan", "Account", "First seen", "Last seen"], row: (c) => [two('<span class="mono">' + esc(c.id) + "</span>"), chip(c), c.version ? "v" + esc(c.version) + (c.version === latest() ? ' <span class="tag good">latest</span>' : "") : '<span class="dim">—</span>', planTag(c.plan), c.account ? '<span class="who"><span class="avatar sm">' + esc(initials(c.account)) + "</span>" + esc(c.account) + "</span>" : '<span class="dim">not signed in</span>', date(c.first), seen(c.last)] },
+  computers: { open: (c) => "computer:" + c.device, head: ["Computer", "Setup", "Version", "Plan", "Account", "Days seen", "First seen", "Last seen"], row: (c) => [two('<span class="mono">' + esc(c.id) + "</span>" + (c.team ? ' <span class="tag">ours</span>' : "")), chip(c), c.version ? "v" + esc(c.version) + (c.version === latest() ? ' <span class="tag good">latest</span>' : "") : '<span class="dim">—</span>', planTag(c.plan), c.account ? '<span class="who"><span class="avatar sm">' + esc(initials(c.account)) + "</span>" + esc(c.account) + "</span>" : '<span class="dim">not signed in</span>', (c.days || 1) + ((c.days || 1) >= 2 ? ' <span class="tag good">returning</span>' : ""), date(c.first), seen(c.last)] },
   accounts: { open: (a) => a.id ? "account:" + a.id : null, head: ["Person", "Setups", "Licenses", "Computers", "Last seen", "Signed up"], row: (a) => ['<span class="who"><span class="avatar">' + esc(initials(a.name || a.email)) + "</span>" + two(esc(a.name || a.email), a.name ? esc(a.email) : "") + "</span>", (a.setups.length ? a.setups.map(chip).join("") : '<span class="dim">—</span>') + (a.setups.length > 2 ? '<span class="tag warn">' + a.setups.length + " setups</span>" : ""), a.licenses || '<span class="dim">0</span>', a.computers || '<span class="dim">0</span>', a.lastSeen ? seen(a.lastSeen) : '<span class="dim">—</span>', two(date(a.createdAt), ago(a.createdAt))] },
   licenses: { open: (l) => "license:" + l.license, head: ["License", "Owner", "Seats", "Computers", "Paid until", "State"], row: (l) => ['<span class="mono">' + esc(l.license) + "</span>", esc(l.email || "—"), '<span class="seats">' + l.devices.length + '<span class="track"><i style="width:' + Math.min(100, l.devices.length * 34) + '%;background:var(--accent)"></i></span></span>', l.devices.map((d) => { const c = D.computers.find((x) => x.device === d.device); return (c ? chip(c) : "") + esc(d.name); }).join("<br>") || '<span class="dim">—</span>', l.paidUntil ? two(date(l.paidUntil), ago(l.paidUntil)) : "never ends", stateTag(l)] },
   trials: { open: (t) => "computer:" + t.deviceId, head: ["Computer", "Setup", "Started", "Ends", "State"], row: (t) => { const c = D.computers.find((x) => x.device === t.deviceId); return ['<span class="mono">' + esc(t.device) + "</span>", c ? chip(c) : '<span class="dim">—</span>', date(t.startedAt), two(date(t.endsAt), ago(t.endsAt)), '<span class="tag ' + ({ running: "good", ending: "warn", converted: "violet", ended: "" }[t.state]) + '">' + t.state + "</span>"]; } },
@@ -399,6 +400,7 @@ async function show(kind, id, quiet) {
       const seats = D.licenses.filter((l) => l.devices.some((d) => d.device === id));
       $("drawer").innerHTML = head(big(ICONS[s.sys]) + (s.web ? "" : ""), 'Computer <span class="mono">' + esc(id.slice(0, 8)) + "</span>", chip(c))
         + facts([["Setup", s.web ? "Browser version" : c.os ? "Installed app" : "Unknown"], ["System", { mac: "macOS", windows: "Windows", linux: "Linux", other: "—" }[s.sys]], ["Browser", s.web ? browserIcon(s.browser) + " " + esc(c.browser || s.browser) : ""], ["Version", c.version ? "v" + esc(c.version) + (c.version === latest() ? ' <span class="tag good">latest</span>' : ' <span class="tag warn">update available</span>') : ""], ["Plan", c.plan ? planTag(c.plan) : ""], ["Account", c.accountId ? '<a href="#" data-open="account:' + esc(c.accountId) + '">' + esc(c.account || c.accountId) + "</a>" : "not signed in"], ["First seen", date(c.first)], ["Last seen", c.last ? when(c.last) + ' <span class="muted small">(' + ago(c.last) + ")</span>" : ""], ["Full id", '<span class="mono">' + esc(id) + "</span>"]])
+        + "<h3>Counting</h3>" + '<p class="note" style="margin:0 0 10px">' + (c.team ? "One of your team’s computers: left out of the numbers." : "Counted as a church’s computer. Seen on " + (c.days || 1) + ((c.days || 1) > 1 ? " days." : " day.")) + "</p>" + (can("support") && c.os ? '<button class="sm" data-team="' + esc(id) + '" data-on="' + (c.team ? "0" : "1") + '">' + (c.team ? "Count it again" : "Mark as ours (leave out of the numbers)") + "</button>" : "")
         + "<h3>Trial</h3>" + (trial ? facts([["Started", date(trial.startedAt)], ["Ends", date(trial.endsAt) + ' <span class="muted small">(' + ago(trial.endsAt) + ")</span>"], ["State", esc(trial.state)]]) + (trial.state !== "converted" ? '<div style="margin-top:12px">' + actButtons(["extend-trial"], { device: id }) + "</div>" : "") : '<p class="note">No trial on this computer.</p>')
         + "<h3>Licenses</h3>" + (seats.map((l) => '<div class="item"><div class="grow"><span class="mono">' + esc(l.license) + "</span> " + stateTag(l) + '<div class="muted small">' + esc(l.email) + '</div></div><button class="sm" data-open="license:' + esc(l.license) + '">Open</button></div>').join("") || '<p class="note">Not on any license.</p>');
     }
@@ -434,7 +436,7 @@ async function approvalPage(id, token) {
 // --- Wiring ---------------------------------------------------------------------------------------
 
 document.addEventListener("click", (event) => {
-  const t = event.target.closest("[data-tab],[data-open],[data-act],[data-free],[data-end],#close,#shade,#act-cancel,#refresh,#gate-retry");
+  const t = event.target.closest("[data-tab],[data-open],[data-act],[data-free],[data-end],[data-team],#close,#shade,#act-cancel,#refresh,#gate-retry");
   if (!t) return;
   if (t.id === "close" || t.id === "shade") return closeDrawer();
   if (t.id === "refresh") return load();
@@ -444,6 +446,7 @@ document.addEventListener("click", (event) => {
   if (t.dataset.open) { event.preventDefault(); const i = t.dataset.open.indexOf(":"); form = null; return show(t.dataset.open.slice(0, i), t.dataset.open.slice(i + 1)); }
   if (t.dataset.act) { form = { action: t.dataset.act, target: JSON.parse(t.dataset.target) }; if (!ACTS[form.action].fields.length) { const f = form; return confirm(ACTS[f.action].label + "?") && run(Object.assign({ action: f.action }, f.target), ACTS[f.action].label); } return show(open.kind, open.id, true); }
   if (t.dataset.free) { if (confirm("Free this computer’s seat? It keeps working until its next check-in.")) run({ action: "release-device", license: t.dataset.license, device: t.dataset.free }, "Seat freed"); return; }
+  if (t.dataset.team) return run({ action: "mark-team", device: t.dataset.team, team: t.dataset.on === "1" }, t.dataset.on === "1" ? "Marked as ours" : "Counted again");
   if (t.dataset.end) { if (confirm("End code " + t.dataset.end + " now? It stops working at once.")) run({ action: "end-promo", code: t.dataset.end }, "Code ended"); }
 });
 document.addEventListener("keydown", (event) => {

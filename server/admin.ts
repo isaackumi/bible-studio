@@ -17,7 +17,7 @@
 //   POST /admin/api/action   {action, …}                 → {ok, …} | 202 {pending, approval}
 //   POST /admin/api/approve  {id, token, decline?}
 
-import { readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial } from "./api.ts";
+import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial } from "./api.ts";
 import type { Account, LinkedLicense } from "./accounts.ts";
 import { licenseKeyEmail } from "./email.ts";
 import { adminPage } from "./admin-page.ts";
@@ -67,6 +67,7 @@ const ACTIONS = {
   "resend-key": "support",
   "extend-license": "support",
   "extend-trial": "support",
+  "mark-team": "support",
   suspend: "owner",
   resume: "owner",
   refund: "owner",
@@ -273,7 +274,7 @@ type AuditEntry = {
 const auditKey = (at: number) => `audit:${String(9_999_999_999_999 - at).padStart(13, "0")}:${random(3)}`;
 
 const targetOf = (action: string, input: Record<string, unknown>) =>
-  action.endsWith("promo") ? `code ${text(input.code, 40).toUpperCase()}` : action === "extend-trial" ? `computer ${text(input.device, 80).slice(0, 8)}` : `license ${text(input.license, 16)}`;
+  action.endsWith("promo") ? `code ${text(input.code, 40).toUpperCase()}` : action === "extend-trial" || action === "mark-team" ? `computer ${text(input.device, 80).slice(0, 8)}` : `license ${text(input.license, 16)}`;
 
 async function record(config: ApiConfig, entry: AuditEntry): Promise<void> {
   await putJson(config.store, auditKey(entry.at), entry, { at: entry.at, by: entry.by, action: entry.action, target: entry.target, outcome: entry.outcome });
@@ -293,6 +294,7 @@ const CHANGE_WORDS: Record<AdminAction, (input: Record<string, unknown>) => stri
   "resend-key": (input) => `resend the key for license ${text(input.license, 16)}`,
   "extend-license": (input) => `extend license ${text(input.license, 16)} by ${input.days} days`,
   "extend-trial": (input) => `extend the trial on computer ${text(input.device, 80).slice(0, 8)} by ${input.days} days`,
+  "mark-team": (input) => `${input.team === false ? "count computer" : "mark computer"} ${text(input.device, 80).slice(0, 8)} ${input.team === false ? "again" : "as the team's own"}`,
   suspend: (input) => `suspend license ${text(input.license, 16)} (${text(input.reason, 120)})`,
   resume: (input) => `restore license ${text(input.license, 16)}`,
   refund: (input) => `revoke license ${text(input.license, 16)} for a refund`,
@@ -340,6 +342,12 @@ async function perform(config: ApiConfig, admin: Admin, action: AdminAction, inp
     // Ended, not deleted: the record of who used it stays.
     await putJson(store, `promo:${code}`, { ...promo, expiresAt: Math.min(promo.expiresAt ?? now, now) }, { used: promo.used });
     return { ok: true, detail: `${code} ended after ${promo.used} uses` };
+  }
+  if (action === "mark-team") {
+    const device = text(input.device, 80);
+    if (!device || !(await store.get(`device:${device}`))) return { ok: false, error: "No such computer." };
+    await noteDevice(config, device, { internal: input.team !== false });
+    return { ok: true, detail: input.team === false ? "counted in the numbers again" : "left out of the numbers" };
   }
   if (action === "extend-trial") {
     const device = text(input.device, 80);
@@ -552,7 +560,7 @@ async function accountView(config: ApiConfig, id: string) {
 async function richDetails(config: ApiConfig) {
   const base = await details(config);
   const emails = await accountEmails(config);
-  const devices = (await config.store.list("device:")).filter((entry) => entry.meta).map((entry) => ({ device: entry.key.slice("device:".length), meta: entry.meta as DeviceMeta }));
+  const devices = (await audience(config)).map((item) => ({ device: item.id, meta: item.meta, team: item.team }));
   const byAccount = new Map<string, Set<string>>();
   for (const { meta } of devices) if (meta.account) byAccount.set(meta.account, (byAccount.get(meta.account) ?? new Set()).add(setupOf(meta)));
   const accountIds = new Map([...emails.entries()].map(([id, email]) => [email, id]));
@@ -561,7 +569,7 @@ async function richDetails(config: ApiConfig) {
     computers: devices
       .sort((a, b) => b.meta.last - a.meta.last)
       .slice(0, 300)
-      .map(({ device, meta }) => ({ ...meta, id: device.length > 10 ? `${device.slice(0, 8)}…` : device, device, setup: setupOf(meta), account: meta.account ? (emails.get(meta.account) ?? null) : null, accountId: meta.account ?? null })),
+      .map(({ device, meta, team }) => ({ ...meta, team, id: device.length > 10 ? `${device.slice(0, 8)}…` : device, device, setup: setupOf(meta), account: meta.account ? (emails.get(meta.account) ?? null) : null, accountId: meta.account ?? null })),
     accounts: await Promise.all(
       (base.accounts as Array<{ email: string; createdAt: number }>).map(async (account) => {
         const id = accountIds.get(account.email) ?? null;

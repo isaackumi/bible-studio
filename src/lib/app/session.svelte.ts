@@ -5182,7 +5182,7 @@ class Session {
     await this.refreshEntitlement();
     void this.startErrorReports();
     if (this.workspace.shareUsage !== false) {
-      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), browser: this.browserName(), plan: this.plan });
+      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), browser: this.browserName(), plan: this.plan, ...(import.meta.env.DEV ? { dev: true } : {}) });
       if (hello.ok) {
         this.billingTest = hello.data.test === true;
         // The server's clock: the native core never lets this computer's clock trail it.

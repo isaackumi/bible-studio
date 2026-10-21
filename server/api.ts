@@ -241,11 +241,13 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 // --- Check-in and stats --------------------------------------------------------------------
 
 /** A computer as the admin page sees it: the browser ("Edge 129") for the web version, and the account signed in on it. */
-export type DeviceMeta = { first: number; last: number; plan: string; version: string; os: string; browser?: string; account?: string; trial?: number; paid?: number };
+export type DeviceMeta = { first: number; last: number; plan: string; version: string; os: string; browser?: string; account?: string; trial?: number; paid?: number; days?: number; internal?: boolean };
 
 async function hello(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const device = text(input.device, 80);
-  if (device) await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20), browser: text(input.browser, 24) });
+  // Development builds and the deploy check are not churches: answered, never counted.
+  const counted = input.dev !== true && text(input.os, 20) !== "deploy";
+  if (device && counted) await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20), browser: text(input.browser, 24) });
   return json(200, { now: config.now(), provider: config.provider.name, test: config.provider.test });
 }
 
@@ -254,11 +256,36 @@ export async function noteDevice(config: ApiConfig, device: string, change: Part
   const now = config.now();
   const saved = await getJson<DeviceMeta>(config.store, key);
   // At most one write a day per computer unless something changed (KV writes are the scarce part).
+  // A new day also counts one more day seen, so one visit and a church that comes back every week differ.
+  const day = (at: number) => new Date(at).toISOString().slice(0, 10);
+  const newDay = !saved || day(saved.last) !== day(now);
   const same = saved && Object.entries(change).every(([name, value]) => value === "" || value === undefined || saved[name as keyof DeviceMeta] === value);
-  if (same && now - saved.last < 20 * 3_600_000) return;
+  if (same && !newDay) return;
   const next: DeviceMeta = { first: saved?.first ?? now, last: now, plan: "free", version: "", os: "", ...saved, ...Object.fromEntries(Object.entries(change).filter(([, value]) => value !== "" && value !== undefined)) };
   next.last = now;
+  next.days = (saved?.days ?? 1) + (saved && newDay ? 1 : 0);
   await putJson(config.store, key, next, next as unknown as Record<string, unknown>);
+}
+
+/** One computer for the numbers: whether it is the team's own and whether it is the browser version. */
+export type Counted = { id: string; meta: DeviceMeta; team: boolean; web: boolean };
+
+/**
+ * Every computer, marked: the team's own (marked as ours on the admin page, or signed in to an
+ * admin's account) and the deploy check are left out of the numbers; the browser version is
+ * counted apart from installed apps, since each new browser or private window is a new id.
+ */
+export async function audience(config: ApiConfig): Promise<Counted[]> {
+  const admins = new Set(Object.keys(config.admin?.users ?? {}));
+  const adminAccounts = new Set((await config.store.list("acct:")).filter((entry) => admins.has(String(entry.meta?.email ?? "").toLowerCase())).map((entry) => entry.key.slice("acct:".length)));
+  return (await config.store.list("device:"))
+    .filter((entry) => entry.meta)
+    .map((entry) => {
+      const id = entry.key.slice("device:".length);
+      const meta = entry.meta as DeviceMeta;
+      const team = meta.internal === true || meta.os === "deploy" || id === "deploy-check" || (!!meta.account && adminAccounts.has(meta.account));
+      return { id, meta, team, web: String(meta.os ?? "").startsWith("web") };
+    });
 }
 
 /**
@@ -279,9 +306,10 @@ export async function details(config: ApiConfig) {
     return days.map((day) => counts.get(day)!);
   };
   const short = (id: string) => (id.length > 10 ? `${id.slice(0, 8)}…` : id);
-  const computers = (await config.store.list("device:"))
-    .filter((entry) => entry.meta)
-    .map((entry) => ({ id: short(entry.key.slice("device:".length)), ...(entry.meta as DeviceMeta) }));
+  const everyone = await audience(config);
+  const notOurs = new Set(everyone.filter((item) => !item.team).map((item) => item.id));
+  const installed = everyone.filter((item) => !item.team && !item.web);
+  const computers = everyone.map((item) => ({ id: short(item.id), ...item.meta, team: item.team }));
   const trials = (await config.store.list("trial:"))
     .filter((entry) => entry.meta)
     .map((entry) => ({ device: short(entry.key.slice("trial:".length)), deviceId: entry.key.slice("trial:".length), ...(entry.meta as { startedAt: number; endsAt: number; converted?: boolean }) }));
@@ -304,11 +332,12 @@ export async function details(config: ApiConfig) {
   return {
     days,
     series: {
-      computers: tally(computers.map((computer) => computer.first)),
-      trials: tally(trials.map((trial) => trial.startedAt)),
+      computers: tally(installed.map((item) => item.meta.first)),
+      trials: tally(trials.filter((trial) => notOurs.has(trial.deviceId)).map((trial) => trial.startedAt)),
       sales: tally(checkouts.filter((checkout) => checkout.status === "paid" && checkout.paidAt).map((checkout) => checkout.paidAt!)),
     },
-    funnel: { computers: computers.length, trials: trials.length, paid: checkouts.filter((checkout) => checkout.status === "paid").length },
+    // Installed computers that are not the team's, their trials, and paid checkouts.
+    funnel: { computers: installed.length, trials: trials.filter((trial) => notOurs.has(trial.deviceId)).length, paid: checkouts.filter((checkout) => checkout.status === "paid").length },
     computers: newest(computers, (computer) => computer.last),
     trials: newest(trials, (trial) => trial.startedAt).map((trial) => ({ ...trial, state: trial.converted ? "converted" : trial.endsAt > now ? (trial.endsAt - now < 3 * DAY ? "ending" : "running") : "ended" })),
     checkouts: newest(checkouts, (checkout) => checkout.createdAt ?? checkout.paidAt ?? 0),
@@ -319,10 +348,17 @@ export async function details(config: ApiConfig) {
 
 export async function stats(config: ApiConfig) {
   const now = config.now();
-  const devices = (await config.store.list("device:")).map((entry) => entry.meta as DeviceMeta | null).filter((meta): meta is DeviceMeta => !!meta);
-  const active = (days: number) => devices.filter((meta) => now - meta.last < days * DAY).length;
+  // Real churches only: the team's own computers and the deploy check are left out, and the browser
+  // version (a new id for every new browser or private window) is counted apart from installed apps.
+  const everyone = await audience(config);
+  const theirs = everyone.filter((item) => !item.team);
+  const devices = theirs.filter((item) => !item.web).map((item) => item.meta);
+  const browsersOnly = theirs.filter((item) => item.web).map((item) => item.meta);
+  const notOurs = new Set(theirs.map((item) => item.id));
+  const active = (days: number, list = devices) => list.filter((meta) => now - meta.last < days * DAY).length;
+  const returning = (list: DeviceMeta[]) => list.filter((meta) => (meta.days ?? 1) >= 2).length;
   const count = (values: string[]) => Object.entries(values.reduce<Record<string, number>>((all, value) => ({ ...all, [value || "unknown"]: (all[value || "unknown"] ?? 0) + 1 }), {})).sort((a, b) => b[1] - a[1]);
-  const trials = (await config.store.list("trial:")).map((entry) => entry.meta as { startedAt: number; endsAt: number; converted?: boolean } | null).filter(Boolean) as Array<{ startedAt: number; endsAt: number; converted?: boolean }>;
+  const trials = (await config.store.list("trial:")).filter((entry) => notOurs.has(entry.key.slice("trial:".length))).map((entry) => entry.meta as { startedAt: number; endsAt: number; converted?: boolean } | null).filter(Boolean) as Array<{ startedAt: number; endsAt: number; converted?: boolean }>;
   const checkouts = (await config.store.list("checkout:")).map((entry) => entry.meta as { status: string; due: number; plan: string; interval: string; promo: string | null; paidAt?: number } | null).filter(Boolean) as Array<{ status: string; due: number; plan: string; interval: string; promo: string | null; paidAt?: number }>;
   const paid = checkouts.filter((entry) => entry.status === "paid");
   const subs = (await config.store.list("sub:")).map((entry) => entry.meta as { status: string; plan: string; interval: string } | null).filter(Boolean) as Array<{ status: string; plan: string; interval: string }>;
@@ -334,16 +370,17 @@ export async function stats(config: ApiConfig) {
   return {
     provider: config.provider.name,
     test: config.provider.test,
-    computers: { total: devices.length, active1: active(1), active7: active(7), active30: active(30), newThisWeek: devices.filter((meta) => now - meta.first < 7 * DAY).length },
+    // Installed apps: computers, how many came back on another day, and how many were active lately.
+    computers: { total: devices.length, returning: returning(devices), active1: active(1), active7: active(7), active30: active(30), newThisWeek: devices.filter((meta) => now - meta.first < 7 * DAY).length },
+    // The browser version on its own: browsers, not people (a private window is a new one).
+    web: { total: browsersOnly.length, returning: returning(browsersOnly), active1: active(1, browsersOnly), active7: active(7, browsersOnly), active30: active(30, browsersOnly) },
+    team: everyone.length - theirs.length,
     plans: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.plan)),
     versions: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.version)).slice(0, 8),
-    systems: count(devices.filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.os)),
+    systems: count(theirs.map((item) => item.meta).filter((meta) => now - meta.last < 30 * DAY).map((meta) => meta.os)),
     // The web version by browser ("Edge", "Safari"…), and each system as app or browser, over 30 days.
-    browsers: count(devices.filter((meta) => now - meta.last < 30 * DAY && meta.os.startsWith("web")).map((meta) => (meta.browser ?? "").replace(/\s+\d.*$/, "") || "Other")),
-    platforms: (["macos", "windows", "linux"] as const).map((os) => {
-      const recent = devices.filter((meta) => now - meta.last < 30 * DAY);
-      return { os, app: recent.filter((meta) => meta.os === os).length, web: recent.filter((meta) => meta.os === `web-${os}`).length };
-    }),
+    browsers: count(browsersOnly.filter((meta) => now - meta.last < 30 * DAY).map((meta) => (meta.browser ?? "").replace(/\s+\d.*$/, "") || "Other")),
+    platforms: (["macos", "windows", "linux"] as const).map((os) => ({ os, app: devices.filter((meta) => now - meta.last < 30 * DAY && meta.os === os).length, web: browsersOnly.filter((meta) => now - meta.last < 30 * DAY && meta.os === `web-${os}`).length })),
     trials: { started: trials.length, running: trials.filter((entry) => entry.endsAt > now).length, converted: trials.filter((entry) => entry.converted).length },
     sales: {
       checkouts: checkouts.length,
