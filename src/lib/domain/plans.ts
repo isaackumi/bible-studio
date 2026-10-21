@@ -268,7 +268,30 @@ export function sanitizeProfile(value: unknown): Profile | null {
   const email = typeof record.email === "string" ? record.email.trim().toLowerCase().slice(0, 120) : "";
   if (!name && !email) return null;
   const token = typeof record.token === "string" && /^cst_[0-9a-f]{64}$/.test(record.token) ? record.token : undefined;
-  return { name: name || email.split("@")[0] || "Operator", email, ...(token ? { token } : {}) };
+  // No name from the sign-in (an email link gives none), or only the email's first part: a readable one.
+  const local = email.split("@")[0] ?? "";
+  const shown = !name || name.toLowerCase() === local ? nameFromEmail(email) : name;
+  return { name: shown || "Operator", email, ...(token ? { token } : {}) };
+}
+
+/**
+ * A readable name from an email address, for people who sign in with an email link:
+ * "isaac.k.kumi29@gmail.com" → "Isaac K Kumi", "john_smith-1985+church@x.org" → "John Smith".
+ * Numbers and +tags go, dots, dashes and underscores become spaces, and it is kept short.
+ */
+export function nameFromEmail(email: string): string {
+  const local = (email.split("@")[0] ?? "").split("+")[0] ?? "";
+  const words = local
+    .split(/[._-]+/)
+    .map((word) => word.replace(/\d+/g, ""))
+    .filter(Boolean)
+    .map((word) => word[0]!.toUpperCase() + word.slice(1).toLowerCase());
+  let out = "";
+  for (const word of words) {
+    if ((out + " " + word).trim().length > 24) break;
+    out = (out + " " + word).trim();
+  }
+  return out || local.slice(0, 24);
 }
 
 export function validEmail(email: string): boolean {

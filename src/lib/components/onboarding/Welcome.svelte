@@ -412,7 +412,7 @@
                 <div class="account-card" aria-live="polite">
                   {#if session.workspace.profile?.token}
                     <Icon name="check" size={15} />
-                    <span><strong>{t("Signed in as {name}", { name: session.workspace.profile.name || session.workspace.profile.email })}</strong><em>{t("Your trial and plans follow you to every computer.")}</em></span>
+                    <span><strong class="one-line">{t("Signed in as {name}", { name: session.workspace.profile.name || session.workspace.profile.email })}</strong><em>{t("Your trial and plans follow you to every computer.")}</em></span>
                   {:else if session.accountSignin?.status === "waiting"}
                     <Icon name="globe" size={15} />
                     <span><strong>{t("In your browser, tap {number}", { number: session.accountSignin.number })}</strong><em>{t("Sign in there, then tap the number this screen shows.")}</em></span>
@@ -699,4 +699,5 @@
   .ob-lang { display: inline-flex; align-self: flex-start; width: max-content; gap: 4px; margin-top: 18px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; }
   .ob-lang button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
   .ob-lang button[aria-checked="true"] { background: var(--field); color: var(--ink); }
+  .one-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

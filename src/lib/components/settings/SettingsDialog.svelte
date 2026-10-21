@@ -1488,7 +1488,7 @@
             <div class="row">
               <div class="row-lead">
                 <span class="avatar" style:background={current.color}>{initials(profile.name)}</span>
-                <div class="row-copy"><strong>{profile.name}</strong><span>{profile.token ? t("{email} · your plan follows this account", { email: profile.email }) : t("{email} · signed in on this computer", { email: profile.email })}</span></div>
+                <div class="row-copy"><strong class="one-line" title={profile.name}>{profile.name}</strong><span>{profile.token ? t("{email} · your plan follows this account", { email: profile.email }) : t("{email} · signed in on this computer", { email: profile.email })}</span></div>
               </div>
               <div class="row-end">
                 <span class="pill" style:background={`color-mix(in srgb, ${current.color} 20%, transparent)`} style:color={current.color}>{current.name}</span>
@@ -1813,7 +1813,7 @@
   .settings-body :global(.row.dim) { opacity: 0.55; }
   .settings-body :global(.row-copy) { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; max-width: 560px; }
   .settings-body :global(.row-copy strong) { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-  .settings-body :global(.row-copy span), .settings-body :global(.row-copy small) { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .settings-body :global(.row-copy span), .settings-body :global(.row-copy small) { font-size: 12.5px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
   .settings-body :global(.row-icon) { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--panel); color: var(--muted); }
   .settings-body :global(.row-lead) { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
   .settings-body :global(.row-end) { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -2026,4 +2026,5 @@
   .upsell-copy span { font-size: 12px; color: var(--muted); }
   .upsell-plans { display: inline-flex; gap: 4px; }
   .upsell-plans i { width: 10px; height: 10px; border-radius: 50%; }
+  .settings-body :global(.one-line) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 </style>

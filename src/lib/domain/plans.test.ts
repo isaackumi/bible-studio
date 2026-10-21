@@ -106,3 +106,16 @@ describe("free listening", () => {
     expect(listenAllowance({ month: "2026-09", seconds: 4000 }, october).leftSeconds).toBe(3600);
   });
 });
+
+describe("a readable name from an email", () => {
+  it("drops numbers and tags, splits on dots and dashes, capitalises, and stays short", async () => {
+    const { nameFromEmail, sanitizeProfile } = await import("./plans");
+    expect(nameFromEmail("isaac.k.kumi29@gmail.com")).toBe("Isaac K Kumi");
+    expect(nameFromEmail("john_smith-1985+church@x.org")).toBe("John Smith");
+    expect(nameFromEmail("averyveryverylongfirstname.anotherlongsurname@x.org").length).toBeLessThanOrEqual(24);
+    expect(nameFromEmail("12345@x.org")).toBe("12345");
+    // A name the sign-in gave is kept; the bare email part is made readable.
+    expect(sanitizeProfile({ name: "Pastor Mensah", email: "p@x.org" })?.name).toBe("Pastor Mensah");
+    expect(sanitizeProfile({ name: "isaac.k.kumi29", email: "isaac.k.kumi29@gmail.com" })?.name).toBe("Isaac K Kumi");
+  });
+});
