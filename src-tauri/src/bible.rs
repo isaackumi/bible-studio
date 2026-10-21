@@ -463,6 +463,19 @@ mod tests {
         books[42].chapters[2][15].clone()
     }
 
+    /// The real thing, over the internet: cargo test --lib downloads_from_the_site -- --ignored
+    #[test]
+    #[ignore]
+    fn downloads_from_the_site() {
+        let dir = std::env::temp_dir().join(format!("cs-bibles-{}", std::process::id()));
+        for t in DOWNLOADS {
+            let path = fetch_download(t.id, &dir).unwrap();
+            let books: Vec<SourceBook> = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            assert_eq!(books.len(), 66, "{}", t.id);
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn downloads_are_well_formed() {
         let mut seen = std::collections::HashSet::new();
