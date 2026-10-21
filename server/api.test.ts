@@ -214,8 +214,8 @@ describe("server API", () => {
     expect(mac.status).toBe(200);
     expect(mac.headers.get("content-disposition")).toBe('attachment; filename="Church.Studio_9.9.9_universal.dmg"');
     expect(await mac.text()).toBe("DMG-BYTES");
-    // No file for that platform: back to the download section.
-    expect((await handleApi(new Request("https://keys.test/download/windows"), config)).headers.get("location")).toBe("/#download");
+    // No file for that platform: the release page with every file, never back to the same page.
+    expect((await handleApi(new Request("https://keys.test/download/windows"), config)).headers.get("location")).toBe("https://github.com/isaackumi/bible-studio/releases/latest");
     expect(String((await call("/")).data.html)).toContain("v9.9.9");
     for (const path of ["/terms", "/privacy", "/refunds"]) {
       const page = await call(path);

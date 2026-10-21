@@ -16,7 +16,7 @@
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
-import { type Platform, type Release } from "./downloads.ts";
+import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
@@ -151,10 +151,12 @@ const randomId = (prefix: string) => `${prefix}_${hex(crypto.getRandomValues(new
 async function serveDownload(config: ApiConfig, platform: Platform): Promise<Response> {
   const release = config.releases ? await config.releases().catch(() => null) : null;
   const asset = release?.assets[platform];
-  if (!asset) return new Response(null, { status: 302, headers: { location: "/#download" } });
+  // Never back to the page the button is on: the release page lists every file.
+  if (!asset) return new Response(null, { status: 302, headers: { location: RELEASES_PAGE } });
   const http = config.fetcher ?? fetch;
-  const upstream = await http(asset.url, { redirect: "follow", cf: { cacheEverything: true, cacheTtl: 86_400 } } as RequestInit).catch(() => null);
-  if (!upstream?.ok || !upstream.body) return new Response(null, { status: 302, headers: { location: asset.url } });
+  // Kept near the visitor for a day when it worked; a failed answer is never kept.
+  const upstream = await http(asset.url, { redirect: "follow", cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 86_400, "300-599": -1 } } } as RequestInit).catch(() => null);
+  if (!upstream?.ok || !upstream.body) return new Response(null, { status: 302, headers: { location: upstream?.status === 404 ? RELEASES_PAGE : asset.url } });
   return new Response(upstream.body, {
     status: 200,
     headers: {

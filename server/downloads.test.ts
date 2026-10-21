@@ -26,6 +26,28 @@ describe("the newest release", () => {
     expect(kept.data.get("release:latest")).toContain("1.2.3");
   });
 
+  it("never drops a file because GitHub missed one answer, and keeps its last known size", async () => {
+    const kept = store();
+    const sizes = (async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/latest.json")) return new Response(JSON.stringify({ version: "1.2.3" }));
+      if (init?.method === "HEAD") return new Response(null, { headers: { "content-length": "29000000" } });
+      return new Response(null, { status: 404 });
+    }) as typeof fetch;
+    await latestRelease(sizes, kept, 0);
+    forgetRelease();
+    // This time the Mac and Windows files do not answer: they stay, with the sizes read before.
+    const flaky = (async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/latest.json")) return new Response(JSON.stringify({ version: "1.2.3" }));
+      if (init?.method === "HEAD" && (url.endsWith(".dmg") || url.endsWith("-setup.exe"))) return new Response(null, { status: 503 });
+      if (init?.method === "HEAD") return new Response(null, { headers: { "content-length": "29000000" } });
+      return new Response(null, { status: 404 });
+    }) as typeof fetch;
+    const release = await latestRelease(flaky, kept, 0);
+    expect(Object.keys(release!.assets).sort()).toEqual(["linux", "linux-deb", "linux-rpm", "mac", "windows", "windows-msi"]);
+    expect(release!.assets.mac!.size).toBe(29_000_000);
+    expect(release!.assets.windows!.size).toBe(29_000_000);
+  });
+
   it("keeps working from the last good release when GitHub does not answer", async () => {
     const kept = store();
     await kept.put("release:latest", JSON.stringify({ version: "1.2.2", date: "", assets: { mac: { name: "a.dmg", url: "https://x/a.dmg", size: 1 } } }));

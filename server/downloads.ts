@@ -32,9 +32,16 @@ const STORE_KEY = "release:latest";
 /** A small key-value store that outlives one server instance (Cloudflare KV), for the last good release. */
 type Keeper = { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
 
-/** Read the newest release from GitHub: its version from latest.json, each file's size from its headers. */
+/** Errors are never kept in Cloudflare's cache: one failed answer must not hide a file for a day. */
+export const NO_CACHED_ERRORS = { cacheTtlByStatus: { "200-299": 3600, "300-599": -1 } };
+
+/**
+ * Read the newest release from GitHub: its version from latest.json, each file's size from its
+ * headers. Every release has all six files, so a file whose size cannot be read stays listed
+ * (size unknown): a missed answer must never take the Mac or Windows button away.
+ */
 async function readRelease(http: typeof fetch): Promise<Release | null> {
-  const response = await http(`https://github.com/${REPO}/releases/latest/download/latest.json`, { redirect: "follow", headers: { "user-agent": "church-studio-site" } });
+  const response = await http(`https://github.com/${REPO}/releases/latest/download/latest.json`, { redirect: "follow", headers: { "user-agent": "church-studio-site" }, cf: NO_CACHED_ERRORS } as RequestInit);
   if (!response.ok) return null;
   const data = (await response.json()) as { version?: string; pub_date?: string };
   const version = (data.version ?? "").replace(/^v/, "");
@@ -43,18 +50,11 @@ async function readRelease(http: typeof fetch): Promise<Release | null> {
     (Object.entries(NAMES) as Array<[Platform, (v: string) => string]>).map(async ([platform, name]) => {
       const file = name(version);
       const url = `https://github.com/${REPO}/releases/download/v${version}/${file}`;
-      try {
-        const head = await http(url, { method: "HEAD", redirect: "follow", headers: { "user-agent": "church-studio-site" } });
-        if (!head.ok) return null;
-        return [platform, { name: file, url, size: Number(head.headers.get("content-length")) || 0 }] as const;
-      } catch {
-        return [platform, { name: file, url, size: 0 }] as const;
-      }
+      const head = await http(url, { method: "HEAD", redirect: "follow", headers: { "user-agent": "church-studio-site" }, cf: NO_CACHED_ERRORS } as RequestInit).catch(() => null);
+      return [platform, { name: file, url, size: (head?.ok && Number(head.headers.get("content-length"))) || 0 }] as const;
     }),
   );
-  const assets: Release["assets"] = {};
-  for (const entry of entries) if (entry) assets[entry[0]] = entry[1];
-  return { version, date: data.pub_date ?? "", assets };
+  return { version, date: data.pub_date ?? "", assets: Object.fromEntries(entries) };
 }
 
 /**
@@ -70,28 +70,35 @@ export async function latestRelease(http: typeof fetch = fetch, store?: Keeper, 
     release = null;
   }
   if (release && Object.keys(release.assets).length) {
-    const changed = kept?.release?.version !== release.version;
+    // Sizes GitHub did not give this time come from the last good read of the same version.
+    const previous = kept?.release?.version === release.version ? kept.release : await readSaved(store);
+    if (previous?.version === release.version) {
+      for (const [platform, asset] of Object.entries(release.assets) as Array<[Platform, Asset]>) if (!asset.size && previous.assets[platform]?.size) asset.size = previous.assets[platform]!.size;
+    }
     kept = { at: now, release };
-    // Written only when the version is new to the store (KV allows few writes a day).
-    if (changed && store) {
-      const saved = await store.get(STORE_KEY).catch(() => null);
-      if (!saved || (JSON.parse(saved) as Release).version !== release.version) await store.put(STORE_KEY, JSON.stringify(release)).catch(() => {});
+    // Written only when something is new to the store (KV allows few writes a day).
+    const sizes = (item: Release | null) => JSON.stringify(Object.values(item?.assets ?? {}).map((asset) => asset.size));
+    if (store && (previous?.version !== release.version || sizes(previous) !== sizes(release))) {
+      const saved = await readSaved(store);
+      if (saved?.version !== release.version || sizes(saved) !== sizes(release)) await store.put(STORE_KEY, JSON.stringify(release)).catch(() => {});
     }
     return release;
   }
   // GitHub did not answer: the last good release (this instance's, else the store's).
   if (kept?.release) return kept.release;
+  const saved = await readSaved(store);
+  if (saved) kept = { at: now - KEEP_MS + 60_000, release: saved };
+  return saved;
+}
+
+async function readSaved(store: Keeper | undefined): Promise<Release | null> {
   const saved = await store?.get(STORE_KEY).catch(() => null);
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved) as Release;
-      kept = { at: now - KEEP_MS + 60_000, release: parsed };
-      return parsed;
-    } catch {
-      /* unreadable: none */
-    }
+  if (!saved) return null;
+  try {
+    return JSON.parse(saved) as Release;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /** 96 MB, 14.7 MB. */
