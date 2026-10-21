@@ -6,6 +6,7 @@
 // makes the very same key instead of a second one.
 
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
+import { latestRelease } from "./downloads.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Identity } from "./accounts.ts";
 import { betterAuthIdentity } from "./auth.ts";
@@ -109,6 +110,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     paddleClient: env.PADDLE_CLIENT_TOKEN ? { token: env.PADDLE_CLIENT_TOKEN, sandbox: env.PADDLE_ENV === "sandbox" } : undefined,
     mail,
     publicUrl: env.PUBLIC_URL,
+    releases: () => latestRelease(http),
     now: () => Date.now(),
   };
 }

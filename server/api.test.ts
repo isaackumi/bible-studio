@@ -178,11 +178,19 @@ describe("server API", () => {
     config.site = { company: "Grace Software Ltd", contact: "help@grace.example" };
     const home = String((await call("/")).data.html);
     for (const plan of ["premium", "church"] as const) {
-      expect(home).toContain(`$${PRICES[plan].monthly / 100} <small>/ month</small>`);
-      expect(home).toContain(`or $${PRICES[plan].yearly / 100} a year`);
+      expect(home).toContain(`>$${PRICES[plan].monthly / 100}</span><small>/ month</small>`);
+      expect(home).toContain(`$${PRICES[plan].yearly / 100} billed yearly`);
     }
     expect(home).toContain("mailto:help@grace.example");
     expect(home).toContain('href="/terms"');
+    expect(home).toContain("Merchant of Record");
+    // Downloads go to the newest release's file, or the release page when GitHub is out of reach.
+    config.releases = async () => ({ version: "9.9.9", date: "", assets: { mac: { name: "Church.Studio_9.9.9_universal.dmg", url: "https://example.test/mac.dmg", size: 30_000_000 } } });
+    const mac = await handleApi(new Request("https://keys.test/download/mac"), config);
+    expect(mac.status).toBe(302);
+    expect(mac.headers.get("location")).toBe("https://example.test/mac.dmg");
+    expect((await handleApi(new Request("https://keys.test/download/windows"), config)).headers.get("location")).toContain("/releases/latest");
+    expect(String((await call("/")).data.html)).toContain("v9.9.9");
     for (const path of ["/terms", "/privacy", "/refunds"]) {
       const page = await call(path);
       expect(page.status).toBe(200);

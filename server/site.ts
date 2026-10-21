@@ -6,8 +6,7 @@
 // DRAFTS: the policies are a plain-language starting point, not legal advice. Have them checked
 // for the countries you sell in before going live.
 
-import { FEATURE_LABELS, PLANS, TRIAL_DAYS } from "../src/lib/domain/plans.ts";
-import { PRICES } from "./pricing.ts";
+import { TRIAL_DAYS } from "../src/lib/domain/plans.ts";
 
 export type Site = {
   /** The legal name of the business that sells Church Studio (COMPANY_NAME). */
@@ -17,9 +16,7 @@ export type Site = {
 };
 
 const UPDATED = "20 October 2026";
-const DOWNLOAD = "https://github.com/isaackumi/bible-studio/releases/latest";
 const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
-const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
 function layout(title: string, site: Site, body: string): string {
   const mail = escape(site.contact);
@@ -69,38 +66,6 @@ function layout(title: string, site: Site, body: string): string {
   <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/refunds">Refunds &amp; cancellation</a></span>
 </div></footer>
 </body></html>`;
-}
-
-const FEATURES: Array<[string, string]> = [
-  ["Scripture in seconds", "Every translation you have, by typing or saying the reference. Verses fit the screen by themselves."],
-  ["Songs that follow", "A song library with folders and imports. Song detection follows the singing on Premium."],
-  ["Sermons and slides", "Outlines, desk notes, announcements, images, PowerPoint and PDF."],
-  ["Preview, then Program", "Line up the next thing on Preview and take it live when you are ready, so the screen never shows a mistake."],
-  ["Production Desk", "Scenes, cameras and video, with lower thirds and split screens (Premium)."],
-  ["Phone remote and stage display", "Run slides from a phone, and show the next item and a clock to the stage (Premium)."],
-];
-
-function planCards(): string {
-  return PLANS.map((plan) => {
-    const prices = plan.id === "free" ? null : PRICES[plan.id];
-    const price = prices ? `<div class="price">${dollars(prices.monthly)} <small>/ month</small></div><div class="yearly">or ${dollars(prices.yearly)} a year · ${plan.computers === 1 ? "1 computer" : `${plan.computers} computers`}</div>` : `<div class="price">$0</div><div class="yearly">Free forever · 1 computer</div>`;
-    const items = plan.features.map((id) => `<li>${escape(FEATURE_LABELS[id].label)}${FEATURE_LABELS[id].soon ? "<em>coming soon</em>" : ""}</li>`).join("");
-    return `<div class="plan${plan.popular ? " popular" : ""}"><h3>${escape(plan.name)}</h3><p class="tag">${escape(plan.tagline)}</p>${price}<ul>${items}</ul></div>`;
-  }).join("");
-}
-
-export function homePage(site: Site): string {
-  return layout("Church Studio · presentation software for churches", site, `
-  <div class="hero">
-    <h1>Scripture, songs and sermons on screen, from one desk.</h1>
-    <p>Church Studio is presentation software for churches, for Mac and Windows. Put verses, lyrics, sermon slides and video on the projector and the stream, and run the whole service from a single Presenter Desk.</p>
-    <div class="actions"><a class="btn" href="${DOWNLOAD}">Download for Mac or Windows</a><a class="btn ghost" href="#pricing">See pricing</a></div>
-  </div>
-  <section id="features"><h2>What it does</h2><div class="features">${FEATURES.map(([title, text]) => `<div class="feature"><b>${escape(title)}</b><span>${escape(text)}</span></div>`).join("")}</div></section>
-  <section id="pricing"><h2>Pricing</h2><div class="plans">${planCards()}</div>
-    <p class="note">Prices in US dollars; local taxes are added at checkout where they apply. Premium can be tried free for ${TRIAL_DAYS} days, with no card. Subscriptions renew until cancelled and can be cancelled at any time. Orders are processed by Paddle.com, our reseller and Merchant of Record.</p></section>
-  <section id="contact"><h2>Contact</h2>
-    <p>Questions, help or billing: <a href="mailto:${escape(site.contact)}">${escape(site.contact)}</a>. We answer within two working days. Church Studio is made by ${escape(site.company)}.</p></section>`);
 }
 
 export function termsPage(site: Site): string {

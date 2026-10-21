@@ -17,11 +17,13 @@
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
+import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
+import { landingPage } from "./landing.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
 import { adminPage, checkoutPage, payPage } from "./pages.ts";
-import { homePage, privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
+import { privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
 
@@ -56,6 +58,8 @@ export type ApiConfig = {
   mail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
   /** The server's public address, for links and the logo in emails. */
   publicUrl?: string;
+  /** The newest release on GitHub, for the home page and /download/… (none: the release page). */
+  releases?: () => Promise<Release | null>;
   now: () => number;
 };
 
@@ -158,11 +162,17 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   }
   if (request.method === "GET") {
     const site = config.site ?? DEFAULT_SITE;
-    if (path === "/") return html(200, homePage(site));
+    if (path === "/") return html(200, landingPage(site, config.releases ? await config.releases().catch(() => null) : null));
+    const download = path.match(/^\/download\/([a-z-]+)$/);
+    if (download) {
+      const release = config.releases ? await config.releases().catch(() => null) : null;
+      const asset = release?.assets[download[1] as Platform];
+      return new Response(null, { status: 302, headers: { location: asset?.url ?? RELEASES_PAGE, "cache-control": "public, max-age=300" } });
+    }
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
     if (path === "/refunds") return html(200, refundsPage(site));
-    if (path === "/checkout") return config.paddleClient ? html(200, checkoutPage(config.paddleClient)) : html(404, homePage(site));
+    if (path === "/checkout") return config.paddleClient ? html(200, checkoutPage(config.paddleClient)) : html(404, landingPage(site, null));
   }
   const pay = path.match(/^\/pay\/([A-Za-z0-9_]+)(\/cancel)?$/);
   if (pay) return payRoute(request, config, pay[1]!, !!pay[2]);
