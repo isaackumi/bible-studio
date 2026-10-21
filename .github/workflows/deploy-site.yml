@@ -1,0 +1,65 @@
+# Deploys church-studio.heitechinc.com: the license server (server/), the home page and the browser
+# version of the app (/app). Runs on every push to main that touches them, or by hand from Actions.
+#
+# Needs one repository secret, CLOUDFLARE_API_TOKEN: Cloudflare › My Profile › API Tokens › Create
+# token › "Edit Cloudflare Workers" template (add D1 › Edit), for HeiTech's account and the
+# heitechinc.com zone. The account id is in server/wrangler.jsonc. Server secrets (Paddle, Resend,
+# Better Auth) stay where `wrangler secret put` put them; a deploy never touches them.
+
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "src/**"
+      - "static/**"
+      - "package.json"
+      - "package-lock.json"
+      - "svelte.config.js"
+      - "vite.config.*"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits for the running one instead of racing it.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://church-studio.heitechinc.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Nothing goes out unless the server's tests pass.
+      - name: Server tests
+        run: npx vitest run server
+      # The browser version, served at /app (server/web/app).
+      - name: Build the browser version
+        run: npm run build:web
+        env:
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      # Without the token yet, the build is still checked and the run says what is missing.
+      - name: Cloudflare token
+        id: token
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "::warning::Not deployed: add the CLOUDFLARE_API_TOKEN repository secret (see the top of this workflow)."; fi
+      - name: Deploy to Cloudflare
+        if: steps.token.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: server
+          wranglerVersion: "4"
+          command: deploy

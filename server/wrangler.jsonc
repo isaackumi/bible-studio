@@ -2,6 +2,8 @@
 // Secrets are not kept here; set them once with `wrangler secret put` (see README.md).
 {
   "name": "church-studio-keys",
+  // HeiTech's Cloudflare account (not a secret), so the deploy pipeline needs only an API token.
+  "account_id": "9c069a5afbfa4133f6a165e2adb7b316",
   "main": "paddle.ts",
   "compatibility_date": "2026-09-01",
   // Better Auth (accounts) uses Node's AsyncLocalStorage.
