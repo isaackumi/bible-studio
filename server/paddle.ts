@@ -111,6 +111,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     mail,
     publicUrl: env.PUBLIC_URL,
     releases: () => latestRelease(http),
+    fetcher: http,
     now: () => Date.now(),
   };
 }

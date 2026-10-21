@@ -407,7 +407,7 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
       <div class="chips"><span><i></i>AppImage</span><span><i></i>.deb</span><span><i></i>.rpm</span></div>
       <div class="gets">${getButton(release, "linux", "Download AppImage", true)}${getButton(release, "linux-deb", "Ubuntu / Debian (.deb)")}${getButton(release, "linux-rpm", "Fedora (.rpm)")}</div></article>
   </div>
-  <p class="release-note reveal">${version ? `Version ${version}${release?.date ? ` · released ${escape(new Date(release.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}` : ""} · ` : ""}<a href="${RELEASES_PAGE}">All downloads and release notes</a></p>
+  <p class="release-note reveal">${version ? `Version ${version}${release?.date ? ` · released ${escape(new Date(release.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}` : ""} · ` : ""}<a href="${RELEASES_PAGE}">Release notes</a></p>
 </div></section>
 
 <section id="pricing"><div class="wrap">

@@ -186,10 +186,14 @@ describe("server API", () => {
     expect(home).toContain("Merchant of Record");
     // Downloads go to the newest release's file, or the release page when GitHub is out of reach.
     config.releases = async () => ({ version: "9.9.9", date: "", assets: { mac: { name: "Church.Studio_9.9.9_universal.dmg", url: "https://example.test/mac.dmg", size: 30_000_000 } } });
+    config.fetcher = (async (url: string) => (url === "https://example.test/mac.dmg" ? new Response("DMG-BYTES", { headers: { "content-length": "9" } }) : new Response(null, { status: 404 }))) as typeof fetch;
+    // The file comes from this address, under its own name: nobody is sent to GitHub.
     const mac = await handleApi(new Request("https://keys.test/download/mac"), config);
-    expect(mac.status).toBe(302);
-    expect(mac.headers.get("location")).toBe("https://example.test/mac.dmg");
-    expect((await handleApi(new Request("https://keys.test/download/windows"), config)).headers.get("location")).toContain("/releases/latest");
+    expect(mac.status).toBe(200);
+    expect(mac.headers.get("content-disposition")).toBe('attachment; filename="Church.Studio_9.9.9_universal.dmg"');
+    expect(await mac.text()).toBe("DMG-BYTES");
+    // No file for that platform: back to the download section.
+    expect((await handleApi(new Request("https://keys.test/download/windows"), config)).headers.get("location")).toBe("/#download");
     expect(String((await call("/")).data.html)).toContain("v9.9.9");
     for (const path of ["/terms", "/privacy", "/refunds"]) {
       const page = await call(path);

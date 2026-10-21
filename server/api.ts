@@ -17,7 +17,7 @@
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
-import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
+import { type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
@@ -60,6 +60,8 @@ export type ApiConfig = {
   publicUrl?: string;
   /** The newest release on GitHub, for the home page and /download/… (none: the release page). */
   releases?: () => Promise<Release | null>;
+  /** How the server fetches a release file to hand on (tests pass their own). */
+  fetcher?: typeof fetch;
   now: () => number;
 };
 
@@ -146,6 +148,29 @@ async function shortId(seed: string): Promise<Uint8Array> {
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 const randomId = (prefix: string) => `${prefix}_${hex(crypto.getRandomValues(new Uint8Array(12)))}`;
 
+/**
+ * A download, from this address: the newest release's file for the platform, streamed through from
+ * GitHub (kept in Cloudflare's cache near the visitor) under its own name, so nobody is sent to
+ * GitHub. With no file to hand, back to the download section of the home page.
+ */
+async function serveDownload(config: ApiConfig, platform: Platform): Promise<Response> {
+  const release = config.releases ? await config.releases().catch(() => null) : null;
+  const asset = release?.assets[platform];
+  if (!asset) return new Response(null, { status: 302, headers: { location: "/#download" } });
+  const http = config.fetcher ?? fetch;
+  const upstream = await http(asset.url, { redirect: "follow", cf: { cacheEverything: true, cacheTtl: 86_400 } } as RequestInit).catch(() => null);
+  if (!upstream?.ok || !upstream.body) return new Response(null, { status: 302, headers: { location: asset.url } });
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "content-type": "application/octet-stream",
+      "content-disposition": `attachment; filename="${asset.name.replace(/"/g, "")}"`,
+      ...(upstream.headers.get("content-length") ? { "content-length": upstream.headers.get("content-length")! } : {}),
+      "cache-control": "public, max-age=3600",
+    },
+  });
+}
+
 export async function handleApi(request: Request, config: ApiConfig): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
@@ -164,11 +189,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     const site = config.site ?? DEFAULT_SITE;
     if (path === "/") return html(200, landingPage(site, config.releases ? await config.releases().catch(() => null) : null));
     const download = path.match(/^\/download\/([a-z-]+)$/);
-    if (download) {
-      const release = config.releases ? await config.releases().catch(() => null) : null;
-      const asset = release?.assets[download[1] as Platform];
-      return new Response(null, { status: 302, headers: { location: asset?.url ?? RELEASES_PAGE, "cache-control": "public, max-age=300" } });
-    }
+    if (download) return serveDownload(config, download[1] as Platform);
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
     if (path === "/refunds") return html(200, refundsPage(site));
