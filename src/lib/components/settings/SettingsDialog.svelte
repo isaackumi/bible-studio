@@ -6,6 +6,7 @@
   import CaptionsSettings from "./CaptionsSettings.svelte";
   import VoiceWords from "./VoiceWords.svelte";
   import ScreensSettings from "./ScreensSettings.svelte";
+  import StorageSpace from "./StorageSpace.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -1173,6 +1174,7 @@
         </section>
         <p class="note stand">{t("Headers become sections, songs come with their lyrics (new ones go into a \"Planning Center\" folder), and other items become editable slides. Nothing goes live on its own.")}</p>
       {:else if section === "storage"}
+        <StorageSpace />
         <p class="section-label">{t("Automatic backup and a second computer")}</p>
         <section class="rows">
           <div class="row">

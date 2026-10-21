@@ -9,6 +9,7 @@ mod noise;
 mod broadcast;
 mod ndi;
 mod voice;
+mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
 
@@ -326,6 +327,23 @@ fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
 #[tauri::command]
 fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>, engine: Option<String>) -> Result<(), String> {
     voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default(), engine.as_deref() == Some("accurate"))
+}
+
+/// Space on this computer: what the app keeps, and the safe ways to make it smaller.
+#[tauri::command]
+fn storage_usage(app: tauri::AppHandle) -> Result<storage::Usage, String> {
+    storage::usage(&app)
+}
+
+#[tauri::command]
+fn storage_clear_cache(app: tauri::AppHandle) -> u64 {
+    storage::clear_cache(&app)
+}
+
+#[tauri::command]
+fn storage_compact(db: tauri::State<'_, db::Db>) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
+    storage::compact(&conn)
 }
 
 /// Accurate listening's model: whether it is here, and getting or removing it.
@@ -774,6 +792,9 @@ pub fn run() {
             open_privacy_settings,
             start_sermon_listen,
             whisper_status,
+            storage_usage,
+            storage_clear_cache,
+            storage_compact,
             whisper_download,
             whisper_cancel,
             whisper_delete,

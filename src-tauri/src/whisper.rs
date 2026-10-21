@@ -166,6 +166,7 @@ fn context(app: &tauri::AppHandle) -> Result<Arc<whisper_rs::WhisperContext>, St
 /// Start listening with Whisper. `mix` is the noise filter's share of cleaned signal (0 = off).
 pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(), String> {
     stop();
+    *STOPPED_AT.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
     let context = context(&app)?;
     let prompt = prompt_for(words);
     let audio: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
@@ -192,9 +193,28 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
     Ok(())
 }
 
+/// Listening stopped: the model leaves memory (about 150 MB) after a few quiet minutes, unless
+/// listening starts again first. The next listen loads it again in a second or two.
+static STOPPED_AT: Mutex<Option<Instant>> = Mutex::new(None);
+const KEEP_LOADED: Duration = Duration::from_secs(180);
+
+fn forget_model_later() {
+    let at = Instant::now();
+    *STOPPED_AT.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(at);
+    std::thread::spawn(move || {
+        std::thread::sleep(KEEP_LOADED);
+        let stopped = *STOPPED_AT.lock().unwrap_or_else(|poison| poison.into_inner());
+        let listening = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()).is_some();
+        if stopped == Some(at) && !listening {
+            *CONTEXT.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
+        }
+    });
+}
+
 pub fn stop() {
     let running = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()).take();
     let Some(mut running) = running else { return };
+    forget_model_later();
     running.stop.store(true, Ordering::SeqCst);
     if let Some(feed) = running.feed.take() {
         feed.stop();
