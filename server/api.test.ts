@@ -63,6 +63,20 @@ describe("server API", () => {
     expect(await call("/v1/trial", { device: "mac-1" })).toMatchObject({ status: 403, data: { used: true } });
   });
 
+  it("lists the records behind the numbers for the admin page, behind the admin token", async () => {
+    const { call } = setup();
+    await call("/v1/hello", { device: "computer-one-long-id", version: "0.2.4", os: "macos", plan: "free" });
+    await call("/v1/trial", { device: "computer-one-long-id", os: "macos" });
+    expect((await call("/v1/admin/details")).status).toBe(401);
+    const details = (await call("/v1/admin/details", undefined, { authorization: "Bearer secret" })).data as { days: string[]; series: { computers: number[]; trials: number[] }; computers: Array<{ id: string; os: string }>; trials: Array<{ state: string }>; funnel: { computers: number; trials: number } };
+    expect(details.days).toHaveLength(30);
+    expect(details.series.computers.at(-1)).toBe(1);
+    expect(details.series.trials.at(-1)).toBe(1);
+    expect(details.computers[0]).toMatchObject({ id: "computer…", os: "macos" });
+    expect(details.trials[0]!.state).toBe("running");
+    expect(details.funnel).toMatchObject({ computers: 1, trials: 1 });
+  });
+
   it("gives no trial to the browser demo", async () => {
     const { call } = setup();
     expect(await call("/v1/trial", { device: "browser-1", os: "web-macos" })).toMatchObject({ status: 403, data: { web: true } });

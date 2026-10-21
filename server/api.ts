@@ -206,6 +206,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (!config.adminToken) return json(503, { error: "Set ADMIN_TOKEN on the server first." });
     if (!sameText(request.headers.get("authorization") ?? "", `Bearer ${config.adminToken}`)) return json(401, { error: "Wrong admin token." });
     if (path === "/v1/admin/stats" && request.method === "GET") return json(200, await stats(config));
+    if (path === "/v1/admin/details" && request.method === "GET") return json(200, await details(config));
     if (path === "/v1/admin/promos" && request.method === "GET") return json(200, { promos: await listPromos(config.store) });
     if (path === "/v1/admin/promos" && request.method === "POST") {
       const promo = makePromo((await body(request)) ?? {}, config.now());
@@ -288,6 +289,62 @@ async function noteDevice(config: ApiConfig, device: string, change: Partial<Dev
   const next: DeviceMeta = { first: saved?.first ?? now, last: now, plan: "free", version: "", os: "", ...saved, ...Object.fromEntries(Object.entries(change).filter(([, value]) => value !== "" && value !== undefined)) };
   next.last = now;
   await putJson(config.store, key, next, next as unknown as Record<string, unknown>);
+}
+
+/**
+ * The records behind the numbers, for the admin page: the last 30 days by day (new computers, trials
+ * started, sales), and the latest computers, trials, checkouts, licenses and accounts. Computer ids
+ * are shortened; emails are shown only here, behind the admin token.
+ */
+async function details(config: ApiConfig) {
+  const now = config.now();
+  const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
+  const days = Array.from({ length: 30 }, (_, n) => dayOf(now - (29 - n) * DAY));
+  const tally = (times: number[]) => {
+    const counts = new Map(days.map((day) => [day, 0]));
+    for (const at of times) {
+      const day = dayOf(at);
+      if (counts.has(day)) counts.set(day, counts.get(day)! + 1);
+    }
+    return days.map((day) => counts.get(day)!);
+  };
+  const short = (id: string) => (id.length > 10 ? `${id.slice(0, 8)}…` : id);
+  const computers = (await config.store.list("device:"))
+    .filter((entry) => entry.meta)
+    .map((entry) => ({ id: short(entry.key.slice("device:".length)), ...(entry.meta as DeviceMeta) }));
+  const trials = (await config.store.list("trial:"))
+    .filter((entry) => entry.meta)
+    .map((entry) => ({ device: short(entry.key.slice("trial:".length)), ...(entry.meta as { startedAt: number; endsAt: number; converted?: boolean }) }));
+  const checkouts = (await config.store.list("checkout:"))
+    .filter((entry) => entry.meta)
+    .map((entry) => ({ id: entry.key.slice("checkout:".length), ...(entry.meta as { status: string; due: number; plan: string; interval: string; promo: string | null; paidAt?: number | null; createdAt?: number; email?: string; name?: string }) }));
+  const accounts = (await config.store.list("acct:"))
+    .filter((entry) => entry.meta)
+    .map((entry) => ({ ...(entry.meta as { email: string; createdAt: number }) }));
+  const seats = await Promise.all(
+    (await config.store.list("act:")).slice(0, 60).map(async (entry) => {
+      const id = entry.key.slice("act:".length);
+      const devices = (await getJson<Array<{ device: string; name: string; seenAt: string }>>(config.store, entry.key)) ?? [];
+      const record = await getJson<LicenseRecord>(config.store, `license:${id}`);
+      const revoked = !!(await config.store.get(`revoked:${id}`));
+      return { license: id, email: record?.email ?? "", paidUntil: record?.paidUntil ?? null, test: record?.test ?? false, revoked, devices: devices.map((device) => ({ name: device.name, seenAt: device.seenAt })) };
+    }),
+  );
+  const newest = <T>(items: T[], at: (item: T) => number) => [...items].sort((a, b) => at(b) - at(a)).slice(0, 100);
+  return {
+    days,
+    series: {
+      computers: tally(computers.map((computer) => computer.first)),
+      trials: tally(trials.map((trial) => trial.startedAt)),
+      sales: tally(checkouts.filter((checkout) => checkout.status === "paid" && checkout.paidAt).map((checkout) => checkout.paidAt!)),
+    },
+    funnel: { computers: computers.length, trials: trials.length, paid: checkouts.filter((checkout) => checkout.status === "paid").length },
+    computers: newest(computers, (computer) => computer.last),
+    trials: newest(trials, (trial) => trial.startedAt).map((trial) => ({ ...trial, state: trial.converted ? "converted" : trial.endsAt > now ? (trial.endsAt - now < 3 * DAY ? "ending" : "running") : "ended" })),
+    checkouts: newest(checkouts, (checkout) => checkout.createdAt ?? checkout.paidAt ?? 0),
+    licenses: newest(seats, (seat) => Math.max(0, ...seat.devices.map((device) => Date.parse(device.seenAt) || 0))),
+    accounts: newest(accounts, (account) => account.createdAt),
+  };
 }
 
 async function stats(config: ApiConfig) {
@@ -441,7 +498,7 @@ async function startCheckout(config: ApiConfig, input: Record<string, unknown>, 
 }
 
 const saveCheckout = (config: ApiConfig, order: Checkout) =>
-  putJson(config.store, `checkout:${order.id}`, order, { status: order.status, due: order.due, plan: order.plan, interval: order.interval, promo: order.promo, paidAt: order.paidAt ?? null });
+  putJson(config.store, `checkout:${order.id}`, order, { status: order.status, due: order.due, plan: order.plan, interval: order.interval, promo: order.promo, paidAt: order.paidAt ?? null, createdAt: order.createdAt, email: order.email.slice(0, 80), name: order.name.slice(0, 60) });
 
 async function checkoutStatus(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const order = await getJson<Checkout>(config.store, `checkout:${text(input.session, 60)}`);
