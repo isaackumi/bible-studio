@@ -1,4 +1,15 @@
 fn main() {
+    // whisper.cpp asks "is this macOS new enough?" while it runs (___isPlatformVersionAtLeast). That
+    // helper lives in the C compiler's runtime library, which Rust does not link, so link it here.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        if let Ok(output) = std::process::Command::new("xcrun").args(["clang", "--print-runtime-dir"]).output() {
+            let dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !dir.is_empty() && std::path::Path::new(&dir).join("libclang_rt.osx.a").exists() {
+                println!("cargo:rustc-link-search=native={dir}");
+                println!("cargo:rustc-link-lib=static=clang_rt.osx");
+            }
+        }
+    }
     #[cfg(target_os = "macos")]
     {
         build_helper(Helper {
