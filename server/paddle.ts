@@ -6,6 +6,7 @@
 // makes the very same key instead of a second one.
 
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
+import { licenseKeyEmail } from "./email.ts";
 import type { Identity } from "./accounts.ts";
 import { betterAuthIdentity } from "./auth.ts";
 import { completeCheckout, handleApi, licenseOfSubscription, renewLicense, revoke, type ApiConfig } from "./api.ts";
@@ -59,7 +60,7 @@ export type Env = {
   APPLE_CLIENT_SECRET?: string;
 };
 
-type Mail = (to: string, subject: string, text: string) => Promise<void>;
+type Mail = (to: string, subject: string, text: string, html?: string) => Promise<void>;
 
 /**
  * Better Auth, made for each request: Workers do not let one request wait on a promise begun in
@@ -86,11 +87,11 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
       ? paddleProvider({ apiKey: env.PADDLE_API_KEY, sandbox: env.PADDLE_ENV === "sandbox", prices: paddlePriceMap(env.PADDLE_PRICES ?? ""), discounts: codeMap(env.PADDLE_DISCOUNTS ?? "") }, http)
       : mockProvider;
   const mail: Mail | undefined = env.RESEND_API_KEY
-    ? async (to, subject, text) => {
+    ? async (to, subject, text, html) => {
         const response = await http("https://api.resend.com/emails", {
           method: "POST",
           headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-          body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+          body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text, ...(html ? { html } : {}) }),
         });
         if (!response.ok) throw new Error(`Email failed: ${response.status}`);
       }
@@ -107,6 +108,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     site: env.COMPANY_NAME && env.CONTACT_EMAIL ? { company: env.COMPANY_NAME, contact: env.CONTACT_EMAIL } : undefined,
     paddleClient: env.PADDLE_CLIENT_TOKEN ? { token: env.PADDLE_CLIENT_TOKEN, sandbox: env.PADDLE_ENV === "sandbox" } : undefined,
     mail,
+    publicUrl: env.PUBLIC_URL,
     now: () => Date.now(),
   };
 }
@@ -318,33 +320,16 @@ async function keyId(transactionId: string): Promise<Uint8Array> {
 
 // --- Email ----------------------------------------------------------------------------------
 
-export function keyEmail(key: string, issued: Issued): { subject: string; text: string } {
-  const plan = issued.plan === "church" ? "Church" : "Premium";
-  const until = issued.until ? `It runs until ${issued.until}. When your plan renews, a new key arrives by email.` : "It does not expire.";
-  return {
-    subject: `Your Church Studio ${plan} license key`,
-    text: [
-      `Thank you for choosing Church Studio ${plan}.`,
-      "",
-      "Your license key:",
-      "",
-      key,
-      "",
-      "To use it: open Church Studio, go to Settings › Plan & account, paste the key under License key, and choose Add key. No internet connection is needed.",
-      "",
-      until,
-      "",
-      "Keep this email. You can add the same key again on a new computer.",
-    ].join("\n"),
-  };
+export function keyEmail(key: string, issued: Issued, base = "https://license.heitechinc.com"): { subject: string; text: string; html: string } {
+  return licenseKeyEmail({ key, plan: issued.plan === "church" ? "church" : "premium", until: issued.until }, base);
 }
 
 async function sendKey(to: string, key: string, issued: Issued, env: Env, http: Fetch): Promise<void> {
-  const { subject, text } = keyEmail(key, issued);
+  const { subject, text, html } = keyEmail(key, issued, env.PUBLIC_URL);
   const response = await http("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text, html }),
   });
   if (!response.ok) throw new Error(`Email failed: ${response.status}`);
 }

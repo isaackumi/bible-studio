@@ -199,3 +199,13 @@ describe("server API", () => {
     expect(String((await call("/checkout")).data.html)).not.toContain("Environment.set");
   });
 });
+
+describe("email logo", () => {
+  it("serves the app icon as a PNG for emails", async () => {
+    const { config } = setup();
+    const response = await handleApi(new Request("https://keys.test/email/logo.png"), config);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect([...bytes.slice(1, 4)].map((b) => String.fromCharCode(b)).join("")).toBe("PNG");
+  });
+});

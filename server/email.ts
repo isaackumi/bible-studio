@@ -1,0 +1,97 @@
+// The emails Church Studio sends (sign-in links, license keys), in one design: the app's icon and
+// name, a clear heading, one button or one code, and a short footer from HeiTech. Each has a plain
+// text version too, for mail apps that show no HTML. Built with tables and inline styles, which is
+// what every mail app (Gmail, Outlook, Apple Mail) draws the same.
+
+export type Email = { subject: string; text: string; html: string };
+
+const ACCENT = "#fa4f00";
+const INK = "#16181d";
+const MUTED = "#5f6470";
+const LINE = "#e6e7eb";
+
+const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** Where the logo is served (the license server's own address). */
+export const logoUrl = (base: string) => `${base.replace(/\/+$/, "")}/email/logo.png`;
+
+type Block = { kind: "text"; text: string } | { kind: "button"; label: string; url: string } | { kind: "code"; code: string } | { kind: "note"; text: string };
+
+function layout(base: string, input: { preheader: string; heading: string; blocks: Block[]; footer: string }): string {
+  const body = input.blocks
+    .map((block) => {
+      if (block.kind === "text") return `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${INK};">${escape(block.text)}</p>`;
+      if (block.kind === "note") return `<p style="margin:0 0 12px;font-size:13px;line-height:1.55;color:${MUTED};">${escape(block.text)}</p>`;
+      if (block.kind === "code")
+        return `<div style="margin:4px 0 20px;padding:14px 16px;border:1px solid ${LINE};border-radius:10px;background:#f6f7f9;font-family:SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;line-height:1.5;color:${INK};word-break:break-all;">${escape(block.code)}</div>`;
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 22px;"><tr><td style="border-radius:10px;background:${ACCENT};"><a href="${escape(block.url)}" style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">${escape(block.label)}</a></td></tr></table>`;
+    })
+    .join("");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escape(input.heading)}</title></head>
+<body style="margin:0;padding:0;background:#f2f3f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escape(input.preheader)}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2f3f5;"><tr><td align="center" style="padding:32px 16px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;">
+    <tr><td style="padding:0 4px 18px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+        <td style="vertical-align:middle;"><img src="${escape(logoUrl(base))}" width="40" height="40" alt="Church Studio" style="display:block;border:0;border-radius:10px;"></td>
+        <td style="vertical-align:middle;padding-left:12px;font-size:17px;font-weight:700;color:${INK};letter-spacing:-0.01em;">Church Studio</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:16px;padding:32px 32px 18px;">
+      <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;font-weight:750;color:${INK};letter-spacing:-0.01em;">${escape(input.heading)}</h1>
+      ${body}
+    </td></tr>
+    <tr><td style="padding:18px 8px 0;font-size:12px;line-height:1.6;color:${MUTED};text-align:center;">
+      ${escape(input.footer)}<br>
+      Church Studio by HeiTech · <a href="mailto:support@heitechinc.com" style="color:${MUTED};">support@heitechinc.com</a>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>`;
+}
+
+/** The emailed sign-in link. */
+export function signInEmail(url: string, base: string): Email {
+  return {
+    subject: "Sign in to Church Studio",
+    text: `Sign in to Church Studio\n\nOpen this link to sign in:\n${url}\n\nIt works once, for 15 minutes. Then go back to Church Studio and tap the number it shows.\n\nIf you did not ask to sign in, you can ignore this email.\n\nChurch Studio by HeiTech · support@heitechinc.com`,
+    html: layout(base, {
+      preheader: "Your sign-in link for Church Studio. It works once, for 15 minutes.",
+      heading: "Sign in to Church Studio",
+      blocks: [
+        { kind: "text", text: "Use the button below to sign in. Then go back to Church Studio and tap the number it shows." },
+        { kind: "button", label: "Sign in to Church Studio", url },
+        { kind: "note", text: "The link works once, for 15 minutes." },
+        { kind: "note", text: `Button not working? Copy this into your browser: ${url}` },
+      ],
+      footer: "You got this because someone asked to sign in to Church Studio with this address. If it was not you, ignore it: nothing changes.",
+    }),
+  };
+}
+
+/** A license key, after a purchase. `added`: Church Studio already put it on the computer that bought it. */
+export function licenseKeyEmail(input: { key: string; plan: "premium" | "church"; until?: string | null; added?: boolean }, base: string): Email {
+  const plan = input.plan === "church" ? "Church" : "Premium";
+  const how = input.added
+    ? "Church Studio has already added it on the computer you bought from. To use it on another computer: Settings › Plan & account › License key."
+    : "Open Church Studio, go to Settings › Plan & account, paste the key under License key, and choose Add key.";
+  const when = input.until ? `It runs until ${input.until}. When your plan renews, it keeps working.` : "The key keeps working while your plan renews; there is nothing to do at renewal.";
+  return {
+    subject: `Your Church Studio ${plan} license key`,
+    text: [`Thank you for choosing Church Studio ${plan}.`, "", "Your license key:", "", input.key, "", how, "", when, "", "Keep this email. You can add the same key again on a new computer.", "", "Church Studio by HeiTech · support@heitechinc.com"].join("\n"),
+    html: layout(base, {
+      preheader: `Your Church Studio ${plan} license key, and how to add it.`,
+      heading: `Your ${plan} plan is ready`,
+      blocks: [
+        { kind: "text", text: `Thank you for choosing Church Studio ${plan}. Here is your license key:` },
+        { kind: "code", code: input.key },
+        { kind: "text", text: how },
+        { kind: "note", text: when },
+        { kind: "note", text: "Keep this email. You can add the same key again on a new computer." },
+      ],
+      footer: "You got this because a Church Studio plan was bought with this address.",
+    }),
+  };
+}

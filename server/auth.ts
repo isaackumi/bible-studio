@@ -7,6 +7,7 @@
 // (made by `node server/auth-schema.ts`, applied by deploy.sh).
 
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { signInEmail } from "./email.ts";
 import { magicLink } from "better-auth/plugins/magic-link";
 import type { Identity, SigninMethod } from "./accounts.ts";
 
@@ -23,7 +24,7 @@ export type AuthSettings = {
   microsoft?: Credentials;
   apple?: Credentials;
   /** Sends the sign-in link; without it there is no email sign-in. */
-  mail?: (to: string, subject: string, text: string) => Promise<void>;
+  mail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
 };
 
 const has = (credentials?: Credentials): credentials is Required<Credentials> => !!(credentials?.clientId && credentials.clientSecret);
@@ -52,7 +53,7 @@ export function authOptions(settings: AuthSettings): BetterAuthOptions {
           magicLink({
             expiresIn: 15 * 60,
             sendMagicLink: async ({ email, url }) =>
-              mail(email, "Your Church Studio sign-in link", `Open this link to sign in to Church Studio:\n\n${url}\n\nIt works once, for 15 minutes. If you did not ask to sign in, you can ignore this email.`),
+              (({ subject, text, html }) => mail(email, subject, text, html))(signInEmail(url, new URL(url).origin)),
           }),
         ]
       : [],

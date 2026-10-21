@@ -17,11 +17,16 @@
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
+import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
+import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
 import { adminPage, checkoutPage, payPage } from "./pages.ts";
 import { homePage, privacyPage, refundsPage, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
+
+/** Where the server lives when no address is set (links and the logo in emails). */
+const DEFAULT_PUBLIC_URL = "https://license.heitechinc.com";
 
 export type ApiConfig = {
   store: Store;
@@ -48,7 +53,9 @@ export type ApiConfig = {
   /** Days a subscription key keeps working past the paid period, to cover a late renewal. */
   graceDays: number;
   /** Sends the key email, if mail is set up. */
-  mail?: (to: string, subject: string, text: string) => Promise<void>;
+  mail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
+  /** The server's public address, for links and the logo in emails. */
+  publicUrl?: string;
   now: () => number;
 };
 
@@ -143,6 +150,11 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
 
   // Pages.
   if (path === "/admin" && request.method === "GET") return html(200, adminPage());
+  // The app icon for emails (mail apps cannot show SVG).
+  if (path === "/email/logo.png" && request.method === "GET") {
+    const bytes = Uint8Array.from(atob(EMAIL_LOGO_PNG), (char) => char.charCodeAt(0));
+    return new Response(bytes, { status: 200, headers: { "content-type": "image/png", "cache-control": "public, max-age=604800" } });
+  }
   if (request.method === "GET") {
     const site = config.site ?? DEFAULT_SITE;
     if (path === "/") return html(200, homePage(site));
@@ -437,10 +449,8 @@ export async function completeCheckout(config: ApiConfig, sessionId: string, sub
     await noteDevice(config, order.device, { plan: order.plan, paid: now });
   }
   if (config.mail) {
-    const plan = order.plan === "church" ? "Church" : "Premium";
-    await config
-      .mail(order.email, `Your Church Studio ${plan} license key`, [`Thank you for choosing Church Studio ${plan}.`, "", "Your license key:", "", key, "", "Church Studio has already added it on the computer you bought from. To use it on another computer: Settings › Plan & account › License key.", "", "The key keeps working while your subscription renews; nothing to do at renewal."].join("\n"))
-      .catch(() => {});
+    const email = licenseKeyEmail({ key, plan: order.plan, added: true }, config.publicUrl ?? DEFAULT_PUBLIC_URL);
+    await config.mail(order.email, email.subject, email.text, email.html).catch(() => {});
   }
   return paid;
 }
