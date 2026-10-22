@@ -22,6 +22,8 @@ jobs:
       # The license server and scripts (outside src/, so npm run check does not see them).
       - run: npm run check:server
       - run: npm test
+      # What each window loads at start, against its budget (scripts/bundle-budget.mjs).
+      - run: npm run budget
 
   desktop:
     name: Desktop (${{ matrix.platform }})

@@ -5,12 +5,23 @@ import { SITE_URL } from "../domain/billing";
 
 type SourceBook = { chapters: string[][] };
 
+/**
+ * Whether this build carries the five built-in Bibles as files of its own (vite.config.js): the
+ * browser version and development do; the desktop app does not (about 20 MB), because its Bibles
+ * are in its library and are read from there.
+ */
+declare const __BUNDLED_BIBLES__: boolean;
+
 const LOADERS: Record<string, () => Promise<{ default?: SourceBook[] } | SourceBook[]>> = {
-  kjv: () => import("../../../src-tauri/resources/kjv.json"),
-  asv: () => import("../../../src-tauri/resources/asv.json"),
-  web: () => import("../../../src-tauri/resources/web.json"),
-  bbe: () => import("../../../src-tauri/resources/bbe.json"),
-  twi: () => import("../../../src-tauri/resources/twi.json"),
+  ...(__BUNDLED_BIBLES__
+    ? {
+        kjv: () => import("../../../src-tauri/resources/kjv.json"),
+        asv: () => import("../../../src-tauri/resources/asv.json"),
+        web: () => import("../../../src-tauri/resources/web.json"),
+        bbe: () => import("../../../src-tauri/resources/bbe.json"),
+        twi: () => import("../../../src-tauri/resources/twi.json"),
+      }
+    : {}),
   // Downloaded only when chosen (the desktop app checks each against its SHA-256 in src-tauri/src/bible.rs).
   ...Object.fromEntries(["ewe", "yor", "ibo", "hausa", "twiasante"].map((id) => [id, () => fetchBible(id)])),
 };
@@ -101,9 +112,11 @@ function load(id: string): Promise<SourceBook[]> {
   const existing = cache.get(id);
   if (existing) return existing;
   const loader = LOADERS[id];
-  // A Bible the church imported lives only in the desktop database: ask the core for its text.
-  if (!loader) {
-    if (!id.startsWith("user-") || !(globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) return Promise.resolve([]);
+  // The desktop app reads every Bible from its library (the built-in ones are installed there, and
+  // the ones a church imported live only there): ask the core for its text.
+  const desktop = !!(globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  if (desktop || !loader) {
+    if (!desktop) return Promise.resolve([]);
     const pending = import("@tauri-apps/api/core")
       .then(({ invoke }) => invoke<string[][][]>("bible_source", { translationId: id }))
       .then((books) => books.map((chapters) => ({ chapters })))

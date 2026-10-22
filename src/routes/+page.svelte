@@ -1,14 +1,19 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import AudienceOutput from "$lib/components/AudienceOutput.svelte";
-  import OperatorShell from "$lib/components/OperatorShell.svelte";
-  import RemotePad from "$lib/components/RemotePad.svelte";
-  import StageOutput from "$lib/components/StageOutput.svelte";
-  import SecondOutput from "$lib/components/SecondOutput.svelte";
-  import ScreenOutput from "$lib/components/ScreenOutput.svelte";
+  import { onMount, type Component } from "svelte";
   import { isDesktop } from "$lib/platform/runtime";
 
   type Surface = "operator" | "audience" | "remote" | "stage" | "second" | "screen";
+
+  // Each window loads only what it shows: an audience, stage or extra screen never loads the desk
+  // (most of the app's code), so it opens faster and holds less memory, once per screen.
+  const SURFACES: Record<Surface, () => Promise<{ default: Component<any> }>> = {
+    operator: () => import("$lib/components/OperatorShell.svelte"),
+    audience: () => import("$lib/components/AudienceOutput.svelte"),
+    remote: () => import("$lib/components/RemotePad.svelte"),
+    stage: () => import("$lib/components/StageOutput.svelte"),
+    second: () => import("$lib/components/SecondOutput.svelte"),
+    screen: () => import("$lib/components/ScreenOutput.svelte"),
+  };
 
   function markedAudience(): boolean {
     if (typeof window === "undefined") return false;
@@ -49,16 +54,10 @@
   });
 </script>
 
-{#if surface === "audience"}
-  <AudienceOutput />
-{:else if surface === "remote"}
-  <RemotePad />
-{:else if surface === "stage"}
-  <StageOutput />
-{:else if surface === "second"}
-  <SecondOutput />
-{:else if surface === "screen"}
-  <ScreenOutput id={new URLSearchParams(window.location.search).get("screen") || (tauriWindowLabel() ?? "").replace(/^screen-/, "")} />
-{:else}
-  <OperatorShell />
-{/if}
+{#await SURFACES[surface]() then { default: View }}
+  {#if surface === "screen"}
+    <View id={new URLSearchParams(window.location.search).get("screen") || (tauriWindowLabel() ?? "").replace(/^screen-/, "")} />
+  {:else}
+    <View />
+  {/if}
+{/await}

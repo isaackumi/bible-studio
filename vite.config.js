@@ -9,7 +9,12 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [sveltekit()],
   // The app version, for check-ins and support emails.
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  // __BUNDLED_BIBLES__: the browser version (and development) carries the built-in Bibles as files;
+  // the desktop app (tauri dev and tauri build set TAURI_ENV_PLATFORM) reads them from its library instead.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUNDLED_BIBLES__: JSON.stringify(!process.env.TAURI_ENV_PLATFORM),
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   // Compiles .svelte.ts modules ($state and friends), so classes such as the audio deck can be tested.
   plugins: [svelte()],
+  // Tests read the built-in Bibles from their files, as the browser version does.
+  define: { __BUNDLED_BIBLES__: "true" },
   test: {
     include: ["src/**/*.test.ts", "server/**/*.test.ts"],
     environment: "node",
