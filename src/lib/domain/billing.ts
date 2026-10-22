@@ -89,7 +89,18 @@ export type AccountStatus = {
 export const ACCOUNT_TOKEN = /^cst_[0-9a-f]{64}$/;
 
 /** Where an account is signed in (POST /v1/account/devices). */
-export type SignedInComputer = { id: string; name: string; createdAt: number; you: boolean };
+export type SignedInComputer = {
+  id: string;
+  name: string;
+  createdAt: number;
+  you: boolean;
+  /** From its check-ins: "macos", "windows", "linux", or "web-macos" for the browser version (empty when unknown). */
+  os?: string;
+  /** The browser version's browser ("Edge 129"). */
+  browser?: string;
+  version?: string;
+  lastSeen?: number;
+};
 
 /** A PKCE verifier and its challenge (base64url SHA-256), for the loopback sign-in. */
 export async function pkcePair(): Promise<{ verifier: string; challenge: string }> {

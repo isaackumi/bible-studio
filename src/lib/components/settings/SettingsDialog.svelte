@@ -7,6 +7,8 @@
   import VoiceWords from "./VoiceWords.svelte";
   import ScreensSettings from "./ScreensSettings.svelte";
   import StorageSpace from "./StorageSpace.svelte";
+  import PlatformMark, { platformOf } from "../PlatformMark.svelte";
+  import type { SignedInComputer } from "../../domain/billing";
   import SettingsSearch from "./SettingsSearch.svelte";
   import type { SettingEntry } from "../../settings/search";
   import { tick } from "svelte";
@@ -410,6 +412,17 @@
   let trialBusy = $state(false);
   let trialError = $state("");
   let signInError = $state("");
+
+  /** "Mac app, used today" / "Edge on Windows, used 3 days ago": what it is, and when it was last used. */
+  function computerLine(computer: SignedInComputer): string {
+    const { platform, browser } = platformOf(computer.os, computer.browser);
+    const system = { mac: "Mac", windows: "Windows", linux: "Linux", other: "" }[platform];
+    const browserName = (computer.browser ?? "").replace(/\s+\d.*$/, "");
+    const what = browser ? (system ? t("{browser} on {system}", { browser: browserName || t("Browser"), system }) : browserName || t("Browser")) : system ? t("{system} app", { system }) : t("Computer");
+    const days = Math.floor((Date.now() - (computer.lastSeen ?? computer.createdAt)) / 86_400_000);
+    const when = days <= 0 ? t("used today") : days === 1 ? t("used yesterday") : tn(days, "used {n} day ago", "used {n} days ago");
+    return t("{what}, {when}", { what, when });
+  }
   let accountBusy = $state(false);
   const visibleGroups = $derived.by(() => {
     return groups
@@ -1644,9 +1657,23 @@
               <div class="row stack">
                 <div class="row-copy"><strong>{t("Where you are signed in")}</strong><span>{t("A computer nobody opens for six months signs itself out.")}</span></div>
                 {#if session.signedInComputers}
-                  {#each session.signedInComputers as computer (computer.id)}
-                    <div class="member"><span class="one-line">{computer.name}{computer.you ? ` · ${t("this computer")}` : ""}</span>{#if !computer.you}<button type="button" class="btn small" onclick={async () => { signInError = (await session.signOutComputer(computer.id)) ?? ""; }}>{t("Sign out")}</button>{/if}</div>
-                  {/each}
+                  <ul class="computers">
+                    {#each [...session.signedInComputers].sort((a, b) => Number(b.you) - Number(a.you) || (b.lastSeen ?? 0) - (a.lastSeen ?? 0)) as computer (computer.id)}
+                      {@const mark = platformOf(computer.os, computer.browser)}
+                      <li class:you={computer.you}>
+                        <PlatformMark platform={mark.platform} browser={mark.browser} />
+                        <span class="computer-copy">
+                          <strong class="one-line" title={computer.version ? t("Church Studio {version}", { version: computer.version }) : undefined}>{computer.name}</strong>
+                          <span class="one-line">{computerLine(computer)}</span>
+                        </span>
+                        {#if computer.you}
+                          <span class="here">{t("This computer")}</span>
+                        {:else}
+                          <button type="button" class="quiet-action" onclick={async () => { signInError = (await session.signOutComputer(computer.id)) ?? ""; }}>{t("Sign out")}</button>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
                   {#if session.signedInComputers.some((computer) => !computer.you)}
                     <div class="sign-in"><button type="button" class="btn" onclick={async () => { signInError = (await session.signOutComputer("others")) ?? ""; }}>{t("Sign out everywhere else")}</button></div>
                   {/if}
@@ -2067,6 +2094,18 @@
   .avatar-mark { border-radius: 50%; }
   .plan-chip { font-weight: 700; }
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Where you are signed in: each computer with its system's mark, newest use first, this one on top. */
+  .computers { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+  .computers li { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px 10px; border-radius: 12px; }
+  .computers li.you { background: color-mix(in srgb, var(--good, #3ccf7a) 7%, transparent); }
+  .computers li:not(.you):hover { background: color-mix(in srgb, currentColor 5%, transparent); }
+  .computer-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .computer-copy strong { font-size: 13px; font-weight: 650; line-height: 1.3; }
+  .computer-copy span { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+  .here { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; color: var(--good, #3ccf7a); background: color-mix(in srgb, var(--good, #3ccf7a) 14%, transparent); }
+  .quiet-action { flex: none; padding: 5px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .quiet-action:hover, .quiet-action:focus-visible { color: var(--danger, #ff6b5e); background: color-mix(in srgb, var(--danger, #ff6b5e) 10%, transparent); }
+  .member span { font-size: 13px; }
   .member { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
   .sign-in input { flex: 1 1 200px; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 9px; background: transparent; color: inherit; font: inherit; }
   .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }

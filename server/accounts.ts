@@ -257,7 +257,13 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       const account = await accountOf(config, token);
       if (!account) return json(401, { signedOut: true, error: "Sign in again." });
       const mine = await sha256(token);
-      const devices = (await liveTokens(config, account.id)).map((entry) => ({ id: entry.hash.slice(0, 12), name: entry.name, createdAt: entry.createdAt, you: entry.hash === mine }));
+      // Each with what its check-ins say (system, browser, version, last seen), for its icon and line.
+      const devices = await Promise.all(
+        (await liveTokens(config, account.id)).map(async (entry) => {
+          const meta = await getJson<{ os?: string; browser?: string; version?: string; last?: number }>(config.store, `device:${entry.device}`);
+          return { id: entry.hash.slice(0, 12), name: entry.name, createdAt: entry.createdAt, you: entry.hash === mine, os: meta?.os ?? "", browser: meta?.browser ?? "", version: meta?.version ?? "", lastSeen: meta?.last ?? entry.createdAt };
+        }),
+      );
       return json(200, { devices });
     }
     case "/v1/account/signout": {
