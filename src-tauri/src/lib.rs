@@ -33,6 +33,52 @@ fn with_db<T>(state: &State<Db>, f: impl FnOnce(&rusqlite::Connection) -> Result
 /// The library that could not be opened and was set aside at launch (its file name), for the desk to say once.
 struct StartupNotice(Mutex<Option<String>>);
 
+/// One entry of a pictures folder: a picture, or a folder inside it.
+#[derive(serde::Serialize)]
+struct FolderEntry {
+    name: String,
+    path: String,
+    kind: &'static str,
+    bytes: u64,
+    modified: u64,
+}
+
+/// The pictures in a folder the person chose (and the folders inside it), shown where they are,
+/// with no copying: the folder is opened to the window's picture loader, without its subfolders.
+#[tauri::command(async)]
+fn picture_folder(app: AppHandle, path: String) -> Result<Vec<FolderEntry>, String> {
+    let dir = std::path::PathBuf::from(&path);
+    if !dir.is_dir() {
+        return Err("That folder could not be found.".into());
+    }
+    app.asset_protocol_scope().allow_directory(&dir, false).map_err(|error| error.to_string())?;
+    list_pictures(&dir)
+}
+
+/// A folder's pictures (JPEG, PNG, GIF, BMP, WebP) and the folders inside it; hidden ones left out.
+fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
+    let mut entries = Vec::new();
+    for entry in std::fs::read_dir(dir).map_err(|error| format!("That folder could not be read. {error}"))?.flatten().take(10_000) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else { continue };
+        let modified = meta.modified().ok().and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok()).map(|at| at.as_millis() as u64).unwrap_or(0);
+        let kind = if meta.is_dir() {
+            "folder"
+        } else {
+            let ext = std::path::Path::new(&name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+            match ext.as_str() {
+                "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" => "image",
+                _ => continue,
+            }
+        };
+        entries.push(FolderEntry { name, path: entry.path().to_string_lossy().to_string(), kind, bytes: meta.len(), modified });
+    }
+    Ok(entries)
+}
+
 /// Get ready for the browser to come back after signing in: the port it returns to.
 #[tauri::command]
 fn signin_listen(app: AppHandle) -> Result<u16, String> {
@@ -802,6 +848,7 @@ pub fn run() {
             entitlement::entitlement_device,
             startup_notice,
             signin_listen,
+            picture_folder,
             pco_get,
             easyworship_songs,
             ai_post,
@@ -929,6 +976,20 @@ mod backup_tests {
 
 #[cfg(test)]
 mod vmix_tests {
+    #[test]
+    fn lists_only_pictures_and_folders() {
+        let dir = std::env::temp_dir().join(format!("cs-pictures-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Easter")).unwrap();
+        for name in ["a.JPG", "b.png", "c.bmp", "notes.txt", ".hidden.png", "clip.mp4"] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+        let mut found: Vec<(String, &str)> = super::list_pictures(&dir).unwrap().into_iter().map(|entry| (entry.name, entry.kind)).collect();
+        found.sort();
+        assert_eq!(found, vec![("Easter".to_string(), "folder"), ("a.JPG".to_string(), "image"), ("b.png".to_string(), "image"), ("c.bmp".to_string(), "image")]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     use super::lan_host_allowed;
 
     #[test]

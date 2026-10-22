@@ -6,6 +6,8 @@
   import DeckEditor from "./decks/DeckEditor.svelte";
   import AudiencePanel from "./audience/AudiencePanel.svelte";
   import { audienceRoom } from "../app/rooms.svelte";
+  import PicturesPanel from "./pictures/PicturesPanel.svelte";
+  import { pictures } from "../app/pictures.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
   import WhatsNew from "./WhatsNew.svelte";
@@ -225,6 +227,7 @@
       </a>
     {/if}
     {#if audienceRoom.open}<AudiencePanel />{/if}
+    {#if pictures.open}<PicturesPanel />{/if}
     {#if session.studio}
       {@const studioDeck = session.decks.find((deck) => deck.id === session.studio?.deckId)}
       {#if studioDeck}

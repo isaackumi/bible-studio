@@ -54,6 +54,10 @@ function readSaved(): Saved | null {
   }
 }
 
+/** Called when the Audience drawer opens (the Pictures drawer, in the same place, closes). */
+let onShow: (() => void) | null = null;
+export const whenAudienceOpens = (run: () => void) => void (onShow = run);
+
 class AudienceRoom {
   /** The room this desk runs, if any. */
   current = $state<Saved | null>(typeof localStorage === "undefined" ? null : readSaved());
@@ -75,6 +79,7 @@ class AudienceRoom {
   }
 
   show = () => {
+    onShow?.();
     this.open = true;
     void this.poll();
   };

@@ -8,6 +8,7 @@
   import { isDesktop } from "../platform/runtime";
   import FavoriteStar from "./FavoriteStar.svelte";
   import { t } from "../i18n/core";
+  import { pictures } from "../app/pictures.svelte";
 
   let picker: HTMLInputElement | null = $state(null);
 
@@ -55,6 +56,7 @@
 <div class="pane">
   {#if isDesktop()}
     <button type="button" class="primary" onclick={() => void chooseDesktop()}>{t("Import image or video")}</button>
+    <button type="button" class="secondary" onclick={() => pictures.show()}>{t("Pictures from a folder…")}</button>
   {:else}
     <button type="button" class="primary" onclick={() => picker?.click()}>{t("Import image or video")}</button>
     <input
@@ -100,5 +102,8 @@
   h4 { margin: 16px 0 6px; font-size: 13px; }
   .kind { font-size: 12px; color: var(--muted, #a3a3a3); letter-spacing: 0; }
   .loop { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted, #a3a3a3); margin: 8px 0; }
+  /* Beside Import: pictures shown from a folder, without copying. */
+  .secondary { width: 100%; min-height: 36px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+  .secondary:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
   .camera-note { margin: 0 0 8px; font-size: 12px; color: var(--muted, #a3a3a3); }
 </style>

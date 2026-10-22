@@ -134,7 +134,7 @@ import { readBibleFile, verseCount } from "../bible/import";
 import { stageChords, type ChordLine } from "../domain/chords";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
-import type { ShortcutAction } from "../domain/types";
+import type { ShortcutAction, TransitionKind } from "../domain/types";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { clockLabel, DEFAULT_START, minutesOfDay, parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming, shiftSchedule } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
@@ -4318,9 +4318,17 @@ class Session {
   };
 
   /** Play, pause, jump or change the volume of the video on Program, on every screen at once. */
-  controlVideo = async (change: { kind: "play" | "pause" | "restart" } | { kind: "seek"; at: number } | { kind: "volume"; volume: number }) => {
+  controlVideo = async (change: { kind: "play" | "pause" | "restart" | "mute" | "loop" } | { kind: "seek"; at: number } | { kind: "volume"; volume: number }) => {
     const model = this.live.program.model;
     if (model.layout !== "video" || !model.video) return;
+    // Sound on or off, and play once or loop: every screen follows, the picture carries on.
+    if (change.kind === "mute" || change.kind === "loop") {
+      const video = change.kind === "mute" ? { ...model.video, muted: !model.video.muted } : { ...model.video, loop: !model.video.loop };
+      this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video } } };
+      if (change.kind === "loop") this.videoEnded = null;
+      await this.pushProgram();
+      return;
+    }
     const now = Date.now();
     const current = model.video.control ?? { playing: true, at: 0, stamp: now, volume: 1 };
     const at = videoPosition(current, now);
@@ -4340,8 +4348,11 @@ class Session {
         control = { ...current, at: Math.max(model.video.start ?? 0, change.at), stamp: now };
         this.videoEnded = null;
         break;
-      default:
+      case "volume":
         control = { ...current, at, stamp: now, volume: Math.min(1, Math.max(0, change.volume)) };
+        break;
+      default:
+        return;
     }
     this.live = { ...this.live, program: { ...this.live.program, model: { ...model, video: { ...model.video, control } } } };
     await this.pushProgram();
@@ -7019,7 +7030,8 @@ class Session {
     this.notify(label, { detail: t("Undo puts back what was showing ({key}).", { key }), actions: [{ label: t("Undo"), run: () => { void this.undoProgram(); this.dismissToast(); } }] });
   }
 
-  private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {
+  /** `transition`: this take's own (a slideshow's chosen one), instead of the theme's. */
+  private act = async (action: "take" | "cut" | "clear" | "black" | "logo", transition?: TransitionKind) => {
     if (!this.desktop() && !this.controlsAudience) {
       this.warn(t("This window is not sending to the audience."));
       return;
@@ -7037,7 +7049,9 @@ class Session {
     const themeTransition = this.theme().transition;
     const takeTransition =
       action === "take"
-        ? takeTransitionForPreview(this.live.preview.sourceId, this.looksForTake(), themeTransition)
+        ? transition
+          ? { type: transition }
+          : takeTransitionForPreview(this.live.preview.sourceId, this.looksForTake(), themeTransition)
         : null;
     this.live = applyProgramAction(
       this.live,
@@ -7097,7 +7111,7 @@ class Session {
     );
   };
 
-  take = () => this.act("take");
+  take = (transition?: TransitionKind) => this.act("take", transition);
   cut = () => this.act("cut");
   clear = () => this.act("clear");
 

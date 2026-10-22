@@ -5,6 +5,7 @@
   import Icon from "./Icon.svelte";
   import { msg, t, tn } from "../i18n/core";
   import { audienceRoom } from "../app/rooms.svelte";
+  import { pictures } from "../app/pictures.svelte";
 
   // Go to anything (⌘K / Ctrl+K), from any page: a page, a part or item of the service, a song, a
   // verse ("John 3:16" goes on Preview), a setting, or an action (LIVE, Clear, Start service…).
@@ -61,6 +62,9 @@
       // The design studio: slides, templates, lower thirds, gradients, icons and pictures.
       { id: "d-studio", group: msg("Design"), label: msg("Design studio"), detail: msg("Slides, gradients, shapes, icons and pictures"), icon: "stage", run: () => session.openStudio(), words: "design studio slides editor deck page graphics gradient shape icon picture image svg logo rotate group" },
       { id: "d-template", group: msg("Design"), label: msg("New page from a template"), detail: msg("Welcome, event, verse, sermon, giving"), icon: "plus", run: () => session.openStudio(undefined, "templates"), words: "template templates layout welcome event announcement notices verse scripture sermon series giving prayer design" },
+      // Pictures from a folder, and slideshows.
+      { id: "pic-folder", group: msg("Media"), label: msg("Pictures from a folder"), detail: msg("Show pictures straight from any folder"), icon: "media", run: () => pictures.show(), words: "pictures photos images folder album jpg png gif bmp browse" },
+      { id: "pic-slideshow", group: msg("Media"), label: msg("Slideshow"), detail: msg("A folder of pictures on the screen, one after another"), icon: "media", run: () => pictures.show(), words: "slideshow slide show photos loop walk-in announcements auto advance" },
       // The congregation's phones.
       { id: "aud-qa", group: msg("Audience"), label: msg("Live Q&A"), detail: msg("People ask and vote from their phones"), icon: "users", run: () => audienceRoom.show(), words: "q&a questions ask audience congregation phone qr room moderate vote" },
       { id: "aud-games", group: msg("Audience"), label: msg("Quizzes and Bible games"), detail: msg("Played on people's phones"), icon: "users", run: () => audienceRoom.show(), words: "quiz quizzes game games bible trivia kahoot play youth children leaderboard" },

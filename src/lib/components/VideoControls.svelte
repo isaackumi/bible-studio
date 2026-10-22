@@ -75,6 +75,8 @@
     />
     <span class="time">{to ? clock(to) : "–:––"}</span>
     {#if video.end && video.end !== "hold" && video.end !== "loop"}<span class="then" title={t("What happens when this video ends")}>{video.end === "clear" ? t("then clear") : video.end === "next" ? t("then next item") : t("then next in part")}</span>{/if}
+    <button type="button" class="vc text" aria-pressed={!!video.loop} class:on={video.loop} title={video.loop ? t("Looping: plays again from the start") : t("Plays once")} onclick={() => void session.controlVideo({ kind: "loop" })}>{t("Loop")}</button>
+    <button type="button" class="vc" aria-pressed={!!video.muted} class:on={video.muted} aria-label={video.muted ? t("Sound off: turn it on") : t("Sound on: mute it")} title={video.muted ? t("Sound off") : t("Sound on")} onclick={() => void session.controlVideo({ kind: "mute" })}><Icon name={video.muted ? "mute" : "sound"} size={13} /></button>
     <input class="volume" type="range" min="0" max="1" step="0.05" value={control?.volume ?? 1} aria-label={t("Volume")} title={t("Volume")} onchange={(event) => void session.controlVideo({ kind: "volume", volume: Number(event.currentTarget.value) })} />
     <button type="button" class="vc text" disabled={fading || control?.playing === false} title={t("Bring the sound down over 3 seconds, then pause")} onclick={() => void fade()}>{fading ? t("Fading…") : t("Fade out")}</button>
   </div>
@@ -85,6 +87,7 @@
   .vc { display: grid; place-items: center; flex: none; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .vc.text { padding: 0 8px; }
   .vc:disabled { opacity: 0.5; cursor: default; }
+  .vc.on { border-color: var(--accent); color: var(--accent); }
   .time { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
   .scrub { flex: 1; min-width: 60px; accent-color: var(--live); }
   .volume { width: 64px; flex: none; accent-color: var(--accent); }
