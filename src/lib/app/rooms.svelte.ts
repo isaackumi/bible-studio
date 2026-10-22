@@ -11,6 +11,7 @@ import { presentQr } from "../domain/overlays";
 import { presentText } from "../domain/present";
 import { t } from "../i18n/core";
 import { session } from "./session.svelte";
+import { remoteSafe } from "../display/remote-safe";
 
 export type RoomQuestion = {
   id: string;
@@ -105,6 +106,9 @@ class AudienceRoom {
   end = async () => {
     const saved = this.current;
     if (!saved) return;
+    this.stopWatching?.();
+    this.stopWatching = null;
+    this.sharing = false;
     await serverCall(`/v1/rooms/${saved.code}/close`, { hostKey: saved.hostKey });
     this.save(null);
     this.view = null;
@@ -151,6 +155,59 @@ class AudienceRoom {
     const saved = this.current;
     if (!saved) return;
     session.previewModel(presentQr({ theme: session.theme(), data: saved.joinUrl, style: "rounded", dark: "#000000", light: "#ffffff", caption: `${caption} · ${saved.joinUrl.replace(/^https?:\/\//, "")}` }), `room:${saved.code}:qr`);
+  };
+
+  // --- The screen on phones and browsers ------------------------------------------------------
+
+  /** Program is being shared with browsers and phones used as displays (/d/CODE). */
+  sharing = $state(false);
+  private shareTimer: ReturnType<typeof setTimeout> | undefined;
+  private shareSent = "";
+  private stopWatching: (() => void) | null = null;
+
+  get displayUrl(): string | null {
+    return this.current ? this.current.joinUrl.replace("/j/", "/d/") : null;
+  }
+
+  /** Start or stop sending Program to the room's displays. */
+  share = async (on: boolean) => {
+    const saved = this.current;
+    if (!saved) return;
+    if (!on) {
+      this.sharing = false;
+      this.stopWatching?.();
+      this.stopWatching = null;
+      clearTimeout(this.shareTimer);
+      this.shareSent = "";
+      await serverCall(`/v1/rooms/${saved.code}/share`, { hostKey: saved.hostKey, on: false });
+      return;
+    }
+    this.sharing = true;
+    // Every change to Program goes out (at most four times a second; the newest always wins).
+    this.stopWatching = $effect.root(() => {
+      $effect(() => {
+        const program = session.live.program;
+        const canvas = session.outputCanvas();
+        const frame = JSON.stringify({ model: remoteSafe(program.model), aspect: canvas.width / canvas.height });
+        clearTimeout(this.shareTimer);
+        this.shareTimer = setTimeout(() => void this.sendScreen(frame), 250);
+      });
+    });
+  };
+
+  private sendScreen = async (frame: string) => {
+    const saved = this.current;
+    if (!saved || !this.sharing || frame === this.shareSent) return;
+    const answer = await serverCall(`/v1/rooms/${saved.code}/share`, { hostKey: saved.hostKey, frame });
+    if (answer.ok) this.shareSent = frame;
+    else this.error = answer.offline ? t("No internet: displays keep the last screen until it is back.") : answer.error;
+  };
+
+  /** The display link's QR code on Preview: for a phone or a TV browser to show the screen. */
+  displayQrOnPreview = () => {
+    const url = this.displayUrl;
+    if (!url) return;
+    session.previewModel(presentQr({ theme: session.theme(), data: url, style: "rounded", dark: "#000000", light: "#ffffff", caption: `${t("Scan to follow on your phone")} · ${url.replace(/^https?:\/\//, "")}` }), `room:${this.current?.code}:display-qr`);
   };
 
   // --- Games ---------------------------------------------------------------------------------

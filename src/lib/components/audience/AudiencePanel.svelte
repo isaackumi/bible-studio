@@ -90,6 +90,20 @@
         </div>
       </div>
     </section>
+    <!-- The screen on phones, tablets and TV browsers: anyone with the link sees what the room sees. -->
+    <section class="share">
+      <label class="share-head">
+        <input type="checkbox" class="switch" checked={audienceRoom.sharing} onchange={(event) => audienceRoom.share(event.currentTarget.checked)} />
+        <span><strong>{t("Show the screen on phones and browsers")}</strong><em>{audienceRoom.sharing ? t("Sharing what goes LIVE. Pictures and videos stay on this computer; words, songs and scripture show.") : t("For an overflow room, a TV with a browser, or people's own phones.")}</em></span>
+      </label>
+      {#if audienceRoom.sharing && audienceRoom.displayUrl}
+        <div class="row">
+          <span class="link">{audienceRoom.displayUrl.replace(/^https?:\/\//, "")}</span>
+          <button type="button" class="btn" onclick={() => audienceRoom.displayQrOnPreview()}>{t("Its QR on Preview")}</button>
+          <button type="button" class="btn" onclick={() => navigator.clipboard.writeText(audienceRoom.displayUrl ?? "").catch(() => {})}>{t("Copy")}</button>
+        </div>
+      {/if}
+    </section>
     {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
 
     <div class="tabs" role="tablist">
@@ -178,6 +192,11 @@
   .btn { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .btn:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn.accent { border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); }
+  .share { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .share-head { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+  .share-head span { display: grid; gap: 2px; }
+  .share-head strong { font-size: 13px; }
+  .share-head em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.4; }
   .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
   .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
   .tabs button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }

@@ -114,6 +114,22 @@ describe("rooms: quizzes and polls", () => {
   });
 });
 
+describe("rooms: the screen on browsers and phones", () => {
+  it("shares what the desk sends, answers 'nothing new' cheaply, and stops when sharing stops", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace"));
+    expect(data(await core.screen(0))).toBeNull();
+    expect(await core.share("wrong", { frame: "{}" })).toMatchObject({ ok: false, status: 403 });
+    expect(await core.share(hostKey, { frame: "not json" })).toMatchObject({ ok: false, status: 400 });
+    expect(await core.share(hostKey, { frame: "x".repeat(LIMITS.frameBytes + 1) })).toMatchObject({ ok: false, status: 413 });
+    const { revision } = data<{ revision: number }>(await core.share(hostKey, { frame: JSON.stringify({ model: { layout: "title" } }) }));
+    expect(data(await core.screen(0))).toMatchObject({ on: true, revision, name: "Grace", frame: '{"model":{"layout":"title"}}' });
+    expect(data(await core.screen(revision))).toBeNull();
+    data(await core.share(hostKey, { on: false }));
+    expect(data<{ on: boolean; frame?: string }>(await core.screen(revision))).toMatchObject({ on: false });
+  });
+});
+
 describe("rooms on Cloudflare", () => {
   it("opens a room with a join link, and passes phones through to their room", async () => {
     const namespace = memoryRooms();
@@ -127,5 +143,9 @@ describe("rooms on Cloudflare", () => {
     expect(host).toMatchObject({ people: 1, questions: [{ state: "pending" }] });
     expect((await call(`/v1/rooms/ZZZZZZ/state`))!.status).toBe(404);
     expect(await call("/v1/licenses")).toBeNull();
+    const display = (await call(`/d/${opened.code.toLowerCase()}`))!;
+    expect(display.status).toBe(302);
+    expect(display.headers.get("location")).toBe(`https://church.test/app/?receiver=${opened.code}`);
+    expect((await call(`/v1/rooms/${opened.code}/screen?after=0`))!.status).toBe(204);
   });
 });

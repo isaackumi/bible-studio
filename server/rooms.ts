@@ -19,7 +19,10 @@
 //   POST /v1/rooms/:code/settings        {hostKey, moderate?, open?, name?}
 //   POST /v1/rooms/:code/activity        {hostKey, activity}     (start/advance/reveal a quiz or poll)
 //   POST /v1/rooms/:code/close           {hostKey}
+//   POST /v1/rooms/:code/share           {hostKey, on?, frame?}  (the desk shares its screen, or stops)
+//   GET  /v1/rooms/:code/screen?after=   (a display: the latest screen, or 204 when nothing is new)
 //   GET  /j/:code                        the audience page
+//   GET  /d/:code                        a browser or phone as a display (the app's own screen)
 
 export type QuestionState = "pending" | "approved" | "rejected" | "archived";
 export type Question = {
@@ -83,11 +86,18 @@ export type RoomState = {
   answers: Record<string, { choice: number; at: number }>;
   /** Asks per participant, for the rate limit (times). */
   asked: Record<string, number[]>;
+  /**
+   * What the church's screen shows, for browsers and phones used as displays (/d/CODE), while the
+   * desk shares it: the Program frame as the desk sent it, and a number that goes up with each.
+   */
+  screen?: { on: boolean; revision: number; frame: string; at: number };
 };
 
 export type RoomStorage = { get(): Promise<RoomState | null>; put(state: RoomState): Promise<void>; drop(): Promise<void> };
 
 export const LIMITS = {
+  /** One Program frame (words, theme, layout; pictures stay on the church's computer). */
+  frameBytes: 256 * 1024,
   questionLength: 280,
   nameLength: 40,
   questions: 500,
@@ -431,6 +441,37 @@ export class RoomCore {
     return { ok: true, data: { ok: true } };
   }
 
+  /** The desk sends what is on its screen (or stops sharing it). */
+  async share(hostKey: unknown, input: { on?: unknown; frame?: unknown }): Promise<Result<{ revision: number }>> {
+    const found = await this.host(hostKey);
+    if (!found.ok) return found;
+    const state = found.data;
+    const current = state.screen ?? { on: false, revision: 0, frame: "", at: 0 };
+    if (input.on === false) {
+      state.screen = { on: false, revision: current.revision + 1, frame: "", at: this.now() };
+    } else {
+      const frame = typeof input.frame === "string" ? input.frame : "";
+      if (!frame || frame.length > LIMITS.frameBytes) return fail(413, "That screen is too large to share.");
+      try {
+        JSON.parse(frame);
+      } catch {
+        return fail(400, "That is not a screen.");
+      }
+      state.screen = { on: true, revision: current.revision + 1, frame, at: this.now() };
+    }
+    await this.save(state);
+    return { ok: true, data: { revision: state.screen.revision } };
+  }
+
+  /** A display asks for the screen: nothing new since `after`, or the latest frame. */
+  async screen(after: number): Promise<Result<{ on: boolean; revision: number; frame?: string; name: string } | null>> {
+    const state = await this.load();
+    if (!state) return fail(404, "This room has ended.");
+    const screen = state.screen ?? { on: false, revision: 0, frame: "", at: 0 };
+    if (screen.revision === after) return { ok: true, data: null };
+    return { ok: true, data: { on: screen.on, revision: screen.revision, name: state.name, ...(screen.on ? { frame: screen.frame } : {}) } };
+  }
+
   async close(hostKey: unknown): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
@@ -513,6 +554,14 @@ export class RoomObject {
         return reply(await this.core.activity(input.hostKey, input));
       case "close":
         return reply(await this.core.close(input.hostKey));
+      case "share":
+        return reply(await this.core.share(input.hostKey, input));
+      case "screen": {
+        const result = await this.core.screen(Number(url.searchParams.get("after")) || 0);
+        // Nothing new: an empty answer, so a display asking every second costs almost nothing.
+        if (result.ok && result.data === null) return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "cache-control": "no-store" } });
+        return reply(result);
+      }
       default:
         return json(404, { error: "Not found" });
     }
@@ -529,6 +578,9 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
   const url = new URL(request.url);
   const path = url.pathname;
   if (request.method === "OPTIONS" && path.startsWith("/v1/rooms")) return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type" } });
+  // A browser or phone as a display: the app's own screen, showing what the church's screen shows.
+  const displayPage = path.match(/^\/d\/([A-Za-z0-9]{6})$/);
+  if (displayPage && request.method === "GET") return Response.redirect(`${origin}/app/?receiver=${displayPage[1]!.toUpperCase()}`, 302);
   const joinPage = path.match(/^\/j\/([A-Za-z0-9]{6})$/);
   if (joinPage && request.method === "GET") {
     return new Response(page(joinPage[1]!.toUpperCase(), origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
@@ -551,7 +603,7 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
     }
     return json(503, { error: "Could not open a room. Try again." });
   }
-  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|state|ask|vote|answer|host|moderate|settings|activity|close)$/);
+  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen)$/);
   if (!match) return json(404, { error: "Not found" });
   const code = match[1]!.toUpperCase();
   const action = match[2]!;

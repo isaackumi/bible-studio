@@ -4068,4 +4068,10 @@ export const fr: Readonly<Record<string, string>> = {
   "{n} picture": "{n} image",
   "{n} pictures": "{n} images",
   "{n} second": "{n} seconde",
+  "For an overflow room, a TV with a browser, or people's own phones.": "Pour une salle annexe, une télévision avec navigateur ou les téléphones de chacun.",
+  "Its QR on Preview": "Son QR en aperçu",
+  "No internet: displays keep the last screen until it is back.": "Pas d’internet : les écrans gardent la dernière image jusqu’à son retour.",
+  "Scan to follow on your phone": "Scannez pour suivre sur votre téléphone",
+  "Sharing what goes LIVE. Pictures and videos stay on this computer; words, songs and scripture show.": "Partage de ce qui passe en DIRECT. Les images et vidéos restent sur cet ordinateur ; les textes, chants et Écritures s’affichent.",
+  "Show the screen on phones and browsers": "Afficher l’écran sur téléphones et navigateurs",
 };
