@@ -5,6 +5,7 @@
 mod easyworship;
 mod bible;
 mod entitlement;
+mod signin;
 mod db;
 mod displays;
 mod remote;
@@ -31,6 +32,12 @@ fn with_db<T>(state: &State<Db>, f: impl FnOnce(&rusqlite::Connection) -> Result
 
 /// The library that could not be opened and was set aside at launch (its file name), for the desk to say once.
 struct StartupNotice(Mutex<Option<String>>);
+
+/// Get ready for the browser to come back after signing in: the port it returns to.
+#[tauri::command]
+fn signin_listen(app: AppHandle) -> Result<u16, String> {
+    signin::listen(app)
+}
 
 #[tauri::command]
 fn startup_notice(notice: State<StartupNotice>) -> Option<String> {
@@ -794,6 +801,7 @@ pub fn run() {
             entitlement::entitlement_clear,
             entitlement::entitlement_device,
             startup_notice,
+            signin_listen,
             pco_get,
             easyworship_songs,
             ai_post,

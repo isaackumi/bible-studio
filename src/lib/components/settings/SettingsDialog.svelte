@@ -1588,11 +1588,19 @@
         <section class="rows">
           {#if signin}
             <div class="row stack signin-wait" role="status" aria-live="polite">
-              {#if signin.status === "waiting"}
-                <div class="row-copy"><strong>{t("Finish signing in in your browser")}</strong><span>{t("When the page asks, tap this number:")}</span></div>
-                <div class="signin-number" aria-label={t("Sign-in number {number}", { number: signin.number })}>{signin.number}</div>
+              {#if signin.status === "waiting" && signin.mode === "code"}
+                <div class="row-copy"><strong>{t("Type this code on the sign-in page")}</strong><span>{t("Open the page on any phone or computer, sign in, then type:")}</span></div>
+                <div class="signin-number" aria-label={t("Sign-in code {code}", { code: signin.code ?? "" })}>{signin.code}</div>
+                <p class="note">{signin.url}</p>
                 <div class="sign-in">
                   <button type="button" class="btn" onclick={() => session.reopenAccountSignin()}>{t("Open the page again")}</button>
+                  <button type="button" class="btn" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
+                </div>
+              {:else if signin.status === "waiting"}
+                <div class="row-copy"><strong>{t("Finish signing in in your browser")}</strong><span>{t("Sign in there and choose Continue. Church Studio carries on by itself.")}</span></div>
+                <div class="sign-in">
+                  <button type="button" class="btn" onclick={() => session.reopenAccountSignin()}>{t("Open the page again")}</button>
+                  <button type="button" class="btn" onclick={async () => { signInError = (await session.startAccountSignin(true)) ?? ""; }}>{t("Use a code instead")}</button>
                   <button type="button" class="btn" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
                 </div>
               {:else}
@@ -1620,11 +1628,39 @@
               </div>
             </div>
             {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
+            {#if profile.token}
+              {#each session.accountLicenses.filter((entry) => entry.owner && !entry.revoked) as owned (owned.license)}
+                <div class="row stack">
+                  <div class="row-copy"><strong>{t("People on your {plan} license", { plan: owned.plan === "church" ? "Church" : "Premium" })}</strong><span>{t("Add someone by the email they sign in with. Their computers then use this license, up to its seats.")}</span></div>
+                  {#each owned.members ?? [] as email (email)}
+                    <div class="member"><span class="one-line">{email}</span><button type="button" class="btn small" onclick={async () => { signInError = (await session.changeLicenseMembers(owned.license, { remove: email })) ?? ""; }}>{t("Remove")}</button></div>
+                  {/each}
+                  <form class="sign-in" onsubmit={async (event) => { event.preventDefault(); const input = event.currentTarget.elements.namedItem("email") as HTMLInputElement; signInError = (await session.changeLicenseMembers(owned.license, { add: input.value })) ?? ""; if (!signInError) input.value = ""; }}>
+                    <input name="email" type="email" required placeholder="volunteer@church.org" aria-label={t("Email to add")} />
+                    <button type="submit" class="btn">{t("Add person")}</button>
+                  </form>
+                </div>
+              {/each}
+              <div class="row stack">
+                <div class="row-copy"><strong>{t("Where you are signed in")}</strong><span>{t("A computer nobody opens for six months signs itself out.")}</span></div>
+                {#if session.signedInComputers}
+                  {#each session.signedInComputers as computer (computer.id)}
+                    <div class="member"><span class="one-line">{computer.name}{computer.you ? ` · ${t("this computer")}` : ""}</span>{#if !computer.you}<button type="button" class="btn small" onclick={async () => { signInError = (await session.signOutComputer(computer.id)) ?? ""; }}>{t("Sign out")}</button>{/if}</div>
+                  {/each}
+                  {#if session.signedInComputers.some((computer) => !computer.you)}
+                    <div class="sign-in"><button type="button" class="btn" onclick={async () => { signInError = (await session.signOutComputer("others")) ?? ""; }}>{t("Sign out everywhere else")}</button></div>
+                  {/if}
+                {:else}
+                  <div class="sign-in"><button type="button" class="btn" onclick={async () => { signInError = (await session.loadSignedInComputers()) ?? ""; }}>{t("Show computers")}</button></div>
+                {/if}
+              </div>
+            {/if}
           {:else}
             <div class="row stack">
-              <div class="row-copy"><strong>{t("Sign in")}</strong><span>{t("Optional. Your plan follows your account, so another computer only needs you to sign in. Google, Microsoft, Apple or an email link, in your browser.")}</span></div>
+              <div class="row-copy"><strong>{t("Sign in")}</strong><span>{t("Needed for the free trial and to add a license key. Your plan then follows you, so another computer only needs you to sign in. Google, Microsoft, Apple or an email link, in your browser.")}</span></div>
               <div class="sign-in">
                 <button type="button" class="btn primary" onclick={async () => { signInError = (await session.startAccountSignin()) ?? ""; }}>{t("Sign in with your browser")}</button>
+                <button type="button" class="btn" onclick={async () => { signInError = (await session.startAccountSignin(true)) ?? ""; }}>{t("Sign in on another device")}</button>
               </div>
               {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
               {#if import.meta.env.DEV}
@@ -2031,6 +2067,8 @@
   .avatar-mark { border-radius: 50%; }
   .plan-chip { font-weight: 700; }
   .sign-in { display: flex; gap: 8px; flex-wrap: wrap; }
+  .member { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+  .sign-in input { flex: 1 1 200px; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 9px; background: transparent; color: inherit; font: inherit; }
   .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }
   .form-error { margin: 0; font-size: 12px; color: var(--live, #e5484d); }
   .contrast-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; cursor: pointer; font-size: inherit; font-weight: inherit; color: var(--ink); }

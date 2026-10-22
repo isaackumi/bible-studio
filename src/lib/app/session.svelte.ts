@@ -6,7 +6,7 @@ import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-pl
 import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
-import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SigninPoll, type SigninStart } from "../domain/billing";
+import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
@@ -5549,6 +5549,8 @@ class Session {
       return;
     }
     writeFlag(AUTO_TRIAL_KEY, "pending");
+    // Signed out: the trial waits for sign-in (onboarding and Settings › Account ask for it).
+    if (!this.signedIn) return;
     const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", this.trialRequest());
     if (!answer.ok) {
       if (answer.status === 403 || answer.status === 429) {
@@ -5566,9 +5568,8 @@ class Session {
     this.persistSoon();
     const days = answer.data.days ?? TRIAL_DAYS;
     this.notify(t("Premium is yours free for {n} days", { n: days }), {
-      detail: t("Everything is unlocked on this computer. Sign in to keep your trial and plans with you."),
+      detail: t("Everything is unlocked, on any computer you sign in on."),
       ms: 20_000,
-      actions: this.workspace.profile?.token ? [] : [{ label: t("Sign in"), run: () => { void this.startAccountSignin(); this.dismissToast(); } }],
     });
   };
 
@@ -5603,7 +5604,7 @@ class Session {
     const due = this.ent.kind !== "license" || this.ent.reason !== null || (this.ent.renewBy ?? 0) - Date.now() < RENEW_EARLY_DAYS * 86_400_000;
     if (!force && !due) return;
     this.activation = { ...this.activation, status: "checking" };
-    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key, device: this.deviceId, name: this.deviceName() });
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key, device: this.deviceId, name: this.deviceName(), ...(this.workspace.profile?.token ? { token: this.workspace.profile.token } : {}) });
     if (answer.ok) {
       await this.keepLease(answer.data.lease);
       this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
@@ -5699,27 +5700,89 @@ class Session {
     const token = this.workspace.profile?.token;
     if (token) void serverCall("/v1/account/signout", { token });
     this.cancelAccountSignin();
+    this.accountLicenses = [];
+    this.signedInComputers = null;
     this.workspace = { ...this.workspace, profile: null };
     this.persistSoon();
     this.message = t("Signed out. Your library stays on this computer.");
   };
 
   // Signing in to an account: the browser does the signing in (Google, Microsoft, Apple or an
-  // emailed link); the app shows a number to tap there, then collects its account token. The plan
-  // follows the account, so a second computer needs no key.
+  // emailed link). On the desktop the browser then comes back to this app on 127.0.0.1 with a
+  // one-time code that only this app can use (it holds the PKCE verifier); from another device, or
+  // in the browser version, the person types the code shown here instead. The plan follows the
+  // account, so a second computer needs no key.
 
-  /** A sign-in waiting in the browser. */
-  accountSignin = $state<{ id: string; url: string; number: number; status: "waiting" | "error"; message?: string } | null>(null);
+  /** A sign-in waiting in the browser: "browser" comes back by itself, "code" shows a code to type. */
+  accountSignin = $state<{ id: string; url: string; mode: "browser" | "code"; code?: string; status: "waiting" | "error"; message?: string } | null>(null);
   private signinTimer: ReturnType<typeof setTimeout> | undefined;
+  private signinUnlisten: UnlistenFn | null = null;
+  /** What to carry on with once signed in (a trial or a key asked for while signed out). */
+  private afterSignin: { kind: "trial"; promo?: string } | { kind: "key"; code: string } | null = null;
 
-  /** Open the sign-in page in the browser and wait for it. Returns an error to show, or null. */
-  startAccountSignin = async (): Promise<string | null> => {
-    const answer = await serverCall<SigninStart>("/v1/signin/start", { device: this.deviceId, name: this.deviceName() });
+  get signedIn(): boolean {
+    return !!this.workspace.profile?.token;
+  }
+
+  /**
+   * Open the sign-in page in the browser and wait for it. Returns an error to show, or null.
+   * `elsewhere`: sign in from another device (or a browser that cannot come back here), with a code.
+   */
+  startAccountSignin = async (elsewhere = false): Promise<string | null> => {
+    this.cancelAccountSignin();
+    const loopback = this.desktop() && !elsewhere;
+    const pkce = loopback ? await pkcePair() : null;
+    const port = loopback ? await invoke<number>("signin_listen").catch(() => null) : null;
+    // The listener could not start (a firewall): the code works everywhere.
+    const mode = loopback && port ? "loopback" : "code";
+    const answer = await serverCall<SigninStart>("/v1/signin/start", {
+      device: this.deviceId,
+      name: this.deviceName(),
+      mode,
+      ...(mode === "loopback" && pkce ? { redirect: `http://127.0.0.1:${port}/signin`, challenge: pkce.challenge } : {}),
+    });
     if (!answer.ok) return answer.offline ? t("Connect to the internet to sign in.") : answer.error;
-    this.accountSignin = { id: answer.data.id, url: answer.data.url, number: answer.data.number, status: "waiting" };
-    await openExternal(answer.data.url).catch(() => {});
-    this.watchSignin(answer.data.id, answer.data.secret, answer.data.expiresAt);
+    const { id, url, secret, expiresAt } = answer.data;
+    this.accountSignin = { id, url, mode: mode === "loopback" ? "browser" : "code", ...(answer.data.code ? { code: answer.data.code } : {}), status: "waiting" };
+    await openExternal(url).catch(() => {});
+    if (mode === "loopback" && pkce) {
+      this.signinUnlisten = await listen<{ id: string; code: string }>("signin-callback", (event) => {
+        if (event.payload.id !== id || this.accountSignin?.id !== id) return;
+        void this.finishLoopback(id, event.payload.code, pkce.verifier);
+      });
+      this.signinTimer = setTimeout(() => {
+        if (this.accountSignin?.id === id) this.accountSignin = { ...this.accountSignin, status: "error", message: t("That sign-in ended before it finished. Try again.") };
+      }, Math.max(0, expiresAt - Date.now()));
+    } else this.watchSignin(id, secret, expiresAt);
     return null;
+  };
+
+  private finishLoopback = async (id: string, code: string, verifier: string) => {
+    const answer = await serverCall<SigninToken>("/v1/signin/token", { id, code, verifier });
+    if (this.accountSignin?.id !== id) return;
+    if (!answer.ok) {
+      this.accountSignin = { ...this.accountSignin, status: "error", message: answer.offline ? t("Connect to the internet to sign in.") : answer.error };
+      return;
+    }
+    await this.finishSignin(answer.data.token, answer.data.account);
+  };
+
+  /** Signed in: keep the token, bring the account's plan here, and carry on with what was waiting. */
+  private finishSignin = async (token: string, account: { email: string; name: string }) => {
+    this.cancelAccountSignin();
+    this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...account, token }) };
+    this.persistSoon();
+    this.message = t("Signed in as {name}.", { name: this.workspace.profile?.name });
+    await this.syncAccount();
+    const next = this.afterSignin;
+    this.afterSignin = null;
+    if (next?.kind === "trial") {
+      const problem = await this.startTrial(next.promo);
+      if (problem) this.warn(problem);
+    } else if (next?.kind === "key") {
+      const problem = await this.redeemCode(next.code);
+      if (problem) this.warn(problem);
+    } else if (readFlag(AUTO_TRIAL_KEY) === "pending") void this.autoStartTrial();
   };
 
   private watchSignin(id: string, secret: string, expiresAt: number) {
@@ -5729,11 +5792,7 @@ class Session {
       const answer = await serverCall<SigninPoll>("/v1/signin/poll", { id, secret });
       if (this.accountSignin?.id !== id) return;
       if (answer.ok && answer.data.status === "done" && answer.data.token && answer.data.account) {
-        this.accountSignin = null;
-        this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...answer.data.account, token: answer.data.token }) };
-        this.persistSoon();
-        this.message = t("Signed in as {name}.", { name: this.workspace.profile?.name });
-        await this.syncAccount();
+        await this.finishSignin(answer.data.token, answer.data.account);
         return;
       }
       const ended = answer.ok && answer.data.status !== "pending";
@@ -5745,6 +5804,42 @@ class Session {
     }, 2000);
   }
 
+  /** The account's licenses as the server last said (owned ones carry the people added to them). */
+  accountLicenses = $state<AccountStatus["licenses"]>([]);
+  /** Where this account is signed in, once asked for (Settings › Account). */
+  signedInComputers = $state<SignedInComputer[] | null>(null);
+
+  loadSignedInComputers = async (): Promise<string | null> => {
+    const token = this.workspace.profile?.token;
+    if (!token) return null;
+    const answer = await serverCall<{ devices: SignedInComputer[] }>("/v1/account/devices", { token });
+    if (!answer.ok) return answer.offline ? t("Connect to the internet to see where you are signed in.") : answer.error;
+    this.signedInComputers = answer.data.devices;
+    return null;
+  };
+
+  /** Sign another computer out of this account (by the id the list shows), or every other one. */
+  signOutComputer = async (id: string | "others"): Promise<string | null> => {
+    const token = this.workspace.profile?.token;
+    if (!token) return null;
+    const others = (this.signedInComputers ?? []).filter((entry) => !entry.you);
+    for (const entry of id === "others" ? others : others.filter((item) => item.id === id)) {
+      const answer = await serverCall("/v1/account/signout", { token, device: entry.id });
+      if (!answer.ok) return answer.offline ? t("Connect to the internet to sign a computer out.") : answer.error;
+    }
+    return this.loadSignedInComputers();
+  };
+
+  /** The owner adds or removes a person (by email) on one of their licenses. */
+  changeLicenseMembers = async (license: string, change: { add?: string; remove?: string }): Promise<string | null> => {
+    const token = this.workspace.profile?.token;
+    if (!token) return null;
+    const answer = await serverCall<{ members: string[] }>("/v1/license/members", { token, license, ...change });
+    if (!answer.ok) return answer.offline ? t("Connect to the internet to change who uses this license.") : answer.error;
+    this.accountLicenses = this.accountLicenses.map((entry) => (entry.license === license ? { ...entry, members: answer.data.members } : entry));
+    return null;
+  };
+
   /** Open the waiting sign-in page again. */
   reopenAccountSignin = () => {
     if (this.accountSignin?.url) void openExternal(this.accountSignin.url).catch(() => {});
@@ -5752,6 +5847,8 @@ class Session {
 
   cancelAccountSignin = () => {
     clearTimeout(this.signinTimer);
+    this.signinUnlisten?.();
+    this.signinUnlisten = null;
     this.accountSignin = null;
   };
 
@@ -5773,6 +5870,7 @@ class Session {
       return answer.offline ? null : answer.error;
     }
     const { account, lease, activation } = answer.data;
+    this.accountLicenses = answer.data.licenses;
     this.workspace = { ...this.workspace, profile: sanitizeProfile({ ...account, token }) };
     this.persistSoon();
     // A key added on this computer becomes part of the account, so signing in elsewhere brings it.
@@ -5823,8 +5921,15 @@ class Session {
       this.message = t("License added: {note}.", { note: result.note });
       return null;
     }
-    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key: result.entitlement.license, device: this.deviceId, name: this.deviceName() });
+    // A key belongs to the person adding it (or the owner adds them): signing in comes first.
+    if (!this.signedIn) {
+      this.afterSignin = { kind: "key", code };
+      const problem = await this.startAccountSignin();
+      return problem ?? t("Sign in in your browser to add this key. It is added as soon as you are signed in.");
+    }
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key: result.entitlement.license, device: this.deviceId, name: this.deviceName(), token: this.workspace.profile?.token });
     if (!answer.ok) {
+      if ((answer.data as { owned?: boolean }).owned) return answer.error;
       if (answer.status === 409) {
         this.workspace = { ...this.workspace, entitlement: result.entitlement };
         this.persistSoon();
@@ -5857,6 +5962,12 @@ class Session {
   /** Start the free trial: one per computer, given by the server. Returns an error to show, or null. */
   startTrial = async (promo?: string): Promise<string | null> => {
     if (!this.desktop()) return t("The free Premium trial is in the desktop app. Download it from church-studio.heitechinc.com to try Premium.");
+    // One trial a person: signing in is what makes that hold. The trial starts once signed in.
+    if (!this.signedIn) {
+      this.afterSignin = { kind: "trial", promo };
+      const problem = await this.startAccountSignin();
+      return problem ?? t("Sign in in your browser to start your free trial. It stays with you on any computer.");
+    }
     const answer = await serverCall<{ lease: string; endsAt: number; days?: number }>("/v1/trial", this.trialRequest(promo));
     if (!answer.ok) {
       if (answer.status === 403) {

@@ -416,14 +416,18 @@
                     <span><strong class="one-line">{t("Signed in as {name}", { name: session.workspace.profile.name || session.workspace.profile.email })}</strong><em>{t("Your trial and plans follow you to every computer.")}</em></span>
                   {:else if session.accountSignin?.status === "waiting"}
                     <Icon name="globe" size={15} />
-                    <span><strong>{t("In your browser, tap {number}", { number: session.accountSignin.number })}</strong><em>{t("Sign in there, then tap the number this screen shows.")}</em></span>
+                    {#if session.accountSignin.mode === "code"}
+                      <span><strong>{t("Type {code} on the sign-in page", { code: session.accountSignin.code ?? "" })}</strong><em>{t("Sign in there, then type this code.")}</em></span>
+                    {:else}
+                      <span><strong>{t("Finish signing in in your browser")}</strong><em>{t("Sign in there and choose Continue. Church Studio carries on by itself.")}</em></span>
+                    {/if}
                     <span class="account-actions">
                       <button type="button" class="btn quiet small" onclick={() => session.reopenAccountSignin()}>{t("Open the page again")}</button>
                       <button type="button" class="btn quiet small" onclick={() => session.cancelAccountSignin()}>{t("Cancel")}</button>
                     </span>
                   {:else}
                     <Icon name="user" size={15} />
-                    <span><strong>{t("Keep your trial with you")} <small>{t("Optional")}</small></strong><em>{accountError || session.accountSignin?.message || t("Sign in with Google, Microsoft, Apple or an email link. Your trial and any plan follow you to every computer.")}</em></span>
+                    <span><strong>{t("Sign in to start your free trial")}</strong><em>{accountError || session.accountSignin?.message || t("Google, Microsoft, Apple or an email link. Your trial and any plan follow you to every computer. You can also sign in later.")}</em></span>
                     <span class="account-actions"><button type="button" class="btn quiet small" onclick={async () => (accountError = (await session.startAccountSignin()) ?? "")}>{t("Sign in")}</button></span>
                   {/if}
                 </div>
@@ -633,7 +637,6 @@
   .account-card > :global(svg) { flex: none; color: var(--muted); }
   .account-card > span:not(.account-actions) { flex: 1; min-width: 0; display: grid; gap: 2px; }
   .account-card strong { font-size: 13px; font-weight: 700; }
-  .account-card small { margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 10%, transparent); font-size: 10.5px; font-weight: 650; color: var(--muted); }
   .account-card em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--muted); }
   .account-actions { display: flex; gap: 4px; flex: none; }
   .account-actions .btn.small { height: 32px; padding: 0 12px; font-size: 13px; border-color: var(--line); background: var(--field); color: var(--ink); }

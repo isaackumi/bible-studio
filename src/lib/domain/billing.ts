@@ -72,15 +72,29 @@ export type CheckoutPoll = { status: "pending" | "paid" | "cancelled"; key?: str
 /** How long the app waits for a checkout opened in the browser. */
 export const CHECKOUT_WAIT_MS = 45 * 60_000;
 
-// Signing in to an account (server/accounts.ts): the app opens a page in the browser, shows a
-// number, and collects an account token once the person has signed in there and tapped it.
-export type SigninStart = { id: string; secret: string; number: number; url: string; expiresAt: number; methods: string[] };
+// Signing in to an account (server/accounts.ts): the app opens a page in the browser. On this
+// computer the browser comes back to the app with a one-time code (loopback); from another device
+// the person types the code the app shows there.
+export type SigninStart = { id: string; secret: string; number?: number; code?: string; url: string; expiresAt: number; methods: string[] };
+export type SigninToken = { token: string; account: { email: string; name: string } };
 export type SigninPoll = { status: "pending" | "done" | "cancelled" | "expired" | "collected"; token?: string; account?: { email: string; name: string } };
 export type AccountStatus = {
   account: { email: string; name: string };
-  licenses: Array<{ license: string; plan: LicensePlan; revoked: boolean }>;
+  /** owner: this account owns it (members: who it added); removed: the owner took this account off it. */
+  licenses: Array<{ license: string; plan: LicensePlan; revoked: boolean; owner?: boolean; members?: string[]; removed?: boolean }>;
   lease?: string;
   activation?: { key?: string; seats?: number; devices?: unknown[]; status?: number; error?: string };
 };
 /** An account token, as the server makes them. */
 export const ACCOUNT_TOKEN = /^cst_[0-9a-f]{64}$/;
+
+/** Where an account is signed in (POST /v1/account/devices). */
+export type SignedInComputer = { id: string; name: string; createdAt: number; you: boolean };
+
+/** A PKCE verifier and its challenge (base64url SHA-256), for the loopback sign-in. */
+export async function pkcePair(): Promise<{ verifier: string; challenge: string }> {
+  const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+  return { verifier, challenge };
+}
