@@ -1,0 +1,82 @@
+# Temporary: reproduce "Not responding, then closes" on Windows with the released installer.
+# Installs the release, launches it, records every second whether Windows says it is responding,
+# takes screenshots, and collects the app's files and the Windows event log.
+
+name: Diagnose Windows startup
+
+on:
+  push:
+    branches: ["diag/windows-startup"]
+  workflow_dispatch:
+
+jobs:
+  startup:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: v0.3.0
+    steps:
+      - name: Download the released installer
+        shell: pwsh
+        run: |
+          gh release download $env:VERSION -R ${{ github.repository }} -p "*x64-setup.exe" -D installer
+          Get-ChildItem installer
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem installer\*.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList "/S" -Wait
+          $exe = Get-ChildItem -Recurse "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "*.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Church Studio" -and $_.Name -notmatch "uninstall" } | Select-Object -First 1
+          if (-not $exe) { throw "Installed app not found" }
+          "Installed at $($exe.FullName)"
+          "EXE=$($exe.FullName)" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Launch and watch for 120 seconds
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          function Shot($name) {
+            try {
+              $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+              $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+              $bmp.Save("out\$name.png")
+            } catch { "screenshot failed: $_" }
+          }
+          $p = Start-Process $env:EXE -PassThru
+          $start = Get-Date
+          for ($i = 1; $i -le 120; $i++) {
+            Start-Sleep -Seconds 1
+            $p.Refresh()
+            if ($p.HasExited) { "{0,4}s EXITED code={1}" -f $i, $p.ExitCode | Tee-Object -Append out\watch.txt; break }
+            $kids = (Get-CimInstance Win32_Process -Filter "ParentProcessId=$($p.Id)" | ForEach-Object { $_.Name }) -join ","
+            "{0,4}s responding={1} title='{2}' cpu={3:N1}s mem={4:N0}MB children=[{5}]" -f $i, $p.Responding, $p.MainWindowTitle, $p.CPU, ($p.WorkingSet64 / 1MB), $kids | Tee-Object -Append out\watch.txt
+            if ($i -in 2, 5, 10, 20, 40, 80, 120) { Shot ("t{0:D3}" -f $i) }
+          }
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+
+      - name: Collect the app's files and the event log
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          foreach ($root in "$env:LOCALAPPDATA\app.churchstudio.present", "$env:APPDATA\app.churchstudio.present") {
+            if (Test-Path $root) {
+              Get-ChildItem -Recurse $root | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String -Width 400 | Tee-Object -Append out\files.txt
+              Get-ChildItem -Recurse $root -Include *.log, *.json -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName ("out\" + $_.Name) -ErrorAction SilentlyContinue }
+            } else { "missing: $root" | Tee-Object -Append out\files.txt }
+          }
+          Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddMinutes(-15) } -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -match "Application Hang|Application Error|Windows Error Reporting|\.NET Runtime" -or $_.Message -match "church" } |
+            Format-List TimeCreated, ProviderName, Id, Message | Out-String -Width 400 | Tee-Object out\events.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-startup
+          path: out
