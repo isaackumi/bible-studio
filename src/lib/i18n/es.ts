@@ -4035,4 +4035,5 @@ export const es: Readonly<Record<string, string>> = {
   "Scenes runs the service with scenes. Looks is where you design layouts like scripture over a camera.": "Escenas lleva el culto con escenas. Looks es donde diseñas composiciones, como la Escritura sobre una cámara.",
   "or go to": "o entra en",
   "and enter": "e introduce",
+  "Pictures: show a folder of pictures, or run it as a slideshow": "Imágenes: muestra una carpeta de imágenes o pásala como presentación",
 };

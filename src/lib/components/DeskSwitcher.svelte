@@ -1,6 +1,8 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import { audienceRoom } from "../app/rooms.svelte";
+  import { pictures } from "../app/pictures.svelte";
+  import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
 
@@ -60,12 +62,30 @@
     <span class="short">{t("Audience")}</span>
     {#if (audienceRoom.view?.questions.filter((question) => question.state === "pending").length ?? 0) > 0}<span class="dot" aria-hidden="true"></span>{/if}
   </button>
+  <!-- Pictures straight from a folder, and slideshows (a drawer, like Audience). Folders need the desktop app. -->
+  {#if isDesktop()}
+    <button
+      type="button"
+      class:on={pictures.open}
+      aria-label={t("Pictures")}
+      aria-pressed={pictures.open}
+      data-tip={t("Pictures: show a folder of pictures, or run it as a slideshow")}
+      onclick={() => (pictures.open ? pictures.hide() : pictures.show())}
+    >
+      <Icon name="media" size={16} />
+      <span class="label">{t("Pictures")}</span>
+      <span class="short">{t("Pictures")}</span>
+      {#if pictures.slideshow.running}<span class="dot" class:paused={pictures.slideshow.paused} aria-hidden="true"></span>{/if}
+    </button>
+  {/if}
 </nav>
 
 <style>
   .short { display: none; }
   /* Questions are waiting for the operator. */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
+  /* A slideshow is on the screen (amber while paused). */
+  .dot.paused { background: #f5a524; }
   .compact .label { display: none; }
   .compact button { width: var(--tool-size); padding: 0; justify-content: center; }
   /* The desk in use always says its name, so icons alone never leave the operator guessing. */
