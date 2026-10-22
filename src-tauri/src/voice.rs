@@ -35,6 +35,7 @@ pub fn relaunch_inside_bundle() {
 /// One transcriber output line, tagged with the run that produced it. The frontend ignores
 /// lines from an earlier run (a stopped helper still sends its final "end").
 #[derive(Clone, Serialize)]
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 pub struct ListenLine {
     pub run: u64,
     pub line: String,

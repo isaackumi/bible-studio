@@ -2,6 +2,8 @@
 //! for OBS, vMix, a streaming computer or an NDI monitor. On macOS a helper captures the audience
 //! window with ScreenCaptureKit and sends it with the NDI library, loaded at run time. Status
 //! lines from the helper arrive in the app as `ndi-status` events.
+// The helper exists on macOS only; elsewhere the commands answer "not available".
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
 use serde::Serialize;
 

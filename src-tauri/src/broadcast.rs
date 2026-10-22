@@ -2,6 +2,8 @@
 //! window and encodes it with the Mac's own H.264 and AAC encoders, to an .mp4 file and/or an RTMP
 //! or RTMPS stream (YouTube, Facebook, any RTMP service). Its JSON status lines come to the app
 //! as "broadcast-status" events.
+// The helper exists on macOS only; elsewhere the commands answer "not available".
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
 

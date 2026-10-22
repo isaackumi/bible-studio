@@ -46,6 +46,7 @@ pub struct Output {
     pub operator_key: Mutex<Option<String>>,
     pub mode: Mutex<String>,
     /// True after we ask AppKit to leave native fullscreen, until that bit is gone.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     leaving_fullscreen: Mutex<bool>,
 }
 
@@ -540,6 +541,7 @@ fn first_external_ns_frame() -> Option<(i32, i32, u32, u32)> {
 }
 
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)]
 fn first_external_ns_frame() -> Option<(i32, i32, u32, u32)> {
     None
 }
