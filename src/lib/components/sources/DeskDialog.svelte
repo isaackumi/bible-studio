@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  /** Open dialogs, newest last: only the top one answers Escape and Tab (a list over Settings). */
+  const stack: symbol[] = [];
+</script>
+
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { t } from "../../i18n/core";
@@ -10,6 +15,7 @@
     returnTo,
     wide = false,
     huge = false,
+    list = false,
   }: {
     title: string;
     onclose: () => void;
@@ -21,9 +27,19 @@
     wide?: boolean;
     /** Most of the screen: a finder with several columns. */
     huge?: boolean;
+    /** A long list to search and pick from: a steady height, so filtering does not make it jump. */
+    list?: boolean;
   } = $props();
 
   const id = `desk-dialog-${Math.random().toString(36).slice(2, 8)}`;
+  const me = Symbol(id);
+  $effect(() => {
+    stack.push(me);
+    return () => {
+      const at = stack.indexOf(me);
+      if (at >= 0) stack.splice(at, 1);
+    };
+  });
   let panel = $state<HTMLDivElement | undefined>();
 
   const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -42,9 +58,12 @@
     };
   });
 
+  // Caught on the way in, before the desk's own keys: Escape closes this dialog and nothing behind it.
   function onkeydown(event: KeyboardEvent) {
+    if (stack[stack.length - 1] !== me) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       onclose();
       return;
     }
@@ -63,11 +82,11 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window onkeydowncapture={onkeydown} />
 
 <div class="layer">
   <button type="button" class="backdrop" aria-label={t("Close")} tabindex="-1" onclick={onclose}></button>
-  <div class="panel" class:wide class:huge role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
+  <div class="panel" class:wide class:huge class:list role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" bind:this={panel}>
     <h2 {id}>{title}</h2>
     <div class="body">{@render children()}</div>
     {#if footer}
@@ -87,6 +106,9 @@
   .panel:focus { outline: none; }
   .panel.wide { width: min(1040px, calc(100% - 28px)); }
   .panel.huge { width: min(1360px, calc(100% - 28px)); }
+  .panel.list { width: min(760px, calc(100% - 28px)); height: min(760px, calc(100% - 28px)); }
+  .panel.list .body { padding: 0; gap: 0; }
+  @media (max-width: 640px) { .panel.list { width: 100%; height: 100%; max-height: 100%; border-radius: 0; } }
   .backdrop {
     position: absolute;
     inset: 0;

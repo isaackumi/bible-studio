@@ -33,11 +33,13 @@
   import { usageCsv, usageReport, type UsageRow } from "../../domain/song-usage";
   import type { PcoPlan } from "../../integrations/pco";
   import { invoke } from "@tauri-apps/api/core";
+  import { mediaUrl } from "../../db/api";
   import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, maskedLicense, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
+  import PickList from "../PickList.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
@@ -240,7 +242,23 @@
 
   let stageText = $state("");
   /** A media file whose Delete was pressed once. */
-  let armedMedia = $state<string | null>(null);
+  /** Every picture, video and sound in a searchable list, instead of a page that grows with them. */
+  let mediaManaging = $state(false);
+  const mediaItems = $derived(
+    [...session.media, ...session.audioTracks].map((asset) => ({
+      key: asset.id,
+      name: asset.name,
+      detail: asset.kind === "video" ? t("Video") : asset.kind === "audio" ? t("Audio") : t("Picture"),
+      thumb: asset.kind === "image" ? mediaUrl(asset) : null,
+      icon: asset.kind === "video" ? "video" : asset.kind === "audio" ? "audio" : "media",
+      tag: session.workspace.logoAssetId === asset.id ? t("logo") : undefined,
+    })),
+  );
+  const languageFilters = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const bible of apiList) counts.set(bible.language, (counts.get(bible.language) ?? 0) + 1);
+    return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([language]) => ({ id: language, label: language, match: (item: { detail?: string }) => item.detail === language }));
+  });
 
   // Updates (desktop): signed releases from GitHub, checked and installed by the session.
   let updateNote = $state("");
@@ -381,7 +399,8 @@
   // Licensed translations through API.Bible.
   let apiKey = $state(session.workspace.onlineBibles.key);
   let apiList = $state<OnlineBible[]>([]);
-  let apiFilter = $state("");
+  /** The translations a key can use, in a searchable list (there can be hundreds). */
+  let apiPicking = $state(false);
   let apiBusy = $state(false);
   let apiError = $state("");
 
@@ -397,6 +416,13 @@
     } finally {
       apiBusy = false;
     }
+  }
+
+  /** Keep exactly the ticked translations, in the order they were already listed, new ones after. */
+  function useApiBibles(keys: string[]) {
+    const kept = session.workspace.onlineBibles.bibles.filter((entry) => keys.includes(entry.id));
+    const added = apiList.filter((bible) => keys.includes(bible.id) && !kept.some((entry) => entry.id === bible.id)).map((bible) => ({ id: bible.id, abbreviation: bible.abbreviation, name: bible.name, language: bible.language }));
+    void session.setOnlineBibles(apiKey || session.workspace.onlineBibles.key, [...kept, ...added]);
   }
 
   function toggleApiBible(bible: OnlineBibleChoice, on: boolean) {
@@ -1386,19 +1412,10 @@
           {#if apiList.length}
             <div class="row">
               <div class="row-copy"><strong>{t("Find a translation")}</strong><span>{t("{length} available to your key. Tick the ones to show in the translation list.", { length: apiList.length })}</span></div>
-              <input class="field" aria-label={t("Filter translations")} placeholder={t("NIV, King James, Twi…")} bind:value={apiFilter} />
+              <button type="button" class="btn" onclick={() => (apiPicking = true)}><Icon name="search" size={14} /> {t("Choose translations…")}</button>
             </div>
-            {#each apiList.filter((bible) => !apiFilter.trim() || `${bible.abbreviation} ${bible.name} ${bible.language}`.toLowerCase().includes(apiFilter.trim().toLowerCase())).slice(0, 40) as bible (bible.id)}
-              {@const on = session.workspace.onlineBibles.bibles.some((entry) => entry.id === bible.id)}
-              <label class="row">
-                <div class="row-lead">
-                  <span class="bible-badge" class:muted={!on}>{bible.abbreviation || "—"}</span>
-                  <div class="row-copy"><strong>{bible.name}</strong><span>{bible.language}</span></div>
-                </div>
-                <input type="checkbox" class="switch" role="switch" aria-label={t("Use {name}", { name: bible.name })} checked={on} onchange={(event) => toggleApiBible(bible, event.currentTarget.checked)} />
-              </label>
-            {/each}
-          {:else if session.workspace.onlineBibles.bibles.length}
+          {/if}
+          {#if session.workspace.onlineBibles.bibles.length}
             {#each session.workspace.onlineBibles.bibles as bible (bible.id)}
               <div class="row">
                 <div class="row-lead"><span class="bible-badge">{bible.abbreviation}</span><div class="row-copy"><strong>{bible.name}</strong><span>{t("{language} · online", { language: bible.language })}</span></div></div>
@@ -1454,29 +1471,12 @@
             <button type="button" class="btn primary" onclick={() => void importMedia()}>{t("Import…")}</button>
             <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
           </div>
-          {#each [...session.media, ...session.audioTracks] as asset (asset.id)}
+          {#if session.media.length + session.audioTracks.length}
             <div class="row">
-              <div class="row-lead"><span class="row-icon"><Icon name={asset.kind === "audio" ? "audio" : "media"} size={16} /></span><div class="row-copy"><strong>{asset.name}</strong><span>{asset.kind === "video" ? t("Video") : asset.kind === "audio" ? t("Audio") : t("Picture")}{session.workspace.logoAssetId === asset.id ? ` · ${t("logo")}` : ""}</span></div></div>
-              <div class="row-end">
-                {#if asset.kind === "image"}
-                  <button type="button" class="btn" disabled={session.workspace.logoAssetId === asset.id} onclick={() => session.setLogo(asset.id)}>{session.workspace.logoAssetId === asset.id ? t("Logo") : t("Use as logo")}</button>
-                {/if}
-                <button
-                  type="button"
-                  class="btn danger"
-                  aria-label={armedMedia === asset.id ? t("Confirm delete {name}", { name: asset.name }) : t("Delete {name}", { name: asset.name })}
-                  onclick={() => {
-                    if (armedMedia !== asset.id) {
-                      armedMedia = asset.id;
-                      return;
-                    }
-                    armedMedia = null;
-                    void session.deleteMedia(asset.id);
-                  }}
-                >{armedMedia === asset.id ? t("Delete? Click again") : t("Delete")}</button>
-              </div>
+              <div class="row-copy"><strong>{t("Manage the library")}</strong><span>{t("Search, set the logo, and delete what you no longer need.")}</span></div>
+              <button type="button" class="btn" onclick={() => (mediaManaging = true)}><Icon name="media" size={14} /> {t("Manage…")}</button>
             </div>
-          {/each}
+          {/if}
         </section>
         <p class="section-label">{t("Cameras")}</p>
         <section class="rows">
@@ -1838,6 +1838,38 @@
   </div>
   {#if searchOpen}
     <SettingsSearch pages={searchPages} initial={searchStart} onpick={(entry) => void pickSetting(entry)} onclose={closeSearch} />
+  {/if}
+  {#if apiPicking}
+    <PickList
+      title={t("Online translations")}
+      intro={t("{length} available to your key. Tick the ones to show in the translation list; text is fetched when shown.", { length: apiList.length })}
+      items={apiList.map((bible) => ({ key: bible.id, name: bible.name, detail: bible.language, badge: bible.abbreviation || "—" }))}
+      picked={session.workspace.onlineBibles.bibles.map((entry) => entry.id)}
+      filters={languageFilters}
+      action={{ allowNone: true, label: (count) => (count ? tn(count, "Use {n} translation", "Use {n} translations") : t("Use none")), run: useApiBibles }}
+      onclose={() => (apiPicking = false)}
+    />
+  {/if}
+  {#if mediaManaging}
+    <PickList
+      title={t("Pictures, videos and sounds")}
+      intro={t("Tick what to delete. Deleting removes it from songs, services and looks that use it; a picture can be set as the logo here too.")}
+      items={mediaItems}
+      filters={[
+        { id: "picture", label: t("Pictures"), match: (item) => item.icon === "media" },
+        { id: "video", label: t("Videos"), match: (item) => item.icon === "video" },
+        { id: "audio", label: t("Audio"), match: (item) => item.icon === "audio" },
+      ]}
+      empty={t("No pictures, videos or sounds yet.")}
+      action={{ danger: true, label: (count) => tn(count, "Delete {n} file", "Delete {n} files"), run: async (keys) => { for (const key of keys) await session.deleteMedia(key); } }}
+      onclose={() => (mediaManaging = false)}
+    >
+      {#snippet row(item)}
+        {#if item.icon === "media"}
+          <button type="button" class="btn" disabled={session.workspace.logoAssetId === item.key} onclick={() => session.setLogo(item.key)}>{session.workspace.logoAssetId === item.key ? t("Logo") : t("Use as logo")}</button>
+        {/if}
+      {/snippet}
+    </PickList>
   {/if}
 </div>
 

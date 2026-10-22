@@ -2,7 +2,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { session } from "../../app/session.svelte";
   import { isDesktop } from "../../platform/runtime";
-  import { t } from "../../i18n/core";
+  import { t, tn } from "../../i18n/core";
+  import { assetUrl } from "../../db/api";
+  import PickList, { type PickItem } from "../PickList.svelte";
 
   // Space on this computer: what Church Studio keeps, and the safe ways to make it smaller.
 
@@ -12,49 +14,51 @@
   let note = $state("");
   type Unused = { id: string; name: string; path: string; bytes: number };
   let unused = $state<Unused[] | null>(null);
-  let picked = $state<Set<string>>(new Set());
-  let confirming = $state(false);
   const keyOf = (item: Unused) => item.id || item.path;
-  const pickedBytes = $derived((unused ?? []).filter((item) => picked.has(keyOf(item))).reduce((sum, item) => sum + item.bytes, 0));
+  const PICTURE = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
+  const VIDEO = /\.(mp4|m4v|mov|webm)$/i;
+  const unusedItems = $derived<PickItem[]>(
+    (unused ?? []).map((item) => {
+      const picture = PICTURE.test(item.path);
+      const video = VIDEO.test(item.path);
+      return {
+        key: keyOf(item),
+        name: item.name,
+        bytes: item.bytes,
+        thumb: picture ? assetUrl(item.path) : null,
+        icon: video ? "video" : picture ? "media" : "files",
+        detail: video ? t("Video") : picture ? t("Picture") : t("File"),
+        tag: item.id ? undefined : t("leftover file"),
+      };
+    }),
+  );
 
   async function findUnused() {
     busy = "find";
     note = "";
-    confirming = false;
     // Save first, so the search sees every song, service and setting as they are now.
     await session.flushSave().catch(() => {});
     unused = await invoke<Unused[]>("storage_unused_media").catch(() => []);
-    picked = new Set((unused ?? []).map(keyOf));
     busy = "";
-  }
-
-  function toggle(item: Unused) {
-    const next = new Set(picked);
-    if (next.has(keyOf(item))) next.delete(keyOf(item));
-    else next.add(keyOf(item));
-    picked = next;
-    confirming = false;
-  }
-
-  async function removePicked() {
-    if (!unused) return;
-    if (!confirming) {
-      confirming = true;
-      return;
+    if (unused && !unused.length) {
+      note = t("Every picture and video is used somewhere. Nothing to clear.");
+      unused = null;
     }
+  }
+
+  /** Removes what is ticked in the list; a failure stays in the list for the operator to see. */
+  async function removePicked(keys: string[]) {
+    const chosen = (unused ?? []).filter((item) => keys.includes(keyOf(item)));
+    const freed = chosen.reduce((sum, item) => sum + item.bytes, 0);
     busy = "remove";
-    const chosen = unused.filter((item) => picked.has(keyOf(item)));
     try {
       await invoke("storage_remove_unused", { ids: chosen.filter((item) => item.id).map((item) => item.id), files: chosen.filter((item) => !item.id).map((item) => item.path) });
-      note = t("{count} unused files removed: {size} freed.", { count: chosen.length, size: size(pickedBytes) });
-      unused = null;
+      note = t("{count} unused files removed: {size} freed.", { count: chosen.length, size: size(freed) });
       await session.reloadMedia();
-    } catch (error) {
-      note = error instanceof Error ? error.message : String(error);
+    } finally {
+      busy = "";
+      await refresh();
     }
-    confirming = false;
-    busy = "";
-    await refresh();
   }
 
   const size = (bytes: number) => (bytes >= 1_000_000_000 ? `${(bytes / 1_000_000_000).toFixed(1)} GB` : bytes >= 1_000_000 ? `${Math.round(bytes / 1_000_000)} MB` : bytes >= 1000 ? `${Math.round(bytes / 1000)} KB` : bytes ? `${bytes} B` : "0 MB");
@@ -114,26 +118,6 @@
       <div class="row-copy"><strong>{t("Pictures and videos")} · {size(usage.media)}</strong><span>{t("Files added to Media. Find the ones nothing uses: no song, service, sermon, slide, look, theme or setting.")}</span></div>
       <button type="button" class="btn" disabled={!!busy} onclick={() => void findUnused()}>{busy === "find" ? t("Looking…") : t("Find unused")}</button>
     </div>
-    {#if unused}
-      <div class="row stack">
-        {#if !unused.length}
-          <div class="row-copy"><span>{t("Every picture and video is used somewhere. Nothing to clear.")}</span></div>
-        {:else}
-          <div class="row-copy"><strong>{t("{count} files nothing uses · {size}", { count: unused.length, size: size(unused.reduce((sum, item) => sum + item.bytes, 0)) })}</strong><span>{t("Untick any you want to keep. Removed files leave Media for good; a backup folder keeps a copy of the library, not of media files.")}</span></div>
-          <ul class="unused">
-            {#each unused as item (keyOf(item))}
-              <li><label><input type="checkbox" checked={picked.has(keyOf(item))} onchange={() => toggle(item)} /> <span class="file">{item.name}</span>{#if !item.id}<em>{t("leftover file")}</em>{/if}<span class="bytes">{size(item.bytes)}</span></label></li>
-            {/each}
-          </ul>
-          <div class="actions">
-            <button type="button" class="btn" class:danger={confirming} disabled={!!busy || !picked.size} onclick={() => void removePicked()}>
-              {busy === "remove" ? t("Removing…") : confirming ? t("Click again to remove {count} files ({size})", { count: picked.size, size: size(pickedBytes) }) : t("Remove {count} files ({size})", { count: picked.size, size: size(pickedBytes) })}
-            </button>
-            <button type="button" class="btn" onclick={() => { unused = null; confirming = false; }}>{t("Cancel")}</button>
-          </div>
-        {/if}
-      </div>
-    {/if}
     {#if usage.models}
       <div class="row">
         <div class="row-copy"><strong>{t("Speech model")} · {size(usage.models)}</strong><span>{t("For Accurate listening. Remove it to free the space; download it again any time.")}</span></div>
@@ -147,14 +131,19 @@
   </section>
 {/if}
 
-<style>
-  .stack { flex-direction: column; align-items: stretch !important; gap: 10px; }
-  .unused { max-height: 240px; overflow: auto; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 10px; }
-  .unused li { border-bottom: 1px solid var(--line); } .unused li:last-child { border-bottom: 0; }
-  .unused label { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
-  .unused .file { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .unused em { font-style: normal; font-size: 11px; color: var(--muted); }
-  .unused .bytes { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .danger { border-color: #e5484d !important; color: #ff6b6f !important; }
-</style>
+{#if unused?.length}
+  <PickList
+    title={t("Pictures and videos nothing uses")}
+    intro={t("Nothing in a song, service, sermon, slide, look, theme or setting points to these. Untick any you want to keep. Removed files leave Media for good; a backup keeps the library, not media files.")}
+    items={unusedItems}
+    picked={unusedItems.map((item) => item.key)}
+    filters={[
+      { id: "picture", label: t("Pictures"), match: (item) => item.icon === "media" },
+      { id: "video", label: t("Videos"), match: (item) => item.icon === "video" },
+      { id: "leftover", label: t("Leftover files"), match: (item) => !!item.tag },
+    ]}
+    action={{ danger: true, label: (count, bytes) => tn(count, "Remove {n} file", "Remove {n} files") + (bytes ? ` · ${size(bytes)}` : ""), run: removePicked }}
+    onclose={() => (unused = null)}
+  />
+{/if}
+
