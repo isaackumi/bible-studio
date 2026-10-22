@@ -168,8 +168,13 @@ fn persist(app: &AppHandle, saved: &Saved) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
+        // Written beside it, then swapped in: a crash mid-write never leaves half a file, which
+        // would read as no license at all and drop an offline church to Free.
         if let Ok(text) = serde_json::to_string(saved) {
-            let _ = std::fs::write(path, text);
+            let temp = path.with_extension("json.tmp");
+            if std::fs::write(&temp, text).is_ok() {
+                let _ = std::fs::rename(&temp, &path);
+            }
         }
     }
 }

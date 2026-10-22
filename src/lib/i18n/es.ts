@@ -3640,4 +3640,6 @@ export const es: Readonly<Record<string, string>> = {
   "Church Studio logo": "Logo de Church Studio",
   "No picture (words only)": "Sin imagen (solo palabras)",
   "Import picture": "Importar imagen",
+  "The library could not be opened, so a new one was started. The old one is kept as {file}. Restore your latest backup in Settings › Storage & backup.":
+    "No se pudo abrir la biblioteca, así que se creó una nueva. La anterior se guarda como {file}. Restaura tu último respaldo en Ajustes › Espacio y respaldo.",
 };

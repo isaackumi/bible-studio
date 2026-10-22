@@ -592,6 +592,9 @@ class Session {
             : this.output.message
           : "Browser session. Audience output opens in its own window.";
       }
+      // The library could not be opened, so the app started a new one: say so before anything else.
+      const setAside = this.desktop() ? await invoke<string | null>("startup_notice").catch(() => null) : null;
+      if (setAside) this.message = t("The library could not be opened, so a new one was started. The old one is kept as {file}. Restore your latest backup in Settings › Storage & backup.", { file: setAside });
       if (!keepLive && this.cursor.itemId && this.service) await this.selectItem(this.cursor.itemId);
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);

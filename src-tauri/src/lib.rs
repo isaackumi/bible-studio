@@ -14,7 +14,7 @@ mod storage;
 mod whisper;
 
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::Db;
@@ -23,6 +23,14 @@ use crate::displays::{reconcile_blocking, set_preferences, status, Output, Outpu
 fn with_db<T>(state: &State<Db>, f: impl FnOnce(&rusqlite::Connection) -> Result<T, String>) -> Result<T, String> {
     let guard = state.0.lock().unwrap_or_else(|poison| poison.into_inner());
     f(&guard)
+}
+
+/// The library that could not be opened and was set aside at launch (its file name), for the desk to say once.
+struct StartupNotice(Mutex<Option<String>>);
+
+#[tauri::command]
+fn startup_notice(notice: State<StartupNotice>) -> Option<String> {
+    notice.0.lock().unwrap_or_else(|poison| poison.into_inner()).take()
 }
 
 #[tauri::command]
@@ -153,7 +161,7 @@ fn song_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::song_list)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn song_search(db: State<Db>, query: String) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| db::song_search(conn, &query))
 }
@@ -208,7 +216,7 @@ fn service_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::service_save(conn, &document))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn import_library(db: State<Db>, snapshot: Value) -> Result<(), String> {
     with_db(&db, |conn| db::import_library(conn, &snapshot))
 }
@@ -218,13 +226,13 @@ fn media_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::media_list)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn import_media(app: AppHandle, db: State<Db>, path: String) -> Result<Value, String> {
     with_db(&db, |conn| db::import_media(conn, &app, std::path::Path::new(&path)))
 }
 
 /// Raw image bytes in the request body; the name is URL-encoded in `x-media-name`.
-#[tauri::command]
+#[tauri::command(async)]
 fn import_media_bytes(app: AppHandle, db: State<Db>, request: tauri::ipc::Request<'_>) -> Result<Value, String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("Send the image as raw bytes.".into());
@@ -262,7 +270,7 @@ fn bible_translations(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, bible::translations)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_install(app: AppHandle, db: State<Db>, id: String) -> Result<(), String> {
     // A Bible that downloads on request: fetched and checked first, without holding the library.
     if bible::is_download(&id) {
@@ -275,13 +283,13 @@ fn bible_install(app: AppHandle, db: State<Db>, id: String) -> Result<(), String
 }
 
 /// Install a Bible read from a church's own file. Returns its id.
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_import(db: State<Db>, bible: bible::ImportedBible) -> Result<String, String> {
     with_db(&db, |conn| bible::import_translation(conn, &bible))
 }
 
 /// A translation's whole text (books of chapters of verses), for the voice word index.
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_source(db: State<Db>, translation_id: String) -> Result<Vec<Vec<Vec<String>>>, String> {
     with_db(&db, |conn| bible::source_books(conn, &translation_id))
 }
@@ -315,7 +323,7 @@ fn bible_passage(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_search(db: State<Db>, translation_id: String, query: String) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| bible::search(conn, &translation_id, &query))
 }
@@ -330,13 +338,13 @@ fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
     voice::open_privacy_settings(pane.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>, engine: Option<String>) -> Result<(), String> {
     voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default(), engine.as_deref() == Some("accurate"))
 }
 
 /// Space on this computer: what the app keeps, and the safe ways to make it smaller.
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_usage(app: tauri::AppHandle) -> Result<storage::Usage, String> {
     storage::usage(&app)
 }
@@ -346,7 +354,7 @@ fn storage_clear_cache(app: tauri::AppHandle) -> u64 {
     storage::clear_cache(&app)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::Unused>, String> {
     let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
@@ -354,7 +362,7 @@ fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> 
 }
 
 /// Delete unused pictures and videos: Media entries by id, leftover files by path.
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_remove_unused(app: tauri::AppHandle, db: tauri::State<'_, db::Db>, ids: Vec<String>, files: Vec<String>) -> Result<(), String> {
     let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
@@ -367,7 +375,7 @@ fn storage_remove_unused(app: tauri::AppHandle, db: tauri::State<'_, db::Db>, id
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_compact(db: tauri::State<'_, db::Db>) -> Result<(), String> {
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
     storage::compact(&conn)
@@ -401,9 +409,11 @@ fn whisper_download(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn whisper_cancel() {
+fn whisper_cancel(app: tauri::AppHandle) {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    whisper::cancel_download();
+    whisper::cancel_download(&app);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let _ = app;
 }
 
 #[tauri::command]
@@ -493,7 +503,7 @@ fn stop_noise_test() {
     noise::stop_test();
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn stop_sermon_listen() {
     voice::stop_transcribe();
 }
@@ -534,7 +544,7 @@ fn backup_file_name(name: &str) -> Result<&str, String> {
 }
 
 /// Write a backup into the chosen folder, then keep only the newest twenty there.
-#[tauri::command]
+#[tauri::command(async)]
 fn backup_write(dir: String, name: String, contents: String) -> Result<(), String> {
     let folder = std::path::PathBuf::from(&dir);
     if !folder.is_dir() {
@@ -558,7 +568,7 @@ fn backup_write(dir: String, name: String, contents: String) -> Result<(), Strin
 }
 
 /// The newest backup in a folder: its name and contents, or nothing.
-#[tauri::command]
+#[tauri::command(async)]
 fn backup_latest(dir: String) -> Result<Option<(String, String)>, String> {
     let folder = std::path::PathBuf::from(&dir);
     if !folder.is_dir() {
@@ -759,11 +769,15 @@ pub fn run() {
         .manage(Output::default())
         .setup(|app| {
             record_panics(app.handle());
-            let database = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;
+            let (database, notice) = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;
             app.manage(database);
+            app.manage(StartupNotice(Mutex::new(notice)));
             app.manage(entitlement::load(app.handle()));
             displays::place_operator(app.handle());
-            displays::reconcile(app.handle()).map_err(|message| std::io::Error::other(message))?;
+            // The screens are checked again every second, so a first look that fails is not fatal.
+            if let Err(error) = displays::reconcile(app.handle()) {
+                log::warn!("Screens could not be placed at launch: {error}");
+            }
             displays::start(app.handle().clone());
             app.manage(Arc::new(remote::LanRemote::default()));
             ndi::start_hub();
@@ -775,6 +789,7 @@ pub fn run() {
             entitlement::entitlement_note_time,
             entitlement::entitlement_clear,
             entitlement::entitlement_device,
+            startup_notice,
             pco_get,
             easyworship_songs,
             ai_post,

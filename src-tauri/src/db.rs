@@ -11,16 +11,43 @@ use crate::bible;
 
 pub struct Db(pub Mutex<Connection>);
 
-pub fn open(app: &AppHandle) -> Result<Db, String> {
+/// Open the library. One that cannot be opened is set aside (never deleted) and a new one started,
+/// so the app still opens on a Sunday morning; the second value is the set-aside file's name, for the desk.
+pub fn open(app: &AppHandle) -> Result<(Db, Option<String>), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("church.db");
-    let conn = Connection::open(&path).map_err(|e| e.to_string())?;
-    conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
+    let resources = resource_dir(app);
+    match open_at(&path, &resources) {
+        Ok(conn) => Ok((Db(Mutex::new(conn)), None)),
+        Err(error) => {
+            log::error!("The library could not be opened: {error}");
+            let kept = dir.join(format!("church.db.unreadable-{}", chrono_stamp()));
+            fs::rename(&path, &kept).map_err(|e| format!("The library could not be opened ({error}) or set aside ({e})."))?;
+            for side in ["-wal", "-shm"] {
+                let _ = fs::rename(dir.join(format!("church.db{side}")), dir.join(format!("{}{side}", kept.display())));
+            }
+            let conn = open_at(&path, &resources)?;
+            Ok((Db(Mutex::new(conn)), Some(kept.file_name().and_then(|name| name.to_str()).unwrap_or("church.db.unreadable").to_string())))
+        }
+    }
+}
+
+fn open_at(path: &Path, resources: &Path) -> Result<Connection, String> {
+    let conn = Connection::open(path).map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 3000;")
         .map_err(|e| e.to_string())?;
-    migrate(&conn)?;
-    bible::seed_bundled_translations(&conn, &resource_dir(app))?;
-    Ok(Db(Mutex::new(conn)))
+    migrate_keeping_copy(&conn, path)?;
+    // The bundled Bibles: a missing one is logged, not fatal (the others, and downloads, still work).
+    if let Err(error) = bible::seed_bundled_translations(&conn, resources) {
+        log::warn!("A bundled Bible could not be installed: {error}");
+    }
+    Ok(conn)
+}
+
+/// Seconds since 1970, for file names.
+fn chrono_stamp() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 pub fn resource_dir(app: &AppHandle) -> PathBuf {
@@ -37,32 +64,48 @@ pub fn resource_dir(app: &AppHandle) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
 }
 
+/// Every change to the tables, in order. Each runs once, in a transaction with its record in
+/// schema_migrations, so a step that alters a table (ALTER TABLE) is never run twice.
+const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (1, "init", include_str!("../migrations/001_init.sql")),
+    (2, "sermons", include_str!("../migrations/002_sermons.sql")),
+];
+
+fn pending(conn: &Connection) -> Result<Vec<&'static (i64, &'static str, &'static str)>, String> {
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, description TEXT NOT NULL);")
+        .map_err(|e| e.to_string())?;
+    let mut statement = conn.prepare("SELECT version FROM schema_migrations").map_err(|e| e.to_string())?;
+    let applied = statement
+        .query_map([], |row| row.get::<_, i64>(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(MIGRATIONS.iter().filter(|(version, _, _)| !applied.contains(version)).collect())
+}
+
 fn migrate(conn: &Connection) -> Result<(), String> {
-    conn.execute_batch(include_str!("../migrations/001_init.sql"))
-        .map_err(|e| e.to_string())?;
-    mark_migration(conn, 1, "init")?;
-    conn.execute_batch(include_str!("../migrations/002_sermons.sql"))
-        .map_err(|e| e.to_string())?;
-    mark_migration(conn, 2, "sermons")?;
+    for (version, description, sql) in pending(conn)? {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        tx.execute_batch(sql).map_err(|e| format!("Library update {version} ({description}) failed: {e}"))?;
+        tx.execute("INSERT INTO schema_migrations (version, description) VALUES (?1, ?2)", params![version, description])
+            .map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
-fn mark_migration(conn: &Connection, version: i64, description: &str) -> Result<(), String> {
-    let applied: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?1",
-            params![version],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    if applied == 0 {
-        conn.execute(
-            "INSERT INTO schema_migrations (version, description) VALUES (?1, ?2)",
-            params![version, description],
-        )
-        .map_err(|e| e.to_string())?;
+/// Before changing the tables of a library that already has data, keep a copy beside it
+/// (church.db.before-v3), so a failed update can be undone by hand.
+fn migrate_keeping_copy(conn: &Connection, path: &Path) -> Result<(), String> {
+    let steps = pending(conn)?;
+    let existing: i64 = conn.query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row.get(0)).map_err(|e| e.to_string())?;
+    if let (Some(last), true) = (steps.last(), existing > 0) {
+        let copy = path.with_file_name(format!("church.db.before-v{}", last.0));
+        if !copy.exists() {
+            conn.execute("VACUUM INTO ?1", params![copy.to_string_lossy()]).map_err(|e| format!("Could not keep a copy before updating the library: {e}"))?;
+        }
     }
-    Ok(())
+    migrate(conn)
 }
 
 fn parse_row(text: Result<String, rusqlite::Error>) -> Result<Option<Value>, String> {
@@ -545,6 +588,37 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         migrate(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn runs_each_library_update_once() {
+        let conn = test_db();
+        migrate(&conn).unwrap();
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, MIGRATIONS.len() as i64);
+        assert!(pending(&conn).unwrap().is_empty());
+        // A step that could only run once (as ALTER TABLE) is not run again on the next launch.
+        conn.execute_batch("ALTER TABLE sermons ADD COLUMN once INTEGER").unwrap();
+        conn.execute("INSERT INTO schema_migrations (version, description) VALUES (99, 'once')", []).unwrap();
+        migrate(&conn).unwrap();
+    }
+
+    #[test]
+    fn keeps_a_copy_before_updating_a_library_with_data() {
+        let dir = std::env::temp_dir().join(format!("cs-migrate-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("church.db");
+        let conn = Connection::open(&path).unwrap();
+        migrate(&conn).unwrap();
+        conn.execute("DELETE FROM schema_migrations WHERE version = 2", []).unwrap();
+        migrate_keeping_copy(&conn, &path).unwrap();
+        assert!(dir.join("church.db.before-v2").exists());
+        // A new library has nothing to keep.
+        let fresh = dir.join("fresh.db");
+        migrate_keeping_copy(&Connection::open(&fresh).unwrap(), &fresh).unwrap();
+        assert!(!dir.join("church.db.before-v1").exists());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

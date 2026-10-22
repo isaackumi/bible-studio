@@ -12,7 +12,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager};
@@ -57,7 +57,10 @@ struct Progress {
 }
 
 static DOWNLOADING: AtomicBool = AtomicBool::new(false);
-static CANCEL: AtomicBool = AtomicBool::new(false);
+/// The current download's number. Cancel moves it on, so a download stuck on a dead connection is
+/// left behind at once (it stops, and removes its own part file, when its read ends) and a new
+/// one can start beside it.
+static RUN: AtomicU64 = AtomicU64::new(0);
 
 fn model_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("models");
@@ -79,8 +82,11 @@ pub fn delete(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn cancel_download() {
-    CANCEL.store(true, Ordering::SeqCst);
+pub fn cancel_download(app: &tauri::AppHandle) {
+    RUN.fetch_add(1, Ordering::SeqCst);
+    if DOWNLOADING.swap(false, Ordering::SeqCst) {
+        let _ = app.emit("whisper-download", Progress { received: 0, total: MODEL_BYTES, done: true, error: Some("Download cancelled.".into()) });
+    }
 }
 
 /// Download the model on its own thread; `whisper-download` events report progress and the end.
@@ -88,10 +94,14 @@ pub fn download(app: tauri::AppHandle) -> Result<(), String> {
     if DOWNLOADING.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
-    CANCEL.store(false, Ordering::SeqCst);
+    let run = RUN.fetch_add(1, Ordering::SeqCst) + 1;
     let path = model_path(&app)?;
     std::thread::spawn(move || {
-        let result = fetch(&app, &path);
+        let result = fetch(&app, &path, run);
+        // Cancelled: cancel_download has already said so.
+        if RUN.load(Ordering::SeqCst) != run {
+            return;
+        }
         DOWNLOADING.store(false, Ordering::SeqCst);
         let error = result.err();
         let _ = app.emit("whisper-download", Progress { received: if error.is_none() { MODEL_BYTES } else { 0 }, total: MODEL_BYTES, done: true, error });
@@ -99,11 +109,18 @@ pub fn download(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn fetch(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
+fn fetch(app: &tauri::AppHandle, path: &PathBuf, run: u64) -> Result<(), String> {
     let dir = path.parent().ok_or("No folder for the model.")?;
     std::fs::create_dir_all(dir).map_err(|error| format!("Could not make the models folder. {error}"))?;
-    let part = path.with_extension("part");
-    let response = ureq::get(MODEL_URL).call().map_err(|error| format!("The download could not start. Check the internet connection. ({error})"))?;
+    let part = path.with_extension(format!("part{run}"));
+    // A dead connection fails instead of waiting for ever; the whole 60 MB may take 20 minutes.
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_secs(15)))
+        .timeout_recv_response(Some(Duration::from_secs(30)))
+        .timeout_recv_body(Some(Duration::from_secs(20 * 60)))
+        .build()
+        .into();
+    let response = agent.get(MODEL_URL).call().map_err(|error| format!("The download could not start. Check the internet connection. ({error})"))?;
     let mut body = response.into_body().into_reader();
     let mut file = std::fs::File::create(&part).map_err(|error| format!("Could not save the model. {error}"))?;
     let mut hash = Sha256::new();
@@ -111,7 +128,7 @@ fn fetch(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
     let mut received = 0u64;
     let mut last = Instant::now();
     loop {
-        if CANCEL.load(Ordering::SeqCst) {
+        if RUN.load(Ordering::SeqCst) != run {
             drop(file);
             let _ = std::fs::remove_file(&part);
             return Err("Download cancelled.".into());
@@ -134,6 +151,10 @@ fn fetch(app: &tauri::AppHandle, path: &PathBuf) -> Result<(), String> {
     if digest != MODEL_SHA256 || received != MODEL_BYTES {
         let _ = std::fs::remove_file(&part);
         return Err("The downloaded model did not match the published one, so it was not used. Try again.".into());
+    }
+    if RUN.load(Ordering::SeqCst) != run {
+        let _ = std::fs::remove_file(&part);
+        return Err("Download cancelled.".into());
     }
     std::fs::rename(&part, path).map_err(|error| format!("Could not save the model. {error}"))?;
     Ok(())

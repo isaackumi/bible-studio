@@ -90,7 +90,15 @@ pub fn fetch_download(id: &str, dir: &Path) -> Result<std::path::PathBuf, String
     use std::io::Read;
     let translation = DOWNLOADS.iter().find(|t| t.id == id).ok_or_else(|| format!("{id} is not in the catalog"))?;
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let response = ureq::get(&format!("{DOWNLOAD_BASE}{id}.json"))
+    // A dead connection fails instead of waiting for ever (a Bible is a few megabytes).
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(std::time::Duration::from_secs(15)))
+        .timeout_recv_response(Some(std::time::Duration::from_secs(30)))
+        .timeout_recv_body(Some(std::time::Duration::from_secs(3 * 60)))
+        .build()
+        .into();
+    let response = agent
+        .get(&format!("{DOWNLOAD_BASE}{id}.json"))
         .call()
         .map_err(|error| format!("{} could not be downloaded. Check the internet connection. ({error})", translation.abbreviation))?;
     let mut bytes = Vec::new();
