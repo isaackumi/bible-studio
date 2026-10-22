@@ -3730,4 +3730,15 @@ export const es: Readonly<Record<string, string>> = {
   "Type this code on the sign-in page": "Escribe este código en la página de inicio de sesión",
   "Use a code instead": "Usar un código",
   "Where you are signed in": "Dónde has iniciado sesión",
+  // What's new in 0.3.0
+  "Sign in once, in your browser": "Inicia sesión una vez, en tu navegador",
+  "Sign in comes back to Church Studio by itself, with no number to tap. From a phone or another computer, type the short code instead.": "El inicio de sesión vuelve solo a Church Studio, sin número que tocar. Desde un teléfono u otro ordenador, escribe el código corto.",
+  "Your plan goes with you": "Tu plan te acompaña",
+  "The free trial and license keys now belong to your account. Add your team by email in Settings › Account, and see every computer you are signed in on.": "La prueba gratuita y las claves de licencia ahora pertenecen a tu cuenta. Añade a tu equipo por correo en Ajustes › Cuenta y ve cada ordenador donde has iniciado sesión.",
+  "Steadier on Sunday": "Más estable el domingo",
+  "Installing a Bible, importing a video or starting to listen no longer freezes the desk or the projector, and quick clicks through verses always land on the right one.": "Instalar una Biblia, importar un vídeo o empezar a escuchar ya no congela el escritorio ni el proyector, y los clics rápidos por los versículos siempre llegan al correcto.",
+  "Every screen shape": "Todas las formas de pantalla",
+  "Looks with gaps or frames, theme previews and slide pages follow your screen's real shape, 4:3 and portrait included.": "Los diseños con espacios o marcos, las vistas previas de temas y las páginas de diapositivas siguen la forma real de tu pantalla, 4:3 y vertical incluidos.",
+  "Clearer in French and Spanish": "Más claro en francés y español",
+  "Desk messages are translated, and problems stand out as warnings in every language.": "Los mensajes del escritorio están traducidos y los problemas destacan como avisos en todos los idiomas.",
 };

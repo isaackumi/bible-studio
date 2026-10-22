@@ -3811,4 +3811,15 @@ export const fr: Readonly<Record<string, string>> = {
   "Type this code on the sign-in page": "Tapez ce code sur la page de connexion",
   "Use a code instead": "Utiliser un code",
   "Where you are signed in": "Où vous êtes connecté",
+  // What's new in 0.3.0
+  "Sign in once, in your browser": "Connexion unique, dans votre navigateur",
+  "Sign in comes back to Church Studio by itself, with no number to tap. From a phone or another computer, type the short code instead.": "La connexion revient toute seule dans Church Studio, sans numéro à toucher. Depuis un téléphone ou un autre ordinateur, tapez plutôt le code court.",
+  "Your plan goes with you": "Votre formule vous suit",
+  "The free trial and license keys now belong to your account. Add your team by email in Settings › Account, and see every computer you are signed in on.": "L’essai gratuit et les clés de licence appartiennent maintenant à votre compte. Ajoutez votre équipe par e-mail dans Réglages › Compte, et voyez chaque ordinateur où vous êtes connecté.",
+  "Steadier on Sunday": "Plus stable le dimanche",
+  "Installing a Bible, importing a video or starting to listen no longer freezes the desk or the projector, and quick clicks through verses always land on the right one.": "Installer une Bible, importer une vidéo ou commencer l’écoute ne fige plus le pupitre ni le projecteur, et des clics rapides sur les versets tombent toujours sur le bon.",
+  "Every screen shape": "Toutes les formes d’écran",
+  "Looks with gaps or frames, theme previews and slide pages follow your screen's real shape, 4:3 and portrait included.": "Les vues avec espaces ou cadres, les aperçus de thèmes et les pages de diapositives suivent la vraie forme de votre écran, 4:3 et portrait compris.",
+  "Clearer in French and Spanish": "Plus clair en français et en espagnol",
+  "Desk messages are translated, and problems stand out as warnings in every language.": "Les messages du pupitre sont traduits, et les problèmes ressortent comme des avertissements dans toutes les langues.",
 };

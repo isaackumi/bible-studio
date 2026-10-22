@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.3.0",
+    date: "2026-10-22",
+    highlights: [
+      { icon: "user", title: msg("Sign in once, in your browser"), text: msg("Sign in comes back to Church Studio by itself, with no number to tap. From a phone or another computer, type the short code instead.") },
+      { icon: "key", title: msg("Your plan goes with you"), text: msg("The free trial and license keys now belong to your account. Add your team by email in Settings › Account, and see every computer you are signed in on.") },
+      { icon: "screens", title: msg("Steadier on Sunday"), text: msg("Installing a Bible, importing a video or starting to listen no longer freezes the desk or the projector, and quick clicks through verses always land on the right one.") },
+      { icon: "layout", title: msg("Every screen shape"), text: msg("Looks with gaps or frames, theme previews and slide pages follow your screen's real shape, 4:3 and portrait included.") },
+      { icon: "globe", title: msg("Clearer in French and Spanish"), text: msg("Desk messages are translated, and problems stand out as warnings in every language.") },
+    ],
+  },
+  {
     version: "0.2.9",
     date: "2026-10-21",
     highlights: [
