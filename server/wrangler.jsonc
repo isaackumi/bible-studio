@@ -54,7 +54,9 @@
   "ratelimits": [{ "name": "LIMITS", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   // Usage over time (usage.ts): one point per check-in, read by the admin page through the SQL API
   // with the ANALYTICS_TOKEN secret (a Cloudflare API token with Account Analytics Read).
-  "analytics_engine_datasets": [{ "binding": "USAGE", "dataset": "church_studio_usage" }],
+  // Off until Analytics Engine is enabled for the account (dash.cloudflare.com › Workers › Analytics
+  // Engine; a deploy with it fails before that). Without it, check-ins still work; only usage history waits.
+  // "analytics_engine_datasets": [{ "binding": "USAGE", "dataset": "church_studio_usage" }],
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }
