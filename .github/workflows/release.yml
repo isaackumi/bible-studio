@@ -42,8 +42,34 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-  release:
+  # One draft for all three platforms, made before they start. (Left to each platform job, GitHub
+  # cannot find a draft by its tag, so parallel jobs each made their own and 0.3.0 split in two.)
+  draft:
     needs: test
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      id: ${{ steps.create.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create the draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          npx vite-node scripts/release-notes.ts > notes.md
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" -f tag_name="v$version" -f target_commitish="$GITHUB_SHA" -f name="Church Studio v$version" -F draft=true -F body=@notes.md -q .id)"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: draft
     permissions:
       contents: write
     strategy:
@@ -73,15 +99,6 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
       # The release text is this version's highlights from src/lib/domain/changelog.ts.
-      - name: Release notes
-        id: notes
-        shell: bash
-        run: |
-          {
-            echo 'body<<NOTES_END'
-            npx vite-node scripts/release-notes.ts
-            echo 'NOTES_END'
-          } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,18 +108,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: Church Studio v__VERSION__
-          releaseBody: ${{ steps.notes.outputs.body }}
-          # A draft until every platform is in (publish below): installed copies and the download
-          # buttons read the latest release, so a half-built one must never be it.
-          releaseDraft: true
+          # Into the one draft made above. It stays a draft until every platform is in (publish
+          # below): installed copies and the download buttons read the latest release.
+          releaseId: ${{ needs.draft.outputs.id }}
           includeUpdaterJson: true
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}
 
   # All three platforms built: check the release has its update file, then make it the latest.
   publish:
-    needs: release
+    needs: [draft, release]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -112,8 +126,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="v$(node -p "require('./package.json').version")"
-          assets="$(gh release view "$tag" --json assets -q '.assets[].name')"
+          id="${{ needs.draft.outputs.id }}"
+          assets="$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" -q '.assets[].name')"
           echo "$assets"
-          grep -qx latest.json <<< "$assets" || { echo "::error::$tag has no latest.json; left as a draft."; exit 1; }
-          gh release edit "$tag" --draft=false --latest
+          grep -qx latest.json <<< "$assets" || { echo "::error::The release has no latest.json; left as a draft."; exit 1; }
+          # Every platform's update must be in latest.json, or that platform's copies never update.
+          gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" -q '.assets[] | select(.name == "latest.json") | .id')" > latest.json
+          for platform in darwin-aarch64 darwin-x86_64 windows-x86_64 linux-x86_64; do
+            jq -e --arg p "$platform" '.platforms[$p]' latest.json > /dev/null || { echo "::error::latest.json has no $platform; left as a draft."; exit 1; }
+          done
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -f make_latest=true -q .html_url
