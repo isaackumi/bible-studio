@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { applyLayerDrag, layerOrder, presentComposition, type Composition, type LayerDragHandle } from "../../domain/composition";
+  import { applyLayerDrag, layerOrder, presentComposition, resizeLayer, type Composition, type LayerDragHandle } from "../../domain/composition";
+  import { snapBounds, type Guide } from "../../domain/snap";
   import { withMediaUrls } from "../../domain/sources";
   import { mediaUrl } from "../../db/api";
   import FrameView from "../FrameView.svelte";
@@ -61,6 +62,9 @@
     drag = { id, handle, x: event.clientX, y: event.clientY, start: page, moved: false };
   }
 
+  /** The lines a dragged element caught on, shown while dragging. */
+  let guides = $state<Guide[]>([]);
+
   function move(event: PointerEvent) {
     if (!drag || !canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -68,12 +72,24 @@
     const dy = ((event.clientY - drag.y) / rect.height) * 100;
     if (Math.abs(dx) + Math.abs(dy) < 0.2) return;
     drag.moved = true;
-    onpreview(applyLayerDrag(drag.start, drag.id, drag.handle, { dx, dy }));
+    const dragged = applyLayerDrag(drag.start, drag.id, drag.handle, { dx, dy });
+    const layer = dragged.layers.find((entry) => entry.id === drag!.id);
+    // Edges and centres catch on the page and on other elements; hold Alt (Option) to place freely.
+    if (!layer || event.altKey) {
+      guides = [];
+      onpreview(dragged);
+      return;
+    }
+    const others = dragged.layers.filter((entry) => entry.id !== layer.id && entry.visible).map((entry) => entry.bounds);
+    const snapped = snapBounds(layer.bounds, others, drag.handle);
+    guides = snapped.guides;
+    onpreview(resizeLayer(dragged, layer.id, snapped.bounds));
   }
 
   function up() {
     if (drag?.moved) oncommit(page);
     drag = null;
+    guides = [];
   }
 
   const handles: LayerDragHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
@@ -107,6 +123,9 @@
         {/if}
       </div>
     {/each}
+    {#each guides as guide (`${guide.axis}${guide.at}`)}
+      <span class="guide {guide.axis}" style:left={guide.axis === "x" ? `${guide.at}%` : undefined} style:top={guide.axis === "y" ? `${guide.at}%` : undefined} aria-hidden="true"></span>
+    {/each}
   </div>
 </div>
 
@@ -127,4 +146,8 @@
   .s { left: 50%; top: 100%; cursor: ns-resize; }
   .sw { left: 0; top: 100%; cursor: nesw-resize; }
   .w { left: 0; top: 50%; cursor: ew-resize; }
+  /* Where a dragged element caught: thin lines across the page, gone when it is let go. */
+  .guide { position: absolute; z-index: 5; pointer-events: none; background: #ff3d8b; }
+  .guide.x { top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); }
+  .guide.y { left: 0; right: 0; height: 1px; transform: translateY(-0.5px); }
 </style>

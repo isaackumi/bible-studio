@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { mediaUrl } from "../../db/api";
-  import { removeLayer, sanitizeBackground, setCompositionBackground, type Composition, type PageBackground } from "../../domain/composition";
+  import { addLayer, duplicateLayer, moveLayerTo, removeLayer, reorderLayers, resizeLayer, sanitizeBackground, setCompositionBackground, type Composition, type CompositionLayer, type PageBackground } from "../../domain/composition";
   import {
     addIconElement,
     addImageElement,
@@ -119,6 +119,8 @@
     imageMenu = false;
   }
   let templates = $state(false);
+  /** An element copied with ⌘C / Ctrl+C, pasted with ⌘V on any page of this deck. */
+  let clipboard: CompositionLayer | null = null;
   /** The church's screen shape, so templates are laid out for it. */
   const screenAspect = $derived.by(() => {
     const canvas = session.outputCanvas();
@@ -182,6 +184,42 @@
       return;
     }
     if (typing) return;
+    const command = event.metaKey || event.ctrlKey;
+    // Copy, paste and duplicate an element; arrows nudge it; brackets change what is in front.
+    if (command && event.key.toLowerCase() === "c" && selected) {
+      clipboard = $state.snapshot(selected) as CompositionLayer;
+      return;
+    }
+    if (command && event.key.toLowerCase() === "v" && clipboard) {
+      event.preventDefault();
+      const copy = clipboard;
+      const next = addLayer(page, { name: copy.name, bounds: { ...copy.bounds, x: Math.min(98, copy.bounds.x + 2), y: Math.min(98, copy.bounds.y + 2) }, source: copy.source, fit: copy.fit });
+      const added = next.layers.at(-1)!;
+      commitPage({ ...next, layers: next.layers.map((layer) => (layer.id === added.id ? { ...layer, animation: copy.animation, opacity: copy.opacity } : layer)) });
+      selectedId = added.id;
+      return;
+    }
+    if (command && event.key.toLowerCase() === "d" && selected) {
+      event.preventDefault();
+      const next = duplicateLayer(page, selected.id);
+      commitPage(next);
+      selectedId = next.layers.at(-1)?.id ?? selectedId;
+      return;
+    }
+    if (command && (event.key === "]" || event.key === "[") && selected) {
+      event.preventDefault();
+      const forward = event.key === "]";
+      commitPage(event.shiftKey ? moveLayerTo(page, selected.id, forward ? 0 : page.layers.length - 1) : reorderLayers(page, selected.id, forward ? 1 : -1));
+      return;
+    }
+    const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    if (nudge && selected && !selected.locked) {
+      event.preventDefault();
+      const step = event.shiftKey ? 5 : 0.5;
+      const { x, y, w, h } = selected.bounds;
+      commitPage(resizeLayer(page, selected.id, { x: x + nudge[0]! * step, y: y + nudge[1]! * step, w, h }));
+      return;
+    }
     if ((event.key === "Delete" || event.key === "Backspace") && selected && !selected.locked) {
       event.preventDefault();
       event.stopPropagation();

@@ -9,6 +9,7 @@
     resizeLayer,
     setLayerFit,
     setLayerLocked,
+    moveLayerTo,
     setLayerAnimation,
     setLayerOpacity,
     setLayerStyle,
@@ -25,6 +26,7 @@
   import TextWords from "../TextWords.svelte";
   import GradientEditor from "./GradientEditor.svelte";
   import { encodeFill, sanitizeFill } from "../../domain/fill";
+  import { alignToPage } from "../../domain/snap";
 
   // Properties of the selected element on a deck page. Every change is one history step.
   let { page, layer, oncommit }: { page: Composition; layer: CompositionLayer; oncommit: (page: Composition) => void } = $props();
@@ -191,7 +193,17 @@
       </label>
     {/if}
   </div>
+  <div class="stack">
+    <span>{t("Line up on the page")}</span>
+    <div class="align" role="group" aria-label={t("Line up on the page")}>
+      {#each [["left", t("Left")], ["center", t("Centre")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
+        <button type="button" disabled={layer.locked} onclick={() => oncommit(resizeLayer(page, layer.id, alignToPage(layer.bounds, where as "left")))}>{label}</button>
+      {/each}
+    </div>
+  </div>
   <div class="actions">
+    <button type="button" onclick={() => oncommit(moveLayerTo(page, layer.id, 0))}>{t("To front")}</button>
+    <button type="button" onclick={() => oncommit(moveLayerTo(page, layer.id, page.layers.length - 1))}>{t("To back")}</button>
     <button type="button" onclick={() => oncommit(reorderLayers(page, layer.id, 1))}>{t("Bring forward")}</button>
     <button type="button" onclick={() => oncommit(reorderLayers(page, layer.id, -1))}>{t("Send backward")}</button>
     <button type="button" aria-pressed={layer.locked} onclick={() => oncommit(setLayerLocked(page, layer.id, !layer.locked))}>{layer.locked ? t("Unlock") : t("Lock")}</button>
@@ -216,4 +228,7 @@
   .pick button { text-align: left; }
   .pick button.on { border-color: var(--accent); }
   .note { margin: 0; color: var(--muted); font-size: 12px; }
+  .align { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .align button { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+  .align button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
 </style>

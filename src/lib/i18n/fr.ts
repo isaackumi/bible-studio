@@ -3897,4 +3897,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Lower thirds": "Bandeaux",
   "Clear (shows what is behind)": "Transparent (laisse voir derrière)",
   "Put this page over a camera in a Production look: add a Slide page layer and choose it.": "Posez cette page sur une caméra dans une vue Production : ajoutez un calque Page de diapositive et choisissez-la.",
+  "Line up on the page": "Aligner sur la page",
+  "Middle": "Milieu",
+  "To back": "Tout derrière",
+  "To front": "Tout devant",
 };
