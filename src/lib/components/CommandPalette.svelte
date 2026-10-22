@@ -3,7 +3,7 @@
   import { formatReference, parseReference } from "../bible/reference";
   import type { BibleItem, PewPage } from "../domain/types";
   import Icon from "./Icon.svelte";
-  import { msg, t } from "../i18n/core";
+  import { msg, t, tn } from "../i18n/core";
 
   // Go to anything (⌘K / Ctrl+K), from any page: a page, a part or item of the service, a song, a
   // verse ("John 3:16" goes on Preview), a setting, or an action (LIVE, Clear, Start service…).
@@ -57,6 +57,10 @@
       { id: "p-songs", group: msg("Pages"), label: msg("Songs"), icon: "lyrics", run: go("songs"), words: "lyrics hymns" },
       { id: "p-sermon", group: msg("Pages"), label: msg("Sermon"), icon: "book", run: go("sermon"), words: "notes preaching" },
       { id: "p-service", group: msg("Pages"), label: msg("Service"), icon: "list", run: go("service"), words: "running order plan" },
+      // The design studio: slides, templates, lower thirds, gradients, icons and pictures.
+      { id: "d-studio", group: msg("Design"), label: msg("Design studio"), detail: msg("Slides, gradients, shapes, icons and pictures"), icon: "stage", run: () => session.openStudio(), words: "design studio slides editor deck page graphics gradient shape icon picture image svg logo rotate group" },
+      { id: "d-template", group: msg("Design"), label: msg("New page from a template"), detail: msg("Welcome, event, verse, sermon, giving"), icon: "plus", run: () => session.openStudio(undefined, "templates"), words: "template templates layout welcome event announcement notices verse scripture sermon series giving prayer design" },
+      { id: "d-lower", group: msg("Design"), label: msg("Lower thirds"), detail: msg("Name bars that go over a camera"), icon: "captions", run: () => session.openStudio(undefined, "templates"), words: "lower third thirds name bar caption speaker overlay camera" },
     );
     for (const [id, label, icon, words] of SETTINGS) entries.push({ id: `s-${id}`, group: msg("Settings"), label, icon, run: () => session.openSettings(id), words: `settings ${words}` });
     return entries;
@@ -104,6 +108,7 @@
       }
     }
     if (q) {
+      for (const deck of session.decks) add({ id: `deck-${deck.id}`, group: msg("Design"), label: t("Edit slides: {name}", { name: deck.name }), detail: tn(deck.pages.length, "{n} page", "{n} pages"), icon: "stage", run: () => session.openStudio(deck.id) });
       for (const song of session.songs) add({ id: `song-${song.id}`, group: msg("Songs"), label: song.title || t("Untitled song"), detail: song.author || undefined, icon: "lyrics", run: () => { go("songs")(); session.previewSongSection(song, song.sections[0]?.id ?? null); } });
     }
     for (const entry of fixed) add(entry, entry.group === "Actions" ? 0.5 : 0);

@@ -3,6 +3,7 @@
   import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
   import CommandPalette from "./CommandPalette.svelte";
+  import DeckEditor from "./decks/DeckEditor.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
   import WhatsNew from "./WhatsNew.svelte";
@@ -220,6 +221,12 @@
       <a class="demo-badge" href="https://church-studio.heitechinc.com/#download" target="_blank" rel="noopener" title={t("This is the browser demo. Download the app for the Premium trial, the audience screen on a projector, voice, streaming and more.")}>
         <i aria-hidden="true"></i>{t("Browser demo")} · <b>{t("Get the app")}</b>
       </a>
+    {/if}
+    {#if session.studio}
+      {@const studioDeck = session.decks.find((deck) => deck.id === session.studio?.deckId)}
+      {#if studioDeck}
+        {#key studioDeck.id}<DeckEditor deck={studioDeck} startWith={session.studio.start} onclose={() => session.closeStudio()} />{/key}
+      {/if}
     {/if}
     <CommandPalette />
     <UpdateNotice />

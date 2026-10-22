@@ -28,7 +28,7 @@
   import { t } from "../../i18n/core";
 
   // Full-screen deck editor. Edits stay in a draft until "Save changes"; Program never changes here.
-  let { deck, onclose }: { deck: SlideDeck; onclose: () => void } = $props();
+  let { deck, onclose, startWith = null }: { deck: SlideDeck; onclose: () => void; startWith?: "templates" | null } = $props();
 
   // The editor works on a copy taken when it opens.
   let draft = $state<SlideDeck>(untrack(() => JSON.parse(JSON.stringify(deck))));
@@ -164,7 +164,8 @@
     selectedId = next.layers.at(-1)?.id ?? null;
     imageMenu = false;
   }
-  let templates = $state(false);
+  // Opened from search as "New page from a template": the gallery comes up straight away.
+  let templates = $state(untrack(() => startWith === "templates"));
   /** An element copied with ⌘C / Ctrl+C, pasted with ⌘V on any page of this deck. */
   let clipboard: CompositionLayer | null = null;
   /** The church's screen shape, so templates are laid out for it. */
@@ -283,7 +284,10 @@
       selectedId = null;
     } else if (event.key === "Escape") {
       event.preventDefault();
-      if (editingText) editingText = null;
+      // A window over the studio closes first; the studio only on the next Escape.
+      if (templates) templates = false;
+      else if (iconPicker) iconPicker = null;
+      else if (editingText) editingText = null;
       else if (selectedId) selectedId = null;
       else close();
     }

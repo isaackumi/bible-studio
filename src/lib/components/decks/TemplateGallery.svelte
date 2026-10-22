@@ -26,7 +26,7 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={onclose}>
-  <div class="gallery" role="dialog" aria-modal="true" aria-label={t("Start from a template")} tabindex="-1" use:modalFocus onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.key === "Escape" && onclose()}>
+  <div class="gallery" role="dialog" aria-modal="true" aria-label={t("Start from a template")} tabindex="-1" use:modalFocus onclick={(event) => event.stopPropagation()} onkeydown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onclose(); } }}>
     <header>
       <h2>{t("Start from a template")}</h2>
       <p>{t("Each one is laid out for your screen's shape, and everything on it can be changed.")}</p>

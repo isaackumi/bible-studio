@@ -3829,4 +3829,11 @@ export const es: Readonly<Record<string, string>> = {
   "Turn, in degrees": "Giro, en grados",
   "Ungroup": "Desagrupar",
   "{n} elements picked": "{n} elementos elegidos",
+  "Design studio": "Estudio de diseño",
+  "Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)": "Estudio de diseño: diapositivas, plantillas, rótulos, degradados e iconos (⌘K y escribe «diseño»)",
+  "Edit slides: {name}": "Editar diapositivas: {name}",
+  "Name bars that go over a camera": "Rótulos de nombre que van sobre una cámara",
+  "New page from a template": "Nueva página desde una plantilla",
+  "Slides, gradients, shapes, icons and pictures": "Diapositivas, degradados, formas, iconos e imágenes",
+  "Welcome, event, verse, sermon, giving": "Bienvenida, evento, versículo, sermón, ofrendas",
 };

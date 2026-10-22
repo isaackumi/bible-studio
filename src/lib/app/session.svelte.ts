@@ -189,7 +189,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
-import { deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
+import { createDeck, deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, createTimer, presentTimer, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
@@ -4246,6 +4246,23 @@ class Session {
   get decks(): SlideDeck[] {
     return (this.workspace.decks ?? []).map(sanitizeDeck).filter((deck): deck is SlideDeck => deck !== null);
   }
+
+  /**
+   * The design studio (the slide editor) open over any page: on a deck, the newest one, or a new one.
+   * `start`: open the template gallery straight away.
+   */
+  studio = $state<{ deckId: string; start: "templates" | null } | null>(null);
+
+  openStudio = (deckId?: string, start: "templates" | null = null) => {
+    const deck = deckId ? this.decks.find((entry) => entry.id === deckId) : [...this.decks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    const chosen = deck ?? createDeck(t("Slides {n}", { n: this.decks.length + 1 }));
+    if (!deck) this.saveDeck(chosen);
+    this.studio = { deckId: chosen.id, start };
+  };
+
+  closeStudio = () => {
+    this.studio = null;
+  };
 
   /** Which deck page is on Preview, so Next/Previous step pages. */
   deckFocus = $state<{ deckId: string; index: number } | null>(null);

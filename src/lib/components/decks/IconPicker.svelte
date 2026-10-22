@@ -37,7 +37,7 @@
 {/snippet}
 
 <div class="backdrop" role="presentation" onclick={onclose}>
-  <div class="picker" role="dialog" aria-modal="true" aria-label={t("Choose an icon")} tabindex="-1" use:modalFocus={".search"} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.key === "Escape" && onclose()}>
+  <div class="picker" role="dialog" aria-modal="true" aria-label={t("Choose an icon")} tabindex="-1" use:modalFocus={".search"} onclick={(event) => event.stopPropagation()} onkeydown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onclose(); } }}>
     <header>
       <h2>{t("Choose an icon")}</h2>
       <input class="search" type="search" placeholder={t("Search icons: cross, music, calendar…")} aria-label={t("Search icons")} bind:value={query} />

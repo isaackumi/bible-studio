@@ -32,6 +32,19 @@
     <span class="label">{t("Production Desk")}</span>
     <span class="short">{t("Production")}</span>
   </button>
+  <!-- Not a desk: the design studio opens over whichever desk is showing. -->
+  <button
+    type="button"
+    class="studio"
+    class:on={!!session.studio}
+    aria-label={t("Design studio")}
+    data-tip={t("Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)")}
+    onclick={() => session.openStudio()}
+  >
+    <Icon name="stage" size={16} />
+    <span class="label">{t("Studio")}</span>
+    <span class="short">{t("Studio")}</span>
+  </button>
 </nav>
 
 <style>
