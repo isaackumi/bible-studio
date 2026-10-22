@@ -19,6 +19,11 @@ import { handleApi } from "./api.ts";
 import { authOptions, betterAuthIdentity, type AuthSettings } from "./auth.ts";
 import { mockProvider } from "./billing.ts";
 import { memoryStore } from "./store.ts";
+import { handleRooms, memoryRooms } from "./rooms.ts";
+import { roomPage } from "./room-page.ts";
+
+// Rooms for the audience's phones (Q&A, quizzes, polls), held in memory while this runs.
+const rooms = memoryRooms();
 
 const PORT = Number(process.env.PORT ?? 8787);
 const DATA = join(import.meta.dirname ?? ".", ".dev-store.json");
@@ -73,7 +78,7 @@ createServer(async (incoming, outgoing) => {
     headers: Object.entries(incoming.headers).flatMap(([key, value]) => (typeof value === "string" ? [[key, value] as [string, string]] : [])),
     body: incoming.method === "GET" || incoming.method === "HEAD" || body.length === 0 ? undefined : body,
   });
-  const response = await handleApi(request, config);
+  const response = (await handleRooms(request, rooms, `http://localhost:${PORT}`, roomPage)) ?? (await handleApi(request, config));
   outgoing.writeHead(response.status, Object.fromEntries(response.headers.entries()));
   outgoing.end(Buffer.from(await response.arrayBuffer()));
   if (incoming.method !== "GET") save();

@@ -1,0 +1,131 @@
+import { describe, expect, it } from "vitest";
+import { handleRooms, LIMITS, memoryRooms, RoomCore, type RoomState } from "./rooms";
+
+function room() {
+  let saved: RoomState | null = null;
+  let clock = Date.UTC(2026, 9, 25, 10);
+  const core = new RoomCore({ get: async () => (saved ? structuredClone(saved) : null), put: async (state) => void (saved = structuredClone(state)), drop: async () => void (saved = null) }, () => clock);
+  return { core, advance: (ms: number) => (clock += ms), peek: () => saved };
+}
+
+type View = { questions: Array<{ id: string; text: string; votes: number; mine: boolean }>; waiting: number; activity: Record<string, unknown>; leaderboard?: Array<{ name: string; score: number }> };
+const data = <T>(result: { ok: boolean; data?: unknown }) => {
+  if (!result.ok) throw new Error(JSON.stringify(result));
+  return result.data as T;
+};
+
+describe("rooms: Q&A", () => {
+  it("moderates: a question waits for the operator, then the audience sees it", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace Chapel"));
+    const { pid } = data<{ pid: string }>(await core.join("Ama", "ip1"));
+    const asked = data<{ id: string; state: string }>(await core.ask(pid, "  What does grace mean?  ", ""));
+    expect(asked.state).toBe("pending");
+    expect(data<View>(await core.view(pid))).toMatchObject({ questions: [], waiting: 1 });
+    // Phones cannot moderate; the desk can.
+    expect((await core.moderate("wrong", asked.id, "approve")).ok).toBe(false);
+    data(await core.moderate(hostKey, asked.id, "approve"));
+    expect(data<View>(await core.view(null)).questions).toMatchObject([{ text: "What does grace mean?", votes: 0 }]);
+    data(await core.moderate(hostKey, asked.id, "hide"));
+    expect(data<View>(await core.view(null)).questions).toEqual([]);
+  });
+
+  it("asks without waiting when moderation is off, and limits how many one person asks", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    data(await core.settings(hostKey, { moderate: false }));
+    const { pid } = data<{ pid: string }>(await core.join("", "ip"));
+    for (let i = 0; i < LIMITS.asksPer10Min; i++) expect(data<{ state: string }>(await core.ask(pid, `Question number ${i}`, "")).state).toBe("approved");
+    expect(await core.ask(pid, "One too many", "")).toMatchObject({ ok: false, status: 429 });
+    advance(11 * 60_000);
+    expect((await core.ask(pid, "Later on", "")).ok).toBe(true);
+    expect(await core.ask("nobody", "Who am I", "")).toMatchObject({ ok: false, status: 401 });
+    expect(await core.ask(pid, "<b>" + "x".repeat(400), "")).toMatchObject({ ok: true });
+    const longest = data<View>(await core.view(null)).questions.find((question) => question.text.startsWith("<b>"))!;
+    expect(longest.text.length).toBe(LIMITS.questionLength);
+  });
+
+  it("counts one vote per person, takes it back on a second press, and limits one network", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    data(await core.settings(hostKey, { moderate: false }));
+    const a = data<{ pid: string }>(await core.join("A", "")).pid;
+    const b = data<{ pid: string }>(await core.join("B", "")).pid;
+    const { id } = data<{ id: string }>(await core.ask(a, "Why do we sing?", ""));
+    expect(data<{ votes: number }>(await core.vote(a, id, "net1")).votes).toBe(1);
+    expect(data<{ votes: number }>(await core.vote(b, id, "net1")).votes).toBe(2);
+    expect(data<{ votes: number }>(await core.vote(b, id, "net1")).votes).toBe(1);
+    expect(data<View>(await core.view(a)).questions[0]).toMatchObject({ votes: 1, mine: true });
+    expect(data<View>(await core.view(b)).questions[0]).toMatchObject({ mine: false });
+  });
+
+  it("ends: closed rooms and idle ones are gone", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    expect((await core.create("ABC234", "")).ok).toBe(false);
+    advance(LIMITS.idleMs + 1);
+    expect(await core.view(null)).toMatchObject({ ok: false, status: 404 });
+    const second = room();
+    const key = data<{ hostKey: string }>(await second.core.create("XYZ234", "")).hostKey;
+    data(await second.core.close(key));
+    expect(await second.core.view(null)).toMatchObject({ ok: false, status: 404 });
+    void hostKey;
+  });
+});
+
+describe("rooms: quizzes and polls", () => {
+  it("runs a quiz question: answers once, never shows the right answer early, scores quicker answers higher", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const quick = data<{ pid: string }>(await core.join("Quick", "")).pid;
+    const slow = data<{ pid: string }>(await core.join("Slow", "")).pid;
+    const wrong = data<{ pid: string }>(await core.join("Wrong", "")).pid;
+    expect(await core.answer(quick, 0)).toMatchObject({ ok: false, status: 409 });
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", game: "Bible quiz", round: 1, total: 3, question: { prompt: "Who built the ark?", choices: ["Noah", "Moses", "David"], correct: 0, seconds: 20, points: 1000 } }));
+    const open = data<View>(await core.view(quick)).activity;
+    expect(open).toMatchObject({ kind: "quiz", phase: "open", answered: null });
+    expect((open.question as Record<string, unknown>).correct).toBeUndefined();
+    data(await core.answer(quick, 0));
+    expect(await core.answer(quick, 1)).toMatchObject({ ok: false, status: 409 });
+    data(await core.answer(wrong, 2));
+    advance(15_000);
+    data(await core.answer(slow, 0));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    const revealed = data<View>(await core.view(quick));
+    expect(revealed.activity).toMatchObject({ phase: "reveal", correct: 0, counts: [2, 0, 1] });
+    expect(revealed.leaderboard![0]!.name).toBe("Quick");
+    expect(revealed.leaderboard![0]!.score).toBeGreaterThan(revealed.leaderboard![1]!.score);
+    expect(revealed.leaderboard!.some((entry) => entry.name === "Wrong")).toBe(false);
+    // Revealing twice does not score twice.
+    const before = revealed.leaderboard![0]!.score;
+    data(await core.activity(hostKey, { action: "reveal" }));
+    expect(data<View>(await core.view(null)).leaderboard![0]!.score).toBe(before);
+  });
+
+  it("runs a poll with no right answer, and refuses a quiz question without one", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    expect(await core.activity(hostKey, { action: "open", kind: "quiz", question: { prompt: "Q", choices: ["a", "b"] } })).toMatchObject({ ok: false });
+    data(await core.activity(hostKey, { action: "open", kind: "poll", question: { prompt: "Which song next?", choices: ["Amazing Grace", "How Great Thou Art"] } }));
+    const pid = data<{ pid: string }>(await core.join("", "")).pid;
+    data(await core.answer(pid, 1));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    expect(data<View>(await core.view(pid)).activity).toMatchObject({ kind: "poll", counts: [0, 1], correct: undefined });
+  });
+});
+
+describe("rooms on Cloudflare", () => {
+  it("opens a room with a join link, and passes phones through to their room", async () => {
+    const namespace = memoryRooms();
+    const call = (path: string, body?: unknown) => handleRooms(new Request(`https://church.test${path}`, body === undefined ? {} : { method: "POST", body: JSON.stringify(body) }), namespace, "https://church.test", (code) => `page ${code}`);
+    const opened = (await (await call("/v1/rooms", { name: "Grace" }))!.json()) as { code: string; hostKey: string; joinUrl: string };
+    expect(opened.joinUrl).toBe(`https://church.test/j/${opened.code}`);
+    expect(await (await call(`/j/${opened.code}`))!.text()).toBe(`page ${opened.code}`);
+    const joined = (await (await call(`/v1/rooms/${opened.code}/join`, { name: "Kofi" }))!.json()) as { pid: string };
+    expect((await call(`/v1/rooms/${opened.code}/ask`, { pid: joined.pid, text: "Is there coffee after?" }))!.status).toBe(200);
+    const host = (await (await call(`/v1/rooms/${opened.code}/host`, { hostKey: opened.hostKey }))!.json()) as { questions: Array<{ state: string }>; people: number };
+    expect(host).toMatchObject({ people: 1, questions: [{ state: "pending" }] });
+    expect((await call(`/v1/rooms/ZZZZZZ/state`))!.status).toBe(404);
+    expect(await call("/v1/licenses")).toBeNull();
+  });
+});

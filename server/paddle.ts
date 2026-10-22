@@ -15,6 +15,11 @@ import { completeCheckout, handleApi, licenseOfSubscription, reinstate, renewLic
 import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
 import { getJson, kvStore, type KvNamespace } from "./store.ts";
 import { analyticsEngine } from "./usage.ts";
+import { handleRooms, type RoomNamespace } from "./rooms.ts";
+import { roomPage } from "./room-page.ts";
+
+// Each room (Q&A, quizzes, polls) is one Durable Object (rooms.ts).
+export { RoomObject } from "./rooms.ts";
 
 export type Env = {
   /** The web demo's files (npm run build:web → server/web), served under /app. */
@@ -44,6 +49,8 @@ export type Env = {
   ANALYTICS_TOKEN?: string;
   /** HeiTech's Cloudflare account id, for the usage SQL API. */
   CLOUDFLARE_ACCOUNT_ID?: string;
+  /** Rooms for the audience's phones (durable_objects in wrangler.jsonc). */
+  ROOMS?: RoomNamespace;
   /** Cloudflare's rate limiter (ratelimits in wrangler.jsonc): a few requests a minute per key. */
   LIMITS?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** "mock" (built-in test checkout, the default) or "paddle". */
@@ -165,6 +172,9 @@ export default {
     }
     if (path === "/paddle/webhook") return handle(request, env, fetch, Date.now(), apiConfig(env));
     const config = apiConfig(env);
+    // Rooms: the audience's phones join from the public address, whichever one the desk used.
+    const rooms = await handleRooms(request, env.ROOMS, env.PUBLIC_URL?.replace(/\/+$/, "") || url.origin, roomPage, config?.limit);
+    if (rooms) return rooms;
     if (!config) return new Response("The server is not set up yet (KV binding and signing key).", { status: 503 });
     return handleApi(request, config);
   },

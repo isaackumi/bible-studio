@@ -57,6 +57,9 @@
   // Off until Analytics Engine is enabled for the account (dash.cloudflare.com › Workers › Analytics
   // Engine; a deploy with it fails before that). Without it, check-ins still work; only usage history waits.
   // "analytics_engine_datasets": [{ "binding": "USAGE", "dataset": "church_studio_usage" }],
+  // Rooms for the audience's phones (Q&A, quizzes, polls): one Durable Object per room (rooms.ts).
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "RoomObject" }] },
+  "migrations": [{ "tag": "rooms-v1", "new_sqlite_classes": ["RoomObject"] }],
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }
