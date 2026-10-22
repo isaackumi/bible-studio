@@ -12,14 +12,15 @@ const ROOT = ".svelte-kit/output/client/";
 const KB = 1024;
 
 // Gzipped JavaScript and raw CSS each window loads before it shows anything. Output windows run
-// once per screen, through the whole service, so they get the tightest budgets.
+// once per screen, through the whole service, so they get the tightest budgets. A language's lines
+// load only when it is chosen (i18n/core.ts), so no window carries French or Spanish it does not show.
 const BUDGETS = {
-  OperatorShell: { js: 760 * KB, css: 500 * KB },
-  AudienceOutput: { js: 340 * KB, css: 70 * KB },
-  StageOutput: { js: 270 * KB, css: 50 * KB },
-  SecondOutput: { js: 310 * KB, css: 70 * KB },
-  ScreenOutput: { js: 340 * KB, css: 70 * KB },
-  RemotePad: { js: 260 * KB, css: 50 * KB },
+  OperatorShell: { js: 600 * KB, css: 500 * KB },
+  AudienceOutput: { js: 140 * KB, css: 70 * KB },
+  StageOutput: { js: 60 * KB, css: 45 * KB },
+  SecondOutput: { js: 105 * KB, css: 65 * KB },
+  ScreenOutput: { js: 140 * KB, css: 70 * KB },
+  RemotePad: { js: 50 * KB, css: 40 * KB },
 };
 /** All the desktop app's JavaScript together (it once carried 20 MB of Bibles it never used). */
 const DESKTOP_TOTAL_JS = 4 * 1024 * KB;

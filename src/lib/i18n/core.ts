@@ -2,9 +2,10 @@
 // French line when French is chosen, and the English when a line has no translation yet, so a
 // missing entry never shows a code. Placeholders are {name}: t("Step {n} of {total}", { n, total }).
 // This module has no Svelte in it so domain code can use it; i18n.svelte.ts makes it reactive.
-
-import { es } from "./es";
-import { fr } from "./fr";
+//
+// Each language's lines are loaded when that language is chosen (loadLanguage), not with the app:
+// they are about 300 KB each, and a window that shows English (every output window) never needs them.
+// They are files inside the app, so loading one takes a moment and needs no internet.
 
 export type UiLanguage = "en" | "fr" | "es";
 
@@ -14,7 +15,28 @@ export const UI_LANGUAGES: Array<{ id: UiLanguage; name: string; english: string
   { id: "es", name: "Español", english: "Spanish" },
 ];
 
-const CATALOGS: Record<UiLanguage, Readonly<Record<string, string>> | null> = { en: null, fr, es };
+const LOADERS: Record<Exclude<UiLanguage, "en">, () => Promise<Readonly<Record<string, string>>>> = {
+  fr: () => import("./fr").then((module) => module.fr),
+  es: () => import("./es").then((module) => module.es),
+};
+const CATALOGS: Partial<Record<UiLanguage, Readonly<Record<string, string>>>> = {};
+const loading: Partial<Record<UiLanguage, Promise<void>>> = {};
+
+/** Load a language's lines (once); switch to it after this resolves, so nothing shows half-translated. */
+export function loadLanguage(language: UiLanguage): Promise<void> {
+  if (language === "en" || CATALOGS[language]) return Promise.resolve();
+  return (loading[language] ??= LOADERS[language]().then(
+    (lines) => void (CATALOGS[language] = lines),
+    (error) => {
+      // A failed load (it should not happen: the files are inside the app) can be tried again.
+      delete loading[language];
+      throw error;
+    },
+  ));
+}
+
+/** Whether a language's lines are here (English always is). */
+export const languageLoaded = (language: UiLanguage): boolean => language === "en" || !!CATALOGS[language];
 
 type Params = Record<string, string | number | null | undefined>;
 

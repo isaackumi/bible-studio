@@ -17,13 +17,41 @@
   import { outputShape } from "../display/output-shape.svelte";
   import { AUDIENCE_ASPECT_KEY, aspectFor, sanitizeScreenShape } from "../display/shape";
   import { isDesktop } from "../platform/runtime";
-  import { t } from "../i18n/core";
+  import { loadLanguage, sanitizeUiLanguage, t, type UiLanguage } from "../i18n/core";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
   import FindOverlay from "./FindOverlay.svelte";
   import PartPickerDialog from "./pew/PartPickerDialog.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
   import PewDesk from "./pew/PewDesk.svelte";
   import SettingsDialog from "./settings/SettingsDialog.svelte";
+
+  // The desk's language: its lines are loaded first and the desk switches once they are here, so it
+  // never shows half one language. The last one is remembered on this computer, so a French desk
+  // starts loading French before the settings are even read.
+  const LANGUAGE_KEY = "church-studio:ui-language";
+  let wantedLanguage: UiLanguage = "en";
+  function showLanguage(language: UiLanguage) {
+    wantedLanguage = language;
+    void loadLanguage(language)
+      .then(() => {
+        if (wantedLanguage !== language) return;
+        uiLanguage.current = language;
+        document.documentElement.lang = language;
+        try {
+          localStorage.setItem(LANGUAGE_KEY, language);
+        } catch {
+          // Storage refused: the language still comes from the settings, a moment later.
+        }
+      })
+      .catch(() => {
+        // The lines could not load (they are inside the app, so this should not happen): stay as is.
+      });
+  }
+  try {
+    showLanguage(sanitizeUiLanguage(localStorage.getItem(LANGUAGE_KEY)));
+  } catch {
+    // No storage: English until the settings are read.
+  }
 
   onMount(() => {
     void session.init();
@@ -83,8 +111,7 @@
     root.style.setProperty("--ui-scale", String(appearance.scale));
     root.style.setProperty("zoom", String(appearance.scale));
     root.dataset.desk = appearance.desk;
-    uiLanguage.current = appearance.language ?? "en";
-    root.lang = uiLanguage.current;
+    showLanguage(appearance.language ?? "en");
     root.toggleAttribute("data-calm", appearance.calm === true);
     root.toggleAttribute("data-contrast", appearance.contrast === true);
     root.style.setProperty("--accent", appearance.accent);

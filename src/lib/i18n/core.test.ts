@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bindLanguage, guessUiLanguage, sanitizeUiLanguage, t, tn, translate } from "./core";
+import { bindLanguage, guessUiLanguage, languageLoaded, loadLanguage, sanitizeUiLanguage, t, tn, translate } from "./core";
 import { es } from "./es";
 import { fr } from "./fr";
 
@@ -64,7 +64,16 @@ describe("interface language", () => {
     expect(translate("en", "Step {n} of {total}", { n: 2, total: 3 })).toBe("Step 2 of 3");
   });
 
-  it("follows the chosen language, with French singular for 0 and 1", () => {
+  it("loads a language's lines only when asked, once", async () => {
+    expect(languageLoaded("es")).toBe(false);
+    expect(translate("es", "Macros")).toBe("Macros");
+    await Promise.all([loadLanguage("es"), loadLanguage("es")]);
+    expect(languageLoaded("es")).toBe(true);
+    expect(translate("es", "Macros")).toBe(es["Macros"]);
+  });
+
+  it("follows the chosen language, with French singular for 0 and 1", async () => {
+    await loadLanguage("fr");
     let language: "en" | "fr" = "fr";
     bindLanguage(() => language);
     expect(t("Macros")).toBe(fr["Macros"]);
