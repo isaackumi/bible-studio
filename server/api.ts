@@ -266,7 +266,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   const input = await body(request);
   if (!input) return json(400, { error: "Send JSON." });
   // The routes that send email, make records or could be guessed at: a few a minute from one address.
-  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
+  // Check-ins too: each new computer id is a stored record, so one address cannot make thousands.
+  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start" || path === "/v1/hello") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
 
   switch (path) {
     case "/v1/hello":
@@ -577,8 +578,11 @@ async function startCheckout(config: ApiConfig, input: Record<string, unknown>, 
   return json(200, { session: order.id, url: link.url, list, due, currency: CURRENCY, test: config.provider.test });
 }
 
+/** An unpaid checkout is kept a week (long enough for a late payment webhook); a paid one for good. */
+const UNPAID_CHECKOUT_TTL = 7 * 86_400;
+
 const saveCheckout = (config: ApiConfig, order: Checkout) =>
-  putJson(config.store, `checkout:${order.id}`, order, { status: order.status, due: order.due, plan: order.plan, interval: order.interval, promo: order.promo, paidAt: order.paidAt ?? null, createdAt: order.createdAt, email: order.email.slice(0, 80), name: order.name.slice(0, 60) });
+  putJson(config.store, `checkout:${order.id}`, order, { status: order.status, due: order.due, plan: order.plan, interval: order.interval, promo: order.promo, paidAt: order.paidAt ?? null, createdAt: order.createdAt, email: order.email.slice(0, 80), name: order.name.slice(0, 60) }, order.status === "paid" ? undefined : UNPAID_CHECKOUT_TTL);
 
 async function checkoutStatus(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const order = await getJson<Checkout>(config.store, `checkout:${text(input.session, 60)}`);

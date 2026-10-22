@@ -259,6 +259,15 @@ describe("email logo", () => {
     expect(await buy()).toBe(200);
   });
 
+  it("lets unpaid checkouts expire and keeps paid ones", async () => {
+    const { config, call } = setup();
+    const store = config.store as ReturnType<typeof memoryStore>;
+    const session = (await call("/v1/checkout", { plan: "premium", interval: "monthly", email: "a@b.co" })).data.session as string;
+    expect(store.dump().get(`checkout:${session}`)!.ttl).toBe(7 * 86_400);
+    await call(`/pay/${session}`, {});
+    expect(store.dump().get(`checkout:${session}`)!.ttl).toBeUndefined();
+  });
+
   it("slows down one network address on the routes that send email or make records", async () => {
     const { config, call } = setup();
     const asked = new Map<string, number>();

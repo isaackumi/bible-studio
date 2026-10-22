@@ -39,11 +39,11 @@ export function kvStore(kv: KvNamespace): Store {
 }
 
 /** An in-memory Store (tests, local runs). */
-export function memoryStore(): Store & { dump(): Map<string, { value: string; meta: Record<string, unknown> | null }> } {
-  const data = new Map<string, { value: string; meta: Record<string, unknown> | null }>();
+export function memoryStore(): Store & { dump(): Map<string, { value: string; meta: Record<string, unknown> | null; ttl?: number }> } {
+  const data = new Map<string, { value: string; meta: Record<string, unknown> | null; ttl?: number }>();
   return {
     get: async (key) => data.get(key)?.value ?? null,
-    put: async (key, value, meta) => void data.set(key, { value, meta: meta ?? null }),
+    put: async (key, value, meta, ttl) => void data.set(key, { value, meta: meta ?? null, ...(ttl ? { ttl } : {}) }),
     delete: async (key) => void data.delete(key),
     list: async (prefix) => [...data.entries()].filter(([key]) => key.startsWith(prefix)).map(([key, entry]) => ({ key, meta: entry.meta })),
     dump: () => data,
@@ -60,4 +60,5 @@ export async function getJson<T>(store: Store, key: string): Promise<T | null> {
   }
 }
 
-export const putJson = (store: Store, key: string, value: unknown, meta?: Record<string, unknown>) => store.put(key, JSON.stringify(value), meta);
+/** `ttl`: seconds until the record goes by itself (records that only matter for a while). */
+export const putJson = (store: Store, key: string, value: unknown, meta?: Record<string, unknown>, ttl?: number) => store.put(key, JSON.stringify(value), meta, ttl);

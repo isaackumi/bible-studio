@@ -21,6 +21,9 @@ import { activateDevice, noteAccountTrial, noteDevice, readAnyLicense, type ApiC
 import { signinPage } from "./pages.ts";
 import { getJson, putJson } from "./store.ts";
 
+/** A sign-in record is only needed for its few minutes; KV removes it a day later. */
+const SIGNIN_TTL = 86_400;
+
 /** A person signed in to the browser, as the identity provider says. */
 export type Person = { id: string; email: string; name: string; emailVerified: boolean };
 
@@ -120,7 +123,7 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       const secret = random(32);
       const { number, choices } = numbers();
       const signin: Signin = { id: random(12), secret: await sha256(secret), device, name: text(input.name, 60) || "Computer", number, choices, status: "pending", createdAt: config.now() };
-      await putJson(config.store, `signin:${signin.id}`, signin);
+      await putJson(config.store, `signin:${signin.id}`, signin, undefined, SIGNIN_TTL);
       return json(200, { id: signin.id, secret, number, url: `${origin}/signin/${signin.id}`, expiresAt: signin.createdAt + SIGNIN_MINUTES * 60_000, methods: config.identity.methods });
     }
     case "/v1/signin/poll": {
@@ -131,7 +134,7 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       // The token is handed over once; asking again after that finds nothing to hand.
       if (!signin.token) return json(200, { status: "collected" });
       const token = signin.token;
-      await putJson(config.store, `signin:${signin.id}`, { ...signin, token: undefined });
+      await putJson(config.store, `signin:${signin.id}`, { ...signin, token: undefined }, undefined, SIGNIN_TTL);
       return json(200, { status: "done", token, account: { email: signin.person.email, name: signin.person.name } });
     }
     case "/v1/account":
@@ -193,7 +196,7 @@ export async function signinRoute(request: Request, config: ApiConfig, id: strin
   if (signin.status === "done") return html(200, signinPage({ state: "done", id, email: signin.person?.email }));
   if (signin.status === "cancelled" || expired) return html(200, signinPage({ state: "expired", id }));
   if (request.method === "POST" && action === "cancel") {
-    await putJson(config.store, `signin:${id}`, { ...signin, status: "cancelled" });
+    await putJson(config.store, `signin:${id}`, { ...signin, status: "cancelled" }, undefined, SIGNIN_TTL);
     return html(200, signinPage({ state: "expired", id }));
   }
   const person = await identity.current(request);
@@ -203,13 +206,13 @@ export async function signinRoute(request: Request, config: ApiConfig, id: strin
     const picked = Number(form?.get("number"));
     if (picked !== signin.number) {
       // One try: a wrong number ends this sign-in, so the numbers cannot be guessed in turn.
-      await putJson(config.store, `signin:${id}`, { ...signin, status: "cancelled" });
+      await putJson(config.store, `signin:${id}`, { ...signin, status: "cancelled" }, undefined, SIGNIN_TTL);
       return html(200, signinPage({ state: "wrong", id }));
     }
     const account = await upsertAccount(config, person);
     const token = `cst_${random(32)}`;
     await putJson(config.store, `atok:${await sha256(token)}`, { user: account.id, device: signin.device, createdAt: config.now() } satisfies AccountToken);
-    await putJson(config.store, `signin:${id}`, { ...signin, status: "done", person, token });
+    await putJson(config.store, `signin:${id}`, { ...signin, status: "done", person, token }, undefined, SIGNIN_TTL);
     return html(200, signinPage({ state: "done", id, email: person.email }));
   }
   return html(200, signinPage({ state: "confirm", id, device: signin.name, email: person.email, choices: signin.choices }));
