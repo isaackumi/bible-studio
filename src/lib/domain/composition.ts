@@ -23,6 +23,8 @@ export type LayerAnimation = {
   exit: LayerAnimationKind;
   durationMs: number;
   easing: "ease" | "ease-in" | "ease-out" | "linear";
+  /** Wait before coming in, so a lower third's bar arrives before its words. */
+  delayMs?: number;
 };
 
 export type SourceType =
@@ -41,6 +43,7 @@ export type SourceType =
   | "qr"
   | "shape"
   | "icon"
+  | "slide"
   | "empty"
   | "web";
 
@@ -88,6 +91,11 @@ export type Composition = {
   id: string;
   name: string;
   background?: PageBackground;
+  /**
+   * A clear page (a lower third, a logo bug): no background, and its elements paint only themselves,
+   * so whatever is behind it shows through (a camera, when it is a Slide page layer of a look).
+   */
+  clear?: boolean;
   /** Full freeze: no rename, layer, or transition edits until unlock. */
   locked: boolean;
   /** Folder color in the Scenes list (#rrggbb). Organizing only; allowed while locked. */
@@ -374,6 +382,7 @@ function sanitizeAnimation(value: Partial<LayerAnimation> | undefined): LayerAni
     exit: allowed.includes(exit as LayerAnimationKind) ? (exit as LayerAnimationKind) : DEFAULT_ANIMATION.exit,
     durationMs: Math.min(2000, Math.max(0, Math.round(value?.durationMs ?? DEFAULT_ANIMATION.durationMs))),
     easing: value?.easing === "ease" || value?.easing === "ease-in" || value?.easing === "linear" ? value.easing : "ease-out",
+    ...(Number(value?.delayMs) > 0 ? { delayMs: Math.min(3000, Math.round(Number(value?.delayMs))) } : {}),
   };
 }
 
@@ -668,7 +677,7 @@ export function assignLayerSource(composition: Composition, layerId: string, sou
 const MOVING: ReadonlySet<SourceType> = new Set<SourceType>(["camera", "video", "ndi"]);
 
 /** Overlays (lower thirds, timers, the time, QR codes, shapes) never get region edges. */
-const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "timer", "clock", "countdown", "qr", "shape", "icon", "empty"]);
+const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "timer", "clock", "countdown", "qr", "shape", "icon", "slide", "empty"]);
 
 export function setCompositionEdges(composition: Composition, edges: CompositionEdges): Composition {
   if (composition.locked) return composition;
@@ -1347,6 +1356,7 @@ export function sanitizeComposition(value: unknown): Composition {
   return {
     ...base,
     ...(background ? { background } : {}),
+    ...(record.clear === true && !background ? { clear: true } : {}),
     ...(typeof record.color === "string" && HEX_COLOR.test(record.color) ? { color: record.color.toLowerCase() } : {}),
     id: typeof record.id === "string" && record.id ? record.id : base.id,
     locked: record.locked === true,
@@ -1535,6 +1545,15 @@ export function applyLowerThirdTemplate(
 /** Plugins register a compiler here. They still compile to PresentationModel and cannot Take. */
 const extraCompilers = new Map<string, (source: SourceRef, ctx: CompileContext) => PresentationModel>();
 
+/**
+ * A page designed in the studio, shown as one layer of a look (a lower third over a camera, a logo
+ * bug): the session finds the page in its decks, so editing the design changes every look using it.
+ */
+let slideResolver: ((deckId: string, page: number) => Composition | null) | null = null;
+export function setSlideResolver(resolve: typeof slideResolver) {
+  slideResolver = resolve;
+}
+
 export function registerSourceCompiler(type: string, compile: (source: SourceRef, ctx: CompileContext) => PresentationModel) {
   extraCompilers.set(type, compile);
 }
@@ -1589,6 +1608,12 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
         ...(payload.shadow === "soft" || payload.shadow === "strong" ? { shadow: payload.shadow } : {}),
       },
     };
+  }
+  if (source.type === "slide") {
+    const page = slideResolver?.(payload.deckId ?? "", Math.max(0, Number(payload.page) || 0));
+    // A page holding slide layers of its own is drawn without them (no page inside itself).
+    const flat = page ? { ...page, layers: page.layers.filter((layer) => layer.source.type !== "slide") } : null;
+    return flat ? presentComposition(flat, ctx) : presentText({ theme: ctx.theme, layout: "title", heading: "", body: "" });
   }
   if (source.type === "icon") {
     return {
@@ -1718,7 +1743,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,
       // On a deck page the page background shows through every element.
-      model: composition.background ? { ...compileSource(layer.source, ctx), fill: "transparent" } : compileSource(layer.source, ctx),
+      model: composition.background || composition.clear ? { ...compileSource(layer.source, ctx), fill: "transparent" } : compileSource(layer.source, ctx),
       mirror: layer.source.type === "camera" && layer.source.payload.mirror === "true",
       ...(layer.backing ? { backing: `color-mix(in srgb, ${layer.backing.color} ${Math.round(layer.backing.opacity * 100)}%, transparent)` } : {}),
       animation: layer.animation,
@@ -1726,7 +1751,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
   return {
     layout: "composition",
     theme: ctx.theme,
-    ...(composition.background ? { fill: backgroundCss(composition.background) } : {}),
+    ...(composition.background ? { fill: backgroundCss(composition.background) } : composition.clear ? { fill: "transparent" } : {}),
     reference: composition.name,
     attribution: null,
     lines: [],

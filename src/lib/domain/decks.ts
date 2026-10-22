@@ -131,6 +131,14 @@ export function addPage(deck: SlideDeck, after = deck.pages.length - 1, now = ne
   return touched(deck, pages, now);
 }
 
+/** Put a page (from a template) after the given one. */
+export function insertPage(deck: SlideDeck, page: Composition, after = deck.pages.length - 1, now = new Date()): SlideDeck {
+  if (deck.pages.length >= MAX_DECK_PAGES) return deck;
+  const pages = deck.pages.slice();
+  pages.splice(Math.min(pages.length, Math.max(0, after + 1)), 0, page);
+  return touched(deck, pages, now);
+}
+
 export function duplicatePage(deck: SlideDeck, index: number, now = new Date()): SlideDeck {
   const page = deck.pages[index];
   if (!page || deck.pages.length >= MAX_DECK_PAGES) return deck;

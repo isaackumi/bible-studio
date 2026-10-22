@@ -130,6 +130,7 @@ export type PaintedLayer = {
     exit: string;
     durationMs: number;
     easing: string;
+    delayMs?: number;
   };
 };
 

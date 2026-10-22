@@ -34,6 +34,7 @@ import {
 import { deleteProfile, duplicateProfile, renameProfile } from "../display/profiles";
 import {
   createScene,
+  setSlideResolver,
   COMPOSITION_TEMPLATES,
   fillTemplate,
   persistLook,
@@ -525,6 +526,11 @@ class Session {
   }
 
   init = async () => {
+    // Slide-page layers in looks find their page here, so a design edited in the studio changes every look using it.
+    setSlideResolver((deckId, page) => {
+      const found = this.decks.find((deck) => deck.id === deckId)?.pages[page];
+      return found ? withMediaUrls(found, this.mediaSrc) : null;
+    });
     this.ready = true;
     this.bootStep("starting");
     void this.startCameraRelay();

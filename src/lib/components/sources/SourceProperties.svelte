@@ -13,6 +13,7 @@
   import DeskDialog from "./DeskDialog.svelte";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
+  import DeckThumb from "../decks/DeckThumb.svelte";
   import { sourceMeta } from "../obs/source-meta";
   import { buildSource, sourceKindLabel } from "../../domain/sources";
   import { compileSource } from "../../domain/composition";
@@ -159,7 +160,8 @@
       (fields.type !== "song" || fields.body.length > 0) &&
       (fields.type !== "image" || fields.imageUrl.length > 0) &&
       (fields.type !== "video" || fields.videoUrl.length > 0) &&
-      (fields.type !== "qr" || (fields.data.trim().length > 0 && fields.data.trim() !== "https://")),
+      (fields.type !== "qr" || (fields.data.trim().length > 0 && fields.data.trim() !== "https://")) &&
+      (fields.type !== "slide" || fields.deckId.length > 0),
   );
 
   function save() {
@@ -353,6 +355,30 @@
         <span>{t("Subtitle")}</span>
         <InlineWords text={fields.subtitle} rich={fields.subtitleRich ?? null} label={t("Subtitle")} onchange={(words) => fields.type === "lower-third" && (fields = { ...fields, subtitle: words.text, subtitleRich: words.rich })} />
       </div>
+    {:else if fields.type === "slide"}
+      {@const deckId = fields.type === "slide" ? fields.deckId : ""}
+      {@const pageIndex = fields.type === "slide" ? fields.page : 0}
+      {@const deck = session.decks.find((entry) => entry.id === deckId)}
+      <label class="row">
+        <span>{t("Deck")}</span>
+        <select class="field" aria-label={t("Deck")} value={deckId} onchange={(event) => fields.type === "slide" && (fields = { ...fields, deckId: event.currentTarget.value, page: 0 })}>
+          <option value="" disabled>{t("Choose a deck")}</option>
+          {#each session.decks as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
+        </select>
+      </label>
+      {#if deck}
+        <div class="slide-pages" role="radiogroup" aria-label={t("Page")}>
+          {#each deck.pages as page, index (index)}
+            <button type="button" role="radio" aria-checked={pageIndex === index} class:on={pageIndex === index} title={page.name} onclick={() => fields.type === "slide" && (fields = { ...fields, page: index })}>
+              <DeckThumb {page} />
+              <span>{index + 1}</span>
+            </button>
+          {/each}
+        </div>
+        <p class="hint">{t("A page with no background shows what is behind it, like a lower third over a camera. Edit the deck and this layer changes too.")}</p>
+      {:else if !session.decks.length}
+        <p class="hint">{t("Design a page in Slides first: a lower third, a logo or a bar.")}</p>
+      {/if}
     {:else if fields.type === "ndi"}
       <div class="row">
         <span>{t("Source")}</span>
@@ -592,4 +618,8 @@
   .note { margin: 0; color: var(--muted); }
   .notice { margin: 0; padding: 8px 10px; border-radius: var(--radius-control); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .error { margin: 0; color: var(--live, #ff5a5a); }
+  .slide-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 260px; overflow: auto; padding: 2px; }
+  .slide-pages button { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; background: none; cursor: pointer; overflow: hidden; }
+  .slide-pages button.on { border-color: var(--accent); }
+  .slide-pages button span { position: absolute; left: 6px; top: 4px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / 0.8); }
 </style>

@@ -18,7 +18,7 @@ import { ndiShortName } from "./ndi";
 
 export type SharedSource = { id: string; name: string; source: SourceRef };
 
-export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "image" | "video" | "qr" | "web" | "ndi";
+export type SourceKind = "camera" | "scripture" | "song" | "text" | "timer" | "clock" | "lower-third" | "slide" | "image" | "video" | "qr" | "web" | "ndi";
 
 export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "camera", label: msg("Camera") },
@@ -28,6 +28,7 @@ export const SOURCE_KINDS: { type: SourceKind; label: string }[] = [
   { type: "timer", label: msg("Timer") },
   { type: "clock", label: msg("Clock") },
   { type: "lower-third", label: msg("Lower third") },
+  { type: "slide", label: msg("Slide page") },
   { type: "image", label: msg("Image") },
   { type: "video", label: msg("Video") },
   { type: "qr", label: msg("QR code") },
@@ -44,6 +45,8 @@ export type SourceFields =
   | { type: "timer"; mode: TimerMode; durationMs: number; targetAt: number | null; label: string; warningMs: number; style: TextStyle }
   | { type: "clock"; label: string; style: TextStyle }
   | { type: "lower-third"; templateId: string; title: string; subtitle: string; style: TextStyle; titleRich?: RichDoc | null; subtitleRich?: RichDoc | null }
+  /** A page designed in the studio (a deck's page), shown as this layer. */
+  | { type: "slide"; deckId: string; page: number }
   | { type: "image"; assetId: string; name: string; imageUrl: string }
   | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean }
   | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string }
@@ -261,6 +264,8 @@ export function buildSource(fields: SourceFields): SourceRef {
         ...(fields.titleRich ? { titleRich: encodeRich(fields.titleRich) } : {}),
         ...(fields.subtitleRich ? { subtitleRich: encodeRich(fields.subtitleRich) } : {}),
       });
+    case "slide":
+      return sourceRef("slide", `${fields.deckId}:${fields.page}`, "Slide page", { deckId: fields.deckId, page: String(fields.page) });
     case "image":
       return sourceRef("image", fields.assetId || "image", fields.name || "Image", {
         assetId: fields.assetId,
@@ -327,6 +332,8 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
         ...(subtitleRich ? { subtitleRich } : {}),
       };
     }
+    case "slide":
+      return { type: "slide", deckId: p.deckId ?? "", page: Math.max(0, Number(p.page) || 0) };
     case "image":
       return { type: "image", assetId: p.assetId ?? "", name: source.title, imageUrl: p.imageUrl ?? "" };
     case "ndi":
@@ -371,6 +378,8 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
       return { type: "clock", label: "", style: {} };
     case "lower-third":
       return { type: "lower-third", templateId: "speaker", title: "", subtitle: "", style: {} };
+    case "slide":
+      return { type: "slide", deckId: "", page: 0 };
     case "image":
       return { type: "image", assetId: "", name: "", imageUrl: "" };
     case "video":

@@ -12,6 +12,7 @@ export const SOURCE_META: Record<string, SourceMeta> = {
   song: { icon: "note", color: "#e93d82", blurb: msg("A section of a song from the library"), group: "Words" },
   text: { icon: "type", color: "#8e4ec6", blurb: msg("A heading and words you type"), group: "Words" },
   "lower-third": { icon: "captions", color: "#3e63dd", blurb: msg("A name bar: speaker, title, notice"), group: "Words" },
+  slide: { icon: "stage", color: "#d4a017", blurb: msg("A page you designed: a lower third, a logo, a bar"), group: "Graphics" },
   timer: { icon: "timer", color: "#f76b15", blurb: msg("Countdown or count-up"), group: "Time" },
   countdown: { icon: "timer", color: "#f76b15", blurb: msg("Countdown"), group: "Time" },
   clock: { icon: "clock", color: "#0d9488", blurb: msg("The time of day"), group: "Time" },

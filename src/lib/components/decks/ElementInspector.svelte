@@ -9,11 +9,13 @@
     resizeLayer,
     setLayerFit,
     setLayerLocked,
+    setLayerAnimation,
     setLayerOpacity,
     setLayerStyle,
     sourceRef,
     type Composition,
     type CompositionLayer,
+    type LayerAnimationKind,
     type LayerFit,
   } from "../../domain/composition";
   import { parseTextStyle } from "../../domain/text-style";
@@ -166,6 +168,29 @@
     <span>{t("Opacity")}</span>
     <input type="range" min="0" max="1" step="0.05" aria-label={t("Element opacity")} value={layer.opacity} onchange={(event) => oncommit(setLayerOpacity(page, layer.id, Number(event.currentTarget.value)))} />
   </label>
+  <div class="stack">
+    <span>{t("Comes in")}</span>
+    <div class="inline">
+      <select class="field" aria-label={t("How it comes in")} value={layer.animation?.entrance ?? "fade"} onchange={(event) => oncommit(setLayerAnimation(page, layer.id, { entrance: event.currentTarget.value as LayerAnimationKind }))}>
+        <option value="none">{t("At once")}</option>
+        <option value="fade">{t("Fade")}</option>
+        <option value="slide-left">{t("Slide from the right")}</option>
+        <option value="slide-right">{t("Slide from the left")}</option>
+        <option value="slide-up">{t("Rise up")}</option>
+        <option value="slide-down">{t("Drop down")}</option>
+      </select>
+    </div>
+    {#if (layer.animation?.entrance ?? "fade") !== "none"}
+      <label class="field-row">
+        <span>{t("Takes")}</span>
+        <input class="field" type="range" min="150" max="1500" step="50" aria-label={t("How long it takes to come in")} value={layer.animation?.durationMs ?? 400} onchange={(event) => oncommit(setLayerAnimation(page, layer.id, { durationMs: Number(event.currentTarget.value) }))} />
+      </label>
+      <label class="field-row">
+        <span>{t("After")}</span>
+        <input class="field" type="range" min="0" max="2000" step="100" aria-label={t("Wait before coming in")} value={layer.animation?.delayMs ?? 0} onchange={(event) => oncommit(setLayerAnimation(page, layer.id, { delayMs: Number(event.currentTarget.value) }))} />
+      </label>
+    {/if}
+  </div>
   <div class="actions">
     <button type="button" onclick={() => oncommit(reorderLayers(page, layer.id, 1))}>{t("Bring forward")}</button>
     <button type="button" onclick={() => oncommit(reorderLayers(page, layer.id, -1))}>{t("Send backward")}</button>

@@ -11,6 +11,7 @@
     addShapeElement,
     addTextElement,
     duplicatePage,
+    insertPage,
     movePage,
     removePage,
     replacePage,
@@ -20,6 +21,7 @@
   import ElementInspector from "./ElementInspector.svelte";
   import PageCanvas from "./PageCanvas.svelte";
   import GradientEditor from "./GradientEditor.svelte";
+  import TemplateGallery from "./TemplateGallery.svelte";
   import { encodeFill, sanitizeFill, type Fill } from "../../domain/fill";
   import type { IconNode } from "../../domain/icon";
   import { t } from "../../i18n/core";
@@ -116,6 +118,19 @@
     selectedId = next.layers.at(-1)?.id ?? null;
     imageMenu = false;
   }
+  let templates = $state(false);
+  /** The church's screen shape, so templates are laid out for it. */
+  const screenAspect = $derived.by(() => {
+    const canvas = session.outputCanvas();
+    return canvas.width / canvas.height;
+  });
+  function addTemplatePage(next: Composition) {
+    templates = false;
+    commitDeck(insertPage(draft, next, pageIndex));
+    pageIndex = pageIndex + 1;
+    selectedId = null;
+  }
+
   /** The icon picker, loaded only when opened (with the whole icon set). */
   let iconPicker = $state<null | typeof import("./IconPicker.svelte").default>(null);
   async function openIcons() {
@@ -143,7 +158,12 @@
 
   function setBackground(patch: Partial<PageBackground>) {
     const current = page.background ?? sanitizeBackground({ type: "color" })!;
-    commitPage(setCompositionBackground(page, { ...current, ...patch }));
+    const { clear: _clear, ...rest } = setCompositionBackground(page, { ...current, ...patch });
+    commitPage(rest);
+  }
+  /** Clear: no background, so the page shows what is behind it (a lower third over a camera). */
+  function setClear() {
+    commitPage({ ...setCompositionBackground(page, undefined), clear: true });
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -224,6 +244,7 @@
         {/each}
       </ol>
       <button type="button" class="add-page" onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>{t("+ Add new page")}</button>
+      <button type="button" class="add-page template" onclick={() => (templates = true)}>{t("From a template")}</button>
     </aside>
 
     <main class="work">
@@ -277,13 +298,16 @@
         </label>
         <label class="field-row">
           <span>{t("Background")}</span>
-          <select class="field" aria-label={t("Background type")} value={page.background?.type ?? "color"} onchange={(event) => setBackground({ type: event.currentTarget.value as PageBackground["type"] })}>
+          <select class="field" aria-label={t("Background type")} value={page.clear ? "clear" : (page.background?.type ?? "color")} onchange={(event) => (event.currentTarget.value === "clear" ? setClear() : setBackground({ type: event.currentTarget.value as PageBackground["type"] }))}>
+            <option value="clear">{t("Clear (shows what is behind)")}</option>
             <option value="color">{t("Color")}</option>
             <option value="gradient">{t("Gradient")}</option>
             <option value="image">{t("Picture")}</option>
           </select>
         </label>
-        {#if (page.background?.type ?? "color") !== "image"}
+        {#if page.clear}
+          <p class="note">{t("Put this page over a camera in a Production look: add a Slide page layer and choose it.")}</p>
+        {:else if (page.background?.type ?? "color") !== "image"}
           <GradientEditor label={t("Page background")} fill={page.background?.type === "gradient" ? pageFill : { kind: "solid", color: page.background?.color ?? "#1b1b1f" }} onchange={setPageFill} />
         {:else}
           <div class="stack">
@@ -329,6 +353,9 @@
   {/if}
 </div>
 
+{#if templates}
+  <TemplateGallery aspect={screenAspect} onpick={addTemplatePage} onclose={() => (templates = false)} />
+{/if}
 {#if iconPicker}
   {@const Picker = iconPicker}
   <Picker onpick={addIcon} onclose={() => (iconPicker = null)} />
@@ -357,6 +384,7 @@
   .page-actions { display: flex; gap: 4px; margin-top: 4px; padding-left: 22px; }
   .page-actions button { font-size: 11px; min-height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--muted); cursor: pointer; }
   .add-page { margin: 10px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
+  .add-page.template { margin-top: 0; background: transparent; }
   .work { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 20px; gap: 12px; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 0) 0 0 / 22px 22px; }
   .toolbar { align-self: center; display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
   .toolbar > button, .menu-wrap > button { min-height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); cursor: pointer; font-weight: 600; }

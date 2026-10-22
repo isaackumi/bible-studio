@@ -348,12 +348,12 @@ button { cursor: pointer; }
 .frame video.cover.mirror { transform: scaleX(-1); }
 .frame video.live { position: absolute; inset: 0; z-index: 2; background: #000; opacity: 0; transition: opacity 160ms ease-out; }
 .frame video.live.ready { opacity: 1; }
-.comp-layer.enter-fade { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
-.comp-layer.enter-dissolve { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
-.comp-layer.enter-slide-left { animation: cs-slide-left var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
-.comp-layer.enter-slide-right { animation: cs-slide-right var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
-.comp-layer.enter-slide-up { animation: cs-slide-up var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
-.comp-layer.enter-slide-down { animation: cs-slide-down var(--layer-dur, 400ms) var(--layer-ease, ease-out) both; }
+.comp-layer.enter-fade { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
+.comp-layer.enter-dissolve { animation: cs-fade var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
+.comp-layer.enter-slide-left { animation: cs-slide-left var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
+.comp-layer.enter-slide-right { animation: cs-slide-right var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
+.comp-layer.enter-slide-up { animation: cs-slide-up var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
+.comp-layer.enter-slide-down { animation: cs-slide-down var(--layer-dur, 400ms) var(--layer-ease, ease-out) var(--layer-delay, 0ms) both; }
 @keyframes cs-fade { from { opacity: 0; } to { opacity: var(--layer-opacity, 1); } }
 @keyframes cs-slide-left { from { transform: translateX(-12%); opacity: 0.2; } to { transform: none; opacity: var(--layer-opacity, 1); } }
 @keyframes cs-slide-right { from { transform: translateX(12%); opacity: 0.2; } to { transform: none; opacity: var(--layer-opacity, 1); } }
