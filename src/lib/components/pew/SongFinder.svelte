@@ -218,7 +218,7 @@
             {/each}
           </ol>
           <footer class="detail-actions">
-            <button type="button" class="desk-btn" onclick={() => void session.addSongToService(song)}><Icon name="queue" size={14} /> {t("Add to service")}</button>
+            <button type="button" class="desk-btn" onclick={() => void session.pickServicePart(song.title).then((part) => { if (part) void session.addSongToService(song, part); })}><Icon name="queue" size={14} /> {t("Add to service")}</button>
             <button type="button" class="desk-btn" onclick={() => open(song)}>{t("Open")}</button>
             <button type="button" class="desk-btn {clickLive ? 'live' : 'primary-soft'}" onclick={() => void start()}><Icon name="play" size={14} /> {clickLive ? t("Show it") : t("Start")}</button>
           </footer>

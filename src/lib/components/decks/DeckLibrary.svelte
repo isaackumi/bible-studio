@@ -111,7 +111,7 @@
         {#if menuFor === deck.id}
           <div class="menu" role="menu">
             <button type="button" role="menuitem" onclick={() => { menuFor = null; onedit(deck.id); }}>{t("Edit")}</button>
-            <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.addDeckToService(deck.id); }}>{t("Add to queue")}</button>
+            <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.pickServicePart(deck.name).then((part) => { if (part) void session.addDeckToService(deck.id, part); }); }}>{t("Add to service")}</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.startDeckLoop(deck.id, 8); }}>{t("Loop on Program (8 s a page)")}</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; session.saveDeck(duplicateDeck(deck)); }}>{t("Duplicate")}</button>
             <button type="button" role="menuitem" class="danger" onclick={() => remove(deck.id)}>{armedDelete === deck.id ? t("Delete? Click again") : t("Delete")}</button>

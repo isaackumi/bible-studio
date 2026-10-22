@@ -101,6 +101,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     schemaVersion: 2,
     churchName: typeof value.churchName === "string" ? value.churchName : base.churchName,
     logoAssetId: typeof value.logoAssetId === "string" ? value.logoAssetId : null,
+    ...(value.logoPicture === "none" ? { logoPicture: "none" as const } : {}),
     logoText: typeof value.logoText === "string" ? value.logoText : base.logoText,
     themeId: typeof value.themeId === "string" ? value.themeId : base.themeId,
     lastServiceId: typeof value.lastServiceId === "string" ? value.lastServiceId : null,

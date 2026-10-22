@@ -214,6 +214,7 @@ import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { whatsNewFor, type Release } from "../domain/changelog";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
+import { DEFAULT_LOGO_URL } from "../brand/logo";
 import { aspectFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
 import {
   activateTab,
@@ -558,7 +559,7 @@ class Session {
       // audience screen until the operator puts something on Program.
       if (!keepLive && (this.desktop() || this.controlsAudience)) {
         try {
-          this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
+          this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.logoImage() });
           this.programHeld = true;
           await this.atMost("preparing the audience screen", this.pushProgram());
         } catch (error) {
@@ -1525,7 +1526,7 @@ class Session {
     return secondOutputModel(this.live.program.model, settings, backdrop, {
       theme: this.theme(),
       title: this.logoTitle(),
-      imageUrl: this.mediaSrc(this.workspace.logoAssetId),
+      imageUrl: this.logoImage(),
     });
   };
 
@@ -3726,6 +3727,22 @@ class Session {
     await this.saveWorkspaceDocument(this.workspace);
   };
 
+  /** The "Add to service" window: what is being added, and who waits for the part chosen (null: cancelled). */
+  partPicker = $state<{ title: string; resolve: (sectionId: string | null) => void } | null>(null);
+
+  /** Ask which part of the service `title` goes into. Starts a service first when none is open. */
+  pickServicePart = (title: string): Promise<string | null> =>
+    new Promise((resolve) => {
+      this.partPicker?.resolve(null);
+      this.partPicker = { title, resolve };
+    });
+
+  answerPartPicker = (sectionId: string | null) => {
+    const asked = this.partPicker;
+    this.partPicker = null;
+    asked?.resolve(sectionId);
+  };
+
   addSection = (name: string) => {
     if (!this.service) return;
     const section = { id: uid(), name: name.trim() || "Section", items: [] };
@@ -3954,12 +3971,12 @@ class Session {
     );
   };
 
-  addPassageToService = (passage: BibleItem, sectionId?: string) => {
+  addPassageToService = (passage: BibleItem, sectionId?: string): Promise<string> => {
     this.remember(passage);
     // The service's own verses-per-screen applies to readings longer than one screenful.
     const per = this.service?.versesPerScreen;
     const bible = per && !passage.perScreen && passage.endVerse - passage.startVerse + 1 > per ? { ...passage, perScreen: per } : passage;
-    void this.addToService({ kind: "bible", title: passage.reference, bible }, false, sectionId);
+    return this.addToService({ kind: "bible", title: passage.reference, bible }, false, sectionId);
   };
 
   /** Settings new services start with (saved on this computer by "Use for new services"). */
@@ -4118,9 +4135,9 @@ class Session {
     return this.addToService({ kind: "slide", title: title.slice(0, 80), slide }, false, sectionId);
   };
 
-  addLyric = (songId: string, sectionId: string, title: string) => {
+  addLyric = (songId: string, sectionId: string, title: string, partId?: string) => {
     if (!this.service) return;
-    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
+    const target = (partId && this.service.sections.some((entry) => entry.id === partId) ? partId : null) ?? this.cursor.sectionId ?? this.service.sections[0]?.id;
     if (!target) {
       this.message = t("Add a section first.");
       return;
@@ -4227,6 +4244,17 @@ class Session {
     name: "",
   });
   private ndiUnlisten: (() => void) | null = null;
+  /** Whether this install has NDI output (null until asked). Not every build has it yet. */
+  ndiAvailable = $state<boolean | null>(null);
+
+  checkNdiAvailable = async () => {
+    if (this.ndiAvailable !== null) return;
+    try {
+      this.ndiAvailable = this.desktop() ? await invoke<boolean>("ndi_available") : false;
+    } catch {
+      this.ndiAvailable = false;
+    }
+  };
 
   /**
    * Start sending over NDI. Program comes from the audience window, so it is opened first.
@@ -4847,9 +4875,9 @@ class Session {
   };
 
   queueSongHit = async (hit: SongHit) => {
-    if (!this.service) await this.createService("Sunday Service");
-    if (!this.service?.sections.length) this.addSection("Songs");
-    this.addLyric(hit.songId, hit.sectionId, `${hit.title} — ${hit.label}`);
+    const part = await this.pickServicePart(`${hit.title} — ${hit.label}`);
+    if (!part) return;
+    this.addLyric(hit.songId, hit.sectionId, `${hit.title} — ${hit.label}`, part);
     this.message = t("{title} queued. Preview it, then LIVE.", { title: hit.title });
   };
 
@@ -5192,7 +5220,7 @@ class Session {
     // The logo slide on Program now carries the church name (and theme) chosen in setup.
     // While held at startup it is redrawn on the desk only.
     if (this.live.program.model.layout === "logo") {
-      if (this.programHeld) this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.mediaSrc(this.workspace.logoAssetId) });
+      if (this.programHeld) this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.logoImage() });
       else void this.logo();
     }
   };
@@ -6069,9 +6097,9 @@ class Session {
     this.message = t("Sermon deleted.");
   };
 
-  addSermonSection = (section: Sermon["sections"][number], title: string) => {
+  addSermonSection = (section: Sermon["sections"][number], title: string, sectionId?: string) => {
     if (!this.service) return;
-    const target = this.cursor.sectionId ?? this.service.sections[0]?.id;
+    const target = (sectionId && this.service.sections.some((entry) => entry.id === sectionId) ? sectionId : null) ?? this.cursor.sectionId ?? this.service.sections[0]?.id;
     if (!target) {
       this.message = t("Add a section first.");
       return;
@@ -6577,8 +6605,33 @@ class Session {
     }
   };
 
+  /** The picture the Logo button shows: the church's own, else the Church Studio mark, unless set to words alone. */
+  logoImage = (): string | null => {
+    const own = this.mediaSrc(this.workspace.logoAssetId);
+    if (own) return own;
+    return this.workspace.logoPicture === "none" ? null : DEFAULT_LOGO_URL;
+  };
+
+  /** Logo picture: a media id, "default" (the Church Studio mark) or "none" (the words alone). */
+  setLogoPicture = (choice: string) => {
+    if (choice === "default" || choice === "none") {
+      const { logoPicture: _old, ...rest } = this.workspace;
+      this.workspace = { ...rest, logoAssetId: null, ...(choice === "none" ? { logoPicture: "none" as const } : {}) };
+      this.persistSoon();
+      this.refreshLogoOnProgram();
+      return;
+    }
+    this.setLogo(choice);
+  };
+
+  /** A logo already on Program changes with the setting. */
+  private refreshLogoOnProgram() {
+    if (this.live.program.model.layout === "logo") this.live = applyProgramAction(this.live, "logo", this.theme(), { title: this.logoTitle(), imageUrl: this.logoImage() });
+  }
+
   setLogo = (assetId: string | null) => {
     this.workspace = { ...this.workspace, logoAssetId: assetId };
+    this.refreshLogoOnProgram();
     this.persistSoon();
     this.message = t("Logo updated. Press Logo to send it to program.");
   };
@@ -6696,7 +6749,7 @@ class Session {
     if (this.deckLoop) this.stopDeckLoop();
     this.rememberProgram();
     this.releaseHold();
-    const imageUrl = this.mediaSrc(this.workspace.logoAssetId);
+    const imageUrl = this.logoImage();
     const themeTransition = this.theme().transition;
     const takeTransition =
       action === "take"
@@ -7335,7 +7388,7 @@ class Session {
 
   idleModel = (): PresentationModel => emptyModel(this.theme());
   blackPreview = (): PresentationModel => blackModel(this.theme());
-  logoPreview = (): PresentationModel => logoModel(this.theme(), this.logoTitle(), this.mediaSrc(this.workspace.logoAssetId));
+  logoPreview = (): PresentationModel => logoModel(this.theme(), this.logoTitle(), this.logoImage());
 }
 
 export const session = new Session();

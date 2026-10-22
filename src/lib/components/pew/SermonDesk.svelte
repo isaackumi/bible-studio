@@ -1,38 +1,41 @@
 <script lang="ts">
-  import InlineWords from "../InlineWords.svelte";
-  import TextWords from "../TextWords.svelte";
   import RichView from "../RichView.svelte";
-  import type { RichDoc } from "../../domain/rich-text";
   import { session } from "../../app/session.svelte";
-  import { formatReference, parseReference } from "../../bible/reference";
-  import { searchSermonHits, sermonAudienceItem } from "../../domain/sermon";
-  import type { SermonSummary } from "../../ai/summarize";
-  import type { PresentationItem, Sermon, SermonSection } from "../../domain/types";
-  import AiSlidesDialog from "../decks/AiSlidesDialog.svelte";
+  import { sermonClock, watchClock } from "../../app/sermon-clock.svelte";
+  import { clockText, paceOf, sectionSpent } from "../../domain/sermon-clock";
+  import { duplicateSermon, plannedMinutes, searchSermonHits, sermonAudienceItem, sermonSeries } from "../../domain/sermon";
+  import type { Sermon, SermonSection } from "../../domain/types";
   import Icon from "../Icon.svelte";
+  import ToolMenu from "../ToolMenu.svelte";
+  import ItemThumb from "./ItemThumb.svelte";
   import MonitorPair from "./MonitorPair.svelte";
   import LibrarySidebar from "./LibrarySidebar.svelte";
   import SearchField from "./SearchField.svelte";
-  import { msg, t, tn } from "../../i18n/core";
+  import SermonEditor from "./sermon/SermonEditor.svelte";
+  import SermonPreach from "./sermon/SermonPreach.svelte";
+  import SermonRail from "./sermon/SermonRail.svelte";
+  import { t, tn } from "../../i18n/core";
 
-  // Sermon window: a library of sermons, the outline as cards (what the audience sees, and the
-  // notes that stay on this desk), and the speaker's notes beside Preview and Program.
-  // Notes never reach Preview or Program. LIVE sends Program.
+  // Sermon window: a library of sermons (by series), the outline as a timeline and cards (what the
+  // audience sees, its time, and the notes that stay on this desk), Preach mode for running it,
+  // and the speaker's notes beside Preview and Program. Notes never reach Preview or Program.
 
   let { translationId = "kjv" }: { translationId?: string } = $props();
 
-  type Show = "slide" | "scripture" | "image";
-  type DraftSection = { id: string; name: string; notes: string; notesRich: RichDoc | null; show: Show; heading: string; body: string; rich: RichDoc | null; scripture: string; imageId: string };
-  type Draft = { id: string; title: string; speaker: string; notes: string; notesRich: RichDoc | null; sections: DraftSection[]; isNew: boolean };
-
   let query = $state("");
   let selectedId = $state<string | null>(null);
-  let draft = $state<Draft | null>(null);
+  /** The editor: a sermon to change, "new" for a blank one, or closed. */
+  let editing = $state<Sermon | "new" | null>(null);
+  let preaching = $state(false);
   let note = $state("");
   let armed = $state<string | null>(null);
   let armTimer: ReturnType<typeof setTimeout> | undefined;
+  let seriesFilter = $state<string | null>(null);
 
-  const sermons = $derived([...session.sermons].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  $effect(() => watchClock());
+
+  const series = $derived(sermonSeries(session.sermons));
+  const sermons = $derived([...session.sermons].filter((doc) => !seriesFilter || doc.series === seriesFilter).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
   const hits = $derived(query.trim() ? searchSermonHits(session.sermons, query) : []);
   let hitIndex = $state(-1);
   $effect(() => {
@@ -83,7 +86,7 @@
   const focus = $derived(session.sermonFocus);
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
-  const images = $derived(session.media.filter((asset) => asset.kind === "image"));
+  const liveSectionOf = (doc: Sermon) => (programLive && programSource.startsWith(`sermon:${doc.id}:`) ? programSource.slice(`sermon:${doc.id}:`.length) : null);
   const focusSection = $derived.by(() => {
     const doc = focus ? session.sermons.find((entry) => entry.id === focus.sermonId) : null;
     return doc?.sections.find((entry) => entry.id === focus?.sectionId) ?? null;
@@ -95,10 +98,14 @@
     const index = doc?.sections.findIndex((entry) => entry.id === focus?.sectionId) ?? -1;
     return doc && index >= 0 ? `${doc.sections[index]!.name} · ${index + 1} of ${doc.sections.length}` : "";
   });
+  const clock = $derived(selected && sermonClock.value?.sermonId === selected.id ? sermonClock.value : null);
 
   $effect(() => {
     const current = session.sermonFocus;
-    if (current && !draft) selectedId = current.sermonId;
+    if (current && !editing) selectedId = current.sermonId;
+  });
+  $effect(() => {
+    if (!selected) preaching = false;
   });
 
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
@@ -121,7 +128,7 @@
   }
 
   function when(iso: string): string {
-    const date = new Date(iso);
+    const date = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -137,7 +144,7 @@
   }
 
   function pick(id: string) {
-    draft = null;
+    editing = null;
     selectedId = id;
   }
 
@@ -157,219 +164,62 @@
     show(doc, sectionId);
   }
 
-  async function ensureService() {
-    if (!session.service) await session.createService(t("Sunday Service"));
-    if (!session.service?.sections.length) session.addSection(t("Sermon"));
-  }
-
   async function queueAll(doc: Sermon) {
-    await ensureService();
-    for (const section of doc.sections) session.addSermonSection(section, `${doc.title} — ${section.name}`);
-    note = `${doc.sections.length} section${doc.sections.length === 1 ? "" : "s"} added to the queue. Notes were not queued.`;
+    const part = await session.pickServicePart(tn(doc.sections.length, "{title} · {n} section", "{title} · {n} sections", { title: doc.title }));
+    if (!part) return;
+    for (const section of doc.sections) session.addSermonSection(section, `${doc.title} — ${section.name}`, part);
+    note = tn(doc.sections.length, "{n} section added to the service. Notes were not added.", "{n} sections added to the service. Notes were not added.");
   }
 
   async function queueOne(doc: Sermon, section: SermonSection) {
-    await ensureService();
-    session.addSermonSection(section, `${doc.title} — ${section.name}`);
-    note = `${section.name} added to the queue. Notes were not queued.`;
+    const part = await session.pickServicePart(`${doc.title} — ${section.name}`);
+    if (!part) return;
+    session.addSermonSection(section, `${doc.title} — ${section.name}`, part);
+    note = t("{name} added to the service. Notes were not added.", { name: section.name });
   }
 
   async function remove(doc: Sermon) {
     if (!arm(`sermon:${doc.id}`)) return;
     await session.deleteSermon(doc.id);
     selectedId = null;
-    note = `${doc.title} deleted.`;
+    note = t("{title} deleted.", { title: doc.title });
   }
 
-  // Editing
-
-  // Summarize with the church's own AI service: notes in, a summary and points out.
-  let summarizing = $state(false);
-  let summary = $state<SermonSummary | null>(null);
-  let summaryError = $state("");
-
-  /** Everything written for this sermon, as the AI reads it. */
-  function notesFor(value: Draft): string {
-    const parts = [value.notes.trim()];
-    for (const section of value.sections) {
-      const lines = [section.name, section.heading, section.scripture, section.body, section.notes].map((line) => line.trim()).filter(Boolean);
-      if (lines.length) parts.push(lines.join("\n"));
-    }
-    return parts.filter(Boolean).join("\n\n");
-  }
-
-  async function summarize() {
-    if (!draft) return;
-    if (!session.aiReady) {
-      session.openSettings("ai");
-      return;
-    }
-    summarizing = true;
-    summaryError = "";
-    try {
-      summary = await session.summarizeSermon({ title: draft.title, notes: notesFor(draft) });
-    } catch (error) {
-      summaryError = error instanceof Error ? error.message : String(error);
-      summary = null;
-    } finally {
-      summarizing = false;
+  async function duplicate(doc: Sermon) {
+    const copy = duplicateSermon(doc, t("{title} (copy)", { title: doc.title }));
+    if (await session.saveSermon(copy)) {
+      selectedId = copy.id;
+      note = t("A copy of {title} is ready to change.", { title: doc.title });
     }
   }
 
-  function usePoints() {
-    if (!draft || !summary) return;
-    const added = summary.points.map((point) => ({
-      ...blankSection(point.heading),
-      show: (point.scripture && parseReference(point.scripture, session.books)?.startVerse ? "scripture" : "slide") as Show,
-      heading: point.heading,
-      body: point.body,
-      scripture: point.scripture,
-    }));
-    draft.sections = [...draft.sections, ...added];
-    note = `${added.length} point${added.length === 1 ? "" : "s"} added as sections. Check them, then Save.`;
-    summary = null;
+  async function preach(doc: Sermon) {
+    preaching = true;
+    if (focus?.sermonId !== doc.id && doc.sections[0]) await session.previewSermonSection(doc, doc.sections[0].id);
   }
 
-  function useSummarySlide() {
-    if (!draft || !summary) return;
-    draft.sections = [...draft.sections, { ...blankSection(t("Summary")), heading: draft.title || t("Summary"), body: summary.summary }];
-    note = t("The summary is a slide at the end. Save to keep it.");
+  function closeEditor(savedId: string | null) {
+    if (savedId) selectedId = savedId;
+    editing = null;
   }
-
-  function blankSection(name: string): DraftSection {
-    return { id: crypto.randomUUID(), name, notes: "", notesRich: null, show: "slide", heading: "", body: "", rich: null, scripture: "", imageId: "" };
-  }
-
-  function newSermon() {
-    draft = { id: crypto.randomUUID(), title: "", speaker: "", notes: "", notesRich: null, sections: [blankSection(t("Opening"))], isNew: true };
-  }
-
-  function edit(doc: Sermon) {
-    draft = {
-      id: doc.id,
-      title: doc.title,
-      speaker: doc.speaker,
-      notes: doc.notes,
-      notesRich: doc.notesRich ?? null,
-      isNew: false,
-      sections: doc.sections.map((section) => {
-        const attached = section.items.find((item) => item.kind === "bible" || item.kind === "image") ?? null;
-        const slide = section.items.find((item) => item.kind === "slide");
-        return {
-          id: section.id,
-          name: section.name,
-          notes: section.notes,
-          notesRich: section.notesRich ?? null,
-          rich: slide?.slide?.rich ?? null,
-          show: attached?.kind === "bible" ? "scripture" : attached?.kind === "image" ? "image" : "slide",
-          heading: slide?.slide?.heading ?? "",
-          body: slide?.slide?.body ?? "",
-          scripture: attached?.bible?.reference ?? "",
-          imageId: attached?.image?.assetId ?? "",
-        };
-      }),
-    };
-  }
-
-  /** The draft as a sermon. Returns the problems instead when a reference or image is missing. */
-  function build(value: Draft): { sermon: Sermon; problems: string[] } {
-    const problems: string[] = [];
-    const sections: SermonSection[] = value.sections.map((section) => {
-      const heading = section.heading.trim() || section.name.trim() || t("Sermon");
-      const words = section.show === "slide" && section.rich ? { heading: section.heading.trim(), body: section.body, imageId: null, rich: section.rich } : { heading, body: section.body, imageId: null };
-      const slide: PresentationItem = { id: `${section.id}-slide`, kind: "slide", title: heading, slide: words };
-      let attached: PresentationItem | null = null;
-      if (section.show === "scripture") {
-        const parsed = parseReference(section.scripture);
-        if (!parsed) problems.push(t("{name}: “{reference}” is not a reference.", { name: section.name || t("A section"), reference: section.scripture || t("no reference") }));
-        else {
-          const start = parsed.startVerse ?? 1;
-          const end = parsed.endVerse ?? start;
-          const chapters = session.books.find((entry) => entry.ord === parsed.bookOrd)?.chapters ?? 150;
-          const reference = formatReference(parsed.bookName, parsed.chapter, start, end, chapters);
-          attached = {
-            id: `${section.id}-bible`,
-            kind: "bible",
-            title: reference,
-            bible: { translationId, bookOrd: parsed.bookOrd, chapter: parsed.chapter, startVerse: start, endVerse: end, reference },
-          };
-        }
-      } else if (section.show === "image") {
-        const asset = session.media.find((entry) => entry.id === section.imageId);
-        if (!asset) problems.push(t("{name}: pick an image.", { name: section.name || t("A section") }));
-        else attached = { id: `${section.id}-image`, kind: "image", title: asset.name, image: { assetId: asset.id } };
-      }
-      return { id: section.id, name: section.name, notes: section.notes, ...(section.notesRich ? { notesRich: section.notesRich } : {}), items: attached ? [attached, slide] : [slide] };
-    });
-    return {
-      sermon: { id: value.id, title: value.title, speaker: value.speaker, notes: value.notes, ...(value.notesRich ? { notesRich: value.notesRich } : {}), sections, updatedAt: new Date().toISOString() },
-      problems,
-    };
-  }
-
-  function previewDraftSection(sectionId: string) {
-    if (!draft) return;
-    const { sermon, problems } = build(draft);
-    if (problems.length) note = problems[0]!;
-    void session.previewSermonSection(sermon, sectionId);
-  }
-
-  // Dragging sermon sections in the editor.
-  let cardDrag = $state<number | null>(null);
-  let cardDrop = $state<number | null>(null);
-  function dropCard(to: number) {
-    if (cardDrag === null || !draft) return;
-    const from = cardDrag;
-    cardDrag = null;
-    cardDrop = null;
-    if (from === to) return;
-    const next = draft.sections.slice();
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved!);
-    draft.sections = next;
-  }
-
-  function moveDraft(sectionId: string, direction: 1 | -1) {
-    if (!draft) return;
-    const from = draft.sections.findIndex((entry) => entry.id === sectionId);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= draft.sections.length) return;
-    const next = draft.sections.slice();
-    [next[from], next[to]] = [next[to]!, next[from]!];
-    draft.sections = next;
-  }
-
-  function removeDraft(sectionId: string) {
-    if (draft) draft.sections = draft.sections.filter((entry) => entry.id !== sectionId);
-  }
-
-  async function saveDraft() {
-    if (!draft) return;
-    const { sermon, problems } = build(draft);
-    if (problems.length) {
-      note = problems[0]!;
-      return;
-    }
-    if (!(await session.saveSermon(sermon))) {
-      note = session.message;
-      return;
-    }
-    note = `${sermon.title.trim()} saved. Notes stay on this desk.`;
-    selectedId = sermon.id;
-    draft = null;
-  }
-  let aiSlides = $state<{ notes: string; title: string } | null>(null);
 </script>
 
-{#if aiSlides}<AiSlidesDialog notes={aiSlides.notes} title={aiSlides.title} onclose={() => (aiSlides = null)} />{/if}
-
-<section class="sermon-desk">
+<section class="sermon-desk" class:preaching>
+  {#if !preaching}
   <!-- Library -->
-  <LibrarySidebar title={t("Sermons")} icon="book" count={sermons.length} storageKey="sermons">
+  <LibrarySidebar title={t("Sermons")} icon="book" count={session.sermons.length} storageKey="sermons">
     {#snippet actions()}
-      <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> {t("New")}</button>
+      <button type="button" class="desk-btn" onclick={() => (editing = "new")}><Icon name="plus" size={14} /> {t("New")}</button>
     {/snippet}
     <SearchField bind:value={query} label={t("Search sermons")} placeholder={t("Title, speaker, notes or scripture")} onnavigate={navigate} />
+    {#if series.length && !query.trim()}
+      <div class="series" role="group" aria-label={t("Series")}>
+        <button type="button" class:on={seriesFilter === null} aria-pressed={seriesFilter === null} onclick={() => (seriesFilter = null)}>{t("All")}</button>
+        {#each series as name (name)}
+          <button type="button" class:on={seriesFilter === name} aria-pressed={seriesFilter === name} onclick={() => (seriesFilter = seriesFilter === name ? null : name)}>{name}</button>
+        {/each}
+      </div>
+    {/if}
     <div class="list">
       {#if query.trim()}
         <p class="group">{t("Matches")} <span>{hits.length}</span></p>
@@ -382,156 +232,71 @@
           </button>
         {/each}
       {:else}
-        {#if sermons.length === 0}<p class="empty">{t("No sermons yet. Create one to plan the message and its notes.")}</p>{/if}
+        {#if session.sermons.length === 0}<p class="empty">{t("No sermons yet. Create one to plan the message and its notes.")}</p>{/if}
         {#each groups as group (group.label)}
           <p class="group">{group.label} <span>{group.items.length}</span></p>
           {#each group.items as doc (doc.id)}
-            <button type="button" class="row" class:on={selectedId === doc.id && !draft} onclick={() => pick(doc.id)}>
+            {@const minutes = plannedMinutes(doc)}
+            <button type="button" class="row" class:on={selectedId === doc.id && !editing} onclick={() => pick(doc.id)}>
               <strong>
-                {doc.title || t("Untitled sermon")}
-                {#if programLive && programSource.startsWith(`sermon:${doc.id}:`)}<em class="badge live">{t("Live")}</em>
+                <span class="row-title">{doc.title || t("Untitled sermon")}</span>
+                {#if liveSectionOf(doc)}<em class="badge live">{t("Live")}</em>
                 {:else if focus?.sermonId === doc.id}<em class="badge">{t("Preview")}</em>{/if}
               </strong>
-              {#if doc.sections[0]}<span class="snippet">{doc.sections.map((section) => section.name).join(" → ")}</span>{/if}
-              <span>{[doc.speaker, `${doc.sections.length} section${doc.sections.length === 1 ? "" : "s"}`, when(doc.updatedAt)].filter(Boolean).join(" · ")}</span>
+              {#if doc.series}<span class="row-series">{doc.series}</span>{/if}
+              <span class="row-bars" aria-hidden="true">{#each doc.sections.slice(0, 16) as section (section.id)}<i class={sermonAudienceItem(section).kind} style:flex-grow={section.minutes ?? 1}></i>{/each}</span>
+              <span>{[doc.speaker, tn(doc.sections.length, "{n} section", "{n} sections"), minutes ? t("{n} min", { n: minutes }) : "", when(doc.date ?? doc.updatedAt)].filter(Boolean).join(" · ")}</span>
             </button>
           {/each}
         {/each}
       {/if}
     </div>
   </LibrarySidebar>
+  {/if}
 
   <!-- Outline -->
-  <div class="sheet">
+  <div class="sheet" class:wide={preaching}>
     {#if note}
       <p class="note" role="status"><span>{note}</span><button type="button" aria-label={t("Dismiss")} onclick={() => (note = "")}><Icon name="close" size={14} /></button></p>
     {/if}
-    {#if draft}
-      <form class="editor" onsubmit={(event) => { event.preventDefault(); void saveDraft(); }}>
-        <div class="head">
-          <h2>{draft.isNew ? t("New sermon") : t("Edit sermon")}</h2>
-          <div class="actions">
-            <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? t("Make a summary and points from your notes") : t("Set up your AI key first")} onclick={() => void summarize()}>
-              <Icon name="sparkles" size={14} /> {summarizing ? t("Summarizing…") : t("Summarize")}
-            </button>
-            <button type="button" class="desk-btn ai-btn" data-tip={t("Make a slide deck from these notes with your AI service")} onclick={() => draft && (aiSlides = { notes: notesFor(draft), title: draft.title })}><Icon name="stage" size={14} /> {t("Make slides")}</button>
-            <button type="button" class="desk-btn ghost" onclick={() => (draft = null)}>{t("Cancel")}</button>
-            <button type="submit" class="desk-btn primary">{t("Save")}</button>
-          </div>
-        </div>
-        {#if summaryError}<p class="ai-error" role="alert">{summaryError}</p>{/if}
-        {#if summary}
-          <section class="ai-card" aria-label={t("AI summary")}>
-            <header><span><Icon name="sparkles" size={14} /> {t("Summary")}</span><button type="button" class="ai-close" aria-label={t("Close summary")} onclick={() => (summary = null)}><Icon name="close" size={13} /></button></header>
-            {#if summary.summary}<p class="ai-summary">{summary.summary}</p>{/if}
-            {#if summary.points.length}
-              <ol class="ai-points">
-                {#each summary.points as point, n (n)}
-                  <li><strong>{point.heading}</strong>{#if point.scripture}<em>{point.scripture}</em>{/if}{#if point.body}<span>{point.body}</span>{/if}</li>
-                {/each}
-              </ol>
-            {/if}
-            <div class="ai-actions">
-              <button type="button" class="desk-btn" disabled={!summary.summary} onclick={useSummarySlide}>{t("Add summary as a slide")}</button>
-              <button type="button" class="desk-btn primary-soft" disabled={!summary.points.length} onclick={usePoints}>{t("Add points as sections")}</button>
-            </div>
-            <p class="ai-foot">{t("Written by AI from your notes. Read it before it reaches the screen.")}</p>
-          </section>
-        {/if}
-        <div class="fields">
-          <input aria-label={t("Sermon title")} placeholder={t("Title")} bind:value={draft.title} />
-          <input aria-label={t("Speaker")} placeholder={t("Speaker")} bind:value={draft.speaker} />
-        </div>
-        <div class="desk-only">
-          <span><Icon name="lock" size={12} /> {t("Notes for the whole sermon · desk only")}</span>
-          <InlineWords text={draft.notes} rich={draft.notesRich} multiline variant="full" rows={2} label={t("Operator notes")} placeholder={t("Reminders for the operator. Never shown to the audience.")} onchange={(words) => { if (draft) { draft.notes = words.text; draft.notesRich = words.rich; } }} />
-        </div>
-
-        {#each draft.sections as section, i (section.id)}
-          <div
-            class="edit-card"
-            role="group"
-            aria-label={section.name}
-            class:drop-before={cardDrag !== null && cardDrop === i && cardDrag !== i}
-            class:dragging={cardDrag === i}
-            ondragover={(event) => { if (cardDrag !== null) { event.preventDefault(); cardDrop = i; } }}
-            ondrop={(event) => { event.preventDefault(); dropCard(i); }}
-          >
-            <div class="edit-head">
-              <button
-                type="button"
-                class="grip"
-                draggable="true"
-                aria-label={t("Move {name}: drag, or Alt+arrow keys", { name: section.name || t("this section") })}
-                title={t("Drag to move")}
-                ondragstart={(event) => { cardDrag = i; event.dataTransfer?.setData("text/plain", String(i)); }}
-                ondragend={() => { cardDrag = null; cardDrop = null; }}
-                onkeydown={(event) => { if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) { event.preventDefault(); moveDraft(section.id, event.key === "ArrowUp" ? -1 : 1); } }}
-              ><Icon name="grip" size={14} /></button>
-              <i>{i + 1}</i>
-              <input aria-label={t("Section name")} placeholder={t("Section name")} bind:value={section.name} />
-              <button type="button" class="row-tool" aria-label={t("Preview {name}", { name: section.name })} title={t("Preview")} onclick={() => previewDraftSection(section.id)}><Icon name="play" size={14} /></button>
-              <button type="button" class="row-tool del" aria-label={t("Delete {name}", { name: section.name })} title={t("Delete this section")} onclick={() => removeDraft(section.id)}><Icon name="trash" size={14} /></button>
-            </div>
-            <div class="two">
-              <div class="audience-edit">
-                <div class="seg" role="radiogroup" aria-label={t("Audience sees")}>
-                  {#each [["slide", "Slide"], ["scripture", "Scripture"], ["image", "Image"]] as [id, label] (id)}
-                    <button type="button" role="radio" aria-checked={section.show === id} class:on={section.show === id} onclick={() => (section.show = id as Show)}>{label}</button>
-                  {/each}
-                </div>
-                {#if section.show === "scripture"}
-                  <input aria-label={t("Attach scripture")} placeholder={t("John 3:16-17")} bind:value={section.scripture} />
-                {:else if section.show === "image"}
-                  {#if images.length}
-                    <select aria-label={t("Attach image")} bind:value={section.imageId}>
-                      <option value="">{t("Pick an image")}</option>
-                      {#each images as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
-                    </select>
-                  {:else}
-                    <p class="muted">{t("Import images in the Production Desk's Media panel first.")}</p>
-                  {/if}
-                {/if}
-                {#if section.show === "slide"}
-                  <TextWords heading={section.heading} body={section.body} rich={section.rich} headingLabel={msg("Audience heading")} bodyLabel={msg("Audience body")} headingPlaceholder={t("Heading on screen")} bodyPlaceholder={t("Text on screen")} onchange={(words) => { section.heading = words.heading; section.body = words.body; section.rich = words.rich; }} />
-                {:else}
-                  <input aria-label={t("Audience heading")} placeholder={t("Heading (when shown as a slide)")} bind:value={section.heading} />
-                {/if}
-              </div>
-              <div class="desk-only">
-                <span><Icon name="lock" size={12} /> {t("Desk notes")}</span>
-                <InlineWords text={section.notes} rich={section.notesRich} multiline variant="full" rows={5} label={t("Section notes")} placeholder={t("What to say, cues, timing. Desk only.")} onchange={(words) => { section.notes = words.text; section.notesRich = words.rich; }} />
-              </div>
-            </div>
-          </div>
-        {/each}
-        <button type="button" class="add" onclick={() => draft && (draft.sections = [...draft.sections, blankSection(`Section ${draft.sections.length + 1}`)])}>
-          <Icon name="plus" size={14} /> {t("Add section")}
-        </button>
-      </form>
+    {#if editing}
+      {#key editing === "new" ? "new" : editing.id}
+        <SermonEditor sermon={editing === "new" ? null : editing} {translationId} seriesList={series} onclose={closeEditor} onnote={(text) => (note = text)} />
+      {/key}
+    {:else if selected && preaching}
+      <SermonPreach sermon={selected} onexit={() => (preaching = false)} />
     {:else if selected}
-      <header class="head">
-        <div>
+      {@const total = plannedMinutes(selected)}
+      {@const liveId = liveSectionOf(selected)}
+      {@const previewId = focus?.sermonId === selected.id ? focus.sectionId : null}
+      <header class="hero">
+        <div class="hero-copy">
+          {#if selected.series}<span class="hero-series"><Icon name="layers" size={12} /> {selected.series}</span>{/if}
           <h2 class="title">{selected.title}</h2>
           <p class="meta">
-            <span>{selected.speaker || t("No speaker")}</span>
-            <span>{tn(selected.sections.length, "{n} section", "{n} sections")}</span>
-            {#if when(selected.updatedAt)}<span>{t("Updated {updatedAt}", { updatedAt: when(selected.updatedAt) })}</span>{/if}
+            <span><Icon name="user" size={12} /> {selected.speaker || t("No speaker")}</span>
+            {#if selected.date}<span><Icon name="timer" size={12} /> {when(selected.date)}</span>{/if}
+            <span><Icon name="list" size={12} /> {tn(selected.sections.length, "{n} section", "{n} sections")}</span>
+            {#if total}<span><Icon name="clock" size={12} /> {t("{n} min planned", { n: total })}</span>{/if}
+            {#if clock}<span class="running {paceOf(sermonClock.now - clock.startedAt, total || undefined)}"><i aria-hidden="true"></i>{t("Running {time}", { time: clockText(sermonClock.now - clock.startedAt) })}</span>{/if}
           </p>
         </div>
         <div class="actions">
-          <button type="button" class="desk-btn" onclick={() => void queueAll(selected)}><Icon name="queue" size={14} /> {t("Queue all")}</button>
-          <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
-          <button
-            type="button"
-            class="desk-btn ghost icon"
-            class:armed={armed === `sermon:${selected.id}`}
-            aria-label={armed === `sermon:${selected.id}` ? t("Confirm delete sermon") : t("Delete sermon")}
-            data-tip={armed === `sermon:${selected.id}` ? t("Click again to delete") : t("Delete sermon")}
-            onclick={() => void remove(selected)}
-          ><Icon name="close" size={14} /></button>
+          <button type="button" class="desk-btn primary" onclick={() => void preach(selected)} title={t("Run the sermon: big notes, the time, and Next to LIVE")}><Icon name="play" size={14} /> {t("Preach")}</button>
+          <button type="button" class="desk-btn" onclick={() => void queueAll(selected)}><Icon name="queue" size={14} /> {t("Add all to service")}</button>
+          <button type="button" class="desk-btn" onclick={() => (editing = selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
+          <ToolMenu label={t("More for this sermon")} className="desk-btn icon">
+            {#snippet trigger()}<Icon name="more" size={15} />{/snippet}
+            {#snippet children(close)}
+              <button type="button" role="menuitem" onclick={() => { close(); void duplicate(selected); }}><Icon name="copy" size={13} /> {t("Duplicate")}<span class="menu-hint">{t("For another Sunday")}</span></button>
+              <button type="button" role="menuitem" class="danger" onclick={() => { if (armed === `sermon:${selected.id}`) close(); void remove(selected); }}><Icon name="trash" size={13} /> {armed === `sermon:${selected.id}` ? t("Click again to delete") : t("Delete sermon")}</button>
+            {/snippet}
+          </ToolMenu>
         </div>
       </header>
+      {#if selected.sections.length}
+        <SermonRail sermon={selected} {previewId} {liveId} onpick={(id) => show(selected, id)} />
+      {/if}
       {#if selected.notes.trim()}
         <div class="sermon-notes"><Icon name="lock" size={12} /> {#if selected.notesRich}<RichView doc={selected.notesRich} base="1em" />{:else}{selected.notes}{/if}</div>
       {/if}
@@ -539,53 +304,68 @@
       <ol class="outline">
         {#each selected.sections as section, n (section.id)}
           {@const seen = audience(section)}
-          {@const isLive = programLive && programSource === `sermon:${selected.id}:${section.id}`}
-          {@const onPreview = focus?.sermonId === selected.id && focus.sectionId === section.id}
-          <li class="card" class:on={onPreview} class:live={isLive}>
+          {@const isLive = liveId === section.id}
+          {@const onPreview = previewId === section.id}
+          {@const spent = sectionSpent(clock, section.id, sermonClock.now)}
+          <li class="card {sermonAudienceItem(section).kind}" class:on={onPreview} class:live={isLive}>
             <button type="button" class="card-main" onclick={() => show(selected, section.id)} ondblclick={() => void showAndTake(selected, section.id)}>
-              <span class="card-head">
-                <i>{n + 1}</i>
-                <strong>{section.name}</strong>
-                <span class="tags">
+              <span class="thumb"><ItemThumb item={sermonAudienceItem(section)} icon={seen.icon} label={seen.kind} /></span>
+              <span class="card-copy">
+                <span class="card-head">
+                  <i>{n + 1}</i>
+                  <strong>{section.name}</strong>
                   {#if isLive}<em class="badge live">{t("Live")}</em>{/if}
                   {#if onPreview}<em class="badge">{t("Preview")}</em>{/if}
+                  {#if spent || section.minutes}
+                    <span class="time {paceOf(spent, section.minutes)}">{spent ? clockText(spent) : ""}{spent && section.minutes ? " / " : ""}{section.minutes ? t("{n} min", { n: section.minutes }) : ""}</span>
+                  {/if}
                 </span>
+                <span class="seen">
+                  <span class="kind"><Icon name={seen.icon} size={12} />{seen.kind}</span>
+                  <span class="seen-title">{seen.title}</span>
+                  {#if seen.body}<span class="seen-body">{seen.body}</span>{/if}
+                </span>
+                {#if section.notes.trim()}
+                  <span class="notes"><Icon name="lock" size={12} /><span>{#if section.notesRich}<RichView doc={section.notesRich} base="1em" />{:else}{section.notes}{/if}</span></span>
+                {/if}
               </span>
-              <span class="seen">
-                <span class="kind"><Icon name={seen.icon} size={12} />{seen.kind}</span>
-                <span class="seen-title">{seen.title}</span>
-                {#if seen.body}<span class="seen-body">{seen.body}</span>{/if}
-              </span>
-              {#if section.notes.trim()}
-                <span class="notes"><Icon name="lock" size={12} /><span>{#if section.notesRich}<RichView doc={section.notesRich} base="1em" />{:else}{section.notes}{/if}</span></span>
-              {/if}
             </button>
-            <button type="button" class="row-tool queue" aria-label={t("Queue {name}", { name: section.name })} title={t("Add to queue")} onclick={() => void queueOne(selected, section)}><Icon name="queue" size={14} /></button>
+            <span class="card-tools">
+              <button type="button" class="row-tool go-live" aria-label={t("Send {name} LIVE", { name: section.name })} title={t("LIVE")} onclick={() => void showAndTake(selected, section.id)}><Icon name="play" size={13} /></button>
+              <button type="button" class="row-tool" aria-label={t("Add {name} to the service", { name: section.name })} title={t("Add to the service")} onclick={() => void queueOne(selected, section)}><Icon name="queue" size={14} /></button>
+            </span>
           </li>
         {/each}
       </ol>
+      <button type="button" class="add-more" onclick={() => (editing = selected)}><Icon name="plus" size={13} /> {t("Add or change sections")}</button>
     {:else}
       <div class="blank">
-        <Icon name="book" size={28} />
-        <p>{t("Pick a sermon from the library, or create one.")}</p>
-        <button type="button" class="desk-btn" onclick={newSermon}><Icon name="plus" size={14} /> {t("New sermon")}</button>
+        <span class="blank-icon"><Icon name="book" size={30} /></span>
+        <h2>{t("Plan the message, then preach it")}</h2>
+        <p>{t("Sections with what the audience sees, notes only you see, and the time each part takes. Paste your notes and the outline is made for you.")}</p>
+        <div class="blank-actions">
+          <button type="button" class="desk-btn primary" onclick={() => (editing = "new")}><Icon name="plus" size={14} /> {t("New sermon")}</button>
+        </div>
+        {#if session.sermons.length}<p class="muted">{t("Or pick one from the library.")}</p>{/if}
       </div>
     {/if}
   </div>
 
   <!-- Speaker notes and monitors -->
   <aside class="stage">
-    <section class="speaker" aria-label={t("Desk notes")}>
-      <header>
-        <span class="kicker"><Icon name="lock" size={12} /> {t("Desk notes")}</span>
-        <span class="muted">{focusSection?.name ?? ""}</span>
-      </header>
-      {#if deskNotesDoc}
-        <div class="rich-notes"><RichView doc={deskNotesDoc} base="1em" /></div>
-      {:else}
-        <p class:empty-notes={!deskNotes}>{deskNotes || t("Notes for the section on Preview show here. They never reach Preview or Program.")}</p>
-      {/if}
-    </section>
+    {#if !preaching}
+      <section class="speaker" aria-label={t("Desk notes")}>
+        <header>
+          <span class="kicker"><Icon name="lock" size={12} /> {t("Desk notes")}</span>
+          <span class="muted">{focusSection?.name ?? ""}</span>
+        </header>
+        {#if deskNotesDoc}
+          <div class="rich-notes"><RichView doc={deskNotesDoc} base="1em" /></div>
+        {:else}
+          <p class:empty-notes={!deskNotes}>{deskNotes || t("Notes for the section on Preview show here. They never reach Preview or Program.")}</p>
+        {/if}
+      </section>
+    {/if}
     <MonitorPair page="sermon" {place} onstep={(direction) => void session.stepSermon(direction)} />
   </aside>
 </section>
@@ -599,6 +379,7 @@
     gap: var(--gap, 10px);
     padding: var(--gap, 10px) var(--panel-pad, 12px) var(--panel-pad, 12px);
   }
+  .sermon-desk.preaching { grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); }
   .sheet, .stage {
     min-height: 0;
     display: flex;
@@ -610,118 +391,109 @@
   }
   h2 { margin: 0; font-size: 16px; }
   .muted { margin: 0; color: var(--muted); font-size: 12px; }
-  input, select {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control, 8px);
-    background: var(--field);
-    color: var(--ink);
-    font: inherit;
-    min-width: 0;
-  }
-  input, select { height: 32px; padding: 0 10px; }
-  i { font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--panel); color: var(--ink); font-size: 11px; font-weight: 700; }
-  .row-tool { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 6px; background: none; color: var(--muted); }
-  .row-tool:hover:not(:disabled) { background: var(--field); color: var(--ink); }
-  .row-tool:disabled { opacity: 0.35; }
-  .armed { color: var(--live) !important; border-color: var(--live) !important; }
+  i { font-style: normal; display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--panel); color: var(--ink); font-size: 11px; font-weight: 750; }
+  .row-tool { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .row-tool:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
+  .row-tool.go-live:hover { color: var(--live, #e5484d); }
   .badge { flex: none; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-  .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live); }
+  .badge.live { background: var(--live); color: #fff; }
 
   /* Library */
-  .group { margin: 0; padding: 10px 6px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
+  .series { display: flex; gap: 4px; padding: 0 10px 8px; overflow-x: auto; scrollbar-width: none; }
+  .series button { flex: none; height: 24px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+  .series button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); }
+  .group { margin: 0; padding: 10px 6px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
   .group span { margin-left: 4px; opacity: 0.8; }
   .list { margin: 0; padding: 0 10px 14px; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .list > :global(*) { flex: none; }
   .list > .group:first-child { padding-top: 0; }
-  .row { width: 100%; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); background: none; color: var(--ink); text-align: left; font: inherit; }
-  .row strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
+  .row { width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius-control, 8px); background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+  .row strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; min-width: 0; }
+  .row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .row-series { color: var(--accent); font-weight: 650; }
   .row .snippet { font-style: italic; }
+  .row-bars { display: flex; gap: 2px; height: 4px; }
+  .row-bars i { flex: 1 1 0; width: auto; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 55%, var(--field)); }
+  .row-bars i.bible { background: color-mix(in srgb, #d4a017 70%, var(--field)); }
+  .row-bars i.image { background: color-mix(in srgb, #30a46c 70%, var(--field)); }
   .row:hover { background: var(--field); }
   .row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .empty { margin: 0; padding: 12px 6px; color: var(--muted); font-size: 12px; }
 
   /* Outline */
-  .sheet { overflow: auto; padding: 14px 16px 18px; gap: 12px; }
-  .note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 8px 8px 12px; border-radius: var(--radius-control, 8px); background: var(--field); font-size: 12px; color: var(--muted); flex: none; }
+  .sheet { overflow: auto; padding: 14px 16px 18px; gap: 14px; }
+  .sheet.wide { padding: 16px 18px; }
+  .note { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 8px 8px 12px; border-radius: var(--radius-control, 8px); background: color-mix(in srgb, var(--accent) 10%, var(--field)); font-size: 12px; color: var(--ink); flex: none; }
   .note span { flex: 1; }
-  .note button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
-  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; flex: none; }
-  .title { font-size: 20px; }
-  .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .note button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; flex: none; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%), var(--field); }
+  .hero-copy { display: grid; gap: 4px; min-width: 0; }
+  .hero-series { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); }
+  .title { font-size: clamp(20px, 2.2vw, 28px); line-height: 1.15; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .meta span { display: inline-flex; align-items: center; gap: 5px; }
+  .running { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .running i { width: 7px; height: 7px; border-radius: 50%; background: var(--live, #e5484d); animation: pulse 1.4s ease-in-out infinite; }
+  .running.near { color: #f5a524; }
+  .running.over { color: var(--live, #e5484d); }
+  @keyframes pulse { 50% { opacity: 0.35; } }
   .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .sermon-notes, .notes { display: flex; gap: 6px; align-items: flex-start; color: var(--muted); font-size: 12px; white-space: pre-wrap; }
   .sermon-notes { margin: 0; padding: 8px 10px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); flex: none; }
   .hint { margin: 0; font-size: 12px; color: var(--muted); flex: none; }
   kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }
   .outline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  .card { position: relative; display: flex; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: var(--radius-control, 8px); background: var(--field); }
-  .card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); border-left-color: var(--muted); }
+  .card { --tone: var(--accent); position: relative; display: flex; align-items: stretch; border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: 10px; background: var(--field); transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+  .card.bible { --tone: #d4a017; }
+  .card.image { --tone: #30a46c; }
+  .card:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); border-left-color: var(--tone); }
   .card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .card.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); }
-  .card-main { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 6px 18px; padding: 12px 14px; border: 0; background: none; color: var(--ink); text-align: left; font: inherit; }
-  .card-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
-  .card-head strong { font-size: 14px; }
-  .tags { margin-left: auto; display: flex; gap: 4px; }
+  .card.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live); background: color-mix(in srgb, var(--live) 7%, var(--field)); }
+  .card-main { flex: 1; min-width: 0; display: flex; gap: 14px; padding: 10px 12px; border: 0; background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+  .thumb { flex: none; align-self: flex-start; }
+  .thumb :global(.item-thumb) { width: 132px; }
+  .card-copy { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 16px; align-content: start; }
+  .card-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .card-head strong { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--panel); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .time.near { color: #f5a524; }
+  .time.over { color: #fff; background: var(--live, #e5484d); }
   .seen { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .kind { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
+  .kind { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--tone); }
   .seen-title { font-size: 14px; font-weight: 600; }
   .seen-body { font-size: 12px; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
   .notes { padding-left: 12px; border-left: 1px dashed var(--line); }
   .notes span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; }
-  .queue { position: absolute; top: 8px; right: 8px; }
-  .card .tags { margin-right: 30px; }
-  .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; color: var(--muted); text-align: center; }
-  .blank p { margin: 0; }
-
-  /* Editor */
-  .editor { display: flex; flex-direction: column; gap: 12px; }
-  .fields { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
-  .desk-only { display: flex; flex-direction: column; gap: 6px; }
-  .ai-btn :global(svg) { color: #7c3aed; }
-  .ai-error { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--live) 12%, var(--field)); color: var(--ink); font-size: 13px; }
-  .ai-card { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, #7c3aed 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #7c3aed 6%, var(--field)); }
-  .ai-card header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; }
-  .ai-card header span { display: inline-flex; align-items: center; gap: 6px; }
-  .ai-card header :global(svg) { color: #7c3aed; }
-  .ai-close { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
-  .ai-summary { margin: 0; font-size: 14px; line-height: 1.5; }
-  .ai-points { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
-  .ai-points li strong { font-weight: 650; }
-  .ai-points li em { margin-left: 8px; font-style: normal; font-size: 12px; color: var(--accent); }
-  .ai-points li span { display: block; color: var(--muted); }
-  .ai-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-  .ai-foot { margin: 0; font-size: 11px; color: var(--muted); }
-  .desk-only > span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
-  .desk-only :global(textarea) { border-style: dashed; }
-  .edit-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); }
-  .edit-card input, .edit-card select { background: var(--panel); }
-  .edit-head { display: flex; align-items: center; gap: 6px; }
-  .edit-head input { flex: 1; font-weight: 600; }
-  .two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
-  .audience-edit { display: flex; flex-direction: column; gap: 8px; }
-  .seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-  .seg button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; }
-  .seg button.on { background: var(--accent); color: var(--on-accent); }
-  .add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); background: none; color: var(--muted); font: inherit; font-weight: 600; }
-  .add:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+  .card-tools { display: flex; flex-direction: column; gap: 2px; padding: 6px 6px 6px 0; opacity: 0.55; transition: opacity 0.12s ease; }
+  .card:hover .card-tools, .card:focus-within .card-tools, .card.on .card-tools, .card.live .card-tools { opacity: 1; }
+  @media (hover: none) { .card-tools { opacity: 1; } }
+  .add-more { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px dashed var(--line); border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .add-more:hover { color: var(--ink); }
+  .blank { flex: 1; display: grid; place-items: center; align-content: center; gap: 10px; max-width: 460px; margin: 0 auto; color: var(--muted); text-align: center; }
+  .blank-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: color-mix(in srgb, var(--accent) 14%, var(--field)); color: var(--accent); }
+  .blank h2 { color: var(--ink); font-size: 20px; }
+  .blank p { margin: 0; line-height: 1.5; }
+  .blank-actions { display: flex; gap: 8px; }
 
   /* Stage */
   .stage { padding: 12px; gap: 12px; overflow: auto; }
   .speaker { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed color-mix(in srgb, var(--ink) 25%, var(--line)); border-radius: var(--radius-control, 8px); background: var(--field); flex: none; }
   .speaker header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
+  .kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--muted); }
   .speaker p { margin: 0; font-size: 16px; line-height: 1.5; white-space: pre-wrap; max-height: 220px; overflow: auto; }
   .speaker p.empty-notes { font-size: 12px; color: var(--muted); }
 
   @media (max-width: 1280px) {
     .sermon-desk { grid-template-columns: auto minmax(0, 1fr) minmax(240px, 300px); }
-    .card-main, .two { grid-template-columns: 1fr; }
+    .sermon-desk.preaching { grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); }
+    .card-copy { grid-template-columns: 1fr; }
     .notes { padding-left: 0; border-left: 0; }
+    .thumb :global(.item-thumb) { width: 104px; }
   }
-  .grip { flex: none; width: 22px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: grab; }
-  .grip:hover { color: var(--ink); background: var(--field); }
-  .edit-card.dragging { opacity: 0.4; }
-  .edit-card.drop-before { box-shadow: 0 -3px 0 var(--accent); }
-  .row-tool.del:hover { color: var(--danger, #e5484d); }
+  @media (max-width: 900px) {
+    .sermon-desk, .sermon-desk.preaching { grid-template-columns: 1fr; overflow: auto; }
+    .thumb { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .running i { animation: none; } }
 </style>

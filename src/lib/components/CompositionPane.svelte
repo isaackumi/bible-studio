@@ -821,7 +821,7 @@
               <span>{tn(look.layers.length, "{n} layer", "{n} layers")}{look.locked ? ` · ${t("locked")}` : ""}</span>
             </button>
             <button type="button" class="tool" title={t("Duplicate")} aria-label={t("Duplicate {name}", { name: look.name })} onclick={() => { const copy = duplicateLook(look); session.saveLook(copy); openSaved(copy); }}><Icon name="copy" size={14} /></button>
-            <button type="button" class="tool" title={t("Add to queue")} aria-label={t("Queue {name}", { name: look.name })} onclick={() => void session.addLookToService(look)}><Icon name="queue" size={14} /></button>
+            <button type="button" class="tool" title={t("Add to service")} aria-label={t("Add {name} to the service", { name: look.name })} onclick={() => void session.pickServicePart(look.name).then((part) => { if (part) void session.addLookToService(look, part); })}><Icon name="queue" size={14} /></button>
             <button
               type="button"
               class="tool"
@@ -885,7 +885,7 @@
               session.previewLook(copy);
             }}
           ><Icon name="copy" size={14} /></button>
-          <button type="button" class="desk-btn ghost icon" title={t("Add to queue")} aria-label={t("Queue")} onclick={() => draft && void session.addLookToService(draft)}><Icon name="queue" size={14} /></button>
+          <button type="button" class="desk-btn ghost icon" title={t("Add to service")} aria-label={t("Add to service")} onclick={() => { const look = draft; if (look) void session.pickServicePart(look.name).then((part) => { if (part) void session.addLookToService(look, part); }); }}><Icon name="queue" size={14} /></button>
         </div>
       </header>
     {:else}

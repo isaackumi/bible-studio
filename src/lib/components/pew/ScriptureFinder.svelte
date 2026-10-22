@@ -541,7 +541,7 @@
           <div class="go">
             <button type="button" class="btn" onclick={() => choose(selected, false)}>{t("Preview")} <kbd>Enter</kbd></button>
             <button type="button" class="btn live" onclick={() => choose(selected, true)}>{t("Show now")} <kbd>⇧ Enter</kbd></button>
-            <AddToService className="btn ghost" onadd={(sectionId) => selectedItem && session.addPassageToService(selectedItem, sectionId)} />
+            <AddToService className="btn ghost" item={selectedItem?.reference ?? ""} onadd={(sectionId) => selectedItem && session.addPassageToService(selectedItem, sectionId)} />
           </div>
         {:else if selected?.kind === "book"}
           <p class="ref">{selected.name}</p>

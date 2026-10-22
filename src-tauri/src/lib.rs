@@ -458,6 +458,12 @@ fn screen_capture_allowed(ask: bool) -> bool {
     broadcast::screen_capture_allowed(ask)
 }
 
+/// Whether NDI output is in this install (it is not in every build yet).
+#[tauri::command]
+fn ndi_available() -> bool {
+    ndi::available()
+}
+
 #[tauri::command]
 fn stop_ndi() {
     ndi::stop(ndi::Output::Program);
@@ -830,6 +836,7 @@ pub fn run() {
             stop_sermon_listen,
             start_noise_test,
             start_ndi,
+            ndi_available,
             stop_ndi,
             vmix_get,
             start_broadcast,

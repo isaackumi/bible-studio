@@ -53,10 +53,25 @@
     session.dismissHeardVerse(passage.reference);
   }
 
-  function addToService() {
+  // Add asks which part first (the window says when the verse is already in the service). Once
+  // added, the same button takes it out again.
+  /** The item added from here, while that verse is still on Preview. */
+  let added = $state<{ reference: string; itemId: string } | null>(null);
+  const justAdded = $derived(added !== null && added.reference === session.previewBible?.reference && !!session.service?.sections.some((section) => section.items.some((item) => item.id === added!.itemId)));
+
+  async function addToService() {
     const passage = session.previewBible;
     if (!passage) return;
-    session.addPassageToService({ ...passage }, session.cursor.sectionId ?? undefined);
+    const part = await session.pickServicePart(passage.reference);
+    if (!part) return;
+    const itemId = await session.addPassageToService({ ...passage }, part);
+    added = { reference: passage.reference, itemId };
+  }
+
+  function removeAdded() {
+    if (!added) return;
+    session.deleteItem(added.itemId);
+    added = null;
   }
 
   // "/" finds a verse from anywhere on the Service page.
@@ -84,7 +99,11 @@
     <div class="free-bar" role="status">
       <span class="free-copy"><strong>{session.previewBible?.reference}</strong><em>{t("On Preview, not in the service")}</em></span>
       <button type="button" class="act live" onclick={() => void session.take()} title={t("Send it to the screen (Space)")}>{t("LIVE")}</button>
-      <button type="button" class="act" onclick={addToService} title={t("Add it to the running order, in the part selected")}><Icon name="plus" size={12} /> {t("Add")}</button>
+      {#if justAdded}
+        <button type="button" class="act" onclick={removeAdded} title={t("Take it out of the running order again")}><Icon name="check" size={12} /> {t("Added")} · {t("Remove")}</button>
+      {:else}
+        <button type="button" class="act" onclick={() => void addToService()} title={t("Add it to the running order: choose the part")}><Icon name="plus" size={12} /> {t("Add")}</button>
+      {/if}
       <button type="button" class="act" onclick={() => void session.backToService()} title={t("The selected item of the service back on Preview")}><Icon name="list" size={12} /> {t("Back to the service")}</button>
     </div>
   {/if}

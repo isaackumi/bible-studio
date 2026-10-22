@@ -7,6 +7,9 @@
   import VoiceWords from "./VoiceWords.svelte";
   import ScreensSettings from "./ScreensSettings.svelte";
   import StorageSpace from "./StorageSpace.svelte";
+  import SettingsSearch from "./SettingsSearch.svelte";
+  import type { SettingEntry } from "../../settings/search";
+  import { tick } from "svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -31,7 +34,7 @@
   import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
-  import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
+  import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, maskedLicense, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import { AI_DEFAULTS } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
@@ -172,7 +175,65 @@
   /** Older links: these pages were folded into others. */
   const ALIASES: Partial<Record<string, SettingsSectionId>> = { license: "account", performance: "appearance" };
 
-  let search = $state("");
+  /** The search over everything in Settings, and the letters typed to open it. */
+  let searchOpen = $state(false);
+  let searchStart = $state("");
+  let settingsBody = $state<HTMLDivElement | undefined>();
+
+  function openSearch(start = "") {
+    searchStart = start;
+    searchOpen = true;
+  }
+
+  /** A search result: open its page, then scroll to the row and light it up for a moment. */
+  async function pickSetting(entry: SettingEntry) {
+    searchOpen = false;
+    section = entry.section as SettingsSectionId;
+    await tick();
+    if (entry.kind === "page") {
+      settingsBody?.scrollTo({ top: 0 });
+      return;
+    }
+    const want = t(entry.title).trim();
+    // Some pages fill in a moment later (lists, devices): look again for up to a second.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const target = findSetting(want);
+      if (target) {
+        const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        target.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+        target.classList.remove("found-setting");
+        void target.offsetWidth;
+        target.classList.add("found-setting");
+        window.setTimeout(() => target.classList.remove("found-setting"), 2400);
+        return;
+      }
+      await new Promise((done) => window.setTimeout(done, 50));
+    }
+  }
+
+  /** The row, card or section label on the open page whose name is `want`. */
+  function findSetting(want: string): HTMLElement | null {
+    const names = settingsBody?.querySelectorAll<HTMLElement>("strong, h3, .section-label, .keys li > span") ?? [];
+    for (const name of names) {
+      const text = (name.textContent ?? "").trim();
+      if (text !== want && !text.startsWith(`${want} `)) continue;
+      if (name.classList.contains("section-label")) return name;
+      return name.closest<HTMLElement>(".row, .keys li, .card, section") ?? name;
+    }
+    return null;
+  }
+
+  function closeSearch() {
+    searchOpen = false;
+    void tick().then(() => document.querySelector<HTMLElement>(".settings .nav-search")?.focus());
+  }
+
+  function onSettingsKey(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.code === "KeyF" && !searchOpen && !capturing) {
+      event.preventDefault();
+      openSearch();
+    }
+  }
   let billing = $state<"monthly" | "yearly">("yearly");
 
   let stageText = $state("");
@@ -342,6 +403,8 @@
     void session.setOnlineBibles(apiKey || session.workspace.onlineBibles.key, next);
   }
   let code = $state("");
+  /** Typing a new key over the one applied. */
+  let replacingKey = $state(false);
   let codeError = $state("");
   let codeBusy = $state(false);
   let trialBusy = $state(false);
@@ -349,24 +412,15 @@
   let signInError = $state("");
   let accountBusy = $state(false);
   const visibleGroups = $derived.by(() => {
-    const needle = search.trim().toLowerCase();
     return groups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter(
-          (item) =>
-            (item.id !== "remote" || canUse("remote-control")) &&
-            (!needle || `${item.title} ${item.about} ${t(item.title)} ${t(item.about)} ${item.keywords} ${group.label}`.toLowerCase().includes(needle)),
-        ),
-      }))
-      .filter((group) => group.items.length > 0)
-      // Plan & account lives on the profile card, but searching "license" or "trial" must find it.
-      .concat(
-        needle && `${ACCOUNT.title} ${ACCOUNT.about} ${t(ACCOUNT.title)} ${t(ACCOUNT.about)} ${ACCOUNT.keywords}`.toLowerCase().includes(needle)
-          ? [{ label: msg("Account"), items: [ACCOUNT] }]
-          : [],
-      );
+      .map((group) => ({ ...group, items: group.items.filter((item) => item.id !== "remote" || canUse("remote-control")) }))
+      .filter((group) => group.items.length > 0);
   });
+  /** Every page the search can open; Plan & account lives on the profile card, but "license" or "trial" must find it. */
+  const searchPages = $derived([
+    ...visibleGroups.flatMap((group) => group.items.map((item) => ({ ...item, group: group.label }))),
+    { ...ACCOUNT, group: msg("Account") },
+  ]);
 
   const sections: SettingsEntry[] = [...groups.flatMap((group) => group.items), ACCOUNT];
   const themes: { id: OperatorTheme; name: string; note: string; ground: string; ink: string }[] = [
@@ -396,6 +450,7 @@
   let newProfile = $state("");
   let churchName = $state("");
   let logoText = $state("");
+  let logoInput = $state<HTMLInputElement | undefined>();
   let fileInput = $state<HTMLInputElement | null>(null);
   let fileMessage = $state("");
   const IMPORT_ACCEPT = ".json,.txt,.md,.markdown,.text,.pdf,application/json,text/plain,text/markdown,application/pdf";
@@ -525,11 +580,16 @@
   function setMode(mode: OutputMode) {
     if (profile.outputMode !== mode) void session.setOutputMode(mode);
   }
+  $effect(() => {
+    void session.checkNdiAvailable();
+  });
 </script>
+
+<svelte:window onkeydown={onSettingsKey} />
 
 <div class="settings-layer">
   <button type="button" class="settings-backdrop" aria-label={t("Close settings")} onclick={close}></button>
-  <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-label={t("Settings")} use:modalFocus={'input[type="search"]'}>
+  <div class="settings" role="dialog" tabindex="-1" aria-modal="true" aria-label={t("Settings")} use:modalFocus={".nav-search"}>
     <nav class="settings-nav" aria-label={t("Settings")}>
       <button type="button" class="account-card" class:active={section === "account"} onclick={() => (section = "account")}>
         {#if session.workspace.profile}
@@ -546,10 +606,24 @@
         </span>
         <Icon name="chevron-right" size={14} />
       </button>
-      <label class="nav-search">
+      <!-- Opens the search over everything in Settings; typing here starts it with those letters. -->
+      <button
+        type="button"
+        class="nav-search"
+        aria-haspopup="dialog"
+        aria-keyshortcuts="Meta+F Control+F"
+        onclick={() => openSearch()}
+        onkeydown={(event) => {
+          if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey && event.key !== " ") {
+            event.preventDefault();
+            openSearch(event.key);
+          }
+        }}
+      >
         <Icon name="search" size={14} />
-        <input type="search" placeholder={t("Search settings")} aria-label={t("Search settings")} bind:value={search} />
-      </label>
+        <span class="nav-search-text">{t("Search settings")}</span>
+        <kbd>⌘F</kbd>
+      </button>
       <div class="nav-list">
         {#each visibleGroups as group (group.label)}
           <p class="nav-group">{t(group.label)}</p>
@@ -559,13 +633,11 @@
               <span class="nav-title">{t(item.title)}</span>
             </button>
           {/each}
-        {:else}
-          <p class="nav-empty">{t("No settings match “{search}”.", { search })}</p>
         {/each}
       </div>
     </nav>
 
-    <div class="settings-body">
+    <div class="settings-body" bind:this={settingsBody}>
       <header class="set-head">
         <span class="tile big" style:background={page?.color}><Icon name={page?.icon ?? "settings"} size={22} /></span>
         <div class="head-copy">
@@ -582,8 +654,27 @@
             <input class="field" aria-label={t("Church name")} placeholder={t("Grace Chapel")} bind:value={churchName} onchange={() => session.setChurchName(churchName)} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>{t("Logo text")}</strong><span>{t("The Logo button sends this to Program. Pick the picture in Media.")}</span></div>
+            <div class="row-copy"><strong>{t("Logo text")}</strong><span>{t("The words on the logo screen when the church name is empty.")}</span></div>
             <input class="field" aria-label={t("Logo text")} bind:value={logoText} onchange={() => session.setLogoText(logoText)} />
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Logo picture")}</strong><span>{session.workspace.logoAssetId ? t("Your own picture fills the logo screen.") : session.workspace.logoPicture === "none" ? t("No picture: the Logo button shows the words alone.") : t("The Church Studio mark with the church name under it, until you choose your church's own picture.")}</span></div>
+            <div class="row-end">
+              <span class="logo-still" aria-hidden="true">{#if session.logoImage()}<img src={session.logoImage()} alt="" />{:else}<b>Aa</b>{/if}</span>
+              <select class="field" aria-label={t("Logo picture")} value={session.workspace.logoAssetId ?? session.workspace.logoPicture ?? "default"} onchange={(event) => session.setLogoPicture(event.currentTarget.value)}>
+                <option value="default">{t("Church Studio logo")}</option>
+                {#each session.media.filter((asset) => asset.kind === "image") as asset (asset.id)}<option value={asset.id}>{asset.name}</option>{/each}
+                <option value="none">{t("No picture (words only)")}</option>
+              </select>
+              <button type="button" class="btn" onclick={() => logoInput?.click()}>{t("Import picture")}</button>
+              <input bind:this={logoInput} class="logo-file" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" hidden onchange={async (event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (!file) return;
+                const asset = await session.importImage(file);
+                if (asset) session.setLogo(asset.id);
+              }} />
+            </div>
           </div>
         </section>
         <p class="section-label">{t("Copyright")}</p>
@@ -784,7 +875,14 @@
           {/if}
         </section>
         <p class="section-label">{t("Network video (NDI®)")}</p>
-        <section class="rows">
+        {@const ndiSoon = session.ndiAvailable === false && isDesktop()}
+        <section class="rows" class:soon={ndiSoon}>
+          {#if ndiSoon}
+            <div class="row">
+              <div class="row-copy"><strong>{t("NDI output")}</strong><span>{t("Send what the audience sees to OBS, vMix or any NDI app over the network. It is on its way in an update.")}</span></div>
+              <span class="pill muted">{t("Coming soon")}</span>
+            </div>
+          {/if}
           <div class="row">
             <div class="row-copy">
               <strong>{t("Send Program over NDI")}</strong>
@@ -802,7 +900,7 @@
               class="switch"
               role="switch"
               aria-label={t("Send Program over NDI")}
-              disabled={!isDesktop()}
+              disabled={!isDesktop() || ndiSoon}
               checked={session.ndi.status === "on" || session.ndi.status === "starting"}
               onchange={(event) => (event.currentTarget.checked ? void session.startNdi() : void session.stopNdi())}
             />
@@ -812,11 +910,11 @@
               <strong>{t("Send sound with the picture")}</strong>
               <span>{session.ndi.status === "on" && session.workspace.ndiAudio ? (session.ndi.audio ? t("On: videos and music on Program go out over NDI.") : t("This NDI or macOS version cannot send sound; the picture still goes out.")) : t("Videos and music on Program go out with the picture, so the sound desk or the stream gets them over the network too. Needs macOS 13 or later.")}</span>
             </div>
-            <input type="checkbox" class="switch" role="switch" aria-label={t("Send sound with the picture")} disabled={!isDesktop()} checked={session.workspace.ndiAudio} onchange={(event) => void session.setNdiAudio(event.currentTarget.checked)} />
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Send sound with the picture")} disabled={!isDesktop() || ndiSoon} checked={session.workspace.ndiAudio} onchange={(event) => void session.setNdiAudio(event.currentTarget.checked)} />
           </div>
           <div class="row">
             <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends colour bars, and a beep each second when sound is on, under the same name, so you can add the source in vMix, OBS or any NDI app and check the sound before the service.")}</span></div>
-            <button type="button" class="btn" disabled={!isDesktop() || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
+            <button type="button" class="btn" disabled={!isDesktop() || ndiSoon || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
               {session.ndi.status === "on" && session.ndi.pattern ? t("Stop test") : t("Send test pattern")}
             </button>
           </div>
@@ -836,13 +934,15 @@
               class="switch"
               role="switch"
               aria-label={t("Send the words for keying")}
-              disabled={!isDesktop()}
+              disabled={!isDesktop() || ndiSoon}
               checked={session.ndiKey.status === "on" || session.ndiKey.status === "starting"}
               onchange={(event) => (event.currentTarget.checked ? void session.startNdiKey() : void session.stopNdiKey())}
             />
           </div>
         </section>
+        {#if !ndiSoon}
         <p class="note stand">{t("NDI needs the free NDI Tools or NDI Runtime on this computer:")} <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. {t("The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
+        {/if}
         <p class="section-label">{t("Second screen")}</p>
         {@const second = session.workspace.secondOutput}
         <section class="rows">
@@ -1616,6 +1716,19 @@
 
         <p class="section-label">{t("License key")}</p>
         <section class="rows">
+          {#if ent.source === "license" && ent.license && !replacingKey}
+            <!-- The key is applied: show that it is, never the key itself (anyone at the desk could copy it). -->
+            <div class="row">
+              <div class="row-copy">
+                <strong><Icon name="check" size={13} /> {t("License key applied")}</strong>
+                <span>{ent.holder ? t("Licensed to {holder}.", { holder: ent.holder }) : t("This computer runs on it.")} {t("The key is hidden so no one at the desk can copy it.")}</span>
+              </div>
+              <div class="row-end">
+                <code class="key-mask" aria-label={t("License key, hidden")}>{maskedLicense(ent.license)}</code>
+                <button type="button" class="btn" onclick={() => { replacingKey = true; code = ""; codeError = ""; }}>{t("Replace key")}</button>
+              </div>
+            </div>
+          {:else}
           <form
             class="row"
             onsubmit={async (event) => {
@@ -1623,15 +1736,20 @@
               codeBusy = true;
               codeError = (await session.redeemCode(code)) ?? "";
               codeBusy = false;
-              if (!codeError) code = "";
+              if (!codeError) {
+                code = "";
+                replacingKey = false;
+              }
             }}
           >
-            <div class="row-copy"><strong>{t("Add a license key")}</strong><span class:form-error={!!codeError}>{codeError || t("Paste the key from your purchase email (it starts with CS1). The first time needs the internet; after that it works offline.")}</span></div>
+            <div class="row-copy"><strong>{replacingKey ? t("Replace the license key") : t("Add a license key")}</strong><span class:form-error={!!codeError}>{codeError || t("Paste the key from your purchase email (it starts with CS1). The first time needs the internet; after that it works offline.")}</span></div>
             <div class="row-end">
-              <input class="field license-field" aria-label={t("License key")} placeholder={t("CS1-…")} autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
+              <input class="field license-field" type="password" aria-label={t("License key")} placeholder={t("CS1-…")} autocapitalize="characters" autocomplete="off" spellcheck="false" bind:value={code} />
+              {#if replacingKey}<button type="button" class="btn" onclick={() => { replacingKey = false; code = ""; codeError = ""; }}>{t("Cancel")}</button>{/if}
               <button type="submit" class="btn primary" disabled={!code.trim() || codeBusy}>{codeBusy ? t("Checking…") : t("Add key")}</button>
             </div>
           </form>
+          {/if}
         </section>
 
         <p class="section-label">{t("Privacy")}</p>
@@ -1655,6 +1773,9 @@
       {/if}
     </div>
   </div>
+  {#if searchOpen}
+    <SettingsSearch pages={searchPages} initial={searchStart} onpick={(entry) => void pickSetting(entry)} onclose={closeSearch} />
+  {/if}
 </div>
 
 <style>
@@ -1729,9 +1850,19 @@
     color: var(--muted);
     flex-direction: row;
   }
-  .nav-search:focus-within { border-color: var(--accent); color: var(--ink); }
-  .nav-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
-  .nav-search input::-webkit-search-cancel-button { display: none; }
+  .nav-search { width: 100%; font: inherit; text-align: left; cursor: text; transition: border-color 120ms, color 120ms; }
+  .nav-search:hover, .nav-search:focus-visible { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); color: var(--ink); outline: none; }
+  .nav-search-text { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-search kbd { flex: none; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 10px; font-weight: 700; color: var(--muted); }
+  /* A setting found by the search: a soft ring that fades. */
+  .settings-body :global(.found-setting) { border-radius: 10px; animation: found-setting 2.4s ease-out; }
+  @keyframes found-setting {
+    0%, 30% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent); background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+    100% { box-shadow: 0 0 0 2px transparent, 0 0 0 6px transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .settings-body :global(.found-setting) { animation: none; box-shadow: 0 0 0 2px var(--accent); }
+  }
   .nav-list {
     flex: 1;
     min-height: 0;
@@ -1782,7 +1913,6 @@
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25);
   }
   .tile.big { width: 42px; height: 42px; border-radius: 11px; }
-  .nav-empty { margin: 12px 10px; font-size: 12px; color: var(--muted); }
 
   /* Page */
   .settings-body { min-width: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 36px 44px; }
@@ -1843,6 +1973,7 @@
   .settings-body :global(.row .field.grow) { width: auto; flex: 1; }
   .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
   .settings-body :global(.pill.ok) { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
+  .rows.soon .row:not(:first-child) { opacity: 0.5; }
   .settings-body :global(.pill.muted) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
 
   /* Toggle switch: <input type="checkbox" class="switch" role="switch"> */
@@ -1906,7 +2037,11 @@
   .contrast-row > span { flex: 1; min-width: 0; }
   .contrast-row h3 { margin: 0 0 4px; }
   .contrast-note { display: block; max-width: 60ch; font-size: 13px; font-weight: 400; color: var(--muted); line-height: 1.45; }
+  .logo-still { flex: none; display: grid; place-items: center; width: 56px; height: 32px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: #000; color: #fff; font-size: 12px; overflow: hidden; box-sizing: border-box; }
+  .logo-still img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .logo-file { display: none !important; }
   .license-field { width: 280px; letter-spacing: 0.02em; }
+  .key-mask { padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); font-size: 12px; letter-spacing: 0.08em; color: var(--muted); user-select: none; }
 
   /* Plans */
   .plan-hero { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid color-mix(in srgb, var(--plan) 50%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--plan) 18%, var(--field)), var(--field) 70%); flex: none; }

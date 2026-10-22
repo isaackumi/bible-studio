@@ -993,7 +993,7 @@
         </div>
         <div class="row-actions">
           <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => { if (!selected.sections[0]) return; previewOnly = true; show(selected, selected.sections[0].id); }}><Icon name="play" size={14} /> {t("Start")}</button>
-          <AddToService onadd={(sectionId) => session.addSongToService(selected, sectionId)} />
+          <AddToService item={selected.title} onadd={(sectionId) => session.addSongToService(selected, sectionId)} />
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
           <ToolMenu label={t("More for this song")} tip={t("Folder, save as a file, delete")}>
             {#snippet trigger()}<Icon name="more" size={16} />{/snippet}

@@ -78,7 +78,7 @@
         <button type="button" onclick={() => draft && (draft = moveSongSection(draft, section.id, 1))}>{t("Down")}</button>
         <button type="button" onclick={() => draft && (draft = removeSongSection(draft, section.id))}>{t("Remove")}</button>
         <button type="button" onclick={() => draft && session.previewSongSection(draft, section.id)}>{t("Preview")}</button>
-        <button type="button" onclick={() => draft && session.addLyric(draft.id, section.id, `${draft.title} — ${section.label}`)}>{t("Add")}</button>
+        <button type="button" onclick={() => { const song = draft; if (song) void session.pickServicePart(`${song.title} — ${section.label}`).then((part) => { if (part) void session.addLyric(song.id, section.id, `${song.title} — ${section.label}`, part); }); }}>{t("Add")}</button>
       </div>
     {/each}
     {#if session.message}<p class="hint">{session.message}</p>{/if}

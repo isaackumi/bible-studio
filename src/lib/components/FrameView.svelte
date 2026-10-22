@@ -1,5 +1,6 @@
 <script lang="ts">
   import RichView from "./RichView.svelte";
+  import { DEFAULT_LOGO_INK_URL, DEFAULT_LOGO_URL, darkText } from "../brand/logo";
   import InlineRich from "./InlineRich.svelte";
   import { cameraFeedForLayer, type CameraFeeds } from "../domain/camera";
   import { backdropCss, displayWash, frameBackground } from "../domain/backgrounds";
@@ -329,6 +330,12 @@
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}
     <img class="cover" src={model.imageUrl} alt="" />
+  {:else if model.layout === "logo" && model.imageUrl === DEFAULT_LOGO_URL}
+    <!-- The Church Studio mark stands in for a church's own logo, so the church's name goes under it. -->
+    <div class="logo-lockup" style:color={model.theme.color} style:font-family={model.theme.fontFamily}>
+      <img src={darkText(model.theme.color) ? DEFAULT_LOGO_INK_URL : model.imageUrl} alt="" />
+      {#if model.lines[0]?.text}<p>{model.lines[0].text}</p>{/if}
+    </div>
   {:else if model.layout === "logo" && model.imageUrl}
     <img class="logo" src={model.imageUrl} alt="" />
   {:else if model.layout !== "empty" && model.layout !== "black" && !(stream && (playing || audio))}

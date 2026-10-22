@@ -32,6 +32,12 @@ const LONGEST: usize = RATE * 12;
 const PAUSE: usize = RATE * 7 / 10;
 /// Loudness (RMS, 0..1) below which audio counts as quiet.
 const QUIET: f32 = 0.006;
+/// Loudness is judged in frames this long (20 ms).
+const FRAME: usize = RATE / 50;
+/// Speech must stand this many times above the room's own hum (fans, air conditioning).
+const OVER_ROOM: f32 = 3.0;
+/// At least this much speech (0.3 s) before Whisper is asked: given only room noise it makes words up.
+const MIN_SPEECH: usize = 15;
 
 const BOOKS: &str = "Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Joshua, Judges, Ruth, 1 Samuel, 2 Samuel, 1 Kings, 2 Kings, 1 Chronicles, 2 Chronicles, Ezra, Nehemiah, Esther, Job, Psalms, Proverbs, Ecclesiastes, Song of Solomon, Isaiah, Jeremiah, Lamentations, Ezekiel, Daniel, Hosea, Joel, Amos, Obadiah, Jonah, Micah, Nahum, Habakkuk, Zephaniah, Haggai, Zechariah, Malachi, Matthew, Mark, Luke, John, Acts, Romans, 1 Corinthians, 2 Corinthians, Galatians, Ephesians, Philippians, Colossians, 1 Thessalonians, 2 Thessalonians, 1 Timothy, 2 Timothy, Titus, Philemon, Hebrews, James, 1 Peter, 2 Peter, 1 John, 2 John, 3 John, Jude, Revelation";
 
@@ -235,13 +241,47 @@ fn loudness(samples: &[f32]) -> f32 {
     (samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32).sqrt()
 }
 
+/// The loudness of each 20 ms frame.
+fn frame_levels(samples: &[f32]) -> Vec<f32> {
+    samples.chunks(FRAME).map(loudness).collect()
+}
+
+/// The loudness above which a frame is speech: well over the room's quietest moments, never below QUIET.
+fn speech_level(levels: &[f32]) -> f32 {
+    let mut sorted = levels.to_vec();
+    sorted.sort_by(f32::total_cmp);
+    let room = sorted.get(sorted.len() / 10).copied().unwrap_or(0.0);
+    (room * OVER_ROOM).max(QUIET)
+}
+
+/// Someone spoke in `samples`, not just the room humming.
+fn has_speech(samples: &[f32]) -> bool {
+    let levels = frame_levels(samples);
+    let level = speech_level(&levels);
+    levels.iter().filter(|&&frame| frame > level).count() >= MIN_SPEECH
+}
+
+/// The last `PAUSE` of `samples` is quiet against the room's own hum: the phrase has ended.
+fn speech_ended(samples: &[f32]) -> bool {
+    let levels = frame_levels(samples);
+    let level = speech_level(&levels);
+    levels[levels.len().saturating_sub(PAUSE / FRAME)..].iter().all(|&frame| frame <= level)
+}
+
+/// Whisper given noise can read its own prompt back ("Bible reading. Genesis, Exodus, Leviticus…").
+fn echoes_prompt(text: &str, prompt: &str) -> bool {
+    let words = |line: &str| line.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|word| !word.is_empty()).map(String::from).collect::<Vec<_>>();
+    let (said, given) = (words(text), words(prompt));
+    said.len() >= 5 && given.windows(said.len()).any(|run| run == said.as_slice())
+}
+
 /// What Whisper writes for silence, music or noise, never a phrase to show.
 fn is_noise(text: &str) -> bool {
     let plain = text.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
     plain.is_empty()
         || text.trim().starts_with('[')
         || text.trim().starts_with('(')
-        || ["thank you", "thanks for watching", "you", "bye", "thank you for watching"].contains(&plain.as_str())
+        || ["thank you", "thanks for watching", "you", "bye", "thank you for watching", "thank you so much for watching", "please subscribe", "see you next time"].contains(&plain.as_str())
 }
 
 /// The words in `samples` (16 kHz mono), or None when Whisper failed. Shared by listening and tests.
@@ -296,8 +336,9 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
         std::thread::sleep(STEP);
         let window: Vec<f32> = {
             let mut buffer = audio.lock().unwrap_or_else(|poison| poison.into_inner());
-            // Long quiet before anything was said: drop it, keeping a moment for the first word.
-            if buffer.len() > RATE * 2 && loudness(&buffer) < QUIET {
+            // Long quiet (or only the room humming) before anything was said: drop it, keeping a
+            // moment for the first word.
+            if buffer.len() > RATE * 2 && !has_speech(&buffer) {
                 let keep = buffer.len() - RATE / 4;
                 buffer.drain(..keep);
                 decoded_len = 0;
@@ -307,13 +348,16 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
         if window.len() < RATE || window.len() - decoded_len.min(window.len()) < RATE / 2 {
             continue;
         }
-        let paused = window.len() > PAUSE + RATE && loudness(&window[window.len() - PAUSE..]) < QUIET;
         let full = window.len() >= LONGEST;
         let take = &window[window.len().saturating_sub(LONGEST)..];
+        if !has_speech(take) {
+            continue;
+        }
+        let paused = window.len() > PAUSE + RATE && speech_ended(take);
         let Some(text) = transcribe(&mut state, take, &prompt, threads) else { continue };
         decoded_len = window.len();
         let final_phrase = paused || full;
-        if !is_noise(&text) && (final_phrase || text != last_text) {
+        if !is_noise(&text) && !echoes_prompt(&text, &prompt) && (final_phrase || text != last_text) {
             emit(&app, run, serde_json::json!({ "kind": "phrase", "text": text, "final": final_phrase, "alternatives": [] }));
             last_text = text;
         }
@@ -332,6 +376,71 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// A steady hum at `level` (RMS), like a fan or air conditioning.
+    fn hum(seconds: f32, level: f32) -> Vec<f32> {
+        (0..(RATE as f32 * seconds) as usize).map(|i| level * std::f32::consts::SQRT_2 * (i as f32 * 0.07).sin()).collect()
+    }
+
+    /// Syllables: loud bursts of 150 ms with short gaps, over the hum.
+    fn speech(seconds: f32, room: f32) -> Vec<f32> {
+        let mut samples = hum(seconds, room);
+        for (i, sample) in samples.iter_mut().enumerate() {
+            if (i / (RATE * 15 / 100)) % 2 == 0 {
+                *sample += 0.1 * (i as f32 * 0.3).sin();
+            }
+        }
+        samples
+    }
+
+    #[test]
+    fn a_humming_room_is_not_speech() {
+        assert!(!has_speech(&hum(3.0, 0.0)));
+        // Louder than the old fixed limit (0.006), still only the room.
+        assert!(!has_speech(&hum(3.0, 0.015)));
+        assert!(!has_speech(&hum(3.0, 0.04)));
+    }
+
+    #[test]
+    fn speech_over_the_hum_is_heard() {
+        assert!(has_speech(&speech(1.5, 0.0)));
+        assert!(has_speech(&speech(1.5, 0.015)));
+        let mut words = hum(2.0, 0.015);
+        words.extend(speech(1.0, 0.015));
+        assert!(has_speech(&words));
+    }
+
+    #[test]
+    fn a_cough_is_not_speech() {
+        let mut samples = hum(2.0, 0.01);
+        for sample in &mut samples[RATE..RATE + RATE / 10] {
+            *sample += 0.2;
+        }
+        assert!(!has_speech(&samples));
+    }
+
+    #[test]
+    fn a_phrase_ends_when_only_the_room_is_left() {
+        let mut samples = speech(2.0, 0.015);
+        assert!(!speech_ended(&samples));
+        samples.extend(hum(1.0, 0.015));
+        assert!(speech_ended(&samples));
+    }
+
+    #[test]
+    fn the_prompt_read_back_is_dropped() {
+        let prompt = prompt_for("Pastor Mensah\nHosanna");
+        assert!(echoes_prompt("Genesis, Exodus, Leviticus, Numbers, Deuteronomy.", &prompt));
+        assert!(echoes_prompt("Bible reading. Genesis, Exodus, Leviticus.", &prompt));
+        assert!(echoes_prompt("Chapter 3, verse 16. John 3:16.", &prompt));
+        // What a preacher really says stays.
+        assert!(!echoes_prompt("John 3:16", &prompt));
+        assert!(!echoes_prompt("Chapter 3 verse 16", &prompt));
+        assert!(!echoes_prompt("Turn with me to Genesis chapter 1", &prompt));
+        assert!(!echoes_prompt("Romans 8, verse 28 and 29", &prompt));
+    }
+
     /// Decode spoken WAV files (16 kHz mono 16-bit) with the real model. Run by hand:
     /// WHISPER_MODEL=path/model.bin WHISPER_WAVS=a.wav,b.wav cargo test whisper -- --ignored --nocapture
     #[test]

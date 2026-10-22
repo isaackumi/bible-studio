@@ -119,3 +119,12 @@ describe("a readable name from an email", () => {
     expect(sanitizeProfile({ name: "isaac.k.kumi29", email: "isaac.k.kumi29@gmail.com" })?.name).toBe("Isaac K Kumi");
   });
 });
+
+describe("license key on screen", () => {
+  it("shows only the start and the last four", async () => {
+    const { maskedLicense } = await import("./plans");
+    expect(maskedLicense("CS1-ABCD-EFGH-7F2Q")).toBe("CS1-••••7F2Q");
+    expect(maskedLicense("short")).toBe("••••");
+    expect(maskedLicense("CS1-ABCD-EFGH-7F2Q")).not.toContain("ABCD");
+  });
+});

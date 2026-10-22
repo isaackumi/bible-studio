@@ -151,6 +151,14 @@ export type Entitlement = {
   trialUsed: boolean;
 };
 
+/** A license key as the screen may show it: its start and last four, never enough to use it ("CS1-••••7F2Q"). */
+export function maskedLicense(key: string): string {
+  const clean = key.trim();
+  if (clean.length <= 8) return "••••";
+  const prefix = /^[A-Za-z0-9]{2,4}-/.exec(clean)?.[0] ?? "";
+  return `${prefix}••••${clean.slice(-4)}`;
+}
+
 export function freeEntitlement(): Entitlement {
   return { plan: "free", source: "free", expiresAt: null, code: null, license: null, holder: null, trialEndsAt: null, trialUsed: false };
 }

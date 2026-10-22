@@ -12,6 +12,7 @@
   import { onMount, untrack } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { session } from "../app/session.svelte";
+  import { trackProgram } from "../app/sermon-clock.svelte";
   import { uiLanguage } from "../i18n/i18n.svelte";
   import { outputShape } from "../display/output-shape.svelte";
   import { AUDIENCE_ASPECT_KEY, aspectFor, sanitizeScreenShape } from "../display/shape";
@@ -19,6 +20,7 @@
   import { t } from "../i18n/core";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
   import FindOverlay from "./FindOverlay.svelte";
+  import PartPickerDialog from "./pew/PartPickerDialog.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
   import PewDesk from "./pew/PewDesk.svelte";
   import SettingsDialog from "./settings/SettingsDialog.svelte";
@@ -157,6 +159,13 @@
     });
     return 0.2126 * r! + 0.7152 * g! + 0.0722 * b! > 0.45 ? "#111" : "#fff";
   }
+
+  // The sermon clock follows Program on every page, so it is right whenever the Sermon page opens.
+  // A black screen mid-sermon keeps it counting: the preacher is still preaching.
+  $effect(() => {
+    const program = session.live.program;
+    if (program.model.layout !== "black") trackProgram(program.sourceId ?? "");
+  });
 </script>
 
 <svelte:window onkeydown={onKeyDown} />
@@ -175,6 +184,7 @@
     {/if}
     <RemoteApproval />
     <Paywall />
+    <PartPickerDialog />
     <Toast />
     {#if !isDesktop() && !import.meta.env.DEV}
       <!-- The browser version is a demo: Premium and the trial are in the installed app. -->

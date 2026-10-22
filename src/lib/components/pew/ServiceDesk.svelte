@@ -700,7 +700,7 @@
                       </button>
                     {/if}
                     <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
-                    <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Delete")} onclick={() => session.deleteItem(item.id)}><Icon name="trash" size={14} /></button>
+                    <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Remove from the service (Undo comes up)")} onclick={() => session.deleteItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>
                 </li>
               {/each}
@@ -949,6 +949,8 @@
   .items :global(.item-thumb) { width: 68px; }
   /* Edit and delete show on the row in hand (hovered, selected or live), not on every row. */
   .item .row-tool { opacity: 0; transition: opacity 0.12s ease; }
+  /* Remove stays findable on every row, just quieter until the row is in hand. */
+  .item .row-tool.del { opacity: 0.4; }
   .item:hover .row-tool, .item:focus-within .row-tool, .item.on .row-tool, .item.live .row-tool { opacity: 1; }
   @media (hover: none) { .item .row-tool { opacity: 1; } }
   .item { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; }

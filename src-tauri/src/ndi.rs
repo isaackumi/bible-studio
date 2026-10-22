@@ -46,6 +46,18 @@ mod running {
     }
 }
 
+/// Whether this install has the NDI sender (macOS builds that bundle it).
+pub fn available() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-ndi").exists())).unwrap_or(false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 /// Start sending. `pattern` sends colour bars instead of Program (to find the source first).
 /// `audio` sends the audience window's sound too (with the pattern, a beep each second).
 /// The key output draws the words it is given (`key_words`) on a transparent picture.
@@ -58,7 +70,7 @@ pub fn start(app: tauri::AppHandle, output: Output, name: &str, fps: u32, patter
             .ok()
             .and_then(|exe| exe.parent().map(|dir| dir.join("church-studio-ndi")))
             .filter(|path| path.exists())
-            .ok_or("The NDI sender was not built. Quit Church Studio and run npm run tauri dev again.")?;
+            .ok_or("NDI output is coming soon to Church Studio.")?;
         let clean: String = name.chars().filter(|c| !c.is_control()).take(60).collect();
         let mut command = std::process::Command::new(helper);
         command

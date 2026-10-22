@@ -360,6 +360,8 @@ export type SermonSection = {
   /** The notes formatted (desk and stage only); `notes` keeps them plain. */
   notesRich?: import("./rich-text").RichDoc;
   items: PresentationItem[];
+  /** Planned length in minutes (1 to 120). Absent: not planned. */
+  minutes?: number;
 };
 
 export type Sermon = {
@@ -371,6 +373,10 @@ export type Sermon = {
   notesRich?: import("./rich-text").RichDoc;
   sections: SermonSection[];
   updatedAt: string;
+  /** The series it belongs to ("Faith that works"). Absent: none. */
+  series?: string;
+  /** The day it is (or was) preached, YYYY-MM-DD. Absent: not set. */
+  date?: string;
 };
 
 export type MediaAsset = {
@@ -509,6 +515,8 @@ export type Workspace = {
   schemaVersion: 2;
   churchName: string;
   logoAssetId: string | null;
+  /** With no picture of its own: "default" shows the Church Studio mark, "none" the words alone. Unset: default. */
+  logoPicture?: "default" | "none";
   logoText: string;
   themeId: string;
   lastServiceId: string | null;
