@@ -92,7 +92,7 @@
   .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); justify-self: start; }
   .seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .seg button.on { background: var(--live); color: #fff; }
-  .mock { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: linear-gradient(160deg, #1b2230, #0b0d12); border: 1px solid var(--line); }
+  .mock { position: relative; aspect-ratio: var(--output-aspect, 16 / 9); border-radius: 10px; overflow: hidden; background: linear-gradient(160deg, #1b2230, #0b0d12); border: 1px solid var(--line); }
   .mock-slide { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.35); font-size: 10px; }
   .mock-bar { position: absolute; left: 0; right: 0; height: 22%; display: flex; align-items: center; padding: 0 8px; background: #c8102e; color: #fff; font-size: 9px; font-weight: 700; overflow: hidden; white-space: nowrap; }
   .mock-bar.bottom { bottom: 0; }

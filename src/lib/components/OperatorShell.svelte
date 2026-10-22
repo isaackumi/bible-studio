@@ -71,6 +71,8 @@
   $effect(() => {
     const appearance = session.workspace.appearance;
     outputShape.aspect = aspectFor(sanitizeScreenShape(appearance.screenShape), appearance.measuredAspect ?? null);
+    // Every schematic and preview of the audience screen (CSS aspect-ratio: var(--output-aspect)) takes its shape.
+    document.documentElement.style.setProperty("--output-aspect", String(outputShape.aspect));
   });
 
   $effect(() => {

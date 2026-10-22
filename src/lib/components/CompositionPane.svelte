@@ -1284,7 +1284,7 @@
   .tile { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; text-align: left; }
   .tile:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .schema { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 4px; background: #000; overflow: hidden; }
+  .schema { position: relative; display: block; aspect-ratio: var(--output-aspect, 16 / 9); border-radius: 4px; background: #000; overflow: hidden; }
   .schema { background: var(--panel) !important; }
   .schema i { position: absolute; box-sizing: border-box; border: 1.5px solid var(--field); border-radius: 3px; background: color-mix(in srgb, var(--muted) 28%, transparent); }
   .schema i.main { background: color-mix(in srgb, var(--accent) 30%, transparent); }

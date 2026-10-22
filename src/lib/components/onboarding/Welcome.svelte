@@ -15,6 +15,7 @@
   import Icon from "../Icon.svelte";
   import MotionBackground from "../MotionBackground.svelte";
   import Screen from "../Screen.svelte";
+  import { outputShape } from "../../display/output-shape.svelte";
   import MiniApp, { type Zone } from "./MiniApp.svelte";
   import BrandMark from "../BrandMark.svelte";
   import { UI_LANGUAGES, msg, t } from "../../i18n/core";
@@ -316,7 +317,7 @@
                 <div class="walls" role="radiogroup" aria-label={t("Screen theme")}>
                   {#each wallThemes as theme (theme.id)}
                     <button type="button" role="radio" aria-checked={screenTheme.id === theme.id} class="wall" class:on={screenTheme.id === theme.id} onclick={() => session.useTheme(theme.id)}>
-                      <span class="wall-shot"><Screen model={sample(theme)} still aspect={16 / 9} /></span>
+                      <span class="wall-shot"><Screen model={sample(theme)} still aspect={outputShape.aspect} /></span>
                       <strong>{theme.name}</strong>
                     </button>
                   {/each}

@@ -11,6 +11,7 @@
   import FavoriteStar from "../FavoriteStar.svelte";
   import { favoritesFirst } from "../../domain/favorites";
   import Screen from "../Screen.svelte";
+  import { outputShape } from "../../display/output-shape.svelte";
   import { msg, t } from "../../i18n/core";
 
   // Theme library: browse every look for the audience screen, preview it live, and (Premium)
@@ -199,7 +200,7 @@
 <section class="lib">
   <!-- Selected theme, large and live -->
   <div class="hero">
-    <div class="hero-screen"><Screen model={sample(selected)} aspect={16 / 9} /></div>
+    <div class="hero-screen"><Screen model={sample(selected)} aspect={outputShape.aspect} /></div>
     <div class="hero-side">
       <input
         class="theme-name"
@@ -244,7 +245,7 @@
       <div class="card-wrap">
       <span class="card-star"><FavoriteStar on={starred(theme)} label={theme.name} onclick={() => session.toggleFavorite("themes", theme.id)} /></span>
       <button type="button" class="theme-card" class:on={selectedId === theme.id} class:current={session.workspace.themeId === theme.id} onclick={() => (selectedId = theme.id)} ondblclick={() => apply(theme)}>
-        <span class="thumb"><Screen model={sample(theme)} still aspect={16 / 9} /></span>
+        <span class="thumb"><Screen model={sample(theme)} still aspect={outputShape.aspect} /></span>
         <span class="card-meta">
           <strong>{theme.name}</strong>
           {#if session.workspace.themeId === theme.id}<em class="pill ok">{t("In use")}</em>

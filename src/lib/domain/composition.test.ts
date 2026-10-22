@@ -1327,6 +1327,16 @@ describe("side-by-side regions fill the screen and show their edges", () => {
     expect(touching.layers!.every((layer) => layer.edge === undefined)).toBe(true);
   });
 
+  it("framed gaps keep the same size on every side of any screen shape", () => {
+    const look = setCompositionEdges(lookTwoRegions({ left: video, right: words }), "framed");
+    for (const canvas of [{ width: 1440, height: 1080 }, { width: 1080, height: 1920 }, { width: 1920, height: 1080 }]) {
+      const [left] = presentComposition(look, { ...ctx, canvas }).layers!;
+      const sidePx = (left!.bounds.x / 100) * canvas.width;
+      const topPx = (left!.bounds.y / 100) * canvas.height;
+      expect(sidePx).toBeCloseTo(topPx, 5);
+    }
+  });
+
   it("a gap pulls regions apart with no line; the line and frame take the chosen colour", () => {
     const look = lookTwoRegions({ left: video, right: words });
     const [left, right] = presentComposition(setCompositionEdges(look, "gap"), ctx).layers!;

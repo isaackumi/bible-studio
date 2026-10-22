@@ -134,6 +134,8 @@ export type PaintedLayer = {
 export type CompileContext = {
   theme: Theme;
   now: number;
+  /** The output's canvas in frame pixels (canvasFor the screen's shape): framed gaps keep their size on any shape. */
+  canvas?: { width: number; height: number };
 };
 
 const DEFAULT_ANIMATION: LayerAnimation = {
@@ -1684,7 +1686,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       id: layer.id,
       zIndex: layer.zIndex,
       opacity: layer.opacity,
-      bounds: (edges === "framed" || edges === "gap") && isRegion(layer) ? framedBounds(layer.bounds, composition.canvas) : layer.bounds,
+      bounds: (edges === "framed" || edges === "gap") && isRegion(layer) ? framedBounds(layer.bounds, ctx.canvas ?? composition.canvas) : layer.bounds,
       ...((edges === "line" || edges === "framed") && isRegion(layer) ? { edge: edges, ...(composition.edgeColor ? { edgeColor: composition.edgeColor } : {}) } : {}),
       fit: layer.fit,
       sourceId: `${layer.source.type}:${layer.source.id}`,

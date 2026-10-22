@@ -10,7 +10,7 @@
   const model = $derived(
     presentComposition(
       withMediaUrls(page, (id) => mediaUrl(session.media.find((asset) => asset.id === id) ?? null)),
-      { theme: session.theme(), now: 0 },
+      { theme: session.theme(), now: 0, canvas: session.outputCanvas() },
     ),
   );
 </script>

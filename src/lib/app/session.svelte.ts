@@ -215,7 +215,7 @@ import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { whatsNewFor, type Release } from "../domain/changelog";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
-import { aspectFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
+import { aspectFor, canvasFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
 import {
   activateTab,
   collapsePanel,
@@ -2052,12 +2052,12 @@ class Session {
       const deck = this.decks.find((entry) => entry.id === item.deck?.deckId);
       const page = deck?.pages[0];
       if (!page) return emptyModel(theme);
-      return presentComposition(withMediaUrls(page, this.mediaSrc), { theme, now: Date.now() });
+      return presentComposition(withMediaUrls(page, this.mediaSrc), { theme, now: Date.now(), canvas: this.outputCanvas() });
     }
     if (item.kind === "composition" && item.composition) {
       const saved = this.workspace.compositions.find((entry) => entry.id === item.composition?.compositionId);
       if (!saved) return presentSavedLook(this.workspace.compositions, item.composition.compositionId, { theme, now: Date.now() });
-      return presentComposition(withMediaUrls(restoreComposition(saved), this.mediaSrc), { theme, now: Date.now() });
+      return presentComposition(withMediaUrls(restoreComposition(saved), this.mediaSrc), { theme, now: Date.now(), canvas: this.outputCanvas() });
     }
     if (item.kind === "announcement" && item.announcement) {
       return presentAnnouncement({ theme, words: item.announcement, backgroundImageUrl: this.mediaSrc(item.announcement.imageId) ?? backgroundImageUrl });
@@ -2324,7 +2324,7 @@ class Session {
     this.sermonFocus = null;
     const clean = sanitizeComposition(composition);
     this.lookOnPreview = clean;
-    const model = presentComposition(withMediaUrls(clean, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    const model = presentComposition(withMediaUrls(clean, this.mediaSrc), { theme: this.theme(), now: Date.now(), canvas: this.outputCanvas() });
     this.live = previewComposition(this.live, model, clean.id);
     this.message = t("{name} is on Preview. LIVE still sends Program.", { name: clean.name });
   };
@@ -2377,7 +2377,7 @@ class Session {
       return false;
     }
     const next = withLiveScripture(look, layer.id, { reference: fields.reference, body: fields.body, attribution: fields.attribution, verse: fields.verse, translationId: translation });
-    const model = presentComposition(withMediaUrls(next, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    const model = presentComposition(withMediaUrls(next, this.mediaSrc), { theme: this.theme(), now: Date.now(), canvas: this.outputCanvas() });
     if (target === "preview") {
       this.lookOnPreview = next;
       this.live = setPreview(this.live, frame(model, compositionSourceId(next.id), "cut"));
@@ -4242,7 +4242,7 @@ class Session {
     this.lookOnPreview = null;
     this.previewBible = null;
     this.deckFocus = { deckId, index };
-    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now(), canvas: this.outputCanvas() });
     this.live = setPreview(this.live, frame(model, `deck:${deckId}:${index}`, page.transition.type === "cut" ? "cut" : "fade"));
     this.message = t("{name}: page {index} of {length} on Preview. LIVE sends Program.", { name: deck.name, index: index + 1, length: deck.pages.length });
   };
@@ -4780,7 +4780,7 @@ class Session {
     const deck = loop && this.decks.find((entry) => entry.id === loop.deckId);
     const page = deck?.pages[loop!.index];
     if (!loop || !deck || !page) return;
-    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now() });
+    const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now(), canvas: this.outputCanvas() });
     this.releaseHold();
     this.live = { ...this.live, program: frame(model, `deck:${deck.id}:${loop.index}`, page.transition.type === "cut" ? "cut" : "fade"), revision: this.live.revision + 1 };
     await this.pushProgram();
@@ -7283,6 +7283,12 @@ class Session {
   setScreenShape = (shape: ScreenShape) => {
     this.setAppearance({ screenShape: sanitizeScreenShape(shape) });
     if (this.live.program.model.layout !== "empty") void this.pushProgram();
+  };
+
+  /** The audience screen's canvas in frame pixels, from its chosen or measured shape. */
+  outputCanvas = () => {
+    const appearance = this.workspace.appearance;
+    return canvasFor(aspectFor(sanitizeScreenShape(appearance.screenShape), appearance.measuredAspect ?? null));
   };
 
   /** The audience window measured its screen; the desk's monitors follow it. */

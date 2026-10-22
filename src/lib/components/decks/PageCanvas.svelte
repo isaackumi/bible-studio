@@ -45,7 +45,7 @@
   const model = $derived(
     presentComposition(
       withMediaUrls(page, (id) => mediaUrl(session.media.find((asset) => asset.id === id) ?? null)),
-      { theme: session.theme(), now: Date.now() },
+      { theme: session.theme(), now: Date.now(), canvas: session.outputCanvas() },
     ),
   );
   const boxes = $derived(layerOrder(page).filter((layer) => layer.visible));
@@ -112,7 +112,7 @@
 
 <style>
   .stage-wrap { max-width: 100%; margin: 0 auto; }
-  .page-canvas { position: relative; aspect-ratio: var(--aspect, 16 / 9); width: 100%; background: #000; overflow: hidden; border-radius: 6px; touch-action: none; user-select: none; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); }
+  .page-canvas { position: relative; aspect-ratio: var(--aspect, var(--output-aspect, 16 / 9)); width: 100%; background: #000; overflow: hidden; border-radius: 6px; touch-action: none; user-select: none; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); }
   .paint { position: absolute; left: 0; top: 0; width: var(--canvas-w, 1920px); height: var(--canvas-h, 1080px); transform-origin: top left; pointer-events: none; }
   .box { position: absolute; outline: 1px dashed transparent; cursor: move; }
   .box:hover { outline-color: color-mix(in srgb, #fff 45%, transparent); }
