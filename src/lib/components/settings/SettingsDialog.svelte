@@ -1452,7 +1452,7 @@
           <div class="row">
             <div class="row-copy"><strong>{t("Pictures and videos")}</strong><span>{tn(session.media.length, "{n} item on this computer.", "{n} items on this computer.")} {t("Use them as backgrounds, the logo, or sources in a scene.")}</span></div>
             <button type="button" class="btn primary" onclick={() => void importMedia()}>{t("Import…")}</button>
-            <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
+            <input bind:this={mediaInput} type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,.mov,.m4v" hidden onchange={(event) => void importMediaFile(event)} />
           </div>
           {#each [...session.media, ...session.audioTracks] as asset (asset.id)}
             <div class="row">

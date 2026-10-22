@@ -1,4 +1,5 @@
 import type { ImportedBible } from "../bible/import";
+import { fitImage, isSvg } from "../platform/fit-image";
 import { isOnlineTranslation, onlineChapter, onlinePassage, onlineTranslations, WORDS_TRANSLATION } from "../bible/online-bibles";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { cleanVerse } from "../bible/clean";
@@ -30,6 +31,27 @@ function desktop(): boolean {
 }
 
 const cleanRows = (rows: VerseText[]) => rows.map((row) => ({ ...row, text: cleanVerse(row.text) }));
+
+/**
+ * A picture chosen by path on the desktop is copied in as it is; when it is larger than a screen
+ * needs, it is replaced by a right-sized copy (fit-image.ts), so the screens never decode the original.
+ */
+async function shrinkImported(asset: MediaAsset): Promise<MediaAsset> {
+  if (asset.kind !== "image") return asset;
+  try {
+    const url = mediaUrl(asset);
+    if (!url) return asset;
+    const original = await (await fetch(url)).blob();
+    const fit = await fitImage(original, asset.name);
+    if (!fit.resized) return asset;
+    const smaller = await api.importMediaBytes(asset.name, fit.blob);
+    await api.mediaDelete(asset.id).catch(() => {});
+    return smaller;
+  } catch {
+    // Kept as it came: it still shows, only heavier.
+    return asset;
+  }
+}
 
 export const api = {
   outputStatus: () => invoke<OutputStatus>("output_status"),
@@ -82,23 +104,26 @@ export const api = {
   mediaDelete: (id: string) => (desktop() ? invoke<void>("media_delete", { id }) : browserMedia.remove(id)),
   /** In-memory image (for example a rendered PDF page). Desktop sends raw bytes to Rust. */
   importMediaBytes: async (name: string, blob: Blob): Promise<MediaAsset> => {
+    // Pictures come in at a size a screen can use (fit-image.ts); an SVG becomes a sharp PNG.
+    const fit = await fitImage(blob, name).catch(() => ({ blob, name, resized: false }));
     if (desktop()) {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      return invoke<MediaAsset>("import_media_bytes", bytes, { headers: { "x-media-name": encodeURIComponent(name) } });
+      const bytes = new Uint8Array(await fit.blob.arrayBuffer());
+      return invoke<MediaAsset>("import_media_bytes", bytes, { headers: { "x-media-name": encodeURIComponent(fit.name) } });
     }
-    return api.importMedia(new File([blob], name, { type: blob.type || "image/png" }));
+    return browserMedia.importFile(new File([fit.blob], fit.name, { type: fit.blob.type || "image/png" }));
   },
   importMedia: (source: string | File) => {
     if (desktop()) {
       // A picture handed over as a file (a browser file input, a drop) goes in as bytes; videos
       // are too large for that and come by path from the system picker.
       if (typeof source !== "string") {
-        if (source.type.startsWith("image/")) return api.importMediaBytes(source.name, source);
+        if (source.type.startsWith("image/") || isSvg(source, source.name)) return api.importMediaBytes(source.name, source);
         return Promise.reject(new Error("Use Import… to choose the file from this computer."));
       }
-      return invoke<MediaAsset>("import_media", { path: source });
+      return invoke<MediaAsset>("import_media", { path: source }).then(shrinkImported);
     }
     if (typeof source === "string") return Promise.reject(new Error("This browser import needs the image file, not a path."));
+    if (source.type.startsWith("image/") || isSvg(source, source.name)) return api.importMediaBytes(source.name, source);
     return browserMedia.importFile(source);
   },
   translations: () =>
