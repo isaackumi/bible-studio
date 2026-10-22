@@ -41,7 +41,7 @@ mod running {
 pub fn record_path(folder: Option<&str>, stamp: &str) -> std::path::PathBuf {
     let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("."));
     let dir = match folder.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(value) if value == "~" => home,
+        Some("~") => home,
         Some(value) if value.starts_with("~/") => home.join(&value[2..]),
         Some(value) => std::path::PathBuf::from(value),
         None => home.join("Movies").join("Church Studio"),

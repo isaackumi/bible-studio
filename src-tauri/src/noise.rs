@@ -351,7 +351,7 @@ mod tests {
     fn clean_file() {
         let (Ok(input), Ok(output)) = (std::env::var("NOISE_IN"), std::env::var("NOISE_OUT")) else { return };
         let bytes = std::fs::read(input).unwrap();
-        let samples: Vec<f32> = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+        let samples: Vec<f32> = bytes.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
         let mut cleaner = Cleaner::new(48_000.0, Filter::Strong.mix());
         let mut out = Vec::new();
         for chunk in samples.chunks(1_024) {

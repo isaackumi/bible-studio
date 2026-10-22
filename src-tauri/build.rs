@@ -1,3 +1,5 @@
+#![allow(clippy::collapsible_if)]
+
 fn main() {
     // whisper.cpp asks "is this macOS new enough?" while it runs (___isPlatformVersionAtLeast). That
     // helper lives in the C compiler's runtime library, which Rust does not link, so link it here.

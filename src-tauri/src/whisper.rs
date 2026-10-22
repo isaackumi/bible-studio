@@ -203,7 +203,7 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
         mix,
         move |bytes| {
             let mut buffer = sink_audio.lock().unwrap_or_else(|poison| poison.into_inner());
-            buffer.extend(bytes.chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0));
+            buffer.extend(bytes.as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0));
             true
         },
         move |_room, clean| {
@@ -408,7 +408,7 @@ mod tests {
     fn speech(seconds: f32, room: f32) -> Vec<f32> {
         let mut samples = hum(seconds, room);
         for (i, sample) in samples.iter_mut().enumerate() {
-            if (i / (RATE * 15 / 100)) % 2 == 0 {
+            if (i / (RATE * 15 / 100)).is_multiple_of(2) {
                 *sample += 0.1 * (i as f32 * 0.3).sin();
             }
         }
@@ -473,7 +473,7 @@ mod tests {
         for wav in wavs.split(',') {
             let bytes = std::fs::read(wav).expect("wav");
             let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
-            let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0).collect();
+            let samples: Vec<f32> = bytes[data..].as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0).collect();
             let started = std::time::Instant::now();
             let text = super::transcribe(&mut state, &samples, &super::prompt_for(""), 4).unwrap_or_default();
             println!("{wav}: {text}  ({} ms)", started.elapsed().as_millis());

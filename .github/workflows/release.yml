@@ -1,7 +1,8 @@
 # Signed releases with automatic updates. Push a tag like v0.2.0 (matching the version in
 # tauri.conf.json), or run this workflow from the Actions tab, and this builds Windows, macOS and
 # Linux installers, signs the update files, and publishes a GitHub release with latest.json,
-# which installed copies check from Settings › Updates. The release is named after the app's
+# which installed copies check from Settings › Updates. Tests run first; the release stays a draft
+# until all three platforms are in, then becomes the latest. The release is named after the app's
 # version, so bump it in package.json, tauri.conf.json and Cargo.toml before releasing again.
 #
 # One-time setup: add the repository secret TAURI_SIGNING_PRIVATE_KEY with the contents of
@@ -18,7 +19,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Nothing ships that fails the checks CI runs.
+  test:
+    name: Tests before release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: npm ci
+      - run: npm run check
+      - run: npm run check:server
+      - run: npm test
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
   release:
+    needs: test
     permissions:
       contents: write
     strategy:
@@ -69,6 +94,26 @@ jobs:
           tagName: v__VERSION__
           releaseName: Church Studio v__VERSION__
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: false
+          # A draft until every platform is in (publish below): installed copies and the download
+          # buttons read the latest release, so a half-built one must never be it.
+          releaseDraft: true
           includeUpdaterJson: true
           args: ${{ matrix.args }} --config {"bundle":{"createUpdaterArtifacts":true}}
+
+  # All three platforms built: check the release has its update file, then make it the latest.
+  publish:
+    needs: release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          assets="$(gh release view "$tag" --json assets -q '.assets[].name')"
+          echo "$assets"
+          grep -qx latest.json <<< "$assets" || { echo "::error::$tag has no latest.json; left as a draft."; exit 1; }
+          gh release edit "$tag" --draft=false --latest

@@ -174,7 +174,7 @@ fn seed_from(conn: &Connection, translation: Seed<'_>, path: &Path) -> Result<()
         return Err(format!("{} source is missing at {}", translation.abbreviation, path.display()));
     }
     log::info!("seeding {} from {}", translation.abbreviation, path.display());
-    let file = File::open(&path).map_err(|e| e.to_string())?;
+    let file = File::open(path).map_err(|e| e.to_string())?;
     let books: Vec<SourceBook> =
         serde_json::from_reader(BufReader::new(file)).map_err(|e| e.to_string())?;
     let canon: Vec<CanonBook> =

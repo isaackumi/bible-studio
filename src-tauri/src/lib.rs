@@ -1,3 +1,7 @@
+// Nested ifs read as the steps they are; let-chains are not used here.
+#![allow(clippy::collapsible_if)]
+
+
 mod easyworship;
 mod bible;
 mod entitlement;
@@ -769,7 +773,7 @@ pub fn run() {
         .manage(Output::default())
         .setup(|app| {
             record_panics(app.handle());
-            let (database, notice) = db::open(app.handle()).map_err(|message| std::io::Error::other(message))?;
+            let (database, notice) = db::open(app.handle()).map_err(std::io::Error::other)?;
             app.manage(database);
             app.manage(StartupNotice(Mutex::new(notice)));
             app.manage(entitlement::load(app.handle()));

@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      # The license server and scripts (outside src/, so npm run check does not see them).
+      - run: npm run check:server
       - run: npm test
 
   desktop:
@@ -48,6 +50,10 @@ jobs:
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test
+      # Each platform compiles its own code (voice, displays), so each is linted.
+      - name: Rust lints
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
       - name: Build the app
         run: npx tauri build
       - uses: actions/upload-artifact@v4

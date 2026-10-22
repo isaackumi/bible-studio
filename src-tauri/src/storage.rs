@@ -132,7 +132,7 @@ pub fn unused_media(conn: &rusqlite::Connection, media_dir: &Path) -> Result<Vec
             }
         }
     }
-    unused.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    unused.sort_by_key(|entry| std::cmp::Reverse(entry.bytes));
     Ok(unused)
 }
 

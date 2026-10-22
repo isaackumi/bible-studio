@@ -16,7 +16,7 @@ pub fn open_privacy_settings(pane: Option<&str>) -> Result<(), String> {
             .arg(format!("x-apple.systempreferences:com.apple.preference.security?{anchor}"))
             .spawn()
             .map_err(|e| e.to_string())?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(not(target_os = "macos"))]
     {

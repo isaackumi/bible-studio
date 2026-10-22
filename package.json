@@ -12,6 +12,7 @@
     "prepare": "svelte-kit sync || echo ''",
     "test": "vitest run",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:server": "tsc -p server",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
     "server:dev": "vite-node server/dev.ts"
