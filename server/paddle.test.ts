@@ -100,6 +100,30 @@ describe("Paddle license server", () => {
     expect((await handle(new Request("https://keys.example.org/"), env, net.http, NOW)).status).toBe(404);
   });
 
+  it("stops a key bought through a Paddle link when it is refunded or charged back, and restores a reversed charge-back", async () => {
+    const store = memoryStore();
+    const api: ApiConfig = { store, signingKey: pair.secretKey, publicKey: pair.publicKey, provider: { ...mockProvider, name: "paddle", test: false }, leaseDays: 30, trialDays: 14, graceDays: 7, now: () => NOW };
+    const net = network();
+    expect((await handle(await post(completed()), env, net.http, NOW, api)).status).toBe(200);
+    const key = net.sent[0]!.text.split("\n").find((line) => line.startsWith("CS1-"))!;
+    const id = readLicense(key, pair.publicKey)!.id;
+    expect(await store.get("txn:txn_01")).toBe(id);
+    const adjustment = (action: string, status = "approved") => JSON.stringify({ event_type: "adjustment.created", data: { id: "adj_1", customer_id: "ctm_01", action, status, transaction_id: "txn_01" } });
+    // A warning alone changes nothing.
+    expect(await (await handle(await post(adjustment("chargeback_warning")), env, net.http, NOW, api)).text()).toBe("Ignored");
+    expect(await store.get(`revoked:${id}`)).toBeNull();
+    expect(await (await handle(await post(adjustment("chargeback")), env, net.http, NOW, api)).text()).toBe("Charge-back noted");
+    expect(JSON.parse((await store.get(`revoked:${id}`))!).reason).toBe("chargeback");
+    await handle(await post(adjustment("chargeback_reverse")), env, net.http, NOW, api);
+    expect(await store.get(`revoked:${id}`)).toBeNull();
+    // A refund still pending does nothing; an approved one stops the key, and a reversal never undoes a refund.
+    await handle(await post(adjustment("refund", "pending_approval")), env, net.http, NOW, api);
+    expect(await store.get(`revoked:${id}`)).toBeNull();
+    expect(await (await handle(await post(adjustment("refund")), env, net.http, NOW, api)).text()).toBe("Refund noted");
+    await handle(await post(adjustment("chargeback_reverse")), env, net.http, NOW, api);
+    expect(JSON.parse((await store.get(`revoked:${id}`))!).reason).toBe("refund");
+  });
+
   it("completes an app checkout only with the transaction and price made for it", async () => {
     const store = memoryStore();
     const api: ApiConfig = { store, signingKey: pair.secretKey, publicKey: pair.publicKey, provider: { ...mockProvider, name: "paddle", test: false }, leaseDays: 30, trialDays: 14, graceDays: 7, now: () => NOW };

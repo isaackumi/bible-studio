@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { licenseKeyPair, readLicense, signLicense, TEST_LICENSE_PUBLIC_KEY } from "../src/lib/domain/license";
 import { readLease, standing } from "../src/lib/domain/lease";
 import { PLANS } from "../src/lib/domain/plans";
-import { completeCheckout, handleApi, renewLicense, SEATS, type ApiConfig } from "./api";
+import { completeCheckout, EMAILS_PER_INBOX, handleApi, renewLicense, SEATS, type ApiConfig } from "./api";
 import { mockProvider } from "./billing";
 import { PRICES } from "./pricing";
 import { memoryStore } from "./store";
@@ -246,6 +246,34 @@ describe("server API", () => {
 });
 
 describe("email logo", () => {
+  it("emails each inbox only a few test keys a day, however many checkouts name it", async () => {
+    const { call, mails, advance } = setup();
+    const buy = async () => {
+      const session = (await call("/v1/checkout", { plan: "premium", interval: "monthly", email: "Stranger@Example.org" })).data.session as string;
+      return (await call(`/pay/${session}`, {})).status;
+    };
+    for (let i = 0; i < EMAILS_PER_INBOX; i++) expect(await buy()).toBe(200);
+    expect(await buy()).toBe(429);
+    expect(mails).toHaveLength(EMAILS_PER_INBOX);
+    advance(DAY);
+    expect(await buy()).toBe(200);
+  });
+
+  it("slows down one network address on the routes that send email or make records", async () => {
+    const { config, call } = setup();
+    const asked = new Map<string, number>();
+    config.limit = async (key) => (asked.set(key, (asked.get(key) ?? 0) + 1), asked.get(key)! <= 2);
+    const from = { "cf-connecting-ip": "203.0.113.7" };
+    const checkout = () => call("/v1/checkout", { plan: "premium", interval: "monthly", email: "a@b.co" }, from);
+    expect((await checkout()).status).toBe(200);
+    expect((await checkout()).status).toBe(200);
+    expect(await checkout()).toMatchObject({ status: 429, data: { error: expect.stringContaining("Wait a minute") } });
+    // Each route counts on its own, and another address is not held up.
+    expect((await call("/v1/promo", { code: "NONE" }, from)).status).toBe(200);
+    expect((await call("/v1/checkout", { plan: "premium", interval: "monthly", email: "a@b.co" }, { "cf-connecting-ip": "198.51.100.2" })).status).toBe(200);
+    expect([...asked.keys()]).toContain("checkout:203.0.113.7");
+  });
+
   it("serves the app icon as a PNG for emails", async () => {
     const { config } = setup();
     const response = await handleApi(new Request("https://keys.test/email/logo.png"), config);

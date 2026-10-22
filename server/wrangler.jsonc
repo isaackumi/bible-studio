@@ -47,6 +47,9 @@
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": ""
   },
+  // Sign-in links, checkouts, test payments and promo checks: 10 a minute from one network address
+  // (api.ts tooFast). namespace_id is any number unique to this account.
+  "ratelimits": [{ "name": "LIMITS", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }

@@ -11,7 +11,7 @@ import { licenseKeyEmail } from "./email.ts";
 import type { Identity } from "./accounts.ts";
 import { betterAuthIdentity } from "./auth.ts";
 import { parseAdminUsers } from "./admin.ts";
-import { completeCheckout, handleApi, licenseOfSubscription, renewLicense, revoke, type ApiConfig } from "./api.ts";
+import { completeCheckout, handleApi, licenseOfSubscription, reinstate, renewLicense, revoke, type ApiConfig } from "./api.ts";
 import { mockProvider, paddlePriceMap, paddleProvider } from "./billing.ts";
 import { getJson, kvStore, type KvNamespace } from "./store.ts";
 
@@ -35,6 +35,8 @@ export type Env = {
   GRACE_DAYS?: string;
   /** The KV namespace for everything the server keeps (activations, trials, checkouts, promos, stats). */
   ACTIVATIONS?: KvNamespace;
+  /** Cloudflare's rate limiter (ratelimits in wrangler.jsonc): a few requests a minute per key. */
+  LIMITS?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** "mock" (built-in test checkout, the default) or "paddle". */
   BILLING_PROVIDER?: string;
   /** Promo codes charged through Paddle discounts: "EASTER25:dsc_01abc,…". */
@@ -112,6 +114,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     : undefined;
   return {
     store: kvStore(env.ACTIVATIONS),
+    limit: env.LIMITS ? async (key) => (await env.LIMITS!.limit({ key }).catch(() => ({ success: true }))).success : undefined,
     signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
     provider,
     adminToken: env.ADMIN_TOKEN,
@@ -166,11 +169,16 @@ export async function handle(request: Request, env: Env, http: Fetch = fetch, no
     return new Response("Bad signature", { status: 401 });
   }
   const event = JSON.parse(body) as PaddleEvent;
-  // A refund: the license stops getting leases, so its computers drop to Free at their next check-in.
-  if (api && event.event_type.startsWith("adjustment.") && event.data.action === "refund" && event.data.status === "approved" && event.data.transaction_id) {
+  // A refund or a charge-back: the license stops getting leases, so its computers drop to Free at
+  // their next check-in. A charge-back the bank reverses gives it back. (A chargeback_warning is
+  // only a warning; nothing changes until the charge-back itself.)
+  if (api && event.event_type.startsWith("adjustment.") && event.data.status === "approved" && event.data.transaction_id) {
+    const action = event.data.action;
+    if (action !== "refund" && action !== "chargeback" && action !== "chargeback_reverse") return new Response("Ignored", { status: 200 });
     const license = await api.store.get(`txn:${event.data.transaction_id}`);
-    if (license) await revoke(api, license, "refund");
-    return new Response("Refund noted", { status: 200 });
+    if (license && action === "chargeback_reverse") await reinstate(api, license);
+    else if (license) await revoke(api, license, action);
+    return new Response(action === "refund" ? "Refund noted" : "Charge-back noted", { status: 200 });
   }
   if (event.event_type !== "transaction.completed") return new Response("Ignored", { status: 200 });
   // Bought from the app: finish that checkout, so the app collects its key and activates by itself.
@@ -202,7 +210,10 @@ export async function handle(request: Request, env: Env, http: Fetch = fetch, no
   if (!issued) return new Response("No Church Studio plan in this transaction", { status: 200 });
   const customer = await lookupCustomer(event.data.customer_id, env, http);
   if (!customer?.email) return new Response("Customer email not found", { status: 500 });
-  const key = signLicense({ ...issued, holder: customer.name ?? "", id: await keyId(event.data.id) }, env.CHURCH_STUDIO_SIGNING_KEY);
+  const id = await keyId(event.data.id);
+  const key = signLicense({ ...issued, holder: customer.name ?? "", id }, env.CHURCH_STUDIO_SIGNING_KEY);
+  // Kept so a refund or charge-back of this transaction can find the key to stop.
+  if (api) await api.store.put(`txn:${event.data.id}`, Array.from(id, (byte) => byte.toString(16).padStart(2, "0")).join(""));
   try {
     await sendKey(customer.email, key, issued, env, http);
   } catch (error) {

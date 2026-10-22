@@ -57,6 +57,11 @@ export type ApiConfig = {
   trialDays: number;
   /** Days a subscription key keeps working past the paid period, to cover a late renewal. */
   graceDays: number;
+  /**
+   * Cloudflare's rate limiter (the LIMITS binding in wrangler.jsonc): false when this key has asked
+   * too often in the last minute. Missing (tests, local runs): nothing is limited by address.
+   */
+  limit?: (key: string) => Promise<boolean>;
   /** Sends the key email, if mail is set up. */
   mail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
   /** The server's public address, for links and the logo in emails. */
@@ -113,6 +118,28 @@ export const TRIALS_PER_ADDRESS = 5;
 export type Subscription = { id: string; license: string; plan: LicensePlan; interval: Interval; email: string; renewsAt: number; status: "active" | "refunded" };
 /** Per license: what it is paid through (moved on by each renewal), whatever date its key carries. */
 export type LicenseRecord = { sub: string | null; email: string; paidUntil: number; test: boolean };
+
+/** Sign-in links and test-checkout keys one inbox may be sent in a day, so no one can flood a stranger. */
+export const EMAILS_PER_INBOX = 5;
+
+/** Too many requests to this route from this network address in the last minute (Cloudflare's limiter). */
+async function tooFast(config: ApiConfig, request: Request, route: string): Promise<boolean> {
+  const address = request.headers.get("cf-connecting-ip");
+  if (!address || !config.limit) return false;
+  return !(await config.limit(`${route}:${address}`));
+}
+
+/** Counts one more email to this inbox today; true when it has had its share already. */
+export async function inboxFull(config: ApiConfig, email: string): Promise<boolean> {
+  const key = `mailcap:${email.trim().toLowerCase()}:${new Date(config.now()).toISOString().slice(0, 10)}`;
+  const sent = Number(await config.store.get(key)) || 0;
+  if (sent >= EMAILS_PER_INBOX) return true;
+  // KV allows one write a second to a key; a refused count is not worth failing the email for.
+  await config.store.put(key, String(sent + 1), undefined, 2 * 86_400).catch(() => {});
+  return false;
+}
+
+const SLOW_DOWN = "Too many requests from this network. Wait a minute and try again.";
 
 /** Releases a key may make in 30 days (a released computer keeps its lease until it checks in). */
 const RELEASES_PER_30_DAYS = 3;
@@ -219,7 +246,18 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (pay) return payRoute(request, config, pay[1]!, !!pay[2]);
   const signin = path.match(/^\/signin\/([0-9a-f]{24})(?:\/(confirm|cancel))?$/);
   if (signin) return signinRoute(request, config, signin[1]!, signin[2]);
-  if (path.startsWith("/auth/")) return config.identity ? config.identity.handler(request) : json(404, { error: "Accounts are not set up on this server yet." });
+  if (path.startsWith("/auth/")) {
+    if (!config.identity) return json(404, { error: "Accounts are not set up on this server yet." });
+    if (request.method === "POST" && path.startsWith("/auth/sign-in/")) {
+      if (await tooFast(config, request, "signin")) return json(429, { error: SLOW_DOWN });
+      // A sign-in link goes to whatever address is typed, so each inbox gets only a few a day.
+      if (path === "/auth/sign-in/magic-link") {
+        const email = text(((await request.clone().json().catch(() => null)) as { email?: unknown } | null)?.email, 120);
+        if (email && (await inboxFull(config, email))) return json(429, { error: "Several sign-in links were sent to this address today. Use the newest one, or try again tomorrow." });
+      }
+    }
+    return config.identity.handler(request);
+  }
 
   // Admin: everything under /admin, behind Cloudflare Access (admin.ts).
   if (path === "/admin" || path.startsWith("/admin/")) return adminRoute(request, config, path, origin);
@@ -227,6 +265,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (request.method !== "POST" || !path.startsWith("/v1/")) return json(404, { error: "Not found" });
   const input = await body(request);
   if (!input) return json(400, { error: "Send JSON." });
+  // The routes that send email, make records or could be guessed at: a few a minute from one address.
+  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
 
   switch (path) {
     case "/v1/hello":
@@ -596,6 +636,11 @@ async function payRoute(request: Request, config: ApiConfig, sessionId: string, 
       if (order.status === "pending") await saveCheckout(config, { ...order, status: "cancelled" });
       return html(200, payPage({ state: "cancelled", order }));
     }
+    if (order.status === "pending") {
+      if (await tooFast(config, request, "pay")) return html(429, "<p>Too many requests from this network. Wait a minute and try again.</p>");
+      // The test checkout takes any email, so it emails each inbox only a few keys a day.
+      if (await inboxFull(config, order.email)) return html(429, "<p>Several test keys were sent to this address today. Try again tomorrow.</p>");
+    }
     const paid = await completeCheckout(config, sessionId);
     return html(200, payPage({ state: "paid", order: paid ?? order }));
   }
@@ -635,6 +680,16 @@ export async function revoke(config: ApiConfig, license: string, reason: string)
     const sub = await getJson<Subscription>(config.store, `sub:${link.sub}`);
     if (sub) await putJson(config.store, `sub:${sub.id}`, { ...sub, status: "refunded" }, { status: "refunded", plan: sub.plan, interval: sub.interval });
   }
+}
+
+/** A charge-back the bank reversed: the license works again (an admin suspension stays). */
+export async function reinstate(config: ApiConfig, license: string): Promise<void> {
+  const revoked = await getJson<{ reason: string; kind?: string }>(config.store, `revoked:${license}`);
+  if (revoked?.reason !== "chargeback") return;
+  await config.store.delete(`revoked:${license}`);
+  const link = await getJson<{ sub: string | null }>(config.store, `license:${license}`);
+  const sub = link?.sub ? await getJson<Subscription>(config.store, `sub:${link.sub}`) : null;
+  if (sub) await putJson(config.store, `sub:${sub.id}`, { ...sub, status: "active" }, { status: "active", plan: sub.plan, interval: sub.interval });
 }
 
 // --- Seats and activation ------------------------------------------------------------------
