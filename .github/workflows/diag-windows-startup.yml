@@ -17,6 +17,22 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: v0.3.0
     steps:
+      # An upgrade, as most churches have it: the previous version run once first, so it leaves a
+      # library that the new version has to open and move forward.
+      - name: Install and run the previous version first
+        shell: pwsh
+        run: |
+          gh release download v0.2.9 -R ${{ github.repository }} -p "*x64-setup.exe" -D previous
+          $setup = Get-ChildItem previous\*.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList "/S" -Wait
+          $exe = Get-ChildItem -Recurse "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "*.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Church Studio" -and $_.Name -notmatch "uninstall" } | Select-Object -First 1
+          $p = Start-Process $exe.FullName -PassThru
+          Start-Sleep -Seconds 25
+          $p.Refresh(); "previous: responding=$($p.Responding) exited=$($p.HasExited)"
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+
       - name: Download the released installer
         shell: pwsh
         run: |
