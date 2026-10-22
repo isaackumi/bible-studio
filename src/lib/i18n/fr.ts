@@ -4074,4 +4074,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Scan to follow on your phone": "Scannez pour suivre sur votre téléphone",
   "Sharing what goes LIVE. Pictures and videos stay on this computer; words, songs and scripture show.": "Partage de ce qui passe en DIRECT. Les images et vidéos restent sur cet ordinateur ; les textes, chants et Écritures s’affichent.",
   "Show the screen on phones and browsers": "Afficher l’écran sur téléphones et navigateurs",
+  "Video from a link": "Vidéo depuis un lien",
+  "Video or stream address": "Adresse de la vidéo ou du flux",
+  "A video file or an HLS live stream on the web or your network. LIVE sends it like any video.": "Un fichier vidéo ou un flux HLS en direct, sur le web ou votre réseau. DIRECT l’envoie comme toute vidéo.",
+  "RTSP cannot play here. Use the camera's HLS or HTTP stream, or bring it in through OBS or NDI.": "Le RTSP ne peut pas être lu ici. Utilisez le flux HLS ou HTTP de la caméra, ou faites-le passer par OBS ou NDI.",
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stream as streamSource } from "../display/stream";
   import RichView from "./RichView.svelte";
   import { DEFAULT_LOGO_INK_URL, DEFAULT_LOGO_URL, darkText } from "../brand/logo";
   import InlineRich from "./InlineRich.svelte";
@@ -300,7 +301,7 @@
         <!-- Thumbnails: the first frame, silent and paused. -->
         <video class="cover" src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
       {:else}
-        <video class="cover" src={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
+        <video class="cover" use:streamSource={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
       {/if}
     {/key}
   {:else if model.layout === "shape" && model.shape}

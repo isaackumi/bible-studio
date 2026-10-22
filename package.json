@@ -34,6 +34,7 @@
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.14.0",
     "better-auth": "^1.7.11",
+    "hls.js": "^1.7.3",
     "paneforge": "^1.0.2",
     "pdfjs-dist": "5.4.296",
     "qrcode": "1.5.4"

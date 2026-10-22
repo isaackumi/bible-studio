@@ -9,6 +9,7 @@
   import FavoriteStar from "./FavoriteStar.svelte";
   import { t } from "../i18n/core";
   import { pictures } from "../app/pictures.svelte";
+  import { checkStreamUrl } from "../display/stream";
 
   let picker: HTMLInputElement | null = $state(null);
 
@@ -34,6 +35,24 @@
   }
 
   let loop = $state(false);
+  let link = $state("");
+  let linkNote = $state("");
+
+  /** A video or live stream from the network on Preview (RTSP is named, not pretended). */
+  function previewLink() {
+    const checked = checkStreamUrl(link);
+    if (!checked.ok) {
+      linkNote =
+        checked.reason === "rtsp"
+          ? t("RTSP cannot play here. Use the camera's HLS or HTTP stream, or bring it in through OBS or NDI.")
+          : checked.reason === "empty"
+            ? ""
+            : t("That does not look like a web address.");
+      return;
+    }
+    linkNote = "";
+    session.previewModel(presentVideo({ theme: session.theme(), videoUrl: checked.url, loop: loop && !checked.hls }), `link:${checked.url}`);
+  }
 
   function preview(assetId: string) {
     const asset = session.media.find((entry) => entry.id === assetId) ?? null;
@@ -84,6 +103,13 @@
     </div>
   {/each}
 
+  <h4>{t("Video from a link")}</h4>
+  <form class="link" onsubmit={(event) => { event.preventDefault(); previewLink(); }}>
+    <input type="url" placeholder="https://… .mp4 or .m3u8" aria-label={t("Video or stream address")} bind:value={link} />
+    <button type="submit">{t("Preview")}</button>
+  </form>
+  {#if linkNote}<p class="camera-note" role="status">{linkNote}</p>{:else}<p class="camera-note">{t("A video file or an HLS live stream on the web or your network. LIVE sends it like any video.")}</p>{/if}
+
   <h4>{t("Camera")}</h4>
   <p class="camera-note">{t("Select a camera for Preview. LIVE still sends Program. Permission denied stays on this desk.")}</p>
   <button type="button" onclick={() => void session.loadCameras()}>{t("List cameras")}</button>
@@ -105,5 +131,7 @@
   /* Beside Import: pictures shown from a folder, without copying. */
   .secondary { width: 100%; min-height: 36px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
   .secondary:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
+  .link { display: flex; gap: 6px; }
+  .link input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: inherit; font: inherit; }
   .camera-note { margin: 0 0 8px; font-size: 12px; color: var(--muted, #a3a3a3); }
 </style>

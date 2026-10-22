@@ -22,8 +22,12 @@ const BUDGETS = {
   ScreenOutput: { js: 140 * KB, css: 70 * KB },
   RemotePad: { js: 50 * KB, css: 40 * KB },
 };
-/** All the desktop app's JavaScript together (it once carried 20 MB of Bibles it never used). */
-const DESKTOP_TOTAL_JS = 4 * 1024 * KB;
+/**
+ * All the desktop app's JavaScript together, loaded at start or not (it once carried 20 MB of Bibles
+ * it never used). Files loaded only when needed count here too: the icon set (studio picker, ~410 KB)
+ * and hls.js (HLS streams where the engine cannot play them, ~560 KB).
+ */
+const DESKTOP_TOTAL_JS = 5 * 1024 * KB;
 
 const manifest = JSON.parse(readFileSync(`${ROOT}.vite/manifest.json`, "utf8"));
 
