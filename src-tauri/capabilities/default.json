@@ -1,13 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Operator and audience windows",
+  "description": "The operator desk: opens and closes the output windows, dialogs, links and updates",
   "windows": [
-    "main",
-    "audience",
-    "stage",
-    "second",
-    "screen-*"
+    "main"
   ],
   "permissions": [
     "core:default",
