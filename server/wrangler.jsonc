@@ -45,11 +45,16 @@
     // Cloudflare Access in front of /admin (README › Admin): the team domain and the application's
     // AUD tag, both shown in Zero Trust. Not secrets. Empty: the admin page only opens to look.
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    // The account the usage numbers are read from (the same as account_id above).
+    "CLOUDFLARE_ACCOUNT_ID": "9c069a5afbfa4133f6a165e2adb7b316"
   },
   // Sign-in links, checkouts, test payments and promo checks: 10 a minute from one network address
   // (api.ts tooFast). namespace_id is any number unique to this account.
   "ratelimits": [{ "name": "LIMITS", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  // Usage over time (usage.ts): one point per check-in, read by the admin page through the SQL API
+  // with the ANALYTICS_TOKEN secret (a Cloudflare API token with Account Analytics Read).
+  "analytics_engine_datasets": [{ "binding": "USAGE", "dataset": "church_studio_usage" }],
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }

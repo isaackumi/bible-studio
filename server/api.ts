@@ -26,6 +26,7 @@ import { adminRoute, type AdminSettings } from "./admin.ts";
 import { licensesPage, privacyPage, refundsPage, securityPage, securityTxt, termsPage, type Site } from "./site.ts";
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
+import { readCounts, recordCheckIn, usageReport, type Usage } from "./usage.ts";
 
 /** Where the server lives when no address is set (links and the logo in emails). */
 const DEFAULT_PUBLIC_URL = "https://church-studio.heitechinc.com";
@@ -62,6 +63,8 @@ export type ApiConfig = {
    * too often in the last minute. Missing (tests, local runs): nothing is limited by address.
    */
   limit?: (key: string) => Promise<boolean>;
+  /** Usage over time (Workers Analytics Engine, usage.ts); missing: only KV's last visits are kept. */
+  usage?: Usage;
   /** Sends the key email, if mail is set up. */
   mail?: (to: string, subject: string, text: string, html?: string) => Promise<void>;
   /** The server's public address, for links and the logo in emails. */
@@ -312,11 +315,23 @@ async function hello(config: ApiConfig, input: Record<string, unknown>): Promise
   const device = text(input.device, 80);
   // Development builds and the deploy check are not churches: answered, never counted.
   const counted = input.dev !== true && text(input.os, 20) !== "deploy";
-  if (device && counted) await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20), browser: text(input.browser, 24) });
+  if (device && counted) {
+    const meta = await noteDevice(config, device, { plan: text(input.plan, 12) || "free", version: text(input.version, 20), os: text(input.os, 20), browser: text(input.browser, 24) });
+    if (config.usage) recordCheckIn(config.usage, { device, account: meta.account ?? "", plan: meta.plan, os: meta.os, version: meta.version, team: await isTeam(config, device, meta), web: meta.os.startsWith("web"), counts: readCounts(input.counts) });
+  }
   return json(200, { now: config.now(), provider: config.provider.name, test: config.provider.test });
 }
 
-export async function noteDevice(config: ApiConfig, device: string, change: Partial<DeviceMeta>): Promise<void> {
+/** The team's own computer: marked as ours, the deploy check, or signed in to an admin's account. */
+async function isTeam(config: ApiConfig, device: string, meta: DeviceMeta): Promise<boolean> {
+  if (meta.internal === true || meta.os === "deploy" || device === "deploy-check") return true;
+  if (!meta.account) return false;
+  const email = (await getJson<{ email?: string }>(config.store, `acct:${meta.account}`))?.email?.toLowerCase();
+  return !!email && Object.keys(config.admin?.users ?? {}).some((admin) => admin.toLowerCase() === email);
+}
+
+/** Note a visit; returns the computer as now known. */
+export async function noteDevice(config: ApiConfig, device: string, change: Partial<DeviceMeta>): Promise<DeviceMeta> {
   const key = `device:${device}`;
   const now = config.now();
   const saved = await getJson<DeviceMeta>(config.store, key);
@@ -325,11 +340,12 @@ export async function noteDevice(config: ApiConfig, device: string, change: Part
   const day = (at: number) => new Date(at).toISOString().slice(0, 10);
   const newDay = !saved || day(saved.last) !== day(now);
   const same = saved && Object.entries(change).every(([name, value]) => value === "" || value === undefined || saved[name as keyof DeviceMeta] === value);
-  if (same && !newDay) return;
+  if (saved && same && !newDay) return saved;
   const next: DeviceMeta = { first: saved?.first ?? now, last: now, plan: "free", version: "", os: "", ...saved, ...Object.fromEntries(Object.entries(change).filter(([, value]) => value !== "" && value !== undefined)) };
   next.last = now;
   next.days = (saved?.days ?? 1) + (saved && newDay ? 1 : 0);
   await putJson(config.store, key, next, next as unknown as Record<string, unknown>);
+  return next;
 }
 
 /** One computer for the numbers: whether it is the team's own and whether it is the browser version. */
@@ -457,6 +473,8 @@ export async function stats(config: ApiConfig) {
       withPromo: paid.filter((entry) => entry.promo).length,
     },
     subscriptions: { active: activeSubs.length, refunded: subs.length - activeSubs.length, mrr: Math.round(mrr) },
+    // Day by day, from Analytics Engine; an error is shown on the page instead of failing the rest.
+    usage: await usageReport(config.usage).catch((error) => ({ error: error instanceof Error ? error.message : String(error) })),
     promos: (await listPromos(config.store)).map((promo) => ({ code: promo.code, used: promo.used, maxUses: promo.maxUses ?? null, expiresAt: promo.expiresAt ?? null })),
   };
 }

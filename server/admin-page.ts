@@ -133,6 +133,10 @@ export function adminPage(): string {
     <div class="card"><h2>Last 30 days<span class="legend"><span><i style="background:var(--blue)"></i>New installs</span><span><i style="background:var(--accent)"></i>Trials</span><span><i style="background:var(--good)"></i>Sales</span></span></h2><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="axis"></div></div>
     <div class="card"><h2>Funnel</h2><div class="funnel" id="funnel"></div></div>
   </section>
+  <section class="row2">
+    <div class="card"><h2>Active each day<span class="sub">installed apps · 60 days</span><span class="legend"><span><i style="background:var(--blue)"></i>Computers</span><span><i style="background:var(--good)"></i>Signed-in people</span></span></h2><svg class="chart" id="usage-chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="usage-axis"></div></div>
+    <div class="card"><h2>Active now</h2><div id="usage-now"></div></div>
+  </section>
   <section class="mix">
     <div class="card"><h2>Systems<span class="sub">30 days</span></h2><div class="bars" id="platforms"></div><div class="split"><span><i style="background:var(--accent)"></i>Installed app</span><span><i style="background:var(--blue)"></i>Browser</span></div></div>
     <div class="card"><h2>Browsers<span class="sub">web version · 30 days</span></h2><div class="bars" id="browsers"></div></div>
@@ -247,7 +251,7 @@ async function load() {
     $("mode").className = "pill " + (S.test ? "test" : "live");
     $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     $("team-note").textContent = (S.team ? "Your team’s " + S.team + (S.team === 1 ? " computer is" : " computers are") + " left out of the numbers (signed in to an admin’s account, or marked as ours). " : "") + "The browser demo counts browsers, not people: a private window is a new one.";
-    kpis(); chart(); funnel(); mix();
+    kpis(); chart(); funnel(); mix(); usage();
     tabs(); draw();
     if (open) show(open.kind, open.id, true);
   } catch (e) { say("Could not load: " + e.message); }
@@ -277,6 +281,31 @@ function chart() {
   D.days.forEach((day, i) => series.forEach((s, j) => { const v = D.series[s[0]][i]; if (!v) return; const h = (v / max) * 160; svg += '<rect x="' + (i * w + 2 + j * bw) + '" y="' + (170 - h) + '" width="' + Math.max(1, bw - 1) + '" height="' + h + '" rx="1.5" fill="' + s[1] + '"><title>' + day + ": " + v + " " + s[0] + "</title></rect>"; }));
   $("chart").innerHTML = svg;
   $("axis").innerHTML = "<span>" + date(D.days[0]) + "</span><span>peak " + max + " a day</span><span>Today</span>";
+}
+// Usage over time (Analytics Engine): daily computers and people, weekly actives, and what churches did.
+function usage() {
+  const U = S.usage;
+  if (!U || U.error) {
+    $("usage-chart").innerHTML = "";
+    $("usage-axis").innerHTML = "";
+    $("usage-now").innerHTML = '<p class="note">' + (U && U.error ? "Could not read usage: " + esc(U.error) : "Usage over time starts once the server can read it: set the ANALYTICS_TOKEN secret (a Cloudflare API token with Account Analytics Read). Check-ins are being recorded already.") + "</p>";
+    return;
+  }
+  const days = U.daily, max = Math.max(1, ...days.map((d) => d.computers));
+  const x = (i) => (days.length > 1 ? (i / (days.length - 1)) * 600 : 300), y = (v) => 165 - (v / max) * 155;
+  const line = (key, color) => days.length ? '<polyline fill="none" stroke="' + color + '" stroke-width="2" points="' + days.map((d, i) => x(i) + "," + y(d[key])).join(" ") + '"/>' : "";
+  let svg = "";
+  for (let g = 1; g <= 3; g++) svg += '<line x1="0" x2="600" y1="' + y((g / 3) * max) + '" y2="' + y((g / 3) * max) + '" stroke="rgba(255,255,255,.06)"/>';
+  svg += line("computers", "var(--blue)") + line("people", "var(--good)");
+  days.forEach((d, i) => { svg += '<circle cx="' + x(i) + '" cy="' + y(d.computers) + '" r="2.5" fill="var(--blue)"><title>' + d.day + ": " + d.computers + " computers, " + d.people + " people, " + d.services + " services, " + d.scripture + " scripture, " + d.songs + " songs</title></circle>"; });
+  $("usage-chart").innerHTML = svg;
+  $("usage-axis").innerHTML = days.length ? "<span>" + date(days[0].day) + "</span><span>peak " + max + " a day</span><span>" + date(days[days.length - 1].day) + "</span>" : "<span>No check-ins recorded yet.</span>";
+  const A = U.active, sticky = A.computers.month ? Math.round((A.computers.day / A.computers.month) * 100) : 0;
+  const last30 = days.slice(-30).reduce((t, d) => ({ services: t.services + d.services, scripture: t.scripture + d.scripture, songs: t.songs + d.songs }), { services: 0, scripture: 0, songs: 0 });
+  const weeks = U.weekly.slice(-12), wmax = Math.max(1, ...weeks.map((w) => w.computers));
+  $("usage-now").innerHTML = '<div class="stats3"><div><b>' + A.computers.day + " / " + A.computers.week + " / " + A.computers.month + "</b><span>computers · day / week / month</span></div><div><b>" + A.people.day + " / " + A.people.week + " / " + A.people.month + "</b><span>signed-in people</span></div><div><b>" + sticky + "%</b><span>DAU ÷ MAU</span></div></div>"
+    + "<h3>Active each week</h3>" + (weeks.map((w) => '<div class="bar"><span class="name">' + date(w.week) + '</span><span class="track" title="' + w.people + ' signed in"><i style="width:' + (w.computers / wmax) * 100 + '%;background:var(--blue)"></i></span><em>' + w.computers + "</em></div>").join("") || '<p class="note">No weeks yet.</p>')
+    + '<p class="note">Last 30 days: ' + last30.services + " services run · " + last30.scripture + " scripture shown · " + last30.songs + " songs shown. Churches peak once a week, so the weekly number says the most.</p>";
 }
 function funnel() {
   const f = D.funnel, top = Math.max(1, f.computers);

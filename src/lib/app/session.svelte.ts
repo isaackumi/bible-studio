@@ -217,6 +217,7 @@ import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearM
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
+import { countUse, usageCounts, usageSent } from "./usage-counts";
 import type { MessageTone } from "./status-line";
 import { whatsNewFor, type Release } from "../domain/changelog";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
@@ -443,6 +444,7 @@ class Session {
     const model = this.withScreenOverlays(withAlert(next.program.model, this.alert));
     this.#live = model === next.program.model ? next : { ...next, program: { ...next.program, model } };
     this.noteGoneLive(next.program.model);
+    this.noteSongLive(next.program.sourceId);
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
@@ -3249,6 +3251,7 @@ class Session {
       this.warn(t("Add a part to the service first."));
       return;
     }
+    countUse("services");
     if (move) {
       this.service = shiftSchedule(service, Math.floor(minutesOfDay(Date.now())));
       this.persistSoon();
@@ -4588,6 +4591,14 @@ class Session {
   }
 
   /** Keep every scripture that reaches Program (GO LIVE, cut, verse steps, voice, the phone). */
+  /** The song on Program, so each song shown counts once however many of its parts follow. */
+  private songLive: string | null = null;
+  private noteSongLive = (sourceId: string | null) => {
+    const song = sourceId?.startsWith("song:") ? (sourceId.split(":")[1] ?? null) : null;
+    if (song && song !== this.songLive) countUse("songs");
+    this.songLive = song;
+  };
+
   private noteGoneLive = (model: PresentationModel) => {
     const passage = this.programPassage(model);
     const key = passage ? goneLiveKey(passage) : null;
@@ -4596,6 +4607,7 @@ class Session {
     this.programPassageKey = key;
     this.programPassageNow = passage;
     if (!passage) return;
+    countUse("scripture");
     const words = model.layout === "scripture" ? model : model.layers?.find((layer) => layer.model.layout === "scripture")?.model;
     const snippet = words?.lines.map((line) => line.text).join(" ") ?? "";
     this.workspace = { ...this.workspace, goneLive: recordGoneLive(this.workspace.goneLive, passage, Date.now(), { previous, snippet }) };
@@ -5477,21 +5489,31 @@ class Session {
   };
 
   /**
-   * At start: read the plan, check in (anonymous, unless turned off), and renew the license's lease
+   * Check in (anonymous, unless turned off in Settings › Privacy) with what was done since the last
+   * time: how many services were run and scripture and songs shown, counts only.
+   */
+  private checkIn = async () => {
+    if (this.workspace.shareUsage === false) return;
+    const counts = usageCounts();
+    const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), browser: this.browserName(), plan: this.plan, counts, ...(import.meta.env.DEV ? { dev: true } : {}) });
+    if (!hello.ok) return;
+    usageSent(counts);
+    this.billingTest = hello.data.test === true;
+    // The server's clock: the native core never lets this computer's clock trail it.
+    if (typeof hello.data.now === "number") this.ent = await api.entitlementNoteTime(hello.data.now).catch(() => this.ent);
+  };
+
+  /**
+   * At start: read the plan, check in, and renew the license's lease
    * when it is due. A computer offline keeps its plan until its lease asks for a check-in.
    */
   private bootEntitlement = async () => {
     this.deviceId = await api.entitlementDevice().catch(() => "");
     await this.refreshEntitlement();
     void this.startErrorReports();
-    if (this.workspace.shareUsage !== false) {
-      const hello = await serverCall<{ now: number; test: boolean }>("/v1/hello", { device: this.deviceId, version: APP_VERSION, os: this.osName(), browser: this.browserName(), plan: this.plan, ...(import.meta.env.DEV ? { dev: true } : {}) });
-      if (hello.ok) {
-        this.billingTest = hello.data.test === true;
-        // The server's clock: the native core never lets this computer's clock trail it.
-        if (typeof hello.data.now === "number") this.ent = await api.entitlementNoteTime(hello.data.now).catch(() => this.ent);
-      }
-    }
+    await this.checkIn();
+    // While the app stays open (a Saturday rehearsal into Sunday morning), every few hours too.
+    this.every(3 * 60 * 60_000, () => void this.checkIn());
     await this.checkActivation();
     // Offline too long: a paid plan must check in before its lease runs out; say so a week ahead.
     const renewBy = this.ent.kind === "license" ? (this.ent.renewBy ?? 0) : 0;
