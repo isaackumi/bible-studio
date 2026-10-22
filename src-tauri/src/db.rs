@@ -382,7 +382,7 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
         .and_then(|e| e.to_str())
         .unwrap_or("img")
         .to_ascii_lowercase();
-    let kind = media_kind(&ext).ok_or("Use a PNG, JPEG, WebP or GIF image, an MP4, MOV, M4V or WebM video, or MP3, M4A, AAC, WAV, OGG or FLAC audio.")?;
+    let kind = media_kind(&ext).ok_or("Use a PNG, JPEG, WebP, GIF or SVG image, an MP4, MOV, M4V or WebM video, or MP3, M4A, AAC, WAV, OGG or FLAC audio.")?;
     let name = source
         .file_name()
         .and_then(|n| n.to_str())
@@ -394,7 +394,9 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
 /// Image, video or audio, by extension. Anything else is refused.
 pub fn media_kind(ext: &str) -> Option<&'static str> {
     match ext {
-        "png" | "jpg" | "jpeg" | "webp" | "gif" => Some("image"),
+        // An SVG is turned into a PNG by the desk straight after (fit-image.ts); until then it is
+        // only ever shown as a picture, which cannot run its scripts.
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg" => Some("image"),
         "mp4" | "m4v" | "mov" | "webm" => Some("video"),
         "mp3" | "m4a" | "aac" | "wav" | "ogg" | "oga" | "flac" => Some("audio"),
         _ => None,
@@ -580,6 +582,7 @@ mod tests {
         assert_eq!(super::media_kind("png"), Some("image"));
         assert_eq!(super::media_kind("mp3"), Some("audio"));
         assert_eq!(super::media_kind("exe"), None);
+        assert_eq!(super::media_kind("svg"), Some("image"));
     }
 
     use super::*;

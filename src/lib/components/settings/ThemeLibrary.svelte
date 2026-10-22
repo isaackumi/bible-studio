@@ -151,8 +151,8 @@
     const { open } = await import("@tauri-apps/plugin-dialog");
     const filters =
       type === "video"
-        ? [{ name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }, { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }]
-        : [{ name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }, { name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }];
+        ? [{ name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }, { name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] }]
+        : [{ name: "Image", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] }, { name: "Video", extensions: ["mp4", "m4v", "mov", "webm"] }];
     const picked = await open({ multiple: false, filters });
     if (typeof picked !== "string") return;
     await useImported(await session.importImage(picked));

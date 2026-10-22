@@ -138,8 +138,10 @@
   .line.chorded { display: flex; flex-wrap: wrap; align-items: flex-end; white-space: pre; }
   .seg { display: inline-flex; flex-direction: column; }
   .chord { font-size: 0.6em; line-height: 1.1; font-weight: 800; color: #f5c451; min-height: 1.1em; padding-right: 0.4em; }
-  .stage-message { margin: 0; padding: 2vh 2vw; border-radius: 12px; background: #ffd60a; color: #000; font-size: 6vh; font-weight: 800; text-align: center; animation: call 1.2s ease-in-out infinite alternate; }
-  @keyframes call { from { box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.7); } to { box-shadow: 0 0 0 1.2vh rgba(255, 214, 10, 0); } }
+  .stage-message { position: relative; margin: 0; padding: 2vh 2vw; border-radius: 12px; background: #ffd60a; color: #000; font-size: 6vh; font-weight: 800; text-align: center; }
+  /* A ring that grows and fades around the message: moved and faded, never repainted. */
+  .stage-message::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 1.2vh rgba(255, 214, 10, 0.7); pointer-events: none; animation: call 1.2s ease-out infinite; }
+  @keyframes call { from { transform: scale(0.98); opacity: 1; } to { transform: scale(1.06); opacity: 0; } }
   .notes { padding: 1.5vh 1.5vw; border: 1px dashed #444; border-radius: 10px; color: #e8e8e8; }
   .rich-notes { margin-top: 0.6vh; max-height: 22vh; overflow: hidden; line-height: 1.35; }
   .notes p:last-child { margin: 0.6vh 0 0; font-size: 3vh; line-height: 1.35; white-space: pre-wrap; max-height: 22vh; overflow: hidden; }

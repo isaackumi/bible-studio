@@ -2,7 +2,8 @@
   import { untrack } from "svelte";
   import { session } from "../../app/session.svelte";
   import { mediaUrl } from "../../db/api";
-  import { addLayer, duplicateLayer, moveLayerTo, removeLayer, reorderLayers, resizeLayer, sanitizeBackground, setCompositionBackground, type Composition, type CompositionLayer, type PageBackground } from "../../domain/composition";
+  import { addLayer, duplicateLayer, moveLayerTo, removeLayer, reorderLayers, resizeLayer, sanitizeBackground, setCompositionBackground, setLayerGroup, type Composition, type CompositionLayer, type PageBackground } from "../../domain/composition";
+  import { alignTogether } from "../../domain/snap";
   import {
     addIconElement,
     addImageElement,
@@ -33,6 +34,51 @@
   let draft = $state<SlideDeck>(untrack(() => JSON.parse(JSON.stringify(deck))));
   let pageIndex = $state(0);
   let selectedId = $state<string | null>(null);
+  /** Picked with the selected element (Shift-click, or the rest of its group); cleared whenever the selection changes elsewhere. */
+  let alsoFor = $state<{ primary: string | null; ids: string[] }>({ primary: null, ids: [] });
+  const also = $derived(alsoFor.primary === selectedId && selectedId ? alsoFor.ids.filter((id) => id !== selectedId && page.layers.some((layer) => layer.id === id)) : []);
+  /** Everything picked: the selected element first. */
+  const pickedIds = $derived(selectedId ? [selectedId, ...also] : []);
+
+  function pickLayer(id: string | null, add = false) {
+    imageMenu = false;
+    if (!id) {
+      selectedId = null;
+      return;
+    }
+    if (add && selectedId) {
+      const rest = pickedIds.filter((entry) => entry !== id);
+      if (rest.length === pickedIds.length) {
+        alsoFor = { primary: id, ids: pickedIds };
+        selectedId = id;
+      } else {
+        // Taking one away: what is left stays picked.
+        const [first = null, ...others] = rest;
+        alsoFor = { primary: first, ids: others };
+        selectedId = first;
+      }
+      return;
+    }
+    // A grouped element brings its whole group.
+    const group = page.layers.find((layer) => layer.id === id)?.group;
+    alsoFor = { primary: id, ids: group ? page.layers.filter((layer) => layer.group === group && layer.id !== id).map((layer) => layer.id) : [] };
+    selectedId = id;
+  }
+
+  function alignPicked(where: "left" | "center" | "right" | "top" | "middle" | "bottom") {
+    const layers = pickedIds.map((id) => page.layers.find((layer) => layer.id === id)!).filter((layer) => !layer.locked);
+    const lined = alignTogether(layers.map((layer) => layer.bounds), where);
+    commitPage(layers.reduce((next, layer, index) => resizeLayer(next, layer.id, lined[index]!), page));
+  }
+  function groupPicked() {
+    if (pickedIds.length < 2) return;
+    commitPage(setLayerGroup(page, pickedIds, `group:${Math.random().toString(36).slice(2, 8)}`));
+  }
+  function ungroupPicked() {
+    commitPage(setLayerGroup(page, pickedIds, null));
+    alsoFor = { primary: null, ids: [] };
+  }
+  const grouped = $derived(pickedIds.length > 1 && pickedIds.every((id) => { const group = page.layers.find((layer) => layer.id === id)?.group; return !!group && group === page.layers.find((layer) => layer.id === selectedId)?.group; }));
   let zoom = $state(100);
   let undoStack = $state<string[]>([]);
   let redoStack = $state<string[]>([]);
@@ -206,6 +252,12 @@
       selectedId = next.layers.at(-1)?.id ?? selectedId;
       return;
     }
+    if (command && event.key.toLowerCase() === "g" && selected) {
+      event.preventDefault();
+      if (event.shiftKey) ungroupPicked();
+      else groupPicked();
+      return;
+    }
     if (command && (event.key === "]" || event.key === "[") && selected) {
       event.preventDefault();
       const forward = event.key === "]";
@@ -213,17 +265,21 @@
       return;
     }
     const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
-    if (nudge && selected && !selected.locked) {
+    if (nudge && selected) {
       event.preventDefault();
       const step = event.shiftKey ? 5 : 0.5;
-      const { x, y, w, h } = selected.bounds;
-      commitPage(resizeLayer(page, selected.id, { x: x + nudge[0]! * step, y: y + nudge[1]! * step, w, h }));
+      let next = page;
+      for (const id of pickedIds) {
+        const layer = next.layers.find((entry) => entry.id === id);
+        if (layer && !layer.locked) next = resizeLayer(next, id, { ...layer.bounds, x: layer.bounds.x + nudge[0]! * step, y: layer.bounds.y + nudge[1]! * step });
+      }
+      commitPage(next);
       return;
     }
     if ((event.key === "Delete" || event.key === "Backspace") && selected && !selected.locked) {
       event.preventDefault();
       event.stopPropagation();
-      commitPage(removeLayer(page, selected.id));
+      commitPage(pickedIds.reduce((next, id) => (next.layers.find((layer) => layer.id === id)?.locked ? next : removeLayer(next, id)), page));
       selectedId = null;
     } else if (event.key === "Escape") {
       event.preventDefault();
@@ -312,7 +368,8 @@
           {page}
           {selectedId}
           {zoom}
-          onselect={(id) => { selectedId = id; imageMenu = false; }}
+          {also}
+          onselect={pickLayer}
           onpreview={previewPage}
           oncommit={endDrag}
           onedittext={(id) => (editingText = id)}
@@ -326,7 +383,26 @@
     </main>
 
     <aside class="inspect" aria-label={t("Inspector")}>
-      {#if selected}
+      {#if selected && also.length}
+        <h3>{t("{n} elements picked", { n: pickedIds.length })}</h3>
+        <div class="stack">
+          <span>{t("Line them up")}</span>
+          <div class="align-together" role="group" aria-label={t("Line them up")}>
+            {#each [["left", t("Left")], ["center", t("Centre")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
+              <button type="button" onclick={() => alignPicked(where as "left")}>{label}</button>
+            {/each}
+          </div>
+        </div>
+        <div class="sign-row">
+          {#if grouped}
+            <button type="button" class="btn" onclick={ungroupPicked}>{t("Ungroup")}</button>
+          {:else}
+            <button type="button" class="btn" onclick={groupPicked}>{t("Group")}</button>
+          {/if}
+          <button type="button" class="btn danger" onclick={() => { commitPage(pickedIds.reduce((next, id) => removeLayer(next, id), page)); selectedId = null; }}>{t("Delete")}</button>
+        </div>
+        <p class="note">{t("Drag any of them to move them together. Shift-click to add or take one away. ⌘G groups them, ⌘⇧G ungroups.")}</p>
+      {:else if selected}
         <ElementInspector {page} layer={selected} oncommit={commitPage} />
       {:else}
         <h3>{page.name}</h3>
@@ -449,4 +525,10 @@
   .text-edit button { align-self: flex-end; min-height: 32px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer; }
   :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
   @media (max-width: 1100px) { .body { grid-template-columns: 180px minmax(0, 1fr) 260px; } }
+  .align-together { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .align-together button { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+  .align-together button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  .sign-row { display: flex; gap: 8px; margin: 12px 0 8px; }
+  .sign-row .btn { flex: 1; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .sign-row .btn.danger { color: var(--danger, #ff6b5e); }
 </style>

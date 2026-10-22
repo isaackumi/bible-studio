@@ -11,6 +11,7 @@
     setLayerLocked,
     moveLayerTo,
     setLayerAnimation,
+    setLayerRotation,
     setLayerOpacity,
     setLayerStyle,
     sourceRef,
@@ -167,6 +168,14 @@
     {/each}
   </div>
   <label class="field-row">
+    <span>{t("Turn")}</span>
+    <span class="inline">
+      <input class="field turn" type="number" min="-180" max="180" step="1" aria-label={t("Turn, in degrees")} value={layer.rotation ?? 0} onchange={(event) => oncommit(setLayerRotation(page, layer.id, Number(event.currentTarget.value)))} />
+      <span class="unit">°</span>
+      {#if layer.rotation}<button type="button" class="quiet" onclick={() => oncommit(setLayerRotation(page, layer.id, 0))}>{t("Straighten")}</button>{/if}
+    </span>
+  </label>
+  <label class="field-row">
     <span>{t("Opacity")}</span>
     <input type="range" min="0" max="1" step="0.05" aria-label={t("Element opacity")} value={layer.opacity} onchange={(event) => oncommit(setLayerOpacity(page, layer.id, Number(event.currentTarget.value)))} />
   </label>
@@ -231,4 +240,8 @@
   .align { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .align button { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
   .align button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
+  .turn { width: 70px; }
+  .unit { color: var(--muted); font-size: 12px; align-self: center; }
+  .quiet { margin-left: auto; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .quiet:hover { color: var(--ink); background: color-mix(in srgb, currentColor 8%, transparent); }
 </style>

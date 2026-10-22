@@ -282,6 +282,7 @@
         style:--layer-dur="{layer.animation?.durationMs ?? 400}ms"
         style:--layer-ease={layer.animation?.easing ?? "ease-out"}
         style:--layer-delay="{layer.animation?.delayMs ?? 0}ms"
+        style:rotate={layer.rotation ? `${layer.rotation}deg` : undefined}
       >
         <FrameView
           model={layer.model}

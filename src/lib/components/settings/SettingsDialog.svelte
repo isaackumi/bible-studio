@@ -480,7 +480,7 @@
       return;
     }
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const picked = await open({ multiple: false, filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] }] });
+    const picked = await open({ multiple: false, filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp4", "m4v", "mov", "webm"] }] });
     if (typeof picked === "string") await session.importImage(picked);
   }
 

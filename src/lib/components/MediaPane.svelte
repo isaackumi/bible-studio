@@ -19,7 +19,7 @@
     const picked = await open({
       multiple: false,
       filters: [
-        { name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "m4v", "mov", "webm"] },
+        { name: "Image or video", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp4", "m4v", "mov", "webm"] },
       ],
     });
     if (typeof picked === "string") await session.importImage(picked);

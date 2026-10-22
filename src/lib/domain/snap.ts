@@ -89,3 +89,28 @@ export function alignToPage(bounds: LayerBounds, where: "left" | "center" | "rig
       return { ...bounds, y: 100 - bounds.h };
   }
 }
+
+/** Line several elements up with each other: by the edges or centres of the space they cover together. */
+export function alignTogether(boxes: LayerBounds[], where: "left" | "center" | "right" | "top" | "middle" | "bottom"): LayerBounds[] {
+  if (boxes.length < 2) return boxes;
+  const left = Math.min(...boxes.map((box) => box.x));
+  const right = Math.max(...boxes.map((box) => box.x + box.w));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  return boxes.map((box) => {
+    switch (where) {
+      case "left":
+        return { ...box, x: left };
+      case "center":
+        return { ...box, x: (left + right) / 2 - box.w / 2 };
+      case "right":
+        return { ...box, x: right - box.w };
+      case "top":
+        return { ...box, y: top };
+      case "middle":
+        return { ...box, y: (top + bottom) / 2 - box.h / 2 };
+      case "bottom":
+        return { ...box, y: bottom - box.h };
+    }
+  });
+}

@@ -65,6 +65,10 @@ export type CompositionLayer = {
   fit: LayerFit;
   source: SourceRef;
   animation: LayerAnimation;
+  /** Turned this many degrees about its centre (a ribbon, a tilted photo). */
+  rotation?: number;
+  /** Elements grouped together on a page move and are picked as one. */
+  group?: string;
   /** Link to Workspace.sources; absent = unlinked copy. */
   sourceKey?: string;
   /** A panel behind the layer so words read over a camera or picture. */
@@ -1377,7 +1381,45 @@ export function sanitizeComposition(value: unknown): Composition {
       animation: sanitizeAnimation(layer.animation),
       ...(typeof layer.sourceKey === "string" && layer.sourceKey ? { sourceKey: layer.sourceKey } : {}),
       ...(sanitizeBacking(layer.backing) ? { backing: sanitizeBacking(layer.backing)! } : {}),
+      ...(normalRotation(layer.rotation) ? { rotation: normalRotation(layer.rotation) } : {}),
+      ...(typeof layer.group === "string" && /^[\w:-]{1,40}$/.test(layer.group) ? { group: layer.group } : {}),
     })),
+  };
+}
+
+/** Degrees in −180…180, whole (0 when not turned). */
+export function normalRotation(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  const turned = Math.round(((((n + 180) % 360) + 360) % 360) - 180);
+  return turned === -180 ? 180 : turned;
+}
+
+/** Turn an element (degrees about its centre). */
+export function setLayerRotation(composition: Composition, layerId: string, degrees: number): Composition {
+  if (composition.locked) return composition;
+  const rotation = normalRotation(degrees);
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => {
+      if (layer.id !== layerId || layer.locked) return layer;
+      const { rotation: _old, ...rest } = layer;
+      return rotation ? { ...rest, rotation } : rest;
+    }),
+  };
+}
+
+/** Group elements (they move and are picked as one), or ungroup them with null. */
+export function setLayerGroup(composition: Composition, layerIds: string[], group: string | null): Composition {
+  if (composition.locked) return composition;
+  const ids = new Set(layerIds);
+  return {
+    ...composition,
+    layers: composition.layers.map((layer) => {
+      if (!ids.has(layer.id)) return layer;
+      const { group: _old, ...rest } = layer;
+      return group ? { ...rest, group } : rest;
+    }),
   };
 }
 
@@ -1738,6 +1780,7 @@ export function presentComposition(composition: Composition, ctx: CompileContext
       id: layer.id,
       zIndex: layer.zIndex,
       opacity: layer.opacity,
+      ...(layer.rotation ? { rotation: layer.rotation } : {}),
       bounds: (edges === "framed" || edges === "gap") && isRegion(layer) ? framedBounds(layer.bounds, ctx.canvas ?? composition.canvas) : layer.bounds,
       ...((edges === "line" || edges === "framed") && isRegion(layer) ? { edge: edges, ...(composition.edgeColor ? { edgeColor: composition.edgeColor } : {}) } : {}),
       fit: layer.fit,

@@ -117,6 +117,8 @@ export type PaintedLayer = {
   fit: "contain" | "cover" | "fill";
   sourceId: string;
   model: PresentationModel;
+  /** Turned this many degrees about its centre. */
+  rotation?: number;
   /** Camera layers only: flip the video horizontally. */
   mirror?: boolean;
   /** A backing behind the layer so text reads over a camera or picture (CSS color). */

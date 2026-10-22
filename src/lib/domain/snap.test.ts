@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignToPage, snapBounds } from "./snap";
+import { alignToPage, alignTogether, snapBounds } from "./snap";
 
 describe("snapping", () => {
   it("catches a moved box's centre on the page's centre, and shows the line", () => {
@@ -24,5 +24,12 @@ describe("snapping", () => {
   it("lines a box up with the page", () => {
     expect(alignToPage({ x: 5, y: 5, w: 20, h: 10 }, "center")).toEqual({ x: 40, y: 5, w: 20, h: 10 });
     expect(alignToPage({ x: 5, y: 5, w: 20, h: 10 }, "bottom")).toEqual({ x: 5, y: 90, w: 20, h: 10 });
+  });
+
+  it("lines several elements up with each other", () => {
+    const boxes = [{ x: 10, y: 10, w: 20, h: 10 }, { x: 40, y: 30, w: 10, h: 10 }];
+    expect(alignTogether(boxes, "left").map((box) => box.x)).toEqual([10, 10]);
+    expect(alignTogether(boxes, "center").map((box) => box.x + box.w / 2)).toEqual([30, 30]);
+    expect(alignTogether(boxes, "bottom").map((box) => box.y + box.h)).toEqual([40, 40]);
   });
 });

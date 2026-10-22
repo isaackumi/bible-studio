@@ -3820,4 +3820,13 @@ export const es: Readonly<Record<string, string>> = {
   "Middle": "Medio",
   "To back": "Al fondo",
   "To front": "Al frente",
+  "Drag any of them to move them together. Shift-click to add or take one away. ⌘G groups them, ⌘⇧G ungroups.": "Arrastra cualquiera para moverlos juntos. Mayús-clic para añadir o quitar uno. ⌘G los agrupa, ⌘⇧G los desagrupa.",
+  "Drag to turn (Shift: 15° steps)": "Arrastra para girar (Mayús: pasos de 15°)",
+  "Group": "Agrupar",
+  "Line them up": "Alinearlos",
+  "Straighten": "Enderezar",
+  "Turn": "Giro",
+  "Turn, in degrees": "Giro, en grados",
+  "Ungroup": "Desagrupar",
+  "{n} elements picked": "{n} elementos elegidos",
 };

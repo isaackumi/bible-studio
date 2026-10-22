@@ -263,10 +263,14 @@ button { cursor: pointer; }
 .frame .backdrop-tint { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: normal; }
 .frame.wash .line, .frame.wash .ref, .frame.wash .attr { text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); }
 .frame.wash.light .line, .frame.wash.light .ref, .frame.wash.light .attr { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45); }
-.frame.drift { background-size: 160% 160%; animation: wash-drift 22s ease-in-out infinite alternate; }
-.frame.glow { animation: wash-glow 9s ease-in-out infinite alternate; }
-@keyframes wash-drift { from { background-position: 0% 0%; } to { background-position: 80% 40%; } }
-@keyframes wash-glow { from { background-size: 100% 120%; } to { background-size: 140% 160%; } }
+/* Moving washes: the gradient is painted once on a layer behind the words, and the layer itself
+   moves or grows (transform), which the graphics card does without repainting the screen. */
+.frame.drift, .frame.glow { isolation: isolate; }
+.frame.drift::before, .frame.glow::before { content: ""; position: absolute; z-index: -1; background: inherit; pointer-events: none; will-change: transform; }
+.frame.drift::before { inset: -30%; animation: wash-drift 22s ease-in-out infinite alternate; }
+.frame.glow::before { inset: 0; transform-origin: 50% 100%; animation: wash-glow 9s ease-in-out infinite alternate; }
+@keyframes wash-drift { from { transform: translate(0, 0); } to { transform: translate(-15%, -7.5%); } }
+@keyframes wash-glow { from { transform: scale(1, 1.2); } to { transform: scale(1.4, 1.6); } }
 .frame.lower .stack {
   position: absolute;
   left: 0;
@@ -323,11 +327,11 @@ button { cursor: pointer; }
   font-size: 64px !important;
 }
 /* Last stretch of a countdown: beaming red. At zero it holds solid red. */
-.frame.timer.warning .line { color: #ff2b2b !important; animation: timer-beam 1s ease-in-out infinite; }
+.frame.timer.warning .line { color: #ff2b2b !important; text-shadow: 0 0 28px rgba(255, 43, 43, 0.7); animation: timer-beam 1s ease-in-out infinite; }
 .frame.timer.done .line { color: #ff2b2b !important; text-shadow: 0 0 28px rgba(255, 43, 43, 0.6); }
 @keyframes timer-beam {
-  0%, 100% { opacity: 1; text-shadow: 0 0 34px rgba(255, 43, 43, 0.85); }
-  50% { opacity: 0.55; text-shadow: 0 0 6px rgba(255, 43, 43, 0.2); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 @media (prefers-reduced-motion: reduce) {
   .frame.timer.warning .line { animation: none; }
@@ -846,6 +850,8 @@ button { cursor: pointer; }
 :root[data-calm] .motion i,
 :root[data-calm] .motion i::before,
 :root[data-calm] .motion i::after { animation-play-state: paused !important; }
+:root[data-calm] .frame.drift::before,
+:root[data-calm] .frame.glow::before { animation-play-state: paused !important; }
 
 /* On/off switches everywhere (Settings has the same look). */
 input.switch {

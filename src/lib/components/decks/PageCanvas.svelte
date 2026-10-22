@@ -1,6 +1,6 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { applyLayerDrag, layerOrder, presentComposition, resizeLayer, type Composition, type LayerDragHandle } from "../../domain/composition";
+  import { applyLayerDrag, layerOrder, presentComposition, resizeLayer, setLayerRotation, type Composition, type LayerDragHandle } from "../../domain/composition";
   import { snapBounds, type Guide } from "../../domain/snap";
   import { withMediaUrls } from "../../domain/sources";
   import { mediaUrl } from "../../db/api";
@@ -13,6 +13,7 @@
   let {
     page,
     selectedId,
+    also = [],
     zoom,
     onselect,
     onpreview,
@@ -21,8 +22,11 @@
   }: {
     page: Composition;
     selectedId: string | null;
+    /** Picked with it (Shift-click, or the rest of its group): they move together. */
+    also?: string[];
     zoom: number;
-    onselect: (id: string | null) => void;
+    /** `add`: Shift-click, adding to (or taking from) what is picked. */
+    onselect: (id: string | null, add?: boolean) => void;
     /** Live update while dragging (no history entry). */
     onpreview: (page: Composition) => void;
     /** A finished change (one history entry). */
@@ -51,15 +55,40 @@
   );
   const boxes = $derived(layerOrder(page).filter((layer) => layer.visible));
 
-  let drag: { id: string; handle: LayerDragHandle; x: number; y: number; start: Composition; moved: boolean } | null = null;
+  let drag: { id: string; handle: LayerDragHandle | "rotate"; x: number; y: number; start: Composition; moved: boolean; with: string[] } | null = null;
+  const picked = $derived(new Set([selectedId, ...also].filter((id): id is string => !!id)));
 
-  function down(event: PointerEvent, id: string, handle: LayerDragHandle) {
+  function down(event: PointerEvent, id: string, handle: LayerDragHandle | "rotate") {
     event.stopPropagation();
-    onselect(id);
+    // Shift-click adds or takes away; a plain click on something already picked keeps the group to move it.
+    if (event.shiftKey && handle === "move") {
+      onselect(id, true);
+      return;
+    }
+    if (!picked.has(id) || handle !== "move") onselect(id);
     const layer = page.layers.find((entry) => entry.id === id);
     if (!layer || layer.locked || page.locked) return;
     (event.currentTarget as Element).setPointerCapture(event.pointerId);
-    drag = { id, handle, x: event.clientX, y: event.clientY, start: page, moved: false };
+    const together = handle === "move" && picked.has(id) ? [...picked].filter((other) => other !== id) : [];
+    drag = { id, handle, x: event.clientX, y: event.clientY, start: page, moved: false, with: together };
+  }
+
+  /** Turning: the angle from the element's centre to the pointer; it catches on every 45° (Shift: 15° steps). */
+  function turn(event: PointerEvent) {
+    if (!drag || !canvas) return;
+    const layer = drag.start.layers.find((entry) => entry.id === drag!.id);
+    if (!layer) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.left + ((layer.bounds.x + layer.bounds.w / 2) / 100) * rect.width;
+    const cy = rect.top + ((layer.bounds.y + layer.bounds.h / 2) / 100) * rect.height;
+    let degrees = (Math.atan2(event.clientY - cy, event.clientX - cx) * 180) / Math.PI + 90;
+    if (event.shiftKey) degrees = Math.round(degrees / 15) * 15;
+    else {
+      const nearest = Math.round(degrees / 45) * 45;
+      if (Math.abs(degrees - nearest) < 4) degrees = nearest;
+    }
+    drag.moved = true;
+    onpreview(setLayerRotation(drag.start, drag.id, degrees));
   }
 
   /** The lines a dragged element caught on, shown while dragging. */
@@ -67,6 +96,7 @@
 
   function move(event: PointerEvent) {
     if (!drag || !canvas) return;
+    if (drag.handle === "rotate") return turn(event);
     const rect = canvas.getBoundingClientRect();
     const dx = ((event.clientX - drag.x) / rect.width) * 100;
     const dy = ((event.clientY - drag.y) / rect.height) * 100;
@@ -80,10 +110,19 @@
       onpreview(dragged);
       return;
     }
-    const others = dragged.layers.filter((entry) => entry.id !== layer.id && entry.visible).map((entry) => entry.bounds);
+    const moving = new Set([layer.id, ...drag.with]);
+    const others = dragged.layers.filter((entry) => !moving.has(entry.id) && entry.visible).map((entry) => entry.bounds);
     const snapped = snapBounds(layer.bounds, others, drag.handle);
     guides = snapped.guides;
-    onpreview(resizeLayer(dragged, layer.id, snapped.bounds));
+    let next = resizeLayer(dragged, layer.id, snapped.bounds);
+    // Everything picked with it moves by the same amount (snapping included).
+    const sx = snapped.bounds.x - (drag.start.layers.find((entry) => entry.id === layer.id)?.bounds.x ?? 0);
+    const sy = snapped.bounds.y - (drag.start.layers.find((entry) => entry.id === layer.id)?.bounds.y ?? 0);
+    for (const id of drag.with) {
+      const start = drag.start.layers.find((entry) => entry.id === id);
+      if (start && !start.locked) next = resizeLayer(next, id, { ...start.bounds, x: start.bounds.x + sx, y: start.bounds.y + sy });
+    }
+    onpreview(next);
   }
 
   function up() {
@@ -105,6 +144,7 @@
       <div
         class="box"
         class:selected={selectedId === layer.id}
+        class:also={selectedId !== layer.id && picked.has(layer.id)}
         class:locked={layer.locked}
         role="button"
         tabindex="-1"
@@ -113,6 +153,7 @@
         style:top="{layer.bounds.y}%"
         style:width="{layer.bounds.w}%"
         style:height="{layer.bounds.h}%"
+        style:rotate={layer.rotation ? `${layer.rotation}deg` : undefined}
         onpointerdown={(event) => down(event, layer.id, "move")}
         ondblclick={() => layer.source.type === "text" && onedittext(layer.id)}
       >
@@ -120,6 +161,7 @@
           {#each handles as handle (handle)}
             <span class="handle {handle}" role="presentation" onpointerdown={(event) => down(event, layer.id, handle)}></span>
           {/each}
+          <span class="handle rotate" role="presentation" title={t("Drag to turn (Shift: 15° steps)")} onpointerdown={(event) => down(event, layer.id, "rotate")}></span>
         {/if}
       </div>
     {/each}
@@ -150,4 +192,8 @@
   .guide { position: absolute; z-index: 5; pointer-events: none; background: #ff3d8b; }
   .guide.x { top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); }
   .guide.y { left: 0; right: 0; height: 1px; transform: translateY(-0.5px); }
+  /* Turning: a round handle above the element, on a short stem. */
+  .handle.rotate { left: 50%; top: -22px; width: 14px; height: 14px; border-radius: 50%; cursor: grab; }
+  .handle.rotate::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 14px; background: var(--accent); }
+  .box.also { outline: 1.5px dashed var(--accent); outline-offset: 1px; }
 </style>
