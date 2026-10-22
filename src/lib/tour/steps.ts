@@ -191,8 +191,8 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       },
       {
         target: [".prod-modes"],
-        title: msg("Studio and Looks"),
-        body: msg("Studio runs the service with scenes. Looks is where you design layouts like scripture over a camera."),
+        title: msg("Scenes and Looks"),
+        body: msg("Scenes runs the service with scenes. Looks is where you design layouts like scripture over a camera."),
       },
       {
         target: [".pane.preview"],

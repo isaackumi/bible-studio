@@ -5,7 +5,8 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 export type QrStyle = "square" | "rounded" | "dots";
 
 /** A QR frame. Empty data paints the empty frame rather than a code nobody can use. */
-export function presentQr(input: { theme: Theme; data: string; style?: QrStyle; dark?: string; light?: string; caption?: string }): PresentationModel {
+export function presentQr(input: { theme: Theme; data: string; style?: QrStyle; dark?: string; light?: string; caption?: string; code?: { value: string; at: string } }): PresentationModel {
+  const code = input.code && /^[A-Z0-9]{4,8}$/.test(input.code.value) ? { value: input.code.value, at: input.code.at.trim().slice(0, 60) } : undefined;
   const data = input.data.trim().slice(0, 1000);
   return {
     layout: data ? "qr" : "empty",
@@ -23,6 +24,7 @@ export function presentQr(input: { theme: Theme; data: string; style?: QrStyle; 
             dark: input.dark && HEX.test(input.dark) ? input.dark : "#000000",
             light: input.light && HEX.test(input.light) ? input.light : "#ffffff",
             caption: (input.caption ?? "").trim().slice(0, 80),
+            ...(code ? { code } : {}),
           },
         }
       : {}),

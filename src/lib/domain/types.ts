@@ -166,7 +166,15 @@ export type PresentationModel = {
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
   video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
   /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
-  qr?: { data: string; style: "square" | "rounded" | "dots"; dark: string; light: string; caption: string };
+  qr?: {
+    data: string;
+    style: "square" | "rounded" | "dots";
+    dark: string;
+    light: string;
+    caption: string;
+    /** For people too far away to scan: a code to type in at a short address (a room's join code). */
+    code?: { value: string; at: string };
+  };
   /** A web page shown live: a website, a YouTube or Vimeo player, Google Slides. */
   web?: { url: string; kind: import("./web").WebKind; label: string; zoom: number; mute: boolean };
   /** An alert riding on top of Program (never Preview), e.g. a nursery call. */

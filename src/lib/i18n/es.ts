@@ -4031,4 +4031,8 @@ export const es: Readonly<Record<string, string>> = {
   "Leftover files": "Archivos sobrantes",
   "Remove {n} file": "Quitar {n} archivo",
   "Remove {n} files": "Quitar {n} archivos",
+  "Scenes and Looks": "Escenas y Looks",
+  "Scenes runs the service with scenes. Looks is where you design layouts like scripture over a camera.": "Escenas lleva el culto con escenas. Looks es donde diseñas composiciones, como la Escritura sobre una cámara.",
+  "or go to": "o entra en",
+  "and enter": "e introduce",
 };

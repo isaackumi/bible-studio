@@ -21,6 +21,7 @@
 //   POST /v1/rooms/:code/close           {hostKey}
 //   POST /v1/rooms/:code/share           {hostKey, on?, frame?}  (the desk shares its screen, or stops)
 //   GET  /v1/rooms/:code/screen?after=   (a display: the latest screen, or 204 when nothing is new)
+//   GET  /j                              type a room code in (for people too far away to scan)
 //   GET  /j/:code                        the audience page
 //   GET  /d/:code                        a browser or phone as a display (the app's own screen)
 
@@ -581,6 +582,8 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
   // A browser or phone as a display: the app's own screen, showing what the church's screen shows.
   const displayPage = path.match(/^\/d\/([A-Za-z0-9]{6})$/);
   if (displayPage && request.method === "GET") return Response.redirect(`${origin}/app/?receiver=${displayPage[1]!.toUpperCase()}`, 302);
+  // The short address on the screen: type the code in by hand.
+  if ((path === "/j" || path === "/j/") && request.method === "GET") return new Response(page("", origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   const joinPage = path.match(/^\/j\/([A-Za-z0-9]{6})$/);
   if (joinPage && request.method === "GET") {
     return new Response(page(joinPage[1]!.toUpperCase(), origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });

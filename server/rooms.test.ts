@@ -149,3 +149,18 @@ describe("rooms on Cloudflare", () => {
     expect((await call(`/v1/rooms/${opened.code}/screen?after=0`))!.status).toBe(204);
   });
 });
+
+describe("rooms: joining by code", () => {
+  it("serves a page to type the code in at /j, and the room page at /j/CODE", async () => {
+    const { roomPage } = await import("./room-page");
+    const call = (path: string) => handleRooms(new Request(`https://church.test${path}`), memoryRooms(), "https://church.test", roomPage);
+    for (const path of ["/j", "/j/"]) {
+      const response = await call(path);
+      expect(response?.status).toBe(200);
+      expect(await response!.text()).toContain("Enter the code shown on the screen.");
+    }
+    const room = await (await call("/j/ABC234"))!.text();
+    expect(room).toContain("ABC234");
+    expect(room).not.toContain("Enter the code shown on the screen.");
+  });
+});

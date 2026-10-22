@@ -4,6 +4,7 @@
 
 export function roomPage(code: string, origin: string): string {
   const safe = code.replace(/[^A-Z0-9]/g, "");
+  if (!safe) return entryPage();
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -234,6 +235,101 @@ export function roomPage(code: string, origin: string): string {
   document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
   refresh();
 })();
+</script>
+</body>
+</html>`;
+}
+
+/** /j with no code: for the back rows, who read the code off the screen instead of scanning it. */
+function entryPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111013">
+<title>Join a room · Church Studio</title>
+<style>
+  :root { --bg: #111013; --panel: #1b1a1f; --line: #2c2a31; --ink: #f6f3ee; --muted: #a39d96; --accent: #fa4f00; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  main { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 18px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
+  h1 { margin: 0; font-size: 24px; font-weight: 750; letter-spacing: -0.01em; }
+  p { margin: 0; color: var(--muted); max-width: 32ch; }
+  form { display: grid; justify-items: center; gap: 18px; }
+  .boxes { display: flex; gap: 8px; }
+  .boxes input { width: min(13vw, 54px); height: min(16vw, 66px); padding: 0; border: 2px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font-family: inherit; font-size: clamp(22px, 7vw, 30px); font-weight: 800; line-height: 1; text-align: center; text-transform: uppercase; caret-color: var(--accent); }
+  .boxes input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+  button { width: min(100%, 360px); height: 52px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font: inherit; font-weight: 750; font-size: 16px; cursor: pointer; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .bad { color: #ff8a73; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Join a room</h1>
+  <p>Enter the code shown on the screen.</p>
+  <form id="f" autocomplete="off">
+    <div class="boxes" id="boxes"></div>
+    <div class="bad" id="note" role="status"></div>
+    <button id="go" type="submit" disabled>Join</button>
+  </form>
+</main>
+<script>
+  const SIZE = 6;
+  const boxes = document.getElementById("boxes");
+  const go = document.getElementById("go");
+  const note = document.getElementById("note");
+  const inputs = [];
+  for (let i = 0; i < SIZE; i++) {
+    const input = document.createElement("input");
+    input.inputMode = "text";
+    input.autocapitalize = "characters";
+    input.spellcheck = false;
+    input.maxLength = 1;
+    input.setAttribute("aria-label", "Character " + (i + 1) + " of " + SIZE);
+    boxes.appendChild(input);
+    inputs.push(input);
+  }
+  const clean = (text) => text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const code = () => inputs.map((input) => input.value).join("");
+  const update = () => { go.disabled = code().length !== SIZE; note.textContent = ""; };
+  // Typing fills a box and moves on; a pasted code fills them all.
+  const fill = (from, text) => {
+    const chars = clean(text).split("");
+    let at = from;
+    for (const char of chars) { if (at >= SIZE) break; inputs[at].value = char; at++; }
+    inputs[Math.min(at, SIZE - 1)].focus();
+    update();
+    if (code().length === SIZE) document.getElementById("f").requestSubmit();
+  };
+  inputs.forEach((input, index) => {
+    input.addEventListener("input", () => { const text = input.value; input.value = ""; fill(index, text); });
+    // A box that already has a character takes the next one typed in its place.
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("paste", (event) => { event.preventDefault(); fill(0, event.clipboardData.getData("text")); });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Backspace" && !input.value && index > 0) { inputs[index - 1].value = ""; inputs[index - 1].focus(); update(); event.preventDefault(); }
+      if (event.key === "ArrowLeft" && index > 0) inputs[index - 1].focus();
+      if (event.key === "ArrowRight" && index < SIZE - 1) inputs[index + 1].focus();
+    });
+  });
+  document.getElementById("f").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = code();
+    if (value.length !== SIZE) return;
+    go.disabled = true;
+    go.textContent = "Joining…";
+    // Check the room is open before leaving this page, so a typo is fixed here.
+    const found = await fetch("/v1/rooms/" + value + "/state").then((r) => r.status !== 404).catch(() => true);
+    if (found) { location.href = "/j/" + value; return; }
+    go.textContent = "Join";
+    update();
+    note.textContent = "No room with that code. Check the screen and try again.";
+    inputs[0].focus();
+    inputs[0].select();
+  });
+  inputs[0].focus();
 </script>
 </body>
 </html>`;

@@ -154,7 +154,9 @@ class AudienceRoom {
   qrOnPreview = (caption = t("Scan to ask a question")) => {
     const saved = this.current;
     if (!saved) return;
-    session.previewModel(presentQr({ theme: session.theme(), data: saved.joinUrl, style: "rounded", dark: "#000000", light: "#ffffff", caption: `${caption} · ${saved.joinUrl.replace(/^https?:\/\//, "")}` }), `room:${saved.code}:qr`);
+    // The code, in big boxes, for the back rows: type it in at the short address instead of scanning.
+    const at = saved.joinUrl.replace(/^https?:\/\//, "").replace(/\/j\/[^/]*$/, "/j");
+    session.previewModel(presentQr({ theme: session.theme(), data: saved.joinUrl, style: "rounded", dark: "#000000", light: "#ffffff", caption, code: { value: saved.code, at } }), `room:${saved.code}:qr`);
   };
 
   // --- The screen on phones and browsers ------------------------------------------------------

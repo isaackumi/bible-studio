@@ -396,7 +396,7 @@
     <div class="prod-left">
       <DeskSwitcher compact />
       <nav class="prod-modes" aria-label={t("Production view")}>
-        <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip={t("Scenes, sources and media — select stays on Preview")} onclick={() => (looksOpen = false)}>{t("Studio")}</button>
+        <button type="button" class:on={!looksOpen} aria-pressed={!looksOpen} data-tip={t("Scenes, sources and media — select stays on Preview")} onclick={() => (looksOpen = false)}>{t("Scenes")}</button>
         <button type="button" class:on={looksOpen} aria-pressed={looksOpen} data-tip={t("Looks: compositions wait on Preview until you go live")} onclick={() => (looksOpen = true)}>{t("Looks")}</button>
       </nav>
     </div>
