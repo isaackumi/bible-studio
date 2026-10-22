@@ -72,7 +72,7 @@
   .compact button.on .short { display: inline; font-size: 12px; font-weight: 650; }
   .compact button.on { width: auto; padding: 0 10px; gap: 6px; }
   /* With room in the bar, the compact switch names its desks too. */
-  @media (min-width: 1400px) {
+  @container desk (min-width: 1400px) {
     .compact .short { display: inline; font-size: 12px; font-weight: 650; }
     .compact button { width: auto; padding: 0 10px; gap: 6px; }
   }

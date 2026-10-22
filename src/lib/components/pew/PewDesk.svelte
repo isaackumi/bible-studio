@@ -1633,11 +1633,12 @@
   .sheet header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .sheet header button { border: 0; background: transparent; color: var(--accent); }
   .sheet p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .pb { position: relative; }
+  /* The bar fits the desk's own width (a docked drawer narrows the desk, not the window). */
+  .pb { position: relative; container: desk / inline-size; }
   .now-audio { display: inline-flex; align-items: center; height: 32px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--field)); overflow: hidden; }
   .now-audio-name { display: inline-flex; align-items: center; gap: 6px; max-width: 160px; height: 100%; padding: 0 8px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
   .now-audio-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-  @media (max-width: 1560px) { .chip-name { display: none; } }
+  @container desk (max-width: 1560px) { .chip-name { display: none; } }
   /* Guided tours are also in the More menu; narrower desks keep the bar for live tools. */
   .pb-tools :global(.tool-menu > button) { position: relative; }
   .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
@@ -1646,18 +1647,18 @@
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }
   .now-audio-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   /* Narrower desks: shorter labels so the tools on the right stay in reach. */
-  @media (max-width: 1320px) {
+  @container desk (max-width: 1320px) {
     .pb-bar :global(.wide-only) { display: none; }
     .now-audio-name { padding: 0 7px; }
   }
-  @media (max-width: 1180px) {
+  @container desk (max-width: 1180px) {
     .pb-bar { gap: 6px; }
     .pb-left { gap: 6px; }
     .clears .desk-btn { padding-inline: 8px; }
     .pb-modes button { padding-inline: 9px; }
     .pb-bar :global(.output-trigger) { max-width: 150px; }
   }
-  @media (max-width: 1100px) {
+  @container desk (max-width: 1100px) {
     .pb-bar { padding-inline: 6px; gap: 4px; }
     .pb-tools { padding-left: 8px; margin-left: 2px; }
     .pb-modes button { padding-inline: 6px; font-size: 13px; }

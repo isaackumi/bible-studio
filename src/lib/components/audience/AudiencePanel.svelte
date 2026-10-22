@@ -62,7 +62,7 @@
   }
 </script>
 
-<aside class="audience" aria-label={t("Audience")}>
+<aside class="audience dock-drawer" aria-label={t("Audience")}>
   <header>
     <div>
       <h2>{t("Audience")}</h2>
@@ -172,7 +172,7 @@
 </aside>
 
 <style>
-  .audience { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(420px, 100vw); display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; }
+  .audience { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(var(--drawer-w, 420px), 100vw); display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; }
   .audience > :global(*) { width: 100%; flex: none; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   h2 { margin: 0; font-size: 17px; font-weight: 750; }

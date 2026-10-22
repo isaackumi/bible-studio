@@ -21,7 +21,7 @@
   }
 </script>
 
-<aside class="pictures" aria-label={t("Pictures")}>
+<aside class="pictures dock-drawer" aria-label={t("Pictures")}>
   <header>
     <div class="title">
       <h2>{t("Pictures")}</h2>
@@ -120,7 +120,7 @@
 </aside>
 
 <style>
-  .pictures { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(440px, 100vw); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; text-align: left; }
+  .pictures { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(var(--drawer-w, 420px), 100vw); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; text-align: left; }
   .pictures > :global(*) { width: 100%; flex: none; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .title { min-width: 0; }

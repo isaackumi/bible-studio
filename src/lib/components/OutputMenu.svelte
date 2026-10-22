@@ -79,5 +79,5 @@
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   /* A narrow bar keeps the warning whole and lets the menu say how to open the screen. */
   .short { display: none; }
-  @media (max-width: 1180px) { .long { display: none; } .short { display: inline; } }
+  @container desk (max-width: 1180px) { .long { display: none; } .short { display: inline; } }
 </style>

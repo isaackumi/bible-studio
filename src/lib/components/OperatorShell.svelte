@@ -205,7 +205,7 @@
 <svelte:window onkeydown={onKeyDown} />
 
 {#if session.ready}
-  <div class="app pb-app">
+  <div class="app pb-app" class:docked={audienceRoom.open || pictures.open}>
     <!-- The Production Desk is a Premium feature: on Free (or after a trial) the Presenter Desk shows. -->
     {#if session.workspace.appearance.desk === "obs" && session.entitled("production")}
       <ObsDesk />

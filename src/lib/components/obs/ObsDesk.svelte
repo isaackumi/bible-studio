@@ -945,6 +945,7 @@
 <style>
   .alerts-btn.on { background: #c8102e; border-color: #c8102e; color: #fff; }
   .prod {
+    container: desk / inline-size;
     height: 100%;
     min-height: 0;
     min-width: 0;
