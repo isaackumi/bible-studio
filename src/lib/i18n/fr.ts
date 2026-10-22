@@ -3723,4 +3723,5 @@ export const fr: Readonly<Record<string, string>> = {
   "Import picture": "Importer une image",
   "The library could not be opened, so a new one was started. The old one is kept as {file}. Restore your latest backup in Settings › Storage & backup.":
     "La bibliothèque n’a pas pu être ouverte, une nouvelle a donc été créée. L’ancienne est conservée sous le nom {file}. Restaurez votre dernière sauvegarde dans Réglages › Espace et sauvegarde.",
+  "{reference} could not be read. {reason}": "{reference} n’a pas pu être lu. {reason}",
 };

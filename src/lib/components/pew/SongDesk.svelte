@@ -228,16 +228,26 @@
   // or follow singing) is sent at once. The first look after opening the page never sends.
   /** undefined until the page has looked once, so opening Songs never sends anything. */
   let lastPreview: string | null | undefined = undefined;
-  /** Set for a Preview that must stay on Preview (opening a song from search). */
-  let previewOnly = false;
+  const previewKey = (focus: typeof onPreview) => (focus ? `${focus.songId}:${focus.sectionId}:${focus.slot ?? ""}:${focus.screen ?? 0}` : null);
+  /**
+   * The one Preview that must stay on Preview (Alt-click, Start, follow singing), by its key: a
+   * Program change running this effect first cannot use it up, and a click that changed nothing
+   * cannot leave it waiting to hold back the next part meant for the screen.
+   */
+  let quietKey: string | null = null;
+  function previewOnly(song: Song, sectionId: string, slot?: number, screen?: number) {
+    session.previewSongSection(song, sectionId, slot, screen);
+    quietKey = previewKey(session.songFocus);
+  }
   $effect(() => {
-    const now = onPreview ? `${onPreview.songId}:${onPreview.sectionId}:${onPreview.slot ?? ""}:${onPreview.screen ?? 0}` : null;
+    const now = previewKey(onPreview);
     const was = lastPreview;
     lastPreview = now;
-    const quiet = previewOnly;
-    previewOnly = false;
+    if (now === was) return;
+    const quiet = now !== null && now === quietKey;
+    quietKey = null;
     // Never while editing: the editor's Preview button is for checking, not for the room.
-    if (quiet || draft || !now || was === undefined || now === was) return;
+    if (quiet || draft || !now || was === undefined) return;
     if (programSource === `song:${now}`) return;
     // The song on the screen follows the operator: once it is live, choosing another of its
     // parts changes the screen in either mode. A different song waits on Preview (Preview mode).
@@ -283,8 +293,7 @@
       const screen = screenForSung(text, section.lines, session.songScreens(section), sameScreenOf);
       if (focus?.songId === match.songId && focus.sectionId === match.sectionId && (focus.screen ?? 0) === screen) return;
       // Following the singing fills Preview only ("LIVE still sends Program"), even when the song is live.
-      previewOnly = true;
-      session.previewSongSection(song, match.sectionId, undefined, screen);
+      previewOnly(song, match.sectionId, undefined, screen);
       session.voice.message = `${match.label} on Preview. LIVE still sends Program.`;
     });
   });
@@ -307,8 +316,8 @@
 
   /** Option-click (Alt-click) puts a part on Preview only, even when its song is on the screen. */
   function show(song: Song, sectionId: string, event?: MouseEvent, slot?: number, screen?: number) {
-    if (event?.altKey) previewOnly = true;
-    session.previewSongSection(song, sectionId, slot, screen);
+    if (event?.altKey) previewOnly(song, sectionId, slot, screen);
+    else session.previewSongSection(song, sectionId, slot, screen);
   }
 
   async function showAndTake(song: Song, sectionId: string, slot?: number, screen?: number) {
@@ -320,8 +329,7 @@
     const match = detected;
     const song = match ? session.songs.find((entry) => entry.id === match.songId) : null;
     if (!match || !song) return;
-    previewOnly = true;
-    show(song, match.sectionId);
+    previewOnly(song, match.sectionId);
   }
 
   // Folders
@@ -992,7 +1000,7 @@
           </p>
         </div>
         <div class="row-actions">
-          <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => { if (!selected.sections[0]) return; previewOnly = true; show(selected, selected.sections[0].id); }}><Icon name="play" size={14} /> {t("Start")}</button>
+          <button type="button" class="desk-btn primary-soft" data-tip={t("Put the first part on Preview")} onclick={() => { if (!selected.sections[0]) return; previewOnly(selected, selected.sections[0].id); }}><Icon name="play" size={14} /> {t("Start")}</button>
           <AddToService item={selected.title} onadd={(sectionId) => session.addSongToService(selected, sectionId)} />
           <button type="button" class="desk-btn" onclick={() => edit(selected)}><Icon name="pencil" size={14} /> {t("Edit")}</button>
           <ToolMenu label={t("More for this song")} tip={t("Folder, save as a file, delete")}>

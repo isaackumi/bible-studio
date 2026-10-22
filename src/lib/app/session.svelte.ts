@@ -418,7 +418,7 @@ class Session {
     void this.syncCameraFeeds();
     this.publishStandby();
     this.publishStage();
-    this.publishSecond();
+    this.publishSecond(false);
     this.pushKeyWords();
   }
   output = $state<OutputStatus>({
@@ -442,6 +442,9 @@ class Session {
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
+  /** The repeating checks init starts (plan clock, auto-advance, backups, updates), stopped by destroy. */
+  private timers: ReturnType<typeof setInterval>[] = [];
+  private every = (ms: number, run: () => void) => void this.timers.push(setInterval(run, ms));
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   private audienceWindow: { closed: boolean; close(): void; focus(): void; postMessage(message: unknown, targetOrigin: string): void } | null = null;
   private browserWatch: ReturnType<typeof setInterval> | undefined;
@@ -495,13 +498,16 @@ class Session {
     this.ready = true;
     this.bootStep("starting");
     void this.startCameraRelay();
+    // Started again by a remount (init after destroy): never twice side by side.
+    this.timers.forEach(clearInterval);
+    this.timers = [];
     if (typeof window !== "undefined")
-      setInterval(() => {
+      this.every(60_000, () => {
         this.planClock = Date.now();
         void this.refreshEntitlement();
-      }, 60_000);
+      });
     // A part whose time is up moves on (Service settings); checked every few seconds.
-    if (typeof window !== "undefined") setInterval(() => void this.checkAdvance(), 5_000);
+    if (typeof window !== "undefined") this.every(5_000, () => void this.checkAdvance());
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
@@ -528,7 +534,10 @@ class Session {
       if (this.workspace.lastServiceId) {
         try {
           const last = await this.atMost("opening the last service", api.serviceGet(this.workspace.lastServiceId));
-          if (last) this.service = last;
+          if (last) {
+            this.service = last;
+            this.savedService = this.service;
+          }
           if (typeof window !== "undefined") this.loadSectionStarts(this.workspace.lastServiceId);
         } catch (error) {
           console.error(error);
@@ -584,7 +593,7 @@ class Session {
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
-      if (this.desktop()) setInterval(() => void (this.workspace.backup.folder && this.backupNow()), 30 * 60 * 1000);
+      if (this.desktop()) this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
       if (this.message === "Opening workspace") {
         this.message = this.desktop()
           ? this.outputWaiting
@@ -714,6 +723,9 @@ class Session {
     this.cameraRelay = null;
     this.stopVoiceEngine?.();
     if (this.browserWatch) clearInterval(this.browserWatch);
+    this.browserWatch = undefined;
+    this.timers.forEach(clearInterval);
+    this.timers = [];
   };
 
   private adoptAudienceOwner = () => {
@@ -963,21 +975,38 @@ class Session {
    */
   private workspaceLoaded = false;
 
+  /**
+   * The service as last read or written. The service is only ever replaced, never changed in place,
+   * so while it is this same object there is nothing new to write: moving the cursor (every click
+   * on the running order) saves the workspace only, and does not re-date the service.
+   */
+  private savedService: Service | null = null;
+  /** Saves run one after another, so an older save can never land after a newer one. */
+  private saving: Promise<void> = Promise.resolve();
+
   private persist = async () => {
     if (!this.workspaceLoaded) {
       this.persistSoon();
       return;
     }
+    const run = this.saving.then(this.writeNow);
+    this.saving = run.catch(() => {});
+    await run;
+  };
+
+  private writeNow = async () => {
     this.workspace = { ...this.workspace, cursor: this.cursor, lastServiceId: this.service?.id ?? null };
     try {
       await this.saveWorkspaceDocument(this.workspace);
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
     }
-    if (this.service) {
+    if (this.service && this.service !== this.savedService) {
       this.service = stamp(this.service);
+      const saved = this.service;
       try {
-        await api.serviceSave(this.service);
+        await api.serviceSave(saved);
+        this.savedService = saved;
         this.services = await api.serviceList();
       } catch (error) {
         this.message = error instanceof Error ? error.message : String(error);
@@ -1088,7 +1117,10 @@ class Session {
     if (snapshot.themes.length > 0) this.themes = await api.themeList();
     if (this.service) {
       const fresh = await api.serviceGet(this.service.id);
-      if (fresh) this.service = fresh;
+      if (fresh) {
+        this.service = fresh;
+        this.savedService = this.service;
+      }
     }
     this.message = t("Imported {songs} songs, {services} services, and {themes} themes. Program was not in the file.", { songs: snapshot.songs.length, services: snapshot.services.length, themes: snapshot.themes.length });
   };
@@ -1533,9 +1565,17 @@ class Session {
     });
   };
 
-  private publishSecond = () => {
+  /** The second screen's last frame as sent, so a Preview-only change does not re-fade it. */
+  private secondSent = "";
+
+  /** `always` false: only when its frame changed (every Preview/Program write comes through here). */
+  private publishSecond = (always = true) => {
     if (typeof window === "undefined" || !this.secondOpen) return;
-    const frame = { model: this.secondModel(), at: Date.now() };
+    const model = this.secondModel();
+    const text = JSON.stringify(model);
+    if (!always && text === this.secondSent) return;
+    this.secondSent = text;
+    const frame = { model, at: Date.now() };
     try {
       publishSecondLocal(frame);
     } catch {
@@ -2271,12 +2311,15 @@ class Session {
   };
 
   previewModel = (model: PresentationModel, sourceId: string | null) => {
+    // Whatever was still loading for Preview (a running-order item, a verse) is now out of date.
+    this.selectToken++;
     this.lookOnPreview = null;
     this.previewFree = false;
     this.live = setPreview(this.live, frame(model, sourceId, "cut"));
   };
 
   previewLook = (composition: Composition) => {
+    this.selectToken++;
     this.songFocus = null;
     this.sermonFocus = null;
     const clean = sanitizeComposition(composition);
@@ -3016,7 +3059,16 @@ class Session {
     this.sermonFocus = null;
     this.previewBible = passage;
     const item: PresentationItem = { id: "preview", kind: "bible", title: passage.reference, bible: passage };
-    const model = await this.modelFor(item);
+    // Stepping quickly (or an online Bible answering late): only the newest verse lands on Preview.
+    const token = ++this.selectToken;
+    let model: PresentationModel;
+    try {
+      model = await this.modelFor(item);
+    } catch (error) {
+      if (token === this.selectToken) this.message = t("{reference} could not be read. {reason}", { reference: passage.reference, reason: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    if (token !== this.selectToken) return;
     this.previewModel(model, null);
     this.previewFree = true;
     this.remember(passage);
@@ -3724,6 +3776,7 @@ class Session {
   openService = async (id: string) => {
     this.cancelQueuedStart(false);
     this.service = await api.serviceGet(id);
+    this.savedService = this.service;
     if (typeof window !== "undefined") this.loadSectionStarts(id);
     this.cursor = { sectionId: null, itemId: null };
     this.workspace = { ...this.workspace, lastServiceId: id };
@@ -5798,24 +5851,35 @@ class Session {
     clearTimeout(this.checkoutTimer);
     this.checkoutTimer = setTimeout(async () => {
       if (this.checkout?.session !== session || this.checkout.status !== "waiting") return;
-      const answer = await serverCall<CheckoutPoll>("/v1/checkout/status", { session, device: this.deviceId, name: this.deviceName() });
-      if (answer.ok && answer.data.status === "paid" && answer.data.key) {
-        const entitlement = redeemCode(this.workspace.entitlement, answer.data.key, { now: Date.now() });
-        if (entitlement.ok) this.workspace = { ...this.workspace, entitlement: entitlement.entitlement };
-        this.persistSoon();
-        if (answer.data.lease) await this.keepLease(answer.data.lease);
-        else await this.checkActivation(true);
-        this.checkout = { ...this.checkout!, status: "paid", key: answer.data.key };
-        this.message = t("Payment received. Welcome to {plan}!", { plan: this.plan === "church" ? "Church" : "Premium" });
-        return;
-      }
-      if (answer.ok && answer.data.status === "cancelled") {
-        this.checkout = { ...this.checkout!, status: "cancelled" };
-        return;
-      }
-      if (Date.now() - startedAt > CHECKOUT_WAIT_MS) {
-        this.checkout = { ...this.checkout!, status: "error", message: t("The checkout took too long. If you paid, your key is in your email.") };
-        return;
+      // Dismissed while the server was answering: the checkout window stays closed.
+      const stillOpen = () => this.checkout?.session === session ? this.checkout : null;
+      try {
+        const answer = await serverCall<CheckoutPoll>("/v1/checkout/status", { session, device: this.deviceId, name: this.deviceName() });
+        if (answer.ok && answer.data.status === "paid" && answer.data.key) {
+          // Paid is kept even when the window was dismissed: the church paid for it.
+          const entitlement = redeemCode(this.workspace.entitlement, answer.data.key, { now: Date.now() });
+          if (entitlement.ok) this.workspace = { ...this.workspace, entitlement: entitlement.entitlement };
+          this.persistSoon();
+          if (answer.data.lease) await this.keepLease(answer.data.lease);
+          else await this.checkActivation(true);
+          const open = stillOpen();
+          if (open) this.checkout = { ...open, status: "paid", key: answer.data.key };
+          this.message = t("Payment received. Welcome to {plan}!", { plan: this.plan === "church" ? "Church" : "Premium" });
+          return;
+        }
+        const open = stillOpen();
+        if (!open) return;
+        if (answer.ok && answer.data.status === "cancelled") {
+          this.checkout = { ...open, status: "cancelled" };
+          return;
+        }
+        if (Date.now() - startedAt > CHECKOUT_WAIT_MS) {
+          this.checkout = { ...open, status: "error", message: t("The checkout took too long. If you paid, your key is in your email.") };
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        if (!stillOpen()) return;
       }
       this.watchCheckout(session, startedAt);
     }, 2500);
@@ -5897,7 +5961,7 @@ class Session {
   private watchUpdates() {
     if (!this.desktop() || typeof window === "undefined") return;
     setTimeout(() => void this.checkForUpdate(true), 30_000);
-    setInterval(() => void this.checkForUpdate(true), 6 * 60 * 60_000);
+    this.every(6 * 60 * 60_000, () => void this.checkForUpdate(true));
   }
 
   // What's new: this version's highlights, once, the first time it opens after an update.
