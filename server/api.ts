@@ -15,7 +15,8 @@
 
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
-import { accountApi, accountOf, linkLicense, noteLicenseEmail, signinRoute, type Identity } from "./accounts.ts";
+import { accountApi, accountOf, noteLicenseEmail, signinRoute, type Account, type Identity } from "./accounts.ts";
+import { claimLicense } from "./ownership.ts";
 import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
@@ -63,6 +64,11 @@ export type ApiConfig = {
    * too often in the last minute. Missing (tests, local runs): nothing is limited by address.
    */
   limit?: (key: string) => Promise<boolean>;
+  /**
+   * Trials and new activations need a signed-in account (REQUIRE_ACCOUNT=1). Off until the app that
+   * signs in first is out, so older apps keep working; renewals of computers already active never need it.
+   */
+  requireAccount?: boolean;
   /** Usage over time (Workers Analytics Engine, usage.ts); missing: only KV's last visits are kept. */
   usage?: Usage;
   /** Sends the key email, if mail is set up. */
@@ -293,7 +299,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     case "/v1/devices":
       return seats(config, path, input);
     default:
-      return (await accountApi(config, path, input, origin)) ?? json(404, { error: "Not found" });
+      return (await accountApi(config, path, input, origin, request)) ?? json(404, { error: "Not found" });
   }
 }
 
@@ -513,6 +519,8 @@ async function trial(config: ApiConfig, input: Record<string, unknown>, address:
   const key = `trial:${device}`;
   const saved = await getJson<Trial>(config.store, key);
   const account = input.token ? await accountOf(config, text(input.token, 80)) : null;
+  // A new trial is one per person: signing in is what makes that hold (computer ids can be made up).
+  if (!saved && !account && config.requireAccount) return json(401, { signin: true, error: "Sign in to start your free trial. It stays with you on any computer." });
   if (saved) {
     if (account) await noteAccountTrial(config, account.id, saved);
     // The same running trial again (a reinstall, a second request); never a second trial.
@@ -636,7 +644,9 @@ export async function completeCheckout(config: ApiConfig, sessionId: string, sub
   await putJson(config.store, `license:${license}`, { sub: subId, email: order.email, paidUntil, test: signer.test } satisfies LicenseRecord);
   await usePromo(config, order.promo);
   await noteLicenseEmail(config, order.email, { id: license, key });
-  if (order.account) await linkLicense(config, order.account, { id: license, key });
+  // Bought while signed in: the buyer owns it. Otherwise whoever first signs in with this (verified) email does.
+  const buyer = order.account ? await getJson<Account>(config.store, `acct:${order.account}`) : null;
+  if (buyer) await claimLicense(config, buyer, { id: license, key });
   if (order.device) {
     const trialRecord = await getJson<Trial>(config.store, `trial:${order.device}`);
     if (trialRecord) await putJson(config.store, `trial:${order.device}`, trialRecord, { startedAt: trialRecord.startedAt, endsAt: trialRecord.endsAt, converted: true });
@@ -764,6 +774,16 @@ async function seats(config: ApiConfig, path: string, input: Record<string, unkn
   const device = text(input.device, 80);
   if (path === "/v1/activate" || path === "/v1/lease") {
     if (!device) return json(400, { error: "Which computer?" });
+    // Adding a key ties it to the person adding it: the first account owns it, others need the owner to add them.
+    const account = input.token ? await accountOf(config, text(input.token, 80)) : null;
+    if (path === "/v1/activate") {
+      const read = readAnyLicense(config, keyText);
+      if (read && account) {
+        const claimed = await claimLicense(config, account, { id: read.license.id, key: keyText });
+        if (!claimed.ok) return json(409, { owned: true, error: claimed.error });
+        await noteDevice(config, device, { account: account.id });
+      } else if (read && config.requireAccount) return json(401, { signin: true, error: "Sign in to add this key. Your plan then follows you to any computer." });
+    }
     const result = await activateDevice(config, keyText, device, text(input.name, 60) || "Computer");
     return json(result.status, result.lease ? { ...result.body, lease: result.lease } : result.body);
   }

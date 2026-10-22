@@ -70,7 +70,20 @@ export function payPage({ state, order }: { state: PayState; order?: PayOrder })
 }
 
 type SigninState = "choose" | "confirm" | "done" | "wrong" | "expired" | "missing";
-type SigninView = { state: SigninState; id: string; device?: string; email?: string; methods?: string[]; choices?: number[] };
+type SigninView = {
+  state: SigninState;
+  id: string;
+  /** How the app finishes the sign-in: back to this computer (loopback), a typed code, or a tapped number (older apps). */
+  mode?: "loopback" | "code" | "number";
+  device?: string;
+  /** Where the app asked from, so a request from a stranger stands out. */
+  place?: string;
+  email?: string;
+  methods?: string[];
+  choices?: number[];
+  /** The code typed did not match; try again. */
+  retry?: boolean;
+};
 
 const METHOD_LABELS: Record<string, { label: string; icon: string }> = {
   google: { label: "Continue with Google", icon: `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.7-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1C3.4 21.4 7.4 24 12 24z"/><path fill="#FBBC05" d="M5.4 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.6.4-2.4V6.5h-4C.5 8.2 0 10 0 12s.5 3.8 1.4 5.5l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.4 0 3.4 2.6 1.4 6.5l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>` },
@@ -79,7 +92,8 @@ const METHOD_LABELS: Record<string, { label: string; icon: string }> = {
 };
 
 /** The browser side of signing the app in: choose how, then tap the number the app shows. */
-export function signinPage({ state, id, device, email, methods = [], choices = [] }: SigninView): string {
+export function signinPage({ state, id, mode = "number", device, place, email, methods = [], choices = [], retry = false }: SigninView): string {
+  const asked = `<b>${escape(device ?? "your computer")}</b>${place ? ` in ${escape(place)}` : ""}`;
   const social = methods.filter((method) => METHOD_LABELS[method]);
   const body =
     state === "missing"
@@ -87,9 +101,29 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
       : state === "expired"
         ? `<h1>This sign-in has ended</h1><p class="muted">Nothing was signed in. Choose <b>Sign in</b> in Church Studio to start again.</p>`
         : state === "wrong"
-          ? `<h1>That number didn't match</h1><p class="muted">For your safety this sign-in has ended and nothing was signed in. Choose <b>Sign in</b> in Church Studio to try again.</p>`
+          ? `<h1>That ${mode === "code" ? "code" : "number"} didn't match</h1><p class="muted">For your safety this sign-in has ended and nothing was signed in. Choose <b>Sign in</b> in Church Studio to try again.</p>`
           : state === "done"
             ? `<div class="done"><span class="tick">✓</span></div><h1>You're signed in</h1><p class="muted">Church Studio is signed in${email ? ` as <b>${escape(email)}</b>` : ""}. You can close this tab and go back to the app.</p>`
+            : state === "confirm" && mode === "loopback"
+              ? `
+      <p class="eyebrow">Step 2 of 2</p>
+      <h1>Sign in Church Studio on this computer?</h1>
+      <p class="muted">Church Studio on ${asked} asked to sign in. Continue only if you just chose <b>Sign in</b> in the app on this computer.</p>
+      <form method="post" action="/signin/${escape(id)}/confirm"><button type="submit" class="primary">Continue to Church Studio</button></form>
+      <p class="who">Signed in as <b>${escape(email ?? "")}</b> · <button type="button" class="link" onclick="switchAccount()">Use another account</button></p>
+      <form method="post" action="/signin/${escape(id)}/cancel"><button type="submit" class="cancel">This wasn't me · cancel</button></form>`
+            : state === "confirm" && mode === "code"
+              ? `
+      <p class="eyebrow">Step 2 of 2</p>
+      <h1>Type the code on your screen</h1>
+      <p class="muted">Church Studio on ${asked} shows a six-character code. Type it here to sign it in. Never type a code someone sent you.</p>
+      ${retry ? `<p class="error">That code didn't match. Check it and try again.</p>` : ""}
+      <form method="post" action="/signin/${escape(id)}/confirm" class="code">
+        <input name="code" required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="8" placeholder="ABC123" aria-label="Code" />
+        <button type="submit" class="primary">Sign in</button>
+      </form>
+      <p class="who">Signed in as <b>${escape(email ?? "")}</b> · <button type="button" class="link" onclick="switchAccount()">Use another account</button></p>
+      <form method="post" action="/signin/${escape(id)}/cancel"><button type="submit" class="cancel">This wasn't me · cancel</button></form>`
             : state === "confirm"
               ? `
       <p class="eyebrow">Step 2 of 2</p>
@@ -164,6 +198,12 @@ export function signinPage({ state, id, device, email, methods = [], choices = [
   @media (max-width: 460px) { .sent-actions { grid-template-columns: 1fr; } }
   .email button:disabled { opacity: .7; cursor: default; }
   .msg { min-height: 20px; margin: 14px 0 0; font-size: 14px; color: var(--muted); } .msg.good { color: var(--good); font-weight: 650; }
+  .code { display: grid; gap: 10px; margin-bottom: 20px; }
+  .code input { height: 56px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-size: 26px; font-weight: 800; letter-spacing: .3em; text-align: center; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .code input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
+  button.primary { width: 100%; height: 46px; margin-bottom: 20px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } button.primary:hover { filter: brightness(1.06); }
+  .code button.primary { margin-bottom: 0; }
+  p.error { margin: 0 0 12px; color: #ff8a73; font-weight: 650; }
   .numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
   .numbers button { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, background .15s, transform .1s; }
   .numbers button:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); } .numbers button:active { transform: scale(.97); }

@@ -125,7 +125,8 @@ describe("accounts", () => {
     await page(`/signin/${start.id}/confirm`, { number: String(start.number) });
     const { token } = (await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data;
     const status = (await call("/v1/account", { token, device: "mac-2", name: "Office PC" })).data;
-    expect(status.licenses).toEqual([{ license: paid.license, plan: "church", revoked: false }]);
+    // The buyer's verified email claims it: they own it, with nobody added yet.
+    expect(status.licenses).toEqual([{ license: paid.license, plan: "church", revoked: false, owner: true, members: [] }]);
     // Mock checkouts are test sales, signed with the test key.
     expect(readLease(status.lease, TEST_LICENSE_PUBLIC_KEY)).toMatchObject({ plan: "church", device: "mac-2" });
     expect(status.activation.key).toBe(paid.key);
@@ -156,9 +157,121 @@ describe("accounts", () => {
     const bought = await buy("", { token });
     const older = await buy("old-address@example.com");
     expect((await call("/v1/account/link", { token, key: "CS1-not-a-key" })).status).toBe(400);
-    expect((await call("/v1/account/link", { token, key: older.key })).data).toEqual({ ok: true });
+    expect((await call("/v1/account/link", { token, key: older.key })).data).toEqual({ ok: true, owner: true });
     const licenses = (await call("/v1/account", { token })).data.licenses.map((entry: { license: string }) => entry.license);
     expect(licenses.sort()).toEqual([bought.license, older.license].sort());
+  });
+});
+
+describe("signing in safely, and who a license belongs to", () => {
+  const bob: Person = { id: "user-bob", email: "bob@grace.org", name: "Bob", emailVerified: true };
+
+  /** Sign a computer in as someone (the older number flow, which every mode ends like). */
+  async function signedIn(call: ReturnType<typeof setup>["call"], page: ReturnType<typeof setup>["page"], signInAs: (who: Person | null) => void, who: Person, device: string) {
+    const start = (await call("/v1/signin/start", { device, name: device })).data;
+    signInAs(who);
+    await page(`/signin/${start.id}/confirm`, { number: String(start.number) });
+    return (await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data.token as string;
+  }
+
+  it("loopback: only the app that started it, with its verifier, gets the token", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, config } = setup(identity);
+    const verifier = "v".repeat(50);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    const challenge = btoa(String.fromCharCode(...digest)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    // Anywhere but this computer's loopback address is refused.
+    expect((await call("/v1/signin/start", { device: "mac-1", mode: "loopback", redirect: "https://evil.example/cb", challenge })).status).toBe(400);
+    const start = (await call("/v1/signin/start", { device: "mac-1", name: "Sanctuary Mac", mode: "loopback", redirect: "http://127.0.0.1:53682/signin", challenge })).data;
+    expect(start.number).toBeUndefined();
+    signInAs(alice);
+    expect((await page(`/signin/${start.id}`)).html).toContain("Sign in Church Studio on this computer?");
+    const response = await handleApi(new Request(`${ORIGIN}/signin/${start.id}/confirm`, { method: "POST", body: new URLSearchParams({}), headers: { "content-type": "application/x-www-form-urlencoded" } }), config);
+    expect(response.status).toBe(303);
+    const back = new URL(response.headers.get("location")!);
+    expect(back.origin + back.pathname).toBe("http://127.0.0.1:53682/signin");
+    const code = back.searchParams.get("code")!;
+    // The browser's code alone (a phisher who saw it) is not enough: the verifier stays in the app.
+    expect((await call("/v1/signin/token", { id: start.id, code, verifier: "w".repeat(50) })).status).toBe(400);
+    const done = (await call("/v1/signin/token", { id: start.id, code, verifier })).data;
+    expect(done.token).toMatch(/^cst_[0-9a-f]{64}$/);
+    expect((await call("/v1/signin/token", { id: start.id, code, verifier })).status).toBe(400);
+    // The code mode never hands its token by polling.
+    expect((await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data.status).toBe("collected");
+  });
+
+  it("code: the person types the app's code, with a few tries for slips", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page } = setup(identity);
+    const start = (await call("/v1/signin/start", { device: "mac-1", name: "Office PC", mode: "code" })).data;
+    expect(start.code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    signInAs(alice);
+    expect((await page(`/signin/${start.id}`)).html).toContain("Type the code on your screen");
+    expect((await page(`/signin/${start.id}/confirm`, { code: "ZZZZZZ" })).html).toContain("didn't match. Check it");
+    expect((await page(`/signin/${start.id}/confirm`, { code: ` ${start.code.toLowerCase()} ` })).html).toContain("You're signed in");
+    expect((await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data.token).toMatch(/^cst_/);
+    const again = (await call("/v1/signin/start", { device: "mac-2", mode: "code" })).data;
+    for (let i = 0; i < 2; i++) await page(`/signin/${again.id}/confirm`, { code: "ZZZZZZ" });
+    expect((await page(`/signin/${again.id}/confirm`, { code: "ZZZZZZ" })).html).toContain("That code didn't match");
+    expect((await page(`/signin/${again.id}/confirm`, { code: again.code })).html).toContain("This sign-in has ended");
+  });
+
+  it("a key belongs to its first account; others use it once the owner adds them", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
+    const key = (await buy("someone-else@example.com")).key!;
+    expect((await call("/v1/activate", { key, device: "mac-1", token: aliceToken })).status).toBe(200);
+    // Bob has the key too (it was forwarded): not his to use.
+    expect((await call("/v1/account/link", { token: bobToken, key })).status).toBe(409);
+    expect((await call("/v1/activate", { key, device: "pc-2", token: bobToken })).data).toMatchObject({ owned: true });
+    const license = (await call("/v1/account", { token: aliceToken })).data.licenses[0].license;
+    expect((await call("/v1/license/members", { token: bobToken, license, add: "x@y.z" })).status).toBe(404);
+    expect((await call("/v1/license/members", { token: aliceToken, license, add: "Bob@Grace.org" })).data).toEqual({ members: ["bob@grace.org"] });
+    expect((await call("/v1/activate", { key, device: "pc-2", token: bobToken })).status).toBe(200);
+    // Removed again: still listed on Bob's account, never used.
+    await call("/v1/license/members", { token: aliceToken, license, remove: "bob@grace.org" });
+    const bobs = (await call("/v1/account", { token: bobToken, device: "pc-2" })).data;
+    expect(bobs.licenses[0]).toMatchObject({ owner: false, removed: true });
+    expect(bobs.lease).toBeUndefined();
+  });
+
+  it("an owner's added person gets the license when they first sign in", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const bought = await buy("", { token: aliceToken });
+    await call("/v1/license/members", { token: aliceToken, license: bought.license, add: bob.email });
+    const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
+    expect((await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" })).data).toMatchObject({ licenses: [{ license: bought.license, owner: false }], lease: expect.any(String) });
+  });
+
+  it("with sign-in required, a new trial or key needs an account; renewals never do", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy, config } = setup(identity);
+    const key = (await buy("a@b.co")).key!;
+    expect((await call("/v1/activate", { key, device: "old-mac" })).status).toBe(200);
+    config.requireAccount = true;
+    expect((await call("/v1/trial", { device: "new-mac" })).data).toMatchObject({ signin: true });
+    expect((await call("/v1/activate", { key, device: "new-mac" })).data).toMatchObject({ signin: true });
+    expect((await call("/v1/lease", { key, device: "old-mac" })).status).toBe(200);
+    const token = await signedIn(call, page, signInAs, alice, "new-mac");
+    expect((await call("/v1/trial", { device: "new-mac", token })).status).toBe(200);
+  });
+
+  it("lists where an account is signed in, signs out another computer, and lets unused tokens lapse", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, config } = setup(identity);
+    const one = await signedIn(call, page, signInAs, alice, "mac-1");
+    const two = await signedIn(call, page, signInAs, alice, "pc-2");
+    const listed = (await call("/v1/account/devices", { token: one })).data.devices;
+    expect(listed.map((entry: { name: string; you: boolean }) => [entry.name, entry.you])).toEqual([["mac-1", true], ["pc-2", false]]);
+    await call("/v1/account/signout", { token: one, device: listed[1].id });
+    expect((await call("/v1/account", { token: two })).status).toBe(401);
+    expect((await call("/v1/account", { token: one })).status).toBe(200);
+    const store = config.store as ReturnType<typeof memoryStore>;
+    expect([...store.dump().entries()].find(([key]) => key.startsWith("atok:"))![1].ttl).toBe(180 * 86_400);
   });
 });
 

@@ -36,6 +36,8 @@ export type Env = {
   GRACE_DAYS?: string;
   /** The KV namespace for everything the server keeps (activations, trials, checkouts, promos, stats). */
   ACTIVATIONS?: KvNamespace;
+  /** "1": trials and new activations need a signed-in account (turn on once the app that signs in first is out). */
+  REQUIRE_ACCOUNT?: string;
   /** Workers Analytics Engine (analytics_engine_datasets in wrangler.jsonc): one point per check-in. */
   USAGE?: { writeDataPoint(point: { indexes?: string[]; blobs?: string[]; doubles?: number[] }): void };
   /** Reads usage for the admin page: a Cloudflare API token with Account Analytics Read (a secret). */
@@ -121,6 +123,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     : undefined;
   return {
     store: kvStore(env.ACTIVATIONS),
+    requireAccount: env.REQUIRE_ACCOUNT === "1",
     usage: env.USAGE ? analyticsEngine(env.USAGE, env.ANALYTICS_TOKEN && env.CLOUDFLARE_ACCOUNT_ID ? { accountId: env.CLOUDFLARE_ACCOUNT_ID, token: env.ANALYTICS_TOKEN } : null, http) : undefined,
     limit: env.LIMITS ? async (key) => (await env.LIMITS!.limit({ key }).catch(() => ({ success: true }))).success : undefined,
     signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
