@@ -4,6 +4,7 @@
   import { mediaUrl } from "../../db/api";
   import { removeLayer, sanitizeBackground, setCompositionBackground, type Composition, type PageBackground } from "../../domain/composition";
   import {
+    addIconElement,
     addImageElement,
     addPage,
     addQrElement,
@@ -18,6 +19,9 @@
   import DeckThumb from "./DeckThumb.svelte";
   import ElementInspector from "./ElementInspector.svelte";
   import PageCanvas from "./PageCanvas.svelte";
+  import GradientEditor from "./GradientEditor.svelte";
+  import { encodeFill, sanitizeFill, type Fill } from "../../domain/fill";
+  import type { IconNode } from "../../domain/icon";
   import { t } from "../../i18n/core";
 
   // Full-screen deck editor. Edits stay in a draft until "Save changes"; Program never changes here.
@@ -100,8 +104,9 @@
     commitPage(next);
     selectedId = next.layers.at(-1)?.id ?? null;
   }
-  function addShape(kind: "rect" | "ellipse") {
-    const next = addShapeElement(page, kind, "#ffffff", kind === "rect" ? { x: 30, y: 30, w: 40, h: 40 } : { x: 40, y: 32, w: 20, h: 36 });
+  function addShape(kind: "rect" | "ellipse" | "line") {
+    const bounds = kind === "rect" ? { x: 30, y: 30, w: 40, h: 40 } : kind === "line" ? { x: 30, y: 49, w: 40, h: 1.2 } : { x: 40, y: 32, w: 20, h: 36 };
+    const next = addShapeElement(page, kind, "#ffffff", bounds);
     commitPage(next);
     selectedId = next.layers.at(-1)?.id ?? null;
   }
@@ -110,6 +115,25 @@
     commitPage(next);
     selectedId = next.layers.at(-1)?.id ?? null;
     imageMenu = false;
+  }
+  /** The icon picker, loaded only when opened (with the whole icon set). */
+  let iconPicker = $state<null | typeof import("./IconPicker.svelte").default>(null);
+  async function openIcons() {
+    iconPicker = (await import("./IconPicker.svelte")).default;
+  }
+  function addIcon(icon: { name: string; nodes: IconNode[] }) {
+    iconPicker = null;
+    const next = addIconElement(page, icon);
+    commitPage(next);
+    selectedId = next.layers.at(-1)?.id ?? null;
+  }
+  /** The page's gradient: several colours when set, else its two older colours and angle. */
+  const pageFill = $derived<Fill>(
+    sanitizeFill(page.background?.fill, { kind: "linear", angle: page.background?.angle ?? 135, stops: [{ color: page.background?.color ?? "#1b1b1f", at: 0 }, { color: page.background?.to ?? "#3a2a1a", at: 100 }] }),
+  );
+  function setPageFill(fill: Fill) {
+    if (fill.kind === "solid") setBackground({ type: "color", color: fill.color, fill: undefined });
+    else setBackground({ type: "gradient", fill: encodeFill(fill), color: fill.stops[0]!.color, to: fill.stops.at(-1)!.color, ...(fill.kind === "linear" ? { angle: fill.angle } : {}) });
   }
   function addQr() {
     const next = addQrElement(page, "https://");
@@ -207,6 +231,8 @@
         <button type="button" onclick={addText}>{t("Text")}</button>
         <button type="button" onclick={() => addShape("rect")}>{t("Rectangle")}</button>
         <button type="button" onclick={() => addShape("ellipse")}>{t("Ellipse")}</button>
+        <button type="button" onclick={() => addShape("line")}>{t("Line")}</button>
+        <button type="button" onclick={openIcons}>{t("Icon")}</button>
         <span class="menu-wrap">
           <button type="button" aria-haspopup="menu" aria-expanded={imageMenu} onclick={() => (imageMenu = !imageMenu)}>{t("Image")}</button>
           {#if imageMenu}
@@ -258,16 +284,7 @@
           </select>
         </label>
         {#if (page.background?.type ?? "color") !== "image"}
-          <div class="field-row">
-            <span>{page.background?.type === "gradient" ? t("Colors") : t("Color")}</span>
-            <span class="inline">
-              <input type="color" aria-label={t("Background color")} value={page.background?.color ?? "#1b1b1f"} oninput={(event) => setBackground({ color: event.currentTarget.value })} />
-              {#if page.background?.type === "gradient"}
-                <input type="color" aria-label={t("Gradient end color")} value={page.background.to} oninput={(event) => setBackground({ to: event.currentTarget.value })} />
-                <input class="field angle" type="number" min="0" max="359" aria-label={t("Gradient angle")} value={page.background.angle} onchange={(event) => setBackground({ angle: Number(event.currentTarget.value) })} />
-              {/if}
-            </span>
-          </div>
+          <GradientEditor label={t("Page background")} fill={page.background?.type === "gradient" ? pageFill : { kind: "solid", color: page.background?.color ?? "#1b1b1f" }} onchange={setPageFill} />
         {:else}
           <div class="stack">
             {#if images.length === 0}<p class="note">{t("Import pictures in Media first.")}</p>{/if}
@@ -312,6 +329,11 @@
   {/if}
 </div>
 
+{#if iconPicker}
+  {@const Picker = iconPicker}
+  <Picker onpick={addIcon} onclose={() => (iconPicker = null)} />
+{/if}
+
 <style>
   .deck-editor { position: fixed; inset: 0; z-index: 35; background: var(--desk, #111); color: var(--ink); display: flex; flex-direction: column; font-family: var(--font-ui); font-size: 13px; }
   header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
@@ -350,7 +372,6 @@
   .inspect h3 { margin: 0; font-size: 14px; }
   .field-row { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .field { height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 0 8px; font: inherit; min-width: 0; }
-  .angle { width: 64px; }
   .inline { display: flex; gap: 6px; align-items: center; }
   input[type="color"] { width: 40px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
   .stack { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; }

@@ -1,4 +1,6 @@
 import { encodeRich, inlineRuns, parseRich, scaleRuns, type RichDoc } from "./rich-text";
+import { encodeFill, fillCss, sanitizeFill } from "./fill";
+import { sanitizeIconNodes } from "./icon";
 import { presentCamera } from "./camera";
 import { frame, setPreview } from "./live";
 import { presentImage, presentLyrics, presentScripture, presentText, presentVideo } from "./present";
@@ -38,6 +40,7 @@ export type SourceType =
   | "plugin"
   | "qr"
   | "shape"
+  | "icon"
   | "empty"
   | "web";
 
@@ -77,6 +80,8 @@ export type PageBackground = {
   imageUrl: string;
   overlay: string;
   overlayOpacity: number;
+  /** A gradient of several colours, straight or round (fill.ts); when set it paints "gradient" pages. */
+  fill?: string;
 };
 
 export type Composition = {
@@ -663,7 +668,7 @@ export function assignLayerSource(composition: Composition, layerId: string, sou
 const MOVING: ReadonlySet<SourceType> = new Set<SourceType>(["camera", "video", "ndi"]);
 
 /** Overlays (lower thirds, timers, the time, QR codes, shapes) never get region edges. */
-const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "timer", "clock", "countdown", "qr", "shape", "empty"]);
+const OVERLAYS: ReadonlySet<SourceType> = new Set<SourceType>(["lower-third", "timer", "clock", "countdown", "qr", "shape", "icon", "empty"]);
 
 export function setCompositionEdges(composition: Composition, edges: CompositionEdges): Composition {
   if (composition.locked) return composition;
@@ -1306,6 +1311,7 @@ export function sanitizeBackground(value: unknown): PageBackground | undefined {
     imageUrl: typeof record.imageUrl === "string" ? record.imageUrl : "",
     overlay: color(record.overlay, "#000000"),
     overlayOpacity: Number.isFinite(record.overlayOpacity) ? Math.min(1, Math.max(0, Number(record.overlayOpacity))) : 0,
+    ...(record.fill ? { fill: encodeFill(sanitizeFill(record.fill, { kind: "linear", angle: 135, stops: [{ color: color(record.color, "#1b1b1f"), at: 0 }, { color: color(record.to, "#3a2a1a"), at: 100 }] })) } : {}),
   };
 }
 
@@ -1318,6 +1324,7 @@ export function backgroundCss(background: PageBackground): string {
     return `linear-gradient(${rgba}, ${rgba}), `;
   })();
   if (background.type === "image" && background.imageUrl) return `${tint}center / cover no-repeat url("${background.imageUrl}")`;
+  if (background.type === "gradient" && background.fill) return `${tint}${fillCss(sanitizeFill(background.fill, { kind: "solid", color: background.color }))}`;
   if (background.type === "gradient") return `${tint}linear-gradient(${background.angle}deg, ${background.color}, ${background.to})`;
   return tint ? `${tint}${background.color}` : background.color;
 }
@@ -1574,9 +1581,29 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
       imageUrl: null,
       backgroundImageUrl: null,
       shape: {
-        kind: payload.kind === "ellipse" ? "ellipse" : "rect",
-        fill: payload.fill && HEX_COLOR.test(payload.fill) ? payload.fill : "#ffffff",
+        kind: payload.kind === "ellipse" ? "ellipse" : payload.kind === "line" ? "line" : "rect",
+        // One colour, or a gradient (fill.ts); pages made before gradients kept a plain colour.
+        fill: fillCss(sanitizeFill(payload.fill)),
         radius: Math.min(50, Math.max(0, Number(payload.radius) || 0)),
+        ...(HEX_COLOR.test(payload.stroke ?? "") && Number(payload.strokeWidth) > 0 ? { stroke: { color: payload.stroke!, width: Math.min(40, Number(payload.strokeWidth)) } } : {}),
+        ...(payload.shadow === "soft" || payload.shadow === "strong" ? { shadow: payload.shadow } : {}),
+      },
+    };
+  }
+  if (source.type === "icon") {
+    return {
+      layout: "icon",
+      theme: ctx.theme,
+      reference: null,
+      attribution: null,
+      lines: [],
+      imageUrl: null,
+      backgroundImageUrl: null,
+      icon: {
+        nodes: sanitizeIconNodes(payload.nodes),
+        color: payload.color && HEX_COLOR.test(payload.color) ? payload.color : "#ffffff",
+        strokeWidth: Math.min(4, Math.max(0.5, Number(payload.strokeWidth) || 2)),
+        ...(payload.shadow === "soft" || payload.shadow === "strong" ? { shadow: payload.shadow } : {}),
       },
     };
   }

@@ -198,6 +198,9 @@
   );
 
   const displayLines = $derived(timerView ? [{ text: timerView.text }] : model.lines);
+
+  // Shadows under shapes and icons: drawn once with the page (a still layer costs nothing after).
+  const SHADOWS: Record<string, string> = { soft: "0 12px 32px rgba(0, 0, 0, 0.35)", strong: "0 18px 48px rgba(0, 0, 0, 0.6)" };
 </script>
 
 {#snippet words()}
@@ -302,8 +305,16 @@
     <div
       class="shape"
       style:background={model.shape.fill}
-      style:border-radius={model.shape.kind === "ellipse" ? "50%" : `${model.shape.radius}%`}
+      style:border-radius={model.shape.kind === "ellipse" ? "50%" : model.shape.kind === "line" ? "999px" : `${model.shape.radius}%`}
+      style:box-shadow={[model.shape.stroke ? `inset 0 0 0 ${model.shape.stroke.width}px ${model.shape.stroke.color}` : "", SHADOWS[model.shape.shadow ?? ""] ?? ""].filter(Boolean).join(", ") || undefined}
     ></div>
+  {:else if model.layout === "icon" && model.icon}
+    <!-- Plain shapes from the page itself (icon.ts keeps only geometry), on the 24-unit grid. -->
+    <svg class="icon {model.icon.shadow ?? ''}" viewBox="0 0 24 24" fill="none" stroke={model.icon.color} stroke-width={model.icon.strokeWidth} stroke-linecap="round" stroke-linejoin="round" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      {#each model.icon.nodes as [tag, attrs], index (index)}
+        <svelte:element this={tag} {...attrs} />
+      {/each}
+    </svg>
   {:else if model.layout === "web" && model.web}
     {#if still}
       <div class="web-card"><span>{model.web.kind === "youtube" ? t("YouTube") : model.web.kind === "vimeo" ? t("Vimeo") : model.web.kind === "slides" ? t("Google Slides") : t("Website")}</span><strong>{model.web.label}</strong></div>

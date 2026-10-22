@@ -838,6 +838,9 @@ button { cursor: pointer; }
 }
 
 .frame .shape { width: 100%; height: 100%; }
+.frame .icon { width: 100%; height: 100%; display: block; overflow: visible; }
+.frame .icon.soft { filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.4)); }
+.frame .icon.strong { filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.65)); }
 
 /* Calm backgrounds: animated theme backgrounds hold still on this computer. */
 :root[data-calm] .motion i,

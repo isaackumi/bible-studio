@@ -9,6 +9,7 @@ import {
   type LayerBounds,
   type PageBackground,
 } from "./composition";
+import { encodeIconNodes, sanitizeIconNodes, type IconNode } from "./icon";
 import { encodeTextStyle } from "./text-style";
 import type { PresentationItem, SlideDeckDocument, TextStyle } from "./types";
 
@@ -46,12 +47,24 @@ export function addTextElement(page: Composition, text: string, bounds: LayerBou
   });
 }
 
-export function addShapeElement(page: Composition, kind: "rect" | "ellipse", fill: string, bounds: LayerBounds): Composition {
+export function addShapeElement(page: Composition, kind: "rect" | "ellipse" | "line", fill: string, bounds: LayerBounds): Composition {
+  const name = kind === "ellipse" ? "Ellipse" : kind === "line" ? "Line" : "Rectangle";
   return addLayer(page, {
-    name: kind === "ellipse" ? "Ellipse" : "Rectangle",
+    name,
     bounds,
     fit: "fill",
-    source: sourceRef("shape", kind, kind === "ellipse" ? "Ellipse" : "Rectangle", { kind, fill, radius: kind === "rect" ? "6" : "0" }),
+    source: sourceRef("shape", kind, name, { kind, fill, radius: kind === "rect" ? "6" : "0" }),
+  });
+}
+
+/** An icon: its shapes are kept in the page (icon.ts), drawn as outlines in one colour. */
+export function addIconElement(page: Composition, icon: { name: string; nodes: IconNode[] }, bounds: LayerBounds = { x: 44, y: 38, w: 12, h: 24 }): Composition {
+  const title = icon.name.replace(/-/g, " ");
+  return addLayer(page, {
+    name: title.charAt(0).toUpperCase() + title.slice(1),
+    bounds,
+    fit: "contain",
+    source: sourceRef("icon", icon.name, title, { nodes: encodeIconNodes(sanitizeIconNodes(icon.nodes)), color: "#ffffff", strokeWidth: "2" }),
   });
 }
 

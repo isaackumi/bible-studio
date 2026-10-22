@@ -21,6 +21,8 @@
   import { msg, t } from "../../i18n/core";
   import { encodeRich, parseRich, type RichDoc } from "../../domain/rich-text";
   import TextWords from "../TextWords.svelte";
+  import GradientEditor from "./GradientEditor.svelte";
+  import { encodeFill, sanitizeFill } from "../../domain/fill";
 
   // Properties of the selected element on a deck page. Every change is one history step.
   let { page, layer, oncommit }: { page: Composition; layer: CompositionLayer; oncommit: (page: Composition) => void } = $props();
@@ -39,6 +41,17 @@
   };
   const images = $derived(session.media.filter((asset) => asset.kind === "image"));
 </script>
+
+{#snippet shadowPicker()}
+  <label class="field-row">
+    <span>{t("Shadow")}</span>
+    <select class="field" aria-label={t("Shadow")} value={payload.shadow ?? "none"} onchange={(event) => setPayload({ shadow: event.currentTarget.value })}>
+      <option value="none">{t("None")}</option>
+      <option value="soft">{t("Soft")}</option>
+      <option value="strong">{t("Strong")}</option>
+    </select>
+  </label>
+{/snippet}
 
 <div class="inspector">
   <label class="field-row">
@@ -60,16 +73,36 @@
     </div>
     <TextStyleEditor style={parseTextStyle(payload.style)} onchange={(style) => oncommit(setLayerStyle(page, layer.id, style))} />
   {:else if layer.source.type === "shape"}
-    <div class="field-row">
+    <div class="stack">
       <span>{t("Fill")}</span>
-      <input type="color" aria-label={t("Shape fill")} value={payload.fill ?? "#ffffff"} oninput={(event) => setPayload({ fill: event.currentTarget.value })} />
+      <GradientEditor label={t("Shape fill")} fill={sanitizeFill(payload.fill)} onchange={(fill) => setPayload({ fill: encodeFill(fill) })} />
     </div>
-    {#if payload.kind !== "ellipse"}
+    {#if payload.kind !== "line"}
+      <div class="field-row">
+        <span>{t("Outline")}</span>
+        <span class="inline">
+          <input type="color" aria-label={t("Outline colour")} value={payload.stroke ?? "#ffffff"} oninput={(event) => setPayload({ stroke: event.currentTarget.value, strokeWidth: payload.strokeWidth && Number(payload.strokeWidth) > 0 ? payload.strokeWidth : "4" })} />
+          <input class="field" type="range" min="0" max="24" aria-label={t("Outline width")} value={Number(payload.strokeWidth ?? 0)} onchange={(event) => setPayload({ strokeWidth: event.currentTarget.value, stroke: payload.stroke ?? "#ffffff" })} />
+        </span>
+      </div>
+    {/if}
+    {@render shadowPicker()}
+    {#if payload.kind === "rect"}
       <label class="field-row">
         <span>{t("Corners")}</span>
         <input class="field" type="range" min="0" max="50" aria-label={t("Corner radius")} value={Number(payload.radius ?? 0)} onchange={(event) => setPayload({ radius: event.currentTarget.value })} />
       </label>
     {/if}
+  {:else if layer.source.type === "icon"}
+    <div class="field-row">
+      <span>{t("Colour")}</span>
+      <input type="color" aria-label={t("Icon colour")} value={payload.color ?? "#ffffff"} oninput={(event) => setPayload({ color: event.currentTarget.value })} />
+    </div>
+    <label class="field-row">
+      <span>{t("Line weight")}</span>
+      <input class="field" type="range" min="0.5" max="4" step="0.25" aria-label={t("Icon line weight")} value={Number(payload.strokeWidth ?? 2)} onchange={(event) => setPayload({ strokeWidth: event.currentTarget.value })} />
+    </label>
+    {@render shadowPicker()}
   {:else if layer.source.type === "image"}
     <div class="stack">
       <span>{t("Picture")}</span>

@@ -104,6 +104,7 @@ export type PresentationLayout =
   | "video"
   | "qr"
   | "shape"
+  | "icon"
   | "web";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
@@ -172,7 +173,10 @@ export type PresentationModel = {
   /** CSS background for the whole frame (deck page gradients); wins over the theme. */
   fill?: string;
   /** layout "shape": a filled rectangle or ellipse. */
-  shape?: { kind: "rect" | "ellipse"; fill: string; radius: number };
+  /** A shape on a page: fill is CSS (a colour or a gradient), with an optional outline and shadow. */
+  shape?: { kind: "rect" | "ellipse" | "line"; fill: string; radius: number; stroke?: { color: string; width: number }; shadow?: "soft" | "strong" };
+  /** An icon on a page: its shapes on a 24×24 grid (icon.ts), drawn as outlines in one colour. */
+  icon?: { nodes: import("./icon").IconNode[]; color: string; strokeWidth: number; shadow?: "soft" | "strong" };
   /** An announcement laid out in one of its designs (layout "title"). */
   announcement?: import("./announcement").AnnouncementPaint;
   /** Scripture in a second translation, shown beside the first. */
