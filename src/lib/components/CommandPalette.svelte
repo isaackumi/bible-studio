@@ -4,6 +4,7 @@
   import type { BibleItem, PewPage } from "../domain/types";
   import Icon from "./Icon.svelte";
   import { msg, t, tn } from "../i18n/core";
+  import { audienceRoom } from "../app/rooms.svelte";
 
   // Go to anything (⌘K / Ctrl+K), from any page: a page, a part or item of the service, a song, a
   // verse ("John 3:16" goes on Preview), a setting, or an action (LIVE, Clear, Start service…).
@@ -60,6 +61,10 @@
       // The design studio: slides, templates, lower thirds, gradients, icons and pictures.
       { id: "d-studio", group: msg("Design"), label: msg("Design studio"), detail: msg("Slides, gradients, shapes, icons and pictures"), icon: "stage", run: () => session.openStudio(), words: "design studio slides editor deck page graphics gradient shape icon picture image svg logo rotate group" },
       { id: "d-template", group: msg("Design"), label: msg("New page from a template"), detail: msg("Welcome, event, verse, sermon, giving"), icon: "plus", run: () => session.openStudio(undefined, "templates"), words: "template templates layout welcome event announcement notices verse scripture sermon series giving prayer design" },
+      // The congregation's phones.
+      { id: "aud-qa", group: msg("Audience"), label: msg("Live Q&A"), detail: msg("People ask and vote from their phones"), icon: "users", run: () => audienceRoom.show(), words: "q&a questions ask audience congregation phone qr room moderate vote" },
+      { id: "aud-games", group: msg("Audience"), label: msg("Quizzes and Bible games"), detail: msg("Played on people's phones"), icon: "users", run: () => audienceRoom.show(), words: "quiz quizzes game games bible trivia kahoot play youth children leaderboard" },
+      { id: "aud-poll", group: msg("Audience"), label: msg("Poll"), detail: msg("Let the congregation vote"), icon: "users", run: () => audienceRoom.show(), words: "poll vote voting choose survey" },
       { id: "d-lower", group: msg("Design"), label: msg("Lower thirds"), detail: msg("Name bars that go over a camera"), icon: "captions", run: () => session.openStudio(undefined, "templates"), words: "lower third thirds name bar caption speaker overlay camera" },
     );
     for (const [id, label, icon, words] of SETTINGS) entries.push({ id: `s-${id}`, group: msg("Settings"), label, icon, run: () => session.openSettings(id), words: `settings ${words}` });

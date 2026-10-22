@@ -1,0 +1,184 @@
+// Games for the congregation's phones: a game is a list of questions, each with answers, the right
+// one (none for a poll), a time limit and points. Every kind of game (Bible quiz, who said it, which
+// book, finish the verse, youth trivia, a church's own) is this one shape, so the room runs them
+// all the same way and new kinds need no new machinery. Some are made fresh from the Bible text
+// installed on this computer each time (generators below).
+
+export type GameQuestion = {
+  id: string;
+  prompt: string;
+  choices: string[];
+  /** The right answer's index; null in a poll. */
+  correct: number | null;
+  seconds: number;
+  points: number;
+};
+
+export type Game = {
+  id: string;
+  title: string;
+  description: string;
+  kind: "quiz" | "poll";
+  questions: GameQuestion[];
+  updatedAt: string;
+};
+
+export const MOST_CHOICES = 6;
+export const MOST_QUESTIONS = 100;
+
+const uid = (prefix: string) => `${prefix}:${Math.random().toString(36).slice(2, 10)}`;
+const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+
+export function sanitizeGame(value: unknown): Game | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const kind = input.kind === "poll" ? "poll" : "quiz";
+  const questions = (Array.isArray(input.questions) ? input.questions : [])
+    .slice(0, MOST_QUESTIONS)
+    .map((raw): GameQuestion | null => {
+      if (!raw || typeof raw !== "object") return null;
+      const q = raw as Record<string, unknown>;
+      const choices = (Array.isArray(q.choices) ? q.choices : []).map((choice) => text(choice, 120)).slice(0, MOST_CHOICES);
+      const correct = Number.isInteger(q.correct) && Number(q.correct) >= 0 && Number(q.correct) < choices.length ? Number(q.correct) : null;
+      return {
+        id: text(q.id, 40) || uid("q"),
+        prompt: text(q.prompt, 300),
+        choices,
+        correct: kind === "poll" ? null : correct,
+        seconds: Math.min(120, Math.max(0, Math.round(Number(q.seconds) || 0))),
+        points: Math.min(5000, Math.max(0, Math.round(Number(q.points ?? 1000)))),
+      };
+    })
+    .filter((q): q is GameQuestion => q !== null);
+  return {
+    id: text(input.id, 60) || uid("game"),
+    title: text(input.title, 80) || "Untitled game",
+    description: text(input.description, 300),
+    kind,
+    questions,
+    updatedAt: typeof input.updatedAt === "string" ? input.updatedAt : new Date(0).toISOString(),
+  };
+}
+
+/** A question the room can run: words, two or more answers, and (in a quiz) the right one. */
+export function ready(question: GameQuestion, kind: Game["kind"]): boolean {
+  const choices = question.choices.filter((choice) => choice.trim());
+  return question.prompt.trim().length > 0 && choices.length >= 2 && (kind === "poll" || (question.correct !== null && !!question.choices[question.correct]?.trim()));
+}
+
+export function blankQuestion(): GameQuestion {
+  return { id: uid("q"), prompt: "", choices: ["", "", "", ""], correct: 0, seconds: 20, points: 1000 };
+}
+
+export function newGame(title = "New game"): Game {
+  return { id: uid("game"), title, description: "", kind: "quiz", questions: [blankQuestion()], updatedAt: new Date().toISOString() };
+}
+
+/** Mix the answers (the right one keeps being right). */
+export function shuffled(question: GameQuestion, random = Math.random): GameQuestion {
+  const order = question.choices.map((_, index) => index).sort(() => random() - 0.5);
+  return { ...question, choices: order.map((index) => question.choices[index]!), correct: question.correct === null ? null : order.indexOf(question.correct) };
+}
+
+const q = (prompt: string, choices: string[], correct: number | null = 0, seconds = 20, points = 1000): GameQuestion => ({ id: uid("q"), prompt, choices, correct, seconds, points });
+const game = (id: string, title: string, description: string, questions: GameQuestion[], kind: Game["kind"] = "quiz"): Game => ({ id: `builtin:${id}`, title, description, kind, questions, updatedAt: "2026-10-22T00:00:00.000Z" });
+
+/** Ready to play: each answer here checked against the Bible text (the right answer is listed first, and mixed when played). */
+export const BUILT_IN_GAMES: Game[] = [
+  game("bible-basics", "Bible basics", "Ten questions for everyone, young and old.", [
+    q("Who built the ark?", ["Noah", "Moses", "Abraham", "David"]),
+    q("How many days and nights did it rain in the flood?", ["Forty", "Seven", "Twelve", "Three"]),
+    q("Who was swallowed by a great fish?", ["Jonah", "Peter", "Elijah", "Paul"]),
+    q("What did David use to defeat Goliath?", ["A sling and a stone", "A sword", "A spear", "His bare hands"]),
+    q("In which town was Jesus born?", ["Bethlehem", "Nazareth", "Jerusalem", "Capernaum"]),
+    q("How many disciples did Jesus choose?", ["Twelve", "Seven", "Ten", "Seventy"]),
+    q("Who denied Jesus three times?", ["Peter", "Judas", "Thomas", "John"]),
+    q("What was Jesus' first miracle in John's gospel?", ["Water turned into wine", "Feeding the five thousand", "Walking on water", "Healing a blind man"]),
+    q("Who led the Israelites out of Egypt?", ["Moses", "Joshua", "Aaron", "Joseph"]),
+    q("What is the first book of the Bible?", ["Genesis", "Exodus", "Matthew", "Psalms"]),
+  ]),
+  game("who-said-it", "Who said it?", "Name the person who spoke these words.", [
+    q("“Here am I; send me.”", ["Isaiah", "Jeremiah", "Moses", "Samuel"], 0, 25),
+    q("“Speak; for thy servant heareth.”", ["Samuel", "Eli", "David", "Solomon"], 0, 25),
+    q("“Whither thou goest, I will go.”", ["Ruth", "Naomi", "Esther", "Mary"], 0, 25),
+    q("“Am I my brother's keeper?”", ["Cain", "Abel", "Esau", "Joseph"], 0, 25),
+    q("“As for me and my house, we will serve the Lord.”", ["Joshua", "Moses", "Caleb", "Gideon"], 0, 25),
+    q("“Be it unto me according to thy word.”", ["Mary", "Elizabeth", "Martha", "Hannah"], 0, 25),
+    q("“My Lord and my God.”", ["Thomas", "Peter", "John", "Philip"], 0, 25),
+    q("“I have fought a good fight, I have finished my course.”", ["Paul", "Peter", "Timothy", "Stephen"], 0, 25),
+  ]),
+  game("true-or-false", "True or false", "Quick questions: true or false?", [
+    q("Moses received the Ten Commandments on Mount Sinai.", ["True", "False"], 0, 12, 500),
+    q("Jesus was baptised by Peter.", ["True", "False"], 1, 12, 500),
+    q("Paul wrote the letter to the Romans.", ["True", "False"], 0, 12, 500),
+    q("Daniel was thrown into a den of lions.", ["True", "False"], 0, 12, 500),
+    q("Jonah was swallowed by a whale in the Book of Jonah.", ["True", "False"], 1, 15, 500),
+    q("Solomon built the temple in Jerusalem.", ["True", "False"], 0, 12, 500),
+    q("There are 27 books in the New Testament.", ["True", "False"], 0, 12, 500),
+    q("Elijah went up to heaven in a whirlwind.", ["True", "False"], 0, 12, 500),
+  ]),
+  game("bible-places", "Bible places", "Where did it happen?", [
+    q("Where did Jesus turn water into wine?", ["Cana", "Bethany", "Jericho", "Nazareth"]),
+    q("Which city's walls fell after the Israelites marched around it?", ["Jericho", "Jerusalem", "Babylon", "Nineveh"]),
+    q("To which city was Jonah sent to preach?", ["Nineveh", "Tarshish", "Babylon", "Damascus"]),
+    q("On the road to which city was Saul blinded by a light?", ["Damascus", "Jerusalem", "Antioch", "Rome"]),
+    q("Where was Jesus crucified?", ["Golgotha", "Gethsemane", "Mount Sinai", "Mount Carmel"]),
+    q("In which river was Jesus baptised?", ["Jordan", "Nile", "Euphrates", "Tigris"]),
+    q("Where did Elijah call down fire from heaven against the prophets of Baal?", ["Mount Carmel", "Mount Sinai", "Mount of Olives", "Mount Zion"]),
+  ]),
+  game("bible-timeline", "Bible timeline", "Which came first?", [
+    q("Which came first?", ["The flood", "The Exodus from Egypt", "King David's reign", "The exile to Babylon"]),
+    q("Which came first?", ["Abraham's call", "Moses at the burning bush", "Samuel anointing Saul", "Nehemiah rebuilding the walls"]),
+    q("Which came first?", ["The Ten Commandments", "The fall of Jericho", "Solomon's temple", "Daniel in the lions' den"]),
+    q("Which came first?", ["Jesus' baptism", "The feeding of the five thousand", "The Last Supper", "Pentecost"]),
+    q("Which came first?", ["Joseph sold into Egypt", "The Red Sea parting", "Ruth gleaning in Boaz's field", "Elijah on Mount Carmel"]),
+    q("Which came first?", ["Pentecost", "Saul on the road to Damascus", "Paul's shipwreck on Malta", "The letter to the Romans written"]),
+  ]),
+  game("worship-poll", "Pick the closing song", "A poll: let the congregation choose.", [q("Which song shall we close with?", ["Amazing Grace", "How Great Thou Art", "Great Is Thy Faithfulness", "Blessed Assurance"], null, 30, 0)], "poll"),
+];
+
+// --- Made from the Bible on this computer ------------------------------------------------------
+
+/** Verses people know, for games made from the installed Bible. */
+export const WELL_KNOWN: Array<{ book: number; chapter: number; verse: number }> = [
+  { book: 1, chapter: 1, verse: 1 }, { book: 19, chapter: 23, verse: 1 }, { book: 19, chapter: 46, verse: 1 }, { book: 19, chapter: 119, verse: 105 },
+  { book: 20, chapter: 3, verse: 5 }, { book: 23, chapter: 40, verse: 31 }, { book: 24, chapter: 29, verse: 11 }, { book: 25, chapter: 3, verse: 23 },
+  { book: 6, chapter: 1, verse: 9 }, { book: 33, chapter: 6, verse: 8 }, { book: 40, chapter: 5, verse: 14 }, { book: 40, chapter: 11, verse: 28 },
+  { book: 40, chapter: 28, verse: 19 }, { book: 43, chapter: 3, verse: 16 }, { book: 43, chapter: 14, verse: 6 }, { book: 43, chapter: 11, verse: 35 },
+  { book: 45, chapter: 8, verse: 28 }, { book: 45, chapter: 12, verse: 2 }, { book: 46, chapter: 13, verse: 4 }, { book: 48, chapter: 5, verse: 22 },
+  { book: 49, chapter: 2, verse: 8 }, { book: 50, chapter: 4, verse: 13 }, { book: 58, chapter: 11, verse: 1 }, { book: 59, chapter: 1, verse: 22 },
+  { book: 62, chapter: 4, verse: 8 }, { book: 66, chapter: 21, verse: 4 }, { book: 2, chapter: 20, verse: 3 }, { book: 4, chapter: 6, verse: 24 },
+];
+
+const pick = <T>(list: T[], count: number, random: () => number): T[] => [...list].sort(() => random() - 0.5).slice(0, count);
+
+/**
+ * "Which book is this from?": the verse's words, and its book among others near it in the Bible.
+ * `verses` are the verses read from the installed translation; `books` its book names in order.
+ */
+export function whichBookGame(verses: Array<{ book: number; text: string }>, books: string[], random = Math.random, count = 8): Game {
+  const questions = pick(verses.filter((verse) => verse.text && books[verse.book - 1]), count, random).map((verse) => {
+    const right = books[verse.book - 1]!;
+    const others = pick(books.filter((name) => name !== right), 3, random);
+    return shuffled(q(`“${verse.text.trim()}”`, [right, ...others], 0, 25), random);
+  });
+  return { id: "made:which-book", title: "Which book?", description: "Name the book each verse comes from.", kind: "quiz", questions, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * "Finish the verse": the start of a verse, and its true ending among the endings of other verses.
+ */
+export function finishTheVerseGame(verses: Array<{ reference: string; text: string }>, random = Math.random, count = 8): Game {
+  const split = (text: string) => {
+    const words = text.trim().split(/\s+/);
+    const cut = Math.max(3, Math.floor(words.length * 0.55));
+    return { start: words.slice(0, cut).join(" "), end: words.slice(cut).join(" ") };
+  };
+  const usable = verses.filter((verse) => verse.text.trim().split(/\s+/).length >= 8);
+  const questions = pick(usable, count, random).map((verse) => {
+    const { start, end } = split(verse.text);
+    const others = pick(usable.filter((other) => other !== verse), 3, random).map((other) => split(other.text).end);
+    return shuffled(q(`${verse.reference}: “${start} …”`, [`… ${end}`, ...others.map((ending) => `… ${ending}`)], 0, 30), random);
+  });
+  return { id: "made:finish-verse", title: "Finish the verse", description: "Choose how each verse ends.", kind: "quiz", questions, updatedAt: new Date().toISOString() };
+}

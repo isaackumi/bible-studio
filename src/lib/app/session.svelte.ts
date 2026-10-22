@@ -189,6 +189,7 @@ import type {
 } from "../domain/types";
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
+import type { Game } from "../domain/games";
 import { createDeck, deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
@@ -4262,6 +4263,19 @@ class Session {
 
   closeStudio = () => {
     this.studio = null;
+  };
+
+  /** Games a church made for the congregation's phones (games.ts); the built-in ones are not stored. */
+  saveGame = (game: Game) => {
+    const games = this.workspace.games ?? [];
+    const next = { ...game, updatedAt: new Date().toISOString() };
+    this.workspace = { ...this.workspace, games: games.some((entry) => entry.id === game.id) ? games.map((entry) => (entry.id === game.id ? next : entry)) : [next, ...games] };
+    this.persistSoon();
+  };
+
+  removeGame = (id: string) => {
+    this.workspace = { ...this.workspace, games: (this.workspace.games ?? []).filter((entry) => entry.id !== id) };
+    this.persistSoon();
   };
 
   /** Which deck page is on Preview, so Next/Previous step pages. */

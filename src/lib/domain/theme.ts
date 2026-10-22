@@ -328,6 +328,7 @@ export function defaultWorkspace(): Workspace {
     remoteDevices: [],
     voice: { commands: true, wake: true, custom: [] },
     decks: [],
+    games: [],
     playlists: defaultPlaylists(),
     audio: defaultAudioSettings(),
     secondOutput: defaultSecondOutput(),

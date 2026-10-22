@@ -67,6 +67,7 @@
   import Settings from "@lucide/svelte/icons/settings";
   import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import User from "@lucide/svelte/icons/user";
+  import Users from "@lucide/svelte/icons/users";
   import X from "@lucide/svelte/icons/x";
   import Eye from "@lucide/svelte/icons/eye";
   import EyeOff from "@lucide/svelte/icons/eye-off";
@@ -118,6 +119,7 @@
     speed: Gauge,
     refresh: RefreshCw,
     user: User,
+    users: Users,
     key: KeyRound,
     close: X,
     plus: Plus,

@@ -4,6 +4,8 @@
   import Toast from "./Toast.svelte";
   import CommandPalette from "./CommandPalette.svelte";
   import DeckEditor from "./decks/DeckEditor.svelte";
+  import AudiencePanel from "./audience/AudiencePanel.svelte";
+  import { audienceRoom } from "../app/rooms.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
   import WhatsNew from "./WhatsNew.svelte";
@@ -222,6 +224,7 @@
         <i aria-hidden="true"></i>{t("Browser demo")} · <b>{t("Get the app")}</b>
       </a>
     {/if}
+    {#if audienceRoom.open}<AudiencePanel />{/if}
     {#if session.studio}
       {@const studioDeck = session.decks.find((deck) => deck.id === session.studio?.deckId)}
       {#if studioDeck}

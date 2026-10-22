@@ -567,6 +567,8 @@ export type Workspace = {
   remoteDevices: RemoteDeviceDocument[];
   /** Slide decks: named, multi-page, each page a canvas of layers. */
   decks: SlideDeckDocument[];
+  /** Games for the congregation's phones (quizzes and polls a church made; games.ts). */
+  games: import("./games").Game[];
   /** Audio playlists (walk-in music, backing tracks). */
   playlists: import("./playlists").Playlist[];
   audio: import("./playlists").AudioSettings;
