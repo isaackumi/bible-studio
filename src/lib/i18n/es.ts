@@ -1586,6 +1586,7 @@ export const es: Readonly<Record<string, string>> = {
   "Program is black": "Programa en negro",
   "Clear the words; the background, camera or video stays": "Borrar la letra; el fondo, la cámara o el video se quedan",
   "The audience can't see this": "El público no ve esto",
+  "Not on the screen": "No está en pantalla",
   "Previous on Preview": "Anterior en Vista previa",
   "Previous on Preview (←); LIVE shows it": "Anterior en Vista previa (←); EN VIVO lo muestra",
   "Next on Preview": "Siguiente en Vista previa",

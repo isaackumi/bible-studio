@@ -29,7 +29,7 @@
 >
   {#snippet trigger()}
     <span class="lamp" class:on={chip.on} class:warn={unseen}></span>
-    <span class="name">{unseen ? t("Not showing · Open") : chip.label}</span>
+    {#if unseen}<span class="name long">{t("Not showing · Open")}</span><span class="name short">{t("Not showing")}</span>{:else}<span class="name">{chip.label}</span>{/if}
     {#if ndiOn || session.ndi.status === "error" || session.ndiKey.status === "on"}
       <span class="ndi" class:live={ndiWatchers > 0} class:bad={session.ndi.status === "error"} title={session.ndi.status === "error" ? session.ndi.message : tn(ndiWatchers, "NDI: {n} receiver watching", "NDI: {n} receivers watching")}>NDI{#if ndiWatchers}<b>{ndiWatchers}</b>{/if}</span>
     {/if}
@@ -64,7 +64,7 @@
 </ToolMenu>
 
 <style>
-  :global(.output-trigger) { max-width: min(260px, 28vw); }
+  :global(.output-trigger) { max-width: min(260px, 28vw); flex-shrink: 0; }
   .lamp { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line); }
   .lamp.on { background: var(--presence); box-shadow: 0 0 8px var(--presence); }
   .lamp.warn { background: #f5a524; box-shadow: 0 0 8px #f5a524; animation: warn-blink 1.2s ease-in-out infinite; }
@@ -77,4 +77,7 @@
   .ndi b { font-weight: 800; }
   .menu-note-inline { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--muted); }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  /* A narrow bar keeps the warning whole and lets the menu say how to open the screen. */
+  .short { display: none; }
+  @media (max-width: 1180px) { .long { display: none; } .short { display: inline; } }
 </style>

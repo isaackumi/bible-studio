@@ -4,7 +4,7 @@
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
 
-  // A short note after an action, bottom right (clear of the bar, the service strip and Preview): what happened, where, and one or two buttons.
+  // A short note after an action, bottom left: clear of Go LIVE, Program and the queue on the right: what happened, where, and one or two buttons.
   const toast = $derived(session.toast);
 </script>
 
@@ -27,7 +27,7 @@
 <style>
   .toast {
     position: fixed;
-    right: 20px;
+    left: 20px;
     bottom: 20px;
     z-index: 900;
     display: flex;

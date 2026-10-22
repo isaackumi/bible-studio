@@ -1028,7 +1028,6 @@
                   {/each}
                 </select>
               {/if}
-              <button type="button" class="mini" aria-label={t("Edit reference")} onclick={() => bibleInput?.select()}>{@render icon("book")}</button>
               <button type="button" class="mini" class:on={wrapVerses} aria-label={t("Verse layout")} onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
               <label class="bible-search">
                 <Icon name="search" size={14} />
@@ -1109,7 +1108,7 @@
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "program")} ondragend={endPanelDrag}>
                     <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
-                    {#if programSet && !displayLive}<span class="unseen" role="status">{t("The audience can't see this")}</span>{/if}
+                    {#if programSet && !displayLive}<span class="unseen" role="status" title={t("The audience can't see this")}>{t("Not on the screen")}</span>{/if}
                     <button
                       type="button"
                       class="style-name"
@@ -1342,9 +1341,11 @@
   }
   .lib-rail:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
   .lib-rail span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  /* The reference box is what the operator types in most: it keeps room for "1 Corinthians 13:4"
+     and the buttons move to a second row before it gets squeezed. */
   .bible-search {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 140px;
+    min-width: 110px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1469,7 +1470,7 @@
   }
   .mini:hover, .lex:hover, .steppers button:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
   .mini.on { color: var(--accent); border-color: var(--accent); }
-  .script-bar { padding: 8px; }
+  .script-bar { padding: 8px; flex-wrap: wrap; flex: none; }
   select, .script-bar input {
     height: 32px;
     border-radius: 8px;
@@ -1604,7 +1605,10 @@
   .version-head b { color: var(--accent); font-size: 12px; letter-spacing: 0.04em; }
   .version-head em { margin-left: auto; font-style: normal; font-weight: 700; color: var(--live, #e5484d); }
   .version-text { font-size: 14px; line-height: 1.45; }
-  .unseen { font-size: 11px; font-weight: 650; color: #f5a524; white-space: nowrap; }
+  .unseen { flex: none; font-size: 11px; font-weight: 650; color: #f5a524; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* A narrow Program column keeps the warning and drops the look's name (it comes back once the screen shows). */
+  .pb-panel.output { container-type: inline-size; }
+  @container (max-width: 380px) { .unseen ~ .style-name { display: none; } }
   .live-steps .steps-label { font-size: 11px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--live, #e5484d); }
   .live-steps button { border-color: color-mix(in srgb, var(--live, #e5484d) 45%, var(--line)); }
   .steppers button { width: 32px; padding: 0; justify-content: center; }
@@ -1651,13 +1655,13 @@
     .pb-left { gap: 6px; }
     .clears .desk-btn { padding-inline: 8px; }
     .pb-modes button { padding-inline: 9px; }
-    .pb-bar :global(.output-trigger) { max-width: 128px; }
+    .pb-bar :global(.output-trigger) { max-width: 150px; }
   }
   @media (max-width: 1100px) {
     .pb-bar { padding-inline: 6px; gap: 4px; }
     .pb-tools { padding-left: 8px; margin-left: 2px; }
     .pb-modes button { padding-inline: 6px; font-size: 13px; }
-    .pb-bar :global(.output-trigger) { max-width: 96px; }
+    .pb-bar :global(.output-trigger) { max-width: 140px; }
     .pb-tools { gap: 1px; --tool-size: 32px; }
     .desk-btn.live, .desk-btn.danger { padding-inline: 10px; }
     .now-audio-name { padding: 0 5px; }

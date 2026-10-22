@@ -68,6 +68,9 @@
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
   .compact .label { display: none; }
   .compact button { width: var(--tool-size); padding: 0; justify-content: center; }
+  /* The desk in use always says its name, so icons alone never leave the operator guessing. */
+  .compact button.on .short { display: inline; font-size: 12px; font-weight: 650; }
+  .compact button.on { width: auto; padding: 0 10px; gap: 6px; }
   /* With room in the bar, the compact switch names its desks too. */
   @media (min-width: 1400px) {
     .compact .short { display: inline; font-size: 12px; font-weight: 650; }

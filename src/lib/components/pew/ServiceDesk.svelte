@@ -1032,7 +1032,7 @@
   .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); }
   .next-copy strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .next-btn { border-color: var(--accent); background: var(--accent); color: var(--on-accent); height: 40px; font-weight: 750; }
-  .next-btn:disabled { opacity: 0.45; }
+  .next-btn:disabled { border-color: var(--line); background: var(--field); color: var(--muted); opacity: 0.7; }
   .more-tools { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-control, 8px); padding: 8px 10px; }
   .more-tools summary { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }
   .more-tools summary::-webkit-details-marker { display: none; }

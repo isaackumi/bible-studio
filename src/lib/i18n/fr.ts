@@ -1612,6 +1612,7 @@ export const fr: Readonly<Record<string, string>> = {
   "Program is black": "Programme au noir",
   "Clear the words; the background, camera or video stays": "Effacer les paroles ; l’arrière-plan, la caméra ou la vidéo restent",
   "The audience can't see this": "L’assemblée ne voit pas ceci",
+  "Not on the screen": "Pas à l’écran",
   "Previous on Preview": "Précédent sur l’aperçu",
   "Previous on Preview (←); LIVE shows it": "Précédent sur l’aperçu (←) ; DIRECT l’affiche",
   "Next on Preview": "Suivant sur l’aperçu",

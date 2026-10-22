@@ -130,9 +130,10 @@
   }
   .sidebar { min-width: 0; overflow: hidden; }
   .sidebar.dragging { user-select: none; }
-  .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 10px 10px 14px; flex: none; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 10px 10px 14px; flex: none; }
   h2 { margin: 0; font-size: 16px; white-space: nowrap; }
-  .head-actions { display: flex; align-items: center; gap: 4px; }
+  /* A narrow column (or a longer language) moves the buttons under the title instead of hiding Hide. */
+  .head-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
   .collapse, .rail-btn {
     display: grid;
     place-items: center;
