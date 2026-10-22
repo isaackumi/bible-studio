@@ -247,6 +247,16 @@ describe("signing in safely, and who a license belongs to", () => {
     expect((await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" })).data).toMatchObject({ licenses: [{ license: bought.license, owner: false }], lease: expect.any(String) });
   });
 
+  it("the browser version signs in as whoever is signed in to the browser, with no code", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call } = setup(identity);
+    expect((await call("/v1/signin/browser", { device: "web-1" })).data).toEqual({ signedIn: false });
+    signInAs(alice);
+    const done = (await call("/v1/signin/browser", { device: "web-1", name: "Edge" })).data;
+    expect(done).toMatchObject({ token: expect.stringMatching(/^cst_/), account: { email: alice.email } });
+    expect((await call("/v1/account", { token: done.token })).status).toBe(200);
+  });
+
   it("with sign-in required, a new trial or key needs an account; renewals never do", async () => {
     const { identity, signInAs } = fakeIdentity();
     const { call, page, buy, config } = setup(identity);

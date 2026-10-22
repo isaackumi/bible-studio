@@ -17,6 +17,7 @@
 //   POST /admin/api/action   {action, …}                 → {ok, …} | 202 {pending, approval}
 //   POST /admin/api/approve  {id, token, decline?}
 
+import { ownershipOf } from "./ownership.ts";
 import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial } from "./api.ts";
 import type { Account, LinkedLicense } from "./accounts.ts";
 import { licenseKeyEmail } from "./email.ts";
@@ -514,6 +515,7 @@ async function licenseView(config: ApiConfig, id: string) {
   const seats = (await getJson<Device[]>(config.store, `act:${id}`)) ?? [];
   const key = record ? ((await getJson<LinkedLicense[]>(config.store, `email:${record.email.trim().toLowerCase()}`)) ?? []).find((entry) => entry.id === id)?.key : undefined;
   const plan = key ? readAnyLicense(config, key)?.license.plan : sub?.plan;
+  const ownership = await ownershipOf(config, id);
   const owners = [];
   for (const entry of await config.store.list("acct:")) {
     const account = await getJson<Account>(config.store, entry.key);
@@ -529,6 +531,9 @@ async function licenseView(config: ApiConfig, id: string) {
     subscription: sub ? { id: sub.id, interval: sub.interval, status: sub.status, renewsAt: sub.renewsAt } : null,
     stopped: revoked,
     accounts: owners,
+    // Who it belongs to (ownership.ts) and the people its owner added, by email.
+    owner: ownership ? (owners.find((account) => account.id === ownership.owner) ?? { id: ownership.owner, email: "" }) : null,
+    members: ownership?.members ?? [],
     computers: await Promise.all(seats.map(async (seat) => ({ ...(await computer(config, seat.device, emails)), name: seat.name, seenAt: seat.seenAt }))),
     extensions: (await getJson<Extension[]>(config.store, `adminext:license:${id}`)) ?? [],
   };

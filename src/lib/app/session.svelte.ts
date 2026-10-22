@@ -5730,6 +5730,8 @@ class Session {
    */
   startAccountSignin = async (elsewhere = false): Promise<string | null> => {
     this.cancelAccountSignin();
+    // The browser version, already signed in to this browser: nothing more to ask.
+    if (!this.desktop() && !elsewhere && (await this.browserSignin())) return null;
     const loopback = this.desktop() && !elsewhere;
     const pkce = loopback ? await pkcePair() : null;
     const port = loopback ? await invoke<number>("signin_listen").catch(() => null) : null;
@@ -5785,10 +5787,24 @@ class Session {
     } else if (readFlag(AUTO_TRIAL_KEY) === "pending") void this.autoStartTrial();
   };
 
+  /**
+   * The browser version on the server's own address: sign in as whoever is signed in to this browser
+   * (its session cookie), so signing in on the page that opened is enough, with no code to type.
+   * False when nobody is, or the app is not served from the server (development).
+   */
+  private browserSignin = async (): Promise<boolean> => {
+    if (this.desktop() || typeof location === "undefined") return false;
+    const answer = await serverCall<SigninToken & { signedIn?: false }>("/v1/signin/browser", { device: this.deviceId, name: this.deviceName() }, location.origin);
+    if (!answer.ok || !answer.data.token) return false;
+    await this.finishSignin(answer.data.token, answer.data.account);
+    return true;
+  };
+
   private watchSignin(id: string, secret: string, expiresAt: number) {
     clearTimeout(this.signinTimer);
     this.signinTimer = setTimeout(async () => {
       if (this.accountSignin?.id !== id) return;
+      if (await this.browserSignin()) return;
       const answer = await serverCall<SigninPoll>("/v1/signin/poll", { id, secret });
       if (this.accountSignin?.id !== id) return;
       if (answer.ok && answer.data.status === "done" && answer.data.token && answer.data.account) {

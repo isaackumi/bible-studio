@@ -15,6 +15,9 @@
 //   POST /v1/signin/start   {device, name, mode?, redirect?, challenge?} → {id, secret, number|code, url, expiresAt}
 //   POST /v1/signin/poll    {id, secret}              → {status, token?, account?}   (code and number)
 //   POST /v1/signin/token   {id, code, verifier}      → {token, account}             (loopback)
+//   POST /v1/signin/browser {device, name}            → {token, account} | {signedIn: false}
+//     The browser version, on this server's own address: whoever is signed in to this browser
+//     (its session cookie) is who the app signs in as. No code to type.
 //   POST /v1/account        {token, device, name}     → {account, licenses, lease?, activation?}
 //   POST /v1/account/link   {token, key}              → {ok}   (a key bought before signing in)
 //   POST /v1/account/devices {token}                  → {devices}  (where this account is signed in)
@@ -225,6 +228,18 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       await putJson(config.store, `signin:${signin.id}`, { ...signin, grant: undefined }, undefined, SIGNIN_TTL);
       const token = await issueToken(config, signin.person.id, signin.device, signin.name);
       return json(200, { token, account: { email: signin.person.email, name: signin.person.name } });
+    }
+    case "/v1/signin/browser": {
+      // Same browser, same person: only a request carrying this site's own session cookie gets here
+      // signed in (cookies are not sent to it from other sites' pages).
+      if (!config.identity || !request) return json(503, { error: "Accounts are not set up on this server yet." });
+      const device = text(input.device, 80);
+      if (!device) return json(400, { error: "Which computer?" });
+      const person = await config.identity.current(request);
+      if (!person) return json(200, { signedIn: false });
+      const account = await upsertAccount(config, person);
+      const token = await issueToken(config, account.id, device, text(input.name, 60) || "Browser");
+      return json(200, { token, account: { email: account.email, name: account.name } });
     }
     case "/v1/account":
       return accountStatus(config, input);
