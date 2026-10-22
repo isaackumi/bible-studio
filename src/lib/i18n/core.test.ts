@@ -52,6 +52,13 @@ describe("interface language", () => {
     expect(wrong).toEqual([]);
   });
 
+  it("translates every desk message the session sets", () => {
+    // A bare literal here reaches the operator in English whatever the language; wrap it in t().
+    const source = readFileSync("src/lib/app/session.svelte.ts", "utf8");
+    const bare = source.split("\n").flatMap((line, index) => (/this\.message = ["`]/.test(line) ? [`${index + 1}: ${line.trim()}`] : []));
+    expect(bare).toEqual([]);
+  });
+
   it("falls back to English and fills placeholders", () => {
     expect(translate("fr", "A line nobody has translated")).toBe("A line nobody has translated");
     expect(translate("en", "Step {n} of {total}", { n: 2, total: 3 })).toBe("Step 2 of 3");

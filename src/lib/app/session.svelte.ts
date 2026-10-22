@@ -78,6 +78,11 @@ import { applyProgramAction, createLiveState, frame, programPacket, replaceProgr
 function shortcutLabelForUndo(): string {
   return typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘Z" : "Ctrl+Z";
 }
+
+/** What went wrong, in the system's words when it gave some, else our own line. */
+function errorText(error: unknown, fallback = String(error)): string {
+  return error instanceof Error ? error.message : fallback;
+}
 import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo } from "../domain/present";
 import {
   cameraDeviceId,
@@ -212,6 +217,7 @@ import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearM
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
+import type { MessageTone } from "./status-line";
 import { whatsNewFor, type Release } from "../domain/changelog";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
@@ -320,7 +326,29 @@ const IDLE_VOICE: VoiceState = {
 
 class Session {
   ready = $state(false);
-  message = $state("Opening workspace");
+  // What the desk last said. Setting `message` leaves the tone to the status line's guess;
+  // warn() marks a problem and quiet() a confirmation the monitors already show, in any language.
+  #message = $state("Opening workspace");
+  messageTone = $state<MessageTone | null>(null);
+
+  get message(): string {
+    return this.#message;
+  }
+
+  set message(text: string) {
+    this.#message = text;
+    this.messageTone = null;
+  }
+
+  warn = (text: string) => {
+    this.message = text;
+    this.messageTone = "warn";
+  };
+
+  quiet = (text: string) => {
+    this.message = text;
+    this.messageTone = "quiet";
+  };
   liveMode = $state(false);
   library: "bible" | "songs" | "slides" | "media" | "theme" | "sermon" = $state("bible");
   workspace = $state<Workspace>(defaultWorkspace());
@@ -467,10 +495,10 @@ class Session {
 
   audienceLabel = (): string =>
     this.desktop()
-      ? "This app sends to the audience."
+      ? t("This app sends to the audience.")
       : this.controlsAudience
-        ? "This window sends to the audience."
-        : "Another window has the audience.";
+        ? t("This window sends to the audience.")
+        : t("Another window has the audience.");
 
   /** Name the startup step (the loading screen shows it if starting takes too long), and finish it. */
   private bootStep(step: string) {
@@ -599,14 +627,14 @@ class Session {
           ? this.outputWaiting
             ? t("The audience screen opens when you put something on Program.")
             : this.output.message
-          : "Browser session. Audience output opens in its own window.";
+          : t("Browser session. Audience output opens in its own window.");
       }
       // The library could not be opened, so the app started a new one: say so before anything else.
       const setAside = this.desktop() ? await invoke<string | null>("startup_notice").catch(() => null) : null;
-      if (setAside) this.message = t("The library could not be opened, so a new one was started. The old one is kept as {file}. Restore your latest backup in Settings › Storage & backup.", { file: setAside });
+      if (setAside) this.warn(t("The library could not be opened, so a new one was started. The old one is kept as {file}. Restore your latest backup in Settings › Storage & backup.", { file: setAside }));
       if (!keepLive && this.cursor.itemId && this.service) await this.selectItem(this.cursor.itemId);
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
       this.ready = true;
       this.booted = true;
       this.bootStep("ready");
@@ -638,7 +666,7 @@ class Session {
       this.audienceCameraErrors = error
         ? { ...this.audienceCameraErrors, [id]: error }
         : Object.fromEntries(Object.entries(this.audienceCameraErrors).filter(([key]) => key !== id));
-      if (error) this.message = t("The audience screen cannot show {label}: {error} It keeps trying.", { label, error });
+      if (error) this.warn(t("The audience screen cannot show {label}: {error} It keeps trying.", { label, error }));
       else if (this.message.startsWith(t("The audience screen cannot show {label}: {error} It keeps trying.", { label, error: "" }).split(":")[0])) this.message = t("{label} is showing on the audience screen.", { label });
     });
     configureOnlineBibles(this.workspace.onlineBibles.key, this.workspace.onlineBibles.bibles);
@@ -677,7 +705,7 @@ class Session {
       return normalizeWorkspace(await api.workspaceLoad());
     } catch (error) {
       console.error(error);
-      this.message = t("Workspace settings were unreadable. Defaults were restored.");
+      this.warn(t("Workspace settings were unreadable. Defaults were restored."));
       return defaultWorkspace();
     }
   };
@@ -741,7 +769,7 @@ class Session {
       if (!this.controlsAudience) this.message = t("Another window has the audience. Take control before sending.");
     } catch (error) {
       this.controlsAudience = false;
-      this.message = error instanceof Error ? error.message : "Audience control could not be read.";
+      this.warn(errorText(error, t("Audience control could not be read.")));
     }
   };
 
@@ -758,7 +786,7 @@ class Session {
       this.message = t("This window can send to the audience. Go live when you are ready.");
     } catch (error) {
       this.controlsAudience = false;
-      this.message = error instanceof Error ? error.message : "Audience control could not be saved. Nothing was sent.";
+      this.warn(errorText(error, t("Audience control could not be saved. Nothing was sent.")));
     }
   };
 
@@ -786,20 +814,20 @@ class Session {
     };
     if (!this.desktop()) {
       if (!this.controlsAudience) {
-        this.message = t("This window is not sending to the audience.");
+        this.warn(t("This window is not sending to the audience."));
         return;
       }
       try {
         if (!publishLocal(packet)) this.message = t("A newer audience update was kept.");
       } catch (error) {
-        this.message = error instanceof Error ? error.message : "The audience could not be updated. Nothing new was sent.";
+        this.warn(errorText(error, t("The audience could not be updated. Nothing new was sent.")));
       }
       return;
     }
     try {
       await api.publishProgram(packet);
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The audience could not be updated.";
+      this.warn(errorText(error, t("The audience could not be updated.")));
     }
   };
 
@@ -847,7 +875,7 @@ class Session {
       this.message = t("{name}: done.", { name: macro.name });
     } catch (error) {
       const step = macro.steps[this.runningMacro?.step ?? 0];
-      this.message = t("{name} stopped at “{step}”: {reason}", { name: macro.name, step: step ? describeStep(step, { playlist: (playlistId) => this.workspace.playlists.find((list) => list.id === playlistId)?.name ?? t("a playlist") }) : t("a step"), reason: error instanceof Error ? error.message : t("it did not work") });
+      this.warn(t("{name} stopped at “{step}”: {reason}", { name: macro.name, step: step ? describeStep(step, { playlist: (playlistId) => this.workspace.playlists.find((list) => list.id === playlistId)?.name ?? t("a playlist") }) : t("a step"), reason: error instanceof Error ? error.message : t("it did not work") }));
     } finally {
       this.runningMacro = null;
     }
@@ -999,7 +1027,7 @@ class Session {
     try {
       await this.saveWorkspaceDocument(this.workspace);
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
     }
     if (this.service && this.service !== this.savedService) {
       this.service = stamp(this.service);
@@ -1009,7 +1037,7 @@ class Session {
         this.savedService = saved;
         this.services = await api.serviceList();
       } catch (error) {
-        this.message = error instanceof Error ? error.message : String(error);
+        this.warn(errorText(error));
       }
     }
   };
@@ -1162,7 +1190,7 @@ class Session {
         if (url) pages.push({ id: asset.id, name: asset.name, url });
       }
     } catch (error) {
-      this.message = error instanceof Error ? error.message : `${file.name} could not be imported.`;
+      this.warn(errorText(error, t("{name} could not be imported.", { name: file.name })));
       if (!pages.length) return null;
     }
     if (!pages.length) {
@@ -1173,7 +1201,8 @@ class Session {
     this.saveDeck(deck);
     if (toService) await this.addDeckToService(deck.id);
     const capped = total > pages.length ? ` (first ${pages.length} pages)` : "";
-    this.message = `${t("{file} is the slide deck “{deck}”, {pages}{capped}.", { file: file.name, deck: deck.name, pages: tn(pages.length, "{n} page", "{n} pages"), capped })}${toService ? ` ${t("It is in the service; arrows turn the pages.")}` : ""}`;
+    const said = t("{file} is the slide deck “{deck}”, {pages}{capped}.", { file: file.name, deck: deck.name, pages: tn(pages.length, "{n} page", "{n} pages"), capped });
+    this.message = toService ? `${said} ${t("It is in the service; arrows turn the pages.")}` : said;
     return deck.id;
   };
 
@@ -1181,7 +1210,7 @@ class Session {
   importPowerPoint = async (file: File): Promise<string | null> => {
     const name = file.name.replace(/\.pptx$/i, "") || "Presentation";
     if (/\.(ppt|key)$/i.test(file.name)) {
-      this.message = t("Save it as a .pptx (PowerPoint) or a PDF, then import it. Older .ppt and Keynote files cannot be read directly.");
+      this.warn(t("Save it as a .pptx (PowerPoint) or a PDF, then import it. Older .ppt and Keynote files cannot be read directly."));
       return null;
     }
     try {
@@ -1207,7 +1236,7 @@ class Session {
       this.message = t("Imported {slides} from {file}{skipped} as the deck “{deck}”. Tables, charts and SmartArt are not brought over.", { slides: tn(deck.pages.length, "{n} slide", "{n} slides"), file: file.name, skipped, deck: deck.name });
       return deck.id;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : `${file.name} could not be imported.`;
+      this.warn(errorText(error, t("{name} could not be imported.", { name: file.name })));
       return null;
     }
   };
@@ -1321,7 +1350,7 @@ class Session {
     const list = this.workspace.playlists.find((entry) => entry.id === id);
     const tracks = this.playlistTracks(id);
     if (!list || !tracks.length) {
-      this.message = t("Add music to this playlist first.");
+      this.warn(t("Add music to this playlist first."));
       return;
     }
     void this.measureTracks(tracks);
@@ -1335,7 +1364,7 @@ class Session {
     for (const source of sources) {
       const asset = await this.importImage(source);
       if (asset?.kind === "audio") added.push(asset.id);
-      else if (asset) this.message = t("{name} is not an audio file; it went to the media library.", { name: asset.name });
+      else if (asset) this.warn(t("{name} is not an audio file; it went to the media library.", { name: asset.name }));
     }
     if (playlistId && added.length) this.addToPlaylist(playlistId, added);
     if (added.length) this.message = tn(added.length, "{n} track added.", "{n} tracks added.");
@@ -1531,7 +1560,7 @@ class Session {
     const track = button ? this.audioTracks.find((entry) => entry.id === button.assetId) : undefined;
     const url = track ? mediaUrl(track) : null;
     if (!button || !track || !url) {
-      this.message = t("That sound is no longer in the media library.");
+      this.warn(t("That sound is no longer in the media library."));
       return;
     }
     const gain = this.workspace.audio.even ? evenGain(this.workspace.audio.levels[track.id]) : 1;
@@ -1608,19 +1637,20 @@ class Session {
             : { url: "/?second=1", title: name, width: 1280, height: 720 },
         );
         second.once("tauri://error", (event) => {
-          this.message = t("The {name} screen could not open: {payload}", { name, payload: String(event.payload) });
+          this.warn(t("The {name} screen could not open: {payload}", { name, payload: String(event.payload) }));
         });
         second.once("tauri://destroyed", () => (this.secondOpen = false));
         setTimeout(() => this.publishSecond(), 600);
-        this.message = target ? `${name} screen is on ${target.name}.` : `${name} screen opened. Drag it to that screen.`;
+        this.message = target ? t("{name} screen is on {display}.", { name, display: target.name }) : t("{name} screen opened. Drag it to that screen.", { name });
       } catch (error) {
-        this.message = error instanceof Error ? error.message : "The second screen could not open.";
+        this.warn(errorText(error, t("The second screen could not open.")));
       }
       return;
     }
     this.publishSecond();
     const opened = window.open("./?second=1", "church-studio-second", "popup=yes,width=1280,height=720");
-    this.message = opened ? `${name} screen opened. Drag it to that screen.` : "The browser blocked the window. Allow pop-ups for this site, then try again.";
+    if (opened) this.message = t("{name} screen opened. Drag it to that screen.", { name });
+    else this.warn(t("The browser blocked the window. Allow pop-ups for this site, then try again."));
   };
 
   closeSecond = async () => {
@@ -1646,7 +1676,7 @@ class Session {
     if (on && !this.voiceAllowed()) return;
     this.captionsOn = on;
     if (on && this.voice.status !== "listening" && this.voice.status !== "starting") await this.startVoice();
-    this.message = on ? "Captions on. What is said shows as it is heard." : "Captions off.";
+    this.message = on ? t("Captions on. What is said shows as it is heard.") : t("Captions off");
     this.publishCaptions(true);
   };
 
@@ -1682,7 +1712,7 @@ class Session {
         const translations = parseTranslations(replyText(this.workspace.ai.provider, reply), languages);
         if (Object.keys(translations).length) this.captions = withTranslation(this.captions, id, translations);
       } catch (error) {
-        this.message = t("Caption translation: {reason}", { reason: error instanceof Error ? error.message : t("it did not work") });
+        this.warn(t("Caption translation: {reason}", { reason: error instanceof Error ? error.message : t("it did not work") }));
       }
     });
   }
@@ -1886,7 +1916,7 @@ class Session {
         if (saved) this.previewLook(restoreComposition(saved));
       }
     } catch (error) {
-      return remoteEnvelope("denied", { reason: error instanceof Error ? error.message : "The desk could not do that." });
+      return remoteEnvelope("denied", { reason: errorText(error, t("The desk could not do that.")) });
     }
     return remoteEnvelope(action.kind === "command" ? "ack" : "state", this.remoteState(action.kind === "command" ? action.id : ""));
   };
@@ -2367,7 +2397,7 @@ class Session {
     const look = this.lookAt(target);
     const layer = look ? scriptureLayerOf(look) : undefined;
     if (!look || !layer) {
-      this.message = target === "program" ? "The look on Program has no scripture region." : "Put a look with a scripture region on Preview first.";
+      this.warn(target === "program" ? t("The look on Program has no scripture region.") : t("Put a look with a scripture region on Preview first."));
       return false;
     }
     const translation = translationId ?? this.translationForLayer(layer.source.payload);
@@ -2385,7 +2415,7 @@ class Session {
       return true;
     }
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return false;
     }
     this.lookOnProgram = next;
@@ -2416,7 +2446,7 @@ class Session {
     if (!next) {
       const chapter = parsed.chapter + direction;
       if (chapter < 1 || chapter > book.chapters) {
-        this.message = direction > 0 ? `That is the end of ${book.name}.` : `That is the start of ${book.name}.`;
+        this.message = direction > 0 ? t("That is the end of {book}.", { book: book.name }) : t("That is the start of {book}.", { book: book.name });
         return false;
       }
       const count = direction > 0 ? 1 : (await api.verses(current.translationId, parsed.bookOrd, chapter)).length;
@@ -2445,8 +2475,8 @@ class Session {
     if (this.lookOnPreview?.id === clean.id) this.lookOnPreview = synced.look;
     this.persistSoon();
     this.message = synced.unlinked.length
-      ? `${synced.unlinked.join(", ")} unlinked: a locked scene uses the shared source. LIVE still sends Program.`
-      : `${clean.name} saved. LIVE still sends Program.`;
+      ? t("{names} unlinked: a locked scene uses the shared source. LIVE still sends Program.", { names: synced.unlinked.join(", ") })
+      : t("{name} saved. LIVE still sends Program.", { name: clean.name });
   };
 
   /** Save a look's arrangement as a layout to start from again (content is filled from the desk). */
@@ -2527,7 +2557,7 @@ class Session {
     const next = setCompositionLocked(restoreComposition(saved), locked);
     this.saveLook(next);
     if (this.lookOnPreview?.id === id) this.previewLook(next);
-    this.message = locked ? `${next.name} locked.` : `${next.name} unlocked.`;
+    this.message = locked ? t("{name} locked.", { name: next.name }) : t("{name} unlocked.", { name: next.name });
   };
 
   /** Folder color for a scene. Organizing only, so it works on locked scenes too. */
@@ -2581,7 +2611,7 @@ class Session {
   saveSharedSource = (id: string, name: string, source: SourceRef): string[] => {
     const result = updateSharedSource(this.sharedSources, this.workspace.compositions, id, { name, source });
     if (!result.ok) {
-      this.message = t("Used in locked scene \"{blocked}\". Unlock to edit.", { blocked: result.blocked[0] });
+      this.warn(t("Used in locked scene \"{blocked}\". Unlock to edit.", { blocked: result.blocked[0] }));
       return result.blocked;
     }
     this.workspace = { ...this.workspace, sources: result.sources, compositions: result.looks };
@@ -2658,7 +2688,7 @@ class Session {
       onEnd: () => {
         this.stopVoiceEngine = null;
         if (this.voice.status === "error") return;
-        this.voice = { ...this.voice, status: "stopped", level: 0, hearing: false, message: this.voice.message || "Listening stopped." };
+        this.voice = { ...this.voice, status: "stopped", level: 0, hearing: false, message: this.voice.message || t("Listening stopped.") };
       },
       onStatus: (message: string) => {
         this.voice.message = message;
@@ -2820,7 +2850,7 @@ class Session {
         record("failed", `No scripture found for “${query}”.`);
       }
     } catch (error) {
-      record("failed", error instanceof Error ? error.message : `${label} failed.`);
+      record("failed", errorText(error, t("{label} failed.", { label })));
     }
   };
 
@@ -3044,7 +3074,7 @@ class Session {
     if (!this.service?.sections.length) this.addSection("Looks");
     const target = this.service ? (sectionId && this.service.sections.some((section) => section.id === sectionId) ? sectionId : sectionIdForInsert(this.service, this.cursor)) : null;
     if (!this.service || !target) {
-      this.message = t("{title} saved. Add a section first.", { title: queued.item.title });
+      this.warn(t("{title} saved. Add a section first.", { title: queued.item.title }));
       return;
     }
     this.insertItem(target, queued.item);
@@ -3065,7 +3095,7 @@ class Session {
     try {
       model = await this.modelFor(item);
     } catch (error) {
-      if (token === this.selectToken) this.message = t("{reference} could not be read. {reason}", { reference: passage.reference, reason: error instanceof Error ? error.message : String(error) });
+      if (token === this.selectToken) this.warn(t("{reference} could not be read. {reason}", { reference: passage.reference, reason: error instanceof Error ? error.message : String(error) }));
       return;
     }
     if (token !== this.selectToken) return;
@@ -3216,7 +3246,7 @@ class Session {
     const service = this.service;
     const first = service?.sections[0];
     if (!service || !first) {
-      this.message = t("Add a part to the service first.");
+      this.warn(t("Add a part to the service first."));
       return;
     }
     if (move) {
@@ -3422,7 +3452,7 @@ class Session {
     const section = this.service?.sections.find((entry) => entry.id === sectionId);
     const leader = section?.leader?.trim();
     if (!section || !leader) {
-      this.message = t("Add who leads this part first.");
+      this.warn(t("Add who leads this part first."));
       return;
     }
     if (this.leaderTo === "preview") {
@@ -3945,7 +3975,7 @@ class Session {
     if (!this.service) return;
     const sectionId = this.cursor.sectionId ?? this.service.sections[0]?.id;
     if (!sectionId) {
-      this.message = t("Add a section first.");
+      this.warn(t("Add a section first."));
       return;
     }
     const item: PresentationItem =
@@ -3997,7 +4027,7 @@ class Session {
   addSongToService = (song: Song, sectionId?: string) => {
     const first = song.sections[0];
     if (!first) {
-      this.message = t("{title} has no sections yet.", { title: song.title || t("That song") });
+      this.warn(t("{title} has no sections yet.", { title: song.title || t("That song") }));
       return;
     }
     void this.addToService({ kind: "lyric", title: song.title || t("Untitled song"), lyric: { songId: song.id, sectionId: first.id } }, false, sectionId);
@@ -4051,7 +4081,7 @@ class Session {
       localStorage.setItem(DEFAULTS_KEY, JSON.stringify(pickSettings(this.service)));
       this.message = t("New services will start with these settings.");
     } catch {
-      this.message = t("These settings could not be kept on this computer.");
+      this.warn(t("These settings could not be kept on this computer."));
     }
   };
 
@@ -4195,7 +4225,7 @@ class Session {
     if (!this.service) return;
     const target = (partId && this.service.sections.some((entry) => entry.id === partId) ? partId : null) ?? this.cursor.sectionId ?? this.service.sections[0]?.id;
     if (!target) {
-      this.message = t("Add a section first.");
+      this.warn(t("Add a section first."));
       return;
     }
     const item: PresentationItem = { id: uid(), kind: "lyric", title, lyric: { songId, sectionId } };
@@ -4381,14 +4411,14 @@ class Session {
   private switcherDo = async (run: (client: Switcher) => Promise<void>) => {
     const client = this.switcherClient;
     if (!client || this.switcherState.status !== "on") {
-      this.message = t("Connect OBS or vMix first: Settings › Production apps.");
+      this.warn(t("Connect OBS or vMix first: Settings › Production apps."));
       return false;
     }
     try {
       await run(client);
       return true;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
       return false;
     }
   };
@@ -4519,9 +4549,9 @@ class Session {
     } catch {
       return;
     }
-    if (message.kind === "status") this.ndi = { ...this.ndi, status: "on", message: message.message ?? "Sending.", audio: message.audio === true };
+    if (message.kind === "status") this.ndi = { ...this.ndi, status: "on", message: message.message ?? t("Sending."), audio: message.audio === true };
     else if (message.kind === "stats") this.ndi = { ...this.ndi, connections: Number(message.connections) || 0 };
-    else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? "NDI stopped." };
+    else if (message.kind === "error") this.ndi = { ...this.ndi, status: "error", message: message.message ?? t("NDI stopped.") };
     else if (message.kind === "end" && this.ndi.status !== "error") this.ndi = { ...this.ndi, status: "off", connections: 0 };
   };
 
@@ -4575,12 +4605,12 @@ class Session {
   /** Send a passage straight to Program (no Preview step): the pastor went back to it. */
   goLivePassage = async (passage: BibleItem) => {
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return;
     }
     const model = await this.modelFor({ id: "gone-live", kind: "bible", title: passage.reference, bible: passage });
     if (model.lines.length === 0) {
-      this.message = t("{reference} could not be found in this translation.", { reference: passage.reference });
+      this.warn(t("{reference} could not be found in this translation.", { reference: passage.reference }));
       return;
     }
     if (this.deckLoop) this.stopDeckLoop();
@@ -4669,9 +4699,9 @@ class Session {
     } catch {
       return;
     }
-    if (message.kind === "status") this.ndiKey = { ...this.ndiKey, status: "on", message: message.message ?? "Sending." };
+    if (message.kind === "status") this.ndiKey = { ...this.ndiKey, status: "on", message: message.message ?? t("Sending.") };
     else if (message.kind === "stats") this.ndiKey = { ...this.ndiKey, connections: Number(message.connections) || 0 };
-    else if (message.kind === "error") this.ndiKey = { ...this.ndiKey, status: "error", message: message.message ?? "NDI stopped." };
+    else if (message.kind === "error") this.ndiKey = { ...this.ndiKey, status: "error", message: message.message ?? t("NDI stopped.") };
     else if (message.kind === "end" && this.ndiKey.status !== "error") this.ndiKey = { ...this.ndiKey, status: "off", connections: 0 };
   };
 
@@ -4714,7 +4744,7 @@ class Session {
   /** A tiny request to check the key and model work. */
   testAi = async (): Promise<string> => {
     const result = await this.summarizeSermon({ title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." });
-    return result.points.length ? `Connected. The test made ${result.points.length} point${result.points.length === 1 ? "" : "s"}.` : "Connected.";
+    return result.points.length ? tn(result.points.length, "Connected. The test made {n} point.", "Connected. The test made {n} points.") : t("Connected.");
   };
 
   setPcoToken = (appId: string, secret: string) => {
@@ -4750,7 +4780,7 @@ class Session {
     const deck = this.decks.find((entry) => entry.id === deckId);
     if (!deck || deck.pages.length === 0) return;
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return;
     }
     this.stopDeckLoop();
@@ -4802,7 +4832,7 @@ class Session {
   addVideo = async (assetId: string, title: string, options: { loop?: boolean; muted?: boolean } = {}) => {
     const target = await this.sectionForMedia();
     if (!target) {
-      this.message = t("Add a section first.");
+      this.warn(t("Add a section first."));
       return;
     }
     const item: PresentationItem = {
@@ -4825,7 +4855,7 @@ class Session {
   addImage = async (assetId: string, title: string) => {
     const target = await this.sectionForMedia();
     if (!target) {
-      this.message = t("Add a section first.");
+      this.warn(t("Add a section first."));
       return;
     }
     const item: PresentationItem = { id: uid(), kind: "image", title, image: { assetId } };
@@ -4923,7 +4953,7 @@ class Session {
   previewSongHit = (hit: SongHit) => {
     const song = this.songs.find((entry) => entry.id === hit.songId);
     if (!song) {
-      this.message = t("That song is no longer available.");
+      this.warn(t("That song is no longer available."));
       return;
     }
     this.previewSongSection(song, hit.sectionId);
@@ -4969,7 +4999,7 @@ class Session {
     const song = this.songs.find((entry) => entry.id === focus.songId);
     if (!song) {
       this.songFocus = null;
-      this.message = t("That song is no longer available.");
+      this.warn(t("That song is no longer available."));
       this.previewModel(emptyModel(this.theme()), null);
       return false;
     }
@@ -5008,7 +5038,7 @@ class Session {
     const clean = sanitizeSong(song);
     const error = songError(clean);
     if (error) {
-      this.message = error;
+      this.warn(error);
       return false;
     }
     await api.songSave(clean);
@@ -5305,7 +5335,7 @@ class Session {
       this.translations = await api.translations();
       this.message = t("{name} is ready.", { name: this.translations.find((entry) => entry.id === id)?.name ?? id });
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "That translation could not be downloaded.";
+      this.warn(errorText(error, t("That translation could not be downloaded.")));
     } finally {
       this.bibleBusy = this.bibleBusy.filter((entry) => entry !== id);
     }
@@ -5332,7 +5362,7 @@ class Session {
       this.translations = await api.translations();
       this.message = t("Translation removed. Download it again any time.");
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "That translation could not be removed.";
+      this.warn(errorText(error, t("That translation could not be removed.")));
     }
   };
 
@@ -5441,7 +5471,7 @@ class Session {
       this.planClock = Date.now();
       return true;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
       return false;
     }
   };
@@ -6009,7 +6039,7 @@ class Session {
       this.message = t("{name}: {songs} added to {folder}.", { name: pack.name, songs: tn(result.added, "{n} song", "{n} songs"), folder: pack.folder });
       return true;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : `${pack.name} could not be installed.`;
+      this.warn(errorText(error, t("{name} could not be installed.", { name: pack.name })));
       return false;
     }
   };
@@ -6054,7 +6084,7 @@ class Session {
     if (clean) this.createSongFolder(clean);
     await api.songSave(sanitizeSong({ ...song, folder: clean }));
     this.songs = await api.songList();
-    this.message = clean ? `${song.title} moved to ${clean}.` : `${song.title} removed from its folder.`;
+    this.message = clean ? t("{title} moved to {folder}.", { title: song.title, folder: clean }) : t("{title} removed from its folder.", { title: song.title });
   };
 
   /** Import lyric / ChordPro files as songs in a folder. Files with no lyrics are skipped. */
@@ -6073,7 +6103,8 @@ class Session {
       added += 1;
     }
     this.songs = await api.songList();
-    this.message = `${clean ? tn(added, "{n} song imported to {folder}.", "{n} songs imported to {folder}.", { folder: clean }) : tn(added, "{n} song imported.", "{n} songs imported.")}${skipped.length ? ` ${tn(skipped.length, "{n} file had no lyrics.", "{n} files had no lyrics.")}` : ""}`;
+    const imported = clean ? tn(added, "{n} song imported to {folder}.", "{n} songs imported to {folder}.", { folder: clean }) : tn(added, "{n} song imported.", "{n} songs imported.");
+    this.message = skipped.length ? `${imported} ${tn(skipped.length, "{n} file had no lyrics.", "{n} files had no lyrics.")}` : imported;
     return { added, skipped };
   };
 
@@ -6097,7 +6128,7 @@ class Session {
     this.songs = await api.songList();
     if (this.songFocus?.songId === id) {
       this.songFocus = null;
-      this.message = t("That song is no longer available.");
+      this.warn(t("That song is no longer available."));
       this.previewModel(emptyModel(this.theme()), null);
     }
   };
@@ -6120,8 +6151,8 @@ class Session {
     const model = await this.modelFor(item);
     this.previewModel(model, `sermon:${clean.id}:${section.id}`);
     this.message = deskNotes(clean, section.id)
-      ? "Notes are on the desk. LIVE still sends Program."
-      : "Preview the section, then LIVE.";
+      ? t("Notes are on the desk. LIVE still sends Program.")
+      : t("Preview the section, then LIVE.");
   };
 
   stepSermon = async (direction: 1 | -1): Promise<boolean> => {
@@ -6130,7 +6161,7 @@ class Session {
     const sermon = this.sermons.find((entry) => entry.id === focus.sermonId);
     if (!sermon) {
       this.sermonFocus = null;
-      this.message = t("That sermon is no longer available.");
+      this.warn(t("That sermon is no longer available."));
       this.previewModel(emptyModel(this.theme()), null);
       return false;
     }
@@ -6144,7 +6175,7 @@ class Session {
     const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
     const error = sermonError(clean);
     if (error) {
-      this.message = error;
+      this.warn(error);
       return false;
     }
     await api.sermonSave(clean);
@@ -6168,7 +6199,7 @@ class Session {
     if (!this.service) return;
     const target = (sectionId && this.service.sections.some((entry) => entry.id === sectionId) ? sectionId : null) ?? this.cursor.sectionId ?? this.service.sections[0]?.id;
     if (!target) {
-      this.message = t("Add a section first.");
+      this.warn(t("Add a section first."));
       return;
     }
     const source = sermonAudienceItem(section);
@@ -6233,7 +6264,7 @@ class Session {
     const media = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
     if (!media?.getUserMedia) {
       this.cameraNote = cameraUnavailableMessage();
-      this.message = this.cameraNote;
+      this.warn(this.cameraNote);
       return Promise.resolve(false);
     }
     const opening = (async () => {
@@ -6245,7 +6276,7 @@ class Session {
         return true;
       } catch (error) {
         this.cameraNote = error instanceof Error ? error.message : cameraUnavailableMessage();
-        this.message = this.cameraNote;
+        this.warn(this.cameraNote);
         return false;
       } finally {
         this.openingFeeds.delete(id);
@@ -6354,7 +6385,7 @@ class Session {
   sendStageMessage = (text: string) => {
     this.stageMessage = text.trim().slice(0, 140);
     this.publishStage();
-    this.message = this.stageMessage ? `Stage now reads “${this.stageMessage}”.` : "Stage message cleared.";
+    this.message = this.stageMessage ? t("Stage now reads “{text}”.", { text: this.stageMessage }) : t("Stage message cleared.");
   };
 
   setStageLayout = (patch: Partial<StageLayout>) => {
@@ -6379,7 +6410,7 @@ class Session {
     const now = Date.now();
     const alert = sanitizeAlert({ text: input.text, style: input.style, position: input.position, until: input.seconds ? now + input.seconds * 1000 : null, id: `alert:${now}` }, now);
     if (!alert) {
-      this.message = t("Type the alert first.");
+      this.warn(t("Type the alert first."));
       return;
     }
     this.alert = alert;
@@ -6388,7 +6419,7 @@ class Session {
     if (alert.until) this.alertTimer = setTimeout(() => void this.clearAlert(), alert.until - now);
     this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
     await this.pushProgram();
-    this.message = alert.until ? `Alert on Program for ${input.seconds} s.` : "Alert on Program until you clear it.";
+    this.message = alert.until ? t("Alert on Program for {seconds} s.", { seconds: input.seconds }) : t("Alert on Program until you clear it.");
   };
 
   /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
@@ -6432,7 +6463,7 @@ class Session {
     if (!overlay) return;
     const next = on ?? !overlay.on;
     this.updateOverlay(id, { on: next });
-    this.message = next ? `${OVERLAY_KINDS.find((entry) => entry.kind === overlay.kind)?.label ?? "Overlay"} is on the screen.` : "Overlay off.";
+    this.message = next ? t("{name} is on the screen.", { name: t(OVERLAY_KINDS.find((entry) => entry.kind === overlay.kind)?.label ?? "Overlay") }) : t("Overlay off.");
   };
 
   removeOverlay = (id: string) => {
@@ -6580,7 +6611,7 @@ class Session {
           shadow: false,
         });
         opened.once("tauri://error", (event) => {
-          this.message = t("A screen could not open: {payload}", { payload: String(event.payload) });
+          this.warn(t("A screen could not open: {payload}", { payload: String(event.payload) }));
         });
       }
     } catch (error) {
@@ -6611,23 +6642,23 @@ class Session {
             : { url: "/?stage=1", title: "Stage display", width: 1280, height: 720 },
         );
         stage.once("tauri://error", (event) => {
-          this.message = t("The stage display could not open: {payload}", { payload: String(event.payload) });
+          this.warn(t("The stage display could not open: {payload}", { payload: String(event.payload) }));
         });
         this.message = target
-          ? `Stage display is on ${target.name}. It shows Program and what is on Preview next.`
-          : "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
+          ? t("Stage display is on {display}. It shows Program and what is on Preview next.", { display: target.name })
+          : t("Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.");
       } catch (error) {
-        this.message = error instanceof Error ? error.message : "The stage display could not open.";
+        this.warn(errorText(error, t("The stage display could not open.")));
       }
       return;
     }
     const placed = await this.stagePlacement();
     const opened = window.open("./?stage=1", "church-studio-stage", placed?.features ?? "popup=yes,width=1280,height=720");
-    this.message = !opened
-      ? "The browser blocked the stage window. Allow pop-ups for this site, then try again."
-      : placed
-        ? `Stage display is on ${placed.label}. It shows Program and what is on Preview next.`
-        : "Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.";
+    if (!opened) this.warn(t("The browser blocked the stage window. Allow pop-ups for this site, then try again."));
+    else
+      this.message = placed
+        ? t("Stage display is on {display}. It shows Program and what is on Preview next.", { display: placed.label })
+        : t("Stage display opened. Drag it to the platform screen. It shows Program and what is on Preview next.");
   };
 
   /** Chromium: a screen that is neither the desk's nor the audience's. Null = plain popup. */
@@ -6667,7 +6698,7 @@ class Session {
       this.message = t("{name} saved. Preview it, then LIVE.", { name: asset.name });
       return asset;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The image was not saved.";
+      this.warn(errorText(error, t("The image was not saved.")));
       return null;
     }
   };
@@ -6719,7 +6750,7 @@ class Session {
     if (!this.themes.some((entry) => entry.id === next.id)) this.themes = [...this.themes, next];
     this.workspace = { ...this.workspace, themeId: next.id };
     void api.themeSave(next).catch((error) => {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
     });
     this.persistSoon();
     this.showThemeOnPreview(next);
@@ -6779,11 +6810,11 @@ class Session {
   undoProgram = async () => {
     const before = this.programBefore;
     if (!before) {
-      this.message = t("Nothing to undo on Program.");
+      this.warn(t("Nothing to undo on Program."));
       return;
     }
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return;
     }
     if (this.deckLoop) this.stopDeckLoop();
@@ -6804,12 +6835,12 @@ class Session {
 
   private act = async (action: "take" | "cut" | "clear" | "black" | "logo") => {
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return;
     }
     // An empty Preview (a page with nothing staged yet) never clears the screen by accident.
     if ((action === "take" || action === "cut") && this.live.preview.model.layout === "empty") {
-      this.message = t("Nothing on Preview yet. Program did not change.");
+      this.warn(t("Nothing on Preview yet. Program did not change."));
       return;
     }
     // The operator taking over Program ends a running loop.
@@ -6865,18 +6896,19 @@ class Session {
     await this.pushProgram();
     if (action === "clear") this.offerProgramUndo(t("Program cleared"));
     else if (action === "black") this.offerProgramUndo(t("Program is black"));
-    this.message =
+    this.quiet(
       action === "take"
         ? takeTransition?.type === "cut"
-          ? "Cut to program."
-          : "Live."
+          ? t("Cut to program")
+          : t("Live")
         : action === "cut"
-          ? "Cut to program."
+          ? t("Cut to program")
           : action === "black"
-            ? "Program is black."
+            ? t("Program is black")
             : action === "logo"
-              ? "Logo is on program."
-              : "Program cleared.";
+              ? t("Logo is on program")
+              : t("Program cleared"),
+    );
   };
 
   take = () => this.act("take");
@@ -6886,12 +6918,12 @@ class Session {
   /** Take the words off Program; the background, camera, picture or a look's other regions stay. */
   clearWords = async () => {
     if (!this.desktop() && !this.controlsAudience) {
-      this.message = t("This window is not sending to the audience.");
+      this.warn(t("This window is not sending to the audience."));
       return;
     }
     const model = withoutWords(this.live.program.model);
     if (!model) {
-      this.message = t("No words on the screen to clear.");
+      this.warn(t("No words on the screen to clear."));
       return;
     }
     if (this.deckLoop) this.stopDeckLoop();
@@ -6920,14 +6952,14 @@ class Session {
   refreshDisplays = async () => {
     if (!this.desktop()) {
       this.noteBrowserAudience();
-      this.message = t("This browser cannot list monitors. Open the audience window and drag it to the other display.");
+      this.warn(t("This browser cannot list monitors. Open the audience window and drag it to the other display."));
       return;
     }
     try {
       this.output = await api.refreshDisplays();
       this.message = this.output.message;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "Displays could not be listed.";
+      this.warn(errorText(error, t("Displays could not be listed.")));
     }
   };
 
@@ -6937,15 +6969,15 @@ class Session {
       this.output = { ...this.output, mode };
       this.message =
         mode === "fullscreen"
-          ? "On the audience window, choose Fill this screen. This browser cannot fullscreen another monitor from here."
-          : "The audience window stays in a normal window.";
+          ? t("On the audience window, choose Fill this screen. This browser cannot fullscreen another monitor from here.")
+          : t("The audience window stays in a normal window.");
       return;
     }
     try {
       this.output = await api.setOutput(this.currentProfile()?.outputEnabled ?? false, mode);
       this.message = this.output.message;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The audience window could not change mode.";
+      this.warn(errorText(error, t("The audience window could not change mode.")));
     }
   };
 
@@ -6953,7 +6985,7 @@ class Session {
     if (!this.desktop()) {
       this.noteBrowserAudience();
       if (!this.output.online || !this.audienceWindow) {
-        this.message = t("Open the audience window before sending a test. Program was not changed.");
+        this.warn(t("Open the audience window before sending a test. Program was not changed."));
         return;
       }
       this.audienceWindow.postMessage({ type: "output-test" }, window.location.origin);
@@ -6964,7 +6996,7 @@ class Session {
       await api.testOutput();
       this.message = t("Test pattern sent. Program was not changed.");
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The test pattern could not be sent. Program was not changed.";
+      this.warn(errorText(error, t("The test pattern could not be sent. Program was not changed.")));
     }
   };
 
@@ -7028,7 +7060,7 @@ class Session {
       this.output = await api.setOutput(true, this.currentProfile()?.outputMode ?? "window");
       this.message = this.output.message;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The audience window could not be opened.";
+      this.warn(errorText(error, t("The audience window could not be opened.")));
     }
   };
 
@@ -7048,7 +7080,7 @@ class Session {
       this.output = await api.setOutput(false, this.currentProfile()?.outputMode ?? "window");
       this.message = this.output.message;
     } catch (error) {
-      this.message = error instanceof Error ? error.message : "The audience window could not be closed.";
+      this.warn(errorText(error, t("The audience window could not be closed.")));
     }
   };
 
@@ -7232,7 +7264,7 @@ class Session {
     const was = isFavorite(this.workspace.favorites, kind, id);
     this.workspace = { ...this.workspace, favorites: toggleFavorite(this.workspace.favorites, kind, id) };
     this.persistSoon();
-    if (name) this.message = was ? `${name} removed from favorites.` : `${name} added to favorites.`;
+    if (name) this.message = was ? t("{name} removed from favorites.", { name }) : t("{name} added to favorites.", { name });
   };
 
   isFavorite = (kind: Exclude<FavoriteKind, "passages">, id: string) => isFavorite(this.workspace.favorites, kind, id);
@@ -7274,7 +7306,7 @@ class Session {
     const was = isFavoritePassage(this.workspace.favorites, item);
     this.workspace = { ...this.workspace, favorites: toggleFavoritePassage(this.workspace.favorites, item) };
     this.persistSoon();
-    this.message = was ? `${item.reference} removed from favorites.` : `${item.reference} added to favorites.`;
+    this.message = was ? t("{name} removed from favorites.", { name: item.reference }) : t("{name} added to favorites.", { name: item.reference });
   };
 
   isFavoritePassage = (item: Pick<BibleItem, "bookOrd" | "chapter" | "startVerse" | "endVerse">) => isFavoritePassage(this.workspace.favorites, item);
@@ -7326,7 +7358,7 @@ class Session {
     try {
       await this.applyDisplays();
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
     }
   };
 
@@ -7337,7 +7369,7 @@ class Session {
     try {
       await this.applyDisplays();
     } catch (error) {
-      this.message = error instanceof Error ? error.message : String(error);
+      this.warn(errorText(error));
     }
   };
 
@@ -7433,12 +7465,12 @@ class Session {
   controlTimer = async (action: TimerAction) => {
     const model = controlTimers(this.live.program.model, action, Date.now());
     if (!model) {
-      this.message = t("There is no timer on Program.");
+      this.warn(t("There is no timer on Program."));
       return;
     }
     this.live = replaceProgramModel(this.live, model, "cut");
     await this.pushProgram();
-    this.message = action === "pause" ? "Timer paused." : action === "resume" ? "Timer running." : "Timer reset. Start it when ready.";
+    this.message = action === "pause" ? t("Timer paused") : action === "resume" ? t("Timer running") : t("Timer reset. Start it when ready.");
   };
 
   /** "running", "paused" or "" (no controllable timer on Program). */

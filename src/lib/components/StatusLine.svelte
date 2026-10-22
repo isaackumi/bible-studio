@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { fade } from "svelte/transition";
   import { session } from "../app/session.svelte";
   import { messageTone } from "../app/status-line";
@@ -12,7 +13,8 @@
 
   $effect(() => {
     const text = session.message;
-    const tone = messageTone(text);
+    // The tone comes with the message; reading it untracked shows each message once.
+    const tone = messageTone(text, untrack(() => session.messageTone));
     if (!tone) return;
     count += 1;
     shown = { text, tone, key: count };

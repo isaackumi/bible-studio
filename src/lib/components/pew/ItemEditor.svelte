@@ -97,7 +97,7 @@
   function save() {
     if (draft.bible && reference.trim() && reference !== draft.bible.reference) applyReference();
     session.updateItem($state.snapshot(draft) as PresentationItem);
-    session.message = `${draft.title} updated. Program only changes with LIVE.`;
+    session.message = t("{title} updated. Program only changes with LIVE.", { title: draft.title });
     onclose();
   }
 </script>

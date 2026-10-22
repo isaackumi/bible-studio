@@ -294,7 +294,7 @@
       if (focus?.songId === match.songId && focus.sectionId === match.sectionId && (focus.screen ?? 0) === screen) return;
       // Following the singing fills Preview only ("LIVE still sends Program"), even when the song is live.
       previewOnly(song, match.sectionId, undefined, screen);
-      session.voice.message = `${match.label} on Preview. LIVE still sends Program.`;
+      session.voice.message = t("{title} on Preview. LIVE still sends Program.", { title: match.label });
     });
   });
 
@@ -391,7 +391,7 @@
             else if (LYRIC_FILE.test(name) && entry.data.length <= 512 * 1024) files.push({ name, text: decoder.decode(entry.data), dir });
           }
         } catch (error) {
-          note = error instanceof Error ? `${file.name}: ${error.message}` : `${file.name} could not be opened.`;
+          note = error instanceof Error ? `${file.name}: ${error.message}` : t("{name} could not be opened.", { name: file.name });
         }
       } else if (PROPRESENTER_FILE.test(file.name) && file.size <= 4 * 1024 * 1024) {
         const bytes = new Uint8Array(await file.arrayBuffer());
