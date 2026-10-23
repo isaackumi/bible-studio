@@ -2009,6 +2009,10 @@ class Session {
       ...framePayload("preview", this.live.preview.model),
       done,
       desk: this.workspace.churchName || "Church Studio",
+      // The phone wears the desk's look and speaks its language.
+      theme: this.workspace.appearance.theme,
+      accent: this.workspace.appearance.accent,
+      lang: this.workspace.appearance.language ?? "en",
       output: this.output.online ? "on" : "off",
       cursor: this.cursor.itemId ?? "",
       scene: this.lookOnPreview?.id ?? "",

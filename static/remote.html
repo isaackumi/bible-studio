@@ -3,169 +3,292 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0b1018" />
+<meta name="theme-color" content="#1a1a1a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Church Studio Remote</title>
 <style>
+  /* The desk's own look (src/app.css): the same colours, type, buttons and themes. The desk sends its
+     theme and accent, so the phone matches whatever the operator chose. */
   :root {
-    --nave: #0b1018; --pew: #151c27; --pew-2: #1c2533; --line: #2a3546;
-    --linen: #f3ead8; --mist: #9aa7b8; --gilt: #d4a056; --ember: #e23d2e;
-    --ok: #3ccf6e; --warn: #e0b341; --bad: #ff5a5a;
     color-scheme: dark;
+    --desk: #1a1a1a; --panel: #111010; --panel-2: #1e1c1c; --field: #1b1b1b; --recess: #050505;
+    --line: #312f2d; --ink: #f5f5f5; --muted: #bdbdbd;
+    --accent: #fa4f00; --on-accent: #fff; --live: #f21b1b; --presence: #3dce7a; --warn: #f5a524;
+    --screen: #000; --screen-ink: #f5f5f5;
+    --radius: 12px; --radius-sm: 9px;
+    --font: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, system-ui, sans-serif;
   }
+  :root[data-theme="vespers"] { --desk: #100e0c; --panel: #161311; --panel-2: #221e1a; --field: #1c1814; --recess: #0c0a09; --line: #3a332c; --ink: #f6f1e7; --muted: #c4b8a8; }
+  :root[data-theme="nave"] { --desk: #0b1018; --panel: #101722; --panel-2: #182232; --field: #121a26; --recess: #070b12; --line: #2c3b50; --ink: #f4f7fb; --muted: #a9b6c9; }
+  :root[data-theme="light"] { color-scheme: light; --desk: #f7f5f3; --panel: #ffffff; --panel-2: #f3f1ef; --field: #ffffff; --recess: #eeeae6; --line: #d6d2ce; --ink: #050505; --muted: #5c5956; }
+
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--nave); color: var(--linen); }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--desk); color: var(--ink); }
   body {
     min-height: 100dvh;
-    font: 15px/1.4 "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
-    padding: max(14px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
-    display: flex; flex-direction: column; gap: 12px;
+    font: 15px/1.4 var(--font);
+    -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none;
   }
-  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .mark { margin: 0; font: italic 600 19px/1.1 "New York", "Iowan Old Style", Palatino, serif; }
-  .desk { margin: 2px 0 0; color: var(--mist); font-size: 12px; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--mist); }
-  .pill[data-tone="ok"] i { background: var(--ok); }
-  .pill[data-tone="warn"] i { background: var(--warn); }
-  .pill[data-tone="bad"] { border-color: var(--bad); color: #ff9a9a; }
-  .pill[data-tone="bad"] i { background: var(--bad); }
-  [hidden] { display: none !important; }
-  .card { background: var(--pew); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
-  .kicker { margin: 0 0 4px; color: var(--mist); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; display: flex; justify-content: space-between; }
-  .kicker b { color: var(--ember); letter-spacing: 0.1em; display: inline-flex; align-items: center; gap: 6px; }
-  /* Program and Preview framed like the desk's monitors: red for what the audience sees, green for what is next. */
-  .program { border: 2px solid color-mix(in srgb, var(--ember) 55%, var(--line)); }
-  .program.live { border-color: var(--ember); box-shadow: 0 0 0 1px rgba(226, 61, 46, 0.25), 0 0 22px rgba(226, 61, 46, 0.28); }
-  .program .kicker span { color: #ff8a7e; }
-  .preview { border: 2px solid color-mix(in srgb, var(--ok) 45%, var(--line)); }
-  .preview .kicker span { color: #7fe3a2; }
-  /* The on-air light: a red lamp that pulses while Program is live. */
-  .lamp { position: relative; width: 9px; height: 9px; border-radius: 50%; background: var(--ember); box-shadow: 0 0 8px var(--ember); }
-  .lamp::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ember); opacity: 0; animation: beacon 1.6s ease-out infinite; }
-  @keyframes beacon { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.8); opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .lamp::after { animation: none; } }
-  .cue { margin: 0; font-size: 19px; font-weight: 650; }
-  .body { margin: 6px 0 0; color: #d9d2c4; white-space: pre-line; max-height: 6.2em; overflow: hidden; }
-  .preview .cue { font-size: 16px; }
-  .preview .body { max-height: 2.9em; }
-  button { appearance: none; border: 0; font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; }
-  button:disabled { opacity: 0.4; }
-  .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .btn { min-height: 58px; border-radius: 16px; background: var(--pew-2); border: 1px solid var(--line); font-weight: 650; font-size: 17px; }
-  .btn:active { transform: scale(0.98); }
-  .take { min-height: 76px; border-radius: 20px; background: var(--ember); border: 0; font-size: 22px; letter-spacing: 0.08em; font-weight: 800; box-shadow: 0 14px 34px rgba(226, 61, 46, 0.35); }
-  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .row .btn { min-height: 48px; font-size: 14px; }
-  .timer-row { grid-template-columns: 1fr 1fr; }
-  .music-row { grid-template-columns: 1.4fr 1fr 1fr; }
-  .music-now { margin: -4px 2px 8px; font-size: 13px; color: #9aa7b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .flash { outline: 2px solid var(--gilt); }
-  .tabs { display: flex; gap: 6px; }
-  .tabs button { flex: 1; min-height: 44px; padding: 9px; border-radius: 12px; background: transparent; border: 1px solid var(--line); color: var(--mist); font-weight: 600; }
-  .tabs button[aria-selected="true"] { background: var(--pew-2); color: var(--linen); border-color: var(--gilt); }
-  .list { display: flex; flex-direction: column; gap: 6px; max-height: 38dvh; overflow: auto; }
-  .list button { text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--pew); border: 1px solid var(--line); }
-  .list button[aria-current="true"] { border-color: var(--gilt); }
-  .list small { display: block; color: var(--mist); font-size: 12px; }
-  .empty { color: var(--mist); margin: 6px 2px; }
-  form { display: flex; flex-direction: column; gap: 12px; }
-  label { display: flex; flex-direction: column; gap: 6px; color: var(--mist); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
-  input { height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--pew); color: var(--linen); font-size: 18px; padding: 0 14px; }
-  input.code { height: 72px; font: 600 34px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.3em; text-align: center; }
-  .primary { min-height: 56px; border-radius: 16px; background: var(--gilt); color: #1a1206; font-weight: 750; font-size: 17px; }
-  .note { margin: 0; color: var(--mist); }
-  .msg { margin: 0; min-height: 1.4em; color: var(--warn); }
-  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--gilt); animation: spin 0.9s linear infinite; margin: 8px auto; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .pad-grid { display: flex; flex-direction: column; gap: 10px; }
-  .unpair { text-align: center; margin: 0; }
-  /* Short landscape screens: what is live on the left, controls on the right, TAKE without scrolling. */
+  button { appearance: none; border: 0; background: transparent; font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg { display: block; flex: none; }
+
+  /* ---- Top bar ---- */
+  .bar {
+    position: sticky; top: 0; z-index: 3;
+    display: flex; align-items: center; gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--desk) 88%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .brand-text { min-width: 0; }
+  .brand-name { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .desk-name { margin: 1px 0 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mark path:nth-child(2) { fill: var(--accent); }
+  .mark path:not(:nth-child(2)) { fill: var(--ink); }
+  .status { display: inline-flex; align-items: center; gap: 7px; flex: none; height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 650; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status[data-tone="ok"] i { background: var(--presence); box-shadow: 0 0 0 3px color-mix(in srgb, var(--presence) 25%, transparent); }
+  .status[data-tone="warn"] i { background: var(--warn); }
+  .status[data-tone="bad"] { border-color: color-mix(in srgb, var(--live) 60%, var(--line)); color: var(--live); }
+  .status[data-tone="bad"] i { background: var(--live); }
+
+  .page { padding: 14px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 14px; }
+
+  /* ---- Monitors: Program (red, what the room sees) and Preview (next) ---- */
+  .monitors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .monitor { min-width: 0; }
+  .monitor-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 2px 6px; font-size: 11px; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+  .program .monitor-head { color: var(--live); }
+  .preview .monitor-head { color: var(--muted); }
+  .monitor-head small { font-size: 10px; font-weight: 650; letter-spacing: 0.04em; text-transform: none; color: var(--muted); white-space: nowrap; }
+  .program.live .monitor-head small { color: var(--live); }
+  .screen {
+    position: relative; aspect-ratio: 16 / 9; overflow: hidden;
+    display: grid; place-content: center; gap: 4px; padding: 8px 10px;
+    border-radius: var(--radius-sm); background: var(--screen); color: var(--screen-ink); text-align: center;
+    border: 1.5px solid var(--line);
+  }
+  .program .screen { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
+  .program.live .screen { border-color: var(--live); box-shadow: 0 0 0 1px color-mix(in srgb, var(--live) 30%, transparent), 0 0 18px color-mix(in srgb, var(--live) 30%, transparent); }
+  .preview .screen { border-style: dashed; }
+  .cue { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .body { margin: 0; font-size: 12px; line-height: 1.3; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .screen.quiet .cue { font-size: 12px; opacity: 0.5; letter-spacing: 0.1em; }
+  .onair { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 999px; background: var(--live); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: 0.1em; }
+  .onair i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: blink 1.2s steps(1, end) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  /* ---- Buttons, the desk's system: live red sends to the audience, accent is the main action ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: 48px; padding: 0 12px; border-radius: var(--radius-sm);
+    background: var(--field); border: 1px solid var(--line);
+    font-size: 13px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase;
+    transition: transform 0.08s ease, background 0.15s ease;
+  }
+  .btn:active:not(:disabled) { transform: scale(0.97); background: var(--panel-2); }
+  .btn.ghost { background: transparent; }
+  .btn.black { background: #000; color: #fff; border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
+  .btn.flash { border-color: var(--accent); }
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .actions .btn { flex-direction: column; gap: 5px; min-height: 64px; font-size: 11px; }
+  .actions .btn svg { opacity: 0.85; }
+
+  .section-label { margin: 4px 2px -6px; font-size: 11px; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .card { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+  .card-text { flex: 1; min-width: 0; }
+  .card-text strong { display: block; font-size: 14px; }
+  .card-text span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .btn { min-height: 40px; padding: 0 12px; font-size: 11px; }
+  .card-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--panel-2); color: var(--accent); flex: none; }
+
+  /* ---- Service and scenes ---- */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 11px; background: var(--panel); border: 1px solid var(--line); }
+  .seg button { min-height: 38px; border-radius: 8px; color: var(--muted); font-size: 13px; font-weight: 650; }
+  .seg button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+  .list { display: flex; flex-direction: column; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+  .list button { position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+  .list button:last-child { border-bottom: 0; }
+  .list button:active { background: var(--panel-2); }
+  .list button[aria-current="true"] { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+  .list button[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .list .kind { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); flex: none; }
+  .list button[aria-current="true"] .kind { color: var(--accent); }
+  .list .what { min-width: 0; flex: 1; }
+  .list .what b { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list .what small { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { margin: 0; padding: 18px 14px; color: var(--muted); text-align: center; font-size: 13px; }
+  .msg { margin: 0; color: var(--warn); font-size: 13px; text-align: center; }
+  .msg:empty { display: none; }
+  .link { display: block; margin: 6px auto 0; min-height: 44px; padding: 0 14px; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---- The transport, where the thumb is: Previous, GO LIVE, Next ---- */
+  .spacer { height: calc(96px + env(safe-area-inset-bottom)); flex: none; }
+  .transport {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
+    display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px;
+    padding: 12px max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--desk) 90%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+  }
+  .transport .btn { min-height: 64px; border-radius: var(--radius); }
+  .take {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 64px; border-radius: var(--radius);
+    background: var(--live); color: #fff; border: 1px solid var(--live);
+    font-size: 17px; font-weight: 800; letter-spacing: 0.1em;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--live) 35%, transparent);
+    transition: transform 0.08s ease, filter 0.15s ease;
+  }
+  .take i { width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+  .take:active:not(:disabled) { transform: scale(0.98); filter: brightness(1.1); }
+  .take.flash { filter: brightness(1.2); }
+
+  /* ---- Pairing ---- */
+  .center { min-height: calc(100dvh - 70px); display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 20px max(22px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left)); max-width: 460px; margin: 0 auto; }
+  .hero { display: grid; justify-items: center; gap: 12px; text-align: center; }
+  .hero h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .hero p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  form { display: flex; flex-direction: column; gap: 14px; }
+  label { display: flex; flex-direction: column; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 650; }
+  input { height: 52px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 500 17px var(--font); padding: 0 14px; -webkit-user-select: text; user-select: text; }
+  input.code { height: 72px; font: 650 34px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.36em; text-align: center; padding-left: 0.36em; }
+  .primary { min-height: 56px; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 750; }
+  .primary:active { filter: brightness(1.1); }
+  .boot path { animation: pane 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+  .boot path:nth-child(1) { animation-delay: 0ms; } .boot path:nth-child(3) { animation-delay: 140ms; } .boot path:nth-child(4) { animation-delay: 280ms; } .boot path:nth-child(2) { animation-delay: 420ms; }
+  @keyframes pane { 0%, 100% { opacity: 1; } 35% { opacity: 0.25; } 60% { opacity: 1; } }
+
+  /* Short landscape screens: monitors on the left, controls on the right. */
   @media (orientation: landscape) and (max-height: 520px) {
-    .pad-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-flow: row dense; column-gap: 12px; row-gap: 8px; align-items: start; }
-    .program, .preview, .tabs, #list, .unpair { grid-column: 1; }
-    .nav, .take, .row, #padMsg { grid-column: 2; }
-    .take { min-height: 64px; }
-    .body { max-height: 3.2em; }
-    #list { max-height: 30dvh; }
+    .page { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); column-gap: 14px; align-items: start; }
+    .monitors, .seg, #list, #unpair { grid-column: 1; }
+    .actions, .cards, #padMsg { grid-column: 2; }
+    .actions .btn { min-height: 52px; }
+    .cards { display: grid; gap: 8px; }
+    .cards .card { margin-top: 0 !important; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .spinner { animation: none; border-top-color: var(--line); }
-    .btn:active { transform: none; }
-  }
-  .nav .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-  button:focus-visible, input:focus-visible { outline: 3px solid var(--gilt); outline-offset: 2px; }
-  .link { background: none; color: var(--mist); text-decoration: underline; padding: 6px 12px; min-height: 44px; }
+  @media (min-width: 700px) and (min-height: 521px) { .page, .transport > * { max-width: 680px; } .page { margin: 0 auto; } .transport { justify-content: center; grid-template-columns: 72px minmax(0, 520px) 72px; } }
+  @media (prefers-reduced-motion: reduce) { .onair i, .boot path { animation: none; } .btn, .take { transition: none; } }
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <p class="mark">Church Studio</p>
-    <p class="desk" id="desk">Phone remote</p>
+<header class="bar">
+  <div class="brand">
+    <svg class="mark" id="mark" viewBox="0 0 256 256" width="30" height="30" aria-hidden="true">
+      <path d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z"/>
+      <path d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z"/>
+      <path d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z"/>
+      <path d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z"/>
+    </svg>
+    <div class="brand-text">
+      <p class="brand-name">Church Studio</p>
+      <p class="desk-name" id="desk" data-t="Phone remote">Phone remote</p>
+    </div>
   </div>
-  <span class="pill" id="pill" data-tone="warn"><i></i><span id="status">Connecting</span></span>
+  <span class="status" id="pill" data-tone="warn"><i></i><span id="status">Connecting</span></span>
 </header>
 
-<section id="pair" hidden>
+<section id="pair" class="center" hidden>
+  <div class="hero">
+    <svg class="mark" viewBox="0 0 256 256" width="56" height="56" aria-hidden="true">
+      <path d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z"/>
+      <path d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z"/>
+      <path d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z"/>
+      <path d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z"/>
+    </svg>
+    <h1 data-t="Control the desk from this phone">Control the desk from this phone</h1>
+    <p id="pairLead" data-t="On the desk, open Settings › Phone remote › Pair a phone. Scan the QR code, or type the code here.">On the desk, open Settings › Phone remote › Pair a phone. Scan the QR code, or type the code here.</p>
+  </div>
   <form id="pairForm">
-    <p class="note" id="pairLead">On the desk, open Settings → Remote → Pair a phone. Scan its QR code, or type the code here.</p>
-    <label>Your name for this phone <input id="name" maxlength="40" autocomplete="off" /></label>
-    <label>Desk code <input id="code" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></label>
-    <button class="primary" type="submit">Pair</button>
+    <label><span data-t="Your name for this phone">Your name for this phone</span> <input id="name" maxlength="40" autocomplete="off" /></label>
+    <label><span data-t="Desk code">Desk code</span> <input id="code" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></label>
+    <button class="primary" type="submit" data-t="Pair">Pair</button>
     <p class="msg" id="pairMsg"></p>
   </form>
 </section>
 
-<section id="waiting" class="card" hidden>
-  <div class="spinner" aria-hidden="true"></div>
-  <p class="cue" style="text-align:center">Approve this phone on the desk</p>
-  <p class="note" style="text-align:center">The operator taps Allow on the Church Studio screen.</p>
-  <p style="text-align:center"><button class="link" id="cancelPair" type="button">Cancel</button></p>
+<section id="waiting" class="center" hidden>
+  <div class="hero">
+    <svg class="mark boot" viewBox="0 0 256 256" width="64" height="64" aria-hidden="true">
+      <path d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z"/>
+      <path d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z"/>
+      <path d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z"/>
+      <path d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z"/>
+    </svg>
+    <h1 data-t="Waiting for the desk">Waiting for the desk</h1>
+    <p data-t="The operator taps Allow on the Church Studio screen.">The operator taps Allow on the Church Studio screen.</p>
+  </div>
+  <button class="link" id="cancelPair" type="button" data-t="Cancel">Cancel</button>
 </section>
 
 <main id="pad" hidden>
-  <div class="pad-grid">
-    <section class="card program" aria-live="polite">
-      <p class="kicker"><span>Program</span><b id="onair" hidden><i class="lamp" aria-hidden="true"></i>ON AIR</b></p>
-      <p class="cue" id="pCue">—</p>
-      <p class="body" id="pBody"></p>
-    </section>
-    <section class="card preview">
-      <p class="kicker"><span>Preview</span></p>
-      <p class="cue" id="vCue">—</p>
-      <p class="body" id="vBody"></p>
-    </section>
-    <div class="nav">
-      <button class="btn" data-cmd="previous" type="button"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Previous</button>
-      <button class="btn" data-cmd="next" type="button">Next <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <div class="page">
+    <div class="monitors">
+      <section class="monitor program" aria-live="polite">
+        <p class="monitor-head"><span data-t="Program">Program</span><span class="onair" id="onair" hidden><i></i><span data-t="ON AIR">ON AIR</span></span><small id="programState">—</small></p>
+        <div class="screen" id="pScreen">
+          <p class="cue" id="pCue">—</p>
+          <p class="body" id="pBody"></p>
+        </div>
+      </section>
+      <section class="monitor preview">
+        <p class="monitor-head"><span data-t="Preview">Preview</span><small data-t="Next to go live">Next to go live</small></p>
+        <div class="screen" id="vScreen">
+          <p class="cue" id="vCue">—</p>
+          <p class="body" id="vBody"></p>
+        </div>
+      </section>
     </div>
-    <button class="take" data-cmd="take" type="button">GO LIVE</button>
-    <div class="row">
-      <button class="btn" data-cmd="cut" type="button">Cut</button>
-      <button class="btn" data-cmd="clear-words" type="button">Clear words</button>
-        <button class="btn" data-cmd="clear" type="button">Clear</button>
-      <button class="btn" data-cmd="black" type="button">Black</button>
-      <button class="btn" data-cmd="logo" type="button">Logo</button>
+
+    <div class="actions">
+      <button class="btn" data-cmd="cut" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg><span data-t="Cut">Cut</span></button>
+      <button class="btn ghost" data-cmd="clear-words" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="m3 3 18 18"/></svg><span data-t="Clear words">Clear words</span></button>
+      <button class="btn ghost" data-cmd="clear" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m9 10 6 4m0-4-6 4"/></svg><span data-t="Clear">Clear</span></button>
+      <button class="btn black" data-cmd="black" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/></svg><span data-t="Black">Black</span></button>
+      <button class="btn" data-cmd="logo" type="button"><svg width="20" height="20" viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z"/><path fill="var(--accent)" d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z"/><path fill="currentColor" d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z"/><path fill="currentColor" d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z"/></svg><span data-t="Logo">Logo</span></button>
+      <button class="btn" data-cmd="music-fade" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M16 9a5 5 0 0 1 0 6"/></svg><span data-t="Fade music">Fade music</span></button>
     </div>
-    <div class="row timer-row" id="timerRow" hidden>
-      <button class="btn" id="timerToggle" data-timer="timer-pause" type="button">Pause timer</button>
-      <button class="btn" data-cmd="timer-reset" type="button">Reset timer</button>
+
+    <div class="cards">
+      <div class="card" id="timerRow" hidden>
+        <span class="card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></span>
+        <div class="card-text"><strong data-t="Timer">Timer</strong><span id="timerState"></span></div>
+        <button class="btn" id="timerToggle" data-timer="timer-pause" type="button">Pause</button>
+        <button class="btn ghost" data-cmd="timer-reset" type="button" data-t="Reset">Reset</button>
+      </div>
+      <div class="card" id="musicRow" style="margin-top: 10px">
+        <span class="card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+        <div class="card-text"><strong data-t="Music">Music</strong><span id="musicNow"></span></div>
+        <button class="btn" id="musicToggle" data-cmd="music-toggle" type="button">Play</button>
+        <button class="btn ghost" data-cmd="music-next" type="button" aria-label="Next track"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 5v14l9-7zM16 5h3v14h-3z"/></svg></button>
+      </div>
     </div>
-    <div class="row music-row" id="musicRow">
-      <button class="btn" id="musicToggle" data-cmd="music-toggle" type="button">Play music</button>
-      <button class="btn" data-cmd="music-next" type="button">Next track</button>
-      <button class="btn" data-cmd="music-fade" type="button">Fade out</button>
-    </div>
-    <p class="music-now" id="musicNow"></p>
+
     <p class="msg" id="padMsg"></p>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tabItems" aria-selected="true">Service</button>
-      <button type="button" role="tab" id="tabScenes" aria-selected="false">Scenes</button>
+
+    <div class="seg" role="tablist">
+      <button type="button" role="tab" id="tabItems" aria-selected="true" data-t="Service">Service</button>
+      <button type="button" role="tab" id="tabScenes" aria-selected="false" data-t="Scenes">Scenes</button>
     </div>
     <div class="list" id="list"></div>
-    <p class="unpair"><button class="link" id="unpair" type="button">Unpair this phone</button></p>
+    <button class="link" id="unpair" type="button" data-t="Unpair this phone">Unpair this phone</button>
+    <div class="spacer"></div>
   </div>
+  <nav class="transport" aria-label="Transport">
+    <button class="btn" data-cmd="previous" type="button" aria-label="Previous"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="take" data-cmd="take" type="button"><i aria-hidden="true"></i><span data-t="GO LIVE">GO LIVE</span></button>
+    <button class="btn" data-cmd="next" type="button" aria-label="Next"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+  </nav>
 </main>
 
 <script>
@@ -175,15 +298,70 @@
   const TOKEN_KEY = "church-studio.remote.token";
   const PENDING_KEY = "church-studio.remote.pending";
   const NAME_KEY = "church-studio.remote.name";
+  const LOOK_KEY = "church-studio.remote.look";
   const lan = location.port === "17891";
   // Over the internet: the church's remote room relays to the desk (/app/remote.html?room=CODE).
   const room = (new URLSearchParams(location.search).get("room") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-  const OFFLINE = room ? "The desk did not answer. Check this phone's internet, and that Church Studio is open." : "The desk did not answer. Check that the phone is on the same Wi-Fi.";
   const $ = (id) => document.getElementById(id);
   const store = {
     get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
     set(key, value) { try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch {} },
   };
+
+  // ---- The desk's language (French and Spanish as on the desk); before pairing, the phone's own ----
+  const WORDS = {
+    fr: {
+      "Phone remote": "Télécommande", "Connecting": "Connexion", "Pairing": "Jumelage", "Waiting for approval": "En attente d’accord", "Connected": "Connecté", "Reconnecting": "Reconnexion", "Desk unavailable": "Bureau injoignable", "Pairing expired": "Jumelage expiré", "Not authorized": "Non autorisé",
+      "Control the desk from this phone": "Pilotez le bureau depuis ce téléphone", "On the desk, open Settings › Phone remote › Pair a phone. Scan the QR code, or type the code here.": "Sur le bureau, ouvrez Réglages › Télécommande › Jumeler un téléphone. Scannez le QR code ou tapez le code ici.",
+      "Your name for this phone": "Nom de ce téléphone", "Desk code": "Code du bureau", "Pair": "Jumeler", "Waiting for the desk": "En attente du bureau", "The operator taps Allow on the Church Studio screen.": "L’opérateur touche Autoriser sur l’écran de Church Studio.", "Cancel": "Annuler",
+      "Program": "Direct", "Preview": "Aperçu", "Next to go live": "Prochain à l’écran", "On the screen": "À l’écran", "Not on the screen": "Pas à l’écran", "ON AIR": "EN DIRECT", "GO LIVE": "DIRECT",
+      "Cut": "Couper", "Clear words": "Effacer le texte", "Clear": "Effacer", "Black": "Noir", "Logo": "Logo", "Fade music": "Baisser la musique",
+      "Timer": "Minuteur", "Running": "En cours", "Paused": "En pause", "Pause": "Pause", "Start": "Démarrer", "Reset": "Remettre", "Music": "Musique", "Play": "Lire", "Nothing playing": "Rien en lecture",
+      "Service": "Culte", "Scenes": "Scènes", "No service is open on the desk.": "Aucun culte n’est ouvert sur le bureau.", "No scenes yet.": "Pas encore de scènes.", "Unpair this phone": "Dissocier ce téléphone",
+      "Scanned. Confirm this phone's name, then tap Pair.": "Scanné. Confirmez le nom du téléphone, puis touchez Jumeler.", "Type the six-digit code shown on the desk.": "Tapez le code à six chiffres affiché sur le bureau.",
+      "This phone was unpaired. Pair again to control the desk.": "Ce téléphone a été dissocié. Jumelez-le à nouveau pour piloter le bureau.",
+      "The desk did not answer. Check this phone's internet, and that Church Studio is open.": "Le bureau n’a pas répondu. Vérifiez l’internet du téléphone et que Church Studio est ouvert.",
+      "The desk did not answer. Check that the phone is on the same Wi-Fi.": "Le bureau n’a pas répondu. Vérifiez que le téléphone est sur le même Wi-Fi.",
+    },
+    es: {
+      "Phone remote": "Control remoto", "Connecting": "Conectando", "Pairing": "Vinculando", "Waiting for approval": "Esperando aprobación", "Connected": "Conectado", "Reconnecting": "Reconectando", "Desk unavailable": "Mesa no disponible", "Pairing expired": "Vínculo vencido", "Not authorized": "No autorizado",
+      "Control the desk from this phone": "Controla la mesa desde este teléfono", "On the desk, open Settings › Phone remote › Pair a phone. Scan the QR code, or type the code here.": "En la mesa, abre Ajustes › Control remoto › Vincular un teléfono. Escanea el código QR o escribe el código aquí.",
+      "Your name for this phone": "Nombre de este teléfono", "Desk code": "Código de la mesa", "Pair": "Vincular", "Waiting for the desk": "Esperando a la mesa", "The operator taps Allow on the Church Studio screen.": "El operador toca Permitir en la pantalla de Church Studio.", "Cancel": "Cancelar",
+      "Program": "Programa", "Preview": "Vista previa", "Next to go live": "Lo siguiente en vivo", "On the screen": "En pantalla", "Not on the screen": "No está en pantalla", "ON AIR": "AL AIRE", "GO LIVE": "EN VIVO",
+      "Cut": "Corte", "Clear words": "Borrar texto", "Clear": "Limpiar", "Black": "Negro", "Logo": "Logo", "Fade music": "Bajar la música",
+      "Timer": "Temporizador", "Running": "En marcha", "Paused": "En pausa", "Pause": "Pausa", "Start": "Iniciar", "Reset": "Reiniciar", "Music": "Música", "Play": "Reproducir", "Nothing playing": "Nada sonando",
+      "Service": "Culto", "Scenes": "Escenas", "No service is open on the desk.": "No hay ningún culto abierto en la mesa.", "No scenes yet.": "Aún no hay escenas.", "Unpair this phone": "Desvincular este teléfono",
+      "Scanned. Confirm this phone's name, then tap Pair.": "Escaneado. Confirma el nombre del teléfono y toca Vincular.", "Type the six-digit code shown on the desk.": "Escribe el código de seis dígitos que muestra la mesa.",
+      "This phone was unpaired. Pair again to control the desk.": "Este teléfono se desvinculó. Vincúlalo de nuevo para controlar la mesa.",
+      "The desk did not answer. Check this phone's internet, and that Church Studio is open.": "La mesa no respondió. Revisa el internet del teléfono y que Church Studio esté abierto.",
+      "The desk did not answer. Check that the phone is on the same Wi-Fi.": "La mesa no respondió. Revisa que el teléfono esté en el mismo Wi-Fi.",
+    },
+  };
+  let lang = ((navigator.language || "en").slice(0, 2) in WORDS) ? navigator.language.slice(0, 2) : "en";
+  const tr = (text) => (WORDS[lang] && WORDS[lang][text]) || text;
+  function translatePage() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = tr(el.dataset.t); });
+  }
+  const OFFLINE = () => tr(room ? "The desk did not answer. Check this phone's internet, and that Church Studio is open." : "The desk did not answer. Check that the phone is on the same Wi-Fi.");
+
+  // ---- The desk's look: its theme and accent, remembered for the next visit ----
+  function readable(hex) {
+    const value = String(hex || "").replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(value)) return "#fff";
+    const [r, g, b] = [0, 2, 4].map((at) => { const c = parseInt(value.slice(at, at + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#111" : "#fff";
+  }
+  function applyLook(theme, accent, deskLang) {
+    const root = document.documentElement;
+    if (theme && /^(dark|light|vespers|nave)$/.test(theme)) root.dataset.theme = theme;
+    if (accent && /^#[0-9a-f]{6}$/i.test(accent)) { root.style.setProperty("--accent", accent); root.style.setProperty("--on-accent", readable(accent)); }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = getComputedStyle(root).getPropertyValue("--desk").trim() || "#1a1a1a";
+    if (deskLang && deskLang !== lang && (deskLang in WORDS || deskLang === "en")) { lang = deskLang; translatePage(); setState(state); }
+  }
+  try { const look = JSON.parse(store.get(LOOK_KEY) || "null"); if (look) { if (look.lang) lang = look.lang; applyLook(look.theme, look.accent); } } catch {}
+  translatePage();
 
   // Transport: HTTP to the desk's LAN server, the remote room over the internet, or BroadcastChannel
   // to a desk window in this browser.
@@ -234,7 +412,7 @@
   function setState(next) {
     state = next;
     const [label, tone] = STATES[next];
-    $("status").textContent = label;
+    $("status").textContent = tr(label);
     $("pill").dataset.tone = tone;
     const paired = !!store.get(TOKEN_KEY);
     $("pad").hidden = !paired || next === "unauthorized";
@@ -259,7 +437,7 @@
     const name = $("name").value.trim() || guessName();
     store.set(NAME_KEY, name);
     const reply = await send("pair", Object.assign({ name }, payload));
-    if (!reply) { setState("unavailable"); $("pairMsg").textContent = OFFLINE; showPairForm(); return; }
+    if (!reply) { setState("unavailable"); $("pairMsg").textContent = OFFLINE(); showPairForm(); return; }
     if (reply.type === "pending") {
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(reply.payload));
       setState("waiting");
@@ -288,7 +466,7 @@
     try { pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); } catch { pending = null; }
     if (!pending) return;
     const reply = await send("pair-status", { request: pending.request, secret: pending.secret });
-    if (!reply) { $("status").textContent = "Reconnecting"; approvalTimer = setTimeout(pollApproval, 2000); return; }
+    if (!reply) { $("status").textContent = tr("Reconnecting"); approvalTimer = setTimeout(pollApproval, 2000); return; }
     if (reply.type === "pending") { approvalTimer = setTimeout(pollApproval, 1000); return; }
     sessionStorage.removeItem(PENDING_KEY);
     if (reply.type === "welcome" && reply.payload.token) {
@@ -305,11 +483,11 @@
     event.preventDefault();
     if (pairToken) { pair({ pair: pairToken }); return; }
     const code = $("code").value.replace(/\D/g, "");
-    if (code.length !== 6) { $("pairMsg").textContent = "Type the six-digit code shown on the desk."; return; }
+    if (code.length !== 6) { $("pairMsg").textContent = tr("Type the six-digit code shown on the desk."); return; }
     pair({ code });
   });
   $("cancelPair").addEventListener("click", () => { sessionStorage.removeItem(PENDING_KEY); clearTimeout(approvalTimer); setState("pairing"); showPairForm(); });
-  $("unpair").addEventListener("click", () => { store.set(TOKEN_KEY, ""); clearTimeout(pollTimer); setState("pairing"); showPairForm("This phone was unpaired. Pair again to control the desk."); });
+  $("unpair").addEventListener("click", () => { store.set(TOKEN_KEY, ""); clearTimeout(pollTimer); setState("pairing"); showPairForm(tr("This phone was unpaired. Pair again to control the desk.")); });
 
   // ---- Paired: poll state, send commands ----
   let failures = 0;
@@ -317,23 +495,49 @@
   let view = "items";
   let last = null;
 
+  function screen(prefix, payload) {
+    const layout = payload[prefix + "Layout"] || "empty";
+    const quiet = layout === "empty" || layout === "black";
+    $(prefix === "program" ? "pScreen" : "vScreen").classList.toggle("quiet", quiet);
+    const cue = payload[prefix + "Cue"] || "";
+    $(prefix === "program" ? "pCue" : "vCue").textContent = quiet ? tr(layout === "black" ? "Black" : "Clear") : cue || "—";
+    $(prefix === "program" ? "pBody" : "vBody").textContent = quiet ? "" : payload[prefix + "Body"] || "";
+  }
+
   function render(payload) {
+    applyLook(payload.theme, payload.accent, payload.lang);
+    store.set(LOOK_KEY, JSON.stringify({ theme: payload.theme || "", accent: payload.accent || "", lang }));
     $("desk").textContent = payload.desk || "Church Studio";
-    $("pCue").textContent = payload.programCue || (payload.programLayout === "empty" ? "Clear" : "—");
-    $("pBody").textContent = payload.programBody || "";
-    $("vCue").textContent = payload.previewCue || "—";
-    $("vBody").textContent = payload.previewBody || "";
+    screen("program", payload);
+    screen("preview", payload);
     const onAir = payload.output === "on" && payload.programLayout !== "empty" && payload.programLayout !== "black";
     $("onair").hidden = !onAir;
+    $("programState").hidden = onAir;
     document.querySelector(".program").classList.toggle("live", onAir);
+    $("programState").textContent = tr(onAir ? "On the screen" : "Not on the screen");
     $("timerRow").hidden = !payload.timer;
     const toggle = $("timerToggle");
     toggle.dataset.timer = payload.timer === "running" ? "timer-pause" : "timer-resume";
-    toggle.textContent = payload.timer === "running" ? "Pause timer" : "Start timer";
-    $("musicToggle").textContent = payload.music === "playing" ? "Pause music" : "Play music";
-    $("musicNow").textContent = payload.track ? (payload.music === "playing" ? "♪ " : "Paused: ") + payload.track : "";
+    toggle.textContent = tr(payload.timer === "running" ? "Pause" : "Start");
+    $("timerState").textContent = tr(payload.timer === "running" ? "Running" : "Paused");
+    $("musicToggle").textContent = tr(payload.music === "playing" ? "Pause" : "Play");
+    $("musicNow").textContent = payload.track ? (payload.music === "playing" ? "♪ " : tr("Paused") + ": ") + payload.track : tr("Nothing playing");
     last = payload;
     renderList();
+  }
+
+  // Small pictures for what each service item is.
+  const ICONS = {
+    bible: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M12 7v6M9 10h6"/>',
+    lyric: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+    video: '<rect x="2" y="5" width="15" height="14" rx="2"/><path d="m17 10 5-3v10l-5-3z"/>',
+    scene: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    other: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>',
+  };
+  function icon(kind) {
+    const shape = ICONS[kind] || ICONS.other;
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + shape + "</svg>";
   }
 
   function renderList() {
@@ -345,19 +549,27 @@
     if (!entries.length) {
       const empty = document.createElement("p");
       empty.className = "empty";
-      empty.textContent = view === "items" ? "No service is open on the desk." : "No scenes yet.";
+      empty.textContent = tr(view === "items" ? "No service is open on the desk." : "No scenes yet.");
       list.append(empty);
       return;
     }
     for (const entry of entries) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = view === "items" ? entry.title : entry.name;
+      const kind = document.createElement("span");
+      kind.className = "kind";
+      kind.innerHTML = icon(view === "items" ? entry.kind : "scene");
+      const what = document.createElement("span");
+      what.className = "what";
+      const title = document.createElement("b");
+      title.textContent = view === "items" ? entry.title : entry.name;
+      what.append(title);
       if (view === "items" && entry.section) {
         const small = document.createElement("small");
         small.textContent = entry.section;
-        button.append(small);
+        what.append(small);
       }
+      button.append(kind, what);
       const current = view === "items" ? last.cursor === entry.id : last.scene === entry.id;
       button.setAttribute("aria-current", current ? "true" : "false");
       button.addEventListener("click", () => act(view === "items" ? "preview-item" : "preview-scene", view === "items" ? { itemId: entry.id } : { sceneId: entry.id }, button));
@@ -402,7 +614,7 @@
   async function act(type, payload, button) {
     const token = store.get(TOKEN_KEY);
     if (!token) return;
-    if (navigator.vibrate) navigator.vibrate(10);
+    if (navigator.vibrate) navigator.vibrate(type === "command" && payload.id === "take" ? 25 : 10);
     button && button.classList.add("flash");
     $("padMsg").textContent = "";
     handle(await send(type, Object.assign({ token }, payload)));
@@ -430,7 +642,7 @@
     pollApproval();
   } else if (pairToken) {
     store.set(TOKEN_KEY, "");
-    $("pairLead").textContent = "Scanned. Confirm this phone's name, then tap Pair.";
+    $("pairLead").textContent = tr("Scanned. Confirm this phone's name, then tap Pair.");
     setState("pairing");
     showPairForm();
     $("code").closest("label").hidden = true;
