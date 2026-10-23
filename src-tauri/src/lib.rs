@@ -332,6 +332,37 @@ fn ready_facts(db: State<Db>, paths: Vec<String>) -> ReadyFacts {
     ReadyFacts { missing, library_ok }
 }
 
+/// The desk is up and usable: the launch's length is noted for the Performance page.
+#[tauri::command]
+fn desk_ready(app: AppHandle, steps: Vec<(String, u64)>) {
+    diagnostics::desk_ready(&app, steps);
+}
+
+/// Figures for the Performance page and the support file: recent launches, freezes in the last 30
+/// days, memory, and space on the drive that holds the library.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthFacts {
+    startups: Vec<diagnostics::Startup>,
+    hangs: Vec<diagnostics::Hang>,
+    memory: diagnostics::Memory,
+    library_free: Option<u64>,
+    uptime_secs: u64,
+}
+
+#[tauri::command(async)]
+fn health_facts(app: AppHandle) -> HealthFacts {
+    let crash_log = app.path().app_log_dir().ok().and_then(|dir| std::fs::read_to_string(dir.join("crash.log")).ok()).unwrap_or_default();
+    let month_ago = diagnostics::now_secs().saturating_sub(30 * 86_400);
+    HealthFacts {
+        startups: diagnostics::read_startups(&app),
+        hangs: diagnostics::hangs_since(&crash_log, month_ago),
+        memory: diagnostics::memory(),
+        library_free: app.path().app_data_dir().ok().and_then(|dir| storage::free_space(&dir)),
+        uptime_secs: diagnostics::uptime_secs(),
+    }
+}
+
 /// Room left where recordings are saved, in bytes (None when it cannot be told).
 #[tauri::command(async)]
 fn record_room(folder: Option<String>) -> Option<u64> {
@@ -970,6 +1001,8 @@ pub fn run() {
             easyworship_songs,
             ai_post,
             ready_facts,
+            desk_ready,
+            health_facts,
             record_room,
             ai_get,
             crash_log,

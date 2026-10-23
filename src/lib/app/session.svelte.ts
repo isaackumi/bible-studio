@@ -9,6 +9,8 @@ import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type Activation
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
+import { healthRows, healthTips, type Frames, type HealthFacts } from "../domain/health";
+import { problemReport, readProblems } from "./diagnostics";
 import { aiCheck, backupCheck, internetCheck, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck, type ReadyCheck } from "../domain/readiness";
 import { isOnlineTranslation } from "../bible/online-bibles";
 import { SERVER_URL } from "../domain/billing";
@@ -528,8 +530,18 @@ class Session {
         : t("Another window has the audience.");
 
   /** Name the startup step (the loading screen shows it if starting takes too long), and finish it. */
+  /** The desk's own startup steps and how long each took (ms), sent to the core when it is ready. */
+  private bootSteps: Array<[string, number]> = [];
+  private bootStepAt = typeof performance !== "undefined" ? performance.now() : 0;
+  private bootStepName = "";
+
   private bootStep(step: string) {
     if (typeof window !== "undefined") (window as unknown as { __csBootStep?: string }).__csBootStep = step;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    if (this.bootStepName) this.bootSteps.push([`desk: ${this.bootStepName}`, Math.round(now - this.bootStepAt)]);
+    this.bootStepName = step;
+    this.bootStepAt = now;
+    if (step === "ready" && this.desktop()) void invoke("desk_ready", { steps: this.bootSteps }).catch(() => {});
   }
 
   /** A startup step that must never hold the desk: after `ms` it carries on without it. */
@@ -5037,6 +5049,88 @@ class Session {
       aiUsed && online ? aiCheck({ problem: await this.aiModels().then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error))) }) : null,
     ];
     return sortChecks(checks.filter((check): check is ReadyCheck => check !== null));
+  };
+
+  /** The audience window's last smoothness measurement (Settings › Performance). */
+  lastFrames = $state<Frames | null>(null);
+
+  /** Ask the audience window to watch its frames for a few seconds. Null when it is closed or quiet. */
+  measureSmoothness = async (): Promise<Frames | null> => {
+    if (!this.desktop() || !this.output.online) return null;
+    const answer = new Promise<Frames | null>((resolve) => {
+      let stop = () => {};
+      const timer = setTimeout(() => { stop(); resolve(null); }, 9000);
+      void listen<Frames>("audience-frames", (event) => { clearTimeout(timer); stop(); resolve(event.payload); }).then((unlisten) => (stop = unlisten));
+    });
+    await emit("measure-frames", { ms: 5000 }).catch(() => {});
+    this.lastFrames = await answer;
+    return this.lastFrames;
+  };
+
+  /** What the core knows about this computer and recent launches (desktop), unprocessed: for support. */
+  private async healthRaw() {
+    if (!this.desktop()) return null;
+    type Raw = { startups: Array<{ at: number; ms: number; steps: Array<[string, number]> }>; hangs: Array<{ at: number; seconds: number; during: string }>; memory: { total: number; available: number; app: number }; libraryFree: number | null; uptimeSecs: number };
+    const [raw, usage, unused] = await Promise.all([
+      invoke<Raw>("health_facts").catch(() => null),
+      invoke<{ library: number; media: number; models: number; cache: number }>("storage_usage").catch(() => null),
+      invoke<Array<{ bytes: number }>>("storage_unused_media").catch(() => [] as Array<{ bytes: number }>),
+    ]);
+    return { raw, usage, unusedBytes: unused.reduce((sum, item) => sum + item.bytes, 0) };
+  }
+
+  /** Settings › Performance: how it is running here, and what to do about it. */
+  checkHealth = async () => {
+    const found = await this.healthRaw();
+    const facts: HealthFacts = {
+      launches: found?.raw?.startups.map((startup) => startup.ms) ?? [],
+      hangs: found?.raw?.hangs ?? [],
+      memory: found?.raw?.memory ?? null,
+      libraryFree: found?.raw?.libraryFree ?? null,
+      frames: this.lastFrames,
+      audienceOpen: this.output.online,
+      spare: { model: this.workspace.voice.engine === "accurate" ? 0 : (found?.usage?.models ?? 0), cache: found?.usage?.cache ?? 0, unused: found?.unusedBytes ?? 0 },
+      dateText: (at) => new Date(at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "long" }),
+    };
+    return { rows: healthRows(facts), tips: healthTips(facts), desktop: this.desktop() };
+  };
+
+  /**
+   * The support file: everything a developer needs to see what went wrong, and nothing private (no
+   * keys, passwords, songs, sermons or notes). The church saves it and sends it in; nothing is sent by itself.
+   */
+  supportFile = async (): Promise<string> => {
+    const desktop = this.desktop();
+    const [found, crashLog, logTail, ready] = await Promise.all([
+      this.healthRaw(),
+      desktop ? invoke<string>("crash_log").catch(() => "") : Promise.resolve(""),
+      desktop ? invoke<string>("diagnostic_log").catch(() => "") : Promise.resolve(""),
+      this.checkReady().catch(() => []),
+    ]);
+    const mb = (bytes: number | null | undefined) => (bytes === null || bytes === undefined ? "unknown" : `${Math.round(bytes / 1_000_000)} MB`);
+    const when = (secs: number) => new Date(secs * 1000).toISOString();
+    const raw = found?.raw;
+    const sections: Array<[string, string]> = [
+      ["Plan", `${this.plan} (${this.ent.kind ?? "none"}${this.ent.reason ? `, free because: ${this.ent.reason}` : ""}${this.ent.endsAt ? `, ends ${new Date(this.ent.endsAt).toISOString()}` : ""}${this.ent.renewBy ? `, renew by ${new Date(this.ent.renewBy).toISOString()}` : ""})`],
+      ["Screens", [`audience: ${this.output.online ? "open" : "closed"} (${this.output.mode}) on ${this.output.displayName || "-"}`, ...this.output.displays.map((display) => `- ${display.name} ${display.width}x${display.height}${display.primary ? " (primary)" : ""}`)].join("\n")],
+      ["Readiness", ready.map((check) => `- [${check.state}] ${check.id}: ${t(check.title, check.values)}`).join("\n")],
+      ["Launches (ms until the desk was ready)", (raw?.startups ?? []).map((startup) => `- ${when(startup.at)}: ${startup.ms} ms; ${startup.steps.map(([name, ms]) => `${name} ${ms}`).join(", ")}`).join("\n")],
+      ["Freezes, last 30 days", (raw?.hangs ?? []).map((hang) => `- ${when(hang.at)}: ${hang.seconds}s while ${hang.during}`).join("\n") || "none"],
+      ["Memory", raw ? `computer ${mb(raw.memory.available)} free of ${mb(raw.memory.total)}; app core ${mb(raw.memory.app)}; up ${raw.uptimeSecs}s` : ""],
+      ["Space", found ? `library drive free ${mb(raw?.libraryFree)}; library ${mb(found.usage?.library)}, media ${mb(found.usage?.media)}, speech model ${mb(found.usage?.models)}, cache ${mb(found.usage?.cache)}, unused media ${mb(found.unusedBytes)}` : ""],
+      ["Smoothness", this.lastFrames ? `${this.lastFrames.fps} fps, ${this.lastFrames.hiccups} hiccups, worst ${this.lastFrames.worstMs} ms` : "not measured"],
+      ["Settings (no keys)", [`language ${this.workspace.appearance.language ?? "en"}`, `listening ${this.workspace.voice.engine ?? "system"}`, `AI ${aiReady(this.workspace.ai) ? this.workspace.ai.provider : "off"}${this.workspace.ai.features ? ` ${JSON.stringify(this.workspace.ai.features)}` : ""}`, `recording ${this.workspace.broadcast.quality}`, `backup ${this.workspace.backup.folder ? `on, last ${this.workspace.backup.lastAt || "never"}` : "off"}`].join("; ")],
+      ["Log (last lines)", logTail],
+    ];
+    return problemReport({
+      version: APP_VERSION,
+      platform: desktop ? "Desktop app" : "Browser",
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      counts: { songs: this.songs.length, services: this.services.length, sermons: this.sermons.length, decks: this.decks.length, media: this.media.length },
+      problems: readProblems(),
+      crashLog,
+      sections,
+    });
   };
 
   /** Whether the internet answers (a quick request; the address is never shown). */

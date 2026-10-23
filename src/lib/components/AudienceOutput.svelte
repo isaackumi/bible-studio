@@ -8,6 +8,7 @@
   import { broadcastRelayTransport, CameraRelayReceiver, relayEnabled, tauriRelayTransport } from "../display/camera-relay";
   import { api } from "../db/api";
   import { isDesktop } from "../platform/runtime";
+  import { measureFrames } from "../display/frames";
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel, ProgramPacket } from "../domain/types";
   import Screen from "./Screen.svelte";
@@ -222,6 +223,13 @@
     void listen("output-test", () => flashTest()).then((stop) => {
       unlistenTest = stop;
     });
+    // The Performance page asks how smoothly this screen runs: a few seconds of frames, then the answer.
+    let unlistenMeasure = () => {};
+    void listen<{ ms: number }>("measure-frames", (event) => {
+      void measureFrames(event.payload?.ms ?? 5000).then((frames) => emit("audience-frames", frames).catch(() => {}));
+    }).then((stop) => {
+      unlistenMeasure = stop;
+    });
     let unlistenStandby = () => {};
     void listen<string[]>("camera-standby", (event) => {
       standby = Array.isArray(event.payload) ? event.payload.filter((id) => typeof id === "string" && id.startsWith("camera:")) : [];
@@ -236,6 +244,7 @@
       unlistenStandby();
       unlistenFrame();
       unlistenTest();
+      unlistenMeasure();
       window.removeEventListener("message", onMessage);
         window.removeEventListener("resize", onResize);
         clearTimeout(shapeTimer);

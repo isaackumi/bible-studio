@@ -125,6 +125,10 @@ static COMMAND: Mutex<(String, u64)> = Mutex::new((String::new(), 0));
 pub fn doing(what: &str) {
     let mut doing = lock(&DOING);
     if doing.0 != what {
+        // Until the desk is up, each startup step and how long it took (for the Performance page).
+        if !doing.0.is_empty() && READY_MS.load(Ordering::Relaxed) == 0 {
+            lock(&STEPS).push((doing.0.clone(), since_start_ms().saturating_sub(doing.1)));
+        }
         // Each step in the log, so a slow start says which step took the time.
         if what != "running" {
             log::info!("step: {what}");
@@ -154,6 +158,100 @@ pub fn hang_line(stalled: Duration, doing: &(String, u64), command: &(String, u6
         std::env::consts::OS,
         env!("CARGO_PKG_VERSION"),
     )
+}
+
+// --- Startup and health -----------------------------------------------------------------------
+
+static STEPS: Mutex<Vec<(String, u64)>> = Mutex::new(Vec::new());
+/// When the desk said it was ready, in ms since launch (0: not yet).
+static READY_MS: AtomicU64 = AtomicU64::new(0);
+const STARTUPS_KEPT: usize = 10;
+
+/// One launch: when, how long until the desk was usable, and the startup steps.
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct Startup {
+    pub at: u64,
+    pub ms: u64,
+    pub steps: Vec<(String, u64)>,
+}
+
+fn startups_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_log_dir().ok().map(|dir| dir.join("startups.json"))
+}
+
+pub fn read_startups(app: &AppHandle) -> Vec<Startup> {
+    startups_path(app).and_then(|path| std::fs::read_to_string(path).ok()).and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
+}
+
+/// The desk is up: note how long the launch took, keeping the last few launches.
+pub fn desk_ready(app: &AppHandle, desk_steps: Vec<(String, u64)>) {
+    if READY_MS.compare_exchange(0, since_start_ms().max(1), Ordering::Relaxed, Ordering::Relaxed).is_err() {
+        return;
+    }
+    let ms = READY_MS.load(Ordering::Relaxed);
+    log::info!("desk ready after {ms}ms");
+    let Some(path) = startups_path(app) else { return };
+    let mut startups = read_startups(app);
+    let mut steps = lock(&STEPS).clone();
+    steps.extend(desk_steps.into_iter().take(40).map(|(name, ms)| (name.chars().take(60).collect(), ms)));
+    startups.push(Startup { at: unix_secs(), ms, steps });
+    let keep = startups.len().saturating_sub(STARTUPS_KEPT);
+    let _ = std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")));
+    let _ = std::fs::write(path, serde_json::to_string(&startups[keep..]).unwrap_or_default());
+}
+
+/// A freeze the watchdog noted: when, for how long, and what was happening (for support).
+#[derive(serde::Serialize, Clone, PartialEq, Debug)]
+pub struct Hang {
+    pub at: u64,
+    pub seconds: u64,
+    pub during: String,
+}
+
+/// Freezes in crash.log since `since` (unix seconds).
+pub fn hangs_since(crash_log: &str, since: u64) -> Vec<Hang> {
+    crash_log
+        .lines()
+        .filter_map(|line| {
+            let (stamp, rest) = line.strip_prefix('[')?.split_once("] HANG Not responding for ")?;
+            let at: u64 = stamp.parse().ok()?;
+            let (seconds, rest) = rest.split_once("s while ")?;
+            let during = rest.split("; ").next().unwrap_or("").to_string();
+            (at >= since).then(|| Hang { at, seconds: seconds.parse().unwrap_or(0), during })
+        })
+        .collect()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Memory {
+    pub total: u64,
+    pub available: u64,
+    /// This process and the ones it started (on a Mac the window's own processes are not among them).
+    pub app: u64,
+}
+
+pub fn memory() -> Memory {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut system = System::new();
+    system.refresh_memory();
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_memory());
+    let me = sysinfo::get_current_pid().ok();
+    let app = system
+        .processes()
+        .values()
+        .filter(|process| Some(process.pid()) == me || (me.is_some() && process.parent() == me))
+        .map(|process| process.memory())
+        .sum();
+    Memory { total: system.total_memory(), available: system.available_memory(), app }
+}
+
+pub fn uptime_secs() -> u64 {
+    started().elapsed().as_secs()
+}
+
+pub fn now_secs() -> u64 {
+    unix_secs()
 }
 
 // --- The watchdog -------------------------------------------------------------------------------
@@ -234,5 +332,19 @@ mod tests {
         assert_eq!(log_tail(&path, 2), "three\nfour");
         assert_eq!(log_tail(&dir.join("missing.log"), 5), "");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn reads_freezes_back_from_crash_log() {
+        let log = "[100] HANG Not responding for 9s while importing a video (began 2.0s ago); last command import_media (2.1s ago); 40s after launch; macos 0.4.1\n[50] HANG Not responding for 12s while starting; last command none yet; 8s after launch; windows 0.4.0\n[120] panic at somewhere\n";
+        assert_eq!(hangs_since(log, 60), vec![Hang { at: 100, seconds: 9, during: "importing a video (began 2.0s ago)".into() }]);
+        assert_eq!(hangs_since(log, 0).len(), 2);
+    }
+
+    #[test]
+    fn reads_this_computers_memory() {
+        let memory = memory();
+        assert!(memory.total > 0 && memory.available <= memory.total);
+        assert!(memory.app > 0);
     }
 }

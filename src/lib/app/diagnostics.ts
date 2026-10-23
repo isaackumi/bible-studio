@@ -58,10 +58,12 @@ export function problemReport(input: {
   counts: Record<string, number>;
   problems: Problem[];
   crashLog: string;
+  /** Technical sections for support (titled blocks of text), after the problems. */
+  sections?: Array<[string, string]>;
   now?: Date;
 }): string {
   const lines = [
-    "Church Studio problem report",
+    "Church Studio support file",
     `Made: ${(input.now ?? new Date()).toISOString()}`,
     `Version: ${input.version}`,
     `Platform: ${input.platform}`,
@@ -71,6 +73,7 @@ export function problemReport(input: {
     `Problems (${input.problems.length}):`,
     ...(input.problems.length ? input.problems.map((problem) => `- ${problem.at} [${problem.kind}] ${problem.message}${problem.where ? ` (${problem.where})` : ""}`) : ["- none"]),
   ];
+  for (const [title, text] of input.sections ?? []) if (text.trim()) lines.push("", `${title}:`, text.trim());
   if (input.crashLog.trim()) lines.push("", "Desktop crash log:", input.crashLog.trim().slice(-8000));
   return lines.join("\n") + "\n";
 }

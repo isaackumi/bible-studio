@@ -34,19 +34,21 @@
   import type { PcoPlan } from "../../integrations/pco";
   import { invoke } from "@tauri-apps/api/core";
   import { mediaUrl } from "../../db/api";
-  import { clearProblems, problemReport, readProblems } from "../../app/diagnostics";
+  import { clearProblems, readProblems } from "../../app/diagnostics";
   import { listOnlineBibles, type OnlineBible } from "../../bible/online";
   import type { OnlineBibleChoice } from "../../bible/online-bibles";
   import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, maskedLicense, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import PickList from "../PickList.svelte";
   import ReadyCheck from "./ReadyCheck.svelte";
+  import PerformanceCheck from "./PerformanceCheck.svelte";
   import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS, type AiFeature } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
 
   type SettingsSectionId =
     | "ready"
+    | "health"
     | "general"
     | "system"
     | "appearance"
@@ -164,6 +166,7 @@
     {
       label: msg("About"),
       items: [
+        { id: "health", title: msg("Performance"), icon: "speed", color: "#30a46c", about: msg("How quickly Church Studio opens and runs here, with tips."), keywords: "performance health speed slow freeze stutter memory startup smooth frames lag hang" },
         { id: "system", title: msg("This computer"), icon: "laptop", color: "#8e8e93", about: msg("What works in this window, and why some things do not."), keywords: "capabilities browser desktop features" },
         { id: "updates", title: msg("Updates"), icon: "refresh", color: "#0a84ff", about: msg("Which version is running."), keywords: "version update release" },
       ],
@@ -292,17 +295,8 @@
   // Problem reports.
   let problems = $state(readProblems());
 
-  async function buildReport(): Promise<string> {
-    const crashLog = isDesktop() ? await invoke<string>("crash_log").catch(() => "") : "";
-    return problemReport({
-      version: "0.1.0",
-      platform: isDesktop() ? "Desktop app" : "Browser",
-      userAgent: navigator.userAgent,
-      counts: { songs: session.songs.length, services: session.services.length, sermons: session.sermons.length, decks: session.decks.length, media: session.media.length },
-      problems: readProblems(),
-      crashLog,
-    });
-  }
+  /** The support file (session.supportFile): technical detail for the developer, nothing private. */
+  const buildReport = () => session.supportFile();
 
   let supportNote = $state("");
 
@@ -318,7 +312,7 @@
     }
     const mail = supportMailto(session.plan, APP_VERSION);
     if (mail) await openExternal(mail);
-    supportNote = copied ? (mail ? t("The problem report is copied: paste it into the email.") : t("The problem report is copied. Send it to Church Studio support.")) : t("Save the report below and attach it to your email.");
+    supportNote = copied ? (mail ? t("The support file is copied: paste it into the email.") : t("The support file is copied. Send it to Church Studio support.")) : t("Save the support file below and attach it to your email.");
   }
 
   async function saveProblemReport() {
@@ -326,7 +320,7 @@
     const url = URL.createObjectURL(new Blob([report], { type: "text/plain" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `Church Studio problem report ${new Date().toISOString().slice(0, 10)}.txt`;
+    link.download = `Church Studio support file ${APP_VERSION} ${new Date().toISOString().slice(0, 10)}.txt`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -1377,6 +1371,8 @@
           {/if}
         </section>
         <p class="note stand">{t("Headers become sections, songs come with their lyrics (new ones go into a \"Planning Center\" folder), and other items become editable slides. Nothing goes live on its own.")}</p>
+      {:else if section === "health"}
+        <PerformanceCheck ongo={(next) => (section = next as SettingsSectionId)} />
       {:else if section === "ready"}
         <ReadyCheck ongo={(next) => (section = next as SettingsSectionId)} />
       {:else if section === "storage"}
@@ -1643,9 +1639,9 @@
         <p class="section-label">{t("Problem reports")}</p>
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} noted on this computer` : t("No problems noted")}</strong><span>{t("If something went wrong, save a report and send it to Church Studio support. It holds the errors and a few counts, never your songs, sermons or notes. Nothing is sent by itself.")}</span></div>
+            <div class="row-copy"><strong>{problems.length ? tn(problems.length, "{n} problem noted on this computer", "{n} problems noted on this computer") : t("No problems noted")}</strong><span>{t("If something went wrong, save a support file and send it to Church Studio support. It holds technical details about the app and this computer, never your songs, sermons, notes, keys or passwords. Nothing is sent by itself.")}</span></div>
             <div class="row-end">
-              <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> {t("Save report")}</button>
+              <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> {t("Save a support file")}</button>
               {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>{t("Clear")}</button>{/if}
             </div>
           </div>
@@ -1807,7 +1803,7 @@
             <div class="row">
               <div class="row-copy">
                 <strong>{session.entitled("priority-support") ? t("Priority support") : t("Support")}</strong>
-                <span>{supportNote || (session.entitled("priority-support") ? t("Your plan is answered first. The email opens with your plan, and the problem report is copied to paste in.") : t("The email opens with your plan, and the problem report is copied to paste in."))}</span>
+                <span>{supportNote || (session.entitled("priority-support") ? t("Your plan is answered first. The email opens with your plan, and the support file is copied to paste in.") : t("The email opens with your plan, and the support file is copied to paste in."))}</span>
               </div>
               <button type="button" class="btn" onclick={() => void contactSupport()}>{t("Contact support")}</button>
             </div>
