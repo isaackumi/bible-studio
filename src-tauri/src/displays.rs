@@ -249,8 +249,10 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
                 log::info!("OPERATOR_MOVED_OFF_AUDIENCE to={}", monitor_name(other));
             }
         }
+        crate::diagnostics::doing("placing the audience window");
         place(&window, monitor, fullscreen)?;
         window.show().map_err(|e| e.to_string())?;
+        crate::diagnostics::doing("running");
         // Both modes are a dedicated output: above the menu bar and Dock of that display.
         // Do not focus the operator. Focusing it can pull the audience window back.
         join_active_space(&window)?;
@@ -450,11 +452,15 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
     }
     // The builder takes top-left coordinates; place() then sets the exact AppKit frame.
     let (x, y, width, height) = logical_frame(monitor);
-    audience_window(app)
+    log::info!("Creating the audience window on {}", monitor_name(monitor));
+    crate::diagnostics::doing("creating the audience window");
+    let built = audience_window(app)
         .position(x, y)
         .inner_size(width, height)
         .build()
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    crate::diagnostics::doing("running");
+    built
 }
 
 fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<(), String> {

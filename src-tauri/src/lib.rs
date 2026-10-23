@@ -7,6 +7,7 @@ mod bible;
 mod entitlement;
 mod signin;
 mod db;
+mod diagnostics;
 mod displays;
 mod remote;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -657,6 +658,12 @@ fn crash_log(app: tauri::AppHandle) -> String {
         .unwrap_or_default()
 }
 
+/// The last lines of church-studio.log, sent with a crash or hang report.
+#[tauri::command]
+fn diagnostic_log(app: tauri::AppHandle) -> String {
+    diagnostics::log_path(&app).map(|path| diagnostics::log_tail(&path, 60)).unwrap_or_default()
+}
+
 /// Write any panic to crash.log in the app's log folder, so a church can send it in.
 fn record_panics(app: &tauri::AppHandle) {
     use tauri::Manager;
@@ -805,7 +812,7 @@ async fn vmix_get(host: String, port: u16, query: String) -> Result<String, Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    diagnostics::install_logger();
     voice::relaunch_inside_bundle();
     tauri::Builder::default()
         // One copy at a time. A second copy (opened again from the Dock or Finder, or the
@@ -826,21 +833,34 @@ pub fn run() {
         .manage(Output::default())
         .setup(|app| {
             record_panics(app.handle());
+            diagnostics::open_log(app.handle());
+            diagnostics::start_watchdog(app.handle().clone());
+            log::info!("Church Studio {} starting on {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
+            diagnostics::doing("opening the library");
             let (database, notice) = db::open(app.handle()).map_err(std::io::Error::other)?;
             app.manage(database);
             app.manage(StartupNotice(Mutex::new(notice)));
+            diagnostics::doing("reading the license");
             app.manage(entitlement::load(app.handle()));
+            diagnostics::doing("placing the desk window");
             displays::place_operator(app.handle());
             // The screens are checked again every second, so a first look that fails is not fatal.
+            diagnostics::doing("checking screens at launch");
             if let Err(error) = displays::reconcile(app.handle()) {
                 log::warn!("Screens could not be placed at launch: {error}");
             }
             displays::start(app.handle().clone());
             app.manage(Arc::new(remote::LanRemote::default()));
+            diagnostics::doing("starting NDI");
             ndi::start_hub();
+            diagnostics::doing("running");
+            log::info!("Started");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        // Each command from the desk is noted first: most run on the main thread, so the last one is
+        // what the watchdog names when the window stops answering.
+        .invoke_handler({
+            let handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
             entitlement::entitlement_status,
             entitlement::entitlement_set,
             entitlement::entitlement_note_time,
@@ -853,6 +873,7 @@ pub fn run() {
             easyworship_songs,
             ai_post,
             crash_log,
+            diagnostic_log,
             backup_write,
             backup_latest,
             output_status,
@@ -924,7 +945,12 @@ pub fn run() {
             remote_lan_status,
             stop_remote_lan,
             remote_reply
-        ])
+        ]);
+            move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
+                diagnostics::command(invoke.message.command());
+                handler(invoke)
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Church Studio");
 }

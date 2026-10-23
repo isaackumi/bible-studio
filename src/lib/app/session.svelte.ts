@@ -6134,7 +6134,10 @@ class Session {
   private startErrorReports = async () => {
     const allowed = this.workspace.shareUsage !== false;
     await startReports({ version: APP_VERSION, device: this.deviceId, os: this.osName(), allowed });
-    if (allowed && this.desktop()) reportCrashLog(await invoke<string>("crash_log").catch(() => ""));
+    if (allowed && this.desktop()) {
+      const [crashes, tail] = await Promise.all([invoke<string>("crash_log").catch(() => ""), invoke<string>("diagnostic_log").catch(() => "")]);
+      reportCrashLog(crashes, localStorage, tail);
+    }
   };
 
   // Updates: checked quietly after start and every six hours; the desk offers one when it is ready,

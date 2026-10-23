@@ -6,8 +6,9 @@
 // carries the error, where in the code it happened, the app version, the system and the anonymous
 // computer id the check-in already uses. No breadcrumbs are kept (they could hold what was on screen).
 //
-// Desktop crashes of the Rust core are written to crash.log (lib.rs); the next launch sends the new
-// lines here. Crashes below that (a native fault that kills the process) are not caught.
+// Desktop crashes of the Rust core are written to crash.log (lib.rs), and so are freezes the watchdog
+// sees ("HANG Not responding…", diagnostics.rs); the next launch sends the new lines here, with the
+// end of church-studio.log. A native fault that kills the process at once is not caught.
 
 type Sentry = typeof import("@sentry/browser");
 
@@ -82,8 +83,20 @@ export function setReportsAllowed(on: boolean): void {
   allowed = on;
 }
 
-/** Send crash.log lines not sent before (desktop). */
-export function reportCrashLog(log: string, store: Pick<Storage, "getItem" | "setItem"> = localStorage): void {
+/** How a crash.log line is reported: a freeze is its own kind, grouped by what the app was doing. */
+export function crashReport(message: string): { title: string; level: "fatal" | "error"; fingerprint: string[] } {
+  const hang = message.match(/^HANG (.*)$/);
+  if (hang) {
+    const text = scrub(hang[1]!);
+    const doing = text.match(/ while (.+?)(?: \(began|;)/)?.[1] ?? "unknown";
+    const command = text.match(/last command ([a-z_]+)/)?.[1] ?? "none";
+    return { title: `Desktop hang: ${text}`, level: "error", fingerprint: ["desktop-hang", doing, command] };
+  }
+  return { title: `Desktop crash: ${scrub(message)}`, level: "fatal", fingerprint: ["{{ default }}"] };
+}
+
+/** Send crash.log lines not sent before (desktop), with the end of the app's log for context. */
+export function reportCrashLog(log: string, store: Pick<Storage, "getItem" | "setItem"> = localStorage, logTail = ""): void {
   if (!sentry || !allowed || !log.trim()) return;
   let lastSent = 0;
   try {
@@ -92,7 +105,11 @@ export function reportCrashLog(log: string, store: Pick<Storage, "getItem" | "se
     // Storage blocked: send what is there.
   }
   const lines = newCrashLines(log, lastSent);
-  for (const line of lines) sentry.captureMessage(`Desktop crash: ${scrub(line.message)}`, "fatal");
+  const tail = logTail ? scrub(logTail.split("\n").slice(-60).join("\n")) : "";
+  for (const line of lines) {
+    const report = crashReport(line.message);
+    sentry.captureMessage(report.title, { level: report.level, fingerprint: report.fingerprint, ...(tail ? { extra: { log: tail } } : {}) });
+  }
   if (lines.length) {
     try {
       store.setItem(SENT_KEY, String(lines[lines.length - 1]!.at));
