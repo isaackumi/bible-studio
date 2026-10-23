@@ -5,6 +5,7 @@
   import { BUILT_IN_FIXES, nearMisses } from "../../voice/words";
   import { t, tn } from "../../i18n/core";
   import { isDesktop } from "../../platform/runtime";
+  import { CLOUD_SPEECH, type CloudSpeech } from "../../voice/cloud-listen";
 
   // Words the recognizer mishears in this church (accents, names), put right before verses are
   // found. Learned from the operator, added here, or taught in Practice.
@@ -15,6 +16,32 @@
   const listening = $derived(session.voice.status === "listening");
 
   const engine = $derived(session.workspace.voice.engine ?? "system");
+  const desktop = isDesktop();
+
+  // Speech services with the church's own key: saved, tested, removed here.
+  const SERVICES: CloudSpeech[] = ["elevenlabs", "deepgram"];
+  const keys = $derived(session.workspace.voice.speechKeys ?? {});
+  let drafts = $state<Record<CloudSpeech, string>>({ elevenlabs: "", deepgram: "" });
+  let tested = $state<Record<CloudSpeech, "" | "testing" | "ok">>({ elevenlabs: "", deepgram: "" });
+  let testError = $state<Record<CloudSpeech, string>>({ elevenlabs: "", deepgram: "" });
+
+  async function saveKey(service: CloudSpeech) {
+    session.setSpeechKey(service, drafts[service]);
+    drafts[service] = "";
+    await testKey(service);
+  }
+
+  async function testKey(service: CloudSpeech) {
+    tested[service] = "testing";
+    testError[service] = "";
+    try {
+      await session.testSpeechKey(service);
+      tested[service] = "ok";
+    } catch (error) {
+      tested[service] = "";
+      testError[service] = error instanceof Error ? error.message : String(error);
+    }
+  }
   const model = $derived(session.accurate.model);
   const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`;
 
@@ -47,23 +74,50 @@
   }
 </script>
 
-{#if isDesktop() && !model?.unsupported}
-  <p class="section-label">{t("Recognizer")}</p>
-  <section class="rows">
-    <div class="row stack">
-      <div class="row-copy">
-        <strong>{t("Which recognizer listens")}</strong>
-        <span>{t("The system recognizer is built into the computer. Accurate uses Whisper on this computer: it hears accents and Bible names better, needs a one-time download, and uses more of the computer while listening. Accurate never sends audio off this computer.")}</span>
-      </div>
-      <div class="choices" role="radiogroup" aria-label={t("Recognizer")}>
-        <button type="button" role="radio" class="choice" class:on={engine === "system"} aria-checked={engine === "system"} onclick={() => void session.setVoiceEngine("system")}>
-          <b>{t("System")}</b><span>{t("Built in, light on the computer")}</span>
-        </button>
+<p class="section-label">{t("Recognizer")}</p>
+<section class="rows">
+  <div class="row stack">
+    <div class="row-copy">
+      <strong>{t("Which recognizer listens")}</strong>
+      <span>{desktop ? t("The system recognizer is built into the computer. Accurate uses Whisper on this computer and never sends audio away. ElevenLabs and Deepgram are speech services with your own key: they hear accents and Bible names best, and send the sound to that service while listening.") : t("This browser's own recognizer works in Chrome and Edge. ElevenLabs and Deepgram are speech services with your own key: they work in any browser, hear accents and Bible names best, and send the sound to that service while listening.")}</span>
+    </div>
+    <div class="choices" role="radiogroup" aria-label={t("Recognizer")}>
+      <button type="button" role="radio" class="choice" class:on={engine === "system"} aria-checked={engine === "system"} onclick={() => void session.setVoiceEngine("system")}>
+        <b>{desktop ? t("System") : t("This browser")}</b><span>{desktop ? t("Built in, light on the computer") : t("Chrome and Edge, free")}</span>
+      </button>
+      {#if desktop && !model?.unsupported}
         <button type="button" role="radio" class="choice" class:on={engine === "accurate"} aria-checked={engine === "accurate"} disabled={!model?.installed} onclick={() => void session.setVoiceEngine("accurate")}>
           <b>{t("Accurate")}</b><span>{model?.installed ? t("Whisper, on this computer") : t("Download it first")}</span>
         </button>
-      </div>
+      {/if}
+      {#each SERVICES as service (service)}
+        <button type="button" role="radio" class="choice" class:on={engine === service} aria-checked={engine === service} disabled={!keys[service]} onclick={() => void session.setVoiceEngine(service)}>
+          <b>{CLOUD_SPEECH[service].name}</b><span>{keys[service] ? (service === "elevenlabs" ? t("Scribe, your key") : t("Nova-3, your key")) : t("Add your key below")}</span>
+        </button>
+      {/each}
     </div>
+  </div>
+  {#each SERVICES as service (service)}
+    <div class="row stack">
+      <div class="row-copy">
+        <strong>{t("{service} key", { service: CLOUD_SPEECH[service].name })}{#if keys[service]} <em class="ok">{tested[service] === "ok" ? t("Works") : t("Saved")}</em>{/if}</strong>
+        <span>{t("Make a key in your {service} account and paste it here. It stays on this computer.", { service: CLOUD_SPEECH[service].name })} <a href={CLOUD_SPEECH[service].keysUrl} target="_blank" rel="noreferrer">{t("Get a key")}</a></span>
+      </div>
+      <div class="key-row">
+        <input type="password" autocomplete="off" spellcheck="false" placeholder={keys[service] ? "••••••••••••" : t("Paste the key")} bind:value={drafts[service]} aria-label={t("{service} key", { service: CLOUD_SPEECH[service].name })} />
+        <button type="button" class="btn primary" disabled={!drafts[service].trim()} onclick={() => saveKey(service)}>{t("Save")}</button>
+        {#if keys[service]}
+          <button type="button" class="btn" disabled={tested[service] === "testing"} onclick={() => void testKey(service)}>{tested[service] === "testing" ? t("Testing…") : t("Test")}</button>
+          <button type="button" class="btn" onclick={() => { session.setSpeechKey(service, ""); tested[service] = ""; }}>{t("Remove")}</button>
+        {/if}
+      </div>
+      {#if testError[service]}<p class="key-error" role="alert">{testError[service]}</p>{/if}
+    </div>
+  {/each}
+</section>
+
+{#if desktop && !model?.unsupported}
+  <section class="rows">
     <div class="row">
       <div class="row-copy">
         <strong>{t("Accurate listening model")}</strong>
@@ -161,7 +215,14 @@
 </section>
 
 <style>
-  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .key-row { display: flex; gap: 8px; }
+  .key-row input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; }
+  .key-row .btn { height: 36px; }
+  .row-copy a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .row-copy a:hover { text-decoration: underline; }
+  .key-error { margin: 0; color: var(--danger, #ff6b6b); font-size: 12.5px; }
+  .ok { margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--good, #3ccf7a) 18%, transparent); color: var(--good, #3ccf7a); font-size: 11px; font-style: normal; font-weight: 700; }
   .choice { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .choice span { font-size: 12px; color: var(--muted); }
   .choice.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

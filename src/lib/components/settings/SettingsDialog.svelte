@@ -1271,12 +1271,13 @@
         {@const ai = session.workspace.ai}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{t("Which AI")}</strong><span>{t("Claude, ChatGPT and Gemini work over the internet with a key from their website. An AI on this computer works without a key or the internet.")}</span></div>
+            <div class="row-copy"><strong>{t("Which AI")}</strong><span>{isDesktop() ? t("Claude, ChatGPT and Gemini work over the internet with a key from their website. An AI on this computer works without a key or the internet.") : t("Claude, ChatGPT and Gemini work over the internet with a key from their website.")}</span></div>
             <select class="field" aria-label={t("AI service")} value={ai.provider} onchange={(event) => { const provider = AI_PROVIDERS.find((name) => name === event.currentTarget.value) ?? "anthropic"; session.setAiSettings({ provider, key: provider === ai.provider ? ai.key : "", model: AI_DEFAULTS[provider].model, baseUrl: provider === "local" ? AI_DEFAULTS.local.baseUrl : "" }); aiNote = ""; aiModels = []; modelsNote = ""; }}>
               <option value="anthropic">{t("Claude (by Anthropic)")}</option>
               <option value="openai">{t("ChatGPT (by OpenAI)")}</option>
               <option value="gemini">{t("Gemini (by Google)")}</option>
-              <option value="local">{t("An AI on this computer")}</option>
+              <!-- An AI on this computer is for the desktop app; a web page cannot rely on reaching it. -->
+              {#if isDesktop() || ai.provider === "local"}<option value="local">{t("An AI on this computer")}</option>{/if}
             </select>
           </div>
           {#if ai.provider === "local"}

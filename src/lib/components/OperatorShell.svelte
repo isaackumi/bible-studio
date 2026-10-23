@@ -4,9 +4,7 @@
   import Toast from "./Toast.svelte";
   import CommandPalette from "./CommandPalette.svelte";
   import DeckEditor from "./decks/DeckEditor.svelte";
-  import AudiencePanel from "./audience/AudiencePanel.svelte";
   import { audienceRoom } from "../app/rooms.svelte";
-  import PicturesPanel from "./pictures/PicturesPanel.svelte";
   import { pictures } from "../app/pictures.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
@@ -226,8 +224,9 @@
         <i aria-hidden="true"></i>{t("Browser demo")} · <b>{t("Get the app")}</b>
       </a>
     {/if}
-    {#if audienceRoom.open}<AudiencePanel />{/if}
-    {#if pictures.open}<PicturesPanel />{/if}
+    {#if audienceRoom.open}{#await import("./audience/AudiencePanel.svelte") then { default: AudiencePanel }}<AudiencePanel />{/await}{/if}
+    <!-- Loaded when first opened: the folder browser and slideshow settings stay out of the desk's start-up. -->
+    {#if pictures.open}{#await import("./pictures/PicturesPanel.svelte") then { default: PicturesPanel }}<PicturesPanel />{/await}{/if}
     {#if session.studio}
       {@const studioDeck = session.decks.find((deck) => deck.id === session.studio?.deckId)}
       {#if studioDeck}

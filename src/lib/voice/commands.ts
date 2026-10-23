@@ -196,7 +196,8 @@ export function sanitizeVoiceSettings(value: unknown): {
   wakeChosen: boolean;
   custom: CustomVoiceCommand[];
   noiseFilter: "off" | "light" | "strong";
-  engine: "system" | "accurate";
+  engine: "system" | "accurate" | "elevenlabs" | "deepgram";
+  speechKeys: { elevenlabs?: string; deepgram?: string };
   words: WordFix[];
 } {
   const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -227,5 +228,9 @@ export function sanitizeVoiceSettings(value: unknown): {
     heardSeen.add(heard);
     words.push({ heard, means, source: item.source === "learned" ? "learned" : "yours", uses: Number.isFinite(item.uses) ? Math.max(0, Math.round(item.uses!)) : 0, ...(Number.isFinite(item.at) ? { at: item.at } : {}) });
   }
-  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, engine: record.engine === "accurate" ? "accurate" : "system", words: words.slice(0, 300) };
+  const engine = record.engine === "accurate" || record.engine === "elevenlabs" || record.engine === "deepgram" ? record.engine : "system";
+  const rawKeys = record.speechKeys && typeof record.speechKeys === "object" ? (record.speechKeys as Record<string, unknown>) : {};
+  const key = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : undefined);
+  const speechKeys = { ...(key(rawKeys.elevenlabs) ? { elevenlabs: key(rawKeys.elevenlabs) } : {}), ...(key(rawKeys.deepgram) ? { deepgram: key(rawKeys.deepgram) } : {}) };
+  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, engine, speechKeys, words: words.slice(0, 300) };
 }

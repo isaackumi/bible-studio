@@ -151,6 +151,7 @@ import type { SongMatch } from "../ai/songs";
 import { AiAssistant, sermonText } from "./ai-assistant";
 import { ServiceChecks } from "./service-checks.svelte";
 import { LiveNotes } from "./live-notes.svelte";
+import { CLOUD_SPEECH, KeyRefused, startCloudListening, testSpeechKey, type CloudSpeech } from "../voice/cloud-listen";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
@@ -188,6 +189,7 @@ import type {
   TranslationInfo,
   Workspace,
   WorkspaceLayout,
+  VoiceEngine,
   VoiceSettings,
   ProgramAlert,
 } from "../domain/types";
@@ -2797,7 +2799,16 @@ class Session {
       message: t("Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”."),
     };
     const filter = this.workspace.voice.noiseFilter ?? "off";
-    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, expectedWords(this.workspace.voice.words ?? []), this.workspace.voice.engine ?? "system") : startListening(handlers, filter);
+    const engine = this.workspace.voice.engine ?? "system";
+    const words = expectedWords(this.workspace.voice.words ?? []);
+    // A speech service the church has its own key for: the same in the app and in a browser.
+    const cloudKey = engine === "elevenlabs" || engine === "deepgram" ? this.workspace.voice.speechKeys?.[engine] : undefined;
+    if ((engine === "elevenlabs" || engine === "deepgram") && cloudKey) {
+      this.stopVoiceEngine = startCloudListening(handlers, { service: engine, key: cloudKey, words, filter });
+      return;
+    }
+    const local = engine === "accurate" ? "accurate" : "system";
+    this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, words, local) : startListening(handlers, filter);
   };
 
   stopVoice = (message = t("Listening stopped.")) => {
@@ -3093,11 +3104,30 @@ class Session {
   };
 
   /** Which recognizer listens. While listening, restarts it so the change is heard at once. */
-  setVoiceEngine = async (engine: "system" | "accurate") => {
+  setVoiceEngine = async (engine: VoiceEngine) => {
     this.saveVoiceSettings({ engine });
     if (this.voice.status !== "listening") return;
-    this.stopVoice(engine === "accurate" ? t("Accurate listening on. Listening again…") : t("System listening on. Listening again…"));
+    this.stopVoice(engine === "accurate" ? t("Accurate listening on. Listening again…") : engine === "elevenlabs" || engine === "deepgram" ? t("{service} listening on. Listening again…", { service: CLOUD_SPEECH[engine].name }) : t("System listening on. Listening again…"));
     await this.startVoice();
+  };
+
+  /** Keep a speech service's key; an empty one removes it (and goes back to the built-in recognizer). */
+  setSpeechKey = (service: CloudSpeech, key: string) => {
+    const keys = { ...(this.workspace.voice.speechKeys ?? {}) };
+    if (key.trim()) keys[service] = key.trim();
+    else delete keys[service];
+    this.saveVoiceSettings({ speechKeys: keys });
+    if (!key.trim() && this.workspace.voice.engine === service) void this.setVoiceEngine("system");
+  };
+
+  /** Check a speech service's key works; rejects with words a church can act on. */
+  testSpeechKey = async (service: CloudSpeech): Promise<void> => {
+    try {
+      await testSpeechKey(service, this.workspace.voice.speechKeys?.[service] ?? "");
+    } catch (error) {
+      if (error instanceof KeyRefused) throw new Error(service === "deepgram" ? t("{service} refused the connection. Check the key in Settings › Audio & voice, and that this network allows it.", { service: CLOUD_SPEECH[service].name }) : t("{service} did not accept the key. Copy it again from your {service} account.", { service: CLOUD_SPEECH[service].name }));
+      throw new Error(t("{service} could not be reached. Check the internet connection.", { service: CLOUD_SPEECH[service].name }));
+    }
   };
 
   /** Reference or phrase → Preview. Used when no desk handles the request. Never Program. */

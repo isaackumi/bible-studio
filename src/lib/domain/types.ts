@@ -665,13 +665,20 @@ export type VoiceSettings = {
   custom: Array<{ phrase: string; action: string }>;
   /** Clean the microphone before listening: off, light (keeps some room) or strong. */
   noiseFilter?: NoiseFilter;
-  /** Which recognizer listens: the system's (Apple, Windows) or accurate (Whisper on this computer). */
-  engine?: "system" | "accurate";
+  /**
+   * Which recognizer listens: the system's (Apple, Windows, or the browser's own), accurate (Whisper
+   * on this computer), or a speech service with the church's own key (ElevenLabs, Deepgram).
+   */
+  engine?: VoiceEngine;
+  /** The church's own keys for the speech services (never shown again, never in a support file). */
+  speechKeys?: { elevenlabs?: string; deepgram?: string };
   /** Words the recognizer mishears here, put right before anything reads them (voice/words.ts). */
   words?: Array<{ heard: string; means: string; source: "yours" | "learned"; uses?: number; at?: number }>;
 };
 
 export type NoiseFilter = "off" | "light" | "strong";
+
+export type VoiceEngine = "system" | "accurate" | "elevenlabs" | "deepgram";
 
 export type SlideDeckDocument = {
   id: string;

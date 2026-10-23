@@ -54,8 +54,8 @@ describe("voice settings storage", () => {
   it("keeps valid custom phrases only", () => {
     expect(
       sanitizeVoiceSettings({ wake: false, custom: [{ phrase: " Lights Out ", action: "black" }, { phrase: "lights out", action: "next" }, { phrase: "x", action: "format" }, { phrase: "", action: "next" }] }),
-    ).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [{ phrase: "lights out", action: "black" }], noiseFilter: "off", engine: "system", words: [] });
-    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [], noiseFilter: "off", engine: "system", words: [] });
+    ).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [{ phrase: "lights out", action: "black" }], noiseFilter: "off", engine: "system", speechKeys: {}, words: [] });
+    expect(sanitizeVoiceSettings(undefined)).toEqual({ commands: true, wake: false, wakeChosen: false, custom: [], noiseFilter: "off", engine: "system", speechKeys: {}, words: [] });
     // The church's misheard words: cleaned, one per heard phrase.
     expect(sanitizeVoiceSettings({ words: [{ heard: " Efficient ", means: "Ephesians", source: "learned", uses: 2 }, { heard: "efficient", means: "Esther" }, { heard: "", means: "x" }, "junk"] }).words).toEqual([
       { heard: "efficient", means: "Ephesians", source: "learned", uses: 2 },
