@@ -45,6 +45,8 @@ struct FolderEntry {
     modified: u64,
     /// A folder: how many pictures and videos are directly inside it (shown on its tile).
     items: u32,
+    /// A folder: how many folders are directly inside it (a folder of albums has no pictures of its own).
+    folders: u32,
 }
 
 /// What a file is by its name: a picture, a video, or neither.
@@ -57,14 +59,23 @@ fn media_kind(name: &str) -> Option<&'static str> {
     }
 }
 
-/// Pictures and videos directly inside a folder (counting stops at 9999).
-fn media_count(dir: &std::path::Path) -> u32 {
-    std::fs::read_dir(dir)
-        .map(|entries| entries.flatten().take(20_000).filter(|entry| {
+/// Pictures and videos, and folders, directly inside a folder (each count stops at 9999).
+fn media_count(dir: &std::path::Path) -> (u32, u32) {
+    let (mut media, mut folders) = (0u32, 0u32);
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten().take(20_000) {
             let name = entry.file_name().to_string_lossy().to_string();
-            !name.starts_with('.') && media_kind(&name).is_some()
-        }).take(9999).count() as u32)
-        .unwrap_or(0)
+            if name.starts_with('.') {
+                continue;
+            }
+            if media_kind(&name).is_some() {
+                media = (media + 1).min(9999);
+            } else if entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false) {
+                folders = (folders + 1).min(9999);
+            }
+        }
+    }
+    (media, folders)
 }
 
 /// The pictures in a folder the person chose (and the folders inside it), shown where they are,
@@ -90,15 +101,15 @@ fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
         }
         let Ok(meta) = entry.metadata() else { continue };
         let modified = meta.modified().ok().and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok()).map(|at| at.as_millis() as u64).unwrap_or(0);
-        let (kind, items) = if meta.is_dir() {
+        let (kind, (items, folders)) = if meta.is_dir() {
             ("folder", media_count(&entry.path()))
         } else {
             match media_kind(&name) {
-                Some(kind) => (kind, 0),
+                Some(kind) => (kind, (0, 0)),
                 None => continue,
             }
         };
-        entries.push(FolderEntry { name, path: entry.path().to_string_lossy().to_string(), kind, bytes: meta.len(), modified, items });
+        entries.push(FolderEntry { name, path: entry.path().to_string_lossy().to_string(), kind, bytes: meta.len(), modified, items, folders });
     }
     Ok(entries)
 }
@@ -1159,7 +1170,11 @@ mod vmix_tests {
         found.sort();
         assert_eq!(found, vec![("Easter".to_string(), "folder"), ("a.JPG".to_string(), "image"), ("b.png".to_string(), "image"), ("c.bmp".to_string(), "image"), ("clip.mp4".to_string(), "video")]);
         let easter = super::list_pictures(&dir).unwrap().into_iter().find(|entry| entry.kind == "folder").unwrap();
-        assert_eq!(easter.items, 2);
+        assert_eq!((easter.items, easter.folders), (2, 0));
+        // A folder of albums has no pictures of its own, but its folders are counted.
+        std::fs::create_dir_all(dir.join("Easter").join("Sunrise")).unwrap();
+        let easter = super::list_pictures(&dir).unwrap().into_iter().find(|entry| entry.kind == "folder").unwrap();
+        assert_eq!((easter.items, easter.folders), (2, 1));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

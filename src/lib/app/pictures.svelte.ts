@@ -13,7 +13,8 @@ import { isDesktop } from "../platform/runtime";
 import { session } from "./session.svelte";
 import { audienceRoom, whenAudienceOpens } from "./rooms.svelte";
 
-export type FolderEntry = { name: string; path: string; kind: "image" | "video" | "folder"; bytes: number; modified: number; items: number };
+/** A folder's `items` are the pictures and videos directly in it; `folders`, the folders in it. */
+export type FolderEntry = { name: string; path: string; kind: "image" | "video" | "folder"; bytes: number; modified: number; items: number; folders?: number };
 /** Where pictures usually are: Pictures, Desktop, and cloud drives synced by their own apps. */
 export type Place = { name: string; path: string; kind: "pictures" | "desktop" | "google-drive" | "icloud" | "dropbox" | "onedrive" };
 

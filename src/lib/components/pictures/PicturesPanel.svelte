@@ -11,6 +11,12 @@
   const selected = $derived(pictures.images[pictures.current] ?? null);
   const videos = $derived(pictures.images.filter((entry) => entry.kind === "video").length);
   const crumbs = $derived(pictures.folder ? crumbsOf(pictures.folder) : []);
+  const parent = $derived(crumbs.length > 1 ? crumbs[crumbs.length - 2]! : null);
+  // Folders with no pictures and no folders inside are kept out of the way, a click from showing.
+  let showEmpty = $state(false);
+  const isEmpty = (entry: { items: number; folders?: number }) => !entry.items && !entry.folders;
+  const emptyFolders = $derived(pictures.folders.filter(isEmpty).length);
+  const shownFolders = $derived(showEmpty ? pictures.folders : pictures.folders.filter((entry) => !isEmpty(entry)));
   const show = $derived(pictures.slideshow);
   const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
   /** What is switched on in each group, in a few words, for its closed heading. */
@@ -102,52 +108,64 @@
   {:else}
   <div class="layout">
   <div class="browse">
-    <div class="bar">
-      <button type="button" class="btn accent" onclick={() => pictures.choose()}>{t("Choose folder…")}</button>
-      {#if pictures.folder}
-        <button type="button" class="btn" aria-pressed={pictures.pinned.includes(pictures.folder)} onclick={() => pictures.togglePin()}>{pictures.pinned.includes(pictures.folder) ? t("Unpin") : t("Pin folder")}</button>
-      {/if}
-    </div>
-    <!-- Go to: the usual places (synced cloud drives included) and pinned folders, each with its colour. -->
+    {#if pictures.folder}
+      {@const pinned = pictures.pinned.includes(pictures.folder)}
+      <!-- Where you are: up a level, the folder's name, the way back, and what to do with it. -->
+      <div class="location">
+        <button type="button" class="icon-btn up" disabled={!parent} aria-label={parent ? t("Up to {folder}", { folder: parent.name }) : t("Up")} data-tip={parent ? t("Up to {folder}", { folder: parent.name }) : undefined} onclick={() => parent && pictures.openFolder(parent.path)}><Icon name="chevron-left" size={16} /></button>
+        <span class="loc-icon" style:color={folderColor(folderName(pictures.folder))}><Icon name="folder-open" size={20} /></span>
+        <div class="loc-text">
+          <strong title={pictures.folder}>{folderName(pictures.folder)}</strong>
+          {#if crumbs.length > 1}
+            <nav class="loc-path" aria-label={t("Folder path")}>
+              {#each crumbs.slice(0, -1) as crumb, index (crumb.path)}{#if index}<span aria-hidden="true">›</span>{/if}<button type="button" title={crumb.path} onclick={() => pictures.openFolder(crumb.path)}>{crumb.name}</button>{/each}
+            </nav>
+          {/if}
+        </div>
+        <button type="button" class="icon-btn pin" class:on={pinned} aria-pressed={pinned} aria-label={pinned ? t("Unpin this folder") : t("Pin this folder")} data-tip={pinned ? t("Unpin this folder") : t("Pin this folder to Go to")} onclick={() => pictures.togglePin()}><Icon name="star" size={16} /></button>
+        <button type="button" class="btn open" onclick={() => pictures.choose()}><Icon name="folder" size={14} /> {t("Open…")}</button>
+      </div>
+    {:else}
+      <div class="start">
+        <span class="start-icon"><Icon name="media" size={22} /></span>
+        <div><strong>{t("Show pictures from any folder")}</strong><span>{t("Announcements, a photo album, a picture loop for the walk-in. Nothing is copied.")}</span></div>
+        <button type="button" class="btn accent" onclick={() => pictures.choose()}>{t("Choose folder…")}</button>
+      </div>
+    {/if}
+    <!-- Go to: the usual places (synced cloud drives included) and pinned folders, on one line. -->
     {#if pictures.places.length || pictures.pinned.length}
-      <div class="places" aria-label={t("Go to")}>
+      <div class="places" role="group" aria-label={t("Go to")}>
+        <span class="places-label">{t("Go to")}</span>
         {#each pictures.places as place (place.path)}
           <button type="button" class="place" class:on={pictures.folder === place.path} title={place.path} onclick={() => pictures.openFolder(place.path)}>
-            <i style:background={PLACE_COLORS[place.kind]}><Icon name={place.kind === "desktop" ? "laptop" : place.kind === "pictures" ? "media" : "globe"} size={12} /></i>{place.kind === "pictures" ? t("Pictures") : place.kind === "desktop" ? t("Desktop") : place.name}
+            <i style:background={PLACE_COLORS[place.kind]}><Icon name={place.kind === "desktop" ? "laptop" : place.kind === "pictures" ? "media" : "globe"} size={11} /></i>{place.kind === "pictures" ? t("Pictures") : place.kind === "desktop" ? t("Desktop") : place.name}
           </button>
         {/each}
         {#each pictures.pinned as path (path)}
           <button type="button" class="place" class:on={pictures.folder === path} title={path} onclick={() => pictures.openFolder(path)}>
-            <i style:background={folderColor(folderName(path))}><Icon name="pin" size={12} /></i>{folderName(path)}
+            <i style:background={folderColor(folderName(path))}><Icon name="star" size={11} /></i>{folderName(path)}
           </button>
         {/each}
       </div>
     {/if}
-    {#if crumbs.length}
-      <nav class="crumbs" aria-label={t("Folder path")}>
-        {#each crumbs as crumb, index (crumb.path)}
-          {#if index}<span class="sep" aria-hidden="true">›</span>{/if}
-          <button type="button" class:here={crumb.path === pictures.folder} disabled={crumb.path === pictures.folder} title={crumb.path} onclick={() => pictures.openFolder(crumb.path)}>
-            <span class="crumb-icon" style:color={folderColor(crumb.name)}><Icon name={crumb.path === pictures.folder ? "folder-open" : "folder"} size={14} /></span>{crumb.name}
-          </button>
-        {/each}
-      </nav>
-    {/if}
     {#if pictures.error}<p class="error" role="alert">{pictures.error}</p>{/if}
 
     {#if pictures.folder}
-      {#if pictures.folders.length}
+      {#if shownFolders.length}
         <ul class="folders" aria-label={t("Folders inside")}>
-          {#each pictures.folders as entry (entry.path)}
+          {#each shownFolders as entry (entry.path)}
             <li>
               <button type="button" title={entry.name} onclick={() => pictures.openFolder(entry.path)}>
                 <span class="folder-icon" style:color={folderColor(entry.name)}><Icon name="folder" size={22} /></span>
                 <span class="folder-name">{entry.name}</span>
-                <small>{entry.items ? tn(entry.items, "{n} item", "{n} items") : t("Empty")}</small>
+                <small>{entry.items ? tn(entry.items, "{n} item", "{n} items") : entry.folders ? tn(entry.folders, "{n} folder", "{n} folders") : t("Empty")}</small>
               </button>
             </li>
           {/each}
         </ul>
+      {/if}
+      {#if emptyFolders}
+        <button type="button" class="link-btn" onclick={() => (showEmpty = !showEmpty)}>{showEmpty ? t("Hide empty folders") : tn(emptyFolders, "Show {n} empty folder", "Show {n} empty folders")}</button>
       {/if}
       {#if pictures.images.length}
         <ul class="grid" role="listbox" tabindex="0" aria-label={t("Pictures in {folder}", { folder: folderName(pictures.folder) })} {onkeydown}>
@@ -167,8 +185,6 @@
       {:else if !pictures.loading && !pictures.folders.length}
         <p class="note">{t("No pictures or videos in this folder (JPEG, PNG, GIF, BMP, WebP, MP4, MOV or WebM).")}</p>
       {/if}
-    {:else}
-      <p class="note">{t("Choose a folder of pictures: announcements, a photo album, a picture loop for the walk-in. Nothing is copied.")}</p>
     {/if}
   </div>
 
@@ -329,21 +345,40 @@
   h2 { margin: 0; font-size: 17px; font-weight: 750; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
   .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
-  .bar, .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .btn { height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.accent { border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); }
-  .places { display: flex; flex-wrap: wrap; gap: 6px; }
-  .place { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; height: 28px; padding: 0 10px 0 4px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .place i { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #fff; }
+  /* Where you are: one bar, the folder's name large and its path small beneath. */
+  .location { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 6px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
+  .location .up:disabled { opacity: 0.3; cursor: default; }
+  .loc-icon { flex: none; display: grid; }
+  .loc-icon :global(svg) { fill: currentColor; fill-opacity: 0.2; }
+  .loc-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .loc-text strong { font-size: 14px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .loc-path { display: flex; align-items: center; gap: 3px; min-width: 0; overflow: hidden; color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .loc-path button { flex: 0 1 auto; min-width: 0; max-width: 140px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
+  .loc-path button:hover { color: var(--ink); text-decoration: underline; }
+  .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 9%, transparent); color: var(--ink); }
+  .pin.on { color: #f5a524; }
+  .pin.on :global(svg) { fill: currentColor; }
+  .btn.open { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+  .start { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
+  .start-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .start div { display: grid; gap: 2px; }
+  .start strong { font-size: 13.5px; }
+  .start span { color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .start .btn { grid-column: 1 / -1; justify-self: start; }
+  /* Go to: one line that scrolls sideways rather than wrapping into a wall of chips. */
+  .places { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; padding-right: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .places::-webkit-scrollbar { display: none; }
+  .places-label { flex: none; color: var(--muted); font-size: 11.5px; font-weight: 650; margin-right: 2px; }
+  .place { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .place i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #fff; }
   .place:hover, .place.on { border-color: var(--accent); }
-  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px 8px; border-radius: 10px; background: color-mix(in srgb, currentColor 5%, transparent); }
-  .crumbs button { display: inline-flex; align-items: center; gap: 5px; max-width: 160px; height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .crumbs button:hover:not(:disabled) { color: var(--ink); background: color-mix(in srgb, currentColor 8%, transparent); }
-  .crumbs button.here { color: var(--ink); cursor: default; }
-  .crumb-icon { display: grid; flex: none; }
-  .crumbs .sep { color: var(--muted); font-size: 13px; }
+  .place.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .link-btn { justify-self: start; align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   /* Folders inside: big coloured icons first, so they read as places to go, not pictures. */
   .folders { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .folders button { width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, currentColor 3%, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
