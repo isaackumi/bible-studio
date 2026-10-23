@@ -127,4 +127,14 @@ describe("phone remote through a room", () => {
     expect(response!.status).toBe(302);
     expect(response!.headers.get("location")).toBe("https://church.test/app/remote.html?room=ABC234");
   });
+
+  it("is made the way Cloudflare makes it, with its environment second", async () => {
+    const { RoomObject } = await import("./rooms");
+    const store = new Map<string, unknown>();
+    const storage = { get: async (key: string) => store.get(key) as never, put: async (key: string, value: unknown) => void store.set(key, value), deleteAll: async () => store.clear(), setAlarm: async () => {} };
+    const room = new (RoomObject as unknown as new (state: unknown, env: unknown) => InstanceType<typeof RoomObject>)({ storage }, { ROOMS: {}, PUBLIC_URL: "https://church.test" });
+    await room.fetch(new Request("https://room/create", { method: "POST", body: JSON.stringify({ code: "ABC234", name: "Grace" }) }));
+    const answer = await room.fetch(new Request("https://room/remote", { method: "POST", body: JSON.stringify({ v: 2, type: "state", payload: {} }) }));
+    expect(answer.status).toBe(503);
+  });
 });

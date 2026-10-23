@@ -29,7 +29,7 @@
 //   GET  /d/:code                        a browser or phone as a display (the app's own screen)
 //   GET  /r/:code                        the phone remote over the internet (→ /app/remote.html?room=)
 
-import { RELAY, RemoteRelay, type Clock } from "./relay.ts";
+import { RELAY, RemoteRelay } from "./relay.ts";
 
 export type QuestionState = "pending" | "approved" | "rejected" | "archived";
 export type Question = {
@@ -530,8 +530,9 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 export class RoomObject {
   private core: RoomCore;
   private relay: RemoteRelay;
-  constructor(private state: DurableState, clock?: Clock) {
-    this.relay = new RemoteRelay(clock);
+  // Cloudflare makes the object with (state, env): nothing else may sit in the second place.
+  constructor(private state: DurableState) {
+    this.relay = new RemoteRelay();
     this.core = new RoomCore({
       get: async () => (await state.storage.get<RoomState>("room")) ?? null,
       put: async (room) => {
