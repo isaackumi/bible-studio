@@ -197,6 +197,7 @@ import type {
 import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
 import type { Game } from "../domain/games";
+import { MOST_REPORTS, type GameReport } from "../domain/game-report";
 import { createDeck, deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
@@ -4379,6 +4380,17 @@ class Session {
 
   removeGame = (id: string) => {
     this.workspace = { ...this.workspace, games: (this.workspace.games ?? []).filter((entry) => entry.id !== id) };
+    this.persistSoon();
+  };
+
+  /** Keep what a quiz showed once it ended (newest first, the oldest dropped past the limit). */
+  saveGameReport = (report: GameReport) => {
+    this.workspace = { ...this.workspace, gameReports: [report, ...(this.workspace.gameReports ?? []).filter((entry) => entry.id !== report.id)].slice(0, MOST_REPORTS) };
+    this.persistSoon();
+  };
+
+  removeGameReport = (id: string) => {
+    this.workspace = { ...this.workspace, gameReports: (this.workspace.gameReports ?? []).filter((entry) => entry.id !== id) };
     this.persistSoon();
   };
 

@@ -329,6 +329,7 @@ export function defaultWorkspace(): Workspace {
     voice: { commands: true, wake: true, custom: [] },
     decks: [],
     games: [],
+    gameReports: [],
     playlists: defaultPlaylists(),
     audio: defaultAudioSettings(),
     secondOutput: defaultSecondOutput(),

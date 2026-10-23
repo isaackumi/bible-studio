@@ -1,3 +1,4 @@
+import { msg } from "../i18n/core";
 import type { PresentationModel, Theme } from "./types";
 
 // The game show on the church's screen: a lobby while people join, each question with its colour
@@ -39,7 +40,66 @@ export type GameScreenData = {
   sounds: boolean;
   /** Changes with every new question or stage, so the screen knows to start its moves again. */
   key: string;
+  /** Team standings, best first (team mode); null when everyone plays for themselves. */
+  teams: GameTeam[] | null;
+  /** The screen's words in the operator's language (GAME_WORDS → translated), and that language. */
+  words: Record<string, string>;
+  lang: "en" | "fr" | "es";
 };
+
+export type GameTeam = { team: number; name: string; color: string; players: number; score: number; gain: number };
+
+/**
+ * Every line the game screen shows. The audience window loads no language of its own, so the desk
+ * sends these already translated with each frame (a line missing there shows in English).
+ */
+export const GAME_WORDS = [
+  msg("Join the game"),
+  msg("Go to {at} and enter"),
+  msg("{n} player is in"),
+  msg("{n} players are in"),
+  msg("Waiting for the first player…"),
+  msg("+{n} more"),
+  msg("{n} player"),
+  msg("{n} players"),
+  msg("Question {n} of {total}"),
+  msg("Seconds left"),
+  msg("answer"),
+  msg("answers"),
+  msg("Get ready…"),
+  msg("{n} vote"),
+  msg("{n} votes"),
+  msg("{right} of {total} got it right."),
+  msg("Everyone got it!"),
+  msg("Nobody got that one."),
+  msg("Most of you got it."),
+  msg("A tricky one."),
+  msg("A hard one!"),
+  msg("Fastest: {name} · {seconds}s"),
+  msg("Leaderboard"),
+  msg("Right answers in a row"),
+  msg("Catching up"),
+  msg("and {n} more player. Well played, everyone!"),
+  msg("and {n} more players. Well played, everyone!"),
+  msg("Team {name}"),
+  msg("Team {name} wins!"),
+  msg("Teams"),
+  msg("Red"),
+  msg("Blue"),
+  msg("Gold"),
+  msg("Green"),
+];
+
+/** A screen line in the operator's language, with {placeholders} filled. */
+export function say(data: Pick<GameScreenData, "words">, text: string, values: Record<string, string | number> = {}): string {
+  const line = data.words[text] || text;
+  return line.replace(/\{(\w+)\}/g, (all, key: string) => (key in values ? String(values[key]) : all));
+}
+
+/** A count: French uses the singular for 0 and 1; English and Spanish for 1 alone. */
+export function sayCount(data: Pick<GameScreenData, "words" | "lang">, n: number, one: string, other: string, values: Record<string, string | number> = {}): string {
+  return say(data, (data.lang === "fr" ? n < 2 : n === 1) ? one : other, { n, ...values });
+}
 
 export { CHOICE_STYLES, PLAYER_COLORS, playerColor } from "./game-colors";
 
@@ -47,8 +107,10 @@ export function presentGame(theme: Theme, game: GameScreenData): PresentationMod
   return { layout: "game", theme, reference: null, attribution: null, lines: [], imageUrl: null, backgroundImageUrl: null, game };
 }
 
-/** Places as words: 1st, 2nd, 3rd, 4th… */
-export function ordinal(rank: number): string {
+/** Places as words: 1st, 2nd, 3rd, 4th… (1er, 2e in French; 1.º in Spanish). */
+export function ordinal(rank: number, lang: GameScreenData["lang"] = "en"): string {
+  if (lang === "fr") return `${rank}${rank === 1 ? "er" : "e"}`;
+  if (lang === "es") return `${rank}.º`;
   const tens = rank % 100;
   const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][rank % 10] ?? "th");
   return `${rank}${suffix}`;

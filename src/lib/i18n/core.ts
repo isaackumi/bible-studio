@@ -72,6 +72,9 @@ export function translate(language: UiLanguage, text: string, params?: Params): 
 /** Marks a line in data (a list of pages, a menu) for translation; t() it where it is shown. */
 export const msg = (text: string): string => text;
 
+/** The interface language now (for words handed to another window, such as the game screen). */
+export const currentLanguage = (): UiLanguage => read();
+
 /** A line in the chosen language. */
 export function t(text: string, params?: Params): string {
   return translate(read(), text, params);

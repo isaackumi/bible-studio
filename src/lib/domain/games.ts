@@ -21,6 +21,9 @@ export type Game = {
   kind: "quiz" | "poll";
   questions: GameQuestion[];
   updatedAt: string;
+  /** The sermon series it belongs to (the quiz bank groups by it), and the sermon it came from. */
+  series?: string;
+  sermonId?: string;
 };
 
 export const MOST_CHOICES = 6;
@@ -57,7 +60,24 @@ export function sanitizeGame(value: unknown): Game | null {
     kind,
     questions,
     updatedAt: typeof input.updatedAt === "string" ? input.updatedAt : new Date(0).toISOString(),
+    ...(text(input.series, 80) ? { series: text(input.series, 80) } : {}),
+    ...(text(input.sermonId, 60) ? { sermonId: text(input.sermonId, 60) } : {}),
   };
+}
+
+/**
+ * A series final: questions from every quiz in a series, a few from each in turn (so each week is
+ * there), up to `most`, answers mixed when played. Null when the series has fewer than two quizzes.
+ */
+export function seriesFinal(games: Game[], series: string, most = 15, random = Math.random): Game | null {
+  const quizzes = games.filter((game) => game.kind === "quiz" && game.series === series && game.questions.some((question) => ready(question, "quiz")));
+  if (quizzes.length < 2) return null;
+  const pools = quizzes.map((game) => game.questions.filter((question) => ready(question, "quiz")).sort(() => random() - 0.5));
+  const picked: GameQuestion[] = [];
+  for (let round = 0; picked.length < most && pools.some((pool) => pool.length > round); round++) {
+    for (const pool of pools) if (pool[round] && picked.length < most) picked.push({ ...pool[round]!, id: uid("q") });
+  }
+  return { id: uid("game"), title: series, description: "", kind: "quiz", questions: picked, updatedAt: new Date().toISOString(), series };
 }
 
 /** A question the room can run: words, two or more answers, and (in a quiz) the right one. */

@@ -588,6 +588,8 @@ export type Workspace = {
   decks: SlideDeckDocument[];
   /** Games for the congregation's phones (quizzes and polls a church made; games.ts). */
   games: import("./games").Game[];
+  /** What each quiz showed once it ended, newest first (who was listening; game-report.ts). */
+  gameReports: import("./game-report").GameReport[];
   /** Audio playlists (walk-in music, backing tracks). */
   playlists: import("./playlists").Playlist[];
   audio: import("./playlists").AudioSettings;

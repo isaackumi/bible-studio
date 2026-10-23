@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_GAMES, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame } from "./games";
+import { BUILT_IN_GAMES, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame, seriesFinal } from "./games";
 
 describe("games", () => {
   it("built-in games are all ready to play, with the right answer among the answers", () => {
@@ -46,5 +46,14 @@ describe("games", () => {
       const verse = verses.find((entry) => question.prompt.startsWith(entry.reference))!;
       expect(verse.text.endsWith(question.choices[question.correct!]!.replace(/^… /, ""))).toBe(true);
     }
+  });
+
+  it("makes a series final from every quiz in a series, a little from each in turn", () => {
+    const quiz = (id: string, series: string | undefined, prompts: string[]) => ({ id, title: id, description: "", kind: "quiz" as const, updatedAt: "", ...(series ? { series } : {}), questions: prompts.map((prompt) => ({ id: prompt, prompt, choices: ["a", "b"], correct: 0, seconds: 20, points: 1000 })) });
+    const games = [quiz("w1", "Faith", ["1a", "1b", "1c"]), quiz("w2", "Faith", ["2a", "2b"]), quiz("other", "Hope", ["x"]), quiz("loose", undefined, ["y"])];
+    const final = seriesFinal(games, "Faith", 4, () => 0.5)!;
+    expect(final.series).toBe("Faith");
+    expect(final.questions.map((question) => question.prompt)).toEqual(["1a", "2a", "1b", "2b"]);
+    expect(seriesFinal(games, "Hope")).toBeNull();
   });
 });

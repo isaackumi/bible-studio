@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
-  import { CHOICE_STYLES, ordinal, playerColor, type GamePlayer, type GameScreenData } from "../../domain/game-screen";
+  import { CHOICE_STYLES, ordinal, playerColor, say, sayCount, type GamePlayer, type GameScreenData } from "../../domain/game-screen";
   import { GameSound } from "../../game/sounds";
   import QrView from "../QrView.svelte";
 
@@ -96,7 +96,8 @@
   let shown = $state<Record<number, number>>({});
   let climbTimer: ReturnType<typeof setTimeout> | undefined;
   let rolling = 0;
-  const board = $derived(data.top.slice(0, 5));
+  // With teams on the board too, three players fit beneath them.
+  const board = $derived(data.top.slice(0, data.teams ? 3 : 5));
   $effect(() => {
     const { key, stage } = data;
     void key;
@@ -171,8 +172,13 @@
   const rightCount = $derived(data.correct !== null ? (data.counts[data.correct] ?? 0) : 0);
   /** How the room did, as a game show would say it. */
   const verdict = $derived(
-    totalAnswers === 0 ? "" : rightCount === totalAnswers ? "Everyone got it!" : rightCount === 0 ? "Nobody got that one." : rightCount / totalAnswers >= 0.75 ? "Most of you got it." : rightCount / totalAnswers >= 0.4 ? "A tricky one." : "A hard one!",
+    totalAnswers === 0 ? "" : say(data, rightCount === totalAnswers ? "Everyone got it!" : rightCount === 0 ? "Nobody got that one." : rightCount / totalAnswers >= 0.75 ? "Most of you got it." : rightCount / totalAnswers >= 0.4 ? "A tricky one." : "A hard one!"),
   );
+  /** "23 players are in", with the number set apart (it stands out in gold). */
+  const joinedWords = $derived(sayCount(data, data.players, "{n} player is in", "{n} players are in", { n: "\u0000" }).split("\u0000"));
+  /** Team mode: the bars' scale, and the winning team for the podium. */
+  const teamMost = $derived(Math.max(1, ...(data.teams ?? []).map((team) => team.score)));
+  const winningTeam = $derived(data.teams?.length && data.teams[0]!.score > 0 ? data.teams[0]! : null);
   /** The lobby shows the newest names; past that, a count. */
   const MOST_NAMES = 30;
   const names = $derived(data.joined.slice(-MOST_NAMES));
@@ -198,44 +204,48 @@
 
   <header class="top">
     <span class="title">{data.stage === "podium" ? "" : data.title}</span>
-    {#if data.stage === "question" || data.stage === "results"}<span class="pill">Question {data.round} of {data.total}</span>{/if}
-    <span class="pill people">{data.players} {data.players === 1 ? "player" : "players"}</span>
+    {#if data.stage === "question" || data.stage === "results"}<span class="pill">{say(data, "Question {n} of {total}", { n: data.round, total: data.total })}</span>{/if}
+    <span class="pill people">{sayCount(data, data.players, "{n} player", "{n} players")}</span>
   </header>
 
   {#if data.stage === "lobby"}
     <section class="lobby">
       <div class="join">
-        <p class="kicker">Join the game</p>
+        <p class="kicker">{say(data, "Join the game")}</p>
         {#if data.join}
-          <p class="at">Go to <b>{data.join.at}</b> and enter</p>
+          {@const [before, after] = say(data, "Go to {at} and enter").split("{at}")}
+          <p class="at">{before}<b>{data.join.at}</b>{after}</p>
           <div class="code">{#each data.join.code.split("") as char, i (i)}<span>{char}</span>{/each}</div>
         {/if}
-        <p class="count"><b>{data.players}</b> {data.players === 1 ? "player is" : "players are"} in</p>
+        <p class="count">{joinedWords[0]}<b>{data.players}</b>{joinedWords[1]}</p>
+        {#if data.teams}
+          <div class="team-chips">{#each [...data.teams].sort((a, b) => a.team - b.team) as team (team.team)}<span style:--c={team.color}>{team.name} · {team.players}</span>{/each}</div>
+        {/if}
       </div>
       {#if data.join}<div class="qr"><QrView qr={{ data: data.join.url, style: "rounded", dark: "#111111", light: "#ffffff", caption: "" }} /></div>{/if}
       <div class="names">
         {#each names as person (person.n)}
           <span class="bubble" style:--c={playerColor(person.n)}>{person.name}</span>
         {:else}
-          <span class="waiting">Waiting for the first player…</span>
+          <span class="waiting">{say(data, "Waiting for the first player…")}</span>
         {/each}
-        {#if moreNames > 0}<span class="bubble more">+{moreNames} more</span>{/if}
+        {#if moreNames > 0}<span class="bubble more">{say(data, "+{n} more", { n: moreNames })}</span>{/if}
       </div>
     </section>
   {:else if data.stage === "question" || data.stage === "results"}
     <section class="ask">
       <div class="prompt-row" class:reading>
         {#if data.stage === "question" && !reading}
-          <div class="ring" class:urgent={left !== null && left <= 5} aria-label="Seconds left">
+          <div class="ring" class:urgent={left !== null && left <= 5} aria-label={say(data, "Seconds left")}>
             <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="track" /><circle cx="50" cy="50" r="44" class="run" style:stroke-dashoffset={276.5 * (1 - ringShare)} /></svg>
             <b>{left ?? "∞"}</b>
           </div>
         {/if}
         <h1 class="prompt" style:font-size="{reading ? promptSize + 1 : promptSize}cqmin">{data.prompt}</h1>
-        {#if data.stage === "question" && !reading}<div class="answered"><b>{data.answered}</b><span>{data.answered === 1 ? "answer" : "answers"}</span></div>{/if}
+        {#if data.stage === "question" && !reading}<div class="answered"><b>{data.answered}</b><span>{say(data, (data.lang === "fr" ? data.answered < 2 : data.answered === 1) ? "answer" : "answers")}</span></div>{/if}
       </div>
       {#if reading}
-        <div class="ready" aria-live="polite"><span>Get ready…</span>{#key readLeft}<b>{readLeft}</b>{/key}</div>
+        <div class="ready" aria-live="polite"><span>{say(data, "Get ready…")}</span>{#key readLeft}<b>{readLeft}</b>{/key}</div>
       {/if}
       {#if data.stage === "results"}
         <div class="bars">
@@ -261,15 +271,24 @@
       </div>
       {#if data.stage === "results"}
         <p class="foot">
-          {#if data.correct === null}{totalAnswers} {totalAnswers === 1 ? "vote" : "votes"}
-          {:else}<span>{rightCount} of {totalAnswers} got it right.</span> {#if verdict}<span>{verdict}</span>{/if}{/if}
-          {#if data.fastest}<span class="fast">⚡ Fastest: {data.fastest.name} · {(data.fastest.ms / 1000).toFixed(1)}s</span>{/if}
+          {#if data.correct === null}{sayCount(data, totalAnswers, "{n} vote", "{n} votes")}
+          {:else}<span>{say(data, "{right} of {total} got it right.", { right: rightCount, total: totalAnswers })}</span> {#if verdict}<span>{verdict}</span>{/if}{/if}
+          {#if data.fastest}<span class="fast">⚡ {say(data, "Fastest: {name} · {seconds}s", { name: data.fastest.name, seconds: (data.fastest.ms / 1000).toLocaleString(data.lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}</span>{/if}
         </p>
       {/if}
     </section>
   {:else if data.stage === "leaderboard"}
     <section class="board">
-      <h1>Leaderboard</h1>
+      <h1>{say(data, "Leaderboard")}</h1>
+      {#if data.teams}
+        <div class="teams" class:after={climb === "after"}>
+          {#each data.teams as team, i (team.team)}
+            <div class="team-row" style:--c={team.color} style:--share={climb === "after" ? team.score / teamMost : Math.max(0, team.score - team.gain) / teamMost} class:lead={i === 0 && climb === "after"}>
+              <span class="team-name">{team.name}</span><i></i><b>{team.score.toLocaleString()}</b>{#if climb === "after" && team.gain > 0}<em>+{team.gain.toLocaleString()}</em>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
       <div class="rows" style:--rows={board.length}>
         {#each board as player (player.n)}
           <div class="row" style:--c={playerColor(player.n)} style:--slot={slot(player)} class:lead={player.rank === 1 && climb === "after"}>
@@ -277,17 +296,17 @@
             <span class="dot"></span>
             <span class="name">{player.name}</span>
             {#if climb === "after" && player.was > player.rank}<span class="up">▲ {player.was - player.rank}</span>{/if}
-            {#if player.streak >= 2}<span class="streak" title="Right answers in a row"><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9Z" fill="currentColor" /></svg>{player.streak}</span>{/if}
+            {#if player.streak >= 2}<span class="streak" title={say(data, "Right answers in a row")}><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9Z" fill="currentColor" /></svg>{player.streak}</span>{/if}
             {#if climb === "after" && player.gain > 0}<span class="gain">+{player.gain}</span>{/if}
             <b class="score">{(shown[player.n] ?? player.score).toLocaleString()}</b>
           </div>
         {/each}
       </div>
       {#if data.bottom.length}
-        <p class="catching">Catching up</p>
+        <p class="catching">{say(data, "Catching up")}</p>
         <div class="tail">
           {#each data.bottom as player (player.n)}
-            <span style:--c={playerColor(player.n)}><i></i>{ordinal(player.rank)} · {player.name} · {(shown[player.n] ?? player.score).toLocaleString()}</span>
+            <span style:--c={playerColor(player.n)}><i></i>{ordinal(player.rank, data.lang)} · {player.name} · {(shown[player.n] ?? player.score).toLocaleString()}</span>
           {/each}
         </div>
       {/if}
@@ -296,7 +315,8 @@
     <section class="podium">
       <canvas bind:this={confetti} aria-hidden="true"></canvas>
       <h1>{data.title}</h1>
-      {#if data.players > 3}<p class="foot">and {data.players - 3} more {data.players - 3 === 1 ? "player" : "players"}. Well played, everyone!</p>{/if}
+      {#if winningTeam}<p class="team-win" style:--c={winningTeam.color}>{say(data, "Team {name} wins!", { name: winningTeam.name })}</p>{/if}
+      {#if data.players > 3}<p class="foot">{sayCount(data, data.players - 3, "and {n} more player. Well played, everyone!", "and {n} more players. Well played, everyone!")}</p>{/if}
       <div class="steps">
         {#each podium as player, i (i)}
           {#if player}
@@ -409,6 +429,16 @@
   .gain { color: #27ae60; font-size: 2.8cqmin; font-weight: 900; animation: float-up 1.6s ease-out both; }
   @keyframes float-up { 0% { transform: translateY(2cqh); opacity: 0; } 30% { opacity: 1; } 100% { transform: none; } }
   .score { min-width: 14cqmin; text-align: right; font-size: 4.2cqmin; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .teams { display: grid; gap: 1cqmin; margin: -0.6cqmin 0 2cqmin; }
+  .team-row { display: grid; grid-template-columns: 14cqmin 1fr auto auto; align-items: center; gap: 1.6cqmin; font-weight: 900; font-size: 2.8cqmin; }
+  .team-row i { height: 3.4cqmin; border-radius: 99px; background: rgb(255 255 255 / 0.12); position: relative; overflow: hidden; }
+  .team-row i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--share) * 100%); background: var(--c); border-radius: inherit; transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .team-row b { min-width: 12cqmin; text-align: right; font-variant-numeric: tabular-nums; }
+  .team-row em { font-style: normal; color: #7ee2a8; font-size: 2.4cqmin; }
+  .team-row.lead .team-name { color: #ffd166; }
+  .team-chips { display: flex; flex-wrap: wrap; gap: 1cqmin; margin-top: 2cqmin; }
+  .team-chips span { padding: 0.8cqmin 2cqmin; border-radius: 99px; background: var(--c); font-size: 2.6cqmin; font-weight: 800; }
+  .team-win { align-self: center; margin: 0 0 1.4cqmin; padding: 1cqmin 3.4cqmin; border-radius: 99px; background: var(--c); color: #fff; font-size: 4cqmin; font-weight: 900; box-shadow: 0 0.8cqmin 0 rgb(0 0 0 / 0.25); animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: 1.8s; }
   .catching { margin: 2.4cqmin 0 1.2cqmin; font-size: 2.4cqmin; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; text-align: center; }
   .tail { display: flex; justify-content: center; gap: 1.4cqmin; flex-wrap: wrap; }
   .tail span { display: inline-flex; align-items: center; gap: 1cqmin; padding: 1cqmin 2cqmin; border-radius: 99px; background: rgb(255 255 255 / 0.14); font-size: 2.6cqmin; font-weight: 700; }

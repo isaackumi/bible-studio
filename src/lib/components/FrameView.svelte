@@ -13,7 +13,6 @@
   import { videoPosition } from "../domain/types";
   import FrameView from "./FrameView.svelte";
   import QrView from "./QrView.svelte";
-  import GameScreen from "./game/GameScreen.svelte";
   import MotionBackground from "./MotionBackground.svelte";
   import OverlayLayer from "./OverlayLayer.svelte";
   import AnnouncementView from "./AnnouncementView.svelte";
@@ -349,7 +348,8 @@
       <AnnouncementView paint={model.announcement} fontSize={model.theme.fontSize} align={model.theme.align} />
     </div>
   {:else if model.layout === "game" && model.game}
-    <GameScreen data={model.game} {audio} />
+    <!-- Loaded the first time a game is shown: its look, music and confetti stay out of every other frame. -->
+    {#await import("./game/GameScreen.svelte") then { default: GameScreen }}<GameScreen data={model.game} {audio} />{/await}
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}

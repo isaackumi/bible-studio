@@ -9,10 +9,12 @@ import { finishTheVerseGame, ready, shuffled, whichBookGame, WELL_KNOWN, type Ga
 import { api } from "../db/api";
 import { presentQr } from "../domain/overlays";
 import { presentText } from "../domain/present";
-import { t } from "../i18n/core";
+import { currentLanguage, t } from "../i18n/core";
 import { session } from "./session.svelte";
 import { remoteSafe } from "../display/remote-safe";
-import { presentGame, type GamePlayer, type GameScreenData, type GameStage } from "../domain/game-screen";
+import { GAME_WORDS, presentGame, type GamePlayer, type GameScreenData, type GameStage } from "../domain/game-screen";
+import { MOST_TEAMS, TEAMS } from "../domain/game-colors";
+import type { GameReport, ReportQuestion } from "../domain/game-report";
 
 export type RoomQuestion = {
   id: string;
@@ -47,6 +49,8 @@ export type HostView = {
   joined?: Array<{ n: number; name: string }>;
   /** The first right answer to the open question: who, and how quickly. */
   fastest?: { n: number; name: string; ms: number } | null;
+  /** Team standings, best first (team mode); null without teams. */
+  teams?: Array<{ team: number; players: number; score: number; gain: number }> | null;
 };
 
 type Saved = { code: string; hostKey: string; joinUrl: string };
@@ -145,7 +149,7 @@ class AudienceRoom {
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
   settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
-  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores"; kind?: "quiz" | "poll"; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number }) => this.call("activity", input);
+  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams"; kind?: "quiz" | "poll"; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
 
   /** Ask the room what is new; while the panel is open, again every two seconds. */
   poll = async (): Promise<void> => {
@@ -244,7 +248,11 @@ class AudienceRoom {
     }
     this.playing = { game: { ...game, questions }, index: 0 };
     this.lastGame = null;
-    void this.activity({ action: "reset-scores" }).then(() => (this.follow ? this.showGame("lobby", true) : undefined));
+    this.rounds = [];
+    this.lastReport = null;
+    void this.activity({ action: "reset-scores" })
+      .then(() => this.activity({ action: "teams", teams: game.kind === "quiz" ? this.teams : 0 }))
+      .then(() => (this.follow ? this.showGame("lobby", true) : undefined));
   };
 
   /** Made fresh from the Bible on this computer (the first translation installed). */
@@ -290,6 +298,11 @@ class AudienceRoom {
   reveal = async () => {
     const shown = await this.activity({ action: "reveal" });
     this.revealedAt = Date.now();
+    // Answers are closed now: read the room once more so the report counts every one.
+    if (shown) {
+      await this.poll();
+      this.recordRound();
+    }
     if (shown && this.follow) await this.showGame("results", true);
   };
 
@@ -303,6 +316,7 @@ class AudienceRoom {
   finish = async () => {
     const quiz = this.playing?.game.kind === "quiz";
     const title = this.playing?.game.title ?? "";
+    if (quiz) this.saveReport();
     // The podium stays up after the game ends: its last scores are kept for the screen.
     if (quiz && this.follow && this.view?.ranking?.top.length) {
       this.lastGame = { title, ranking: this.view.ranking };
@@ -320,6 +334,52 @@ class AudienceRoom {
   follow = $state(readPrefs().follow);
   /** Music and sound effects on the audience screen. */
   sounds = $state(readPrefs().sounds);
+  /** Team mode for the next quiz: 0 (everyone for themselves) or 2 to 4 teams. */
+  teams = $state(readPrefs().teams);
+  /** The report of the quiz that just ended, shown on the desk until the next game starts. */
+  lastReport = $state<GameReport | null>(null);
+  /** Each question as it was answered, for the report (the room keeps only the open one). */
+  private rounds: ReportQuestion[] = [];
+
+  setTeams = (count: number) => {
+    this.teams = count >= 2 ? Math.min(MOST_TEAMS, Math.round(count)) : 0;
+    this.savePrefs();
+    // During a quiz the room changes now; players keep their scores, the teams are drawn afresh.
+    if (this.playing?.game.kind === "quiz") void this.activity({ action: "teams", teams: this.teams }).then(() => this.poll());
+  };
+
+  /** The question being revealed, as the room answered it (once per question). */
+  private recordRound() {
+    const question = this.question;
+    const view = this.view;
+    if (!question || !view || view.activity.kind === "none" || view.activity.question.id !== question.id) return;
+    const choices = question.choices.filter((choice) => choice.trim());
+    const round: ReportQuestion = { prompt: question.prompt, choices, correct: question.correct, counts: choices.map((_, index) => view.answers[index] ?? 0) };
+    this.rounds = [...this.rounds.filter((entry) => entry.prompt !== round.prompt), round];
+  }
+
+  /** The quiz's report: kept with the church's games, and shown on the desk. */
+  private saveReport() {
+    const run = this.playing;
+    if (!run || !this.rounds.length) return;
+    const view = this.view;
+    const report: GameReport = {
+      id: `report:${Date.now().toString(36)}`,
+      gameId: run.game.id,
+      title: run.game.title,
+      ...(run.game.series ? { series: run.game.series } : {}),
+      ...(run.game.sermonId ? { sermonId: run.game.sermonId } : {}),
+      at: new Date().toISOString(),
+      players: view?.ranking?.players ?? view?.people ?? 0,
+      questions: this.rounds,
+      top: (view?.ranking?.top ?? []).slice(0, 5).map((player) => ({ name: player.name, score: player.score })),
+      ...(view?.teams ? { teams: view.teams.map((team) => ({ name: t(TEAMS[team.team]?.name ?? ""), score: team.score })) } : {}),
+    };
+    session.saveGameReport(report);
+    this.lastReport = report;
+    this.rounds = [];
+  }
+
   /** A few seconds to read each question before the answers open and the clock starts. */
   ready = $state(readPrefs().ready);
   /** The game runs by itself: the answer, the leaderboard and the next question, each in turn. */
@@ -353,7 +413,7 @@ class AudienceRoom {
   };
 
   private savePrefs() {
-    writePrefs({ follow: this.follow, sounds: this.sounds, ready: this.ready, auto: this.auto });
+    writePrefs({ follow: this.follow, sounds: this.sounds, ready: this.ready, auto: this.auto, teams: this.teams });
   }
 
   private get screenId(): string {
@@ -393,6 +453,9 @@ class AudienceRoom {
       join: saved ? { code: saved.code, at, url: saved.joinUrl } : null,
       sounds: this.sounds,
       key: `${stage}:${question?.id ?? ""}:${live?.phase === "open" ? "open" : ""}`,
+      teams: view?.teams ? view.teams.map((team) => ({ ...team, name: t(TEAMS[team.team]?.name ?? ""), color: TEAMS[team.team]?.color ?? "#888888" })) : null,
+      words: Object.fromEntries(GAME_WORDS.map((line) => [line, t(line)])),
+      lang: currentLanguage(),
     };
   }
 
@@ -453,14 +516,15 @@ class AudienceRoom {
 
 export const audienceRoom = new AudienceRoom();
 
-type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean };
+type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean; teams: number };
 
 function readPrefs(): GamePrefs {
   try {
     const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as Partial<Record<keyof GamePrefs, unknown>> | null;
-    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true };
+    const teams = Math.round(Number(saved?.teams) || 0);
+    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true, teams: teams >= 2 && teams <= MOST_TEAMS ? teams : 0 };
   } catch {
-    return { follow: true, sounds: true, ready: true, auto: false };
+    return { follow: true, sounds: true, ready: true, auto: false, teams: 0 };
   }
 }
 

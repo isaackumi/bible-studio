@@ -13,6 +13,7 @@ import { sanitizeRemoteDevices } from "../domain/remote";
 import { sanitizeVoiceSettings } from "../voice/commands";
 import { sanitizeDeck } from "../domain/decks";
 import { sanitizeGame } from "../domain/games";
+import { MOST_REPORTS, sanitizeReport } from "../domain/game-report";
 import { cleanCcli, sanitizeFolderNames } from "../domain/song";
 import { sanitizeEntitlement, sanitizeProfile } from "../domain/plans";
 import { defaultWorkspace } from "../domain/theme";
@@ -166,6 +167,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     broadcast: sanitizeBroadcast(value.broadcast),
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     games: Array.isArray(value.games) ? value.games.map(sanitizeGame).filter((entry): entry is NonNullable<typeof entry> => entry !== null).slice(0, 200) : [],
+    gameReports: Array.isArray(value.gameReports) ? value.gameReports.map(sanitizeReport).filter((entry): entry is NonNullable<typeof entry> => entry !== null).slice(0, MOST_REPORTS) : [],
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)
       : [],
