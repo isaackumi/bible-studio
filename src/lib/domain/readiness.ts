@@ -21,10 +21,17 @@ export type ReadyCheck = {
 
 const DAY = 86_400_000;
 
-export function screenCheck(facts: { online: boolean; displayName: string; screens: number; mode: string }): ReadyCheck {
+export function screenCheck(facts: { online: boolean; displayName: string; screens: number; mode: string; os?: "windows" | "mac" | "other" }): ReadyCheck {
   if (facts.online) return { id: "screen", state: "ok", title: msg("The audience screen is on"), detail: facts.displayName ? msg("Showing on {name}.") : msg("Ready to show."), values: { name: facts.displayName } };
   if (facts.mode === "window" && facts.screens < 2) {
-    return { id: "screen", state: "warn", title: msg("Only one screen is connected"), detail: msg("Plug in the projector or TV, then check again."), fix: { label: msg("Displays"), action: "displays" } };
+    // The usual cause on a church PC: the projector is plugged in but Windows mirrors the laptop to it.
+    const detail =
+      facts.os === "windows"
+        ? msg("Plug in the projector or TV. If it is plugged in and shows the same as this screen, press Windows key + P and choose Extend, then check again.")
+        : facts.os === "mac"
+          ? msg("Plug in the projector or TV. If it shows the same as this screen, open System Settings › Displays and turn off mirroring, then check again.")
+          : msg("Plug in the projector or TV, then check again.");
+    return { id: "screen", state: "warn", title: msg("Only one screen is connected"), detail, fix: { label: msg("Displays"), action: "displays" } };
   }
   return { id: "screen", state: "fail", title: msg("The audience screen is closed"), detail: msg("Open it so the congregation sees what you send."), fix: { label: msg("Open it"), action: "open-audience" } };
 }

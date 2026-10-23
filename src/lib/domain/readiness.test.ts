@@ -9,6 +9,9 @@ describe("Readiness check", () => {
     expect(screenCheck({ online: true, displayName: "Projector", screens: 2, mode: "window" }).state).toBe("ok");
     expect(screenCheck({ online: false, displayName: "", screens: 1, mode: "window" })).toMatchObject({ state: "warn", fix: { action: "displays" } });
     expect(screenCheck({ online: false, displayName: "", screens: 2, mode: "window" })).toMatchObject({ state: "fail", fix: { action: "open-audience" } });
+    // A projector mirrored by Windows looks like one screen: say how to extend it.
+    expect(screenCheck({ online: false, displayName: "", screens: 1, mode: "window", os: "windows" }).detail).toContain("Windows key + P");
+    expect(screenCheck({ online: false, displayName: "", screens: 1, mode: "window", os: "mac" }).detail).toContain("mirroring");
   });
 
   it("names what the service is missing", () => {

@@ -5081,7 +5081,7 @@ class Session {
     const online = needed.length ? await this.reachable() : true;
 
     const checks: Array<ReadyCheck | null> = [
-      screenCheck({ online: this.output.online, displayName: this.output.displayName, screens: this.output.displays.length, mode: this.output.mode }),
+      screenCheck({ online: this.output.online, displayName: this.output.displayName, screens: this.output.displays.length, mode: this.output.mode, os: typeof navigator === "undefined" ? "other" : /Windows/i.test(navigator.userAgent) ? "windows" : /Mac/i.test(navigator.userAgent) ? "mac" : "other" }),
       serviceCheck({ name: this.service?.name ?? null, missing }),
       desktop ? spaceCheck({ free: await this.recordRoom(), kbps: this.recordKbps() }) : null,
       backupCheck({ folder: this.workspace.backup.folder, lastAt: this.workspace.backup.lastAt ?? null, now: Date.now(), desktop }),

@@ -4458,4 +4458,6 @@ export const fr: Readonly<Record<string, string>> = {
   "Review files": "Passer les fichiers en revue",
   "Every file in Media, with where it is used. Files in use cannot be ticked. The rest are ticked to remove; untick any you want to keep. Removed files leave Media for good; a backup keeps the library, not media files.": "Chaque fichier des Médias, avec l’endroit où il sert. Les fichiers utilisés ne peuvent pas être cochés. Les autres sont cochés pour être supprimés ; décochez ceux à garder. Les fichiers supprimés quittent les Médias pour de bon ; une sauvegarde garde la bibliothèque, pas les fichiers médias.",
   "Not used": "Inutilisés",
+  "Plug in the projector or TV. If it is plugged in and shows the same as this screen, press Windows key + P and choose Extend, then check again.": "Branchez le projecteur ou la TV. S’il est branché et affiche la même chose que cet écran, appuyez sur la touche Windows + P et choisissez Étendre, puis vérifiez à nouveau.",
+  "Plug in the projector or TV. If it shows the same as this screen, open System Settings › Displays and turn off mirroring, then check again.": "Branchez le projecteur ou la TV. S’il affiche la même chose que cet écran, ouvrez Réglages Système › Moniteurs et désactivez la recopie vidéo, puis vérifiez à nouveau.",
 };

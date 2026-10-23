@@ -4377,4 +4377,6 @@ export const es: Readonly<Record<string, string>> = {
   "Review files": "Revisar archivos",
   "Every file in Media, with where it is used. Files in use cannot be ticked. The rest are ticked to remove; untick any you want to keep. Removed files leave Media for good; a backup keeps the library, not media files.": "Cada archivo de Medios, con dónde se usa. Los archivos en uso no se pueden marcar. El resto están marcados para quitar; desmarca los que quieras conservar. Los archivos quitados salen de Medios para siempre; una copia de seguridad guarda la biblioteca, no los archivos de medios.",
   "Not used": "Sin usar",
+  "Plug in the projector or TV. If it is plugged in and shows the same as this screen, press Windows key + P and choose Extend, then check again.": "Conecta el proyector o la TV. Si está conectado y muestra lo mismo que esta pantalla, pulsa la tecla Windows + P y elige Extender; luego vuelve a comprobar.",
+  "Plug in the projector or TV. If it shows the same as this screen, open System Settings › Displays and turn off mirroring, then check again.": "Conecta el proyector o la TV. Si muestra lo mismo que esta pantalla, abre Ajustes del Sistema › Pantallas y desactiva la duplicación; luego vuelve a comprobar.",
 };
