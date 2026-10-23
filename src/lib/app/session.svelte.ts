@@ -222,6 +222,7 @@ import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { countUse, usageCounts, usageSent } from "./usage-counts";
 import type { MessageTone } from "./status-line";
 import { whatsNewFor, type Release } from "../domain/changelog";
+import { internetRemote } from "./remote-relay.svelte";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
 import { aspectFor, canvasFor, cleanAspect, sanitizeScreenShape, type ScreenShape } from "../display/shape";
@@ -326,6 +327,17 @@ const IDLE_VOICE: VoiceState = {
   command: null,
   allowLive: false,
 };
+
+const REMOTE_VIA_KEY = "church-studio:remote-via";
+
+function readRemoteVia(): "lan" | "internet" {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return "internet";
+  try {
+    return localStorage.getItem(REMOTE_VIA_KEY) === "internet" ? "internet" : "lan";
+  } catch {
+    return "lan";
+  }
+}
 
 class Session {
   ready = $state(false);
@@ -470,6 +482,12 @@ class Session {
   remotePending = $state<RemotePending[]>([]);
   remoteLanUrl = $state("");
   remoteLanError = $state("");
+  /**
+   * How phones reach the desk: this Wi-Fi (the desktop app's own server, nothing leaves the network)
+   * or the internet (a relay through Church Studio's server, for a phone on mobile data or another
+   * network). A browser tab cannot run a server, so there it is always the internet.
+   */
+  remoteVia = $state<"lan" | "internet">(readRemoteVia());
   private remoteDevicesSaved = 0;
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
@@ -629,6 +647,8 @@ class Session {
       this.watchUpdates();
       this.listenRemote();
       if (this.desktop()) void this.attachLanRemote();
+      // Phones paired over the internet reach the desk again after a restart.
+      if (this.remoteVia === "internet" && internetRemote.room && this.remoteDevices.length) this.startInternetRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open.
       if (this.desktop()) this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
       if (this.message === "Opening workspace") {
@@ -1251,6 +1271,7 @@ class Session {
   };
 
   remotePageUrl = () => {
+    if (this.remoteVia === "internet" && internetRemote.code) return internetRemote.pageUrl();
     if (this.remoteLanUrl) return this.remoteLanUrl;
     if (typeof location === "undefined") return "/?remote=1";
     const url = new URL(location.href);
@@ -1266,7 +1287,9 @@ class Session {
   /** The QR payload: LAN page + one-time pairing token. Empty until the LAN server is up. */
   remotePairingUrl = () => {
     const pairing = this.remotePairing;
-    if (!pairing?.token || !this.remoteLanUrl) return "";
+    if (!pairing?.token) return "";
+    if (this.remoteVia === "internet") return internetRemote.code ? internetRemote.pageUrl(pairing.token) : "";
+    if (!this.remoteLanUrl) return "";
     const host = new URL(this.remoteLanUrl).hostname;
     return pairingUrl(host, pairing.token);
   };
@@ -1275,7 +1298,31 @@ class Session {
     if (!this.requireFeature("phone-remote")) return;
     this.remotePairing = createPairing(Date.now(), randomCode(), randomToken(24));
     this.message = t("Scan the QR code on the phone, or type code {code}. You approve each phone here.", { code: this.remotePairing.code });
-    if (this.desktop()) await this.attachLanRemote(true);
+    if (this.remoteVia === "internet") this.startInternetRemote();
+    else if (this.desktop()) await this.attachLanRemote(true);
+  };
+
+  /** Switch between Wi-Fi and the internet. Paired phones stay paired; they open the other address. */
+  setRemoteVia = async (via: "lan" | "internet") => {
+    if (via === this.remoteVia || (via === "lan" && !this.desktop())) return;
+    this.remoteVia = via;
+    try {
+      localStorage.setItem(REMOTE_VIA_KEY, via);
+    } catch {
+      // Not remembered; fine.
+    }
+    if (via === "internet") {
+      this.startInternetRemote();
+    } else {
+      internetRemote.stop();
+      if (this.remotePairing) await this.attachLanRemote(true);
+    }
+  };
+
+  /** Relay phone messages from the internet (remote-relay.svelte.ts) into the same dispatch as Wi-Fi. */
+  private startInternetRemote = () => {
+    if (!canUse("remote-control")) return;
+    void internetRemote.start(this.logoTitle(), (envelope) => this.dispatchRemote(envelope));
   };
 
   closeRemotePairing = () => {
@@ -1834,6 +1881,7 @@ class Session {
 
   stopRemoteLan = async () => {
     this.closeRemotePairing();
+    internetRemote.stop();
     try {
       await api.stopRemoteLan();
     } catch (error) {

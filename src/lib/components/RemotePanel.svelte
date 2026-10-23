@@ -6,6 +6,7 @@
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
   import QrView from "./QrView.svelte";
+  import { internetRemote } from "../app/remote-relay.svelte";
 
   let keyName = $state("");
   let newKey = $state<string | null>(null);
@@ -13,6 +14,10 @@
   let now = $state(Date.now());
 
   const pairUrl = $derived(session.remotePairingUrl());
+  const internet = $derived(session.remoteVia === "internet");
+  /** What a phone types when it cannot scan: the LAN address, or the short internet one. */
+  const address = $derived(internet ? internetRemote.shortUrl() : session.remoteLanUrl);
+  const problem = $derived(internet ? internetRemote.error : session.remoteLanError);
   const pairing = $derived(session.remotePairing);
   const secondsLeft = $derived(pairing ? Math.max(0, Math.round((pairing.expiresAt - now) / 1000)) : 0);
 
@@ -33,7 +38,7 @@
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
   async function copyAddress() {
     try {
-      await navigator.clipboard.writeText(session.remoteLanUrl);
+      await navigator.clipboard.writeText(internet ? `https://${address}` : address);
       copied = true;
       clearTimeout(copiedTimer);
       copiedTimer = setTimeout(() => (copied = false), 1800);
@@ -64,21 +69,18 @@
   }
 </script>
 
-{#if !isDesktop()}
-  <section class="rows">
-    <div class="row">
-      <div class="row-copy"><strong>{t("Pair a phone")}</strong><span>{t("A phone connects to the desktop app over Wi-Fi. A browser tab cannot run a network server, so here you can only open a pad window on this computer.")}</span></div>
-      <div class="row-end">
-        <button type="button" class="btn primary" onclick={() => void session.openRemotePairing()}>{t("Show code")}</button>
-        <button type="button" class="btn" onclick={() => window.open(session.remotePageUrl(), "_blank", "noopener")}>{t("Open pad")}</button>
-      </div>
-    </div>
-    {#if pairing}
-      <div class="row"><div class="row-copy"><strong>{t("Code {code}", { code: pairing.code })}</strong><span>{t("Expires in {secondsLeft}s.", { secondsLeft })}</span></div></div>
+<!-- How phones reach the desk: this Wi-Fi (nothing leaves the network) or the internet (any connection). -->
+<div class="via">
+  <span>{t("Phones connect over")}</span>
+  <div class="seg" role="radiogroup" aria-label={t("Phones connect over")}>
+    {#if isDesktop()}
+      <button type="button" role="radio" aria-checked={!internet} class:on={!internet} onclick={() => void session.setRemoteVia("lan")}><Icon name="screens" size={13} />{t("This Wi-Fi")}</button>
     {/if}
-  </section>
-{:else}
-  {#if session.remoteLanError}<p class="error" role="alert">{session.remoteLanError}</p>{/if}
+    <button type="button" role="radio" aria-checked={internet} class:on={internet} onclick={() => void session.setRemoteVia("internet")}><Icon name="globe" size={13} />{t("Internet")}</button>
+  </div>
+  <small>{internet ? t("Any connection, Wi-Fi or mobile data. Presses go through Church Studio's server; you still approve each phone here.") : t("Same network only. Nothing leaves this building.")}</small>
+</div>
+  {#if problem}<p class="error" role="alert">{problem}</p>{/if}
   {#if pairing}
     <section class="card pair">
       <div class="qr-side">
@@ -86,7 +88,7 @@
           {#if pairUrl}
             <QrView qr={{ data: pairUrl, style: "square", dark: "#000000", light: "#ffffff", caption: "" }} />
           {:else}
-            <span class="qr-wait">{t("Starting the phone server…")}</span>
+            <span class="qr-wait">{internet ? t("Connecting to the internet…") : t("Starting the phone server…")}</span>
           {/if}
         </div>
         <div class="life" aria-hidden="true"><i style:width="{left}%" class:low={secondsLeft <= 20}></i></div>
@@ -96,7 +98,11 @@
       <ol class="pair-steps">
         <li>
           <b>1</b>
-          <div><strong>{t("Join the same Wi-Fi")}</strong><span>{t("The phone and this computer must be on the same network.")}</span></div>
+          {#if internet}
+            <div><strong>{t("Any internet connection")}</strong><span>{t("The phone can be on mobile data or another Wi-Fi.")}</span></div>
+          {:else}
+            <div><strong>{t("Join the same Wi-Fi")}</strong><span>{t("The phone and this computer must be on the same network.")}</span></div>
+          {/if}
         </li>
         <li>
           <b>2</b>
@@ -104,8 +110,8 @@
             <strong>{t("Scan the code with the phone's camera")}</strong>
             <span>{t("Or open this address in the phone's browser:")}</span>
             <div class="addr">
-              <input readonly aria-label={t("Phone address")} value={session.remoteLanUrl || "…"} onfocus={(event) => event.currentTarget.select()} />
-              <button type="button" class="btn small" disabled={!session.remoteLanUrl} onclick={() => void copyAddress()}><Icon name={copied ? "check" : "copy"} size={13} />{copied ? t("Copied") : t("Copy")}</button>
+              <input readonly aria-label={t("Phone address")} value={address || "…"} onfocus={(event) => event.currentTarget.select()} />
+              <button type="button" class="btn small" disabled={!address} onclick={() => void copyAddress()}><Icon name={copied ? "check" : "copy"} size={13} />{copied ? t("Copied") : t("Copy")}</button>
             </div>
           </div>
         </li>
@@ -132,10 +138,15 @@
   {:else}
     <section class="rows">
       <div class="row">
-        <div class="row-copy"><strong>{t("Pair a phone")}</strong><span>{t("The phone and this computer must be on the same network. Next and Previous on the phone change Preview; Go live changes what the audience sees.")}</span></div>
+        <div class="row-copy"><strong>{t("Pair a phone")}</strong><span>{internet ? t("The phone can be anywhere with internet. Next and Previous on the phone change Preview; Go live changes what the audience sees.") : t("The phone and this computer must be on the same network. Next and Previous on the phone change Preview; Go live changes what the audience sees.")}</span></div>
         <button type="button" class="btn primary" onclick={() => void session.openRemotePairing()}>{t("Pair")}</button>
       </div>
-      {#if session.remoteLanUrl}
+      {#if internet && internetRemote.connected}
+        <div class="row">
+          <div class="row-copy"><strong>{t("Phones can reach this desk over the internet")}</strong><span>{address}</span></div>
+          <button type="button" class="btn" onclick={() => void session.stopRemoteLan()}>{t("Stop")}</button>
+        </div>
+      {:else if !internet && session.remoteLanUrl}
         <div class="row">
           <div class="row-copy"><strong>{t("Phone server is running")}</strong><span>{session.remoteLanUrl}</span></div>
           <button type="button" class="btn" onclick={() => void session.stopRemoteLan()}>{t("Stop")}</button>
@@ -143,7 +154,6 @@
       {/if}
     </section>
   {/if}
-{/if}
 
 <p class="section-label">{t("Stream Deck and other controllers")}</p>
 <section class="rows">
@@ -199,6 +209,12 @@
 </section>
 
 <style>
+  .via { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 12px; margin-bottom: 14px; }
+  .via > span { font-size: 13px; font-weight: 650; }
+  .via small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .seg { justify-self: start; display: inline-flex; padding: 3px; border-radius: 10px; background: var(--field); }
+  .seg button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .seg button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); }
   .pair { display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 18px 26px !important; align-items: start; }
   .qr-side { display: grid; gap: 8px; justify-items: center; }
   .qr-box { display: grid; place-items: center; width: 208px; height: 208px; padding: 10px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 1px var(--line); }

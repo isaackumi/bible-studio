@@ -160,7 +160,9 @@ export function privacyPage(site: Site): string {
     <li><b>Online Bibles</b> are fetched from API.Bible, which receives the passages requested and anonymous usage counts required by the publishers.</li>
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
     <li><b>Streaming</b> sends your program straight from your computer to the platform you choose (for example YouTube or Facebook), under its terms.</li>
-    <li><b>The phone remote and NDI®</b> work on your local network; nothing goes through our servers.</li>
+    <li><b>The phone remote</b> works on your local network unless you choose <i>Internet</i> in its settings. Then the buttons pressed and what the phone shows (the words on Preview and Program, the running order) pass through our server to reach your computer; they are relayed and never stored.</li>
+    <li><b>Audience rooms</b> (questions, votes, quizzes and polls on people's phones) and <b>screens shared to phones and TVs</b> go through our server. A room keeps what is typed into it (questions and any name given), the answers and votes, and the screen being shared, until the church ends the room or a day after it was last used; then it is deleted. To limit votes, a one-way code made from each phone's IP address and the room is kept for the room's life; the address itself is not stored.</li>
+    <li><b>NDI®</b> works on your local network; nothing goes through our servers.</li>
     <li><b>Updates</b> are checked and downloaded from GitHub, which sees your IP address.</li>
   </ul>
 

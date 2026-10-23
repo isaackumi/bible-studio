@@ -176,20 +176,24 @@
   const PENDING_KEY = "church-studio.remote.pending";
   const NAME_KEY = "church-studio.remote.name";
   const lan = location.port === "17891";
+  // Over the internet: the church's remote room relays to the desk (/app/remote.html?room=CODE).
+  const room = (new URLSearchParams(location.search).get("room") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const OFFLINE = room ? "The desk did not answer. Check this phone's internet, and that Church Studio is open." : "The desk did not answer. Check that the phone is on the same Wi-Fi.";
   const $ = (id) => document.getElementById(id);
   const store = {
     get(key) { try { return localStorage.getItem(key) || ""; } catch { return ""; } },
     set(key, value) { try { value ? localStorage.setItem(key, value) : localStorage.removeItem(key); } catch {} },
   };
 
-  // Transport: HTTP to the desk's LAN server, or BroadcastChannel to a desk window in this browser.
+  // Transport: HTTP to the desk's LAN server, the remote room over the internet, or BroadcastChannel
+  // to a desk window in this browser.
   async function send(type, payload) {
     const envelope = { v: V, type, payload };
-    if (lan) {
+    if (lan || room.length === 6) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+      const timer = setTimeout(() => controller.abort(), room ? 8000 : 4000);
       try {
-        const response = await fetch("/v1/remote", {
+        const response = await fetch(room ? "/v1/rooms/" + room + "/remote" : "/v1/remote", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(envelope),
@@ -255,7 +259,7 @@
     const name = $("name").value.trim() || guessName();
     store.set(NAME_KEY, name);
     const reply = await send("pair", Object.assign({ name }, payload));
-    if (!reply) { setState("unavailable"); $("pairMsg").textContent = "The desk did not answer. Check that the phone is on the same Wi-Fi."; showPairForm(); return; }
+    if (!reply) { setState("unavailable"); $("pairMsg").textContent = OFFLINE; showPairForm(); return; }
     if (reply.type === "pending") {
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(reply.payload));
       setState("waiting");
@@ -416,7 +420,8 @@
   // ---- Start ----
   const params = new URLSearchParams(location.search);
   let pairToken = params.get("pair");
-  if (pairToken) history.replaceState(null, "", location.pathname);
+  // The pairing token leaves the address bar (it is single-use); the room stays, so a reload reconnects.
+  if (pairToken) history.replaceState(null, "", location.pathname + (room ? "?room=" + room : ""));
   if (store.get(TOKEN_KEY) && !pairToken) {
     setState("connecting");
     poll(true);

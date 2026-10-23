@@ -21,9 +21,15 @@
 //   POST /v1/rooms/:code/close           {hostKey}
 //   POST /v1/rooms/:code/share           {hostKey, on?, frame?}  (the desk shares its screen, or stops)
 //   GET  /v1/rooms/:code/screen?after=   (a display: the latest screen, or 204 when nothing is new)
+//   POST /v1/rooms/:code/remote          {v, type, payload}      → the desk's answer   (phone remote, relay.ts)
+//   POST /v1/rooms/:code/inbox           {hostKey}               → {messages}          (the desk waits for presses)
+//   POST /v1/rooms/:code/reply           {hostKey, id, envelope} → {delivered}
 //   GET  /j                              type a room code in (for people too far away to scan)
 //   GET  /j/:code                        the audience page
 //   GET  /d/:code                        a browser or phone as a display (the app's own screen)
+//   GET  /r/:code                        the phone remote over the internet (→ /app/remote.html?room=)
+
+import { RELAY, RemoteRelay, type Clock } from "./relay.ts";
 
 export type QuestionState = "pending" | "approved" | "rejected" | "archived";
 export type Question = {
@@ -473,6 +479,20 @@ export class RoomCore {
     return { ok: true, data: { on: screen.on, revision: screen.revision, name: state.name, ...(screen.on ? { frame: screen.frame } : {}) } };
   }
 
+  /** Whether the room is open (a phone remote's message is only relayed into a live room). */
+  async exists(): Promise<boolean> {
+    return (await this.load()) !== null;
+  }
+
+  /** The desk relaying its phone remote: only the church's Church Studio, and it keeps the room alive. */
+  async relayHost(hostKey: unknown): Promise<Result<{ ok: true }>> {
+    const found = await this.host(hostKey);
+    if (!found.ok) return found;
+    // Waiting on the inbox all day is use: touched again hourly, not on every request.
+    if (this.now() - found.data.touchedAt > 60 * 60_000) await this.save(found.data);
+    return { ok: true, data: { ok: true } };
+  }
+
   async close(hostKey: unknown): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
@@ -509,7 +529,9 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 /** One room: its state in the object's own storage, its rules in RoomCore. */
 export class RoomObject {
   private core: RoomCore;
-  constructor(private state: DurableState) {
+  private relay: RemoteRelay;
+  constructor(private state: DurableState, clock?: Clock) {
+    this.relay = new RemoteRelay(clock);
     this.core = new RoomCore({
       get: async () => (await state.storage.get<RoomState>("room")) ?? null,
       put: async (room) => {
@@ -529,7 +551,10 @@ export class RoomObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const action = url.pathname.split("/").pop() ?? "";
-    const input = request.method === "POST" ? ((await request.json().catch(() => ({}))) as Record<string, unknown>) : {};
+    const body = request.method === "POST" ? await request.text() : "";
+    const limit = action === "remote" ? RELAY.messageBytes : action === "reply" ? RELAY.replyBytes + 1024 : action === "share" ? LIMITS.frameBytes * 2 + 4096 : 64 * 1024;
+    if (body.length > limit) return json(413, { error: "Too large." });
+    const input = body ? ((() => { try { return JSON.parse(body); } catch { return {}; } })() as Record<string, unknown>) : {};
     const ip = request.headers.get("x-room-ip") ?? "";
     const reply = (result: Result<unknown>) => (result.ok ? json(200, result.data) : json(result.status, { error: result.error }));
     switch (action) {
@@ -557,6 +582,23 @@ export class RoomObject {
         return reply(await this.core.close(input.hostKey));
       case "share":
         return reply(await this.core.share(input.hostKey, input));
+      // The phone remote over the internet (relay.ts): a phone's message, the desk's inbox, its answer.
+      case "remote": {
+        if (!(await this.core.exists())) return json(404, { error: "This remote link has ended. Ask for a new code." });
+        const answer = await this.relay.send(input);
+        return answer === null ? json(503, { error: "The desk is not connected. Check that Church Studio is open and on the internet." }) : json(200, answer);
+      }
+      case "inbox": {
+        const host = await this.core.relayHost(input.hostKey);
+        if (!host.ok) return reply(host);
+        return json(200, { messages: await this.relay.take() });
+      }
+      case "reply": {
+        const host = await this.core.relayHost(input.hostKey);
+        if (!host.ok) return reply(host);
+        if (JSON.stringify(input.envelope ?? null).length > RELAY.replyBytes) return json(413, { error: "Too large." });
+        return json(200, { delivered: this.relay.reply(String(input.id ?? ""), input.envelope) });
+      }
       case "screen": {
         const result = await this.core.screen(Number(url.searchParams.get("after")) || 0);
         // Nothing new: an empty answer, so a display asking every second costs almost nothing.
@@ -584,6 +626,9 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
   if (displayPage && request.method === "GET") return Response.redirect(`${origin}/app/?receiver=${displayPage[1]!.toUpperCase()}`, 302);
   // The short address on the screen: type the code in by hand.
   if ((path === "/j" || path === "/j/") && request.method === "GET") return new Response(page("", origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  // The phone remote's short address (typed when the QR code cannot be scanned).
+  const remotePage = path.match(/^\/r\/([A-Za-z0-9]{6})$/);
+  if (remotePage && request.method === "GET") return Response.redirect(`${origin}/app/remote.html?room=${remotePage[1]!.toUpperCase()}`, 302);
   const joinPage = path.match(/^\/j\/([A-Za-z0-9]{6})$/);
   if (joinPage && request.method === "GET") {
     return new Response(page(joinPage[1]!.toUpperCase(), origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
@@ -606,7 +651,7 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
     }
     return json(503, { error: "Could not open a room. Try again." });
   }
-  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen)$/);
+  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
   if (!match) return json(404, { error: "Not found" });
   const code = match[1]!.toUpperCase();
   const action = match[2]!;
