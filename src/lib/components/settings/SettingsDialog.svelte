@@ -1303,7 +1303,9 @@
             </div>
           </div>
           <div class="row">
-            <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a short test to the AI.")}</span></div>
+            <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk} class:ai-ok={aiOk && !aiBusy && !!aiNote}>{aiNote || t("Sends a short test to the AI.")}</span></div>
+            <div class="row-end">
+            {#if aiOk && !aiBusy && aiNote}<span class="pill ok ai-connected" role="status"><span class="ai-dot" aria-hidden="true"></span>{t("Connected")}</span>{/if}
             <button type="button" class="btn" disabled={aiBusy} onclick={async () => {
               aiBusy = true;
               aiOk = true;
@@ -1311,6 +1313,7 @@
               try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
               aiBusy = false;
             }}>{aiBusy ? t("Checking…") : t("Test")}</button>
+            </div>
           </div>
         </section>
         <p class="note stand">{t("The AI writes sermon summaries (Sermon › Summarize), makes slides from notes, a passage or a topic (Make slides with AI), and translates live captions (Settings › Captions). Your words go to the AI only when you use one of these.")}</p>
@@ -2098,6 +2101,9 @@
   .settings-body :global(.row .field:focus) { border-color: var(--accent); outline: none; }
   .settings-body :global(.row .field.grow) { width: auto; flex: 1; }
   .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+  .ai-ok { color: var(--presence, #3fb950); }
+  .ai-connected { display: inline-flex; align-items: center; gap: 6px; }
+  .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
   .settings-body :global(.pill.ok) { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
   .rows.soon .row:not(:first-child) { opacity: 0.5; }
   .settings-body :global(.pill.muted) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
