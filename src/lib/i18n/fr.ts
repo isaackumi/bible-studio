@@ -4139,4 +4139,5 @@ export const fr: Readonly<Record<string, string>> = {
   "The phone can be on mobile data or another Wi-Fi.": "Le téléphone peut être sur données mobiles ou un autre Wi-Fi.",
   "This Wi-Fi": "Ce Wi-Fi",
   "The phone remote cannot reach the internet. It tries again by itself.": "La télécommande ne joint pas internet. Elle réessaie toute seule.",
+  "Open beside the desk": "Ouvrir à côté du pupitre",
 };

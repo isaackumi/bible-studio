@@ -6,6 +6,7 @@
   import ServiceStrip from "../pew/ServiceStrip.svelte";
   import OverlaysDialog from "../OverlaysDialog.svelte";
   import { untrack } from "svelte";
+  import { fitBar } from "../../ui/fit-bar";
   import { session } from "../../app/session.svelte";
   import {
     hideLayer,
@@ -392,7 +393,7 @@
 </script>
 
 <div class="prod" class:focus class:looks={looksOpen}>
-  <header class="prod-bar">
+  <header class="prod-bar" use:fitBar>
     <div class="prod-left">
       <DeskSwitcher compact />
       <nav class="prod-modes" aria-label={t("Production view")}>

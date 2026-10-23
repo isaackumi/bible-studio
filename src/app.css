@@ -754,6 +754,14 @@ button { cursor: pointer; }
   padding: 0;
 }
 .desk-btn.on { color: var(--accent); border-color: var(--accent); }
+/* A top bar that runs out of room tightens in steps (ui/fit-bar.ts), so the tools on the right and
+   Settings never leave the screen: names beside icons go first, then the screen status keeps only
+   its light, then the page tabs pack closer. Every button keeps its name on hover. */
+.squeeze-1 .desk-switch .name { display: none !important; }
+.squeeze-2 .output-trigger .name { display: none !important; }
+.squeeze-2 .output-trigger { max-width: none !important; }
+.squeeze-3 .pb-modes button, .squeeze-3 .prod-modes button { padding-inline: 7px !important; font-size: 12.5px !important; }
+.squeeze-3 .pb-bar, .squeeze-3.pb-bar, .squeeze-3.prod-bar { gap: 4px !important; }
 .desk-switch {
   display: flex;
   align-items: center;
@@ -775,11 +783,6 @@ button { cursor: pointer; }
   font-weight: 600;
 }
 .desk-switch button.on { color: var(--ink); border-color: var(--accent); }
-.desk-switch .label { white-space: nowrap; }
-@media (max-width: 1280px) {
-  .desk-switch .label { display: none; }
-  .desk-switch button { width: var(--tool-size); padding: 0; justify-content: center; }
-}
 :root[data-theme="vespers"] {
   color-scheme: dark;
   --booth: #0c0a09;

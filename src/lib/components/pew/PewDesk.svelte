@@ -23,6 +23,7 @@
   import { api } from "../../db/api";
   import type { BibleItem, PewPanel, PresentationItem, SearchHit, Sermon, SermonSection, TextStyle, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
+  import { fitBar } from "../../ui/fit-bar";
   import { canUse } from "../../platform/capabilities";
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { isOnlineTranslation, WORDS_TRANSLATION } from "../../bible/online-bibles";
@@ -690,7 +691,7 @@
 <svelte:window onkeydown={onModeKey} />
 
 <div class="pb" class:focus>
-  <header class="pb-bar">
+  <header class="pb-bar" use:fitBar>
     <div class="pb-left">
       <DeskSwitcher compact />
       <nav class="pb-modes" aria-label={t("Library")}>

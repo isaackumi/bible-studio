@@ -6,94 +6,64 @@
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
 
-  /** Compact: icons only, names in the tooltip. */
+  // Two small groups, so the bar stays short: which desk (Presenter or Production), and what opens
+  // beside it (the design studio, Audience, Pictures). Only the desk in use and an open drawer say
+  // their name; the rest are icons with their name on hover, and every name shows on a very wide bar.
   let { compact = false }: { compact?: boolean } = $props();
+
+  const production = $derived(session.workspace.appearance.desk === "obs" && session.entitled("production"));
+  const waiting = $derived((audienceRoom.view?.questions.filter((question) => question.state === "pending").length ?? 0) > 0);
 </script>
 
 <nav class="desk-switch" class:compact aria-label={t("Desk")}>
-  <button
-    type="button"
-    class:on={session.workspace.appearance.desk === "pewbeam" || !session.entitled("production")}
-    aria-label={t("Presenter Desk")}
-    aria-pressed={session.workspace.appearance.desk === "pewbeam" || !session.entitled("production")}
-    data-tip={t("Presenter Desk: scripture, songs and sermons")}
-    onclick={() => session.setAppearance({ desk: "pewbeam" })}
-  >
-    <Icon name="pew" size={16} />
-    <span class="label">{t("Presenter Desk")}</span>
-    <span class="short">{t("Presenter")}</span>
-  </button>
-  <button
-    type="button"
-    class:on={session.workspace.appearance.desk === "obs" && session.entitled("production")}
-    aria-label={t("Production Desk")}
-    aria-pressed={session.workspace.appearance.desk === "obs" && session.entitled("production")}
-    data-tip={t("Production Desk: scenes, cameras and video")}
-    onclick={() => session.requireFeature("production") && session.setAppearance({ desk: "obs" })}
-  >
-    <Icon name="obs" size={16} />
-    <span class="label">{t("Production Desk")}</span>
-    <span class="short">{t("Production")}</span>
-  </button>
-  <!-- Not a desk: the design studio opens over whichever desk is showing. -->
-  <button
-    type="button"
-    class="studio"
-    class:on={!!session.studio}
-    aria-label={t("Design studio")}
-    data-tip={t("Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)")}
-    onclick={() => session.openStudio()}
-  >
-    <Icon name="stage" size={16} />
-    <span class="label">{t("Studio")}</span>
-    <span class="short">{t("Studio")}</span>
-  </button>
-  <!-- The congregation's phones: Q&A, quizzes and polls (a drawer beside the desk). -->
-  <button
-    type="button"
-    class:on={audienceRoom.open}
-    aria-label={t("Audience")}
-    aria-pressed={audienceRoom.open}
-    data-tip={t("Audience: live Q&A, quizzes, Bible games and polls on people's phones")}
-    onclick={() => (audienceRoom.open ? audienceRoom.hide() : audienceRoom.show())}
-  >
-    <Icon name="users" size={16} />
-    <span class="label">{t("Audience")}</span>
-    <span class="short">{t("Audience")}</span>
-    {#if (audienceRoom.view?.questions.filter((question) => question.state === "pending").length ?? 0) > 0}<span class="dot" aria-hidden="true"></span>{/if}
-  </button>
-  <!-- Pictures straight from a folder, and slideshows (a drawer, like Audience). Folders need the desktop app. -->
-  {#if isDesktop()}
-    <button
-      type="button"
-      class:on={pictures.open}
-      aria-label={t("Pictures")}
-      aria-pressed={pictures.open}
-      data-tip={t("Pictures: show a folder of pictures, or run it as a slideshow")}
-      onclick={() => (pictures.open ? pictures.hide() : pictures.show())}
-    >
-      <Icon name="media" size={16} />
-      <span class="label">{t("Pictures")}</span>
-      <span class="short">{t("Pictures")}</span>
-      {#if pictures.slideshow.running}<span class="dot" class:paused={pictures.slideshow.paused} aria-hidden="true"></span>{/if}
+  <div class="group" role="group" aria-label={t("Desk")}>
+    <button type="button" class:on={!production} aria-label={t("Presenter Desk")} aria-pressed={!production} data-tip={t("Presenter Desk: scripture, songs and sermons")} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
+      <Icon name="pew" size={16} />
+      <span class="name">{t("Presenter")}</span>
     </button>
-  {/if}
+    <button type="button" class:on={production} aria-label={t("Production Desk")} aria-pressed={production} data-tip={t("Production Desk: scenes, cameras and video")} onclick={() => session.requireFeature("production") && session.setAppearance({ desk: "obs" })}>
+      <Icon name="obs" size={16} />
+      <span class="name">{t("Production")}</span>
+    </button>
+  </div>
+  <div class="group" role="group" aria-label={t("Open beside the desk")}>
+    <!-- Not a desk: the design studio opens over whichever desk is showing. -->
+    <button type="button" class:on={!!session.studio} aria-label={t("Design studio")} data-tip={t("Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)")} onclick={() => session.openStudio()}>
+      <Icon name="stage" size={16} />
+      <span class="name">{t("Studio")}</span>
+    </button>
+    <!-- The congregation's phones: Q&A, quizzes and polls (a drawer beside the desk). -->
+    <button type="button" class:on={audienceRoom.open} aria-label={t("Audience")} aria-pressed={audienceRoom.open} data-tip={t("Audience: live Q&A, quizzes, Bible games and polls on people's phones")} onclick={() => (audienceRoom.open ? audienceRoom.hide() : audienceRoom.show())}>
+      <Icon name="users" size={16} />
+      <span class="name">{t("Audience")}</span>
+      {#if waiting}<span class="dot" aria-hidden="true"></span>{/if}
+    </button>
+    <!-- Pictures straight from a folder, and slideshows (a drawer, like Audience). Folders need the desktop app. -->
+    {#if isDesktop()}
+      <button type="button" class:on={pictures.open} aria-label={t("Pictures")} aria-pressed={pictures.open} data-tip={t("Pictures: show a folder of pictures, or run it as a slideshow")} onclick={() => (pictures.open ? pictures.hide() : pictures.show())}>
+        <Icon name="media" size={16} />
+        <span class="name">{t("Pictures")}</span>
+        {#if pictures.slideshow.running}<span class="dot" class:paused={pictures.slideshow.paused} aria-hidden="true"></span>{/if}
+      </button>
+    {/if}
+  </div>
 </nav>
 
 <style>
-  .short { display: none; }
+  .desk-switch { gap: 6px; }
+  /* Each group is one pill, like the page tabs beside it. */
+  .group { display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: calc(var(--radius-control) + 2px); background: var(--field); }
+  .desk-switch .group button { height: calc(var(--tool-size) - 6px); min-width: calc(var(--tool-size) - 6px); padding: 0 8px; border: 1px solid transparent; background: transparent; justify-content: center; }
+  .desk-switch .group button:hover { color: var(--ink); }
+  .desk-switch .group button.on { border-color: var(--accent); background: var(--panel); color: var(--ink); }
+  .name { display: none; white-space: nowrap; font-size: 12px; font-weight: 650; }
+  .on .name { display: inline; }
   /* Questions are waiting for the operator. */
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
   /* A slideshow is on the screen (amber while paused). */
   .dot.paused { background: #f5a524; }
-  .compact .label { display: none; }
-  .compact button { width: var(--tool-size); padding: 0; justify-content: center; }
-  /* The desk in use always says its name, so icons alone never leave the operator guessing. */
-  .compact button.on .short { display: inline; font-size: 12px; font-weight: 650; }
-  .compact button.on { width: auto; padding: 0 10px; gap: 6px; }
-  /* With room in the bar, the compact switch names its desks too. */
-  @container desk (min-width: 1400px) {
-    .compact .short { display: inline; font-size: 12px; font-weight: 650; }
-    .compact button { width: auto; padding: 0 10px; gap: 6px; }
+  /* Plenty of room: every name. */
+  @container desk (min-width: 1720px) {
+    .name { display: inline; }
   }
 </style>
