@@ -19,6 +19,8 @@ import { accountApi, accountOf, noteLicenseEmail, signinRoute, type Account, typ
 import { claimLicense } from "./ownership.ts";
 import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
+import { featuresPage } from "./features.ts";
+import { lostPage, newsPage } from "./news.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
@@ -223,6 +225,17 @@ async function serveDownload(config: ApiConfig, platform: Platform): Promise<Res
   });
 }
 
+/** The public pages, for search engines. */
+const PUBLIC_PAGES = ["/", "/features", "/whats-new", "/terms", "/privacy", "/refunds", "/licenses", "/security"];
+
+function sitemap(origin: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${PUBLIC_PAGES.map((page) => `<url><loc>${origin}${page}</loc></url>`).join("")}</urlset>\n`;
+}
+
+function text200(body: string, type: string): Response {
+  return new Response(body, { status: 200, headers: { "content-type": type, "cache-control": "public, max-age=3600" } });
+}
+
 export async function handleApi(request: Request, config: ApiConfig): Promise<Response> {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
@@ -243,6 +256,10 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (download) return serveDownload(config, download[1] as Platform);
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
+    if (path === "/features") return html(200, featuresPage(site));
+    if (path === "/whats-new") return html(200, newsPage(site));
+    if (path === "/robots.txt") return text200(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /pay/\nDisallow: /signin/\nSitemap: ${origin}/sitemap.xml\n`, "text/plain; charset=utf-8");
+    if (path === "/sitemap.xml") return text200(sitemap(origin), "application/xml; charset=utf-8");
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
     if (path === "/refunds") return html(200, refundsPage(site));
@@ -271,6 +288,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   // Admin: everything under /admin, behind Cloudflare Access (admin.ts).
   if (path === "/admin" || path.startsWith("/admin/")) return adminRoute(request, config, path, origin);
 
+  // A page someone opened that is not here: a page that says so, not a line of JSON.
+  if (request.method === "GET" && !path.startsWith("/v1/")) return html(404, lostPage(config.site ?? DEFAULT_SITE));
   if (request.method !== "POST" || !path.startsWith("/v1/")) return json(404, { error: "Not found" });
   const input = await body(request);
   if (!input) return json(400, { error: "Send JSON." });

@@ -208,6 +208,20 @@ describe("server API", () => {
     expect(licenses).toContain("Open-source licenses");
     expect(licenses).toContain("CC BY-SA 4.0");
     expect(String((await call("/security")).data.html)).toContain("Reporting a problem");
+    // The features page, the release notes, and what search engines read.
+    const features = String((await call("/features")).data.html);
+    expect(features).toContain("Everything your church does on a screen");
+    expect(features).toContain("Grace Software Ltd");
+    expect(String((await call("/whats-new")).data.html)).toContain("Version 0.4.1");
+    expect(home).toContain('"@type":"SoftwareApplication"');
+    expect(home).toContain('href="/features"');
+    expect(await (await handleApi(new Request("https://keys.test/robots.txt"), config)).text()).toContain("Sitemap: https://keys.test/sitemap.xml");
+    expect(await (await handleApi(new Request("https://keys.test/sitemap.xml"), config)).text()).toContain("<loc>https://keys.test/features</loc>");
+    // An address that is not there: a page for people, JSON for the app.
+    const lost = await handleApi(new Request("https://keys.test/no-such-page"), config);
+    expect(lost.status).toBe(404);
+    expect(await lost.text()).toContain("Not <span class=\"serif\">here.</span>");
+    expect((await handleApi(new Request("https://keys.test/v1/nothing"), config)).headers.get("content-type")).toContain("json");
     const txt = await handleApi(new Request("https://keys.test/.well-known/security.txt"), config);
     expect(await txt.text()).toMatch(/^Contact: mailto:help@grace\.example\nExpires: 2027-/);
     for (const plan of ["premium", "church"] as const) {

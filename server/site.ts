@@ -66,7 +66,7 @@ function layout(title: string, site: Site, body: string): string {
 </style></head><body>
 <header class="wrap"><nav>
   <a class="brand" href="/"><span class="mark"><i></i><i></i><i></i><i></i></span>Church Studio</a>
-  <span class="links"><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="/#contact">Contact</a></span>
+  <span class="links"><a href="/features">Features</a><a href="/#pricing">Pricing</a><a href="/whats-new">What's new</a><a href="mailto:${mail}">Contact</a></span>
 </nav></header>
 <main class="wrap">${body}</main>
 <footer><div class="wrap">

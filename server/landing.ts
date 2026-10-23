@@ -4,14 +4,15 @@
 // motion stopped for people who ask their computer for less of it.
 
 import { FEATURE_LABELS, PLANS, TRIAL_DAYS } from "../src/lib/domain/plans.ts";
+import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { megabytes, RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { PRICES } from "./pricing.ts";
 import type { Site } from "./site.ts";
 
-const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+export const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
-const ICON = {
+export const ICON = {
   mic: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>',
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -28,7 +29,7 @@ const ICON = {
   check: '<path d="m5 12 5 5 9-10"/>',
   arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
 };
-const icon = (name: keyof typeof ICON, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+export const icon = (name: keyof typeof ICON, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
 
 /** A download button for one platform: the real file's size and version when known. */
 function getButton(release: Release | null, platform: Platform, label: string, primary = false): string {
@@ -67,24 +68,8 @@ const FAQ: Array<[string, string]> = [
 
 const PARTNERS = ["OBS Studio", "vMix", "NDI", "YouTube Live", "Facebook Live", "ProPresenter import", "EasyWorship import", "Planning Center", "ChordPro", "OpenLyrics", "PowerPoint & PDF", "CCLI reporting"];
 
-export function landingPage(site: Site, release: Release | null): string {
-  const version = release?.version ? `v${escape(release.version)}` : "";
-  const mail = escape(site.contact);
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Church Studio · Scripture, songs and sermons on screen</title>
-<meta name="description" content="Church Studio puts scripture, songs and sermons on your church's screens, listens for the verses being read, and runs the whole service on time. For Mac (Apple silicon and Intel), Windows and Linux.">
-<meta property="og:title" content="Church Studio">
-<meta property="og:description" content="Scripture, songs and sermons on screen, beautifully. For Mac, Windows and Linux.">
-<meta name="theme-color" content="#07070a">
-<link rel="icon" href="/email/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-<style>
-:root { --bg: #07070a; --bg2: #0c0c11; --panel: rgba(255,255,255,.035); --panel2: rgba(255,255,255,.06); --line: rgba(255,255,255,.09); --ink: #f5f5f7; --muted: #9b9ba8; --dim: #6e6e7a; --accent: #fa4f00; --accent2: #ff9a4d; --violet: #8b6cff; --good: #34c88a; --live: #ff3b3b; }
+/** The look every marketing page shares: colours, type, the night sky, the bar, buttons, cards and sections. */
+export const SITE_CSS = `:root { --bg: #07070a; --bg2: #0c0c11; --panel: rgba(255,255,255,.035); --panel2: rgba(255,255,255,.06); --line: rgba(255,255,255,.09); --ink: #f5f5f7; --muted: #9b9ba8; --dim: #6e6e7a; --accent: #fa4f00; --accent2: #ff9a4d; --violet: #8b6cff; --good: #34c88a; --live: #ff3b3b; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -333,21 +318,56 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
 }
 @media (max-width: 560px) { .pill-long { display: none; } .pill-short { display: inline; } .hero { padding-top: 56px; } .float { display: none !important; } .steps { grid-template-columns: 1fr; } .final { padding: 60px 20px; } .nav .btn.small span { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .reveal { opacity: 1; transform: none; } .device { transform: none; } }
-</style>
+`;
+
+/** The bar at the top. On the home page its links are anchors; elsewhere they lead home first. */
+export function siteHeader(page: "home" | "features" | "news" | "other"): string {
+  const at = (anchor: string) => (page === "home" ? `#${anchor}` : `/#${anchor}`);
+  const link = (href: string, label: string, on: boolean) => `<a href="${href}"${on ? ' aria-current="page"' : ""}>${label}</a>`;
+  return `<header class="nav" id="nav"><div class="wrap">
+  <a class="brand" href="/"><img src="/email/logo.png" alt="">Church Studio</a>
+  <nav class="links" aria-label="Sections">${link("/features", "Features", page === "features")}${link(at("sunday"), "How it works", false)}${link(at("download"), "Download", false)}${link(at("pricing"), "Pricing", false)}${link("/whats-new", "What's new", page === "news")}${link(at("faq"), "FAQ", false)}</nav>
+  <span class="grow"></span>
+  <a class="btn hot small" href="${at("download")}" data-get-main>${icon("download", 16)}<span data-get-label>Download</span></a>
+</div></header>`;
+}
+
+export function siteFooter(site: Site): string {
+  const mail = escape(site.contact);
+  return `<footer><div class="wrap">
+  <span>© ${new Date().getFullYear()} ${escape(site.company)} · Church Studio is made by ${escape(site.company)} · <a href="mailto:${mail}">${mail}</a></span>
+  <nav aria-label="Legal"><a href="/features">Features</a><a href="/whats-new">What's new</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a><a href="/licenses">Open-source licenses</a><a href="/security">Security</a></nav>
+</div></footer>`;
+}
+
+export function landingPage(site: Site, release: Release | null): string {
+  const version = release?.version ? `v${escape(release.version)}` : "";
+  const mail = escape(site.contact);
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Church Studio · Scripture, songs and sermons on screen</title>
+<meta name="description" content="Church Studio puts scripture, songs and sermons on your church's screens, listens for the verses being read, and runs the whole service on time. For Mac (Apple silicon and Intel), Windows and Linux.">
+<meta property="og:title" content="Church Studio">
+<meta property="og:description" content="Scripture, songs and sermons on screen, beautifully. For Mac, Windows and Linux.">
+<meta name="theme-color" content="#07070a">
+<link rel="icon" href="/email/logo.png">
+<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Church Studio", applicationCategory: "MultimediaApplication", operatingSystem: "macOS, Windows, Linux", description: "Scripture, songs and sermons on your church's screens, found by listening, with the whole service on time.", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, publisher: { "@type": "Organization", name: site.company } }).replace(/</g, "\\u003c")}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+${SITE_CSS}</style>
 </head>
 <body>
 <div class="sky" aria-hidden="true"></div>
 
-<header class="nav" id="nav"><div class="wrap">
-  <a class="brand" href="/"><img src="/email/logo.png" alt="">Church Studio</a>
-  <nav class="links" aria-label="Sections"><a href="#features">Features</a><a href="#sunday">How it works</a><a href="#download">Download</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
-  <span class="grow"></span>
-  <a class="btn hot small" href="#download" data-get-main>${icon("download", 16)}<span data-get-label>Download</span></a>
-</div></header>
+${siteHeader("home")}
 
 <main>
 <section class="hero" style="padding-top:84px"><div class="wrap">
-  <a class="pill reveal" href="#download"><b>New${version ? ` · ${version}` : ""}</b><span class="pill-long">Spanish and French, chords for the band, ProPresenter import</span><span class="pill-short">See what's new</span> ${icon("arrow", 14)}</a>
+  <a class="pill reveal" href="/whats-new"><b>New${version ? ` · ${version}` : ""}</b><span class="pill-long">${escape(CHANGELOG[0]!.highlights.slice(0, 3).map((highlight) => highlight.title).join(", "))}</span><span class="pill-short">See what's new</span> ${icon("arrow", 14)}</a>
   <h1 class="reveal d1">Every verse, song and sermon, <span class="serif">beautifully</span> on screen.</h1>
   <p class="lede reveal d2">Church Studio listens for the scripture being read, puts the words on your screens in a moment, and runs the whole service on time, from one calm desk.</p>
   <div class="ctas reveal d3">
@@ -402,6 +422,8 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
       <div class="viz langs"><span>English</span><span>Français</span><span>Español</span></div></article>
   </div>
 </div></section>
+
+<div class="wrap" style="text-align:center;margin-top:28px"><a class="btn glass" href="/features">See every feature ${icon("arrow", 16)}</a></div>
 
 <section id="sunday"><div class="wrap">
   <div class="section-head reveal"><span class="eyebrow">How it works</span><h2>A Sunday, <span class="serif">start to finish</span></h2></div>
@@ -459,10 +481,7 @@ footer nav { display: flex; gap: 22px; flex-wrap: wrap; } footer a:hover { color
 </div></section>
 </main>
 
-<footer><div class="wrap">
-  <span>© ${new Date().getFullYear()} ${escape(site.company)} · Church Studio is made by ${escape(site.company)} · <a href="mailto:${mail}">${mail}</a></span>
-  <nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a><a href="/licenses">Open-source licenses</a><a href="/security">Security</a></nav>
-</div></footer>
+${siteFooter(site)}
 
 <script>
 (() => {
