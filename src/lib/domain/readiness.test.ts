@@ -4,7 +4,7 @@ import { backupCheck, internetCheck, libraryCheck, planCheck, recordingMinutes, 
 const now = Date.parse("2026-10-25T08:30:00Z");
 const DAY = 86_400_000;
 
-describe("Ready for Sunday", () => {
+describe("Readiness check", () => {
   it("says what the audience screen needs", () => {
     expect(screenCheck({ online: true, displayName: "Projector", screens: 2, mode: "window" }).state).toBe("ok");
     expect(screenCheck({ online: false, displayName: "", screens: 1, mode: "window" })).toMatchObject({ state: "warn", fix: { action: "displays" } });

@@ -79,7 +79,7 @@
         {#if status.status === "error"}{status.message}
         {:else if running && status.pattern}{status.live ? t("Live: colour bars and a beep are on your stream page now. Stop when you have seen them.") : t("Connecting to the stream server…")}
         {:else if "missing" in target}{target.missing === "key" ? t("Add the stream key to test it.") : t("Add the server address to test it.")}
-        {:else}{t("Sends colour bars and a beep to the stream, so you can check it reaches your page before Sunday. Set the stream to unlisted or private first.")}{/if}
+        {:else}{t("Sends colour bars and a beep to the stream, so you can check it reaches your page before you go live. Set the stream to unlisted or private first.")}{/if}
       </span>
     </div>
     {#if running && status.pattern}

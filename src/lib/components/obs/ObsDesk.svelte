@@ -453,7 +453,7 @@
           <button type="button" role="menuitem" onclick={() => { session.openSettings("displays"); close(); }}><Icon name="outputs" size={16} /> {t("Displays…")}</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}><Icon name="themes" size={16} /> {t("Themes…")}</button>
           <div class="menu-sep"></div>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("ready"); close(); }}><Icon name="check" size={16} /> {t("Ready for Sunday…")}</button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("ready"); close(); }}><Icon name="check" size={16} /> {t("Readiness check…")}</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> {t("Settings…")} <span class="menu-key">⌘,</span></button>
         {/snippet}
       </ToolMenu>

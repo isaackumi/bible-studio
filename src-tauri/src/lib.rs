@@ -314,7 +314,7 @@ fn media_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::media_list)
 }
 
-/// Facts for the Ready for Sunday check: which of these files are missing, and whether the library
+/// Facts for the Readiness check: which of these files are missing, and whether the library
 /// reads back whole. The church sees only the outcome, in its own words.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]

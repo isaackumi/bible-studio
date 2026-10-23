@@ -4991,7 +4991,7 @@ class Session {
     return this.desktop() ? invoke<number | null>("record_room", { folder: this.workspace.broadcast.recordFolder || null }).catch(() => null) : Promise.resolve(null);
   }
 
-  /** Ready for Sunday: everything the service depends on, checked in one go, worst first. */
+  /** Readiness check: everything the service depends on, checked in one go, worst first. */
   checkReady = async (): Promise<ReadyCheck[]> => {
     const desktop = this.desktop();
     const media = new Map(this.media.map((asset) => [asset.id, asset]));

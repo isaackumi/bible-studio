@@ -1,6 +1,6 @@
 import { msg } from "../i18n/core";
 
-// Ready for Sunday: one press checks what a service depends on, and says it the church's way.
+// Readiness check: one press checks what a service depends on, and says it the church's way.
 // Each check turns facts the desk gathered into a line: fine, worth a look, or needs fixing, with
 // the one thing to do about it. Nothing here names the machinery behind it.
 

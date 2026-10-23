@@ -5,7 +5,7 @@
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
 
-  // Ready for Sunday: one press checks what the service depends on. Worst first; each line says what
+  // Readiness check: one press checks what the service depends on. Worst first; each line says what
   // to do, with a button that goes there.
   let { ongo }: { ongo: (section: string) => void } = $props();
 
@@ -47,7 +47,7 @@
         {#if busy && !checks}{t("Checking…")}
         {:else if failing}{tn(failing, "{n} thing needs fixing before the service", "{n} things need fixing before the service")}
         {:else if looking}{tn(looking, "Ready, with {n} thing to look at", "Ready, with {n} things to look at")}
-        {:else}{t("All set for Sunday")}{/if}
+        {:else}{t("All set")}{/if}
       </strong>
       <span>{checkedAt ? t("Checked at {time}.", { time: checkedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) }) : t("Screens, the service, space, backups and more.")}</span>
     </div>
@@ -69,7 +69,7 @@
       </div>
     {/each}
   </section>
-  <p class="note stand">{t("Run this on Sunday morning, with the projector and microphone plugged in. Nothing here changes the screen.")}</p>
+  <p class="note stand">{t("Run this before you start, with the projector and microphone plugged in. Nothing here changes the screen.")}</p>
 {/if}
 
 <style>

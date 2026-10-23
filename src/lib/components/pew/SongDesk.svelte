@@ -547,7 +547,7 @@
     edit(song);
     if (draft) draft.isNew = true;
     draftStart = "";
-    note = t("The AI wrote these words. Check every line before Sunday, then Save.");
+    note = t("The AI wrote these words. Check every line before they go on screen, then Save.");
   }
 
   function edit(song: Song) {

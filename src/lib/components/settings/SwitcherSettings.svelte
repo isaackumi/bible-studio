@@ -72,7 +72,7 @@
       </div>
     </div>
     <div class="row">
-      <div class="row-copy"><strong>{t("Connect when Church Studio opens")}</strong><span>{t("So the desk is ready on Sunday morning.")}</span></div>
+      <div class="row-copy"><strong>{t("Connect when Church Studio opens")}</strong><span>{t("So the desk is ready before the service starts.")}</span></div>
       <input type="checkbox" class="switch" role="switch" aria-label={t("Connect when Church Studio opens")} checked={session.workspace.switcher.autoConnect} onchange={(event) => session.setSwitcherAutoConnect(event.currentTarget.checked)} />
     </div>
   {/if}

@@ -121,7 +121,7 @@
       </ul>
       <p class="hint">{t("Old hymns in the public domain: the AI writes the words for you to check. Other songs: download them from SongSelect with your CCLI license, then import the file.")}</p>
     {:else}
-      <p class="hint">{t("For songs you don't have yet. The AI names the song, its writers and its CCLI number, and can be wrong: check before Sunday.")}</p>
+      <p class="hint">{t("For songs you don't have yet. The AI names the song, its writers and its CCLI number, and can be wrong: check before it goes on screen.")}</p>
     {/if}
   {/if}
 

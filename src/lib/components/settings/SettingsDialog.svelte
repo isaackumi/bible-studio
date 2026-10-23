@@ -133,7 +133,7 @@
     {
       label: msg("Going live"),
       items: [
-        { id: "ready", title: msg("Ready for Sunday"), icon: "check", color: "#30a46c", about: msg("Check screens, the service, space, backups and more before you start."), keywords: "ready check health sunday before service problems disk space backup screen missing files" },
+        { id: "ready", title: msg("Readiness check"), icon: "check", color: "#30a46c", about: msg("Check screens, the service, space, backups and more before you start."), keywords: "ready check health sunday before service problems disk space backup screen missing files" },
         { id: "broadcast", title: msg("Stream & record"), icon: "video", color: "#e5484d", about: msg("Stream to YouTube or Facebook, and record the service."), keywords: "stream live youtube facebook rtmp rtmps key record recording mp4 broadcast online" },
         { id: "switcher", title: msg("Production apps"), icon: "obs", color: "#475569", about: msg("Drive OBS or vMix from the desk: scenes, streaming, recording."), keywords: "obs vmix websocket stream record scene switcher live production youtube facebook" },
       ],
