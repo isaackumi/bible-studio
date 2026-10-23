@@ -21,6 +21,7 @@ import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { featuresPage } from "./features.ts";
 import { lostPage, newsPage } from "./news.ts";
+import { llmsFullTxt, llmsTxt } from "./llms.ts";
 import { INSTRUMENT_SERIF_ITALIC_WOFF2, INTER_WOFF2, SHARE_IMAGE_JPEG } from "./site-assets.ts";
 import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
@@ -239,6 +240,20 @@ function sitemap(origin: string): string {
 
 const POLICIES_UPDATED = "2026-10-21";
 
+/** IndexNow's key for this site: Bing and others are told of new pages at once (see deploy-site.yml). Public by design. */
+export const INDEXNOW_KEY = "34a4867a826cb0db20eac1271c1a63a5";
+
+/**
+ * Who may read the site. Everyone may read the public pages; the AI assistants' crawlers are named
+ * one by one (each obeys only its own line), so ChatGPT, Claude, Perplexity and Gemini can find,
+ * cite and learn about Church Studio. Sign-in, checkout and admin pages are private for all.
+ */
+function robots(origin: string): string {
+  const privateParts = "Disallow: /admin\nDisallow: /pay/\nDisallow: /signin/\nDisallow: /auth/\n";
+  const assistants = ["OAI-SearchBot", "ChatGPT-User", "GPTBot", "Claude-SearchBot", "Claude-User", "ClaudeBot", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "Bingbot", "Googlebot"];
+  return `${assistants.map((bot) => `User-agent: ${bot}\nAllow: /\n${privateParts}`).join("\n")}\nUser-agent: *\nAllow: /\n${privateParts}\nSitemap: ${origin}/sitemap.xml\n`;
+}
+
 /** A file the site serves itself (fonts, the share picture), cached for good: its contents never change at an address. */
 function file(base64: string, type: string, maxAge: number): Response {
   const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
@@ -282,7 +297,10 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (bible) return serveBible(config, bible[1]!);
     if (path === "/features") return page(featuresPage(site, origin));
     if (path === "/whats-new") return page(newsPage(site, origin));
-    if (path === "/robots.txt") return text200(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /pay/\nDisallow: /signin/\nSitemap: ${origin}/sitemap.xml\n`, "text/plain; charset=utf-8");
+    if (path === "/robots.txt") return text200(robots(origin), "text/plain; charset=utf-8");
+    if (path === "/llms.txt") return text200(llmsTxt(origin), "text/markdown; charset=utf-8");
+    if (path === "/llms-full.txt") return text200(llmsFullTxt(origin, site), "text/markdown; charset=utf-8");
+    if (path === `/${INDEXNOW_KEY}.txt`) return text200(INDEXNOW_KEY, "text/plain; charset=utf-8");
     if (path === "/sitemap.xml") return text200(sitemap(origin), "application/xml; charset=utf-8");
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));

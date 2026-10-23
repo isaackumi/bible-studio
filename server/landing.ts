@@ -56,13 +56,17 @@ function planCards(): string {
   }).join("");
 }
 
-const FAQ: Array<[string, string]> = [
+/** The answers people (and AI assistants) look for, said plainly; the home page and llms.txt share them. */
+export const FAQ: Array<[string, string]> = [
+  ["What is Church Studio?", `Church Studio is church presentation software for Mac, Windows and Linux, made by HeiTech. It puts scripture, song lyrics, sermons, slides and pictures on a church's screens, listens for Bible verses as they are read aloud, and runs the whole service on time. It is free to start; Premium is ${"$"}${PRICES.premium.monthly / 100} a month and Church is ${"$"}${PRICES.church.monthly / 100} a month for three computers.`],
+  ["Is it an alternative to ProPresenter or EasyWorship?", "Yes, for most churches. It imports ProPresenter (5, 6 and 7) and EasyWorship (6 and 7) song libraries, has a free plan, and adds what they do not have built in: scripture found by listening, AI help with sermons and songs, live captions translated for phones, and questions and polls from the congregation's phones. Broadcast hardware control such as SDI, MIDI, DMX and timecode is not built in."],
+  ["Can it find Bible verses automatically?", "Yes. Press Listen and Church Studio finds the verse the preacher reads or quotes, in any translation you have, and puts it on Preview; LIVE sends it to the screen. With your own AI key it can also name a verse the preacher only paraphrases or describes."],
   ["Does it work without the internet?", "Yes. Scripture, songs, services and the screens all run offline. The internet is needed only to start a trial or add a plan, for updates, and for online extras like streaming."],
   ["Which computers does it run on?", "Macs with Apple silicon (M1, M2, M3, M4) and Intel Macs, from one download, on macOS 13 Ventura or later. Windows 10 and 11 (64-bit). And Linux: AppImage, .deb and .rpm."],
   ["Can we bring our songs from ProPresenter or EasyWorship?", "Yes. Import ProPresenter and EasyWorship libraries, OpenLyrics, ChordPro (chords kept for the band), plain text, and PowerPoint or PDF slides."],
   ["Will it understand our pastor's accent?", "It is made to. Nearly 250 common mishearings of book names are put right before verses are found (\u201cefficient 4\u201d becomes Ephesians 4), it learns your church's own words as you use it, and Accurate listening (Whisper, a one-time 60 MB download) hears Ghanaian, Nigerian and other accents better. A Practice mode lets you test it with your own readers."],
   ["Is our audio sent anywhere?", "Not with Accurate listening: it runs entirely on your computer. The system recognizer is Apple's or Windows' own; Apple's may use its servers, under Apple's privacy policy. We never receive your audio or the words."],
-  ["Which Bible translations are included?", "Several public-domain translations come built in, and you can add the Bible your church reads from a file, so it works offline too. Online translations are available as well."],
+  ["Which Bible translations are included?", "KJV, ASV, WEB, BBE and Akuapem Twi come built in, and Asante Twi, Ewe, Yorùbá, Igbo and Hausa are a free download; all work offline. You can add your church's Bible from a Zefania, OSIS or OpenSong file, and NIV, ESV and others online with your own API.Bible key."],
   ["Is our data ours?", "Yes. Your songs, services and notes stay on your computer. An account is optional; it only carries your plan to another computer."],
   ["What does streaming need?", "The Church plan and your YouTube or Facebook stream key. Church Studio streams and records the audience screen itself, or works alongside OBS and vMix."],
 ];

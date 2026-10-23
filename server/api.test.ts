@@ -236,6 +236,18 @@ describe("server API", () => {
     expect(head.headers.get("cache-control")).toBe("public, max-age=300");
     expect(await head.text()).toBe("");
     expect(await (await handleApi(new Request("https://keys.test/sitemap.xml"), config)).text()).toMatch(/<loc>https:\/\/keys\.test\/features<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+    // AI assistants: their crawlers are welcome, and llms.txt tells them what Church Studio is.
+    const robots = await (await handleApi(new Request("https://keys.test/robots.txt"), config)).text();
+    for (const bot of ["OAI-SearchBot", "GPTBot", "ClaudeBot", "Claude-SearchBot", "PerplexityBot"]) expect(robots).toContain(`User-agent: ${bot}\nAllow: /\n`);
+    expect(robots).toContain("Disallow: /admin");
+    const llms = await (await handleApi(new Request("https://keys.test/llms.txt"), config)).text();
+    expect(llms).toMatch(/^# Church Studio\n\n> Church Studio is church presentation software/);
+    const full = await (await handleApi(new Request("https://keys.test/llms-full.txt"), config)).text();
+    expect(full).toContain(`**Premium** ($${PRICES.premium.monthly / 100} a month`);
+    expect(full).toContain("### Is it an alternative to ProPresenter or EasyWorship?");
+    expect(home).toContain("Is it an alternative to ProPresenter or EasyWorship?");
+    const { INDEXNOW_KEY } = await import("./api");
+    expect(await (await handleApi(new Request(`https://keys.test/${INDEXNOW_KEY}.txt`), config)).text()).toBe(INDEXNOW_KEY);
     // An address that is not there: a page for people, JSON for the app.
     const lost = await handleApi(new Request("https://keys.test/no-such-page"), config);
     expect(lost.status).toBe(404);

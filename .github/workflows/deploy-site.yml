@@ -63,3 +63,14 @@ jobs:
           workingDirectory: server
           wranglerVersion: "4"
           command: deploy
+      # Tell search engines the pages changed (IndexNow: Bing, Yandex and others; ChatGPT search reads
+      # Bing). Public addresses only; a failure here never fails the deploy.
+      - name: Tell search engines
+        if: steps.token.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          KEY=$(grep -o 'INDEXNOW_KEY = "[0-9a-f]*"' server/api.ts | cut -d'"' -f2)
+          HOST=church-studio.heitechinc.com
+          curl -sS -m 20 -o /dev/null -w "IndexNow: %{http_code}\n" -X POST https://api.indexnow.org/indexnow \
+            -H "content-type: application/json; charset=utf-8" \
+            -d "{\"host\":\"$HOST\",\"key\":\"$KEY\",\"keyLocation\":\"https://$HOST/$KEY.txt\",\"urlList\":[\"https://$HOST/\",\"https://$HOST/features\",\"https://$HOST/whats-new\",\"https://$HOST/llms.txt\",\"https://$HOST/llms-full.txt\"]}"
