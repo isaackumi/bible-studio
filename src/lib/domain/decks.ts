@@ -17,7 +17,8 @@ import type { PresentationItem, SlideDeckDocument, TextStyle } from "./types";
  * Slide decks: a named list of pages. Each page is a Composition (layers on a 1920×1080 canvas),
  * so pages paint, preview and go live exactly like scenes.
  */
-export type SlideDeck = { id: string; name: string; updatedAt: string; pages: Composition[] };
+/** `scroll`: a PDF shown as one long page that scrolls, instead of a page at a time. */
+export type SlideDeck = { id: string; name: string; updatedAt: string; pages: Composition[]; scroll?: boolean };
 
 export const MAX_DECK_PAGES = 200;
 
@@ -119,6 +120,7 @@ export function sanitizeDeck(value: unknown): SlideDeck | null {
     name: typeof record.name === "string" && record.name.trim() ? record.name.trim().slice(0, 80) : "Untitled deck",
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : new Date(0).toISOString(),
     pages: pages.length ? pages : [newPage("Page 1")],
+    ...(record.scroll === true ? { scroll: true } : {}),
   };
 }
 

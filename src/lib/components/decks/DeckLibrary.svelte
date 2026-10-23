@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { documentAssets } from "../../domain/document-scroll";
   import { session } from "../../app/session.svelte";
   import { createDeck, duplicateDeck } from "../../domain/decks";
   import AiSlidesDialog from "./AiSlidesDialog.svelte";
@@ -104,7 +105,7 @@
           <span class="art"><DeckThumb page={deck.pages[0]!} /></span>
           <span class="meta">
             <strong>{deck.name}</strong>
-            <small>{tn(deck.pages.length, "{n} page", "{n} pages")}</small>
+            <small>{tn(deck.pages.length, "{n} page", "{n} pages")}{deck.scroll ? ` · ${t("scrolls")}` : ""}</small>
           </span>
         </button>
         <button type="button" class="more" aria-label={t("More for {name}", { name: deck.name })} aria-haspopup="menu" aria-expanded={menuFor === deck.id} onclick={() => (menuFor = menuFor === deck.id ? null : deck.id)}>⋯</button>
@@ -113,6 +114,10 @@
             <button type="button" role="menuitem" onclick={() => { menuFor = null; onedit(deck.id); }}>{t("Edit")}</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.pickServicePart(deck.name).then((part) => { if (part) void session.addDeckToService(deck.id, part); }); }}>{t("Add to service")}</button>
             <button type="button" role="menuitem" onclick={() => { menuFor = null; void session.startDeckLoop(deck.id, 8); }}>{t("Loop on Program (8 s a page)")}</button>
+            {#if documentAssets(deck)}
+              <!-- A PDF can scroll like a web page, the screen following the desk, instead of a page at a time. -->
+              <button type="button" role="menuitem" onclick={() => { menuFor = null; session.setDeckScroll(deck.id, !deck.scroll); }}>{deck.scroll ? t("Show a page at a time") : t("Scroll as one long page")}</button>
+            {/if}
             <button type="button" role="menuitem" onclick={() => { menuFor = null; session.saveDeck(duplicateDeck(deck)); }}>{t("Duplicate")}</button>
             <button type="button" role="menuitem" class="danger" onclick={() => remove(deck.id)}>{armedDelete === deck.id ? t("Delete? Click again") : t("Delete")}</button>
           </div>

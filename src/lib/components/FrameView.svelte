@@ -178,6 +178,25 @@
   });
 
   const wash = $derived(model.theme.background.type === "wash" ? displayWash(model.theme.background.washId) : null);
+  // A PDF scrolling as one long page: each page as wide as the frame, the whole moved up by `at`
+  // screen heights. Only pages near the screen are drawn, so a long document stays light.
+  let docWidth = $state(0);
+  let docHeight = $state(0);
+  const docLayout = $derived.by(() => {
+    const doc = model.layout === "document" ? model.document : undefined;
+    if (!doc || !docWidth || !docHeight) return null;
+    let top = 0;
+    const pages = doc.pages.map((page) => {
+      const height = docWidth * Math.max(0.05, page.aspect);
+      const placed = { url: page.url, top, height };
+      top += height;
+      return placed;
+    });
+    const offset = Math.max(0, Math.min(doc.at * docHeight, top - docHeight));
+    const near = (page: { top: number; height: number }) => page.top + page.height > offset - docHeight && page.top < offset + docHeight * 2;
+    return { offset, total: top, pages: pages.map((page, index) => ({ ...page, index })).filter(near) };
+  });
+
   const timerView = $derived(
     model.layout === "timer" && model.timer ? timerDisplay(timerFromPaint(model.timer), now || Date.now()) : null,
   );
@@ -325,6 +344,14 @@
         <svelte:element this={tag} {...attrs} />
       {/each}
     </svg>
+  {:else if model.layout === "document" && model.document}
+    <div class="doc" bind:clientWidth={docWidth} bind:clientHeight={docHeight}>
+      {#if docLayout}
+        <div class="doc-pages" class:glide={!still} style:height="{docLayout.total}px" style:transform="translateY({-docLayout.offset}px)">
+          {#each docLayout.pages as page (page.index)}<img src={page.url} alt="" decoding="async" style:top="{page.top}px" style:height="{page.height}px" />{/each}
+        </div>
+      {/if}
+    </div>
   {:else if model.layout === "web" && model.web}
     {#if still}
       <div class="web-card"><span>{model.web.kind === "youtube" ? t("YouTube") : model.web.kind === "vimeo" ? t("Vimeo") : model.web.kind === "slides" ? t("Google Slides") : t("Website")}</span><strong>{model.web.label}</strong></div>

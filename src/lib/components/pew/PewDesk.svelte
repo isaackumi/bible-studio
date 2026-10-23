@@ -34,6 +34,7 @@
   import FavoriteStar from "../FavoriteStar.svelte";
   import SongDesk from "./SongDesk.svelte";
   import VideoControls from "../VideoControls.svelte";
+  import DocumentControls from "../DocumentControls.svelte";
   import ServiceDesk from "./ServiceDesk.svelte";
   import SermonDesk from "./SermonDesk.svelte";
   import OutputMenu from "../OutputMenu.svelte";
@@ -1170,9 +1171,11 @@
                       {themeName} · {session.theme().layout === "lower-third" ? t("Lower third") : t("Frame")}
                     </button>
                   </header>
-                  <div class="monitor main"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
+                  <!-- A PDF scrolling on Program: the mouse wheel over the monitor scrolls the screen. -->
+                  <div class="monitor main" onwheel={(event) => { if (session.live.program.model.layout === "document") session.scrollProgramBy(event.deltaY / 500); }}><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
                   <TimerControls compact />
                   <VideoControls />
+                  <DocumentControls />
                   <footer class="output-tools">
                     <button type="button" class="lex" data-tip={t("The verse on Program in every installed Bible; pick one to show it in that version")} onclick={() => (sheet = sheet === "versions" ? null : "versions")}>{@render icon("bible")} {t("Versions")}</button>
                     <!-- On Program, these change the screen at once (the arrow keys only change Preview). -->

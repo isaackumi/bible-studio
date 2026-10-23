@@ -3,6 +3,7 @@
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
   import VideoControls from "../VideoControls.svelte";
+  import DocumentControls from "../DocumentControls.svelte";
   import GoLive from "./GoLive.svelte";
   import type { PewPage } from "../../domain/types";
   import { t } from "../../i18n/core";
@@ -43,6 +44,7 @@
   </figcaption>
   <div class="monitor"><Screen model={session.live.program.model} sourceId={session.live.program.sourceId} feeds={session.cameraFeeds} hint={t("The audience sees nothing yet. Press LIVE (Space) to send Preview.")} /></div>
   <VideoControls />
+  <DocumentControls />
 </figure>
 {/if}
 

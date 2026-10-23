@@ -108,7 +108,8 @@ export type PresentationLayout =
   | "shape"
   | "icon"
   | "web"
-  | "game";
+  | "game"
+  | "document";
 
 export type LayerBounds = { x: number; y: number; w: number; h: number };
 
@@ -174,6 +175,11 @@ export type PresentationModel = {
   style?: TextStyle;
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */
   video?: { url: string; loop: boolean; muted: boolean; control?: VideoControl; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
+  /**
+   * layout "document": a PDF's pages stacked as one long page, scrolled to `at` screen heights from
+   * the top (domain/document-scroll.ts). Each page's shape (height / width) lets every screen place it.
+   */
+  document?: { pages: Array<{ url: string; aspect: number }>; at: number };
   /** layout "game": the game show on the screen (domain/game-screen.ts). */
   game?: import("./game-screen").GameScreenData;
   /** layout "qr": a scannable code (giving, sign-up, Wi-Fi). */
@@ -685,6 +691,7 @@ export type SlideDeckDocument = {
   name: string;
   updatedAt: string;
   pages: unknown[];
+  scroll?: boolean;
 };
 
 export type RemoteDeviceDocument = {

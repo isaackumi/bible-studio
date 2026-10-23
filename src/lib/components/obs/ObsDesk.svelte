@@ -1,5 +1,6 @@
 <script lang="ts">
   import VideoControls from "../VideoControls.svelte";
+  import DocumentControls from "../DocumentControls.svelte";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import LookScripture from "./LookScripture.svelte";
   import AlertsDialog from "../AlertsDialog.svelte";
@@ -518,6 +519,7 @@
       <LookScripture />
       <TimerControls />
       <VideoControls />
+      <DocumentControls />
     </aside>
     </Pane>
     <PaneResizer />

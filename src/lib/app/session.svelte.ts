@@ -150,6 +150,7 @@ import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sani
 import type { SongMatch } from "../ai/songs";
 import { AiAssistant, sermonText } from "./ai-assistant";
 import { ServiceChecks } from "./service-checks.svelte";
+import { documentAssets, pageAt, pageStart, scrollLength, stepScroll } from "../domain/document-scroll";
 import { LiveNotes } from "./live-notes.svelte";
 import { CLOUD_SPEECH, KeyRefused, startCloudListening, testSpeechKey, type CloudSpeech } from "../voice/cloud-listen";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
@@ -2181,6 +2182,10 @@ class Session {
       const deck = this.decks.find((entry) => entry.id === item.deck?.deckId);
       const page = deck?.pages[0];
       if (!page) return emptyModel(theme);
+      if (deck.scroll) {
+        const document = this.documentFrame(deck.id, 0);
+        if (document) return document;
+      }
       return presentComposition(withMediaUrls(page, this.mediaSrc), { theme, now: Date.now(), canvas: this.outputCanvas() });
     }
     if (item.kind === "composition" && item.composition) {
@@ -2416,6 +2421,8 @@ class Session {
       await this.stepItem(direction);
       return;
     }
+    // A PDF on Preview scrolls, then on through the rundown at either end.
+    if (this.stepPreviewDocument(direction)) return;
     // A deck on Preview steps by page, then on through the rundown at either end.
     const focus = this.deckFocus;
     if (focus && this.live.preview.sourceId === `deck:${focus.deckId}:${focus.index}`) {
@@ -2896,6 +2903,13 @@ class Session {
 
   /** The slide on Program, one page on or back (voice "next slide" with live commands on). */
   private async stepProgramDeck(direction: 1 | -1): Promise<boolean> {
+    const doc = this.live.program.model.document;
+    if (this.live.program.sourceId?.startsWith("doc:") && doc) {
+      const next = stepScroll(doc.at, direction, this.documentLength(this.live.program.model));
+      if (next === null) return false;
+      this.scrollProgramTo(next);
+      return true;
+    }
     const on = deckSource(this.live.program.sourceId);
     if (!on) return false;
     const deck = this.decks.find((entry) => entry.id === on.deckId);
@@ -4452,6 +4466,11 @@ class Session {
     const deck = this.decks.find((entry) => entry.id === deckId);
     const page = deck?.pages[index];
     if (!deck || !page) return;
+    // A PDF set to scroll: the whole document as one long page, from the top of this page.
+    if (deck.scroll && documentAssets(deck)) {
+      void this.previewDocument(deckId, { page: index });
+      return;
+    }
     this.songFocus = null;
     this.sermonFocus = null;
     this.lookOnPreview = null;
@@ -4460,6 +4479,120 @@ class Session {
     const model = presentComposition(withMediaUrls(page, this.mediaSrc), { theme: this.theme(), now: Date.now(), canvas: this.outputCanvas() });
     this.live = setPreview(this.live, frame(model, `deck:${deckId}:${index}`, page.transition.type === "cut" ? "cut" : "fade"));
     this.message = t("{name}: page {index} of {length} on Preview. LIVE sends Program.", { name: deck.name, index: index + 1, length: deck.pages.length });
+  };
+
+  // --- A PDF as one long page that scrolls (domain/document-scroll.ts) --------------------------
+
+  /** Each page picture's shape (height / width), read once from the file. */
+  private pageShapes = new Map<string, number>();
+
+  private async shapesOf(urls: string[]): Promise<number[]> {
+    return Promise.all(
+      urls.map((url) => {
+        const known = this.pageShapes.get(url);
+        if (known) return known;
+        return new Promise<number>((resolve) => {
+          const image = new Image();
+          image.onload = () => {
+            const shape = image.naturalWidth ? image.naturalHeight / image.naturalWidth : 1.414;
+            this.pageShapes.set(url, shape);
+            resolve(shape);
+          };
+          // A page that will not load still takes an A4 page's room, so the rest stay in place.
+          image.onerror = () => resolve(1.414);
+          image.src = url;
+        });
+      }),
+    );
+  }
+
+  /** The screen's shape (width / height), which sets how tall a page is in screen heights. */
+  screenRatio = (): number => {
+    const canvas = this.outputCanvas();
+    return canvas.width / canvas.height;
+  };
+
+  /** How far a document frame can scroll, in screen heights. */
+  documentLength = (model: PresentationModel): number => (model.document ? scrollLength(model.document.pages.map((page) => page.aspect), this.screenRatio()) : 0);
+
+  /** The frame for a scrolling PDF; page shapes not read yet count as A4 until they are. */
+  private documentFrame(deckId: string, at: number, shapes?: number[]): PresentationModel | null {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    const assets = deck ? documentAssets(deck) : null;
+    if (!assets) return null;
+    const urls = assets.map((id) => this.mediaSrc(id) ?? "");
+    const pages = urls.map((url, index) => ({ url, aspect: shapes?.[index] ?? this.pageShapes.get(url) ?? 1.414 }));
+    const length = scrollLength(pages.map((page) => page.aspect), this.screenRatio());
+    return { ...emptyModel(this.theme()), layout: "document", document: { pages, at: Math.max(0, Math.min(length, at)) } };
+  }
+
+  /** A PDF deck shown as one long page that scrolls, or a page at a time. */
+  setDeckScroll = (deckId: string, scroll: boolean) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    if (!deck || !documentAssets(deck)) return;
+    const { scroll: _was, ...rest } = deck;
+    this.saveDeck(scroll ? { ...rest, scroll: true } : rest);
+    this.previewDeckPage(deckId, 0);
+  };
+
+  /** A PDF deck on Preview as one long page: at a position, or from the top of a page. */
+  previewDocument = async (deckId: string, where: { at?: number; page?: number } = {}) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    const assets = deck ? documentAssets(deck) : null;
+    if (!deck || !assets) return;
+    const shapes = await this.shapesOf(assets.map((id) => this.mediaSrc(id) ?? ""));
+    const at = where.page !== undefined ? pageStart(where.page, shapes, this.screenRatio()) : (where.at ?? 0);
+    const model = this.documentFrame(deckId, at, shapes);
+    if (!model?.document) return;
+    this.songFocus = null;
+    this.sermonFocus = null;
+    this.lookOnPreview = null;
+    this.previewBible = null;
+    this.deckFocus = null;
+    this.live = setPreview(this.live, frame(model, `doc:${deckId}`, "cut"));
+    const page = pageAt(model.document.at, shapes, this.screenRatio());
+    this.message = t("{name}: page {index} of {length} on Preview, scrolling. LIVE sends Program.", { name: deck.name, index: page + 1, length: assets.length });
+  };
+
+  /** Scroll the document on Preview one step; false past either end (the running order moves on). */
+  private stepPreviewDocument(direction: 1 | -1): boolean {
+    const preview = this.live.preview;
+    if (!preview.sourceId?.startsWith("doc:") || !preview.model.document) return false;
+    const next = stepScroll(preview.model.document.at, direction, this.documentLength(preview.model));
+    if (next === null) return false;
+    this.live = setPreview(this.live, frame({ ...preview.model, document: { ...preview.model.document, at: next } }, preview.sourceId, "cut"));
+    return true;
+  }
+
+  private scrollTimer: ReturnType<typeof setTimeout> | undefined;
+  private scrollWanted: number | null = null;
+
+  /**
+   * Scroll the document on Program to a position (the desk's slider, the mouse wheel over Program,
+   * the up and down buttons). Every screen glides there; a burst of wheel turns sends the last.
+   */
+  scrollProgramTo = (at: number) => {
+    const model = this.live.program.model;
+    if (model.layout !== "document" || !model.document) return;
+    this.scrollWanted = Math.max(0, Math.min(this.documentLength(model), at));
+    if (this.scrollTimer) return;
+    this.scrollTimer = setTimeout(() => {
+      this.scrollTimer = undefined;
+      const wanted = this.scrollWanted;
+      const current = this.live.program.model;
+      if (wanted === null || current.layout !== "document" || !current.document) return;
+      this.scrollWanted = null;
+      const next = { ...current, document: { ...current.document, at: wanted } };
+      this.live = replaceProgramModel(this.live, next, "cut");
+      // Preview showing the same document follows, so LIVE after this changes nothing.
+      if (this.live.preview.sourceId === this.live.program.sourceId) this.live = setPreview(this.live, frame(next, this.live.preview.sourceId, "cut"));
+      void this.pushProgram();
+    }, 90);
+  };
+
+  scrollProgramBy = (by: number) => {
+    const doc = this.live.program.model.document;
+    if (doc) this.scrollProgramTo((this.scrollWanted ?? doc.at) + by);
   };
 
   /** Play, pause, jump or change the volume of the video on Program, on every screen at once. */
@@ -7356,6 +7489,12 @@ class Session {
 
   /** Preview to Program. A slideshow names its own transition and length; otherwise the theme's or look's. */
   take = (transition?: ScreenTransition, ms?: number) => {
+    // The same scrolling PDF on both: Program glides to Preview's place rather than fading.
+    const { preview, program } = this.live;
+    if (preview.sourceId?.startsWith("doc:") && preview.sourceId === program.sourceId && preview.model.document) {
+      this.live = replaceProgramModel(this.live, preview.model, "cut");
+      return this.pushProgram();
+    }
     this.takeMs = transition && ms ? ms : null;
     return this.act("take", transition);
   };
