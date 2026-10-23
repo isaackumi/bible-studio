@@ -182,6 +182,16 @@ const FEATURES_CSS = `
 .cap-langs { display: flex; gap: 6px; margin-top: 12px; }
 .cap-langs span { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); transition: all .3s; }
 .cap-langs span.on { color: #fff; background: var(--violet); border-color: var(--violet); }
+.lb { position: relative; height: 232px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(120deg, #2b0f63 0%, #171443 45%, #5a1242 100%); overflow: hidden; }
+.lb-head { display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,.85); margin-bottom: 8px; }
+.lb-row { position: absolute; left: 14px; right: 14px; top: 36px; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: 9px; background: rgba(255,255,255,.95); color: #1a1a1a; border-left: 5px solid var(--c); font-size: 13px; transform: translateY(calc(var(--slot, 0) * 47px)); transition: transform .9s cubic-bezier(.34,1.3,.64,1); }
+.lb-row b { width: 16px; color: #666; font-variant-numeric: tabular-nums; }
+.lb-row i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); }
+.lb-row span { flex: 1; font-weight: 700; }
+.lb-row em { font-style: normal; font-weight: 800; color: #27ae60; font-size: 12px; opacity: 0; transition: opacity .4s; }
+.lb-row strong { min-width: 48px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lb.after .lb-row em { opacity: 1; }
+.lb-row.lead { box-shadow: 0 0 0 2px #ffd166; }
 
 /* Control */
 .palette { border: 1px solid rgba(255,255,255,.14); border-radius: 16px; background: rgba(14,14,19,.9); box-shadow: 0 30px 80px rgba(0,0,0,.5); overflow: hidden; }
@@ -430,6 +440,15 @@ ${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.<
       <div class="cap-langs" id="caps"><span class="on">English</span><span>Français</span><span>Español</span><span>Twi</span></div>
     </div>
   </div>
+  <div class="demo reveal d2" style="margin-top:16px"><h3>A game show on the screen</h3><p>Each player in their own colour. After every question the leaderboard climbs as the points count up; the podium and confetti come at the end.</p>
+    <div class="lb" id="lb" aria-hidden="true">
+      <div class="lb-head"><span>Saved by grace</span><span>Question 3 of 8 · 23 players</span></div>
+      <div class="lb-row" style="--c:#ff5a5f" data-before="4000" data-after="4000"><b></b><i></i><span>Ama</span><em></em><strong></strong></div>
+      <div class="lb-row" style="--c:#2f80ed" data-before="3720" data-after="5120"><b></b><i></i><span>Kofi</span><em>+1,400</em><strong></strong></div>
+      <div class="lb-row" style="--c:#f5a524" data-before="3440" data-after="4340"><b></b><i></i><span>Esi</span><em>+900</em><strong></strong></div>
+      <div class="lb-row" style="--c:#27ae60" data-before="3160" data-after="4360"><b></b><i></i><span>Yaw</span><em>+1,200</em><strong></strong></div>
+    </div>
+  </div>
   <ul class="list reveal" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
     ${item("Live captions", "On the screen and on phones through a QR code, translated into up to four languages by your AI.", "free")}
     ${item("Rooms for the congregation", "Q&A with upvotes and moderation, polls, quizzes and Bible games from your Bible.", "free")}
@@ -625,6 +644,28 @@ ${siteFooter(site)}
     const langs = [...document.querySelectorAll("#caps span")];
     let at = 0;
     if (!still) setInterval(() => { langs[at].classList.remove("on"); at = (at + 1) % langs.length; langs[at].classList.add("on"); }, 1600);
+  });
+
+  // 8b. The game: the leaderboard shows last round's order, then players climb as points roll up.
+  when("#lb", () => {
+    const board = document.getElementById("lb");
+    const rows = [...board.querySelectorAll(".lb-row")];
+    const place = (key) => [...rows].sort((a, b) => Number(b.dataset[key]) - Number(a.dataset[key]));
+    const show = (key, roll) => {
+      place(key).forEach((row, i) => { row.style.setProperty("--slot", i); row.querySelector("b").textContent = String(i + 1); row.classList.toggle("lead", key === "after" && i === 0); });
+      board.classList.toggle("after", key === "after");
+      const start = performance.now();
+      const tick = (now) => {
+        const p = roll ? Math.min(1, (now - start) / 1200) : 1, e = 1 - Math.pow(1 - p, 3);
+        rows.forEach((row) => { const from = Number(row.dataset.before), to = Number(row.dataset[key]); row.querySelector("strong").textContent = Math.round(from + (to - from) * e).toLocaleString(); });
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    show("before", false);
+    if (still) { show("after", false); return; }
+    let after = false;
+    setInterval(() => { after = !after; show(after ? "after" : "before", after); }, 2800);
   });
 
   // 9. Control: the palette finds a song; Stream Deck keys light up.
