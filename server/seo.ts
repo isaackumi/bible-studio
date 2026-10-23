@@ -3,7 +3,7 @@
 // read (the organisation, the app and its prices, questions and answers, where a page sits). Also
 // the site's own fonts, so a page needs nothing from another server to look right.
 
-import { CHANGELOG } from "../src/lib/domain/changelog.ts";
+import { published } from "../src/lib/domain/changelog.ts";
 import { PLANS } from "../src/lib/domain/plans.ts";
 import { PRICES } from "./pricing.ts";
 import { escape } from "./landing.ts";
@@ -85,7 +85,9 @@ export function organisation(site: Site, origin = SITE_URL): object[] {
 }
 
 /** Church Studio itself: what it is, where it runs, and every plan's price. */
-export function application(origin = SITE_URL): object {
+/** The app as structured data; `released` is the newest version on GitHub, so an unreleased entry is never named. */
+export function application(origin = SITE_URL, released: string | null = null): object {
+  const releases = published(released, new Date().toISOString().slice(0, 10));
   const offers = PLANS.map((plan) => ({
     "@type": "Offer",
     name: plan.name,
@@ -101,9 +103,9 @@ export function application(origin = SITE_URL): object {
     applicationCategory: "MultimediaApplication",
     applicationSubCategory: "Church presentation software",
     operatingSystem: "macOS 13 or later, Windows 10 and 11, Linux",
-    softwareVersion: CHANGELOG[0]?.version,
-    datePublished: CHANGELOG.at(-1)?.date,
-    dateModified: CHANGELOG[0]?.date,
+    softwareVersion: releases[0]?.version,
+    datePublished: releases.at(-1)?.date,
+    dateModified: releases[0]?.date,
     description: "Church presentation software that listens for the scripture being read and puts it on screen, with songs, sermons, slides, picture slideshows, a production desk and the whole service on time.",
     url: `${origin}/`,
     downloadUrl: `${origin}/#download`,

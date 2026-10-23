@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHANGELOG, compareVersions, releaseNotes, whatsNewFor } from "./changelog";
+import { CHANGELOG, compareVersions, releaseNotes, whatsNewFor, published } from "./changelog";
 import { readFileSync } from "node:fs";
 
 const sample = [
@@ -25,6 +25,13 @@ describe("what's new", () => {
 
   it("writes the GitHub release notes from the same words", () => {
     expect(releaseNotes("0.3.0", sample)).toContain("- **Three.** Third.");
+  });
+
+  it("keeps an entry written for the next version off the website until it is released", () => {
+    const log = [{ version: "0.4.2", date: "2026-10-24", highlights: [] }, { version: "0.4.1", date: "2026-10-23", highlights: [] }];
+    expect(published("0.4.1", "2026-10-24", log).map((r) => r.version)).toEqual(["0.4.1"]);
+    expect(published("0.4.2", "2026-10-23", log).map((r) => r.version)).toEqual(["0.4.2", "0.4.1"]);
+    expect(published(null, "2026-10-23", log).map((r) => r.version)).toEqual(["0.4.1"]);
   });
 
   it("has an entry for the version being built, newest first", () => {

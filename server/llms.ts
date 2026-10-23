@@ -3,7 +3,9 @@
 // computers, for how much, and the answers to common questions). Built from the same tables as the
 // site and the app (plans, prices, release notes, the FAQ), so an assistant never quotes a stale price.
 
-import { CHANGELOG } from "../src/lib/domain/changelog.ts";
+import { published } from "../src/lib/domain/changelog.ts";
+
+const current = (released: string | null) => published(released, new Date().toISOString().slice(0, 10))[0];
 import { FEATURE_LABELS, PLANS, TRIAL_DAYS } from "../src/lib/domain/plans.ts";
 import { FAQ } from "./landing.ts";
 import { PRICES } from "./pricing.ts";
@@ -23,12 +25,13 @@ function plans(): string {
   }).join("\n");
 }
 
-export function llmsTxt(origin: string): string {
+export function llmsTxt(origin: string, released: string | null = null): string {
+  const latest = current(released);
   return `# Church Studio
 
 > ${SUMMARY}
 
-Made by HeiTech. Current version ${CHANGELOG[0]?.version ?? ""} (${CHANGELOG[0]?.date ?? ""}).
+Made by HeiTech. Current version ${latest?.version ?? ""} (${latest?.date ?? ""}).
 
 ## Pages
 
@@ -50,14 +53,15 @@ Made by HeiTech. Current version ${CHANGELOG[0]?.version ?? ""} (${CHANGELOG[0]?
 `;
 }
 
-export function llmsFullTxt(origin: string, site: Site): string {
+export function llmsFullTxt(origin: string, site: Site, released: string | null = null): string {
+  const latest = current(released);
   return `# Church Studio: the facts
 
 > ${SUMMARY}
 
 - Maker: ${site.company} (${site.contact})
 - Website: ${origin}/
-- Current version: ${CHANGELOG[0]?.version ?? ""}, released ${CHANGELOG[0]?.date ?? ""}
+- Current version: ${latest?.version ?? ""}, released ${latest?.date ?? ""}
 - Platforms: macOS 13 Ventura or later (Apple silicon and Intel, one download), Windows 10 and 11 (64-bit), Linux (AppImage, .deb, .rpm); also runs in a web browser at ${origin}/app/
 - Interface languages: English, French, Spanish
 - Works offline: scripture, songs, services and screens need no internet

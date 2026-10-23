@@ -1,7 +1,7 @@
 // The What's new page at /whats-new: every release, newest first, from the same notes the app shows
 // after an update (src/lib/domain/changelog.ts). Also the page for an address that is not there.
 
-import { CHANGELOG } from "../src/lib/domain/changelog.ts";
+import { published } from "../src/lib/domain/changelog.ts";
 import { escape, icon, SITE_CSS, siteFooter, siteHeader } from "./landing.ts";
 import type { Site } from "./site.ts";
 import { FONT_CSS, seoHead, SITE_URL, type PageMeta } from "./seo.ts";
@@ -61,8 +61,9 @@ ${siteFooter(site)}
 
 const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-export function newsPage(site: Site, origin = SITE_URL): string {
-  const releases = CHANGELOG.map(
+export function newsPage(site: Site, origin = SITE_URL, released: string | null = null): string {
+  const changelog = published(released, new Date().toISOString().slice(0, 10));
+  const releases = changelog.map(
     (release, index) => `<article class="release reveal" id="v${escape(release.version)}">
     <h2>Version ${escape(release.version)} <small>${escape(day(release.date))}</small>${index === 0 ? "<em>Latest</em>" : ""}</h2>
     <div class="highlights">${release.highlights.map((highlight) => `<div class="highlight"><b>${escape(highlight.title)}</b><span>${escape(highlight.text)}</span></div>`).join("")}</div>
@@ -75,7 +76,7 @@ export function newsPage(site: Site, origin = SITE_URL): string {
     `<section class="n-hero"><div class="wrap">
   <span class="eyebrow reveal">What's new</span>
   <h1 class="reveal d1">Better every <span class="serif">week.</span></h1>
-  <p class="reveal d2">${CHANGELOG.length} releases so far. Church Studio updates itself; here is what each one brought.</p>
+  <p class="reveal d2">${changelog.length} releases so far. Church Studio updates itself; here is what each one brought.</p>
 </div></section>
 <div class="wrap"><div class="releases">${releases}</div></div>`,
     origin,

@@ -4,7 +4,7 @@
 // motion stopped for people who ask their computer for less of it.
 
 import { FEATURE_LABELS, PLANS, TRIAL_DAYS } from "../src/lib/domain/plans.ts";
-import { CHANGELOG } from "../src/lib/domain/changelog.ts";
+import { published } from "../src/lib/domain/changelog.ts";
 import { megabytes, RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { PRICES } from "./pricing.ts";
 import type { Site } from "./site.ts";
@@ -347,6 +347,7 @@ export function siteFooter(site: Site): string {
 
 export function landingPage(site: Site, release: Release | null, origin = SITE_URL): string {
   const version = release?.version ? `v${escape(release.version)}` : "";
+  const latest = published(release?.version ?? null, new Date().toISOString().slice(0, 10))[0];
   const mail = escape(site.contact);
   return `<!doctype html>
 <html lang="en">
@@ -357,7 +358,7 @@ ${seoHead({
   title: "Church Studio · Free Church Presentation Software",
   description: "Put scripture, songs and sermons on your church's screens. Church Studio listens for the verse being read, runs the whole service on time, and is free to start.",
   path: "/",
-  data: [...organisation(site, origin), application(origin), questions(FAQ)],
+  data: [...organisation(site, origin), application(origin, release?.version ?? null), questions(FAQ)],
 }, origin)}
 <style>
 ${FONT_CSS}
@@ -370,7 +371,7 @@ ${siteHeader("home")}
 
 <main>
 <section class="hero" style="padding-top:84px"><div class="wrap">
-  <a class="pill reveal" href="/whats-new"><b>New${version ? ` · ${version}` : ""}</b><span class="pill-long">${escape(CHANGELOG[0]!.highlights.slice(0, 3).map((highlight) => highlight.title).join(", "))}</span><span class="pill-short">See what's new</span> ${icon("arrow", 14)}</a>
+  <a class="pill reveal" href="/whats-new"><b>New${version ? ` · ${version}` : ""}</b><span class="pill-long">${escape((latest?.highlights ?? []).slice(0, 3).map((highlight) => highlight.title).join(", "))}</span><span class="pill-short">See what's new</span> ${icon("arrow", 14)}</a>
   <h1 class="reveal d1">Every verse, song and sermon, <span class="serif">beautifully</span> on screen.</h1>
   <p class="lede reveal d2">Church Studio listens for the scripture being read, puts the words on your screens in a moment, and runs the whole service on time, from one calm desk.</p>
   <div class="ctas reveal d3">

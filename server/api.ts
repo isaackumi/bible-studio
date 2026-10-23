@@ -208,6 +208,11 @@ async function serveBible(config: ApiConfig, id: string): Promise<Response> {
   });
 }
 
+/** The newest version released on GitHub (null when unknown), so pages never announce one before it is out. */
+async function releasedVersion(config: ApiConfig): Promise<string | null> {
+  return (config.releases ? await config.releases().catch(() => null) : null)?.version ?? null;
+}
+
 async function serveDownload(config: ApiConfig, platform: Platform): Promise<Response> {
   const release = config.releases ? await config.releases().catch(() => null) : null;
   const asset = release?.assets[platform];
@@ -223,7 +228,8 @@ async function serveDownload(config: ApiConfig, platform: Platform): Promise<Res
       "content-type": "application/octet-stream",
       "content-disposition": `attachment; filename="${asset.name.replace(/"/g, "")}"`,
       ...(upstream.headers.get("content-length") ? { "content-length": upstream.headers.get("content-length")! } : {}),
-      "cache-control": "public, max-age=3600",
+      // Never kept by the browser: /download/windows always hands over today's installer.
+      "cache-control": "no-store",
     },
   });
 }
@@ -296,10 +302,10 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
     if (path === "/features") return page(featuresPage(site, origin));
-    if (path === "/whats-new") return page(newsPage(site, origin));
+    if (path === "/whats-new") return page(newsPage(site, origin, await releasedVersion(config)));
     if (path === "/robots.txt") return text200(robots(origin), "text/plain; charset=utf-8");
-    if (path === "/llms.txt") return text200(llmsTxt(origin), "text/markdown; charset=utf-8");
-    if (path === "/llms-full.txt") return text200(llmsFullTxt(origin, site), "text/markdown; charset=utf-8");
+    if (path === "/llms.txt") return text200(llmsTxt(origin, await releasedVersion(config)), "text/markdown; charset=utf-8");
+    if (path === "/llms-full.txt") return text200(llmsFullTxt(origin, site, await releasedVersion(config)), "text/markdown; charset=utf-8");
     if (path === `/${INDEXNOW_KEY}.txt`) return text200(INDEXNOW_KEY, "text/plain; charset=utf-8");
     if (path === "/sitemap.xml") return text200(sitemap(origin), "application/xml; charset=utf-8");
     if (path === "/terms") return html(200, termsPage(site));

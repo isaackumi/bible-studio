@@ -166,6 +166,15 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
+/**
+ * The releases the public can have: up to the newest one on GitHub when that is known, else the
+ * ones dated today or earlier. The next version is written here before it is tagged, and the
+ * website must not announce it until the release is out.
+ */
+export function published(released: string | null, today: string, changelog = CHANGELOG): Release[] {
+  return changelog.filter((release) => (released ? compareVersions(release.version, released) <= 0 : release.date <= today));
+}
+
 export function releaseFor(version: string, changelog = CHANGELOG): Release | null {
   return changelog.find((release) => compareVersions(release.version, version) === 0) ?? null;
 }
