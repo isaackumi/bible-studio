@@ -137,6 +137,10 @@ export function adminPage(): string {
     <div class="card"><h2>Active each day<span class="sub">installed apps · 60 days</span><span class="legend"><span><i style="background:var(--blue)"></i>Computers</span><span><i style="background:var(--good)"></i>Signed-in people</span></span></h2><svg class="chart" id="usage-chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="usage-axis"></div></div>
     <div class="card"><h2>Active now</h2><div id="usage-now"></div></div>
   </section>
+  <section class="row2">
+    <div class="card"><h2>Downloads from the website<span class="sub">60 days</span></h2><svg class="chart" id="dl-chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg><div class="axis" id="dl-axis"></div><div id="dl-site"></div></div>
+    <div class="card"><h2>Downloads on GitHub<span class="sub">all time · each version</span></h2><div id="dl-github"></div></div>
+  </section>
   <section class="mix">
     <div class="card"><h2>Systems<span class="sub">30 days</span></h2><div class="bars" id="platforms"></div><div class="split"><span><i style="background:var(--accent)"></i>Installed app</span><span><i style="background:var(--blue)"></i>Browser</span></div></div>
     <div class="card"><h2>Browsers<span class="sub">web version · 30 days</span></h2><div class="bars" id="browsers"></div></div>
@@ -251,7 +255,7 @@ async function load() {
     $("mode").className = "pill " + (S.test ? "test" : "live");
     $("updated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     $("team-note").textContent = (S.team ? "Your team’s " + S.team + (S.team === 1 ? " computer is" : " computers are") + " left out of the numbers (signed in to an admin’s account, or marked as ours). " : "") + "The browser demo counts browsers, not people: a private window is a new one.";
-    kpis(); chart(); funnel(); mix(); usage();
+    kpis(); chart(); funnel(); mix(); usage(); downloads();
     tabs(); draw();
     if (open) show(open.kind, open.id, true);
   } catch (e) { say("Could not load: " + e.message); }
@@ -306,6 +310,30 @@ function usage() {
   $("usage-now").innerHTML = '<div class="stats3"><div><b>' + A.computers.day + " / " + A.computers.week + " / " + A.computers.month + "</b><span>computers · day / week / month</span></div><div><b>" + A.people.day + " / " + A.people.week + " / " + A.people.month + "</b><span>signed-in people</span></div><div><b>" + sticky + "%</b><span>DAU ÷ MAU</span></div></div>"
     + "<h3>Active each week</h3>" + (weeks.map((w) => '<div class="bar"><span class="name">' + date(w.week) + '</span><span class="track" title="' + w.people + ' signed in"><i style="width:' + (w.computers / wmax) * 100 + '%;background:var(--blue)"></i></span><em>' + w.computers + "</em></div>").join("") || '<p class="note">No weeks yet.</p>')
     + '<p class="note">Last 30 days: ' + last30.services + " services run · " + last30.scripture + " scripture shown · " + last30.songs + " songs shown. Churches peak once a week, so the weekly number says the most.</p>";
+}
+// Downloads: the website's own count (Analytics Engine) and GitHub's per-file counts.
+function downloads() {
+  const R = S.downloads || {}, site = R.site, gh = R.github;
+  const NAMES = { mac: "Mac", windows: "Windows", "windows-msi": "Windows (.msi)", linux: "Linux AppImage", "linux-deb": "Linux .deb", "linux-rpm": "Linux .rpm" };
+  if (!site) {
+    $("dl-chart").innerHTML = ""; $("dl-axis").innerHTML = "";
+    $("dl-site").innerHTML = '<p class="note">Website downloads are counted from now on. The numbers appear once the server can read Analytics Engine (the ANALYTICS_TOKEN secret).</p>';
+  } else {
+    const days = site.days, max = Math.max(1, ...days.map((d) => d.downloads)), w = 600 / Math.max(1, days.length);
+    $("dl-chart").innerHTML = days.map((d, i) => { const h = (d.downloads / max) * 155; return '<rect x="' + (i * w + 1) + '" y="' + (165 - h) + '" width="' + Math.max(1, w - 2) + '" height="' + h + '" rx="2" fill="var(--accent)"><title>' + d.day + ": " + d.downloads + "</title></rect>"; }).join("");
+    $("dl-axis").innerHTML = days.length ? "<span>" + date(days[0].day) + "</span><span>peak " + max + " a day</span><span>" + date(days[days.length - 1].day) + "</span>" : "<span>No downloads recorded yet.</span>";
+    const sum = (k) => site.platforms.reduce((t, p) => t + p[k], 0);
+    const top = Math.max(1, ...site.platforms.map((p) => p.month));
+    $("dl-site").innerHTML = '<div class="stats3"><div><b>' + sum("day") + '</b><span>today</span></div><div><b>' + sum("week") + '</b><span>7 days</span></div><div><b>' + sum("month") + " · " + sum("quarter") + '</b><span>30 · 90 days</span></div></div>'
+      + "<h3>By system · 30 days</h3>" + (site.platforms.map((p) => '<div class="bar"><span class="name">' + esc(NAMES[p.platform] || p.platform) + '</span><span class="track" title="' + p.week + " this week · " + p.quarter + ' in 90 days"><i style="width:' + Math.max(3, (p.month / top) * 100) + '%;background:var(--accent)"></i></span><em>' + p.month + "</em></div>").join("") || '<p class="note">None yet.</p>')
+      + (site.countries.length ? "<h3>Where from · 30 days</h3>" + bars(site.countries) : "");
+  }
+  if (!gh || gh.error) { $("dl-github").innerHTML = '<p class="note">Could not read GitHub: ' + esc((gh && gh.error) || "no answer") + "</p>"; return; }
+  const rows = gh.releases, all = rows.reduce((t, r) => ({ mac: t.mac + r.mac, windows: t.windows + r.windows, linux: t.linux + r.linux, updates: t.updates + r.updates }), { mac: 0, windows: 0, linux: 0, updates: 0 });
+  $("dl-github").innerHTML = '<div class="stats3"><div><b>' + (all.mac + all.windows + all.linux) + '</b><span>installers, all versions</span></div><div><b>' + all.mac + " / " + all.windows + " / " + all.linux + '</b><span>Mac / Windows / Linux</span></div><div><b>' + all.updates + '</b><span>Mac and Linux updates</span></div></div>'
+    + '<div class="table" style="margin-top:12px"><table><thead><tr><th>Version</th><th>Released</th><th>Mac</th><th>Windows</th><th>Linux</th><th>Updates</th></tr></thead><tbody>'
+    + rows.map((r) => "<tr><td>v" + esc(r.version) + "</td><td>" + date(r.date) + "</td><td>" + r.mac + "</td><td>" + r.windows + "</td><td>" + r.linux + "</td><td>" + r.updates + "</td></tr>").join("") + "</tbody></table></div>"
+    + '<p class="note">GitHub counts the app’s own updates (Windows updates use the installer, so they land under Windows) and only the website downloads Cloudflare did not already have a copy of. Files every version gets about equally often (.msi, .deb, .rpm, AppImage) are mostly link checkers and bots. The website count on the left is the one to watch.</p>';
 }
 function funnel() {
   const f = D.funnel, top = Math.max(1, f.computers);

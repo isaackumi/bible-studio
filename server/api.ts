@@ -33,6 +33,7 @@ import { licensesPage, privacyPage, refundsPage, securityPage, securityTxt, term
 import { checkPromo, CURRENCY, makePromo, normalizeCode, PERIOD_DAYS, priceAfter, type Interval, type Promo } from "./pricing.ts";
 import { getJson, putJson, type Store } from "./store.ts";
 import { readCounts, recordCheckIn, usageReport, type Usage } from "./usage.ts";
+import { downloadReport, recordDownload } from "./download-counts.ts";
 
 /** Where the server lives when no address is set (links and the logo in emails). */
 const DEFAULT_PUBLIC_URL = "https://church-studio.heitechinc.com";
@@ -213,7 +214,7 @@ async function releasedVersion(config: ApiConfig): Promise<string | null> {
   return (config.releases ? await config.releases().catch(() => null) : null)?.version ?? null;
 }
 
-async function serveDownload(config: ApiConfig, platform: Platform): Promise<Response> {
+async function serveDownload(config: ApiConfig, platform: Platform, request: Request): Promise<Response> {
   const release = config.releases ? await config.releases().catch(() => null) : null;
   const asset = release?.assets[platform];
   // Never back to the page the button is on: the release page lists every file.
@@ -222,6 +223,8 @@ async function serveDownload(config: ApiConfig, platform: Platform): Promise<Res
   // Kept near the visitor for a day when it worked; a failed answer is never kept.
   const upstream = await http(asset.url, { redirect: "follow", cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 86_400, "300-599": -1 } } } as RequestInit).catch(() => null);
   if (!upstream?.ok || !upstream.body) return new Response(null, { status: 302, headers: { location: upstream?.status === 404 ? RELEASES_PAGE : asset.url } });
+  // Counted here, not on GitHub: Cloudflare hands most installers over from its own copy.
+  if (request.method === "GET") recordDownload(config.usage, { platform, country: String((request as Request & { cf?: { country?: string } }).cf?.country ?? ""), version: release?.version ?? "" });
   return new Response(upstream.body, {
     status: 200,
     headers: {
@@ -300,7 +303,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === "/fonts/instrument-serif-italic.woff2") return file(INSTRUMENT_SERIF_ITALIC_WOFF2, "font/woff2", 31536000);
     if (path === "/share.jpg") return file(SHARE_IMAGE_JPEG, "image/jpeg", 604800);
     const download = path.match(/^\/download\/([a-z-]+)$/);
-    if (download) return serveDownload(config, download[1] as Platform);
+    if (download) return serveDownload(config, download[1] as Platform, request);
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
     if (path === "/features") return page(featuresPage(site, origin));
@@ -551,6 +554,7 @@ export async function stats(config: ApiConfig) {
     subscriptions: { active: activeSubs.length, refunded: subs.length - activeSubs.length, mrr: Math.round(mrr) },
     // Day by day, from Analytics Engine; an error is shown on the page instead of failing the rest.
     usage: await usageReport(config.usage).catch((error) => ({ error: error instanceof Error ? error.message : String(error) })),
+    downloads: await downloadReport(config.usage, config.fetcher ?? fetch),
     promos: (await listPromos(config.store)).map((promo) => ({ code: promo.code, used: promo.used, maxUses: promo.maxUses ?? null, expiresAt: promo.expiresAt ?? null })),
   };
 }
