@@ -1154,6 +1154,7 @@ export const es: Readonly<Record<string, string>> = {
   "It stays on this computer. The company may charge you for what you use.": "Se queda en esta computadora. La empresa puede cobrarte por lo que uses.",
   "The version of the AI to use. claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.": "La versión de la IA que se usa. claude-sonnet-5-5 es un buen equilibrio; claude-haiku-5-5 es más rápido y económico.",
   "The version of the AI to use. Press Find models to see the ones you can use.": "La versión de la IA que se usa. Pulsa Buscar modelos para ver los que puedes usar.",
+  "Choose a model first. Find models lists them.": "Primero elige un modelo. Buscar modelos los muestra.",
   "Choose a model": "Elige un modelo",
   "Model name": "Nombre del modelo",
   "Find models": "Buscar modelos",

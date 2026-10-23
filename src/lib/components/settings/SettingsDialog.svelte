@@ -1274,13 +1274,13 @@
                 {#each LOCAL_AI_APPS as app (app.name)}
                   <button type="button" class="btn" class:primary={ai.baseUrl === app.baseUrl} onclick={() => { session.setAiSettings({ baseUrl: app.baseUrl }); aiNote = ""; aiModels = []; modelsNote = ""; }}>{app.name}</button>
                 {/each}
-                <input class="field" aria-label={t("AI address")} placeholder={AI_DEFAULTS.local.baseUrl} value={ai.baseUrl} onchange={(event) => { session.setAiSettings({ baseUrl: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
+                <input class="field" aria-label={t("AI address")} placeholder={AI_DEFAULTS.local.baseUrl} value={ai.baseUrl} oninput={(event) => { session.setAiSettings({ baseUrl: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
               </div>
             </div>
           {:else}
             <div class="row">
               <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("Get one at console.anthropic.com › API Keys.") : ai.provider === "openai" ? t("Get one at platform.openai.com › API keys.") : t("Get one at aistudio.google.com › Get API key. Google has a free tier.")} {t("It stays on this computer. The company may charge you for what you use.")}</span></div>
-              <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
+              <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} oninput={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
             </div>
           {/if}
           <div class="row">
@@ -1292,7 +1292,7 @@
                   {#each aiModels as model (model)}<option value={model}>{model}</option>{/each}
                 </select>
               {:else}
-                <input class="field" aria-label={t("AI model")} placeholder={t("Model name")} value={ai.model} onchange={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }} />
+                <input class="field" aria-label={t("AI model")} placeholder={t("Model name")} value={ai.model} oninput={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }} />
               {/if}
               <button type="button" class="btn" disabled={modelsBusy || (ai.provider !== "local" && !ai.key)} onclick={async () => {
                 modelsBusy = true;
@@ -1304,8 +1304,9 @@
           </div>
           <div class="row">
             <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a short test to the AI.")}</span></div>
-            <button type="button" class="btn" disabled={!session.aiReady || aiBusy} onclick={async () => {
+            <button type="button" class="btn" disabled={aiBusy} onclick={async () => {
               aiBusy = true;
+              aiNote = "";
               try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
               aiBusy = false;
             }}>{aiBusy ? t("Checking…") : t("Test")}</button>

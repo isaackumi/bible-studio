@@ -4891,6 +4891,9 @@ class Session {
 
   /** A tiny request to check the key and model work. */
   testAi = async (): Promise<string> => {
+    const settings = this.workspace.ai;
+    if (settings.provider !== "local" && !settings.key) throw new Error(t("Paste your key first."));
+    if (!settings.model) throw new Error(t("Choose a model first. Find models lists them."));
     const result = await this.summarizeSermon({ title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." });
     return result.points.length ? tn(result.points.length, "Connected. The test made {n} point.", "Connected. The test made {n} points.") : t("Connected.");
   };

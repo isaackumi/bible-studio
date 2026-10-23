@@ -36,6 +36,7 @@ describe("sermon summary with the church's own AI key", () => {
     const reply = { data: [{ id: "models/gemini-3.8-flash" }, { id: "models/text-embedding-004" }, { id: "gpt-6-luna" }, { id: "tts-1" }, { id: "gpt-6-luna" }] };
     expect(parseModels(reply)).toEqual(["gemini-3.8-flash", "gpt-6-luna"]);
     expect(() => parseModels([{ error: { message: "API key not valid. Please pass a valid API key." } }])).toThrow(/did not accept the key/);
+    expect(() => replyText("gemini", [{ error: { code: 400, message: "Please pass a valid API key", status: "INVALID_ARGUMENT" } }])).toThrow(/did not accept the key/);
   });
 
   it("reads both kinds of reply and explains errors", () => {

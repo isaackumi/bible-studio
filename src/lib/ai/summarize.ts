@@ -184,7 +184,7 @@ export function replyText(provider: AiProvider, reply: unknown): string {
 }
 
 function friendlyError(message: string): string {
-  if (/invalid.*(api[- ]?key|x-api-key)|incorrect api key|api key not valid|authentication/i.test(message)) return "The AI service did not accept the key. Check it in Settings › AI assistant.";
+  if (/invalid.*(api[- ]?key|x-api-key)|incorrect api key|api key not valid|valid api key|authentication/i.test(message)) return "The AI service did not accept the key. Check it in Settings › AI assistant.";
   if (/model/i.test(message) && /not.*found|does not exist|invalid/i.test(message)) return `That model name was not found: ${message}`;
   if (/credit|quota|billing|insufficient/i.test(message)) return "The AI account has no credit left. Top it up with the provider.";
   return message;
