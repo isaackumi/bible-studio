@@ -401,7 +401,7 @@ ${chapter("production", 7, `A production desk, <span class="serif">built in.</sp
     </ul>
   </div>`)}
 
-${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.</span>`, "A remote in anyone's pocket, captions in each person's language, and questions, polls and Bible games with no app to install.", `
+${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.</span>`, "A remote in anyone's pocket, captions in each person's language, questions and polls, and quizzes played like a game show, with no app to install.", `
   <div class="duo flip">
     <div class="demo reveal"><h3>A remote that looks like the desk</h3><p>Pair with a QR code, over Wi-Fi or the internet; approved on the desk.</p>
       <div class="people">
@@ -433,6 +433,9 @@ ${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.<
   <ul class="list reveal" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
     ${item("Live captions", "On the screen and on phones through a QR code, translated into up to four languages by your AI.", "free")}
     ${item("Rooms for the congregation", "Q&A with upvotes and moderation, polls, quizzes and Bible games from your Bible.", "free")}
+    ${item("A game show on the screen", "Every player in their own colour: a lobby with the code and QR, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as points count up, a podium with confetti. Music and sounds. It can run by itself.", "free")}
+    ${item("Quizzes written by your AI", "From today's sermon, so you see who was listening; from a book you read together, a passage, a topic, or anything pasted. You check every question first.", "free")}
+    ${item("Phones in the game", "Each phone shows its colour, the answer shapes and the clock, then the points won, the streak and the place: 2nd of 23.", "free")}
   </ul>`)}
 
 ${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`, "⌘K goes to anything. Macros run a sequence; a Stream Deck or a phone presses the buttons.", `

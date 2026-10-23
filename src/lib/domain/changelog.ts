@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.2",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "users", title: msg("Quizzes like a game show"), text: msg("Each player gets a colour. The screen shows a lobby, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as their points count up, and a podium with confetti. Music and sounds, and it can run by itself.") },
+      { icon: "sparkles", title: msg("Quizzes written by your AI"), text: msg("From today's sermon, a book you are reading together, a Bible passage, a topic, or anything you paste: a summary, an article, notes or questions. You check every question before anyone plays.") },
+      { icon: "phone", title: msg("Phones in the game"), text: msg("Each phone shows its player's colour, the answer shapes and the clock, then their points, their streak and their place: 2nd of 23.") },
+      { icon: "speed", title: msg("Steady for a whole service"), text: msg("The audience screen stays awake, videos free their memory when they leave the screen, moving backgrounds take far less of the computer, and the Audience drawer opens to the full window.") },
+    ],
+  },
+  {
     version: "0.4.1",
     date: "2026-10-23",
     highlights: [

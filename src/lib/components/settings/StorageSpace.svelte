@@ -10,6 +10,8 @@
 
   type Usage = { library: number; media: number; models: number; cache: number; folder: string };
   let usage = $state<Usage | null>(null);
+  /** How much of the media nothing uses (null until counted). */
+  let unusedBytes = $state<number | null>(null);
   let busy = $state<"" | "cache" | "compact" | "model" | "find" | "remove">("");
   let note = $state("");
   type Unused = { id: string; name: string; path: string; bytes: number };
@@ -67,6 +69,10 @@
   async function refresh() {
     if (!isDesktop()) return;
     usage = await invoke<Usage>("storage_usage").catch(() => null);
+    // Counted after saving, so a picture just placed in a service is not called unused.
+    await session.flushSave().catch(() => {});
+    const found = await invoke<Unused[]>("storage_unused_media").catch(() => null);
+    unusedBytes = found ? found.reduce((sum, item) => sum + item.bytes, 0) : null;
   }
 
   $effect(() => {
@@ -115,8 +121,8 @@
       <button type="button" class="btn" disabled={!!busy} onclick={() => void compact()}>{busy === "compact" ? t("Compacting…") : t("Compact")}</button>
     </div>
     <div class="row">
-      <div class="row-copy"><strong>{t("Pictures and videos")} · {size(usage.media)}</strong><span>{t("Files added to Media. Find the ones nothing uses: no song, service, sermon, slide, look, theme or setting.")}</span></div>
-      <button type="button" class="btn" disabled={!!busy} onclick={() => void findUnused()}>{busy === "find" ? t("Looking…") : t("Find unused")}</button>
+      <div class="row-copy"><strong>{t("Pictures and videos")} · {size(usage.media)}</strong><span>{unusedBytes === null ? t("Files added to Media. Find the ones nothing uses: no song, service, sermon, slide, look, theme or setting.") : unusedBytes ? t("Files added to Media. {size} of it is used nowhere: no song, service, sermon, slide, look, theme or setting.", { size: size(unusedBytes) }) : t("Files added to Media. Every one is used somewhere.")}</span></div>
+      <button type="button" class="btn" disabled={!!busy || unusedBytes === 0} onclick={() => void findUnused()}>{busy === "find" ? t("Looking…") : t("Find unused")}</button>
     </div>
     {#if usage.models}
       <div class="row">
