@@ -25,6 +25,39 @@
   const shownReport = $derived(reports.find((report) => report.id === openReport) ?? null);
   const percent = (share: number | null) => (share === null ? "–" : `${Math.round(share * 100)}%`);
 
+  // Finding a game in a long list: words match titles, series, descriptions and question text.
+  let query = $state("");
+  let show = $state<"all" | "quiz" | "poll" | "mine">("all");
+  const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const everything = $derived([...mine, ...BUILT_IN_GAMES]);
+  const searching = $derived(query.trim() !== "" || show !== "all");
+  const results = $derived.by(() => {
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    return everything.filter((game) => {
+      if (show === "mine" && game.id.startsWith("builtin:")) return false;
+      if ((show === "quiz" || show === "poll") && game.kind !== show) return false;
+      if (!words.length) return true;
+      const builtIn = game.id.startsWith("builtin:");
+      const text = fold([builtIn ? t(game.title) : game.title, builtIn ? t(game.description) : game.description, game.series ?? "", ...game.questions.flatMap((question) => [question.prompt, ...question.choices])].join(" "));
+      return words.every((word) => text.includes(word));
+    });
+  });
+  const recent = $derived(audienceRoom.recentGames.map((id) => everything.find((game) => game.id === id)).filter((game): game is Game => !!game).slice(0, 3));
+
+  /** Delete asks once more: a second click within a few seconds. */
+  let armed = $state<string | null>(null);
+  let armTimer: ReturnType<typeof setTimeout> | undefined;
+  function removeGame(id: string) {
+    clearTimeout(armTimer);
+    if (armed === id) {
+      armed = null;
+      session.removeGame(id);
+      return;
+    }
+    armed = id;
+    armTimer = setTimeout(() => (armed = null), 3000);
+  }
+
   function playSeries(name: string) {
     const game = seriesFinal(mine, name);
     if (game) audienceRoom.play({ ...game, title: t("{series}: series final", { series: name }) });
@@ -251,78 +284,94 @@
       {#if session.aiOn("games")}<button type="button" class="btn ai" onclick={() => { asking = true; aiError = ""; }}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>{/if}
     </div>
     {#if note}<p class="note">{note}</p>{/if}
-    <div class="teams-pick" role="radiogroup" aria-label={t("Teams")}>
-      <span>{t("Teams")}</span>
-      <button type="button" role="radio" aria-checked={audienceRoom.teams === 0} class:on={audienceRoom.teams === 0} onclick={() => audienceRoom.setTeams(0)}>{t("Off")}</button>
-      {#each Array.from({ length: MOST_TEAMS - 1 }, (_, i) => i + 2) as count (count)}
-        <button type="button" role="radio" aria-checked={audienceRoom.teams === count} class:on={audienceRoom.teams === count} onclick={() => audienceRoom.setTeams(count)}>
-          {#each TEAMS.slice(0, count) as team (team.name)}<i style:background={team.color}></i>{/each}{count}
-        </button>
-      {/each}
-    </div>
-    {#if audienceRoom.teams}<p class="note">{t("Players are split into teams as they join, evenly. A team's score is its players' average, so a small team can win.")}</p>{/if}
-    {#if audienceRoom.lastReport}
-      <ReportCard report={audienceRoom.lastReport} onclose={() => (audienceRoom.lastReport = null)} />
-    {/if}
-    {#each seriesNames as name (name)}
-      {@const games = mine.filter((game) => game.series === name)}
-      {@const quizzes = games.filter((game) => game.kind === "quiz").length}
-      <div class="series-head">
-        <h3>{name}</h3>
-        {#if quizzes >= 2}<button type="button" class="btn" title={t("Questions from every quiz in the series, mixed")} onclick={() => playSeries(name)}>{t("Play the series final")}</button>{/if}
+    <div class="find">
+      <span class="search"><Icon name="search" size={14} /><input type="text" bind:value={query} placeholder={t("Search games, series and questions")} aria-label={t("Search games")} />{#if query}<button type="button" class="x" aria-label={t("Clear search")} onclick={() => (query = "")}>×</button>{/if}</span>
+      <div class="chips" role="radiogroup" aria-label={t("Show")}>
+        {#each [{ id: "all", label: t("All") }, { id: "quiz", label: t("Quizzes") }, { id: "poll", label: t("Polls") }, { id: "mine", label: t("Mine") }] as chip (chip.id)}
+          <button type="button" role="radio" aria-checked={show === chip.id} class:on={show === chip.id} onclick={() => (show = chip.id as typeof show)}>{chip.label}</button>
+        {/each}
       </div>
-      {#each games as game (game.id)}
-        <div class="game">
-          <div><strong>{game.title}</strong><span>{game.kind === "poll" ? t("Poll") : t("Quiz")} · {tn(game.questions.length, "{n} question", "{n} questions")}</span></div>
-          <button type="button" class="btn accent" onclick={() => audienceRoom.play(game)}>{t("Play")}</button>
-          <button type="button" class="btn" onclick={() => (editing = structuredClone($state.snapshot(game)) as Game)}>{t("Edit")}</button>
-          <button type="button" class="btn" onclick={() => session.removeGame(game.id)}>{t("Delete")}</button>
-        </div>
-      {/each}
-    {/each}
-    {#if loose.length}
-      <h3>{seriesNames.length ? t("Other games") : t("Your games")}</h3>
-      {#each loose as game (game.id)}
-        <div class="game">
-          <div><strong>{game.title}</strong><span>{game.kind === "poll" ? t("Poll") : t("Quiz")} · {tn(game.questions.length, "{n} question", "{n} questions")}</span></div>
-          <button type="button" class="btn accent" onclick={() => audienceRoom.play(game)}>{t("Play")}</button>
-          <button type="button" class="btn" onclick={() => (editing = structuredClone($state.snapshot(game)) as Game)}>{t("Edit")}</button>
-          <button type="button" class="btn" onclick={() => session.removeGame(game.id)}>{t("Delete")}</button>
-        </div>
-      {/each}
-    {/if}
-    {#if reports.length}
-      <h3>{t("Who was listening")}</h3>
-      {#if shownReport}
-        <ReportCard report={shownReport} onclose={() => (openReport = null)} ondelete={() => { session.removeGameReport(shownReport.id); openReport = null; }} />
-      {/if}
-      {#each reports.slice(0, 10) as report (report.id)}
-        {#if report.id !== openReport}
-          <button type="button" class="game report-row" onclick={() => (openReport = report.id)}>
-            <div><strong>{report.title}</strong><span>{new Date(report.at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {tn(report.players, "{n} player", "{n} players")}</span></div>
-            <b>{percent(reportSummary(report).right)}</b>
+    </div>
+    {#if searching}
+      <h3>{tn(results.length, "{n} game found", "{n} games found")}</h3>
+      {#each results as game (game.id)}{@render gameRow(game)}{:else}<p class="note">{t("No game matches. Try other words, or All.")}</p>{/each}
+    {:else}
+      <div class="teams-pick" role="radiogroup" aria-label={t("Teams")}>
+        <span>{t("Teams")}</span>
+        <button type="button" role="radio" aria-checked={audienceRoom.teams === 0} class:on={audienceRoom.teams === 0} onclick={() => audienceRoom.setTeams(0)}>{t("Off")}</button>
+        {#each Array.from({ length: MOST_TEAMS - 1 }, (_, i) => i + 2) as count (count)}
+          <button type="button" role="radio" aria-checked={audienceRoom.teams === count} class:on={audienceRoom.teams === count} onclick={() => audienceRoom.setTeams(count)}>
+            {#each TEAMS.slice(0, count) as team (team.name)}<i style:background={team.color}></i>{/each}{count}
           </button>
-        {/if}
-      {/each}
-    {/if}
-    <h3>{t("Made from your Bible")}</h3>
-    <div class="game">
-      <div><strong>{t("Which book?")}</strong><span>{t("Name the book each verse comes from. Different every time.")}</span></div>
-      <button type="button" class="btn accent" disabled={!!making} onclick={() => make("which-book")}>{making === "which-book" ? t("Making…") : t("Play")}</button>
-    </div>
-    <div class="game">
-      <div><strong>{t("Finish the verse")}</strong><span>{t("Choose how each verse ends. Different every time.")}</span></div>
-      <button type="button" class="btn accent" disabled={!!making} onclick={() => make("finish-verse")}>{making === "finish-verse" ? t("Making…") : t("Play")}</button>
-    </div>
-    <h3>{t("Ready to play")}</h3>
-    {#each BUILT_IN_GAMES as game (game.id)}
-      <div class="game">
-        <div><strong>{t(game.title)}</strong><span>{t(game.description)}</span></div>
-        <button type="button" class="btn accent" onclick={() => audienceRoom.play(game)}>{t("Play")}</button>
-        <button type="button" class="btn" title={t("Make your own copy to change")} onclick={() => (editing = { ...structuredClone(game), id: `game:${Math.random().toString(36).slice(2, 10)}`, title: t("{title} (copy)", { title: t(game.title) }) })}>{t("Copy")}</button>
+        {/each}
       </div>
-    {/each}
+      {#if audienceRoom.teams}<p class="note">{t("Players are split into teams as they join, evenly. A team's score is its players' average, so a small team can win.")}</p>{/if}
+      {#if audienceRoom.lastReport}
+        <ReportCard report={audienceRoom.lastReport} onclose={() => (audienceRoom.lastReport = null)} />
+      {/if}
+      {#if recent.length}
+        <h3>{t("Recently played")}</h3>
+        {#each recent as game (game.id)}{@render gameRow(game)}{/each}
+      {/if}
+      {#each seriesNames as name (name)}
+        {@const games = mine.filter((game) => game.series === name)}
+        {@const quizzes = games.filter((game) => game.kind === "quiz").length}
+        <div class="series-head">
+          <h3>{name}</h3>
+          {#if quizzes >= 2}<button type="button" class="btn" title={t("Questions from every quiz in the series, mixed")} onclick={() => playSeries(name)}>{t("Play the series final")}</button>{/if}
+        </div>
+        {#each games as game (game.id)}{@render gameRow(game)}{/each}
+      {/each}
+      {#if loose.length}
+        <h3>{seriesNames.length ? t("Other games") : t("Your games")}</h3>
+        {#each loose as game (game.id)}{@render gameRow(game)}{/each}
+      {/if}
+      {#if reports.length}
+        <h3>{t("Who was listening")}</h3>
+        {#if shownReport}
+          <ReportCard report={shownReport} onclose={() => (openReport = null)} ondelete={() => { session.removeGameReport(shownReport.id); openReport = null; }} />
+        {/if}
+        {#each reports.slice(0, 10) as report (report.id)}
+          {#if report.id !== openReport}
+            <button type="button" class="game report-row" onclick={() => (openReport = report.id)}>
+              <div><strong>{report.title}</strong><span>{new Date(report.at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {tn(report.players, "{n} player", "{n} players")}</span></div>
+              <b>{percent(reportSummary(report).right)}</b>
+            </button>
+          {/if}
+        {/each}
+      {/if}
+      <h3>{t("Made from your Bible")}</h3>
+      <div class="game">
+        <div><strong>{t("Which book?")}</strong><span>{t("Name the book each verse comes from. Different every time.")}</span></div>
+        <button type="button" class="btn accent" disabled={!!making} onclick={() => make("which-book")}>{making === "which-book" ? t("Making…") : t("Play")}</button>
+      </div>
+      <div class="game">
+        <div><strong>{t("Finish the verse")}</strong><span>{t("Choose how each verse ends. Different every time.")}</span></div>
+        <button type="button" class="btn accent" disabled={!!making} onclick={() => make("finish-verse")}>{making === "finish-verse" ? t("Making…") : t("Play")}</button>
+      </div>
+      {#if show !== "mine"}
+        <h3>{t("Ready to play")}</h3>
+        {#each BUILT_IN_GAMES as game (game.id)}{@render gameRow(game)}{/each}
+      {/if}
+    {/if}
   </section>
+
+  {#snippet gameRow(game: Game)}
+    {@const builtIn = game.id.startsWith("builtin:")}
+    <div class="game">
+      <div>
+        <strong>{builtIn ? t(game.title) : game.title}</strong>
+        <span>{builtIn && game.description ? t(game.description) : `${game.kind === "poll" ? t("Poll") : t("Quiz")} · ${tn(game.questions.length, "{n} question", "{n} questions")}${game.series ? ` · ${game.series}` : ""}`}</span>
+      </div>
+      <button type="button" class="btn accent" onclick={() => audienceRoom.play(game)}>{t("Play")}</button>
+      {#if builtIn}
+        <button type="button" class="btn icon" title={t("Make your own copy to change")} aria-label={t("Copy")} onclick={() => (editing = { ...structuredClone(game), id: `game:${Math.random().toString(36).slice(2, 10)}`, title: t("{title} (copy)", { title: t(game.title) }) })}><Icon name="copy" size={14} /></button>
+      {:else}
+        <button type="button" class="btn icon" title={t("Edit")} aria-label={t("Edit")} onclick={() => (editing = structuredClone($state.snapshot(game)) as Game)}><Icon name="pencil" size={14} /></button>
+        <button type="button" class="btn icon" class:armed={armed === game.id} title={armed === game.id ? t("Click again to delete") : t("Delete")} aria-label={t("Delete")} onclick={() => removeGame(game.id)}><Icon name="trash" size={14} /></button>
+      {/if}
+    </div>
+  {/snippet}
 {/if}
 
 <style>
@@ -343,6 +392,15 @@
   .game strong { font-size: 13px; }
   .game span { color: var(--muted); font-size: 12px; }
   .note { margin: 0; color: var(--muted); font-size: 12px; }
+  .find { display: grid; gap: 6px; }
+  .search { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); }
+  .search:focus-within { border-color: var(--accent); }
+  .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; outline: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chips button { height: 24px; padding: 0 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+  .chips button.on { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .btn.icon { width: 28px; padding: 0; display: inline-grid; place-items: center; }
+  .btn.armed { border-color: var(--danger, #ff6b6b); color: var(--danger, #ff6b6b); }
   .teams-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .teams-pick > span { color: var(--muted); font-size: 12px; margin-right: 2px; }
   .teams-pick button { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }

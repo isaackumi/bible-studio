@@ -150,6 +150,7 @@ import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sani
 import type { SongMatch } from "../ai/songs";
 import { AiAssistant, sermonText } from "./ai-assistant";
 import { ServiceChecks } from "./service-checks.svelte";
+import { LiveNotes } from "./live-notes.svelte";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
@@ -2833,6 +2834,7 @@ class Session {
     }
     // Everything heard goes to the desk's transcript; the screen and phones get it only with captions on.
     this.hearCaption(latest, final);
+    if (final) this.liveNotes.hear(latest);
     this.followSermon(text);
     for (const listener of this.voiceListeners) listener(text, final, alternatives);
   };
@@ -4924,6 +4926,16 @@ class Session {
   makeGameWithAi = (input: Parameters<AiAssistant["makeGame"]>[0]) => this.assistant.makeGame(input);
   sermonText = sermonText;
 
+  /** Notes taken while the pastor preaches (live-notes.svelte.ts): words heard, tidied by the AI. */
+  liveNotes = new LiveNotes({
+    sermon: (id) => this.sermons.find((entry) => entry.id === id),
+    save: (sermon) => this.saveSermonQuietly(sermon),
+    listening: () => this.voice.status === "listening" || this.voice.status === "starting",
+    startListening: () => this.startVoice(),
+    canTidy: () => aiReady(this.workspace.ai) && aiFeatureOn(this.workspace.ai, "notes"),
+    tidy: (input) => this.assistant.tidyNotes(input),
+  });
+
   /**
    * Look up a song with AI, asked for elsewhere (Settings, a sermon's suggestions): what to look up
    * ("" to let the operator type), waiting until the Songs page opens it. null: nothing asked.
@@ -6522,7 +6534,9 @@ class Session {
   };
 
   saveSermon = async (sermon: Sermon): Promise<boolean> => {
-    const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
+    // The editor knows nothing of live notes: keep the ones being taken (or taken before).
+    const kept = sermon.live ?? this.sermons.find((entry) => entry.id === sermon.id)?.live;
+    const clean = sanitizeSermon({ ...sermon, ...(kept ? { live: kept } : {}), updatedAt: new Date().toISOString() });
     const error = sermonError(clean);
     if (error) {
       this.warn(error);
@@ -6533,6 +6547,13 @@ class Session {
     if (this.sermonFocus?.sermonId === clean.id) void this.previewSermonSection(clean, this.sermonFocus.sectionId);
     this.message = t("{title} saved. Notes stay on the desk.", { title: clean.title });
     return true;
+  };
+
+  /** Save live notes as they come in, with no message: it happens every few seconds during a sermon. */
+  private saveSermonQuietly = async (sermon: Sermon) => {
+    const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
+    await api.sermonSave(clean);
+    this.sermons = this.sermons.some((entry) => entry.id === clean.id) ? this.sermons.map((entry) => (entry.id === clean.id ? clean : entry)) : [clean, ...this.sermons];
   };
 
   deleteSermon = async (id: string) => {

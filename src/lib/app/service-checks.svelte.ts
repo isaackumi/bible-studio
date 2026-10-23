@@ -76,7 +76,7 @@ export class ServiceChecks {
     const missing = needs.filter((need) => need.gone || (need.path >= 0 && missingFiles.has(need.path))).map((need) => need.title || t("Untitled"));
 
     const ai = this.host.workspace.ai;
-    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games"] as const).some((feature) => aiFeatureOn(ai, feature));
+    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games", "notes"] as const).some((feature) => aiFeatureOn(ai, feature));
     const needed = [
       ...(aiUsed && ai.provider !== "local" ? [t("the AI")] : []),
       ...(this.host.remoteVia === "internet" && this.host.remoteDevices.length ? [t("the phone remote")] : []),

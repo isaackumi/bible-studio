@@ -9,6 +9,7 @@
   import RichView from "../../RichView.svelte";
   import ItemThumb from "../ItemThumb.svelte";
   import SermonRail from "./SermonRail.svelte";
+  import LiveNotesCard from "./LiveNotesCard.svelte";
 
   // Preach mode: the section being preached in large type for whoever runs the screen (or the
   // preacher at a confidence monitor), its time against the plan, and what comes next. One button
@@ -134,6 +135,7 @@
         <button type="button" class="desk-btn primary big" disabled={!next} onclick={() => next && void toLive(next.id)}>{t("Next to LIVE")} <Icon name="chevron-right" size={16} /></button>
         <button type="button" class="desk-btn" disabled={!previous} onclick={() => previous && void toLive(previous.id)}><Icon name="chevron-left" size={14} /> {t("Back")}</button>
       </div>
+      <LiveNotesCard {sermon} compact />
     </aside>
   </div>
 </section>

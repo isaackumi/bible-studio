@@ -401,7 +401,11 @@ export type Sermon = {
   series?: string;
   /** The day it is (or was) preached, YYYY-MM-DD. Absent: not set. */
   date?: string;
+  /** Notes taken live while it was preached: everything heard, and the AI's clean notes of it. */
+  live?: SermonLive;
 };
+
+export type SermonLive = { transcript: string; notes: string; updatedAt: string };
 
 export type MediaAsset = {
   id: string;

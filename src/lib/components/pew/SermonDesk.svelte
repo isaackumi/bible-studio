@@ -14,6 +14,7 @@
   import SermonEditor from "./sermon/SermonEditor.svelte";
   import SermonPreach from "./sermon/SermonPreach.svelte";
   import SermonRail from "./sermon/SermonRail.svelte";
+  import LiveNotesCard from "./sermon/LiveNotesCard.svelte";
   import { t, tn } from "../../i18n/core";
 
   // Sermon window: a library of sermons (by series), the outline as a timeline and cards (what the
@@ -297,6 +298,7 @@
       {#if selected.sections.length}
         <SermonRail sermon={selected} {previewId} {liveId} onpick={(id) => show(selected, id)} />
       {/if}
+      <LiveNotesCard sermon={selected} />
       {#if selected.notes.trim()}
         <div class="sermon-notes"><Icon name="lock" size={12} /> {#if selected.notesRich}<RichView doc={selected.notesRich} base="1em" />{:else}{selected.notes}{/if}</div>
       {/if}

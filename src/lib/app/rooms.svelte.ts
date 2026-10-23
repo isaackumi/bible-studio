@@ -248,6 +248,8 @@ class AudienceRoom {
     }
     this.playing = { game: { ...game, questions }, index: 0 };
     this.lastGame = null;
+    this.recentGames = [game.id, ...this.recentGames.filter((id) => id !== game.id)].slice(0, MOST_RECENT);
+    writeRecent(this.recentGames);
     this.rounds = [];
     this.lastReport = null;
     void this.activity({ action: "reset-scores" })
@@ -334,6 +336,9 @@ class AudienceRoom {
   follow = $state(readPrefs().follow);
   /** Music and sound effects on the audience screen. */
   sounds = $state(readPrefs().sounds);
+  /** Games played lately, newest first (their ids), for the Games tab's Recently played. */
+  recentGames = $state<string[]>(readRecent());
+
   /** Team mode for the next quiz: 0 (everyone for themselves) or 2 to 4 teams. */
   teams = $state(readPrefs().teams);
   /** The report of the quiz that just ended, shown on the desk until the next game starts. */
@@ -515,6 +520,26 @@ class AudienceRoom {
 }
 
 export const audienceRoom = new AudienceRoom();
+
+const RECENT_KEY = "church-studio:recent-games";
+const MOST_RECENT = 6;
+
+function readRecent(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as unknown;
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string").slice(0, MOST_RECENT) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(ids: string[]) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(ids));
+  } catch {
+    // Remembered for this visit only.
+  }
+}
 
 type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean; teams: number };
 

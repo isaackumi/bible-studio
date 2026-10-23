@@ -3,7 +3,7 @@ import { searchWords, wordsFound, wordsNeeded } from "./match-words";
 import { isRundownKind } from "./content";
 import { moveInList } from "./service";
 import { CANON, parseReference, type CanonBook } from "../bible/reference";
-import type { PresentationItem, PresentationModel, Sermon, SermonSection } from "./types";
+import type { PresentationItem, PresentationModel, Sermon, SermonLive, SermonSection } from "./types";
 
 export type SermonHit = {
   sermonId: string;
@@ -93,7 +93,21 @@ export function sanitizeSermon(sermon: Sermon): Sermon {
     updatedAt: sermon.updatedAt || new Date().toISOString(),
     ...(String(sermon.series ?? "").trim() ? { series: String(sermon.series).trim().slice(0, 80) } : {}),
     ...(/^\d{4}-\d{2}-\d{2}$/.test(String(sermon.date ?? "")) ? { date: String(sermon.date) } : {}),
+    ...keptLive(sermon.live),
   };
+}
+
+/** About three hours of speech, and generous notes: past that, the oldest words go first. */
+export const MOST_TRANSCRIPT_CHARS = 200_000;
+export const MOST_LIVE_NOTES_CHARS = 30_000;
+
+function keptLive(live: unknown): { live?: SermonLive } {
+  if (!live || typeof live !== "object") return {};
+  const input = live as Record<string, unknown>;
+  const transcript = String(input.transcript ?? "").slice(-MOST_TRANSCRIPT_CHARS);
+  const notes = String(input.notes ?? "").slice(0, MOST_LIVE_NOTES_CHARS);
+  if (!transcript.trim() && !notes.trim()) return {};
+  return { live: { transcript, notes, updatedAt: typeof input.updatedAt === "string" ? input.updatedAt : new Date(0).toISOString() } };
 }
 
 function keptMinutes(value: unknown): { minutes?: number } {

@@ -630,6 +630,7 @@
     { feature: "songLookup", title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
     { feature: "captions", title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
     { feature: "verses", title: msg("Verses by meaning, while listening"), about: msg("When the preacher paraphrases a verse or describes it, the AI names it: sure ones go on Preview, others wait under Detections. Only phrases that sound like scripture are sent. Off until you switch it on."), where: msg("Open Scripture"), open: () => { close(); session.goToDesk("presenter", "scriptures"); } },
+    { feature: "notes", title: msg("Live sermon notes"), about: msg("While the pastor preaches and listening is on, the AI turns what it hears into clean notes every few minutes and puts misheard words right. You accept each version. Sermon page › Take live notes."), where: msg("Open Sermon"), open: openSermonPage },
     { feature: "games", title: msg("Quizzes from a sermon or a reading"), about: msg("Writes a quiz from today's sermon, a book you are reading together, a passage or a topic, to play on phones. You check every question first. Audience › Quizzes and polls › Make with AI."), where: msg("Open Audience"), open: () => { close(); audienceRoom.show(); } },
   ];
 

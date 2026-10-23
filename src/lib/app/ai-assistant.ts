@@ -4,6 +4,7 @@ import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
 import { aiFeatureOn, aiReady, modelsRequest, parseModels, parseSummary, replyText, summaryRequest, type AiFeature, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 import { parseHeardVerses, versesRequest, VERSE_ASK_GAP_SECONDS, type HeardVerse } from "../ai/verses";
+import { liveNotesRequest, parseLiveNotes } from "../ai/live-notes";
 import { deckFromOutline, type SlideDeck } from "../domain/decks";
 import type { Game } from "../domain/games";
 import { parseLyrics, sanitizeSong } from "../domain/song";
@@ -137,6 +138,14 @@ export class AiAssistant {
     return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
   };
 
+  /** Live sermon notes: the notes so far, updated with the newest words heard (live-notes.svelte.ts). */
+  tidyNotes = async (input: { title: string; notes: string; heard: string }): Promise<string> => {
+    const settings = this.settingsFor("notes");
+    const notes = parseLiveNotes(replyText(settings.provider, await this.post(liveNotesRequest(settings, input))));
+    if (!notes) throw new Error(t("The AI answer was not in the expected shape. Try again."));
+    return notes;
+  };
+
   /** A quiz written by the AI, not saved: the operator checks every question in the editor first. */
   makeGame = async (input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): Promise<Game> => {
     const settings = this.settingsFor("games");
@@ -145,12 +154,13 @@ export class AiAssistant {
   };
 }
 
-/** A sermon as plain words for the AI: its notes, then each part's name, notes, slides and verses. */
+/** A sermon as plain words for the AI: its notes, then each part's name, notes, slides and verses, then notes taken live. */
 export function sermonText(sermon: Sermon): string {
   const parts = [sermon.notes.trim()];
   for (const section of sermon.sections) {
     const lines = [section.name, section.notes, ...section.items.map((item) => (item.slide ? `${item.slide.heading}\n${item.slide.body}` : item.bible ? item.title : ""))].map((line) => line.trim()).filter(Boolean);
     if (lines.length) parts.push(lines.join("\n"));
   }
+  if (sermon.live?.notes.trim()) parts.push(`Notes taken while it was preached:\n${sermon.live.notes.trim()}`);
   return parts.filter(Boolean).join("\n\n");
 }
