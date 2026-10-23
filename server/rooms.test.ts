@@ -102,6 +102,44 @@ describe("rooms: quizzes and polls", () => {
     expect(data<View>(await core.view(null)).leaderboard![0]!.score).toBe(before);
   });
 
+  it("gives each player a colour number, a streak, and a ranking that shows who moved up", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const names = ["Ama", "Kofi", "Esi", "Yaw", "Abena", "Kwame", "Efua", "Kojo", "Adjoa", "Kwesi", "Akua", "Fiifi", "Nana"];
+    const pids: string[] = [];
+    for (const name of names) {
+      const joined = data<{ pid: string; n: number }>(await core.join(name, ""));
+      expect(joined.n).toBe(pids.length);
+      pids.push(joined.pid);
+    }
+    const ask = (round: number) => core.activity(hostKey, { action: "open", kind: "quiz", game: "G", round, total: 2, question: { prompt: `Q${round}`, choices: ["right", "wrong"], correct: 0, seconds: 20, points: 1000 } });
+    // Round 1: only Kofi is right. Round 2: Kofi and Nana (the last to join, so 13th on a tie) are right: Nana climbs to 2nd.
+    data(await ask(1));
+    data(await core.answer(pids[1], 0));
+    data(await core.answer(pids[0], 1));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    data(await ask(2));
+    data(await core.answer(pids[1], 0));
+    data(await core.answer(pids[12], 0));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    type Host = { ranking: { players: number; top: Array<{ n: number; name: string; score: number; before: number; gain: number; streak: number; rank: number; was: number }>; bottom: Array<{ name: string }> }; joined: Array<{ n: number; name: string }> };
+    const host = data<Host>(await core.hostView(hostKey));
+    expect(host.ranking.players).toBe(13);
+    const [first, second] = host.ranking.top;
+    expect(first).toMatchObject({ name: "Kofi", rank: 1, was: 1, streak: 2 });
+    expect(first!.score).toBe(first!.before + first!.gain);
+    expect(second).toMatchObject({ name: "Nana", rank: 2, was: 13, streak: 1 });
+    // A second right answer in a row earns the streak's extra 100 (both answered at once here).
+    expect(first!.gain).toBe(second!.gain + 100);
+    expect(host.ranking.top).toHaveLength(10);
+    expect(host.ranking.bottom).toHaveLength(3);
+    expect(host.joined.at(-1)).toMatchObject({ n: 12, name: "Nana" });
+    // The phone learns its own standing, never anyone's id.
+    const mine = data<View & { me: { n: number } }>(await core.view(pids[12]));
+    expect(mine.me.n).toBe(12);
+    expect(mine.activity).toMatchObject({ gain: second!.gain, streak: 1, rank: 2, players: 13 });
+  });
+
   it("runs a poll with no right answer, and refuses a quiz question without one", async () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));

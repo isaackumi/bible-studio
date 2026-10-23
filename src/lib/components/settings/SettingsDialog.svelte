@@ -15,6 +15,7 @@
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
+  import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
   import { COMMANDS } from "../../commands/registry";
   import { audienceStatus } from "../../display/status";
@@ -629,6 +630,7 @@
     { feature: "songLookup", title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
     { feature: "captions", title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
     { feature: "verses", title: msg("Verses by meaning, while listening"), about: msg("When the preacher paraphrases a verse or describes it, the AI names it: sure ones go on Preview, others wait under Detections. Only phrases that sound like scripture are sent. Off until you switch it on."), where: msg("Open Scripture"), open: () => { close(); session.goToDesk("presenter", "scriptures"); } },
+    { feature: "games", title: msg("Quizzes from a sermon or a reading"), about: msg("Writes a quiz from today's sermon, a book you are reading together, a passage or a topic, to play on phones. You check every question first. Audience › Quizzes and polls › Make with AI."), where: msg("Open Audience"), open: () => { close(); audienceRoom.show(); } },
   ];
 
   function setMode(mode: OutputMode) {

@@ -13,6 +13,7 @@
   import { videoPosition } from "../domain/types";
   import FrameView from "./FrameView.svelte";
   import QrView from "./QrView.svelte";
+  import GameScreen from "./game/GameScreen.svelte";
   import MotionBackground from "./MotionBackground.svelte";
   import OverlayLayer from "./OverlayLayer.svelte";
   import AnnouncementView from "./AnnouncementView.svelte";
@@ -347,6 +348,8 @@
     <div class="ann-wrap" style:text-transform={effects["text-transform"]} style:text-shadow={effects["text-shadow"]} style:font-style={effects["font-style"]}>
       <AnnouncementView paint={model.announcement} fontSize={model.theme.fontSize} align={model.theme.align} />
     </div>
+  {:else if model.layout === "game" && model.game}
+    <GameScreen data={model.game} {audio} />
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}

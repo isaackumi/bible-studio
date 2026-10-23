@@ -2,6 +2,19 @@
 // and polls. One small page, no app, any connection. Words from the room are always set as text,
 // never as HTML, so nothing anyone types can run on another person's phone.
 
+import { CHOICE_STYLES, PLAYER_COLORS } from "../src/lib/domain/game-colors";
+
+// The answer shapes, the same as on the big screen, so a player can match their tile at a glance.
+const SHAPE_PATHS: Record<(typeof CHOICE_STYLES)[number]["shape"], string> = {
+  triangle: '<path d="M12 3 22 20H2z"/>',
+  diamond: '<path d="M12 2 22 12 12 22 2 12z"/>',
+  circle: '<circle cx="12" cy="12" r="9.5"/>',
+  square: '<rect x="3" y="3" width="18" height="18" rx="2"/>',
+  star: '<path d="m12 2 2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/>',
+  hexagon: '<path d="M12 2 21 7v10l-9 5-9-5V7z"/>',
+};
+const SHAPE_SVG = CHOICE_STYLES.map((style) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SHAPE_PATHS[style.shape]}</svg>`);
+
 export function roomPage(code: string, origin: string): string {
   const safe = code.replace(/[^A-Z0-9]/g, "");
   if (!safe) return entryPage();
@@ -58,7 +71,30 @@ export function roomPage(code: string, origin: string): string {
   .choice .fill { position: absolute; inset: 0 auto 0 0; background: rgb(255 255 255 / 0.18); }
   .choice span.label { position: relative; flex: 1; }
   .choice .count { position: relative; font-size: 14px; }
-  .c0 { background: #e5484d; } .c1 { background: #3e63dd; } .c2 { background: #d4a017; } .c3 { background: #30a46c; } .c4 { background: #8e4ec6; } .c5 { background: #12a5b8; }
+  .c0 { background: #e21b3c; } .c1 { background: #1368ce; } .c2 { background: #d89e00; } .c3 { background: #26890c; } .c4 { background: #864cbf; } .c5 { background: #0aa3a3; }
+  .choice .mark svg { width: 18px; height: 18px; fill: #fff; }
+  .choice:not(:disabled):active { transform: scale(0.97); }
+  .choices.big { grid-template-columns: 1fr 1fr; }
+  .choices.big .choice { min-height: 96px; flex-direction: column; align-items: flex-start; justify-content: space-between; }
+  /* Who I am: my own colour, the same one the big screen gives me. */
+  .me { display: inline-flex; align-items: center; gap: 7px; max-width: 50%; padding: 4px 10px 4px 4px; border-radius: 999px; background: color-mix(in srgb, var(--me, var(--accent)) 22%, transparent); font-size: 13px; font-weight: 750; }
+  .me i { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--me, var(--accent)); color: #fff; font-style: normal; font-size: 12px; }
+  .me span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .activity { border-color: color-mix(in srgb, var(--me, var(--accent)) 45%, var(--line)); }
+  .clock { float: right; min-width: 44px; height: 44px; margin: -4px 0 6px 10px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 3px solid var(--accent); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .clock.hurry { border-color: #e21b3c; color: #ff8a8a; animation: beat 0.5s ease-in-out infinite alternate; }
+  @keyframes beat { to { transform: scale(1.1); } }
+  /* After the answer: right or not, the points won, a streak, and where I stand. */
+  .result { margin: 14px 0 2px; padding: 16px; border-radius: 16px; text-align: center; color: #fff; animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+  .result.win { background: linear-gradient(135deg, #26890c, #35c27a); }
+  .result.miss { background: linear-gradient(135deg, #a3122c, #e21b3c); }
+  .result.none { background: var(--line); color: var(--ink); }
+  .result strong { display: block; font-size: 24px; font-weight: 850; }
+  .result .gain { display: block; margin-top: 2px; font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .result .facts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .result .facts span { padding: 4px 10px; border-radius: 999px; background: rgb(0 0 0 / 0.22); font-size: 13px; font-weight: 750; }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } }
+  .board li.mine { color: var(--me, var(--accent)); font-weight: 800; }
   .choice.picked { box-shadow: 0 0 0 3px var(--ink); }
   .choice.dim { opacity: 0.35; }
   .choice.right { box-shadow: 0 0 0 3px var(--good); }
@@ -71,7 +107,7 @@ export function roomPage(code: string, origin: string): string {
 </head>
 <body>
 <main>
-  <header><h1 id="room">Joining…</h1><span class="code">${safe}</span></header>
+  <header><h1 id="room">Joining…</h1><span class="me hidden" id="me"><i id="me-n"></i><span id="me-name"></span></span><span class="code" id="code">${safe}</span></header>
 
   <section id="join" class="card hidden">
     <label for="name">Your name (optional)</label>
@@ -103,6 +139,9 @@ export function roomPage(code: string, origin: string): string {
 <script>
 (function () {
   var CODE = ${JSON.stringify(safe)};
+  var COLORS = ${JSON.stringify(PLAYER_COLORS)};
+  var SHAPES = ${JSON.stringify(SHAPE_SVG)};
+  var lastReveal = "";
   var API = ${JSON.stringify(origin)} + "/v1/rooms/" + CODE;
   var KEY = "cs-room-" + CODE;
   var pid = null, sort = "top", last = null, timer = null, busy = false;
@@ -181,32 +220,62 @@ export function roomPage(code: string, origin: string): string {
     box.appendChild(el("div", "meta", (a.kind === "quiz" ? "Question " + a.round + " of " + a.total : "Poll") + (a.game ? " · " + a.game : "")));
     box.appendChild(el("h2", null, a.question.prompt));
     if (a.endsAt && a.phase === "open") {
+      var clock = el("div", "clock"); box.insertBefore(clock, box.lastChild);
       var bar = el("div", "timer"), fill = el("i"); bar.appendChild(fill); box.appendChild(bar);
       var span = a.endsAt - a.now, start = Date.now();
-      var tick = function () { var left = Math.max(0, span - (Date.now() - start)); fill.style.transform = "scaleX(" + (span ? left / span : 0) + ")"; if (left > 0 && document.body.contains(fill)) requestAnimationFrame(tick); };
+      var tick = function () { var left = Math.max(0, span - (Date.now() - start)), secs = Math.ceil(left / 1000); fill.style.transform = "scaleX(" + (span ? left / span : 0) + ")"; clock.textContent = String(secs); clock.classList.toggle("hurry", secs <= 5); if (left > 0 && document.body.contains(fill)) requestAnimationFrame(tick); };
       tick();
     }
-    var marks = ["A", "B", "C", "D", "E", "F"], total = (a.counts || []).reduce(function (s, n) { return s + n; }, 0);
-    var grid = el("div", "choices");
+    var total = (a.counts || []).reduce(function (s, n) { return s + n; }, 0);
+    var grid = el("div", "choices" + (a.question.choices.length <= 4 && a.question.choices.every(function (c) { return c.length <= 24; }) ? " big" : ""));
     a.question.choices.forEach(function (choice, i) {
       var reveal = a.phase === "reveal";
       var cls = "choice c" + i + (a.answered === i ? " picked" : "") + (reveal && a.correct !== undefined ? (i === a.correct ? " right" : " dim") : (a.answered !== null && a.answered !== i ? " dim" : ""));
       var b = el("button", cls);
       if (reveal && a.counts) { var f = el("i", "fill"); f.style.width = (total ? (a.counts[i] / total) * 100 : 0) + "%"; b.appendChild(f); }
-      b.appendChild(el("span", "mark", marks[i])); b.appendChild(el("span", "label", choice));
+      var mark = el("span", "mark"); mark.innerHTML = SHAPES[i] || ""; b.appendChild(mark); b.appendChild(el("span", "label", choice));
       if (reveal && a.counts) b.appendChild(el("span", "count", String(a.counts[i])));
       b.disabled = a.phase !== "open" || a.answered !== null;
-      b.onclick = function () { answer(i); };
+      b.onclick = function () { if (navigator.vibrate) navigator.vibrate(30); answer(i); };
       grid.appendChild(b);
     });
     box.appendChild(grid);
-    var status = a.phase === "open" ? (a.answered !== null ? "Answer in. Wait for the others…" : "") : a.phase === "closed" ? "Time is up." : (a.kind === "quiz" ? (a.answered === a.correct ? "Right! " : a.answered === null ? "" : "Not this time. ") + (a.score != null ? "Your score: " + a.score : "") : "Thanks for voting.");
-    if (status) box.appendChild(el("p", "note" + (a.phase === "reveal" && a.answered === a.correct ? " ok" : ""), status));
+    var status = a.phase === "open" ? (a.answered !== null ? "Answer in. Wait for the others…" : "") : a.phase === "closed" ? "Time is up!" : a.kind === "quiz" ? "" : "Thanks for voting.";
+    if (status) box.appendChild(el("p", "note", status));
+    if (a.phase === "reveal" && a.kind === "quiz") {
+      var win = a.answered !== null && a.answered === a.correct;
+      var card = el("div", "result " + (win ? "win" : a.answered === null ? "none" : "miss"));
+      card.appendChild(el("strong", null, win ? "Correct!" : a.answered === null ? "No answer this time" : "Not this time"));
+      if (win && a.gain) { var g = el("span", "gain", "+0"); card.appendChild(g); countUp(g, a.gain); }
+      var facts = el("div", "facts");
+      if (win && a.streak > 1) facts.appendChild(el("span", null, "\u{1F525} " + a.streak + " in a row"));
+      if (a.rank) facts.appendChild(el("span", null, ordinal(a.rank) + " of " + a.players));
+      if (a.score != null) facts.appendChild(el("span", null, a.score.toLocaleString() + " points"));
+      if (facts.childNodes.length) card.appendChild(facts);
+      box.appendChild(card);
+      var revealKey = a.round + ":" + a.game;
+      if (revealKey !== lastReveal) { lastReveal = revealKey; if (navigator.vibrate) navigator.vibrate(win ? [40, 60, 40] : 120); }
+    }
     if (d.leaderboard && d.leaderboard.length) {
       var board = el("ol", "board");
-      d.leaderboard.forEach(function (p, i) { var li = el("li"); li.appendChild(el("span", null, (i + 1) + ". " + p.name)); li.appendChild(el("b", null, String(p.score))); board.appendChild(li); });
+      d.leaderboard.forEach(function (p, i) { var li = el("li", a.rank === i + 1 ? "mine" : null); li.appendChild(el("span", null, (i + 1) + ". " + p.name)); li.appendChild(el("b", null, p.score.toLocaleString())); board.appendChild(li); });
       box.appendChild(board);
     }
+  }
+
+  function ordinal(n) { var t = n % 100; return n + (t >= 11 && t <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] || "th")); }
+  function countUp(node, to) {
+    var start = performance.now(), length = 900;
+    var step = function (now) { var p = Math.min(1, (now - start) / length), e = 1 - Math.pow(1 - p, 3); node.textContent = "+" + Math.round(to * e).toLocaleString(); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  function drawMe(d) {
+    if (!d.me) { show("me", false); return; }
+    var color = COLORS[((d.me.n % COLORS.length) + COLORS.length) % COLORS.length];
+    document.documentElement.style.setProperty("--me", color);
+    $("me-n").textContent = (d.me.name || "?").charAt(0).toUpperCase();
+    $("me-name").textContent = d.me.name || "Guest";
+    show("me", true); show("code", false);
   }
 
   function refresh() {
@@ -221,7 +290,7 @@ export function roomPage(code: string, origin: string): string {
       if (!pid) { show("join", true); return; }
       show("live", true);
       var key = JSON.stringify(d);
-      if (key !== last) { last = key; drawQuestions(d); drawActivity(d); }
+      if (key !== last) { last = key; drawMe(d); drawQuestions(d); drawActivity(d); }
       timer = setTimeout(refresh, d.activity && d.activity.kind !== "none" && d.activity.phase === "open" ? 1500 : 2500);
     }).catch(function () { timer = setTimeout(refresh, 4000); });
   }

@@ -9,12 +9,12 @@ export type AiProvider = "anthropic" | "openai" | "gemini" | "local";
 export const AI_PROVIDERS: readonly AiProvider[] = ["anthropic", "openai", "gemini", "local"];
 
 /** What the AI is used for; each can be switched off in Settings › AI assistant. */
-export type AiFeature = "summary" | "slides" | "songSuggest" | "songLookup" | "captions" | "verses";
+export type AiFeature = "summary" | "slides" | "songSuggest" | "songLookup" | "captions" | "verses" | "games";
 
-export const AI_FEATURES: readonly AiFeature[] = ["summary", "slides", "songSuggest", "songLookup", "captions", "verses"];
+export const AI_FEATURES: readonly AiFeature[] = ["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games"];
 
 /** On unless switched off, except verses by meaning: it sends what the preacher says while listening. */
-const FEATURE_DEFAULTS: Record<AiFeature, boolean> = { summary: true, slides: true, songSuggest: true, songLookup: true, captions: true, verses: false };
+const FEATURE_DEFAULTS: Record<AiFeature, boolean> = { summary: true, slides: true, songSuggest: true, songLookup: true, captions: true, verses: false, games: true };
 
 export type AiSettings = {
   provider: AiProvider;

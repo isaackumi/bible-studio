@@ -2,7 +2,9 @@
   import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
   import { blankQuestion, BUILT_IN_GAMES, MOST_CHOICES, newGame, ready, type Game } from "../../domain/games";
-  import { t, tn } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
+  import { GAME_COUNTS, type GameAudience, type GameLevel, type GameSource } from "../../ai/games";
+  import Icon from "../Icon.svelte";
 
   // Quizzes and polls on people's phones: pick a game (built in, made from the Bible on this
   // computer, or the church's own), run it a question at a time, and put the question, the results
@@ -32,12 +34,54 @@
     if (!editing) return;
     session.saveGame($state.snapshot(editing) as Game);
     editing = null;
+    fromAi = false;
+  }
+
+  // The AI quiz maker: from a sermon (who was listening?), a book the church is reading (its
+  // summary pasted in), a Bible passage or a topic. What it writes opens in the editor to check.
+  let asking = $state(false);
+  let aiSource = $state<GameSource>("sermon");
+  let sermonId = $state(session.sermonFocus?.sermonId ?? "");
+  let aiTitle = $state("");
+  let aiText = $state("");
+  let aiCount = $state(8);
+  let aiLevel = $state<GameLevel>("mixed");
+  let aiAudience = $state<GameAudience>("everyone");
+  let aiBusy = $state(false);
+  let aiError = $state("");
+  let fromAi = $state(false);
+
+  const sermons = $derived([...session.sermons].sort((a, b) => (b.date ?? b.updatedAt).localeCompare(a.date ?? a.updatedAt)));
+  const sermon = $derived(sermons.find((entry) => entry.id === sermonId) ?? sermons[0] ?? null);
+  const SOURCES: Array<{ id: GameSource; label: string; icon: string }> = [
+    { id: "sermon", label: msg("Today's sermon"), icon: "book" },
+    { id: "reading", label: msg("Book reading"), icon: "bible" },
+    { id: "passage", label: msg("Bible passage"), icon: "bible" },
+    { id: "topic", label: msg("A topic"), icon: "sparkles" },
+  ];
+
+  async function writeWithAi() {
+    aiBusy = true;
+    aiError = "";
+    try {
+      const text = aiSource === "sermon" ? [sermon ? session.sermonText(sermon) : "", aiText.trim()].filter(Boolean).join("\n\n") : aiText;
+      const title = aiSource === "sermon" ? (sermon?.title ?? "") : aiTitle.trim();
+      const game = await session.makeGameWithAi({ source: aiSource, title, text, count: aiCount, level: aiLevel, audience: aiAudience });
+      editing = game;
+      fromAi = true;
+      asking = false;
+    } catch (error) {
+      aiError = error instanceof Error ? error.message : String(error);
+    } finally {
+      aiBusy = false;
+    }
   }
 </script>
 
 {#if editing}
   {@const game = editing}
   <section class="edit">
+    {#if fromAi}<p class="ai-check"><Icon name="sparkles" size={14} /> {t("Written by the AI. Read each question and check the right answer before you save: the AI can be wrong.")}</p>{/if}
     <label>{t("Title")}<input bind:value={game.title} maxlength="80" /></label>
     <label>{t("Description")}<input bind:value={game.description} maxlength="300" placeholder={t("Shown with the game")} /></label>
     <div class="kind" role="radiogroup" aria-label={t("Kind")}>
@@ -69,7 +113,46 @@
     <button type="button" class="btn" onclick={() => game.questions.push(blankQuestion())}>{t("Add question")}</button>
     <div class="row">
       <button type="button" class="btn accent" onclick={saveEdit}>{t("Save game")}</button>
-      <button type="button" class="btn" onclick={() => (editing = null)}>{t("Cancel")}</button>
+      <button type="button" class="btn" onclick={() => { editing = null; fromAi = false; }}>{t("Cancel")}</button>
+    </div>
+  </section>
+{:else if asking}
+  <section class="maker">
+    <div class="maker-head">
+      <strong><Icon name="sparkles" size={15} /> {t("Make a quiz with AI")}</strong>
+      <button type="button" class="link" onclick={() => (asking = false)}>{t("Cancel")}</button>
+    </div>
+    <div class="sources" role="radiogroup" aria-label={t("Made from")}>
+      {#each SOURCES as source (source.id)}
+        <button type="button" role="radio" aria-checked={aiSource === source.id} class:on={aiSource === source.id} onclick={() => { aiSource = source.id; aiError = ""; }}><Icon name={source.icon} size={16} /> {t(source.label)}</button>
+      {/each}
+    </div>
+    {#if aiSource === "sermon"}
+      {#if sermons.length}
+        <label>{t("Sermon")}<select bind:value={sermonId}>{#each sermons as entry (entry.id)}<option value={entry.id}>{entry.title || t("Untitled sermon")}{entry.date ? ` · ${entry.date}` : ""}</option>{/each}</select></label>
+        <p class="hint">{t("Made from its notes and slides. See who was listening!")}</p>
+      {:else}
+        <p class="hint">{t("No sermons yet. Paste the sermon's summary or notes below.")}</p>
+      {/if}
+      <label>{t("The AI summary or anything else said (optional)")}<textarea bind:value={aiText} maxlength="30000" placeholder={t("Paste the summary from Sermon › Summarize, or notes taken during the sermon")}></textarea></label>
+    {:else if aiSource === "reading"}
+      <label>{t("Book and chapters")}<input bind:value={aiTitle} maxlength="120" placeholder={t("The Pilgrim's Progress, chapters 1 to 3")} /></label>
+      <label>{t("Summary of what was read")}<textarea class="tall" bind:value={aiText} maxlength="30000" placeholder={t("Paste or type the summary. The questions come only from it.")}></textarea></label>
+    {:else if aiSource === "passage"}
+      <label>{t("Bible passage")}<input bind:value={aiText} maxlength="200" placeholder={t("Jonah 1 to 4, or the story of Ruth")} /></label>
+    {:else}
+      <label>{t("Topic")}<input bind:value={aiText} maxlength="300" placeholder={t("The miracles of Jesus, or prayer")} /></label>
+    {/if}
+    <div class="maker-opts">
+      <label>{t("Questions")}<select bind:value={aiCount}>{#each GAME_COUNTS as n (n)}<option value={n}>{n}</option>{/each}</select></label>
+      <label>{t("How hard")}<select bind:value={aiLevel}><option value="easy">{t("Easy")}</option><option value="mixed">{t("Mixed")}</option><option value="hard">{t("Hard")}</option></select></label>
+      <label>{t("For")}<select bind:value={aiAudience}><option value="everyone">{t("Everyone")}</option><option value="youth">{t("Youth")}</option><option value="children">{t("Children")}</option></select></label>
+    </div>
+    {#if aiError}<p class="error" role="alert">{aiError}</p>{/if}
+    <div class="row">
+      {#if !session.aiReady}<button type="button" class="btn" onclick={() => session.openSettings("ai")}>{t("Open AI settings")}</button>{/if}
+      <button type="button" class="btn accent" disabled={aiBusy} onclick={writeWithAi}><Icon name="sparkles" size={14} /> {aiBusy ? t("Writing the questions…") : t("Write the quiz")}</button>
+      <span class="hint">{t("You check every question before anyone plays.")}</span>
     </div>
   </section>
 {:else if run && question}
@@ -102,18 +185,28 @@
         <button type="button" class="btn accent" onclick={() => audienceRoom.stopAnswers()}>{t("Stop answers")}</button>
       {:else if live.phase === "closed"}
         <button type="button" class="btn accent" onclick={() => audienceRoom.reveal()}>{run.game.kind === "quiz" ? t("Show the answer") : t("Show the results")}</button>
-      {:else if run.index + 1 < run.game.questions.length}
-        <button type="button" class="btn accent" onclick={() => audienceRoom.next()}>{t("Next question")}</button>
       {:else}
-        <button type="button" class="btn accent" onclick={() => audienceRoom.finish()}>{t("Finish game")}</button>
+        {#if run.game.kind === "quiz"}<button type="button" class="btn" onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>{/if}
+        {#if run.index + 1 < run.game.questions.length}
+          <button type="button" class="btn accent" onclick={() => audienceRoom.next()}>{t("Next question")}</button>
+        {:else}
+          <button type="button" class="btn accent" onclick={() => audienceRoom.finish()}>{run.game.kind === "quiz" ? t("Finish with the podium") : t("Finish game")}</button>
+        {/if}
       {/if}
     </div>
     <div class="screen">
-      <span>{t("On Preview:")}</span>
-      <button type="button" class="btn" onclick={() => audienceRoom.questionOnScreen()}>{t("Question")}</button>
-      <button type="button" class="btn" disabled={!live} onclick={() => audienceRoom.resultsOnScreen()}>{t("Results")}</button>
-      {#if run.game.kind === "quiz"}<button type="button" class="btn" onclick={() => audienceRoom.leaderboardOnScreen()}>{t("Leaderboard")}</button>{/if}
-      <button type="button" class="btn" onclick={() => audienceRoom.qrOnPreview(t("Scan to play"))}>{t("Join QR")}</button>
+      <span>{audienceRoom.follow ? t("On the screen:") : t("On Preview:")}</span>
+      <button type="button" class="btn" class:on={audienceRoom.screenStage === "lobby"} onclick={() => audienceRoom.showGame("lobby", audienceRoom.follow)}>{t("Lobby")}</button>
+      <button type="button" class="btn" class:on={audienceRoom.screenStage === "question"} onclick={() => audienceRoom.showGame("question", audienceRoom.follow)}>{t("Question")}</button>
+      <button type="button" class="btn" class:on={audienceRoom.screenStage === "results"} disabled={!live} onclick={() => audienceRoom.showGame("results", audienceRoom.follow)}>{t("Results")}</button>
+      {#if run.game.kind === "quiz"}
+        <button type="button" class="btn" class:on={audienceRoom.screenStage === "leaderboard"} onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>
+        <button type="button" class="btn" class:on={audienceRoom.screenStage === "podium"} onclick={() => audienceRoom.showGame("podium", audienceRoom.follow)}>{t("Podium")}</button>
+      {/if}
+    </div>
+    <div class="switches">
+      <label><input type="checkbox" class="switch" checked={audienceRoom.follow} onchange={(event) => audienceRoom.setFollow(event.currentTarget.checked)} /> <span>{t("Screen follows the game")}<small>{t("Each question, answer and the podium go to the screen as they happen; when time is up, the answer shows by itself.")}</small></span></label>
+      <label><input type="checkbox" class="switch" checked={audienceRoom.sounds} onchange={(event) => audienceRoom.setSounds(event.currentTarget.checked)} /> <span>{t("Game sounds")}<small>{t("Music while people join and answer, ticks, a gong, a drumroll and a fanfare, on the audience screen.")}</small></span></label>
     </div>
     {#if audienceRoom.view?.leaderboard.length}
       <ol class="board">
@@ -126,6 +219,7 @@
   <section class="library">
     <div class="row">
       <button type="button" class="btn accent" onclick={() => (editing = newGame(t("New game")))}>{t("Make a game")}</button>
+      {#if session.aiOn("games")}<button type="button" class="btn ai" onclick={() => { asking = true; aiError = ""; }}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>{/if}
     </div>
     {#if note}<p class="note">{note}</p>{/if}
     {#if mine.length}
@@ -164,6 +258,10 @@
   h3 { margin: 8px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); }
   .row, .screen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .screen span { color: var(--muted); font-size: 12px; margin-right: 2px; }
+  .screen .btn.on { border-color: var(--accent); color: var(--accent); }
+  .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .switches label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .switches small { display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; font-weight: 500; line-height: 1.4; }
   .btn { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn:disabled { opacity: 0.45; cursor: default; }
@@ -173,6 +271,22 @@
   .game strong { font-size: 13px; }
   .game span { color: var(--muted); font-size: 12px; }
   .note { margin: 0; color: var(--muted); font-size: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .btn.ai { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+  .maker { padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .maker-head { display: flex; justify-content: space-between; align-items: center; }
+  .maker-head strong { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+  .sources { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sources button { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; text-align: left; }
+  .sources button.on { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
+  .maker label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+  .maker input, .maker textarea, .maker select { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, var(--panel)); color: var(--ink); font: inherit; }
+  .maker textarea { min-height: 70px; resize: vertical; }
+  .maker textarea.tall { min-height: 140px; }
+  .maker-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .hint { margin: 0; color: var(--muted); font-size: 11.5px; }
+  .error { margin: 0; color: var(--danger, #ff6b6b); font-size: 12px; }
+  .ai-check { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-size: 12px; line-height: 1.4; }
   .run-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
   .run-head strong { color: var(--ink); }
   .prompt { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.35; }

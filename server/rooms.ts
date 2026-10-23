@@ -68,7 +68,38 @@ export type Activity =
   | { kind: "none" }
   | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number };
 
-export type Participant = { name: string; joinedAt: number; score: number; ip: string };
+/**
+ * Someone who joined. `n` is their public number (join order) and picks their colour; `gain` is what
+ * the last revealed question gave them, `before` their score before it, `streak` right answers in a row.
+ */
+export type Participant = { name: string; joinedAt: number; score: number; ip: string; n?: number; gain?: number; before?: number; streak?: number };
+
+/** How many player colours there are (the desk and phones share the same list, by number). */
+export const PLAYER_COLORS = 12;
+
+/** One player as the screen shows them: never their private id. */
+export type Ranked = { n: number; name: string; score: number; before: number; gain: number; streak: number; rank: number; was: number };
+
+/**
+ * Everyone who has played, best first: their rank now and before the last question (so the screen
+ * can show people moving up), the top of the table and the last three.
+ */
+export function ranking(state: RoomState, top = 10) {
+  const people = Object.values(state.participants).map((person, index) => ({ ...person, n: person.n ?? index }));
+  const order = (key: "score" | "before") => [...people].sort((a, b) => (key === "score" ? b.score - a.score : (b.before ?? b.score) - (a.before ?? a.score)) || a.joinedAt - b.joinedAt);
+  const was = new Map(order("before").map((person, index) => [person.n, index + 1]));
+  const all: Ranked[] = order("score").map((person, index) => ({
+    n: person.n,
+    name: person.name || "Guest",
+    score: person.score,
+    before: person.before ?? person.score,
+    gain: person.gain ?? 0,
+    streak: person.streak ?? 0,
+    rank: index + 1,
+    was: was.get(person.n) ?? index + 1,
+  }));
+  return { players: all.length, top: all.slice(0, top), bottom: all.length > top ? all.slice(-3) : [] };
+}
 
 export type RoomState = {
   code: string;
@@ -168,8 +199,17 @@ export function publicActivity(state: RoomState, pid: string | null, now: number
     now,
     answered: mine ? mine.choice : null,
     ...(reveal ? { correct: activity.kind === "quiz" ? correct : undefined, counts } : {}),
-    ...(reveal && activity.kind === "quiz" && pid ? { score: state.participants[pid]?.score ?? 0 } : {}),
+    ...(reveal && activity.kind === "quiz" && pid ? { score: state.participants[pid]?.score ?? 0, ...standing(state, pid) } : {}),
   };
+}
+
+/** A player's own place after a reveal: what they gained, their streak and rank. */
+function standing(state: RoomState, pid: string) {
+  const person = state.participants[pid];
+  if (!person) return {};
+  const all = ranking(state, Number.MAX_SAFE_INTEGER).top;
+  const me = all.find((entry) => entry.n === (person.n ?? -1));
+  return { gain: person.gain ?? 0, streak: person.streak ?? 0, rank: me?.rank ?? null, players: all.length };
 }
 
 /** The top of the leaderboard (names and scores only). */
@@ -232,14 +272,16 @@ export class RoomCore {
     return { ok: true, data: { hostKey } };
   }
 
-  async join(name: unknown, ip: string): Promise<Result<{ pid: string; room: { name: string; code: string } }>> {
+  async join(name: unknown, ip: string): Promise<Result<{ pid: string; room: { name: string; code: string }; n: number }>> {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (Object.keys(state.participants).length >= LIMITS.participants) return fail(429, "This room is full.");
     const pid = randomId(12);
-    state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip };
+    // Each joiner a number of their own, which picks their colour on the screen and their phone.
+    const n = Object.keys(state.participants).length;
+    state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0 };
     await this.save(state);
-    return { ok: true, data: { pid, room: { name: state.name, code: state.code } } };
+    return { ok: true, data: { pid, room: { name: state.name, code: state.code }, n } };
   }
 
   /** What a phone sees: the room, the questions the operator lets through, and the activity. */
@@ -257,6 +299,7 @@ export class RoomCore {
         waiting: mine,
         activity: publicActivity(state, known, this.now()),
         ...(state.activity.kind !== "none" && state.activity.phase === "reveal" && state.activity.kind === "quiz" ? { leaderboard: leaderboard(state, 5) } : {}),
+        ...(known ? { me: { n: state.participants[known]!.n ?? 0, name: state.participants[known]!.name } } : {}),
       },
     };
   }
@@ -347,6 +390,12 @@ export class RoomCore {
         answers: state.activity.kind === "none" ? [] : state.activity.question.choices.map((_, index) => Object.values(state.answers).filter((answer) => answer.choice === index).length),
         answered: Object.keys(state.answers).length,
         leaderboard: leaderboard(state, 10),
+        ranking: ranking(state, 10),
+        // Who is here, newest last (the lobby shows names popping in).
+        joined: Object.values(state.participants)
+          .sort((a, b) => a.joinedAt - b.joinedAt)
+          .slice(-40)
+          .map((person, index) => ({ n: person.n ?? index, name: person.name || "Guest" })),
       },
     };
   }
@@ -428,13 +477,22 @@ export class RoomCore {
       const activity = state.activity;
       if (activity.kind === "none") return fail(409, "Nothing is open.");
       if (activity.phase !== "reveal" && activity.kind === "quiz") {
-        for (const [pid, answer] of Object.entries(state.answers)) {
-          const person = state.participants[pid];
-          if (!person || answer.choice !== activity.question.correct) continue;
-          // Up to half as many points again for answering quickly.
+        for (const [pid, person] of Object.entries(state.participants)) {
+          const answer = state.answers[pid];
+          person.before = person.score;
+          if (!answer || answer.choice !== activity.question.correct) {
+            person.gain = 0;
+            person.streak = 0;
+            continue;
+          }
+          // Up to half as many points again for answering quickly, and 100 more for each right
+          // answer in a row after the first (up to 500).
           const seconds = activity.question.seconds || 30;
           const quick = Math.max(0, 1 - (answer.at - activity.openedAt) / (seconds * 1000));
-          person.score += Math.round(activity.question.points * (1 + quick / 2));
+          person.streak = (person.streak ?? 0) + 1;
+          const gain = Math.round(activity.question.points * (1 + quick / 2)) + Math.min(500, (person.streak - 1) * 100);
+          person.gain = gain;
+          person.score += gain;
         }
       }
       state.activity = { ...activity, phase: "reveal" };
@@ -442,7 +500,7 @@ export class RoomCore {
       state.activity = { kind: "none" };
       state.answers = {};
     } else if (input.action === "reset-scores") {
-      for (const person of Object.values(state.participants)) person.score = 0;
+      for (const person of Object.values(state.participants)) Object.assign(person, { score: 0, before: 0, gain: 0, streak: 0 });
     } else return fail(400, "Unknown action.");
     await this.save(state);
     return { ok: true, data: { ok: true } };

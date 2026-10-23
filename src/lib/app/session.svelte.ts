@@ -153,6 +153,7 @@ import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTE
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
 import { cleanCcli, cleanFolder, creditFor, lyricsFor, parseLyrics, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
 import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
+import { gameRequest, parseGame, type GameAudience, type GameLevel, type GameSource } from "../ai/games";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
@@ -5016,6 +5017,23 @@ class Session {
     return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
   };
 
+  /** A sermon as plain words for the AI: its notes, then each part's name, notes, slides and verses. */
+  sermonText(sermon: Sermon): string {
+    const parts = [sermon.notes.trim()];
+    for (const section of sermon.sections) {
+      const lines = [section.name, section.notes, ...section.items.map((item) => (item.slide ? `${item.slide.heading}\n${item.slide.body}` : item.bible ? item.title : ""))].map((line) => line.trim()).filter(Boolean);
+      if (lines.length) parts.push(lines.join("\n"));
+    }
+    return parts.filter(Boolean).join("\n\n");
+  }
+
+  /** A quiz written by the AI, not saved: the operator checks every question in the editor first. */
+  makeGameWithAi = async (input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): Promise<Game> => {
+    const settings = this.aiFor("games");
+    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : input.source === "reading" ? t("Paste the summary of what was read first.") : t("This sermon has no notes yet. Add notes or a summary first."));
+    return parseGame(replyText(settings.provider, await this.aiPost(gameRequest(settings, input))), input);
+  };
+
   /** Recording speed in kbps: the chosen quality's video plus the sound. */
   private recordKbps(): number {
     return QUALITIES[this.workspace.broadcast.quality].videoKbps + 192;
@@ -5052,7 +5070,7 @@ class Session {
     const missing = needs.filter((need) => need.gone || (need.path >= 0 && missingFiles.has(need.path))).map((need) => need.title || t("Untitled"));
 
     const ai = this.workspace.ai;
-    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses"] as const).some((feature) => aiFeatureOn(ai, feature));
+    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games"] as const).some((feature) => aiFeatureOn(ai, feature));
     const needed = [
       ...(aiUsed && ai.provider !== "local" ? [t("the AI")] : []),
       ...(this.remoteVia === "internet" && this.remoteDevices.length ? [t("the phone remote")] : []),
@@ -6997,6 +7015,17 @@ class Session {
 
   /** A countdown over a Pictures slideshow ("Service starts in 4:59"), laid over each picture. */
   slideCountdown = $state<{ label: string; endsAt: number } | null>(null);
+
+  /**
+   * Something live that keeps changing (a game's answers coming in, its leaderboard): if this
+   * source is on Program, its frame is replaced in place with no transition; on Preview, the same.
+   */
+  refreshSource = async (sourceId: string, model: PresentationModel) => {
+    if (this.live.preview.sourceId === sourceId) this.live = setPreview(this.live, frame(model, sourceId, "cut"));
+    if (this.live.program.sourceId !== sourceId || JSON.stringify(this.live.program.model) === JSON.stringify(model)) return;
+    this.live = replaceProgramModel(this.live, model, "cut");
+    await this.pushProgram();
+  };
 
   setSlideCountdown = async (countdown: { label: string; endsAt: number } | null) => {
     this.slideCountdown = countdown;

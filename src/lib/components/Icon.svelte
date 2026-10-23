@@ -43,6 +43,7 @@
   import LayoutGrid from "@lucide/svelte/icons/layout-grid";
   import List from "@lucide/svelte/icons/list";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
+  import Minimize2 from "@lucide/svelte/icons/minimize-2";
   import Mic from "@lucide/svelte/icons/mic";
   import MicOff from "@lucide/svelte/icons/mic-off";
   import Minus from "@lucide/svelte/icons/minus";
@@ -105,6 +106,7 @@
     "chevron-down": ChevronDown,
     "chevron-up": ChevronUp,
     expand: Maximize2,
+    shrink: Minimize2,
     church: Church,
     layout: LayoutGrid,
     keys: Keyboard,

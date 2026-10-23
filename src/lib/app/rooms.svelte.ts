@@ -12,6 +12,7 @@ import { presentText } from "../domain/present";
 import { t } from "../i18n/core";
 import { session } from "./session.svelte";
 import { remoteSafe } from "../display/remote-safe";
+import { presentGame, type GamePlayer, type GameScreenData, type GameStage } from "../domain/game-screen";
 
 export type RoomQuestion = {
   id: string;
@@ -40,11 +41,18 @@ export type HostView = {
   answers: number[];
   answered: number;
   leaderboard: Array<{ name: string; score: number }>;
+  /** Everyone's place, best first, with where they stood before the last question (the screen's climb). */
+  ranking?: { players: number; top: GamePlayer[]; bottom: GamePlayer[] };
+  /** Who joined, newest last (the game lobby). */
+  joined?: Array<{ n: number; name: string }>;
 };
 
 type Saved = { code: string; hostKey: string; joinUrl: string };
 const KEY = "church-studio:room";
 const POLL_MS = 2000;
+/** While a game is on the screen or answers are coming in: every second, so the screen keeps up. */
+const GAME_POLL_MS = 1000;
+const GAME_PREFS = "church-studio:game-screen";
 
 function readSaved(): Saved | null {
   try {
@@ -147,7 +155,9 @@ class AudienceRoom {
       this.view = null;
       return;
     } else if (!answer.offline) this.error = answer.error;
-    if (this.open || (this.view?.activity.kind ?? "none") !== "none") this.timer = setTimeout(() => void this.poll(), POLL_MS);
+    void this.refreshScreen();
+    const busy = (this.view?.activity.kind ?? "none") !== "none" || this.screenStage !== null;
+    if (this.open || busy) this.timer = setTimeout(() => void this.poll(), busy ? GAME_POLL_MS : POLL_MS);
   };
 
   /** The join QR code on Preview, ready to send LIVE. */
@@ -225,7 +235,8 @@ class AudienceRoom {
       return;
     }
     this.playing = { game: { ...game, questions }, index: 0 };
-    void this.activity({ action: "reset-scores" });
+    this.lastGame = null;
+    void this.activity({ action: "reset-scores" }).then(() => (this.follow ? this.showGame("lobby", true) : undefined));
   };
 
   /** Made fresh from the Bible on this computer (the first translation installed). */
@@ -253,7 +264,8 @@ class AudienceRoom {
     const run = this.playing;
     const question = this.question;
     if (!run || !question) return;
-    await this.activity({
+    this.askedAt = Date.now();
+    const opened = await this.activity({
       action: "open",
       kind: run.game.kind,
       game: run.game.title,
@@ -261,10 +273,14 @@ class AudienceRoom {
       total: run.game.questions.length,
       question: { id: question.id, prompt: question.prompt, choices: question.choices.filter((choice) => choice.trim()), ...(question.correct !== null ? { correct: question.correct } : {}), seconds: question.seconds, points: question.points },
     });
+    if (opened && this.follow) await this.showGame("question", true);
   };
 
   stopAnswers = () => this.activity({ action: "close" });
-  reveal = () => this.activity({ action: "reveal" });
+  reveal = async () => {
+    const shown = await this.activity({ action: "reveal" });
+    if (shown && this.follow) await this.showGame("results", true);
+  };
 
   next = async () => {
     if (!this.playing) return;
@@ -274,42 +290,108 @@ class AudienceRoom {
   };
 
   finish = async () => {
+    const quiz = this.playing?.game.kind === "quiz";
+    const title = this.playing?.game.title ?? "";
+    // The podium stays up after the game ends: its last scores are kept for the screen.
+    if (quiz && this.follow && this.view?.ranking?.top.length) {
+      this.lastGame = { title, ranking: this.view.ranking };
+      await this.showGame("podium", true);
+    }
     this.playing = null;
     await this.activity({ action: "end" });
   };
 
-  /** The question and its answers on Preview, for the room to read along. */
-  questionOnScreen = () => {
-    const question = this.question;
-    if (!question || !this.playing) return;
-    const marks = ["A", "B", "C", "D", "E", "F"];
-    session.previewModel(
-      presentText({ theme: session.theme(), layout: "title", heading: question.prompt, body: question.choices.filter((choice) => choice.trim()).map((choice, index) => `${marks[index]}   ${choice}`).join("\n") }),
-      `room:${this.current?.code}:game:${question.id}`,
-    );
+  // --- The game on the screen -----------------------------------------------------------------
+
+  /** Which stage of the game the screen shows (null: none). The screen updates by itself while it does. */
+  screenStage = $state<GameStage | null>(null);
+  /** Each step of the game goes to the screen as it happens (otherwise the buttons put it on Preview). */
+  follow = $state(readPrefs().follow);
+  /** Music and sound effects on the audience screen. */
+  sounds = $state(readPrefs().sounds);
+  private askedAt = 0;
+  private lastGame: { title: string; ranking: NonNullable<HostView["ranking"]> } | null = null;
+  private stageKey = "";
+
+  setFollow = (on: boolean) => {
+    this.follow = on;
+    writePrefs({ follow: on, sounds: this.sounds });
   };
 
-  /** How people answered (and the right answer, in a quiz) on Preview. */
-  resultsOnScreen = () => {
-    const question = this.question;
+  setSounds = (on: boolean) => {
+    this.sounds = on;
+    writePrefs({ follow: this.follow, sounds: on });
+    void this.refreshScreen();
+  };
+
+  private get screenId(): string {
+    return `room:${this.current?.code ?? ""}:game-screen`;
+  }
+
+  /** The frame for a stage, from the room as it is now. */
+  private gameScreen(stage: GameStage): GameScreenData {
     const view = this.view;
-    if (!question || !view) return;
-    const total = view.answers.reduce((sum, count) => sum + count, 0);
-    const marks = ["A", "B", "C", "D", "E", "F"];
-    const lines = question.choices.filter((choice) => choice.trim()).map((choice, index) => {
-      const count = view.answers[index] ?? 0;
-      const share = total ? Math.round((count / total) * 100) : 0;
-      return `${question.correct === index ? "✓ " : ""}${marks[index]}   ${choice}   ${share}%`;
-    });
-    session.previewModel(presentText({ theme: session.theme(), layout: "title", heading: question.prompt, body: lines.join("\n") }), `room:${this.current?.code}:results:${question.id}`);
+    const run = this.playing;
+    const question = this.question;
+    const activity = view?.activity;
+    const live = activity && activity.kind !== "none" && question && activity.question.id === question.id ? activity : null;
+    const ranking = stage === "podium" && !run && this.lastGame ? this.lastGame.ranking : view?.ranking;
+    const saved = this.current;
+    const at = saved ? saved.joinUrl.replace(/^https?:\/\//, "").replace(/\/j\/[^/]*$/, "/j") : "";
+    const choices = question ? question.choices.filter((choice) => choice.trim()) : [];
+    return {
+      stage,
+      title: run?.game.title ?? this.lastGame?.title ?? t("Quiz"),
+      round: (run?.index ?? 0) + 1,
+      total: run?.game.questions.length ?? 0,
+      prompt: question?.prompt ?? "",
+      choices,
+      correct: stage === "results" || stage === "leaderboard" ? (question?.correct ?? null) : null,
+      counts: choices.map((_, index) => view?.answers[index] ?? 0),
+      // Running while answers are open; at zero once they close (time up, or stopped early).
+      endsAt: live && question?.seconds ? (live.phase === "open" ? this.askedAt + question.seconds * 1000 : Math.min(Date.now(), this.askedAt + question.seconds * 1000)) : null,
+      seconds: question?.seconds ?? 0,
+      answered: live ? (view?.answered ?? 0) : 0,
+      players: ranking?.players ?? view?.people ?? 0,
+      top: ranking?.top ?? [],
+      bottom: ranking?.bottom ?? [],
+      joined: view?.joined ?? [],
+      join: saved ? { code: saved.code, at, url: saved.joinUrl } : null,
+      sounds: this.sounds,
+      key: `${stage}:${question?.id ?? ""}:${live?.phase === "open" ? "open" : ""}`,
+    };
+  }
+
+  /** Put a stage of the game on Preview, or straight on the screen. */
+  showGame = async (stage: GameStage, live = false) => {
+    if (!this.current) return;
+    this.screenStage = stage;
+    const data = this.gameScreen(stage);
+    this.stageKey = data.key;
+    session.previewModel(presentGame(session.theme(), data), this.screenId);
+    if (live) await session.take();
+    void this.poll();
   };
 
-  leaderboardOnScreen = () => {
-    const board = this.view?.leaderboard ?? [];
-    session.previewModel(
-      presentText({ theme: session.theme(), layout: "title", heading: t("Leaderboard"), body: board.length ? board.slice(0, 8).map((entry, index) => `${index + 1}.  ${entry.name}   ${entry.score}`).join("\n") : t("No scores yet.") }),
-      `room:${this.current?.code}:leaderboard`,
-    );
+  /** While a game stage is on Preview or the screen, keep it up to date with the room. */
+  private refreshScreen = async () => {
+    const stage = this.screenStage;
+    if (!stage) return;
+    const onScreen = session.live.program.sourceId === this.screenId || session.live.preview.sourceId === this.screenId;
+    if (!onScreen) {
+      this.screenStage = null;
+      return;
+    }
+    // Time up: following the game, the answer is shown by itself, as on a game show.
+    const run = this.playing;
+    const question = this.question;
+    const activity = this.view?.activity;
+    if (this.follow && stage === "question" && run && question?.seconds && activity && activity.kind !== "none" && activity.phase === "open" && activity.question.id === question.id && Date.now() > this.askedAt + question.seconds * 1000 + 1200) {
+      await this.reveal();
+      return;
+    }
+    const data = this.gameScreen(stage);
+    await session.refreshSource(this.screenId, presentGame(session.theme(), { ...data, key: this.stageKey }));
   };
 
   /** A question on Preview (with who asked), ready to send LIVE. */
@@ -319,3 +401,20 @@ class AudienceRoom {
 }
 
 export const audienceRoom = new AudienceRoom();
+
+function readPrefs(): { follow: boolean; sounds: boolean } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as { follow?: unknown; sounds?: unknown } | null;
+    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false };
+  } catch {
+    return { follow: true, sounds: true };
+  }
+}
+
+function writePrefs(prefs: { follow: boolean; sounds: boolean }) {
+  try {
+    localStorage.setItem(GAME_PREFS, JSON.stringify(prefs));
+  } catch {
+    // Storage refused: the choice lasts until this window closes.
+  }
+}

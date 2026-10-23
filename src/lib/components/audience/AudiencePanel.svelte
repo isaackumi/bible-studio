@@ -16,6 +16,25 @@
   let query = $state("");
   let copied = $state(false);
   let ending = $state(false);
+  // The whole window, for running a game or a busy question time; remembered for next time.
+  let wide = $state(readWide());
+
+  function readWide(): boolean {
+    try {
+      return localStorage.getItem("church-studio:audience-wide") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function toggleWide() {
+    wide = !wide;
+    try {
+      localStorage.setItem("church-studio:audience-wide", wide ? "1" : "0");
+    } catch {
+      // Not remembered; it still works now.
+    }
+  }
 
   const view = $derived(audienceRoom.view);
   const questions = $derived(view?.questions ?? []);
@@ -62,13 +81,16 @@
   }
 </script>
 
-<aside class="audience dock-drawer" aria-label={t("Audience")}>
+<aside class="audience dock-drawer" class:wide aria-label={t("Audience")}>
   <header>
     <div>
       <h2>{t("Audience")}</h2>
       <p>{view ? tn(view.people, "{n} person joined", "{n} people joined") : t("Questions, quizzes and polls from people's phones")}</p>
     </div>
-    <button type="button" class="icon-btn" aria-label={t("Close")} onclick={() => audienceRoom.hide()}><Icon name="close" size={16} /></button>
+    <div class="head-tools">
+      <button type="button" class="icon-btn" aria-label={wide ? t("Back to the side") : t("Full window")} data-tip={wide ? t("Back to the side") : t("Full window: more room to run the game")} aria-pressed={wide} onclick={toggleWide}><Icon name={wide ? "shrink" : "expand"} size={16} /></button>
+      <button type="button" class="icon-btn" aria-label={t("Close")} onclick={() => audienceRoom.hide()}><Icon name="close" size={16} /></button>
+    </div>
   </header>
 
   {#if !audienceRoom.current}
@@ -174,6 +196,8 @@
 <style>
   .audience { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(var(--drawer-w, 420px), 100vw); display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; }
   .audience > :global(*) { width: 100%; flex: none; }
+  .audience.wide { left: 0; width: auto; z-index: 60; padding: 20px max(20px, calc((100vw - 1100px) / 2)); border-left: 0; box-shadow: none; }
+  .head-tools { display: flex; gap: 2px; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   h2 { margin: 0; font-size: 17px; font-weight: 750; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
