@@ -20,7 +20,7 @@
   const show = $derived(pictures.slideshow);
   const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
   /** What is switched on in each group, in a few words, for its closed heading. */
-  const playingOn = $derived([show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "", show.kenBurns ? t("Slow zoom") : "", show.watch ? t("New pictures join") : ""].filter(Boolean).join(", "));
+  const playingOn = $derived([show.loop ? "" : t("Plays once"), show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "", show.kenBurns ? t("Slow zoom") : "", show.watch ? t("New pictures join") : ""].filter(Boolean).join(", "));
   const screenOn = $derived(
     [show.title && show.titleText ? t("Title") : "", show.clock ? t("Clock") : "", show.captions ? t("Captions") : "", show.countdown ? t("Countdown") : "", show.themeBackground ? "" : t("Black background"), show.fill ? t("Fill the screen") : ""].filter(Boolean).join(", "),
   );
@@ -198,21 +198,36 @@
           {#if show.captions}<figcaption class="big-caption">{selected.name.replace(/\.[a-z0-9]+$/i, "")}</figcaption>{/if}
         </figure>
       {/if}
-      <div class="now">
-        <span class="one-line">{selected ? selected.name : t("Click a picture for Preview; double-click shows it now.")}</span>
-        <div class="row">
-          <button type="button" class="btn" aria-label={t("Previous picture")} onclick={() => pictures.step(-1)}>‹</button>
-          <button type="button" class="btn" aria-label={t("Next picture")} onclick={() => pictures.step(1)}>›</button>
-          <button type="button" class="btn accent" disabled={!selected} onclick={() => pictures.showNow(pictures.current)}>{t("Show now")}</button>
+      <!-- The slideshow's controls first: which picture, and start or stop. Settings come after. -->
+      <section class="player" aria-label={t("Slideshow")}>
+        <div class="picker">
+          <button type="button" class="icon-btn" aria-label={t("Previous picture")} onclick={() => pictures.step(-1)}><Icon name="chevron-left" size={16} /></button>
+          <span class="one-line" title={selected?.name}>{selected ? selected.name.replace(/\.[a-z0-9]+$/i, "") : t("Click a picture for Preview; double-click shows it now.")}</span>
+          <span class="count">{pictures.images.length ? `${Math.max(1, pictures.current + 1)} / ${pictures.images.length}` : ""}</span>
+          <button type="button" class="icon-btn" aria-label={t("Next picture")} onclick={() => pictures.step(1)}><Icon name="chevron-right" size={16} /></button>
+        </div>
+        {#if !pictures.slideshow.running}
+          <button type="button" class="btn accent start-btn" disabled={!pictures.images.length} onclick={() => pictures.start()}><Icon name="play" size={15} /> {selected ? t("Start from this picture") : t("Start slideshow")}</button>
+        {:else}
+          <div class="running">
+            <span class="live"><i></i>{pictures.slideshow.paused ? t("Paused") : t("On the screen")}</span>
+            {#if pictures.slideshow.paused}
+              <button type="button" class="btn accent" onclick={() => pictures.resume()}><Icon name="play" size={14} /> {t("Resume")}</button>
+            {:else}
+              <button type="button" class="btn" onclick={() => pictures.pause()}><Icon name="pause" size={14} /> {t("Pause")}</button>
+            {/if}
+            <button type="button" class="btn" onclick={() => pictures.stop()}>{t("Stop")}</button>
+          </div>
+        {/if}
+        <div class="pair">
+          <button type="button" class="btn" disabled={!selected} onclick={() => pictures.showNow(pictures.current)}>{t("Show now")}</button>
           <button type="button" class="btn" disabled={!selected} onclick={() => pictures.addToService(pictures.current)}>{t("Add to service")}</button>
         </div>
-      </div>
+        <p class="hint">{videos ? t("Videos play to the end before the next. The slideshow steps aside the moment anything else goes LIVE.") : t("The slideshow steps aside the moment anything else goes LIVE.")}</p>
+      </section>
 
-      <section class="slideshow" aria-label={t("Slideshow")}>
-        <div class="slide-head">
-          <h3>{t("Slideshow")}</h3>
-          {#if pictures.slideshow.running}<span class="live">{pictures.slideshow.paused ? t("Paused") : t("On the screen")}</span>{/if}
-        </div>
+      <section class="slideshow" aria-label={t("Slideshow settings")}>
+        <h3>{t("Slideshow settings")}</h3>
         <label class="field">
           <span>{t("Each picture")}</span>
           <input type="range" min="1" max="30" step="1" value={pictures.slideshow.seconds} aria-label={t("Seconds for each picture")} oninput={(event) => pictures.setSeconds(Number(event.currentTarget.value))} />
@@ -225,7 +240,6 @@
               <button type="button" role="radio" title={t(change.tip)} aria-checked={pictures.slideshow.transition === change.id} class:on={pictures.slideshow.transition === change.id} onclick={() => pictures.setOptions({ transition: change.id })}>{t(change.label)}</button>
             {/each}
           </div>
-          <label class="loop"><input type="checkbox" class="switch" checked={pictures.slideshow.loop} onchange={(event) => pictures.setOptions({ loop: event.currentTarget.checked })} /> {t("Loop")}</label>
         </div>
         {#if pictures.slideshow.transition !== "cut"}
           <label class="field">
@@ -245,6 +259,7 @@
               {/each}
             </div>
           </div>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.loop} onchange={(event) => pictures.setOptions({ loop: event.currentTarget.checked })} /><span><b>{t("Loop")}</b>{t("Start again from the first picture after the last.")}</span></label>
           <label class="opt"><input type="checkbox" class="switch" checked={show.kenBurns} onchange={(event) => pictures.setOptions({ kenBurns: event.currentTarget.checked })} /><span><b>{t("Slow zoom")}</b>{t("Each picture slowly zooms and drifts, so stills feel alive.")}</span></label>
           <label class="opt"><input type="checkbox" class="switch" checked={show.watch} onchange={(event) => pictures.setOptions({ watch: event.currentTarget.checked })} /><span><b>{t("Pick up new pictures")}</b>{t("Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.")}</span></label>
         </details>
@@ -297,19 +312,6 @@
           {/if}
         </details>
         {#if pictures.slideshow.running}<p class="note">{t("Changes apply from the next picture; the title and clock at once; order, countdown and music from the next start.")}</p>{/if}
-        <div class="row">
-          {#if !pictures.slideshow.running}
-            <button type="button" class="btn accent" disabled={!pictures.images.length} onclick={() => pictures.start()}>{selected ? t("Start from this picture") : t("Start slideshow")}</button>
-          {:else}
-            {#if pictures.slideshow.paused}
-              <button type="button" class="btn accent" onclick={() => pictures.resume()}>{t("Resume")}</button>
-            {:else}
-              <button type="button" class="btn" onclick={() => pictures.pause()}>{t("Pause")}</button>
-            {/if}
-            <button type="button" class="btn" onclick={() => pictures.stop()}>{t("Stop")}</button>
-          {/if}
-        </div>
-        <p class="note">{videos ? t("Videos play to the end before the next. The slideshow steps aside the moment anything else goes LIVE.") : t("The slideshow steps aside the moment anything else goes LIVE.")}</p>
       </section>
   </div>
   {/if}
@@ -345,7 +347,6 @@
   h2 { margin: 0; font-size: 17px; font-weight: 750; }
   header p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
   .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .btn { height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn:disabled { opacity: 0.45; cursor: default; }
@@ -398,12 +399,23 @@
   .grid button { display: block; width: 100%; aspect-ratio: 16 / 11; padding: 0; border: 2px solid transparent; border-radius: 8px; background: #000; overflow: hidden; cursor: pointer; }
   .grid button.on { border-color: var(--accent); }
   .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .now { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
-  .now .one-line { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .slideshow { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
-  .slide-head { display: flex; align-items: center; justify-content: space-between; }
   h3 { margin: 0; font-size: 13px; font-weight: 700; }
-  .live { padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; }
+  /* The player: the picture, start or stop, and the two other things to do with it. */
+  .player { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
+  .picker { display: flex; align-items: center; gap: 6px; }
+  .picker .one-line { flex: 1; min-width: 0; font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .picker .count { flex: none; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .start-btn { height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; font-weight: 700; }
+  .running { display: flex; align-items: center; gap: 6px; }
+  .running .live { margin-right: auto; }
+  .running .btn, .pair .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+  .live { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--onair, #f21b1b) 16%, transparent); color: var(--ink); font-size: 11.5px; font-weight: 700; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--onair, #f21b1b); animation: blink 1.4s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .live i { animation: none; } }
   .field { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
   .field input[type="range"] { flex: 1; }
   .field b { min-width: 76px; color: var(--ink); font-weight: 650; text-align: right; }
@@ -411,7 +423,6 @@
   .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .seg button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
   .seg.changes { flex-wrap: wrap; }
-  .loop { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .options { border-top: 1px solid var(--line); padding-top: 8px; }
   .options summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 700; }
   .options summary::-webkit-details-marker { display: none; }

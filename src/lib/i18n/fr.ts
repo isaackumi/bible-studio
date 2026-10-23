@@ -4384,4 +4384,6 @@ export const fr: Readonly<Record<string, string>> = {
   "Hide empty folders": "Masquer les dossiers vides",
   "Show {n} empty folder": "Afficher {n} dossier vide",
   "Show {n} empty folders": "Afficher {n} dossiers vides",
+  "Slideshow settings": "Réglages du diaporama",
+  "Start again from the first picture after the last.": "Reprendre à la première image après la dernière.",
 };
