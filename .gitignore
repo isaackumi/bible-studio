@@ -27,3 +27,8 @@ server/web/
 
 # Song lyrics kept for local testing (may be copyrighted; never committed).
 /lyrics.txt
+
+# OAuth client files and other downloaded credentials never belong in the repo.
+google*.json
+client_secret*.json
+*-oauth-client.json
