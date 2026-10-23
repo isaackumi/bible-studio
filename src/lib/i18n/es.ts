@@ -1155,6 +1155,7 @@ export const es: Readonly<Record<string, string>> = {
   "The version of the AI to use. claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.": "La versión de la IA que se usa. claude-sonnet-5-5 es un buen equilibrio; claude-haiku-5-5 es más rápido y económico.",
   "The version of the AI to use. Press Find models to see the ones you can use.": "La versión de la IA que se usa. Pulsa Buscar modelos para ver los que puedes usar.",
   "Choose a model first. Find models lists them.": "Primero elige un modelo. Buscar modelos los muestra.",
+  "Waiting for the AI to answer. This can take up to a minute.": "Esperando la respuesta de la IA. Puede tardar hasta un minuto.",
   "Choose a model": "Elige un modelo",
   "Model name": "Nombre del modelo",
   "Find models": "Buscar modelos",

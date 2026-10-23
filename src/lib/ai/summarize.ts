@@ -21,7 +21,7 @@ export type AiSettings = {
 export const AI_DEFAULTS: Record<AiProvider, { model: string; baseUrl: string }> = {
   anthropic: { model: "claude-sonnet-5-5", baseUrl: "https://api.anthropic.com" },
   openai: { model: "gpt-6.1-sol", baseUrl: "https://api.openai.com/v1" },
-  gemini: { model: "gemini-3.8-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  gemini: { model: "gemini-3.5-flash-lite", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
   local: { model: "", baseUrl: "http://localhost:11434/v1" },
 };
 
@@ -139,7 +139,7 @@ export function modelsRequest(settings: AiSettings): { url: string; headers: Rec
 }
 
 // Models that do something else (speech, pictures, search), left out of the list of writers.
-const NOT_FOR_WRITING = /embed|tts|whisper|transcri|dall-e|image|imagen|veo|sora|banana|audio|realtime|live|moderation|search|aqa/i;
+const NOT_FOR_WRITING = /embed|tts|whisper|transcri|dall-e|image|imagen|veo|sora|banana|audio|realtime|live|moderation|search|aqa|lyria|robotics|research|antigravity|computer-use/i;
 
 /** The model names from a models list (every service answers {data: [{id}]}), writers only. */
 export function parseModels(reply: unknown): string[] {
@@ -186,6 +186,7 @@ export function replyText(provider: AiProvider, reply: unknown): string {
 function friendlyError(message: string): string {
   if (/invalid.*(api[- ]?key|x-api-key)|incorrect api key|api key not valid|valid api key|authentication/i.test(message)) return "The AI service did not accept the key. Check it in Settings › AI assistant.";
   if (/model/i.test(message) && /not.*found|does not exist|invalid/i.test(message)) return `That model name was not found: ${message}`;
+  if (/high demand|overloaded|try again later|temporarily unavailable|rate limit|too many requests/i.test(message)) return "The AI service is busy right now. Try again in a minute, or choose another model.";
   if (/credit|quota|billing|insufficient/i.test(message)) return "The AI account has no credit left. Top it up with the provider.";
   return message;
 }

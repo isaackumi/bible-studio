@@ -1306,7 +1306,8 @@
             <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a short test to the AI.")}</span></div>
             <button type="button" class="btn" disabled={aiBusy} onclick={async () => {
               aiBusy = true;
-              aiNote = "";
+              aiOk = true;
+              aiNote = t("Waiting for the AI to answer. This can take up to a minute.");
               try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
               aiBusy = false;
             }}>{aiBusy ? t("Checking…") : t("Test")}</button>
