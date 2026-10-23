@@ -202,3 +202,66 @@ export function finishTheVerseGame(verses: Array<{ reference: string; text: stri
   });
   return { id: "made:finish-verse", title: "Finish the verse", description: "Choose how each verse ends.", kind: "quiz", questions, updatedAt: new Date().toISOString() };
 }
+
+/**
+ * Questions typed or pasted as plain text, one block per question with a blank line between:
+ *
+ *   Who built the ark?
+ *   * Noah
+ *   Moses
+ *   Abraham
+ *
+ * The first line is the question and each line after it an answer. The right one is marked with a
+ * star (or ✓, or "(right)") or named on an "Answer: B" line; without a mark the first answer is
+ * right. Numbers and letters in front ("1.", "a)", "- ") are left out. In a poll nothing is right.
+ */
+export function questionsFromText(text: string, kind: Game["kind"] = "quiz"): GameQuestion[] {
+  const blocks = text.replace(/\r\n?/g, "\n").split(/\n\s*\n/);
+  const questions: GameQuestion[] = [];
+  for (const block of blocks) {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (lines.length < 3) continue;
+    const prompt = lines[0]!.replace(/^(?:q(?:uestion)?\s*)?\d+\s*[.):-]\s*/i, "").trim();
+    let correct: number | null = null;
+    let answerLine = "";
+    const choices: string[] = [];
+    for (const raw of lines.slice(1)) {
+      const answer = raw.match(/^(?:answer|right answer|correct)\s*[:=-]\s*(.+)$/i);
+      if (answer) {
+        answerLine = answer[1]!.trim();
+        continue;
+      }
+      let line = raw;
+      let marked = false;
+      if (/^[*✓✔]/.test(line)) {
+        marked = true;
+        line = line.replace(/^[*✓✔]\s*/, "");
+      }
+      if (/(?:\s[*✓✔]|\((?:right|correct)\))$/i.test(line)) {
+        marked = true;
+        line = line.replace(/\s*(?:[*✓✔]|\((?:right|correct)\))$/i, "");
+      }
+      line = line.replace(/^(?:[a-f]\s*[.)]|[-•]|\d+\s*[.)])\s*/i, "").trim();
+      if (!line || choices.length >= MOST_CHOICES) continue;
+      if (marked && correct === null) correct = choices.length;
+      choices.push(line.slice(0, 120));
+    }
+    if (choices.length < 2 || !prompt) continue;
+    if (correct === null && answerLine) {
+      const letter = answerLine.match(/^([a-f])\W*$/i);
+      const byLetter = letter ? letter[1]!.toLowerCase().charCodeAt(0) - 97 : -1;
+      const byText = choices.findIndex((choice) => choice.toLowerCase() === answerLine.toLowerCase());
+      correct = byLetter >= 0 && byLetter < choices.length ? byLetter : byText >= 0 ? byText : null;
+    }
+    questions.push({ id: uid("q"), prompt: prompt.slice(0, 300), choices, correct: kind === "poll" ? null : (correct ?? 0), seconds: 20, points: 1000 });
+    if (questions.length >= MOST_QUESTIONS) break;
+  }
+  return questions;
+}
+
+/** A question as text in the same shape questionsFromText reads, for copying a game out. */
+export function questionsAsText(game: Game): string {
+  return game.questions
+    .map((question) => [question.prompt, ...question.choices.filter((choice) => choice.trim()).map((choice, index) => (game.kind === "quiz" && question.correct === index ? `* ${choice}` : choice))].join("\n"))
+    .join("\n\n");
+}

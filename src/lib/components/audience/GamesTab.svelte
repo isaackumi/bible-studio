@@ -1,25 +1,36 @@
 <script lang="ts">
   import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
-  import { blankQuestion, BUILT_IN_GAMES, MOST_CHOICES, newGame, ready, seriesFinal, type Game } from "../../domain/games";
-  import { MOST_TEAMS, TEAMS } from "../../domain/game-colors";
+  import { quizPacks } from "../../app/starter.svelte";
+  import { BUILT_IN_GAMES, newGame, seriesFinal, type Game } from "../../domain/games";
+  import { CHOICE_STYLES, TEAMS } from "../../domain/game-colors";
   import { reportSummary } from "../../domain/game-report";
   import ReportCard from "./ReportCard.svelte";
+  import GameView from "./GameView.svelte";
+  import GameEditor from "./GameEditor.svelte";
+  import ChoiceMark from "./ChoiceMark.svelte";
   import { msg, t, tn } from "../../i18n/core";
   import { GAME_COUNTS, type GameAudience, type GameLevel, type GameSource } from "../../ai/games";
   import Icon from "../Icon.svelte";
 
-  // Quizzes and polls on people's phones: pick a game (built in, made from the Bible on this
-  // computer, or the church's own), run it a question at a time, and put the question, the results
-  // or the leaderboard on Preview when the room should see them.
+  // Quizzes and polls on people's phones. The library shows each one as a card; opening it shows
+  // every question with its answers (the right one marked); the editor makes new ones, typed one by
+  // one or pasted as text; and a game runs a question at a time, with the screen following along.
   let editing = $state<Game | null>(null);
+  let viewing = $state<string | null>(null);
   let making = $state("");
   let note = $state("");
 
   const mine = $derived(session.workspace.games ?? []);
-  // The quiz bank: games grouped by sermon series (named ones first, by name), then the rest.
+  const everything = $derived([...mine, ...BUILT_IN_GAMES]);
+  const viewed = $derived(viewing ? (everything.find((game) => game.id === viewing) ?? null) : null);
+  const isBuiltIn = (game: Game) => game.id.startsWith("builtin:");
+  const titleOf = (game: Game) => (isBuiltIn(game) ? t(game.title) : game.title);
+
+  // The quiz bank: games grouped by sermon series (named ones first, by name), then quizzes, then polls.
   const seriesNames = $derived([...new Set(mine.map((game) => game.series).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b)));
-  const loose = $derived(mine.filter((game) => !game.series));
+  const looseQuizzes = $derived(mine.filter((game) => !game.series && game.kind === "quiz"));
+  const loosePolls = $derived(mine.filter((game) => !game.series && game.kind === "poll"));
   const reports = $derived(session.workspace.gameReports ?? []);
   let openReport = $state<string | null>(null);
   const shownReport = $derived(reports.find((report) => report.id === openReport) ?? null);
@@ -28,65 +39,76 @@
   // Finding a game in a long list: words match titles, series, descriptions and question text.
   let query = $state("");
   let show = $state<"all" | "quiz" | "poll" | "mine">("all");
-  const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const everything = $derived([...mine, ...BUILT_IN_GAMES]);
+  const fold = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const searching = $derived(query.trim() !== "" || show !== "all");
   const results = $derived.by(() => {
     const words = fold(query).split(/\s+/).filter(Boolean);
     return everything.filter((game) => {
-      if (show === "mine" && game.id.startsWith("builtin:")) return false;
+      if (show === "mine" && isBuiltIn(game)) return false;
       if ((show === "quiz" || show === "poll") && game.kind !== show) return false;
       if (!words.length) return true;
-      const builtIn = game.id.startsWith("builtin:");
-      const text = fold([builtIn ? t(game.title) : game.title, builtIn ? t(game.description) : game.description, game.series ?? "", ...game.questions.flatMap((question) => [question.prompt, ...question.choices])].join(" "));
+      const text = fold([titleOf(game), isBuiltIn(game) ? t(game.description) : game.description, game.series ?? "", ...game.questions.flatMap((question) => [question.prompt, ...question.choices])].join(" "));
       return words.every((word) => text.includes(word));
     });
   });
-  const recent = $derived(audienceRoom.recentGames.map((id) => everything.find((game) => game.id === id)).filter((game): game is Game => !!game).slice(0, 3));
+  const recent = $derived(audienceRoom.recentGames.map((id) => everything.find((game) => game.id === id)).filter((game): game is Game => !!game).slice(0, 4));
 
-  /** Delete asks once more: a second click within a few seconds. */
-  let armed = $state<string | null>(null);
-  let armTimer: ReturnType<typeof setTimeout> | undefined;
-  function removeGame(id: string) {
-    clearTimeout(armTimer);
-    if (armed === id) {
-      armed = null;
-      session.removeGame(id);
-      return;
-    }
-    armed = id;
-    armTimer = setTimeout(() => (armed = null), 3000);
-  }
-
-  function playSeries(name: string) {
-    const game = seriesFinal(mine, name);
-    if (game) audienceRoom.play({ ...game, title: t("{series}: series final", { series: name }) });
-  }
   const run = $derived(audienceRoom.playing);
   const question = $derived(audienceRoom.question);
   const activity = $derived(audienceRoom.view?.activity ?? { kind: "none" as const });
   const live = $derived(activity.kind !== "none" && question && activity.question.id === question.id ? activity : null);
   const answers = $derived(audienceRoom.view?.answers ?? []);
-  const marks = ["A", "B", "C", "D", "E", "F"];
+
+  $effect(() => {
+    void quizPacks.load();
+  });
+
+  /** Play: a room opens first when none is open, so phones can join. */
+  async function play(game: Game) {
+    note = "";
+    if (!audienceRoom.current) {
+      await audienceRoom.start();
+      if (!audienceRoom.current) {
+        note = audienceRoom.error || t("The room could not open. Check the internet and try again.");
+        return;
+      }
+    }
+    audienceRoom.play(game);
+  }
 
   async function make(kind: "which-book" | "finish-verse") {
     making = kind;
     note = "";
     const game = await audienceRoom.makeFromBible(kind);
     making = "";
-    if (game) audienceRoom.play(game);
+    if (game) await play(game);
     else note = t("No Bible text could be read on this computer. Install a Bible in Settings › Bible.");
+  }
+
+  const copyOf = (game: Game, title: string): Game => ({ ...structuredClone($state.snapshot(game) as Game), id: `game:${Math.random().toString(36).slice(2, 10)}`, title, updatedAt: new Date().toISOString() });
+
+  function create(kind: Game["kind"]) {
+    const game = newGame(kind === "quiz" ? t("New quiz") : t("New poll"));
+    editing = { ...game, kind, questions: game.questions.map((question) => ({ ...question, correct: kind === "poll" ? null : 0 })) };
+    fromAi = false;
   }
 
   function saveEdit() {
     if (!editing) return;
-    session.saveGame($state.snapshot(editing) as Game);
+    const saved = $state.snapshot(editing) as Game;
+    session.saveGame(saved);
     editing = null;
     fromAi = false;
+    viewing = saved.id;
+  }
+
+  function playSeries(name: string) {
+    const game = seriesFinal(mine, name);
+    if (game) void play({ ...game, title: t("{series}: series final", { series: name }) });
   }
 
   // The AI quiz maker: from a sermon (who was listening?), a book the church is reading (its
-  // summary pasted in), a Bible passage or a topic. What it writes opens in the editor to check.
+  // summary pasted in), pasted text, a Bible passage or a topic. What it writes opens in the editor.
   let asking = $state(false);
   let aiSource = $state<GameSource>("sermon");
   let sermonId = $state(session.sermonFocus?.sermonId ?? "");
@@ -129,45 +151,7 @@
 </script>
 
 {#if editing}
-  {@const game = editing}
-  <section class="edit">
-    {#if fromAi}<p class="ai-check"><Icon name="sparkles" size={14} /> {t("Written by the AI. Read each question and check the right answer before you save: the AI can be wrong.")}</p>{/if}
-    <label>{t("Title")}<input bind:value={game.title} maxlength="80" /></label>
-    <label>{t("Description")}<input bind:value={game.description} maxlength="300" placeholder={t("Shown with the game")} /></label>
-    <label>{t("Sermon series (optional)")}<input bind:value={game.series} maxlength="80" list="game-series" placeholder={t("Groups the quiz with the rest of its series")} /></label>
-    <datalist id="game-series">{#each seriesNames as name (name)}<option value={name}></option>{/each}</datalist>
-    <div class="kind" role="radiogroup" aria-label={t("Kind")}>
-      <button type="button" role="radio" aria-checked={game.kind === "quiz"} class:on={game.kind === "quiz"} onclick={() => (game.kind = "quiz")}>{t("Quiz (right answers, points)")}</button>
-      <button type="button" role="radio" aria-checked={game.kind === "poll"} class:on={game.kind === "poll"} onclick={() => (game.kind = "poll")}>{t("Poll (no right answer)")}</button>
-    </div>
-    {#each game.questions as item, index (item.id)}
-      <fieldset class:unready={!ready(item, game.kind)}>
-        <legend>{t("Question {n}", { n: index + 1 })}</legend>
-        <textarea bind:value={item.prompt} maxlength="300" placeholder={t("The question")}></textarea>
-        {#each item.choices as _choice, choiceIndex (choiceIndex)}
-          <div class="choice-row">
-            {#if game.kind === "quiz"}
-              <input type="radio" name="correct-{item.id}" aria-label={t("Right answer")} checked={item.correct === choiceIndex} onchange={() => (item.correct = choiceIndex)} />
-            {/if}
-            <span class="mark">{marks[choiceIndex]}</span>
-            <input bind:value={item.choices[choiceIndex]} maxlength="120" placeholder={t("Answer {mark}", { mark: marks[choiceIndex] ?? "" })} />
-            {#if item.choices.length > 2}<button type="button" class="x" aria-label={t("Remove answer")} onclick={() => { item.choices.splice(choiceIndex, 1); if (item.correct !== null && item.correct >= item.choices.length) item.correct = 0; }}>×</button>{/if}
-          </div>
-        {/each}
-        <div class="q-tools">
-          {#if item.choices.length < MOST_CHOICES}<button type="button" class="btn" onclick={() => item.choices.push("")}>{t("Add answer")}</button>{/if}
-          <label class="small">{t("Seconds")}<input type="number" min="0" max="120" bind:value={item.seconds} /></label>
-          {#if game.kind === "quiz"}<label class="small">{t("Points")}<input type="number" min="0" max="5000" step="100" bind:value={item.points} /></label>{/if}
-          <button type="button" class="btn" disabled={game.questions.length <= 1} onclick={() => game.questions.splice(index, 1)}>{t("Remove")}</button>
-        </div>
-      </fieldset>
-    {/each}
-    <button type="button" class="btn" onclick={() => game.questions.push(blankQuestion())}>{t("Add question")}</button>
-    <div class="row">
-      <button type="button" class="btn accent" onclick={saveEdit}>{t("Save game")}</button>
-      <button type="button" class="btn" onclick={() => { editing = null; fromAi = false; }}>{t("Cancel")}</button>
-    </div>
-  </section>
+  <GameEditor bind:game={editing} {fromAi} {seriesNames} onsave={saveEdit} oncancel={() => { editing = null; fromAi = false; }} />
 {:else if asking}
   <section class="maker">
     <div class="maker-head">
@@ -216,36 +200,41 @@
       <strong>{run.game.title}</strong>
       <span>{t("Question {n} of {total}", { n: run.index + 1, total: run.game.questions.length })}</span>
     </div>
+    <div class="progress" aria-hidden="true">{#each run.game.questions as _q, index (index)}<i class:done={index < run.index} class:now={index === run.index}></i>{/each}</div>
     <p class="prompt">{question.prompt}</p>
     <ol class="answers">
       {#each question.choices.filter((choice) => choice.trim()) as choice, index (index)}
         {@const count = live ? (answers[index] ?? 0) : 0}
         {@const total = answers.reduce((sum, n) => sum + n, 0)}
-        <li class:right={question.correct === index}>
-          <i style:width="{live && total ? (count / total) * 100 : 0}%"></i>
-          <span class="mark">{marks[index]}</span><span class="label">{choice}</span>{#if live}<b>{count}</b>{/if}
+        {@const right = question.correct === index}
+        <li class:right>
+          <i style:width="{live && total ? (count / total) * 100 : 0}%" style:background="color-mix(in srgb, {CHOICE_STYLES[index]?.color} 28%, transparent)"></i>
+          <ChoiceMark {index} size={22} />
+          <span class="label">{choice}</span>
+          {#if right}<span class="right-tag"><Icon name="check" size={12} /> {t("Right")}</span>{/if}
+          {#if live}<b>{count}</b>{/if}
         </li>
       {/each}
     </ol>
     <p class="status">
-      {#if !live}{t("Not asked yet.")}
+      {#if !live}{t("Not asked yet. People see it on their phones when you ask.")}
       {:else if live.phase === "open"}{tn(audienceRoom.view?.answered ?? 0, "{n} answer in", "{n} answers in")}{question.seconds ? ` · ${t("{n} seconds", { n: question.seconds })}` : ""}
       {:else if live.phase === "closed"}{t("Answers closed.")}
       {:else}{run.game.kind === "quiz" ? t("Answer shown on phones.") : t("Results shown on phones.")}{/if}
     </p>
     <div class="row">
       {#if !live}
-        <button type="button" class="btn accent" onclick={() => audienceRoom.ask()}>{t("Ask on phones")}</button>
+        <button type="button" class="btn accent big" onclick={() => audienceRoom.ask()}>{t("Ask on phones")}</button>
       {:else if live.phase === "open"}
-        <button type="button" class="btn accent" onclick={() => audienceRoom.stopAnswers()}>{t("Stop answers")}</button>
+        <button type="button" class="btn accent big" onclick={() => audienceRoom.stopAnswers()}>{t("Stop answers")}</button>
       {:else if live.phase === "closed"}
-        <button type="button" class="btn accent" onclick={() => audienceRoom.reveal()}>{run.game.kind === "quiz" ? t("Show the answer") : t("Show the results")}</button>
+        <button type="button" class="btn accent big" onclick={() => audienceRoom.reveal()}>{run.game.kind === "quiz" ? t("Show the answer") : t("Show the results")}</button>
       {:else}
         {#if run.game.kind === "quiz"}<button type="button" class="btn" onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>{/if}
         {#if run.index + 1 < run.game.questions.length}
-          <button type="button" class="btn accent" onclick={() => audienceRoom.next()}>{t("Next question")}</button>
+          <button type="button" class="btn accent big" onclick={() => audienceRoom.next()}>{t("Next question")}</button>
         {:else}
-          <button type="button" class="btn accent" onclick={() => audienceRoom.finish()}>{run.game.kind === "quiz" ? t("Finish with the podium") : t("Finish game")}</button>
+          <button type="button" class="btn accent big" onclick={() => audienceRoom.finish()}>{run.game.kind === "quiz" ? t("Finish with the podium") : t("Finish game")}</button>
         {/if}
       {/if}
     </div>
@@ -259,12 +248,13 @@
         <button type="button" class="btn" class:on={audienceRoom.screenStage === "podium"} onclick={() => audienceRoom.showGame("podium", audienceRoom.follow)}>{t("Podium")}</button>
       {/if}
     </div>
-    <div class="switches">
+    <details class="switches">
+      <summary>{t("How the game runs")}</summary>
       <label><input type="checkbox" class="switch" checked={audienceRoom.follow} onchange={(event) => audienceRoom.setFollow(event.currentTarget.checked)} /> <span>{t("Screen follows the game")}<small>{t("Each question, answer and the podium go to the screen as they happen; when time is up, the answer shows by itself.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.sounds} onchange={(event) => audienceRoom.setSounds(event.currentTarget.checked)} /> <span>{t("Game sounds")}<small>{t("Music while people join and answer, ticks, a gong, a drumroll and a fanfare, on the audience screen.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.ready} onchange={(event) => audienceRoom.setReady(event.currentTarget.checked)} /> <span>{t("Get ready countdown")}<small>{t("Each question shows alone for 4 seconds to read, then the answers open and the clock starts.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.auto} disabled={!audienceRoom.follow} onchange={(event) => audienceRoom.setAuto(event.currentTarget.checked)} /> <span>{t("Runs by itself")}<small>{t("After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.")}</small></span></label>
-    </div>
+    </details>
     {#if audienceRoom.view?.teams}
       <ol class="board teams-board">
         {#each audienceRoom.view.teams as team (team.team)}<li><span><i style:background={TEAMS[team.team]?.color}></i>{t(TEAMS[team.team]?.name ?? "")} · {tn(team.players, "{n} player", "{n} players")}</span><b>{team.score}</b></li>{/each}
@@ -277,55 +267,110 @@
     {/if}
     <button type="button" class="link" onclick={() => audienceRoom.finish()}>{t("End the game")}</button>
   </section>
+{:else if viewed}
+  <GameView
+    game={viewed}
+    builtIn={isBuiltIn(viewed)}
+    onplay={() => void play(viewed)}
+    onedit={() => (editing = structuredClone($state.snapshot(viewed)) as Game)}
+    oncopy={() => (editing = copyOf(viewed, isBuiltIn(viewed) ? titleOf(viewed) : t("{title} (copy)", { title: viewed.title })))}
+    ondelete={isBuiltIn(viewed) ? undefined : () => { session.removeGame(viewed.id); viewing = null; }}
+    onback={() => (viewing = null)}
+  />
 {:else}
-  <section class="library">
-    <div class="row">
-      <button type="button" class="btn accent" onclick={() => (editing = newGame(t("New game")))}>{t("Make a game")}</button>
-      {#if session.aiOn("games")}<button type="button" class="btn ai" onclick={() => { asking = true; aiError = ""; }}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>{/if}
+  <section class="games-lib">
+    <div class="new-tiles">
+      <button type="button" class="tile" onclick={() => create("quiz")}>
+        <span class="glyph quiz" aria-hidden="true">{#each [0, 1, 2, 3] as index (index)}<ChoiceMark {index} size={14} />{/each}</span>
+        <strong>{t("New quiz")}</strong><span>{t("Right answers and points")}</span>
+      </button>
+      <button type="button" class="tile" onclick={() => create("poll")}>
+        <span class="glyph poll" aria-hidden="true"><i style:height="60%"></i><i style:height="100%"></i><i style:height="35%"></i></span>
+        <strong>{t("New poll")}</strong><span>{t("Ask the room, see the votes")}</span>
+      </button>
+      {#if session.aiOn("games")}
+        <button type="button" class="tile ai" onclick={() => { asking = true; aiError = ""; }}>
+          <span class="glyph"><Icon name="sparkles" size={20} /></span>
+          <strong>{t("Make with AI")}</strong><span>{t("From the sermon, a passage or text")}</span>
+        </button>
+      {/if}
     </div>
-    {#if note}<p class="note">{note}</p>{/if}
+    {#if note}<p class="note" role="alert">{note}</p>{/if}
+    {#if audienceRoom.lastReport}
+      <ReportCard report={audienceRoom.lastReport} onclose={() => (audienceRoom.lastReport = null)} />
+    {/if}
+
     <div class="find">
-      <span class="search"><Icon name="search" size={14} /><input type="text" bind:value={query} placeholder={t("Search games, series and questions")} aria-label={t("Search games")} />{#if query}<button type="button" class="x" aria-label={t("Clear search")} onclick={() => (query = "")}>×</button>{/if}</span>
+      <span class="search"><Icon name="search" size={14} /><input type="text" bind:value={query} placeholder={t("Search quizzes, polls and questions")} aria-label={t("Search games")} />{#if query}<button type="button" class="x" aria-label={t("Clear search")} onclick={() => (query = "")}>×</button>{/if}</span>
       <div class="chips" role="radiogroup" aria-label={t("Show")}>
         {#each [{ id: "all", label: t("All") }, { id: "quiz", label: t("Quizzes") }, { id: "poll", label: t("Polls") }, { id: "mine", label: t("Mine") }] as chip (chip.id)}
           <button type="button" role="radio" aria-checked={show === chip.id} class:on={show === chip.id} onclick={() => (show = chip.id as typeof show)}>{chip.label}</button>
         {/each}
       </div>
     </div>
+
     {#if searching}
-      <h3>{tn(results.length, "{n} game found", "{n} games found")}</h3>
-      {#each results as game (game.id)}{@render gameRow(game)}{:else}<p class="note">{t("No game matches. Try other words, or All.")}</p>{/each}
+      <h3>{tn(results.length, "{n} found", "{n} found")}</h3>
+      <div class="cards">{#each results as game (game.id)}{@render card(game)}{:else}<p class="note">{t("Nothing matches. Try other words, or All.")}</p>{/each}</div>
     {:else}
-      <div class="teams-pick" role="radiogroup" aria-label={t("Teams")}>
-        <span>{t("Teams")}</span>
-        <button type="button" role="radio" aria-checked={audienceRoom.teams === 0} class:on={audienceRoom.teams === 0} onclick={() => audienceRoom.setTeams(0)}>{t("Off")}</button>
-        {#each Array.from({ length: MOST_TEAMS - 1 }, (_, i) => i + 2) as count (count)}
-          <button type="button" role="radio" aria-checked={audienceRoom.teams === count} class:on={audienceRoom.teams === count} onclick={() => audienceRoom.setTeams(count)}>
-            {#each TEAMS.slice(0, count) as team (team.name)}<i style:background={team.color}></i>{/each}{count}
-          </button>
-        {/each}
-      </div>
-      {#if audienceRoom.teams}<p class="note">{t("Players are split into teams as they join, evenly. A team's score is its players' average, so a small team can win.")}</p>{/if}
-      {#if audienceRoom.lastReport}
-        <ReportCard report={audienceRoom.lastReport} onclose={() => (audienceRoom.lastReport = null)} />
-      {/if}
       {#if recent.length}
-        <h3>{t("Recently played")}</h3>
-        {#each recent as game (game.id)}{@render gameRow(game)}{/each}
+        <h3>{t("Played lately")}</h3>
+        <div class="cards">{#each recent as game (game.id)}{@render card(game)}{/each}</div>
       {/if}
       {#each seriesNames as name (name)}
         {@const games = mine.filter((game) => game.series === name)}
-        {@const quizzes = games.filter((game) => game.kind === "quiz").length}
         <div class="series-head">
           <h3>{name}</h3>
-          {#if quizzes >= 2}<button type="button" class="btn" title={t("Questions from every quiz in the series, mixed")} onclick={() => playSeries(name)}>{t("Play the series final")}</button>{/if}
+          {#if games.filter((game) => game.kind === "quiz").length >= 2}<button type="button" class="btn" title={t("Questions from every quiz in the series, mixed")} onclick={() => playSeries(name)}>{t("Play the series final")}</button>{/if}
         </div>
-        {#each games as game (game.id)}{@render gameRow(game)}{/each}
+        <div class="cards">{#each games as game (game.id)}{@render card(game)}{/each}</div>
       {/each}
-      {#if loose.length}
-        <h3>{seriesNames.length ? t("Other games") : t("Your games")}</h3>
-        {#each loose as game (game.id)}{@render gameRow(game)}{/each}
+      {#if looseQuizzes.length}
+        <h3>{t("Your quizzes")}</h3>
+        <div class="cards">{#each looseQuizzes as game (game.id)}{@render card(game)}{/each}</div>
       {/if}
+      {#if loosePolls.length}
+        <h3>{t("Your polls")}</h3>
+        <div class="cards">{#each loosePolls as game (game.id)}{@render card(game)}{/each}</div>
+      {/if}
+      {#if !mine.length}
+        <p class="empty">{t("Your own quizzes and polls will be here. Start with New quiz, or play one of the ready ones below.")}</p>
+      {/if}
+
+      <h3>{t("Ready to play")}</h3>
+      <div class="cards">
+        <div class="card fresh">
+          <button type="button" class="open" disabled={!!making} onclick={() => make("which-book")}>
+            <span class="glyph"><Icon name="bible" size={18} /></span>
+            <span class="words"><strong>{t("Which book?")}</strong><span>{making === "which-book" ? t("Making…") : t("Name the book each verse comes from. Different every time.")}</span></span>
+          </button>
+        </div>
+        <div class="card fresh">
+          <button type="button" class="open" disabled={!!making} onclick={() => make("finish-verse")}>
+            <span class="glyph"><Icon name="bible" size={18} /></span>
+            <span class="words"><strong>{t("Finish the verse")}</strong><span>{making === "finish-verse" ? t("Making…") : t("Choose how each verse ends. Different every time.")}</span></span>
+          </button>
+        </div>
+        {#each BUILT_IN_GAMES as game (game.id)}{@render card(game)}{/each}
+      </div>
+
+      {#if quizPacks.packs.length}
+        <h3>{t("More to add")}</h3>
+        <div class="cards">
+          {#each quizPacks.packs as pack (pack.id)}
+            {@const added = quizPacks.installed(pack.id)}
+            <div class="card pack">
+              <div class="open static">
+                <span class="glyph"><Icon name="download" size={18} /></span>
+                <span class="words"><strong>{pack.name}</strong><span>{pack.description}</span></span>
+              </div>
+              <button type="button" class="btn" class:accent={!added} disabled={added || quizPacks.busy === pack.id} onclick={() => quizPacks.install(pack)}>{added ? t("Added") : quizPacks.busy === pack.id ? t("Adding…") : tn(pack.count, "Add {n}", "Add {n}")}</button>
+            </div>
+          {/each}
+        </div>
+        {#if quizPacks.error}<p class="note" role="alert">{quizPacks.error}</p>{/if}
+      {/if}
+
       {#if reports.length}
         <h3>{t("Who was listening")}</h3>
         {#if shownReport}
@@ -333,88 +378,92 @@
         {/if}
         {#each reports.slice(0, 10) as report (report.id)}
           {#if report.id !== openReport}
-            <button type="button" class="game report-row" onclick={() => (openReport = report.id)}>
-              <div><strong>{report.title}</strong><span>{new Date(report.at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {tn(report.players, "{n} player", "{n} players")}</span></div>
-              <b>{percent(reportSummary(report).right)}</b>
+            <button type="button" class="report-row" onclick={() => (openReport = report.id)}>
+              <span class="words"><strong>{report.title}</strong><span>{new Date(report.at).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {tn(report.players, "{n} player", "{n} players")}</span></span>
+              <b title={t("Answers right")}>{percent(reportSummary(report).right)}</b>
             </button>
           {/if}
         {/each}
       {/if}
-      <h3>{t("Made from your Bible")}</h3>
-      <div class="game">
-        <div><strong>{t("Which book?")}</strong><span>{t("Name the book each verse comes from. Different every time.")}</span></div>
-        <button type="button" class="btn accent" disabled={!!making} onclick={() => make("which-book")}>{making === "which-book" ? t("Making…") : t("Play")}</button>
-      </div>
-      <div class="game">
-        <div><strong>{t("Finish the verse")}</strong><span>{t("Choose how each verse ends. Different every time.")}</span></div>
-        <button type="button" class="btn accent" disabled={!!making} onclick={() => make("finish-verse")}>{making === "finish-verse" ? t("Making…") : t("Play")}</button>
-      </div>
-      {#if show !== "mine"}
-        <h3>{t("Ready to play")}</h3>
-        {#each BUILT_IN_GAMES as game (game.id)}{@render gameRow(game)}{/each}
-      {/if}
     {/if}
   </section>
-
-  {#snippet gameRow(game: Game)}
-    {@const builtIn = game.id.startsWith("builtin:")}
-    <div class="game">
-      <div>
-        <strong>{builtIn ? t(game.title) : game.title}</strong>
-        <span>{builtIn && game.description ? t(game.description) : `${game.kind === "poll" ? t("Poll") : t("Quiz")} · ${tn(game.questions.length, "{n} question", "{n} questions")}${game.series ? ` · ${game.series}` : ""}`}</span>
-      </div>
-      <button type="button" class="btn accent" onclick={() => audienceRoom.play(game)}>{t("Play")}</button>
-      {#if builtIn}
-        <button type="button" class="btn icon" title={t("Make your own copy to change")} aria-label={t("Copy")} onclick={() => (editing = { ...structuredClone(game), id: `game:${Math.random().toString(36).slice(2, 10)}`, title: t("{title} (copy)", { title: t(game.title) }) })}><Icon name="copy" size={14} /></button>
-      {:else}
-        <button type="button" class="btn icon" title={t("Edit")} aria-label={t("Edit")} onclick={() => (editing = structuredClone($state.snapshot(game)) as Game)}><Icon name="pencil" size={14} /></button>
-        <button type="button" class="btn icon" class:armed={armed === game.id} title={armed === game.id ? t("Click again to delete") : t("Delete")} aria-label={t("Delete")} onclick={() => removeGame(game.id)}><Icon name="trash" size={14} /></button>
-      {/if}
-    </div>
-  {/snippet}
 {/if}
 
+{#snippet card(game: Game)}
+  {@const quiz = game.kind === "quiz"}
+  <div class="card">
+    <button type="button" class="open" onclick={() => (viewing = game.id)} title={t("See every question")}>
+      {#if quiz}
+        <span class="glyph quiz" aria-hidden="true">{#each [0, 1, 2, 3] as index (index)}<ChoiceMark {index} size={14} />{/each}</span>
+      {:else}
+        <span class="glyph poll" aria-hidden="true"><i style:height="60%"></i><i style:height="100%"></i><i style:height="35%"></i></span>
+      {/if}
+      <span class="words">
+        <strong>{titleOf(game)}</strong>
+        <span>{quiz ? t("Quiz") : t("Poll")} · {tn(game.questions.length, "{n} question", "{n} questions")}{game.series ? ` · ${game.series}` : ""}</span>
+      </span>
+    </button>
+    <button type="button" class="btn play" aria-label={t("Play {title}", { title: titleOf(game) })} title={t("Play")} onclick={() => void play(game)}><Icon name="play" size={13} /></button>
+  </div>
+{/snippet}
+
 <style>
-  section { display: grid; gap: 10px; }
-  h3 { margin: 8px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+  section { display: grid; gap: 10px; container-type: inline-size; }
+  h3 { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
   .row, .screen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .screen span { color: var(--muted); font-size: 12px; margin-right: 2px; }
   .screen .btn.on { border-color: var(--accent); color: var(--accent); }
-  .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-  .switches label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 650; cursor: pointer; }
-  .switches small { display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; font-weight: 500; line-height: 1.4; }
-  .btn { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.accent { border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); }
-  .game { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
-  .game > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
-  .game strong { font-size: 13px; }
-  .game span { color: var(--muted); font-size: 12px; }
+  .btn.big { height: 34px; padding: 0 16px; font-size: 13px; }
   .note { margin: 0; color: var(--muted); font-size: 12px; }
-  .find { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .empty { margin: 4px 0 0; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
+  .new-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @container (min-width: 640px) { .new-tiles { grid-template-columns: repeat(3, 1fr); } .new-tiles .tile.ai { grid-column: auto; grid-template-columns: none; align-items: start; } .new-tiles .tile.ai .glyph { grid-row: auto; } .new-tiles .tile.ai strong { margin-top: 6px; } }
+  .tile { display: grid; justify-items: start; gap: 3px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .tile:hover { border-color: var(--accent); }
+  .tile strong { margin-top: 6px; font-size: 13.5px; }
+  .tile > span:last-child { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+  .tile.ai { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; }
+  .tile.ai .glyph { grid-row: span 2; }
+  .tile.ai strong { margin-top: 0; }
+  .tile.ai { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .tile.ai .glyph { color: var(--accent); }
+
+  .glyph { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: color-mix(in srgb, currentColor 8%, transparent); }
+  .glyph.quiz { grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: transparent; }
+  .glyph.poll { display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding: 7px; background: color-mix(in srgb, #1368ce 18%, transparent); }
+  .glyph.poll i { display: block; width: 5px; border-radius: 2px; background: #5b9cf0; }
+
+  .find { display: grid; gap: 10px; }
   .search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: var(--muted); }
   .search:focus-within { border-color: var(--accent); color: var(--ink); }
   .search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
-  .search .x { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; font-size: 16px; }
+  .search .x { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 16px; cursor: pointer; }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; }
   .chips button { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
   .chips button.on { background: var(--ink); border-color: var(--ink); color: var(--panel); }
-  .btn.icon { width: 28px; padding: 0; display: inline-grid; place-items: center; }
-  .btn.armed { border-color: var(--danger, #ff6b6b); color: var(--danger, #ff6b6b); }
-  .teams-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-  .teams-pick > span { color: var(--muted); font-size: 12px; margin-right: 2px; }
-  .teams-pick button { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-  .teams-pick button.on { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
-  .teams-pick i, .teams-board i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-  .teams-board i { margin-right: 6px; }
-  .series-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; }
+
+  .cards { display: grid; gap: 6px; }
+  @container (min-width: 640px) { .cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); } }
+  .card { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border: 1px solid var(--line); border-radius: 12px; }
+  .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .open:disabled { cursor: progress; }
+  .open.static { cursor: default; }
+  .words { min-width: 0; display: grid; gap: 2px; }
+  .words strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .words > span { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+  .btn.play { width: 30px; height: 30px; padding: 0; justify-content: center; border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); border-radius: 50%; }
+  .series-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 10px; }
   .series-head h3 { margin: 0; }
-  .report-row { width: 100%; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .report-row:hover { background: color-mix(in srgb, currentColor 5%, transparent); }
+  .report-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .report-row .words { flex: 1; }
   .report-row b { font-size: 15px; font-variant-numeric: tabular-nums; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; }
-  .btn.ai { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+
   .maker { padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
   .maker-head { display: flex; justify-content: space-between; align-items: center; }
   .maker-head strong { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
@@ -428,36 +477,31 @@
   .maker-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .hint { margin: 0; color: var(--muted); font-size: 11.5px; }
   .error { margin: 0; color: var(--danger, #ff6b6b); font-size: 12px; }
-  .ai-check { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-size: 12px; line-height: 1.4; }
+
   .run-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
   .run-head strong { color: var(--ink); }
-  .prompt { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.35; }
+  .progress { display: flex; gap: 3px; }
+  .progress i { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, currentColor 12%, transparent); }
+  .progress i.done { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .progress i.now { background: var(--accent); }
+  .prompt { margin: 2px 0 0; font-size: 17px; font-weight: 700; line-height: 1.35; }
   .answers { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .answers li { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .answers li i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 22%, transparent); transition: width 0.3s; }
-  .answers li.right { border-color: var(--good, #3ccf7a); }
-  .answers .mark { position: relative; font-weight: 800; color: var(--muted); }
-  .answers .label { position: relative; flex: 1; }
-  .answers b { position: relative; }
+  .answers li { position: relative; display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 7px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .answers li > i { position: absolute; inset: 0 auto 0 0; transition: width 0.3s; }
+  .answers li.right { border-color: color-mix(in srgb, var(--good, #3ccf7a) 70%, transparent); }
+  .answers .label { position: relative; flex: 1; font-size: 13.5px; }
+  .right-tag { position: relative; display: inline-flex; align-items: center; gap: 3px; color: var(--good, #3ccf7a); font-size: 11.5px; font-weight: 700; }
+  .answers b { position: relative; min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+  .answers :global(.mark) { position: relative; }
   .status { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .switches summary { color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer; }
+  .switches[open] summary { margin-bottom: 4px; }
+  .switches label { display: flex; align-items: flex-start; gap: 10px; margin-top: 6px; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .switches small { display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; font-weight: 500; line-height: 1.4; }
   .board { list-style: none; margin: 0; padding: 0; }
   .board li { display: flex; justify-content: space-between; padding: 5px 2px; border-bottom: 1px solid var(--line); }
+  .teams-board i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; }
   .link { justify-self: start; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 2px 0; }
-  .edit label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
-  .edit input, .edit textarea { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; }
-  .edit textarea { min-height: 54px; resize: vertical; }
-  .kind { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .kind button { min-height: 30px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-  .kind button.on { border-color: var(--accent); color: var(--ink); }
-  fieldset { display: grid; gap: 6px; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
-  fieldset.unready { border-style: dashed; }
-  legend { padding: 0 4px; color: var(--muted); font-size: 12px; }
-  .choice-row { display: flex; align-items: center; gap: 6px; }
-  .choice-row input:not([type="radio"]) { flex: 1; min-width: 0; }
-  .choice-row .mark { width: 14px; font-weight: 800; color: var(--muted); }
-  .x { width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
-  .q-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-  .q-tools .small { display: flex; align-items: center; gap: 4px; }
-  .q-tools .small input { width: 64px; }
-  @media (prefers-reduced-motion: reduce) { .answers li i { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .answers li > i { transition: none; } }
 </style>

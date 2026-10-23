@@ -3975,6 +3975,15 @@ class Session {
     this.message = t("{name} deleted.", { name: asset?.name ?? t("The file") });
   };
 
+  /** Open a service made elsewhere (the sample service) as a new one, and keep it. */
+  openNewService = async (service: Service) => {
+    this.service = service;
+    this.cursor = { sectionId: service.sections[0]?.id ?? null, itemId: null };
+    this.loadSectionStarts(service.id);
+    await this.persist();
+    this.services = await api.serviceList();
+  };
+
   createService = async (name: string) => {
     const service: Service = { id: uid(), name: name.trim() || "Untitled service", sections: [], updatedAt: new Date().toISOString(), ...this.serviceDefaults() };
     this.service = service;

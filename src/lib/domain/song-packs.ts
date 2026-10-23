@@ -1,7 +1,8 @@
 // Song packs: optional collections shipped in static/song-packs/ (see the README there),
 // installed into a library folder on request.
 
-export type SongPack = { id: string; name: string; folder: string; file: string; description: string; license: string };
+/** `starter`: sample songs every church may add, on any plan, to try the app with. */
+export type SongPack = { id: string; name: string; folder: string; file: string; description: string; license: string; starter?: boolean };
 
 function text(value: unknown, max = 200): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
@@ -20,7 +21,7 @@ export function sanitizeSongPacks(value: unknown): SongPack[] {
     const file = text(record.file, 120);
     if (!id || !name || !/^[\w.-]+\.zip$/i.test(file) || seen.has(id)) continue;
     seen.add(id);
-    packs.push({ id, name, folder: text(record.folder, 60) || name, file, description: text(record.description, 300), license: text(record.license, 80) });
+    packs.push({ id, name, folder: text(record.folder, 60) || name, file, description: text(record.description, 300), license: text(record.license, 80), ...(record.starter === true ? { starter: true } : {}) });
   }
   return packs;
 }

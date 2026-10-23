@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "public-domain-hymns-v1",
+    "name": "Classic hymns to start with",
+    "folder": "Hymns (public domain)",
+    "file": "public-domain-hymns.zip",
+    "description": "18 well-loved hymns, from Amazing Grace and It Is Well to Silent Night and Christ the Lord Is Risen Today. Yours to edit and show.",
+    "license": "Public domain",
+    "starter": true
+  }
+]

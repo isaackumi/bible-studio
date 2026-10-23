@@ -213,6 +213,9 @@
   /** Why the Production Desk trial could not start (offline, or already used here). */
   let trialError = $state("");
 
+  /** Samples to try with (hymns, a whole sample service, quizzes): on unless unticked. */
+  let samples = $state(true);
+
   /** Finish setup; with `tour`, start the tour of the desk they land on. */
   async function finish(tour = false) {
     if (step === "church") go(index);
@@ -229,6 +232,8 @@
     if (translation) session.setDeskTranslation(translation);
     session.setAppearance({ desk });
     session.finishOnboarding();
+    // Loaded only now, and added in the background while the desk opens.
+    if (samples) void import("../../app/starter.svelte").then((starter) => starter.installStarterKit()).catch(() => {});
     // End on a first verse ready to show: John 3:16 on Preview, and what to press next.
     if (!tour && desk === "pewbeam") void session.showFirstVerse(translation);
     if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
@@ -407,6 +412,10 @@
                   <li class:pending={!session.output.online}><Icon name="cast" size={15} /><span>{session.output.online ? t("Audience window open") : t("Audience screen: open it from the desk when the projector is on")}</span></li>
                   <li class="pending"><Icon name="mic" size={15} /><span>{t("Voice: press Listen on the desk when you want it")}</span></li>
                 </ul>
+                <label class="samples">
+                  <input type="checkbox" class="switch" bind:checked={samples} />
+                  <span><strong>{t("Start with samples")}</strong><em>{t("18 classic hymns, a whole sample Sunday service with its readings, sermon and announcements, and quizzes for phones. Change or delete them any time.")}</em></span>
+                </label>
                 {#if session.plan === "free" && !session.workspace.entitlement.trialUsed}
                   <p class="trial-note"><Icon name="sparkles" size={14} /> {t("Premium is free for {n} days, from when you open your desk. No card needed.", { n: TRIAL_DAYS })}</p>
                 {/if}
@@ -704,4 +713,8 @@
   .ob-lang button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
   .ob-lang button[aria-checked="true"] { background: var(--field); color: var(--ink); }
   .one-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .samples { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+  .samples span { display: grid; gap: 3px; }
+  .samples strong { font-size: 13.5px; }
+  .samples em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.45; }
 </style>

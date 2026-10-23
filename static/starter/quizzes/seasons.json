@@ -1,0 +1,186 @@
+{
+ "games": [
+  {
+   "title": "The Christmas story",
+   "description": "From Luke 1 and 2 and Matthew 1 and 2.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "Which angel visited Mary?",
+     "choices": [
+      "Gabriel",
+      "Michael",
+      "Raphael",
+      "Uriel"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Why did Joseph and Mary travel to Bethlehem?",
+     "choices": [
+      "For a census",
+      "For a wedding",
+      "For the Passover",
+      "To flee Herod"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who were the first to visit the baby after the angels' message?",
+     "choices": [
+      "Shepherds",
+      "Wise men",
+      "Priests",
+      "Soldiers"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "What guided the wise men?",
+     "choices": [
+      "A star",
+      "An angel",
+      "A cloud",
+      "A dream"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Which three gifts did the wise men bring?",
+     "choices": [
+      "Gold, frankincense and myrrh",
+      "Gold, silver and bronze",
+      "Bread, wine and oil",
+      "Silk, spices and gold"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Where did Joseph take Mary and Jesus to escape Herod?",
+     "choices": [
+      "Egypt",
+      "Nazareth",
+      "Babylon",
+      "Jericho"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Which old man in the temple said he could now depart in peace?",
+     "choices": [
+      "Simeon",
+      "Zechariah",
+      "Eli",
+      "Nicodemus"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    }
+   ]
+  },
+  {
+   "title": "The Easter story",
+   "description": "From the last supper to the empty tomb.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "On what animal did Jesus ride into Jerusalem?",
+     "choices": [
+      "A donkey",
+      "A horse",
+      "A camel",
+      "A mule"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "What did the crowds wave and spread on the road?",
+     "choices": [
+      "Palm branches",
+      "Olive branches",
+      "Flags",
+      "Fig leaves"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "For how many pieces of silver did Judas betray Jesus?",
+     "choices": [
+      "Thirty",
+      "Ten",
+      "Forty",
+      "Fifty"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "In which garden did Jesus pray before he was arrested?",
+     "choices": [
+      "Gethsemane",
+      "Eden",
+      "The king's garden",
+      "Bethany"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who carried the cross for Jesus part of the way?",
+     "choices": [
+      "Simon of Cyrene",
+      "Joseph of Arimathea",
+      "Peter",
+      "Nicodemus"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who first saw the risen Jesus, in John's gospel?",
+     "choices": [
+      "Mary Magdalene",
+      "Peter",
+      "John",
+      "Thomas"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "On which day of the week did Jesus rise?",
+     "choices": [
+      "The first day",
+      "The seventh day",
+      "The sixth day",
+      "The fourth day"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    }
+   ]
+  }
+ ]
+}

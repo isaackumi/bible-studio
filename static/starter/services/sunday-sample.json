@@ -1,0 +1,101 @@
+{
+  "name": "Sample Sunday service",
+  "startTime": "09:00",
+  "sections": [
+    {
+      "name": "Welcome",
+      "minutes": 5,
+      "leader": "Service leader",
+      "items": [
+        { "announcement": { "heading": "Welcome to church", "body": "We are glad you are here. Find a seat, greet the people around you, and make yourself at home.", "label": "Good morning", "design": "spotlight" } },
+        { "slide": { "heading": "Before we begin", "body": "Please set your phone to silent. Keep it close: later you can join the quiz on it." } }
+      ]
+    },
+    {
+      "name": "Call to worship",
+      "minutes": 3,
+      "items": [{ "scripture": "Psalm 100:1-5" }]
+    },
+    {
+      "name": "Worship",
+      "minutes": 20,
+      "leader": "Worship team",
+      "items": [{ "song": "Holy, Holy, Holy" }, { "song": "Blessed Assurance" }, { "song": "It Is Well with My Soul" }]
+    },
+    {
+      "name": "Prayer",
+      "minutes": 5,
+      "items": [{ "slide": { "heading": "Let us pray", "body": "For our church, our families, our city, and everyone who is sick or grieving this week." } }]
+    },
+    {
+      "name": "Scripture reading",
+      "minutes": 5,
+      "items": [{ "scripture": "Romans 8:28-39" }]
+    },
+    {
+      "name": "Sermon",
+      "minutes": 35,
+      "leader": "Pastor",
+      "items": [
+        { "slide": { "heading": "Love that never lets go", "body": "Romans 8:28-39" } },
+        { "scripture": "Romans 8:28" },
+        { "scripture": "Romans 8:31-32" },
+        { "scripture": "Romans 8:38-39" }
+      ]
+    },
+    {
+      "name": "Quiz: were you listening?",
+      "minutes": 5,
+      "items": [{ "slide": { "heading": "Phones out!", "body": "Scan the code on the screen to join the quiz on today's sermon. No app needed." } }]
+    },
+    {
+      "name": "Offering",
+      "minutes": 5,
+      "items": [
+        { "scripture": "2 Corinthians 9:7" },
+        { "song": "Praise God, from Whom All Blessings Flow (Doxology)" }
+      ]
+    },
+    {
+      "name": "Announcements",
+      "minutes": 5,
+      "items": [
+        { "announcement": { "heading": "Youth night", "body": "Friday at 7 pm in the hall. Games, food and a Bible quiz. Bring a friend.", "label": "This week", "design": "banner" } },
+        { "announcement": { "heading": "Midweek Bible study", "body": "Wednesdays at 6:30 pm. This month we read the letter to the Romans together.", "label": "Every week", "design": "bulletin" } },
+        { "announcement": { "heading": "Welcome lunch", "body": "New here? Join us for lunch after the service next Sunday. Ask anyone at the door.", "label": "Next Sunday", "design": "card" } }
+      ]
+    },
+    {
+      "name": "Closing song and blessing",
+      "minutes": 5,
+      "items": [{ "song": "Amazing Grace" }, { "scripture": "Numbers 6:24-26" }]
+    }
+  ],
+  "sermon": {
+    "title": "Love that never lets go",
+    "speaker": "Pastor",
+    "series": "Romans",
+    "notes": "A sample sermon to try the Sermon page with: each part has its notes and verses. Change it, or start your own.",
+    "sections": [
+      { "name": "Opening", "minutes": 5, "notes": "Have you ever been afraid of being let go: by a job, a friend, a family? Paul writes to people who knew trouble, and tells them what can never be taken away.", "scriptures": ["Romans 8:28"] },
+      { "name": "God is for us", "minutes": 10, "notes": "If God is for us, who can be against us? The proof is the cross: he did not spare his own Son. A God who gave that much will not hold back the rest.", "scriptures": ["Romans 8:31-32"] },
+      { "name": "Nothing can separate us", "minutes": 12, "notes": "Paul lists everything we fear: trouble, hardship, danger, death, powers, the future. None of it can separate us from the love of God in Christ Jesus.", "scriptures": ["Romans 8:35", "Romans 8:38-39"] },
+      { "name": "Living it this week", "minutes": 8, "notes": "Name one fear you carry into this week. Each morning, read verses 38 and 39 aloud and put that fear in the list.", "scriptures": ["Romans 8:37"] }
+    ]
+  },
+  "games": [
+    {
+      "title": "Love that never lets go: were you listening?",
+      "description": "Five questions on the sample sermon, Romans 8.",
+      "kind": "quiz",
+      "series": "Romans",
+      "questions": [
+        { "prompt": "Which letter was today's reading from?", "choices": ["Romans", "Galatians", "Ephesians", "Hebrews"], "correct": 0, "seconds": 20, "points": 1000 },
+        { "prompt": "Finish the verse: If God is for us…", "choices": ["who can be against us?", "we shall not want.", "all will be well.", "we will not fear."], "correct": 0, "seconds": 20, "points": 1000 },
+        { "prompt": "What did God not spare for us?", "choices": ["His own Son", "His angels", "His temple", "His law"], "correct": 0, "seconds": 20, "points": 1000 },
+        { "prompt": "Which of these can separate us from the love of God?", "choices": ["Nothing at all", "Death", "Trouble", "The future"], "correct": 0, "seconds": 20, "points": 1000 },
+        { "prompt": "In all these things we are more than…", "choices": ["conquerors", "survivors", "servants", "friends"], "correct": 0, "seconds": 20, "points": 1000 }
+      ]
+    }
+  ]
+}

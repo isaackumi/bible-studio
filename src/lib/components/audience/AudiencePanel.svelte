@@ -64,6 +64,18 @@
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || order[sort](a, b));
   });
 
+  // The question most asked for that is not answered yet: one press puts it on Preview.
+  const top = $derived(
+    questions
+      .filter((question) => question.state === "approved" && !question.hidden && !question.answered && question.id !== audienceRoom.shownQuestion)
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.votes - a.votes || a.at - b.at)[0] ?? null,
+  );
+  // Without approval nothing waits, so the list opens on what is up.
+  let filterChosen = false;
+  $effect(() => {
+    if (!filterChosen && view && !view.room.moderate && filter === "waiting") filter = "up";
+  });
+
   const ago = (at: number) => {
     const minutes = Math.round((Date.now() - at) / 60_000);
     return minutes < 1 ? t("just now") : minutes < 60 ? tn(minutes, "{n} min ago", "{n} min ago") : tn(Math.round(minutes / 60), "{n} hour ago", "{n} hours ago");
@@ -93,13 +105,7 @@
     </div>
   </header>
 
-  {#if !audienceRoom.current}
-    <div class="start">
-      <p>{t("Open a room and show its QR code. People join on their phones over the internet (no app, no Wi-Fi needed), then ask questions, vote, and play quizzes. Nothing reaches the screen until you put it there.")}</p>
-      <button type="button" class="primary" disabled={audienceRoom.busy} onclick={() => audienceRoom.start()}>{audienceRoom.busy ? t("Opening…") : t("Open a room")}</button>
-      {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
-    </div>
-  {:else}
+  {#if audienceRoom.current}
     {@const room = audienceRoom.current}
     <section class="join">
       <div class="qr"><QrView qr={{ data: room.joinUrl, style: "rounded", dark: "#111111", light: "#ffffff", caption: "" }} /></div>
@@ -126,14 +132,20 @@
         </div>
       {/if}
     </section>
-    {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
+  {/if}
+  {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
 
     <div class="tabs" role="tablist">
       <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
       <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} onclick={() => (tab = "games")}>{t("Quizzes and polls")}</button>
     </div>
 
-    {#if tab === "questions"}
+    {#if tab === "questions" && !audienceRoom.current}
+      <div class="start">
+        <p>{t("Open a room and show its QR code. People join on their phones over the internet (no app, no Wi-Fi needed), then ask questions, vote, and play quizzes. Nothing reaches the screen until you put it there.")}</p>
+        <button type="button" class="primary" disabled={audienceRoom.busy} onclick={() => audienceRoom.start()}>{audienceRoom.busy ? t("Opening…") : t("Open a room")}</button>
+      </div>
+    {:else if tab === "questions"}
       <!-- How questions come in, which to show, and finding one: together, above the list. -->
       <div class="q-tools">
       <div class="switches">
@@ -142,7 +154,7 @@
       </div>
       <div class="filters" role="radiogroup" aria-label={t("Show")}>
         {#each [["waiting", t("Waiting")], ["up", t("Up")], ["answered", t("Answered")], ["put-away", t("Put away")]] as [id, label] (id)}
-          <button type="button" role="radio" aria-checked={filter === id} class:on={filter === id} onclick={() => (filter = id as Filter)}>{label} <span>{counts[id as Filter]}</span></button>
+          <button type="button" role="radio" aria-checked={filter === id} class:on={filter === id} onclick={() => { filter = id as Filter; filterChosen = true; }}>{label} <span>{counts[id as Filter]}</span></button>
         {/each}
       </div>
       <div class="find">
@@ -159,30 +171,42 @@
         </select>
       </div>
       </div>
+      {#if top && filter === "up"}
+        <button type="button" class="next-up" onclick={() => audienceRoom.questionOnPreview(top)}>
+          <span><Icon name="screens" size={15} /> {t("Show the top question")}</span>
+          <em>{top.text}</em>
+        </button>
+      {/if}
       <ol class="list">
         {#each shown as question (question.id)}
-          <li class:featured={question.featured}>
-            <div class="q-top">
-              <span class="votes" title={t("Votes")}>▲ {question.votes}</span>
-              <span class="who">{question.name || t("Someone")} · {ago(question.at)}</span>
-              {#if question.pinned}<span class="tag">{t("Pinned")}</span>{/if}
-              {#if question.featured}<span class="tag gold">{t("Featured")}</span>{/if}
-            </div>
-            <p class="text">{question.text}</p>
-            <div class="actions">
-              {#if question.state === "pending"}
-                <button type="button" class="btn accent" onclick={() => audienceRoom.moderate(question.id, "approve")}>{t("Put through")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "reject")}>{t("Turn down")}</button>
-              {:else if question.state === "approved" && !question.hidden}
-                <button type="button" class="btn accent" onclick={() => audienceRoom.questionOnPreview(question)}>{t("Show on Preview")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "answered")}>{question.answered ? t("Not answered") : t("Answered")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "pin")}>{question.pinned ? t("Unpin") : t("Pin")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "feature")}>{question.featured ? t("Unfeature") : t("Feature")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "hide")}>{t("Hide")}</button>
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "archive")}>{t("Archive")}</button>
-              {:else}
-                <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, question.hidden ? "show" : "restore")}>{t("Bring back")}</button>
-              {/if}
+          <li class:featured={question.featured} class:pinned={question.pinned} class:onscreen={audienceRoom.shownQuestion === question.id}>
+            <div class="votes" title={t("Votes")}><Icon name="chevron-up" size={14} /><b>{question.votes}</b></div>
+            <div class="q-body">
+              <p class="text">{question.text}</p>
+              <div class="q-meta">
+                <span>{question.name || t("Someone")}</span><span>{ago(question.at)}</span>
+                {#if question.pinned}<span class="tag"><Icon name="pin" size={11} /> {t("Pinned")}</span>{/if}
+                {#if question.featured}<span class="tag gold"><Icon name="star" size={11} /> {t("Featured")}</span>{/if}
+                {#if question.answered}<span class="tag good"><Icon name="check" size={11} /> {t("Answered")}</span>{/if}
+                {#if audienceRoom.shownQuestion === question.id}<span class="tag accent">{t("On Preview")}</span>{/if}
+              </div>
+              <div class="actions">
+                {#if question.state === "pending"}
+                  <button type="button" class="btn accent" onclick={() => audienceRoom.moderate(question.id, "approve")}><Icon name="check" size={13} /> {t("Put through")}</button>
+                  <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, "reject")}>{t("Turn down")}</button>
+                {:else if question.state === "approved" && !question.hidden}
+                  <button type="button" class="btn accent" onclick={() => audienceRoom.questionOnPreview(question)}><Icon name="screens" size={13} /> {t("Show on Preview")}</button>
+                  <button type="button" class="btn" class:on={question.answered} onclick={() => audienceRoom.moderate(question.id, "answered")}><Icon name="check" size={13} /> {question.answered ? t("Answered") : t("Mark answered")}</button>
+                  <span class="more-actions">
+                  <button type="button" class="icon-btn sm" class:on={question.pinned} aria-label={question.pinned ? t("Unpin") : t("Pin")} data-tip={question.pinned ? t("Unpin") : t("Pin to the top of the list")} onclick={() => audienceRoom.moderate(question.id, "pin")}><Icon name={question.pinned ? "pin-off" : "pin"} size={14} /></button>
+                  <button type="button" class="icon-btn sm" class:on={question.featured} aria-label={question.featured ? t("Unfeature") : t("Feature")} data-tip={question.featured ? t("Unfeature") : t("Feature: highlighted on people's phones")} onclick={() => audienceRoom.moderate(question.id, "feature")}><Icon name="star" size={14} /></button>
+                  <button type="button" class="icon-btn sm" aria-label={t("Hide")} data-tip={t("Hide from people's phones")} onclick={() => audienceRoom.moderate(question.id, "hide")}><Icon name="eye-off" size={14} /></button>
+                  <button type="button" class="icon-btn sm" aria-label={t("Archive")} data-tip={t("Archive: put away for good")} onclick={() => audienceRoom.moderate(question.id, "archive")}><Icon name="folder" size={14} /></button>
+                  </span>
+                {:else}
+                  <button type="button" class="btn" onclick={() => audienceRoom.moderate(question.id, question.hidden ? "show" : "restore")}>{t("Bring back")}</button>
+                {/if}
+              </div>
             </div>
           </li>
         {:else}
@@ -193,11 +217,12 @@
       <GamesTab />
     {/if}
 
+    {#if audienceRoom.current}
     <footer>
       <!-- Two presses, so a room is never ended by a slip. -->
       <button type="button" class="link danger" onclick={() => { if (ending) void audienceRoom.end(); else { ending = true; setTimeout(() => (ending = false), 4000); } }}>{ending ? t("Press again to end the room for everyone") : t("End room")}</button>
     </footer>
-  {/if}
+    {/if}
 </aside>
 
 <style>
@@ -247,14 +272,29 @@
   .search .clear:hover { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--ink); }
   .find select { flex: none; width: auto; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: inherit; font: inherit; font-size: 12.5px; }
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .list li { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field, rgb(255 255 255 / 0.02)); }
-  .list li.featured { border-color: #f2c46b; }
-  .q-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 11.5px; }
-  .votes { font-weight: 750; color: var(--ink); }
-  .tag { padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-weight: 700; }
+  .list > li { display: flex; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field, rgb(255 255 255 / 0.02)); }
+  .list > li.pinned { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .list > li.featured { border-color: #f2c46b; }
+  .list > li.onscreen { box-shadow: inset 3px 0 0 var(--accent); }
+  .votes { flex: none; display: grid; justify-items: center; align-content: start; gap: 0; width: 34px; padding-top: 2px; color: var(--muted); }
+  .votes b { color: var(--ink); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .q-body { flex: 1; min-width: 0; display: grid; gap: 6px; }
+  .text { margin: 0; font-size: 15px; font-weight: 550; line-height: 1.45; overflow-wrap: anywhere; }
+  .q-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--muted); font-size: 11.5px; }
+  .tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-weight: 700; }
   .tag.gold { color: #f2c46b; }
-  .text { margin: 6px 0 10px; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
-  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag.good { color: var(--good, #3ccf7a); }
+  .tag.accent { color: var(--accent); }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+  .actions .btn { display: inline-flex; align-items: center; gap: 5px; }
+  .actions .btn.on { color: var(--good, #3ccf7a); border-color: color-mix(in srgb, var(--good, #3ccf7a) 50%, var(--line)); }
+  .more-actions { display: inline-flex; gap: 2px; margin-left: auto; }
+  .icon-btn.sm { width: 28px; height: 28px; }
+  .icon-btn.on { color: var(--accent); }
+  .next-up { display: grid; gap: 4px; width: 100%; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .next-up span { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 12px; font-weight: 750; }
+  .next-up em { font-style: normal; font-size: 13.5px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .next-up:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .empty { color: var(--muted); text-align: center; padding: 20px 8px; }
   footer { margin-top: auto; padding-top: 8px; }
   .link { border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 4px 0; }

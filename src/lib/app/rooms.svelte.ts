@@ -517,8 +517,12 @@ class AudienceRoom {
     await session.refreshSource(this.screenId, presentGame(session.theme(), { ...data, key: this.stageKey }));
   };
 
+  /** The question last put on Preview, marked in the list. */
+  shownQuestion = $state<string | null>(null);
+
   /** A question on Preview (with who asked), ready to send LIVE. */
   questionOnPreview = (question: RoomQuestion) => {
+    this.shownQuestion = question.id;
     session.previewModel(presentText({ theme: session.theme(), layout: "title", heading: question.name ? t("{name} asks", { name: question.name }) : t("A question"), body: question.text }), `room:${this.current?.code}:q:${question.id}`);
   };
 }

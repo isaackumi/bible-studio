@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
-  import { CHOICE_STYLES, ordinal, playerColor, say, sayCount, type GamePlayer, type GameScreenData } from "../../domain/game-screen";
+  import { CHOICE_PATHS, CHOICE_STYLES, ordinal, playerColor, say, sayCount, type GamePlayer, type GameScreenData } from "../../domain/game-screen";
   import { GameSound } from "../../game/sounds";
   import QrView from "../QrView.svelte";
 
@@ -194,16 +194,7 @@
   const promptSize = $derived(data.prompt.length > 180 ? 4.2 : data.prompt.length > 110 ? 5 : data.prompt.length > 60 ? 6 : 7);
   const podium = $derived([data.top[1], data.top[0], data.top[2]]);
 
-  function shape(kind: (typeof CHOICE_STYLES)[number]["shape"]): string {
-    switch (kind) {
-      case "triangle": return "M12 3 22 20H2Z";
-      case "diamond": return "M12 2 22 12 12 22 2 12Z";
-      case "circle": return "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z";
-      case "square": return "M3 3h18v18H3Z";
-      case "star": return "M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7.1L12 17.3 5.8 21l1.6-7.1L2 9.2l7.1-.6Z";
-      default: return "M7 3h10l5 9-5 9H7l-5-9Z";
-    }
-  }
+  const shape = (kind: (typeof CHOICE_STYLES)[number]["shape"]): string => CHOICE_PATHS[kind];
 </script>
 
 <div class="game" class:still>

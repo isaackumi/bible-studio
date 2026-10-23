@@ -15,6 +15,16 @@ export const CHOICE_STYLES: Array<{ color: string; shape: "triangle" | "diamond"
   { color: "#0aa3a3", shape: "hexagon" },
 ];
 
+/** Each answer shape as an SVG path on a 24-unit square, drawn the same on the desk and the big screen. */
+export const CHOICE_PATHS: Record<(typeof CHOICE_STYLES)[number]["shape"], string> = {
+  triangle: "M12 3 22 20H2Z",
+  diamond: "M12 2 22 12 12 22 2 12Z",
+  circle: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z",
+  square: "M3 3h18v18H3Z",
+  star: "M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7.1L12 17.3 5.8 21l1.6-7.1L2 9.2l7.1-.6Z",
+  hexagon: "M7 3h10l5 9-5 9H7l-5-9Z",
+};
+
 /** Team mode: up to four teams, each a colour and a name (the name is translated where it is shown). */
 export const TEAMS = [
   { name: "Red", color: "#e21b3c" },

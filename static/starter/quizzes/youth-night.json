@@ -1,0 +1,277 @@
+{
+ "games": [
+  {
+   "title": "Bible trivia: harder",
+   "description": "For those who think they know their Bible.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "Who was the oldest man in the Bible?",
+     "choices": [
+      "Methuselah",
+      "Noah",
+      "Adam",
+      "Enoch"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Which book comes right after Acts?",
+     "choices": [
+      "Romans",
+      "Galatians",
+      "Hebrews",
+      "James"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who was thrown into a den of lions?",
+     "choices": [
+      "Daniel",
+      "Shadrach",
+      "Jeremiah",
+      "Ezekiel"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "How many books are in the New Testament?",
+     "choices": [
+      "27",
+      "39",
+      "22",
+      "66"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who wrote most of the letters in the New Testament?",
+     "choices": [
+      "Paul",
+      "Peter",
+      "John",
+      "James"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "On which island was John when he wrote Revelation?",
+     "choices": [
+      "Patmos",
+      "Cyprus",
+      "Crete",
+      "Malta"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who replaced Judas as one of the twelve apostles?",
+     "choices": [
+      "Matthias",
+      "Barnabas",
+      "Silas",
+      "Stephen"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "What was Paul's name before he met Jesus?",
+     "choices": [
+      "Saul",
+      "Simon",
+      "Stephen",
+      "Silas"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Who was the first Christian martyr?",
+     "choices": [
+      "Stephen",
+      "James",
+      "Peter",
+      "Philip"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "Which prophet was taken up to heaven in a whirlwind?",
+     "choices": [
+      "Elijah",
+      "Elisha",
+      "Isaiah",
+      "Samuel"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    }
+   ]
+  },
+  {
+   "title": "Who am I?",
+   "description": "Guess the person from the clue.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "I was sold by my brothers and became a ruler in Egypt.",
+     "choices": [
+      "Joseph",
+      "Benjamin",
+      "Moses",
+      "Jacob"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I was a queen who said: if I perish, I perish.",
+     "choices": [
+      "Esther",
+      "Vashti",
+      "Ruth",
+      "Deborah"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I said to my mother-in-law: where you go, I will go.",
+     "choices": [
+      "Ruth",
+      "Orpah",
+      "Naomi",
+      "Hannah"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I was a judge whose strength was in my hair.",
+     "choices": [
+      "Samson",
+      "Gideon",
+      "Jephthah",
+      "Ehud"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I doubted until I touched the marks of the nails.",
+     "choices": [
+      "Thomas",
+      "Philip",
+      "Bartholomew",
+      "Andrew"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I was a tax collector who became one of the twelve.",
+     "choices": [
+      "Matthew",
+      "Zacchaeus",
+      "Luke",
+      "Mark"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I sold purple cloth and opened my home to Paul in Philippi.",
+     "choices": [
+      "Lydia",
+      "Priscilla",
+      "Dorcas",
+      "Phoebe"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    },
+    {
+     "prompt": "I asked God for wisdom, and he gave me riches too.",
+     "choices": [
+      "Solomon",
+      "David",
+      "Hezekiah",
+      "Josiah"
+     ],
+     "correct": 0,
+     "seconds": 20,
+     "points": 1000
+    }
+   ]
+  },
+  {
+   "title": "Warm-up poll",
+   "description": "Get everyone's phone out and laughing.",
+   "kind": "poll",
+   "questions": [
+    {
+     "prompt": "Which Bible story would make the best film?",
+     "choices": [
+      "David and Goliath",
+      "Jonah and the great fish",
+      "Daniel in the lions' den",
+      "The parting of the Red Sea"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "Which would you rather have done?",
+     "choices": [
+      "Walked on water with Peter",
+      "Eaten the loaves and fish",
+      "Seen the walls of Jericho fall",
+      "Sailed on Noah's ark"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "How do you read your Bible most?",
+     "choices": [
+      "On my phone",
+      "A printed Bible",
+      "Listening to audio",
+      "Honestly, not much yet"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    }
+   ]
+  }
+ ]
+}

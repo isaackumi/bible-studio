@@ -1,0 +1,30 @@
+[
+ {
+  "id": "sunday-school-v1",
+  "name": "Sunday school favourites",
+  "description": "Three easy quizzes for children: creation, Noah and Moses, and stories of Jesus.",
+  "file": "sunday-school.json",
+  "count": 3
+ },
+ {
+  "id": "youth-night-v1",
+  "name": "Youth night",
+  "description": "Harder Bible trivia for teens and young adults, with a fun poll to warm up the room.",
+  "file": "youth-night.json",
+  "count": 3
+ },
+ {
+  "id": "seasons-v1",
+  "name": "Christmas and Easter",
+  "description": "A quiz for each season, from the gospels.",
+  "file": "seasons.json",
+  "count": 2
+ },
+ {
+  "id": "church-polls-v1",
+  "name": "Polls for church life",
+  "description": "Ready-made polls: hear from the room after the service, at a meeting or on a youth night.",
+  "file": "church-polls.json",
+  "count": 2
+ }
+]

@@ -71,13 +71,16 @@
   const folders = $derived(songFolders(session.songs, session.workspace.songFolders));
   const packs = $derived(session.songPacks.filter((pack) => !session.workspace.installedPacks.includes(pack.id)));
   let installing = $state<string | null>(null);
+  /** Sample songs offered straight away when the library is empty. */
+  const starterPack = $derived(packs.find((pack) => pack.starter) ?? null);
 
   $effect(() => {
     void session.loadSongPacks();
   });
 
   async function install(pack: (typeof packs)[number]) {
-    if (!session.requireFeature("song-packs")) return;
+    // Starter songs are for every church to try the app with; other packs come with Premium.
+    if (!pack.starter && !session.requireFeature("song-packs")) return;
     installing = pack.id;
     const ok = await session.installSongPack(pack);
     installing = null;
@@ -837,7 +840,16 @@
     <div class="song-scroll">
     <ul class="songs" aria-label={t("Songs")} bind:this={listEl}>
       {#if visible.length === 0}
-        <li class="empty">{openList ? openList.empty : session.songs.length ? t("This folder is empty.") : t("No songs yet. Press New song to type or paste one, or Import to bring in files.")}</li>
+        <li class="empty">
+          {openList ? openList.empty : session.songs.length ? t("This folder is empty.") : t("No songs yet. Press New song to type or paste one, or Import to bring in files.")}
+          {#if !session.songs.length && starterPack}
+            <span class="starter">
+              <strong>{starterPack.name}</strong>
+              <span>{starterPack.description}</span>
+              <button type="button" class="import" disabled={installing !== null} onclick={() => void install(starterPack)}>{installing === starterPack.id ? t("Adding…") : t("Add them")}</button>
+            </span>
+          {/if}
+        </li>
       {:else if shown.length === 0}
         <li class="empty">{t("No song in this list has “{query}”.", { query: listQuery.trim() })}</li>
       {/if}
@@ -1384,6 +1396,10 @@
   .song:hover { background: var(--field); }
   .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
   .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
+  .empty .starter { display: grid; gap: 4px; justify-items: start; margin-top: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .empty .starter strong { color: var(--ink); font-size: 13px; }
+  .empty .starter span { line-height: 1.45; }
+  .empty .starter .import { margin-top: 4px; }
   .badge {
     flex: none;
     padding: 1px 6px;

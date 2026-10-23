@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_GAMES, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame, seriesFinal } from "./games";
+import { BUILT_IN_GAMES, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame, seriesFinal, questionsFromText, questionsAsText } from "./games";
 
 describe("games", () => {
   it("built-in games are all ready to play, with the right answer among the answers", () => {
@@ -55,5 +55,31 @@ describe("games", () => {
     expect(final.series).toBe("Faith");
     expect(final.questions.map((question) => question.prompt)).toEqual(["1a", "2a", "1b", "2b"]);
     expect(seriesFinal(games, "Hope")).toBeNull();
+  });
+});
+
+describe("questions typed or pasted as text", () => {
+  it("reads a question, its answers and the starred right one, block by block", () => {
+    const questions = questionsFromText("Who built the ark?\nMoses\n* Noah\nAbraham\n\n2. How many disciples?\na) Seven\nb) Twelve ✓\nc) Ten");
+    expect(questions.map((q) => [q.prompt, q.choices, q.correct])).toEqual([
+      ["Who built the ark?", ["Moses", "Noah", "Abraham"], 1],
+      ["How many disciples?", ["Seven", "Twelve", "Ten"], 1],
+    ]);
+  });
+
+  it("takes the right answer from an Answer line, by letter or by its words", () => {
+    expect(questionsFromText("First book?\nA. Exodus\nB. Genesis\nAnswer: B")[0]?.correct).toBe(1);
+    expect(questionsFromText("First book?\nExodus\nGenesis\nAnswer: genesis")[0]?.correct).toBe(1);
+  });
+
+  it("leaves out blocks with fewer than two answers, and marks nothing right in a poll", () => {
+    expect(questionsFromText("Just a line\n\nQuestion\nOne answer")).toEqual([]);
+    expect(questionsFromText("Which song?\n* Amazing Grace\nBe Thou My Vision", "poll")[0]?.correct).toBeNull();
+  });
+
+  it("writes a game back out in the same shape", () => {
+    const game = { ...newGame("Test"), questions: questionsFromText("Who built the ark?\nMoses\n* Noah") };
+    expect(questionsAsText(game)).toBe("Who built the ark?\nMoses\n* Noah");
+    expect(questionsFromText(questionsAsText(game))[0]?.correct).toBe(1);
   });
 });

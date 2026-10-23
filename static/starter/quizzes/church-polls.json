@@ -1,0 +1,90 @@
+{
+ "games": [
+  {
+   "title": "After the service",
+   "description": "Quick feedback, anonymous.",
+   "kind": "poll",
+   "questions": [
+    {
+     "prompt": "How did today's service help you?",
+     "choices": [
+      "It encouraged me",
+      "It challenged me",
+      "I learned something new",
+      "I'm still thinking about it"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "Which part of the service would you like more of?",
+     "choices": [
+      "Worship",
+      "Prayer",
+      "The preaching",
+      "Testimonies"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "Which time suits you best for a midweek Bible study?",
+     "choices": [
+      "Early morning",
+      "Lunchtime",
+      "Evening",
+      "Weekend"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    }
+   ]
+  },
+  {
+   "title": "Get to know each other",
+   "description": "Icebreakers for a meeting, a camp or a new members' class.",
+   "kind": "poll",
+   "questions": [
+    {
+     "prompt": "How long have you been part of this church?",
+     "choices": [
+      "This is my first time",
+      "Less than a year",
+      "1 to 5 years",
+      "More than 5 years"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "Which would you rather do on a Saturday?",
+     "choices": [
+      "Serve in the community",
+      "Join a prayer meeting",
+      "Play sports together",
+      "Share a meal"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    },
+    {
+     "prompt": "How do you like to pray?",
+     "choices": [
+      "Alone and quiet",
+      "With one or two friends",
+      "In a big group",
+      "Walking or on the go"
+     ],
+     "correct": null,
+     "seconds": 30,
+     "points": 0
+    }
+   ]
+  }
+ ]
+}

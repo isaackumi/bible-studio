@@ -103,7 +103,7 @@ export function sayCount(data: Pick<GameScreenData, "words" | "lang">, n: number
   return say(data, (data.lang === "fr" ? n < 2 : n === 1) ? one : other, { n, ...values });
 }
 
-export { CHOICE_STYLES, PLAYER_COLORS, playerColor } from "./game-colors";
+export { CHOICE_PATHS, CHOICE_STYLES, PLAYER_COLORS, playerColor } from "./game-colors";
 
 export function presentGame(theme: Theme, game: GameScreenData): PresentationModel {
   return { layout: "game", theme, reference: null, attribution: null, lines: [], imageUrl: null, backgroundImageUrl: null, game };

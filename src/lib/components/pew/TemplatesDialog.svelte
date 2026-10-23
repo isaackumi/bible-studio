@@ -20,6 +20,16 @@
       : null,
   );
   let armed = $state<string | null>(null);
+  let sampleBusy = $state(false);
+
+  /** The sample service is built on demand (its songs and readings from this computer), then opens. */
+  async function addSample() {
+    sampleBusy = true;
+    const { sampleService } = await import("../../app/starter.svelte");
+    const ok = await sampleService.install();
+    sampleBusy = false;
+    if (ok) onclose();
+  }
   /** The part being dragged, and where it would land. */
   let dragFrom = $state<number | null>(null);
   let dragOver = $state<number | null>(null);
@@ -96,6 +106,10 @@
         <p class="empty">{t("No templates yet.")}</p>
       {/each}
       <button type="button" class="add" onclick={() => (selectedId = session.addTemplate().id)}><Icon name="plus" size={14} /> {t("New template")}</button>
+      <button type="button" class="sample" disabled={sampleBusy} onclick={() => void addSample()}>
+        <strong><Icon name="sparkles" size={14} /> {sampleBusy ? t("Adding the sample…") : t("Sample service, all filled in")}</strong>
+        <span>{t("Songs, readings, a sermon with notes, announcements and a quiz, ready to run. Opens as a new service.")}</span>
+      </button>
       {#if session.service}
         <button type="button" class="add" title={t("Its parts and times, not this week's songs")} onclick={() => { const made = session.saveServiceAsTemplate(session.service?.name ?? t("Service")); if (made) selectedId = made.id; }}><Icon name="copy" size={14} /> {t("From this service")}</button>
       {/if}
@@ -195,6 +209,10 @@
   .pick strong { font-size: 13px; }
   .pick span { font-size: 11px; color: var(--muted); }
   .pick.on { background: var(--field); }
+  .sample { display: grid; gap: 3px; margin-top: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 7%, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .sample strong { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .sample span { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+  .sample:disabled { cursor: progress; opacity: 0.7; }
   .add { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px dashed var(--line); border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; margin-top: 4px; }
   .empty { margin: 4px; font-size: 12px; color: var(--muted); }
   .edit { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

@@ -75,6 +75,7 @@
   }
 
   let newName = $state("");
+  let sampleBusy = $state(false);
   let sectionName = $state("");
   /** The templates window, opened on a template (or the first). */
   let templatesOpen = $state<{ id: string | null } | null>(null);
@@ -738,6 +739,10 @@
       <div class="blank">
         <Icon name="list" size={28} />
         <p>{t("Plan the whole service in order: welcome, songs, the reading, the sermon, announcements.")}</p>
+        <button type="button" class="tpl-card sample" disabled={sampleBusy} onclick={async () => { sampleBusy = true; await (await import("../../app/starter.svelte")).sampleService.install(); sampleBusy = false; }}>
+          <strong>{sampleBusy ? t("Adding the sample…") : t("Try the sample service")}</strong>
+          <span>{t("Everything filled in: songs, readings, a sermon, announcements and a quiz. See how a whole Sunday runs.")}</span>
+        </button>
         {#if session.workspace.serviceTemplates.length}
           <p class="from-label">{t("Start from a template, with its parts and times in place")}</p>
           <div class="from-templates">
@@ -1091,6 +1096,7 @@
   .queued button { height: 22px; padding: 0 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; }
   .from-label { margin: 6px 0 0; font-size: 12px; font-weight: 650; color: var(--muted); }
   .from-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; width: min(640px, 100%); }
+  .tpl-card.sample { width: min(100%, 420px); margin: 4px auto 6px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .tpl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; }
   .tpl-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .tpl-card strong { font-size: 14px; }

@@ -1,0 +1,265 @@
+{
+ "games": [
+  {
+   "title": "In the beginning",
+   "description": "Creation and the garden, for children.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "What did God make on the first day?",
+     "choices": [
+      "Light",
+      "Fish",
+      "Trees",
+      "People"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Who were the first man and woman?",
+     "choices": [
+      "Adam and Eve",
+      "Abraham and Sarah",
+      "Isaac and Rebekah",
+      "Boaz and Ruth"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What was the name of the garden where they lived?",
+     "choices": [
+      "Eden",
+      "Gethsemane",
+      "Babylon",
+      "Goshen"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "On which day did God rest?",
+     "choices": [
+      "The seventh day",
+      "The first day",
+      "The third day",
+      "The tenth day"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Who tricked Eve into eating the fruit?",
+     "choices": [
+      "The serpent",
+      "A lion",
+      "A raven",
+      "A donkey"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What did God put in the sky as a promise after the flood?",
+     "choices": [
+      "A rainbow",
+      "A star",
+      "A cloud",
+      "The moon"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    }
+   ]
+  },
+  {
+   "title": "Noah and Moses",
+   "description": "Big stories from the Old Testament, for children.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "How many of each kind of animal went into the ark, at the least?",
+     "choices": [
+      "Two",
+      "One",
+      "Ten",
+      "Five"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Which bird came back to Noah with an olive leaf?",
+     "choices": [
+      "A dove",
+      "A raven",
+      "An eagle",
+      "A sparrow"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Where was baby Moses hidden?",
+     "choices": [
+      "In a basket on the river",
+      "In a cave",
+      "In a tree",
+      "In a tent"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Who found baby Moses?",
+     "choices": [
+      "Pharaoh's daughter",
+      "Miriam's friend",
+      "A shepherd",
+      "A fisherman"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What did God speak to Moses from?",
+     "choices": [
+      "A burning bush",
+      "A big rock",
+      "A well",
+      "A tall tower"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What did God send each morning for the people to eat in the desert?",
+     "choices": [
+      "Manna",
+      "Grapes",
+      "Fish",
+      "Honey cakes"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Which sea did God part so the people could cross?",
+     "choices": [
+      "The Red Sea",
+      "The Dead Sea",
+      "The Sea of Galilee",
+      "The Great Sea"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    }
+   ]
+  },
+  {
+   "title": "Jesus and his friends",
+   "description": "Stories from the gospels, for children.",
+   "kind": "quiz",
+   "questions": [
+    {
+     "prompt": "Where was baby Jesus laid when he was born?",
+     "choices": [
+      "In a manger",
+      "In a boat",
+      "In a palace",
+      "In a basket"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What job did Peter and Andrew do before they followed Jesus?",
+     "choices": [
+      "Fishermen",
+      "Carpenters",
+      "Tax collectors",
+      "Shepherds"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "How many loaves did the boy share when Jesus fed five thousand?",
+     "choices": [
+      "Five",
+      "Two",
+      "Twelve",
+      "Seven"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Who climbed a tree to see Jesus?",
+     "choices": [
+      "Zacchaeus",
+      "Nicodemus",
+      "Lazarus",
+      "Bartimaeus"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "Who did Jesus raise to life after four days in the tomb?",
+     "choices": [
+      "Lazarus",
+      "John",
+      "Jairus",
+      "Thomas"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "What did Jesus walk on in the storm?",
+     "choices": [
+      "Water",
+      "Clouds",
+      "Sand",
+      "Fire"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    },
+    {
+     "prompt": "In the story Jesus told, who stopped to help the hurt man on the road?",
+     "choices": [
+      "A Samaritan",
+      "A priest",
+      "A soldier",
+      "A king"
+     ],
+     "correct": 0,
+     "seconds": 15,
+     "points": 1000
+    }
+   ]
+  }
+ ]
+}
