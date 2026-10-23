@@ -309,8 +309,9 @@
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.primary { border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); }
-  .btn.danger { background: #c62f33; color: #fff; }
-  .btn.danger.armed { background: #e5484d; box-shadow: 0 0 0 3px color-mix(in srgb, #e5484d 30%, transparent); }
+  /* Filled red with white words, also inside Settings (whose own .btn.danger is red words on a plain button). */
+  .foot .btn.primary.danger { border-color: transparent; background: #c62f33; color: #fff; }
+  .foot .btn.primary.danger.armed { background: #e5484d; box-shadow: 0 0 0 3px color-mix(in srgb, #e5484d 30%, transparent); }
   @media (max-width: 640px) { .hint { display: none; } .foot .btn { flex: 1; justify-content: center; } }
   @media (prefers-reduced-motion: reduce) { .meter-bar i { transition: none; } }
 </style>
