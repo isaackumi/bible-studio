@@ -3,10 +3,16 @@
 
 export type SlideOrder = "name" | "newest" | "shuffle";
 
+/** How one picture gives way to the next. Mix picks a different one each time. */
+export type SlideTransition = "fade" | "slide" | "zoom" | "dip" | "mix" | "cut";
+export const SLIDE_TRANSITIONS: readonly SlideTransition[] = ["fade", "slide", "zoom", "dip", "mix", "cut"];
+
 export type SlideOptions = {
   seconds: number;
   loop: boolean;
-  transition: "fade" | "cut";
+  transition: SlideTransition;
+  /** How long the transition takes, in seconds (0.3–3). */
+  transitionSeconds: number;
   order: SlideOrder;
   /** Each picture slowly zooms and drifts (Ken Burns). */
   kenBurns: boolean;
@@ -27,6 +33,7 @@ export const DEFAULT_SLIDE_OPTIONS: SlideOptions = {
   seconds: 6,
   loop: true,
   transition: "fade",
+  transitionSeconds: 1,
   order: "name",
   kenBurns: false,
   captions: false,
@@ -46,7 +53,8 @@ export function cleanSlideOptions(value: unknown): SlideOptions {
   return {
     seconds: number(input.seconds, 6, 1, 30),
     loop: flag("loop"),
-    transition: input.transition === "cut" ? "cut" : "fade",
+    transition: SLIDE_TRANSITIONS.includes(input.transition as SlideTransition) ? (input.transition as SlideTransition) : "fade",
+    transitionSeconds: typeof input.transitionSeconds === "number" && Number.isFinite(input.transitionSeconds) ? Math.min(3, Math.max(0.3, Math.round(input.transitionSeconds * 10) / 10)) : 1,
     order: input.order === "newest" || input.order === "shuffle" ? input.order : "name",
     kenBurns: flag("kenBurns"),
     captions: flag("captions"),
@@ -85,4 +93,18 @@ export function captionOf(fileName: string): string {
     .replace(/\s*-\s*(?=\S)/g, (match) => (match.trim() === "-" && !/\s/.test(match) ? " " : " – "))
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * The screen transition for one change of picture. Slides follow the direction of travel (forward
+ * pushes left, back pushes right); Mix takes turns through fade, slide, zoom and dip, never the same
+ * twice running, so a long slideshow does not feel like a loop.
+ */
+export function screenTransition(choice: SlideTransition, direction: 1 | -1, step: number): "cut" | "dissolve" | "push-left" | "push-right" | "zoom" | "dip" {
+  const pick = choice === "mix" ? (["fade", "slide", "zoom", "dip"] as const)[((step % 4) + 4) % 4]! : choice;
+  if (pick === "cut") return "cut";
+  if (pick === "slide") return direction === 1 ? "push-left" : "push-right";
+  if (pick === "zoom") return "zoom";
+  if (pick === "dip") return "dip";
+  return "dissolve";
 }

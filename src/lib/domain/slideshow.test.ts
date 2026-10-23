@@ -32,3 +32,21 @@ describe("slideshow choices", () => {
     expect(captionOf("easter-sunrise.png")).toBe("easter sunrise");
   });
 });
+
+describe("slideshow transitions", () => {
+  it("keeps a chosen change and its length, within limits", async () => {
+    const { cleanSlideOptions } = await import("./slideshow");
+    expect(cleanSlideOptions({ transition: "zoom", transitionSeconds: 1.26 })).toMatchObject({ transition: "zoom", transitionSeconds: 1.3 });
+    expect(cleanSlideOptions({ transition: "spin", transitionSeconds: 9 })).toMatchObject({ transition: "fade", transitionSeconds: 3 });
+    expect(cleanSlideOptions({}).transitionSeconds).toBe(1);
+  });
+
+  it("slides with the direction of travel, and Mix takes turns", async () => {
+    const { screenTransition } = await import("./slideshow");
+    expect(screenTransition("slide", 1, 0)).toBe("push-left");
+    expect(screenTransition("slide", -1, 0)).toBe("push-right");
+    expect(screenTransition("fade", 1, 3)).toBe("dissolve");
+    expect([1, 2, 3, 4, 5].map((step) => screenTransition("mix", 1, step))).toEqual(["push-left", "zoom", "dip", "dissolve", "push-left"]);
+    expect(screenTransition("cut", 1, 1)).toBe("cut");
+  });
+});

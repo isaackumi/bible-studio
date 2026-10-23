@@ -1,7 +1,8 @@
 <script lang="ts">
   import { crumbsOf, folderColor, folderName, pictures, type Place } from "../../app/pictures.svelte";
   import { isDesktop } from "../../platform/runtime";
-  import { t, tn } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
+  import type { SlideTransition } from "../../domain/slideshow";
   import Icon from "../Icon.svelte";
   import { session } from "../../app/session.svelte";
 
@@ -22,6 +23,16 @@
       show.music && playlists.length ? t("Music") : "",
     ].filter(Boolean).join(", "),
   );
+
+  /** How pictures change, with a line on what each looks like. */
+  const CHANGES: Array<{ id: SlideTransition; label: string; tip: string }> = [
+    { id: "fade", label: msg("Fade"), tip: msg("One picture melts into the next.") },
+    { id: "slide", label: msg("Push"), tip: msg("The next picture pushes the last one off the side.") },
+    { id: "zoom", label: msg("Zoom"), tip: msg("The next picture settles in from slightly larger.") },
+    { id: "dip", label: msg("Dip"), tip: msg("Down to black, then up into the next picture.") },
+    { id: "mix", label: msg("Mix"), tip: msg("A different change each time: fade, push, zoom and dip in turn.") },
+    { id: "cut", label: msg("Cut"), tip: msg("Straight to the next picture.") },
+  ];
 
   /** Each kind of place keeps one colour, so Google Drive or Dropbox is spotted at once. */
   const PLACE_COLORS: Record<Place["kind"], string> = { pictures: "#3b82f6", desktop: "#64748b", "google-drive": "#22c55e", icloud: "#38bdf8", dropbox: "#2563eb", onedrive: "#0ea5e9" };
@@ -151,12 +162,20 @@
         </label>
         <div class="field">
           <span>{t("Change")}</span>
-          <div class="seg" role="radiogroup" aria-label={t("How pictures change")}>
-            <button type="button" role="radio" aria-checked={pictures.slideshow.transition === "fade"} class:on={pictures.slideshow.transition === "fade"} onclick={() => pictures.setOptions({ transition: "fade" })}>{t("Fade")}</button>
-            <button type="button" role="radio" aria-checked={pictures.slideshow.transition === "cut"} class:on={pictures.slideshow.transition === "cut"} onclick={() => pictures.setOptions({ transition: "cut" })}>{t("Cut")}</button>
+          <div class="seg changes" role="radiogroup" aria-label={t("How pictures change")}>
+            {#each CHANGES as change (change.id)}
+              <button type="button" role="radio" title={t(change.tip)} aria-checked={pictures.slideshow.transition === change.id} class:on={pictures.slideshow.transition === change.id} onclick={() => pictures.setOptions({ transition: change.id })}>{t(change.label)}</button>
+            {/each}
           </div>
           <label class="loop"><input type="checkbox" class="switch" checked={pictures.slideshow.loop} onchange={(event) => pictures.setOptions({ loop: event.currentTarget.checked })} /> {t("Loop")}</label>
         </div>
+        {#if pictures.slideshow.transition !== "cut"}
+          <label class="field">
+            <span>{t("Change takes")}</span>
+            <input type="range" min="0.3" max="3" step="0.1" value={pictures.slideshow.transitionSeconds} aria-label={t("Seconds for each change")} oninput={(event) => pictures.setOptions({ transitionSeconds: Number(event.currentTarget.value) })} />
+            <b>{t("{seconds} s", { seconds: pictures.slideshow.transitionSeconds.toFixed(1) })}</b>
+          </label>
+        {/if}
         <!-- Each extra is the church's to switch on or off; remembered on this computer. -->
         <details class="options">
           <summary><span>{t("Options")}</span>{#if optionsOn}<small>{optionsOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
@@ -277,6 +296,7 @@
   .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, currentColor 7%, transparent); }
   .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .seg button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
+  .seg.changes { flex-wrap: wrap; }
   .loop { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .options { border-top: 1px solid var(--line); padding-top: 8px; }
   .options summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 700; }

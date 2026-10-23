@@ -6,9 +6,9 @@
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { presentImage, presentVideo } from "../domain/present";
-import type { TransitionKind } from "../domain/types";
+import type { ScreenTransition } from "../domain/types";
 import { t } from "../i18n/core";
-import { captionOf, cleanSlideOptions, slideOrder, type SlideOptions } from "../domain/slideshow";
+import { captionOf, cleanSlideOptions, screenTransition, slideOrder, type SlideOptions } from "../domain/slideshow";
 import { isDesktop } from "../platform/runtime";
 import { session } from "./session.svelte";
 import { audienceRoom, whenAudienceOpens } from "./rooms.svelte";
@@ -163,19 +163,28 @@ class Pictures {
   };
 
   /** A picture straight to the screen: on Preview, then LIVE. */
-  showNow = async (index: number, transition?: TransitionKind) => {
+  showNow = async (index: number, transition?: ScreenTransition, ms?: number) => {
     const found = this.model(index);
     if (!found) return;
     this.current = index;
     session.previewModel(found.model, found.id);
     this.shownId = found.id;
-    await session.take(transition);
+    await session.take(transition, ms);
   };
+
+  /** Changes of picture so far, so Mix takes turns. */
+  private turns = 0;
+
+  /** The slideshow's transition for its next change of picture, and its length. */
+  private change(direction: 1 | -1): [ScreenTransition, number] {
+    this.turns += 1;
+    return [screenTransition(this.slideshow.transition, direction, this.turns), Math.round(this.slideshow.transitionSeconds * 1000)];
+  }
 
   step = (by: 1 | -1) => {
     if (!this.images.length) return;
     const next = this.current < 0 ? 0 : (this.current + by + this.images.length) % this.images.length;
-    if (this.slideshow.running) void this.showNow(next, this.slideshow.transition);
+    if (this.slideshow.running) void this.showNow(next, ...this.change(by));
     else this.preview(next);
   };
 
@@ -203,7 +212,7 @@ class Pictures {
       clearInterval(this.watchTimer);
       this.watchTimer = setInterval(() => void this.pickUpNew(), 20_000);
     }
-    await this.showNow(this.sequence[0]!, this.slideshow.transition);
+    await this.showNow(this.sequence[0]!, ...this.change(1));
     this.schedule();
   };
 
@@ -260,7 +269,7 @@ class Pictures {
       }
     }
     this.position = position;
-    await this.showNow(this.sequence[position]!, this.slideshow.transition);
+    await this.showNow(this.sequence[position]!, ...this.change(1));
     this.schedule();
   };
 

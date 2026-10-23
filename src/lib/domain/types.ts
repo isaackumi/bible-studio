@@ -1,4 +1,6 @@
 export type TransitionKind = "cut" | "fade";
+/** What a take can use on the screen: a theme's or look's cut and fade, and moves of two frames (picture slideshows); see display/transitions.ts. */
+export type ScreenTransition = TransitionKind | "dissolve" | "push-left" | "push-right" | "push-up" | "push-down" | "zoom" | "dip";
 
 export type MotionId = "aurora" | "rays" | "bokeh" | "waves" | "stars" | "embers" | "clouds";
 
@@ -219,7 +221,7 @@ export type ProgramAlert = {
 };
 
 export type LiveFrame = {
-  transition: TransitionKind;
+  transition: ScreenTransition;
   sourceId: string | null;
   model: PresentationModel;
 };
@@ -701,7 +703,7 @@ export type ProgramPacket = {
   sessionId?: string;
   generation?: number;
   revision: number;
-  transition: TransitionKind;
+  transition: ScreenTransition;
   transitionMs: number;
   frame: LiveFrame;
   /** Hold animated backgrounds still on the audience screen. */

@@ -40,7 +40,7 @@ export function applyProgramAction(
 ): LiveState {
   if (action === "take" || action === "cut") {
     const transition =
-      action === "cut" ? "cut" : options?.transition === "cut" || options?.transition === "fade" ? options.transition : "fade";
+      action === "cut" ? "cut" : options?.transition ?? "fade";
     return {
       preview: state.preview,
       program: {

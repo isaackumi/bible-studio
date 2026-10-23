@@ -9,6 +9,8 @@
   import { api } from "../db/api";
   import { isDesktop } from "../platform/runtime";
   import { measureFrames } from "../display/frames";
+  import { keepsOutgoing, transitionFrames } from "../display/transitions";
+  import { tick } from "svelte";
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel, ProgramPacket } from "../domain/types";
   import Screen from "./Screen.svelte";
@@ -24,6 +26,11 @@
   let closed = false;
   let fading = $state(false);
   let fadeMs = $state(0);
+  /** The frame being replaced, kept on the screen while a slide, zoom, dissolve or dip runs. */
+  let outgoing = $state.raw<{ model: PresentationModel; sourceId: string | null; key: number } | null>(null);
+  let outgoingTimer: ReturnType<typeof setTimeout> | undefined;
+  let incomingLayer = $state<HTMLDivElement | null>(null);
+  let outgoingLayer = $state<HTMLDivElement | null>(null);
   let revision = -1;
   let shown = $state.raw<ProgramPacket | null>(null);
   let testing = $state(false);
@@ -38,15 +45,41 @@
     if (!isDesktop() && !acceptProgramPacket(shown, packet, readOwner(localStorage))) return;
     const next = packet?.frame.model;
     if (!next) return;
-    const animate = packet.transition === "fade" && packet.revision !== revision && revision !== -1;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The same frame sent again (an overlay or timer changed) updates in place: a running move carries on.
+    const fresh = packet.revision !== revision;
+    const moving = fresh && packet.transition !== "cut" && revision !== -1 && !reduce && packet.transitionMs > 0;
+    const before = { model: current, sourceId: currentSource };
     shown = packet;
     revision = packet.revision;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    fading = animate && !reduce;
-    fadeMs = packet.transitionMs;
+    if (fresh) {
+      fading = moving && packet.transition === "fade";
+      fadeMs = packet.transitionMs;
+      clearTimeout(outgoingTimer);
+      outgoing = moving && keepsOutgoing(packet.transition) ? { ...before, key: packet.revision } : null;
+    }
     current = next;
+    if (moving && keepsOutgoing(packet.transition)) void play(packet.transition, packet.transitionMs);
     currentSource = packet.frame.sourceId ?? null;
     document.documentElement.toggleAttribute("data-calm", packet.calm === true);
+  }
+
+  /** Run a two-frame transition: the new frame comes in over the old one, then the old one goes. */
+  async function play(kind: ProgramPacket["transition"], ms: number) {
+    const frames = transitionFrames(kind);
+    await tick();
+    if (!frames) {
+      outgoing = null;
+      return;
+    }
+    const timing = { duration: ms, easing: frames.easing, fill: "both" as const };
+    incomingLayer?.getAnimations().forEach((animation) => animation.cancel());
+    incomingLayer?.animate(frames.incoming, timing);
+    if (frames.outgoing) outgoingLayer?.animate(frames.outgoing, timing);
+    outgoingTimer = setTimeout(() => {
+      outgoing = null;
+      incomingLayer?.getAnimations().forEach((animation) => animation.cancel());
+    }, ms + 60);
   }
 
   function wanted(): string[] {
@@ -259,7 +292,14 @@
 </script>
 
 <div class="audience" style:background={frameBackground(current)} style:--aspect={aspect}>
-  <div class:fade-in={fading} style:--fade="{fadeMs}ms">
+  {#if outgoing}
+    {#key outgoing.key}
+      <div class="layer" bind:this={outgoingLayer} aria-hidden="true">
+        <Screen model={outgoing.model} sourceId={outgoing.sourceId} {feeds} {aspect} />
+      </div>
+    {/key}
+  {/if}
+  <div class="layer" class:fade-in={fading} style:--fade="{fadeMs}ms" bind:this={incomingLayer}>
     <Screen model={current} sourceId={currentSource} {feeds} {aspect} audio />
   </div>
   <CaptionBar />
@@ -272,6 +312,9 @@
 </div>
 
 <style>
+  /* Old and new frames on top of each other, so a transition can move both; the screen clips what slides off. */
+  .audience { overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
   .test-card, .fill-screen {
     position: absolute;
     left: 50%;

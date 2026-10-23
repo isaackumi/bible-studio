@@ -139,7 +139,7 @@ import { readBibleFile, verseCount } from "../bible/import";
 import { stageChords, type ChordLine } from "../domain/chords";
 import { assignShortcut, defaultShortcuts } from "../keyboard/manager";
 import { describeStep, type Macro, type MacroStep } from "../domain/macros";
-import type { ShortcutAction, TransitionKind } from "../domain/types";
+import type { ScreenTransition, ShortcutAction, TransitionKind } from "../domain/types";
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { clockLabel, DEFAULT_START, minutesOfDay, parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming, shiftSchedule } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
@@ -852,7 +852,7 @@ class Session {
     // While held, the audience gets an empty frame (same revision, so later updates still apply).
     const sent = this.programHeld ? { ...this.live, program: createLiveState(this.theme()).program } : this.live;
     const packet = {
-      ...programPacket(sent, lookTransition.ms),
+      ...programPacket(sent, this.takeMs ?? lookTransition.ms),
       sessionId: this.sessionId,
       generation: this.audienceGeneration,
       calm: this.workspace.appearance.calm === true,
@@ -7417,7 +7417,8 @@ class Session {
   }
 
   /** `transition`: this take's own (a slideshow's chosen one), instead of the theme's. */
-  private act = async (action: "take" | "cut" | "clear" | "black" | "logo", transition?: TransitionKind) => {
+  private act = async (action: "take" | "cut" | "clear" | "black" | "logo", transition?: ScreenTransition) => {
+    if (action !== "take") this.takeMs = null;
     if (!this.desktop() && !this.controlsAudience) {
       this.warn(t("This window is not sending to the audience."));
       return;
@@ -7499,7 +7500,13 @@ class Session {
     );
   };
 
-  take = (transition?: TransitionKind) => this.act("take", transition);
+  /** Preview to Program. A slideshow names its own transition and length; otherwise the theme's or look's. */
+  take = (transition?: ScreenTransition, ms?: number) => {
+    this.takeMs = transition && ms ? ms : null;
+    return this.act("take", transition);
+  };
+  /** A take's own transition length (a slideshow's), used for that take's frame only. */
+  private takeMs: number | null = null;
   cut = () => this.act("cut");
   clear = () => this.act("clear");
 
