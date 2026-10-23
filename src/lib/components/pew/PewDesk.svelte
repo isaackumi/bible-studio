@@ -629,14 +629,19 @@
 
   /** The last finished phrases, so the AI hears a whole thought rather than a fragment. */
   let heardLately: string[] = [];
+  /** Counts verses taken from speech, so a late AI answer can tell something newer came first. */
+  let takenCount = 0;
 
   /** Nothing matched: if it sounds like scripture, ask the church's AI (when switched on). */
   function askAiForVerse(text: string) {
     heardLately = [...heardLately, text].slice(-3);
     const heard = heardLately.join(" ");
     if (!session.aiOn("verses") || !soundsLikeScripture(heard)) return;
+    const takenBefore = takenCount;
     void session.versesFromSpeech(heard).then((found) => {
       if (mode === "songs") return;
+      // A verse heard while the AI was thinking is newer: the AI's answer only waits under Detections.
+      const overtaken = takenCount !== takenBefore;
       const items = found.flatMap((entry) => {
         const parsed = parseReference(entry.reference, session.books);
         const named = parsed && session.books.find((candidate) => candidate.ord === parsed.bookOrd);
@@ -650,7 +655,7 @@
       const [first, ...rest] = items;
       // Others the AI named wait under Detections, for the operator to choose.
       for (const other of [...rest].reverse()) noteHeard(other.item, heard, true);
-      if (first?.sure) takeHeard(first.item, heard, true);
+      if (first?.sure && !overtaken) takeHeard(first.item, heard, true);
       else if (first) {
         noteHeard(first.item, heard, true);
         session.voice.message = t("The AI thinks {reference} was meant. It is under Detections.", { reference: first.item.reference });
@@ -674,6 +679,9 @@
   function takeHeard(hit: BibleItem, text: string, ai = false) {
     if (hit.reference === lastSpokenRef) return;
     lastSpokenRef = hit.reference;
+    takenCount++;
+    // What was said before this verse is about something else now.
+    heardLately = [];
     if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
       bookOrd = hit.bookOrd;
       chapter = hit.chapter;
