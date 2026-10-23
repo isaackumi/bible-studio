@@ -22,7 +22,9 @@ jobs:
       - run: npm ci
       - name: Build the installer (unsigned, no updater)
         shell: pwsh
-        run: npx tauri build --bundles nsis --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'
+        run: |
+          Set-Content -Path no-updater.json -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8NoBOM
+          npx tauri build --bundles nsis --config no-updater.json
       - name: Install, run twice (first launch, then a second), collect the log
         shell: pwsh
         run: |
