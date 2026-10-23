@@ -21,6 +21,8 @@ import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { featuresPage } from "./features.ts";
 import { lostPage, newsPage } from "./news.ts";
+import { INSTRUMENT_SERIF_ITALIC_WOFF2, INTER_WOFF2, SHARE_IMAGE_JPEG } from "./site-assets.ts";
+import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
 import type { Provider } from "./billing.ts";
@@ -229,14 +231,33 @@ async function serveDownload(config: ApiConfig, platform: Platform): Promise<Res
 const PUBLIC_PAGES = ["/", "/features", "/whats-new", "/terms", "/privacy", "/refunds", "/licenses", "/security"];
 
 function sitemap(origin: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${PUBLIC_PAGES.map((page) => `<url><loc>${origin}${page}</loc></url>`).join("")}</urlset>\n`;
+  // The product pages change with each release; the policies with their own dates.
+  const released = CHANGELOG[0]?.date ?? "";
+  const changed = (page: string) => (["/", "/features", "/whats-new"].includes(page) ? released : POLICIES_UPDATED);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${PUBLIC_PAGES.map((page) => `<url><loc>${origin}${page}</loc><lastmod>${changed(page)}</lastmod><priority>${page === "/" ? "1.0" : page === "/features" ? "0.9" : "0.5"}</priority></url>`).join("")}</urlset>\n`;
 }
+
+const POLICIES_UPDATED = "2026-10-21";
+
+/** A file the site serves itself (fonts, the share picture), cached for good: its contents never change at an address. */
+function file(base64: string, type: string, maxAge: number): Response {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  return new Response(bytes, { status: 200, headers: { "content-type": type, "cache-control": `public, max-age=${maxAge}${maxAge >= 31536000 ? ", immutable" : ""}`, "access-control-allow-origin": "*" } });
+}
+
+/** A public page: fresh for five minutes in browsers, so a release reaches readers quickly. */
+const page = (body: string) => new Response(body, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" } });
 
 function text200(body: string, type: string): Response {
   return new Response(body, { status: 200, headers: { "content-type": type, "cache-control": "public, max-age=3600" } });
 }
 
 export async function handleApi(request: Request, config: ApiConfig): Promise<Response> {
+  // HEAD (link checkers, some crawlers) gets what GET would, without the body.
+  if (request.method === "HEAD") {
+    const full = await handleApi(new Request(request.url, { method: "GET", headers: request.headers }), config);
+    return new Response(null, { status: full.status, headers: full.headers });
+  }
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
   const path = url.pathname;
@@ -251,13 +272,16 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   }
   if (request.method === "GET") {
     const site = config.site ?? DEFAULT_SITE;
-    if (path === "/") return html(200, landingPage(site, config.releases ? await config.releases().catch(() => null) : null));
+    if (path === "/") return page(landingPage(site, config.releases ? await config.releases().catch(() => null) : null, origin));
+    if (path === "/fonts/inter.woff2") return file(INTER_WOFF2, "font/woff2", 31536000);
+    if (path === "/fonts/instrument-serif-italic.woff2") return file(INSTRUMENT_SERIF_ITALIC_WOFF2, "font/woff2", 31536000);
+    if (path === "/share.jpg") return file(SHARE_IMAGE_JPEG, "image/jpeg", 604800);
     const download = path.match(/^\/download\/([a-z-]+)$/);
     if (download) return serveDownload(config, download[1] as Platform);
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
-    if (path === "/features") return html(200, featuresPage(site));
-    if (path === "/whats-new") return html(200, newsPage(site));
+    if (path === "/features") return page(featuresPage(site, origin));
+    if (path === "/whats-new") return page(newsPage(site, origin));
     if (path === "/robots.txt") return text200(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /pay/\nDisallow: /signin/\nSitemap: ${origin}/sitemap.xml\n`, "text/plain; charset=utf-8");
     if (path === "/sitemap.xml") return text200(sitemap(origin), "application/xml; charset=utf-8");
     if (path === "/terms") return html(200, termsPage(site));

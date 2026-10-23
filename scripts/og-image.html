@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face { font-family: Inter; src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "Instrument Serif"; font-style: italic; src: url("../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2") format("woff2"); }
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+body { position: relative; font-family: Inter, sans-serif; color: #f5f5f7; background:
+  radial-gradient(700px 420px at 12% -10%, rgba(250,79,0,.38), transparent 60%),
+  radial-gradient(640px 460px at 100% 20%, rgba(139,108,255,.22), transparent 60%),
+  radial-gradient(900px 400px at 60% 120%, rgba(250,79,0,.18), transparent 60%), #07070a; }
+body::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse 80% 70% at 40% 40%, #000 30%, transparent 80%); }
+.copy { position: absolute; left: 72px; top: 70px; width: 600px; }
+.brand { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 26px; letter-spacing: -.01em; }
+h1 { margin: 48px 0 22px; font-size: 64px; line-height: 1.02; letter-spacing: -.045em; font-weight: 750; }
+h1 em { font-family: "Instrument Serif", serif; font-style: italic; font-weight: 400; background: linear-gradient(100deg, #ffd2b0, #ff9a4d 40%, #fa4f00 80%); -webkit-background-clip: text; color: transparent; }
+p { margin: 0; font-size: 23px; line-height: 1.45; color: #a9a9b6; }
+.chips { display: flex; gap: 10px; margin-top: 30px; }
+.chips span { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); font-size: 16px; font-weight: 600; color: #d9d9e0; }
+.desk { position: absolute; right: -40px; top: 120px; width: 500px; border: 1px solid rgba(255,255,255,.14); border-radius: 18px; background: linear-gradient(180deg,#16161c,#0d0d12); box-shadow: 0 40px 100px -20px rgba(250,79,0,.45), 0 20px 60px rgba(0,0,0,.6); overflow: hidden; transform: perspective(1400px) rotateY(-14deg) rotateX(4deg); }
+.bar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.bar i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+.bar b { margin-left: auto; padding: 3px 10px; border-radius: 6px; background: #ff3b3b; font-size: 11px; letter-spacing: .06em; }
+.mons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
+.mon small { display: block; margin: 0 0 6px 2px; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #ff9a4d; } .mon.prog small { color: #ff7b7b; }
+.scr { aspect-ratio: 16/9; border-radius: 8px; display: grid; place-items: center; text-align: center; padding: 8px 14px; background: radial-gradient(120% 90% at 50% 120%, #4a1606, #13070a 60%, #050505); border: 1px solid rgba(255,255,255,.08); }
+.prog .scr { border-color: rgba(255,59,59,.7); box-shadow: 0 0 22px rgba(255,59,59,.3); }
+.scr span { display: block; font-size: 8px; letter-spacing: .2em; color: #f2b88f; font-weight: 700; margin-bottom: 4px; } .scr div { font-size: 12px; line-height: 1.35; }
+.rows { display: grid; gap: 6px; padding: 0 12px 14px; }
+.rows div { height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,.08); padding: 0 10px; display: flex; align-items: center; font-size: 11px; color: #9b9ba8; }
+.rows div.on { border-color: rgba(250,79,0,.7); background: rgba(250,79,0,.12); color: #fff; }
+</style></head><body>
+<div class="copy">
+  <div class="brand"><svg width="44" height="44" viewBox="0 0 256 256"><path fill="#f5f5f5" d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z"/><path fill="#fa4f00" d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z"/><path fill="#f5f5f5" d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z"/><path fill="#f5f5f5" d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z"/></svg>Church Studio</div>
+  <h1>Every verse, song and sermon, <em>beautifully</em> on screen.</h1>
+  <p>Church presentation software that listens for the scripture being read. Free to start.</p>
+  <div class="chips"><span>Mac</span><span>Windows</span><span>Linux</span></div>
+</div>
+<div class="desk"><div class="bar"><i></i><i></i><i></i><b>● LIVE</b></div>
+  <div class="mons"><div class="mon"><small>PREVIEW</small><div class="scr"><div><span>JOHN 3:17</span>For God sent not his Son into the world to condemn the world</div></div></div>
+  <div class="mon prog"><small>PROGRAM</small><div class="scr"><div><span>JOHN 3:16</span>For God so loved the world, that he gave his only begotten Son</div></div></div></div>
+  <div class="rows"><div>14 · And as Moses lifted up the serpent…</div><div>15 · That whosoever believeth in him…</div><div class="on">16 · For God so loved the world…</div><div>17 · For God sent not his Son…</div></div>
+</div>
+</body></html>

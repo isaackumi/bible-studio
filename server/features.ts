@@ -6,6 +6,7 @@
 import { TRIAL_DAYS } from "../src/lib/domain/plans.ts";
 import { escape, icon, SITE_CSS, siteFooter, siteHeader } from "./landing.ts";
 import type { Site } from "./site.ts";
+import { application, FONT_CSS, seoHead, SITE_URL } from "./seo.ts";
 
 type Plan = "free" | "premium" | "church";
 const PLAN_NAME: Record<Plan, string> = { free: "Free", premium: "Premium", church: "Church" };
@@ -214,7 +215,7 @@ const FEATURES_CSS = `
 }
 `;
 
-export function featuresPage(site: Site): string {
+export function featuresPage(site: Site, origin = SITE_URL): string {
   const chapter = (id: string, n: number, title: string, lede: string, body: string) => `<section class="chapter" id="${id}"><div class="wrap">
   <div class="chapter-head reveal"><h2><span class="num">${String(n).padStart(2, "0")}</span>${title}</h2><p>${lede}</p></div>
   ${body}
@@ -225,16 +226,15 @@ export function featuresPage(site: Site): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Features · Church Studio</title>
-<meta name="description" content="Everything Church Studio does: scripture found by listening, AI that names a paraphrased verse, songs with chords, any screen, picture slideshows, a production desk, phones for the congregation, and a check before every service.">
-<meta property="og:title" content="Church Studio features">
-<meta property="og:description" content="Scripture, songs, screens, production and the congregation's phones, from one calm desk.">
-<meta name="theme-color" content="#07070a">
-<link rel="canonical" href="/features">
-<link rel="icon" href="/email/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+${seoHead({
+  title: "Features · Church Studio church presentation software",
+  description: "Scripture found by listening, AI that names a paraphrased verse, songs with chords, any screen, slideshows, a production desk, a phone remote and live captions.",
+  path: "/features",
+  crumb: "Features",
+  data: [application(origin)],
+}, origin)}
 <style>
+${FONT_CSS}
 ${SITE_CSS}
 ${FEATURES_CSS}
 </style>

@@ -8,6 +8,7 @@ import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { megabytes, RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { PRICES } from "./pricing.ts";
 import type { Site } from "./site.ts";
+import { application, FONT_CSS, organisation, questions, seoHead, SITE_URL } from "./seo.ts";
 
 export const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
@@ -340,7 +341,7 @@ export function siteFooter(site: Site): string {
 </div></footer>`;
 }
 
-export function landingPage(site: Site, release: Release | null): string {
+export function landingPage(site: Site, release: Release | null, origin = SITE_URL): string {
   const version = release?.version ? `v${escape(release.version)}` : "";
   const mail = escape(site.contact);
   return `<!doctype html>
@@ -348,16 +349,14 @@ export function landingPage(site: Site, release: Release | null): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Church Studio · Scripture, songs and sermons on screen</title>
-<meta name="description" content="Church Studio puts scripture, songs and sermons on your church's screens, listens for the verses being read, and runs the whole service on time. For Mac (Apple silicon and Intel), Windows and Linux.">
-<meta property="og:title" content="Church Studio">
-<meta property="og:description" content="Scripture, songs and sermons on screen, beautifully. For Mac, Windows and Linux.">
-<meta name="theme-color" content="#07070a">
-<link rel="icon" href="/email/logo.png">
-<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Church Studio", applicationCategory: "MultimediaApplication", operatingSystem: "macOS, Windows, Linux", description: "Scripture, songs and sermons on your church's screens, found by listening, with the whole service on time.", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, publisher: { "@type": "Organization", name: site.company } }).replace(/</g, "\\u003c")}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+${seoHead({
+  title: "Church Studio · Free Church Presentation Software",
+  description: "Put scripture, songs and sermons on your church's screens. Church Studio listens for the verse being read, runs the whole service on time, and is free to start.",
+  path: "/",
+  data: [...organisation(site, origin), application(origin), questions(FAQ)],
+}, origin)}
 <style>
+${FONT_CSS}
 ${SITE_CSS}</style>
 </head>
 <body>

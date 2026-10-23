@@ -8,6 +8,7 @@
 
 import { TRIAL_DAYS } from "../src/lib/domain/plans.ts";
 import { THIRD_PARTY } from "./third-party.ts";
+import { FONT_CSS, seoHead } from "./seo.ts";
 
 export type Site = {
   /** The legal name of the business that sells Church Studio (COMPANY_NAME). */
@@ -23,11 +24,22 @@ export type Site = {
 const UPDATED = "21 October 2026";
 const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
+/** Each policy page: its address and what a search result says about it. */
+const POLICY_META: Record<string, { path: string; description: string }> = {
+  "Terms of Service · Church Studio": { path: "/terms", description: "The terms for using Church Studio, the church presentation software made by HeiTech: plans, trials, licences and your content." },
+  "Privacy Policy · Church Studio": { path: "/privacy", description: "What Church Studio keeps, what it never sees, and your rights: your songs, services and audio stay on your computer." },
+  "Open-source licenses · Church Studio": { path: "/licenses", description: "The open-source software and Bible texts Church Studio is built with, and their licences." },
+  "Security · Church Studio": { path: "/security", description: "How Church Studio protects churches' data, and how to report a security problem." },
+  "Refund and Cancellation Policy · Church Studio": { path: "/refunds", description: "How to cancel a Church Studio plan at any time, and when a refund is given." },
+};
+
 function layout(title: string, site: Site, body: string): string {
   const mail = escape(site.contact);
+  const meta = POLICY_META[title];
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title><meta name="description" content="Church Studio puts scripture, songs and sermons on your church's screens, and runs the whole service from one desk.">
+${meta ? seoHead({ title, description: meta.description, path: meta.path, crumb: title.replace(/ · Church Studio$/, ""), systemFonts: true }) : `<title>${escape(title)}</title>`}
 <style>
+  ${FONT_CSS}
   :root { color-scheme: light dark; --bg: #f6f5f3; --panel: #fff; --ink: #17171b; --muted: #62626c; --line: #e4e2de; --accent: #fa4f00; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0f0f12; --panel: #18181d; --ink: #f3f3f5; --muted: #a0a0ab; --line: #2a2a31; } }
   * { box-sizing: border-box; }

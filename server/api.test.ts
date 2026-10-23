@@ -217,10 +217,31 @@ describe("server API", () => {
     expect(home).toContain('href="/features"');
     expect(await (await handleApi(new Request("https://keys.test/robots.txt"), config)).text()).toContain("Sitemap: https://keys.test/sitemap.xml");
     expect(await (await handleApi(new Request("https://keys.test/sitemap.xml"), config)).text()).toContain("<loc>https://keys.test/features</loc>");
+    // Ready for search engines and link previews: one true address, a share picture, structured data, no outside fonts.
+    expect(home).toContain('<link rel="canonical" href="https://keys.test/">');
+    expect(home).toContain('<meta property="og:image" content="https://keys.test/share.jpg">');
+    expect(home).toContain('"@type":"FAQPage"');
+    expect(home).toContain('"@type":"Organization"');
+    expect(home).not.toContain("fonts.googleapis.com");
+    expect(features).toContain('"@type":"BreadcrumbList"');
+    expect(features).toContain('<link rel="canonical" href="https://keys.test/features">');
+    expect(String((await call("/privacy")).data.html)).toContain('<link rel="canonical" href="https://church-studio.heitechinc.com/privacy">');
+    const share = await handleApi(new Request("https://keys.test/share.jpg"), config);
+    expect(share.headers.get("content-type")).toBe("image/jpeg");
+    expect((await share.arrayBuffer()).byteLength).toBeGreaterThan(20_000);
+    expect((await handleApi(new Request("https://keys.test/fonts/inter.woff2"), config)).headers.get("cache-control")).toContain("immutable");
+    const head = await handleApi(new Request("https://keys.test/features", { method: "HEAD" }), config);
+    expect(head.status).toBe(200);
+    expect(head.headers.get("content-type")).toContain("text/html");
+    expect(head.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(await head.text()).toBe("");
+    expect(await (await handleApi(new Request("https://keys.test/sitemap.xml"), config)).text()).toMatch(/<loc>https:\/\/keys\.test\/features<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
     // An address that is not there: a page for people, JSON for the app.
     const lost = await handleApi(new Request("https://keys.test/no-such-page"), config);
     expect(lost.status).toBe(404);
-    expect(await lost.text()).toContain("Not <span class=\"serif\">here.</span>");
+    const lostPage = await lost.text();
+    expect(lostPage).toContain("Not <span class=\"serif\">here.</span>");
+    expect(lostPage).toContain('<meta name="robots" content="noindex">');
     expect((await handleApi(new Request("https://keys.test/v1/nothing"), config)).headers.get("content-type")).toContain("json");
     const txt = await handleApi(new Request("https://keys.test/.well-known/security.txt"), config);
     expect(await txt.text()).toMatch(/^Contact: mailto:help@grace\.example\nExpires: 2027-/);

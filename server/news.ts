@@ -4,6 +4,7 @@
 import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { escape, icon, SITE_CSS, siteFooter, siteHeader } from "./landing.ts";
 import type { Site } from "./site.ts";
+import { FONT_CSS, seoHead, SITE_URL, type PageMeta } from "./seo.ts";
 
 const NEWS_CSS = `
 .n-hero { padding: 96px 0 10px; text-align: center; }
@@ -28,19 +29,15 @@ const NEWS_CSS = `
 @media (max-width: 700px) { .highlights { grid-template-columns: 1fr; } }
 `;
 
-function page(title: string, description: string, site: Site, current: "news" | "other", body: string): string {
+function page(meta: PageMeta, site: Site, current: "news" | "other", body: string, origin: string, noindex = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title>
-<meta name="description" content="${escape(description)}">
-<meta name="theme-color" content="#07070a">
-<link rel="icon" href="/email/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+${noindex ? seoHead(meta, origin).replace(/<meta name="robots"[^>]*>/, '<meta name="robots" content="noindex">').replace(/<link rel="canonical"[^>]*>\n/, "") : seoHead(meta, origin)}
 <style>
+${FONT_CSS}
 ${SITE_CSS}
 ${NEWS_CSS}
 </style>
@@ -64,7 +61,7 @@ ${siteFooter(site)}
 
 const day = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-export function newsPage(site: Site): string {
+export function newsPage(site: Site, origin = SITE_URL): string {
   const releases = CHANGELOG.map(
     (release, index) => `<article class="release reveal" id="v${escape(release.version)}">
     <h2>Version ${escape(release.version)} <small>${escape(day(release.date))}</small>${index === 0 ? "<em>Latest</em>" : ""}</h2>
@@ -72,8 +69,7 @@ export function newsPage(site: Site): string {
   </article>`,
   ).join("");
   return page(
-    "What's new · Church Studio",
-    "Every Church Studio release, newest first: what changed for the church, in plain words.",
+    { title: "What's new in Church Studio · Release notes", description: "Every Church Studio release, newest first: what changed for the church, in plain words.", path: "/whats-new", crumb: "What's new" },
     site,
     "news",
     `<section class="n-hero"><div class="wrap">
@@ -82,13 +78,13 @@ export function newsPage(site: Site): string {
   <p class="reveal d2">${CHANGELOG.length} releases so far. Church Studio updates itself; here is what each one brought.</p>
 </div></section>
 <div class="wrap"><div class="releases">${releases}</div></div>`,
+    origin,
   );
 }
 
 export function lostPage(site: Site): string {
   return page(
-    "Not found · Church Studio",
-    "This page is not here.",
+    { title: "Not found · Church Studio", description: "This page is not here.", path: "/" },
     site,
     "other",
     `<div class="wrap lost"><div>
@@ -97,5 +93,7 @@ export function lostPage(site: Site): string {
   <p>This address leads nowhere. The verse you were looking for may be on another page.</p>
   <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap"><a class="btn hot" href="/">${icon("arrow", 18)}Home</a><a class="btn glass" href="/features">See every feature</a></div>
 </div></div>`,
+    SITE_URL,
+    true,
   );
 }
