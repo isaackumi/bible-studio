@@ -2014,6 +2014,7 @@ class Session {
       accent: this.workspace.appearance.accent,
       lang: this.workspace.appearance.language ?? "en",
       output: this.output.online ? "on" : "off",
+      undo: this.programBefore ? "1" : "",
       cursor: this.cursor.itemId ?? "",
       scene: this.lookOnPreview?.id ?? "",
       items: JSON.stringify(items.slice(0, 200)),
@@ -2026,7 +2027,25 @@ class Session {
   };
 
   /** Next/Previous move Preview only (songs, sermon sections, verses, then the rundown). */
-  private runFromRemote = async (command: CommandId | "next-item" | "previous-item" | "music-toggle" | "music-next" | "music-fade") => {
+  private runFromRemote = async (command: CommandId | "next-item" | "previous-item" | "music-toggle" | "music-next" | "music-fade" | "live-next" | "live-previous" | "undo" | "open-output" | "close-output") => {
+    if (command === "undo") {
+      await this.undoProgram();
+      return;
+    }
+    if (command === "open-output") {
+      await this.openAudience();
+      return;
+    }
+    if (command === "close-output") {
+      await this.closeAudience();
+      return;
+    }
+    // Like the desk's Live arrows under Program: step, then straight to the screen.
+    if (command === "live-next" || command === "live-previous") {
+      await this.runFromRemote(command === "live-next" ? "next" : "previous");
+      await this.take();
+      return;
+    }
     if (command === "music-toggle") {
       if (this.audio.current) await this.audio.toggle();
       else await this.playPlaylist(this.workspace.playlists.find((list) => list.trackIds.length)?.id ?? "walk-in");
