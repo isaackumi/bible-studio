@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyProgramAction, createLiveState } from "./live";
 import { defaultTheme } from "./theme";
 import {
+  cameraDeniedHelp,
   cameraDeniedMessage,
   cameraDeviceId,
   cameraFeedForLayer,
@@ -179,6 +180,11 @@ describe("discoverCameras", () => {
       },
     });
     expect(result.cameras).toEqual([]);
-    expect(result.note).toMatch(/Privacy & Security/);
+    expect(result.note).toMatch(/privacy settings/);
+  });
+
+  it("names each computer's own camera setting", () => {
+    expect(cameraDeniedHelp("mac")).toContain("System Settings › Privacy & Security › Camera");
+    expect(cameraDeniedHelp("windows")).toContain("Windows Settings › Privacy & security › Camera");
   });
 });

@@ -25,6 +25,7 @@
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
   import { t, tn } from "../i18n/core";
+  import { keys } from "../platform/os";
 
   // A long list to look through and tick: search, filters, sort, tick all or none, and one action
   // for what is ticked. Opens over whatever it came from, so a page never grows to hold a list.
@@ -262,7 +263,7 @@
     {/if}
 
     <footer class="foot">
-      <span class="hint">{error || t("↑ ↓ move · Space ticks · ⌘A ticks all shown")}</span>
+      <span class="hint">{error || keys(t("↑ ↓ move · Space ticks · ⌘A ticks all shown"))}</span>
       <button type="button" class="btn" onclick={onclose}>{t("Cancel")}</button>
       <button type="button" class="btn primary" class:danger={action.danger} class:armed={confirming} disabled={busy || (!pickedItems.length && !action.allowNone)} onclick={() => void run()}>
         {#if action.danger}<Icon name="trash" size={14} />{/if}

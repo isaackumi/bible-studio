@@ -2,6 +2,7 @@
   import { session } from "../app/session.svelte";
   import { formatDuration } from "../domain/playlists";
   import { isDesktop } from "../platform/runtime";
+  import { computerOs } from "../platform/os";
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
@@ -191,7 +192,7 @@
                 {#each session.audioOutputs as output (output.id)}<option value={output.id}>{output.label}</option>{/each}
               </select>
             {:else}
-              <span class="setting-note">{t("This computer chooses the output in its own sound settings (on a Mac: System Settings › Sound › Output).")}</span>
+              <span class="setting-note">{computerOs() === "windows" ? t("This computer chooses the output in its own sound settings: Windows Settings › System › Sound › Output.") : computerOs() === "mac" ? t("This computer chooses the output in its own sound settings: System Settings › Sound › Output.") : t("This computer chooses the output in its own sound settings.")}</span>
             {/if}
           </div>
           {#if outputNote}<p class="note" role="status">{outputNote}</p>{/if}

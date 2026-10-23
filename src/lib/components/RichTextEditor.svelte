@@ -3,6 +3,7 @@
   import { htmlToRich, RICH_FONTS, RICH_SIZES, richToHtml, type RichDoc } from "../domain/rich-text";
   import Icon from "./Icon.svelte";
   import { msg, t } from "../i18n/core";
+  import { keys } from "../platform/os";
 
   // The Formatted editor: words typed as in a word processor, with a toolbar for fonts, sizes,
   // colours, highlight, bold, italic, underline, strike, bullets, numbers, titles and alignment.
@@ -179,7 +180,7 @@
     </select>
     <span class="sep"></span>
     {#each TOGGLES as toggle (toggle.command)}
-      <button type="button" class="tb" class:on={active[toggle.command]} aria-pressed={!!active[toggle.command]} title={t(toggle.title)} aria-label={t(toggle.title)} onmousedown={keep} onclick={() => run(toggle.command)}><span style={toggle.style}>{toggle.text}</span></button>
+      <button type="button" class="tb" class:on={active[toggle.command]} aria-pressed={!!active[toggle.command]} title={keys(t(toggle.title))} aria-label={keys(t(toggle.title))} onmousedown={keep} onclick={() => run(toggle.command)}><span style={toggle.style}>{toggle.text}</span></button>
     {/each}
     <span class="sep"></span>
     <span class="palette-wrap">

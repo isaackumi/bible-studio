@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "../platform/runtime";
 import { t } from "../i18n/core";
+import { computerOs, type ComputerOs } from "../platform/os";
 
 /** `blocked` (Windows): which privacy switch is off when the microphone is "denied". */
 export type ListenAccess = { microphone: string; speech: string; blocked?: string };
@@ -26,7 +27,22 @@ export const NETWORK_RETRIES = 3;
 export type PrivacyPane = "microphone" | "speech" | "screen" | "sound";
 
 export function onWindows(): boolean {
-  return typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+  return computerOs() === "windows";
+}
+
+/** Where to allow the microphone again on this computer, after it was refused. */
+export function micAllowHint(desktop = isDesktop(), os: ComputerOs = computerOs()): string {
+  if (os === "windows") {
+    return desktop
+      ? t("Allow it in Windows Settings › Privacy & security › Microphone: turn on Let desktop apps access your microphone.")
+      : t("Allow it in the browser's site settings, and in Windows Settings › Privacy & security › Microphone.");
+  }
+  if (os === "mac") {
+    return desktop
+      ? t("Allow it in System Settings › Privacy & Security › Microphone: turn on Church Studio.")
+      : t("Allow it in the browser's site settings, and in System Settings › Privacy & Security › Microphone.");
+  }
+  return t("Allow it in the browser's site settings and the computer's privacy settings.");
 }
 
 /** Windows never asks a desktop app for the microphone: each switch that blocks it is named. */
@@ -304,7 +320,7 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
       }
       if (!shouldRestartListening("error", event.error)) {
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          fail(t("The microphone or speech recognition is blocked for this site. Allow it in the browser's site settings (or System Settings → Privacy & Security), then listen again."), "denied");
+          fail(`${t("The microphone or speech recognition is blocked for this site.")} ${micAllowHint()} ${t("Then listen again.")}`, "denied");
         } else if (event.error === "audio-capture") {
           fail(t("No microphone is available. Connect one, then listen again."), "no-mic");
         } else {
@@ -396,7 +412,7 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
         if (name === "NotFoundError" || name === "OverconstrainedError") {
           handlers.onError(t("No microphone is available. Connect one, then listen again."), "no-mic");
         } else {
-          handlers.onError(t("The microphone is blocked for this window. Allow it in the browser's site settings (or System Settings → Privacy & Security → Microphone), then listen again."), "denied");
+          handlers.onError(`${t("The microphone is blocked for this window.")} ${micAllowHint()} ${t("Then listen again.")}`, "denied");
         }
         handlers.onEnd();
       });

@@ -5,6 +5,7 @@
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
+  import { keys } from "../platform/os";
 
   // Two small groups, so the bar stays short: which desk (Presenter or Production), and what opens
   // beside it (the design studio, Audience, Pictures). Only the desk in use and an open drawer say
@@ -28,7 +29,7 @@
   </div>
   <div class="group" role="group" aria-label={t("Open beside the desk")}>
     <!-- Not a desk: the design studio opens over whichever desk is showing. -->
-    <button type="button" class:on={!!session.studio} aria-label={t("Design studio")} data-tip={t("Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)")} onclick={() => session.openStudio()}>
+    <button type="button" class:on={!!session.studio} aria-label={t("Design studio")} data-tip={keys(t("Design studio: slides, templates, lower thirds, gradients and icons (⌘K, then type “design”)"))} onclick={() => session.openStudio()}>
       <Icon name="stage" size={16} />
       <span class="name">{t("Studio")}</span>
     </button>

@@ -77,7 +77,7 @@ import { applyProgramAction, createLiveState, frame, programPacket, replaceProgr
 
 /** The Undo key as this computer writes it. */
 function shortcutLabelForUndo(): string {
-  return typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘Z" : "Ctrl+Z";
+  return shortcutKeys("⌘Z");
 }
 
 /** What went wrong, in the system's words when it gave some, else our own line. */
@@ -210,6 +210,7 @@ import {
   type CustomVoiceCommand,
   type VoiceCommand,
 } from "../voice/commands";
+import { computerOs, keys as shortcutKeys, revealLabel } from "../platform/os";
 import {
   onWindows,
   openPrivacySettings,
@@ -4803,6 +4804,11 @@ class Session {
       this.broadcastFailed(t("Streaming and recording work in the Church Studio app for Mac."));
       return false;
     }
+    // Only the Mac app streams and records so far; elsewhere the permission check below would wrongly name macOS.
+    if (computerOs() !== "mac") {
+      this.broadcastFailed(t("Streaming and recording work on a Mac for now. On this computer, OBS can capture the audience window and stream or record it."));
+      return false;
+    }
     const settings = this.workspace.broadcast;
     let rtmp: string | null = null;
     if (options.stream) {
@@ -4887,7 +4893,7 @@ class Session {
     } else if (message.kind === "stats") this.broadcastState = { ...state, seconds: Number(message.seconds) || 0, kbps: Number(message.kbps) || 0, live: message.live === true || state.live };
     else if (message.kind === "saved" && message.path) {
       this.broadcastState = { ...state, saved: message.path };
-      this.notify(t("Recording saved"), { detail: message.path, actions: this.desktop() ? [{ label: t("Show in Finder"), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(message.path!)).catch(() => {}) }] : [] });
+      this.notify(t("Recording saved"), { detail: message.path, actions: this.desktop() ? [{ label: t(revealLabel()), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(message.path!)).catch(() => {}) }] : [] });
     } else if (message.kind === "error") this.broadcastFailed(message.message ?? t("Streaming stopped."), (message as { code?: string }).code === "permission" ? "permission" : null);
     else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
   };

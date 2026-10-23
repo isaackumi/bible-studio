@@ -50,6 +50,7 @@
   import NewSceneDialog from "./NewSceneDialog.svelte";
   import { sourceMeta } from "./source-meta";
   import { t, tn } from "../../i18n/core";
+  import { keys } from "../../platform/os";
 
   let query = $state("");
   let kind = $state<"cut" | "fade">("fade");
@@ -455,7 +456,7 @@
           <button type="button" role="menuitem" onclick={() => { session.openSettings("themes"); close(); }}><Icon name="themes" size={16} /> {t("Themes…")}</button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("ready"); close(); }}><Icon name="check" size={16} /> {t("Readiness check…")}</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> {t("Settings…")} <span class="menu-key">⌘,</span></button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}><Icon name="settings" size={16} /> {t("Settings…")} <span class="menu-key">{keys("⌘,")}</span></button>
         {/snippet}
       </ToolMenu>
     </nav>

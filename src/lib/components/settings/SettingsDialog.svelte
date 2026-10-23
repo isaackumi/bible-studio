@@ -46,6 +46,7 @@
   import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS, type AiFeature } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
+  import { computerOs, keys } from "../../platform/os";
 
   type SettingsSectionId =
     | "ready"
@@ -681,7 +682,7 @@
       >
         <Icon name="search" size={14} />
         <span class="nav-search-text">{t("Search settings")}</span>
-        <kbd>⌘F</kbd>
+        <kbd>{keys("⌘F")}</kbd>
       </button>
       <div class="nav-list">
         {#each visibleGroups as group (group.label)}
@@ -967,7 +968,7 @@
           <div class="row">
             <div class="row-copy">
               <strong>{t("Send sound with the picture")}</strong>
-              <span>{session.ndi.status === "on" && session.workspace.ndiAudio ? (session.ndi.audio ? t("On: videos and music on Program go out over NDI.") : t("This NDI or macOS version cannot send sound; the picture still goes out.")) : t("Videos and music on Program go out with the picture, so the sound desk or the stream gets them over the network too. Needs macOS 13 or later.")}</span>
+              <span>{session.ndi.status === "on" && session.workspace.ndiAudio ? (session.ndi.audio ? t("On: videos and music on Program go out over NDI.") : t("This NDI version cannot send sound; the picture still goes out.")) : `${t("Videos and music on Program go out with the picture, so the sound desk or the stream gets them over the network too.")}${computerOs() === "mac" ? ` ${t("Needs macOS 13 or later.")}` : ""}`}</span>
             </div>
             <input type="checkbox" class="switch" role="switch" aria-label={t("Send sound with the picture")} disabled={!isDesktop() || ndiSoon} checked={session.workspace.ndiAudio} onchange={(event) => void session.setNdiAudio(event.currentTarget.checked)} />
           </div>
@@ -1000,7 +1001,7 @@
           </div>
         </section>
         {#if !ndiSoon}
-        <p class="note stand">{t("NDI needs the free NDI Tools or NDI Runtime on this computer:")} <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. {t("The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window. NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
+        <p class="note stand">{t("NDI needs the free NDI Tools or NDI Runtime on this computer:")} <a href="https://ndi.video/tools" target="_blank" rel="noreferrer">ndi.video/tools</a>. {#if computerOs() === "mac"}{t("The first time, macOS asks to allow Church Studio to record the screen; that is how it sees the audience window.")} {/if}{t("NDI® is a registered trademark of Vizrt NDI AB.")} <a href="https://ndi.video" target="_blank" rel="noreferrer">ndi.video</a></p>
         {/if}
         <p class="section-label">{t("Second screen")}</p>
         {@const second = session.workspace.secondOutput}
@@ -1191,7 +1192,7 @@
                       onclick={() => { keyNote = ""; capturing = capturing === action ? null : action; }}
                     >{capturing === action ? t("Press a key…") : shortcutLabels(shortcuts, action)}</button>
                   {:else}
-                    <kbd class="kbd">{command.id === "open-settings" ? "⌘," : "—"}</kbd>
+                    <kbd class="kbd">{command.id === "open-settings" ? keys("⌘,") : "—"}</kbd>
                   {/if}
                 </li>
               {/each}

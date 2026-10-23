@@ -1,3 +1,4 @@
+import { computerOs, type ComputerOs } from "../platform/os";
 import { frame, setPreview } from "./live";
 import type { LiveState, PresentationModel, Theme } from "./types";
 
@@ -97,8 +98,10 @@ export async function discoverCameras(media: CameraDiscoveryMedia): Promise<{ ca
   return { cameras, note: cameras.length ? "" : cameraUnavailableMessage() };
 }
 
-export function cameraDeniedHelp() {
-  return "Camera permission was denied. Allow Church Studio in System Settings › Privacy & Security › Camera, then press Refresh.";
+export function cameraDeniedHelp(os: ComputerOs = computerOs()) {
+  if (os === "windows") return "Camera permission was denied. In Windows Settings › Privacy & security › Camera, turn on camera access for desktop apps, then press Refresh.";
+  if (os === "mac") return "Camera permission was denied. Allow Church Studio in System Settings › Privacy & Security › Camera, then press Refresh.";
+  return "Camera permission was denied. Allow the camera in the browser or the computer's privacy settings, then press Refresh.";
 }
 
 export function presentCamera(input: { theme: Theme; label: string }): PresentationModel {

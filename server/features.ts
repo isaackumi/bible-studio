@@ -457,7 +457,7 @@ ${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.<
     ${item("Phones in the game", "Each phone shows its colour, the answer shapes and the clock, then the points won, the streak and the place: 2nd of 23.", "free")}
   </ul>`)}
 
-${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`, "⌘K goes to anything. Macros run a sequence; a Stream Deck or a phone presses the buttons.", `
+${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`, "⌘K (Ctrl+K on Windows) goes to anything. Macros run a sequence; a Stream Deck or a phone presses the buttons.", `
   <div class="duo">
     <div class="demo reveal"><h3>Go to anything</h3><p>Songs, scripture, settings and actions, from the keyboard.</p>
       <div class="palette"><div class="q-in">${icon("arrow", 16)}<span class="typed" id="pal-typed"></span><span class="caret"></span><kbd>⌘K</kbd></div>
@@ -474,7 +474,7 @@ ${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`
 
 ${chapter("calm", 10, `Peace of mind, <span class="serif">built in.</span>`, "For the volunteer at the desk on a Sunday morning: nothing surprising, and help close at hand.", `
   <div class="calm-grid">
-    <div class="calm reveal"><div class="ic">${icon("shield")}</div><h3>Preview first, undo after</h3><p>Everything waits on Preview; LIVE sends it. A mistake on the screen? ⌘Z puts back what was there.</p></div>
+    <div class="calm reveal"><div class="ic">${icon("shield")}</div><h3>Preview first, undo after</h3><p>Everything waits on Preview; LIVE sends it. A mistake on the screen? ⌘Z (Ctrl+Z on Windows) puts back what was there.</p></div>
     <div class="calm reveal d1"><div class="ic">${icon("globe")}</div><h3>Works offline</h3><p>Scripture, songs, services and screens run with no internet. Your library stays on your computer.</p></div>
     <div class="calm reveal d2"><div class="ic">${icon("check")}</div><h3>Readiness check</h3><p>Screens, the service's files, recording space, backups and your plan, checked in one press.</p></div>
     <div class="calm reveal"><div class="ic">${icon("clock")}</div><h3>Performance page</h3><p>How fast it opens, any freezes, how smoothly the screen runs, memory and space, with what to do.</p></div>

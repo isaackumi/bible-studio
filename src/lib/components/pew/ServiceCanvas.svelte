@@ -26,6 +26,7 @@
   import Icon from "../Icon.svelte";
   import PartLeader from "./PartLeader.svelte";
   import { t, tn } from "../../i18n/core";
+  import { keys } from "../../platform/os";
 
   // The service as a flow: each part a card on a big dotted canvas, joined in running order by
   // connectors. Drag a card to arrange it; drag from a card's out port onto another card to make that
@@ -416,7 +417,7 @@
     <button type="button" title={t("Add a part at the end")} onclick={addPart}><Icon name="plus" size={13} /> {t("Part")}</button>
   </div>
 
-  <p class="tip">{t("Drag a card to move it · drag from its ● to another card to change the order · scroll to pan, ⌘ or Ctrl + scroll to zoom")}</p>
+  <p class="tip">{keys(t("Drag a card to move it · drag from its ● to another card to change the order · scroll to pan, ⌘+scroll to zoom"))}</p>
 
   {#if service.sections.length > 0}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

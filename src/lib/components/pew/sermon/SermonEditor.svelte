@@ -13,6 +13,7 @@
   import Icon from "../../Icon.svelte";
   import ItemThumb from "../ItemThumb.svelte";
   import { msg, t, tn } from "../../../i18n/core";
+  import { keys } from "../../../platform/os";
 
   // The sermon editor: the sections down the left to jump between, and each section as a card with
   // what the audience sees (and a still of it), its planned minutes, and the desk notes. Notes can
@@ -338,7 +339,7 @@
       {#if session.aiOn("slides")}<button type="button" class="desk-btn ai-btn" data-tip={t("Make a slide deck from these notes with your AI service")} onclick={() => (aiSlides = { notes: notesFor(draft), title: draft.title })}><Icon name="stage" size={14} /> {t("Make slides")}</button>{/if}
       {#if session.aiOn("songSuggest")}<button type="button" class="desk-btn ai-btn" data-tip={t("Songs that fit this sermon, from your library first")} onclick={() => (songIdeas = { notes: notesFor(draft), title: draft.title })}><Icon name="note" size={14} /> {t("Suggest songs")}</button>{/if}
       <button type="button" class="desk-btn ghost" class:armed={armedCancel} onclick={cancel}>{armedCancel ? t("Discard changes?") : t("Cancel")}</button>
-      <button type="submit" class="desk-btn primary" title={t("Save (⌘S)")}>{t("Save")}</button>
+      <button type="submit" class="desk-btn primary" title={keys(t("Save (⌘S)"))}>{t("Save")}</button>
     </div>
   </div>
 

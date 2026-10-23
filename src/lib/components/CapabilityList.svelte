@@ -2,6 +2,7 @@
   import { capabilityReport } from "../platform/capability-report";
   import { detectOutputCapabilities, probeFromWindow } from "../platform/output-capabilities";
   import { isDesktop } from "../platform/runtime";
+  import { computerOs } from "../platform/os";
   import { t } from "../i18n/core";
 
   // What this computer can do in this window, and why not — shown instead of dead buttons.
@@ -12,7 +13,7 @@
     speech: typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window),
     screenDetails: typeof window !== "undefined" && "getScreenDetails" in window,
     secure: typeof window === "undefined" || window.isSecureContext,
-    mac: typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || navigator.userAgent),
+    os: computerOs(),
   });
 </script>
 

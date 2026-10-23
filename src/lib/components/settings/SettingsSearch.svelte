@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import Icon from "../Icon.svelte";
   import { t } from "../../i18n/core";
+  import { keys } from "../../platform/os";
   import { clearRecent, highlight, readRecent, rememberRecent, searchSettings, type SettingEntry, type SettingHit, type SettingsPage } from "../../settings/search";
 
   // Search everything in Settings (⌘F, or the field in the sidebar): every page, card and row.
@@ -163,7 +164,7 @@
     <p class="foot">
       <span><kbd>↑</kbd><kbd>↓</kbd> {t("to move")}</span>
       <span><kbd>↵</kbd> {t("to open")}</span>
-      <span class="hint"><kbd>⌘F</kbd> {t("any time in Settings")}</span>
+      <span class="hint"><kbd>{keys("⌘F")}</kbd> {t("any time in Settings")}</span>
       {#if query.trim()}<span class="count">{t("{n} found", { n: results.length })}</span>{/if}
     </p>
   </div>

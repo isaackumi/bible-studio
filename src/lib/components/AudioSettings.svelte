@@ -6,6 +6,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { isDesktop } from "../platform/runtime";
+  import { micAllowHint } from "../voice/listen";
   import type { NoiseFilter } from "../domain/types";
   import { noiseCut } from "../voice/noise";
   import { msg, t } from "../i18n/core";
@@ -88,7 +89,7 @@
     } catch (error) {
       const name = error && typeof error === "object" && "name" in error ? String((error as { name: string }).name) : "";
       testError =
-        name === "NotFoundError" ? t("No microphone is connected.") : t("The microphone is blocked for this window. Allow it in the browser or System Settings → Privacy & Security.");
+        name === "NotFoundError" ? t("No microphone is connected.") : `${t("The microphone is blocked for this window.")} ${micAllowHint()}`;
       return;
     }
     const context = new AudioContext();

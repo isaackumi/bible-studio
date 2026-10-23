@@ -44,6 +44,7 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { LIBRARY_PANEL, QUEUE_PANEL, defaultSlots, mergeColumns, mergeSplit, panelOpen, swapPanels } from "../../workspace/pew";
   import { t } from "../../i18n/core";
+  import { keys } from "../../platform/os";
 
   type Mode = "scriptures" | "songs" | "sermon" | "service";
   let mode = $state<Mode>("scriptures");
@@ -57,7 +58,7 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let detections = $state<SearchHit[]>([]);
-  const undoKey = typeof navigator !== "undefined" && /mac/i.test(navigator.platform) ? "⌘Z" : "Ctrl+Z";
+  const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
   const keyOf = (action: "take" | "black" | "clear") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   /** The queue's Clear all was pressed once. */
@@ -782,7 +783,7 @@
       </span>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
-      <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={t("Go to a page, song, verse, part or setting (⌘K)")} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
+      <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={keys(t("Go to a page, song, verse, part or setting (⌘K)"))} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
       <ToolMenu label={t("View")} tip={t("Panels, monitors and focus")} tour="view">
         {#snippet trigger()}<Icon name="view" size={16} />{/snippet}
         {#snippet children(close)}
@@ -852,7 +853,7 @@
           <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} {t("How this desk works")}</button>
           <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("ready"); close(); }}>{@render icon("check")} {t("Readiness check…")}</button>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} {t("Settings…")} <span class="menu-key">⌘,</span></button>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} {t("Settings…")} <span class="menu-key">{keys("⌘,")}</span></button>
         {/snippet}
       </ToolMenu>
     </nav>

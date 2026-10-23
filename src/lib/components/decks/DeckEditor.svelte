@@ -26,6 +26,7 @@
   import { encodeFill, sanitizeFill, type Fill } from "../../domain/fill";
   import type { IconNode } from "../../domain/icon";
   import { t } from "../../i18n/core";
+  import { keys } from "../../platform/os";
 
   // Full-screen deck editor. Edits stay in a draft until "Save changes"; Program never changes here.
   let { deck, onclose, startWith = null }: { deck: SlideDeck; onclose: () => void; startWith?: "templates" | null } = $props();
@@ -302,8 +303,8 @@
   <header>
     <input class="deck-name" aria-label={t("Deck name")} value={draft.name} onchange={(event) => commitDeck({ ...draft, name: event.currentTarget.value.trim() || draft.name })} />
     <div class="history">
-      <button type="button" aria-label={t("Undo")} title={t("Undo (⌘Z)")} disabled={!undoStack.length} onclick={undo}>↶</button>
-      <button type="button" aria-label={t("Redo")} title={t("Redo (⇧⌘Z)")} disabled={!redoStack.length} onclick={redo}>↷</button>
+      <button type="button" aria-label={t("Undo")} title={keys(t("Undo (⌘Z)"))} disabled={!undoStack.length} onclick={undo}>↶</button>
+      <button type="button" aria-label={t("Redo")} title={keys(t("Redo (⇧⌘Z)"))} disabled={!redoStack.length} onclick={redo}>↷</button>
     </div>
     <span class="status">{dirty ? t("Unsaved changes") : t("Saved")}</span>
     <button type="button" class="save" disabled={!dirty} onclick={save}>{t("Save changes")}</button>
@@ -405,7 +406,7 @@
           {/if}
           <button type="button" class="btn danger" onclick={() => { commitPage(pickedIds.reduce((next, id) => removeLayer(next, id), page)); selectedId = null; }}>{t("Delete")}</button>
         </div>
-        <p class="note">{t("Drag any of them to move them together. Shift-click to add or take one away. ⌘G groups them, ⌘⇧G ungroups.")}</p>
+        <p class="note">{keys(t("Drag any of them to move them together. Shift-click to add or take one away. ⌘G groups them, ⌘⇧G ungroups."))}</p>
       {:else if selected}
         <ElementInspector {page} layer={selected} oncommit={commitPage} />
       {:else}

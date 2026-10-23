@@ -4,6 +4,7 @@
   import type { BibleItem, PewPage } from "../domain/types";
   import Icon from "./Icon.svelte";
   import { msg, t, tn } from "../i18n/core";
+  import { keys } from "../platform/os";
   import { audienceRoom } from "../app/rooms.svelte";
   import { pictures } from "../app/pictures.svelte";
 
@@ -200,7 +201,7 @@
           <p class="none">{t("Nothing found. Try a song title, a part of the service, or a verse like John 3:16.")}</p>
         {/each}
       </div>
-      <p class="foot"><kbd>↑</kbd><kbd>↓</kbd> {t("to move")} · <kbd>↵</kbd> {t("to open")} · <kbd>⌘K</kbd> {t("any time")}</p>
+      <p class="foot"><kbd>↑</kbd><kbd>↓</kbd> {t("to move")} · <kbd>↵</kbd> {t("to open")} · <kbd>{keys("⌘K")}</kbd> {t("any time")}</p>
     </div>
   </div>
 {/if}

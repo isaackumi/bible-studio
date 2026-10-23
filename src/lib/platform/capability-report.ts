@@ -1,4 +1,5 @@
 import type { OutputCapabilities } from "./output-capabilities";
+import type { ComputerOs } from "./os";
 
 /** One line of "what this computer can do here, and why not". */
 export type CapabilityRow = { id: string; label: string; available: boolean; detail: string };
@@ -6,13 +7,13 @@ export type CapabilityRow = { id: string; label: string; available: boolean; det
 export type CapabilityInput = {
   desktop: boolean;
   caps: OutputCapabilities;
-  /** Web Speech engine present (browser) — desktop uses the on-device macOS engine. */
+  /** Web Speech engine present (browser). The desktop app listens with the Mac's or Windows' own engine. */
   speech: boolean;
   /** Window Management (getScreenDetails) present. */
   screenDetails: boolean;
   /** HTTPS or localhost: browsers only allow camera and microphone there. */
   secure: boolean;
-  mac: boolean;
+  os: ComputerOs;
 };
 
 export function capabilityReport(input: CapabilityInput): CapabilityRow[] {
@@ -54,11 +55,13 @@ export function capabilityReport(input: CapabilityInput): CapabilityRow[] {
     {
       id: "voice",
       label: "Voice",
-      available: desktop ? input.mac : input.speech && !mediaBlocked,
+      available: desktop ? input.os === "mac" || input.os === "windows" : input.speech && !mediaBlocked,
       detail: desktop
-        ? input.mac
+        ? input.os === "mac"
           ? "On-device speech recognition (macOS)."
-          : "On-device speech recognition needs macOS."
+          : input.os === "windows"
+            ? "On-device speech recognition (Windows)."
+            : "Listening on this computer needs a Mac or Windows. ElevenLabs or Deepgram work here with your own key."
         : mediaBlocked || (input.speech ? "Browser speech recognition (sends audio to the browser's online service)." : "This browser has no speech recognition. Use Chrome or Edge, or the desktop app."),
     },
     {
