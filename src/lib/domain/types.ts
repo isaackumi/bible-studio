@@ -734,6 +734,8 @@ export type SearchHit = {
   chapter: number;
   verse: number;
   text: string;
+  /** Named by the church's AI from what the preacher described: worth a look before using. */
+  ai?: boolean;
 };
 
 export type DisplayInfo = {

@@ -20,6 +20,7 @@
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
+  import { soundsLikeScripture } from "../../ai/verses";
   import { api } from "../../db/api";
   import type { BibleItem, PewPanel, PresentationItem, SearchHit, Sermon, SermonSection, TextStyle, VerseText } from "../../domain/types";
   import { untrack } from "svelte";
@@ -609,7 +610,7 @@
   }
 
   // Voice runs in the session (both desks). This desk turns heard words into verses on Preview.
-  function detectSpokenVerse(text: string, _final: boolean, alternatives: string[]) {
+  function detectSpokenVerse(text: string, final: boolean, alternatives: string[]) {
     // While songs are up, lyrics that quote scripture must not pull a verse onto Preview.
     if (!text || mode === "songs") return;
     const phrases = alternatives.length ? alternatives : [text];
@@ -620,25 +621,66 @@
     const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
     if (!match) {
       if (!lastSpokenRef) session.voice.message = quoteIndex ? t("Hearing you. Keep reading the verse.") : t("Loading the Bible so a verse can be found…");
+      if (final) askAiForVerse(text);
       return;
     }
-    const hit = match.item;
+    takeHeard(match.item, match.text);
+  }
+
+  /** The last finished phrases, so the AI hears a whole thought rather than a fragment. */
+  let heardLately: string[] = [];
+
+  /** Nothing matched: if it sounds like scripture, ask the church's AI (when switched on). */
+  function askAiForVerse(text: string) {
+    heardLately = [...heardLately, text].slice(-3);
+    const heard = heardLately.join(" ");
+    if (!session.aiOn("verses") || !soundsLikeScripture(heard)) return;
+    void session.versesFromSpeech(heard).then((found) => {
+      if (mode === "songs") return;
+      const items = found.flatMap((entry) => {
+        const parsed = parseReference(entry.reference, session.books);
+        const named = parsed && session.books.find((candidate) => candidate.ord === parsed.bookOrd);
+        if (!parsed?.startVerse || !named) return [];
+        const end = parsed.endVerse ?? parsed.startVerse;
+        const item: BibleItem = { translationId, bookOrd: parsed.bookOrd, chapter: parsed.chapter, startVerse: parsed.startVerse, endVerse: end, reference: formatReference(named.name, parsed.chapter, parsed.startVerse, end, named.chapters) };
+        return [{ item, sure: entry.sure }];
+      });
+      if (!found.length) return;
+      heardLately = [];
+      const [first, ...rest] = items;
+      // Others the AI named wait under Detections, for the operator to choose.
+      for (const other of [...rest].reverse()) noteHeard(other.item, heard, true);
+      if (first?.sure) takeHeard(first.item, heard, true);
+      else if (first) {
+        noteHeard(first.item, heard, true);
+        session.voice.message = t("The AI thinks {reference} was meant. It is under Detections.", { reference: first.item.reference });
+      }
+    });
+  }
+
+  /** A verse heard (or named by the AI) goes to the top of Detections. */
+  function noteHeard(hit: BibleItem, text: string, ai = false) {
+    const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
+    // A verse heard again moves to the top instead of being listed twice (a repeated key stops the
+    // list from drawing).
+    const again = (entry: SearchHit) => entry.bookOrd === hit.bookOrd && entry.chapter === hit.chapter && entry.verse === hit.startVerse;
+    detections = [
+      { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text, ...(ai ? { ai: true } : {}) },
+      ...detections.filter((entry) => !again(entry)),
+    ].slice(0, 12);
+  }
+
+  /** A verse heard: listed, and staged on Preview (or offered beside it on the Service page). */
+  function takeHeard(hit: BibleItem, text: string, ai = false) {
     if (hit.reference === lastSpokenRef) return;
     lastSpokenRef = hit.reference;
-    const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
     if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {
       bookOrd = hit.bookOrd;
       chapter = hit.chapter;
     }
     anchor = hit.startVerse;
-    session.voice.message = `${hit.reference} is on Preview. LIVE still sends Program.`;
-    // A verse heard again moves to the top instead of being listed twice (a repeated key stops the
-    // list from drawing).
-    const again = (entry: SearchHit) => entry.bookOrd === hit.bookOrd && entry.chapter === hit.chapter && entry.verse === hit.startVerse;
-    detections = [
-      { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text: match.text },
-      ...detections.filter((entry) => !again(entry)),
-    ].slice(0, 12);
+    session.voice.message = ai ? t("{reference} (found by the AI) is on Preview. LIVE still sends Program.", { reference: hit.reference }) : `${hit.reference} is on Preview. LIVE still sends Program.`;
+    noteHeard(hit, text, ai);
     // A pending arrow-key Take must never carry a spoken verse to Program.
     takeAfterPreview = false;
     // On the Service page the running order keeps Preview: the verse heard is offered beside it.
@@ -974,7 +1016,7 @@
               <div class="pb-body detections">
                 {#each detections as hit (`${hit.bookOrd}-${hit.chapter}-${hit.verse}`)}
                   <button type="button" onclick={() => openHit(hit)}>
-                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}</strong>
+                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}</strong>
                     <span>{hit.text}</span>
                   </button>
                 {:else}
@@ -1517,6 +1559,7 @@
   .reading sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
+  .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
   .side-tabs button[aria-selected="true"] { background: var(--field); color: var(--ink); }

@@ -40,7 +40,7 @@
   import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, maskedLicense, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import PickList from "../PickList.svelte";
-  import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS } from "../../ai/summarize";
+  import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS, type AiFeature } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
 
@@ -624,13 +624,14 @@
     session.goToDesk("presenter", "sermon");
   }
 
-  /** Everything the AI assistant is used for, each with a way there. */
-  const AI_USES: Array<{ title: string; about: string; where: string; open: () => void }> = [
-    { title: msg("Sermon summary"), about: msg("Turns sermon notes into a short summary and points to show. Sermon page › Summarize."), where: msg("Open Sermon"), open: openSermonPage },
-    { title: msg("Slides from notes, a passage or a topic"), about: msg("Writes a slide deck in your theme, ready to edit. Sermon page › Make slides."), where: msg("Open Sermon"), open: openSermonPage },
-    { title: msg("Songs for a sermon"), about: msg("Picks songs from your library that fit the sermon, and names a few you could add. Sermon page › Suggest songs."), where: msg("Open Sermon"), open: openSermonPage },
-    { title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
-    { title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
+  /** Everything the AI assistant is used for, each with its switch and a way there. */
+  const AI_USES: Array<{ feature: AiFeature; title: string; about: string; where: string; open: () => void }> = [
+    { feature: "summary", title: msg("Sermon summary"), about: msg("Turns sermon notes into a short summary and points to show. Sermon page › Summarize."), where: msg("Open Sermon"), open: openSermonPage },
+    { feature: "slides", title: msg("Slides from notes, a passage or a topic"), about: msg("Writes a slide deck in your theme, ready to edit. Sermon page › Make slides."), where: msg("Open Sermon"), open: openSermonPage },
+    { feature: "songSuggest", title: msg("Songs for a sermon"), about: msg("Picks songs from your library that fit the sermon, and names a few you could add. Sermon page › Suggest songs."), where: msg("Open Sermon"), open: openSermonPage },
+    { feature: "songLookup", title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
+    { feature: "captions", title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
+    { feature: "verses", title: msg("Verses by meaning, while listening"), about: msg("When the preacher paraphrases a verse or describes it, the AI names it: sure ones go on Preview, others wait under Detections. Only phrases that sound like scripture are sent. Off until you switch it on."), where: msg("Open Scripture"), open: () => { close(); session.goToDesk("presenter", "scriptures"); } },
   ];
 
   function setMode(mode: OutputMode) {
@@ -1332,14 +1333,18 @@
         </section>
         <h3 class="ai-uses-title">{t("What the AI can do")}</h3>
         <section class="rows" aria-label={t("What the AI can do")}>
-          {#each AI_USES as use (use.title)}
-            <div class="row">
+          {#each AI_USES as use (use.feature)}
+            {@const on = session.aiOn(use.feature)}
+            <div class="row" class:ai-off={!on}>
               <div class="row-copy"><strong>{t(use.title)}</strong><span>{t(use.about)}</span></div>
-              <button type="button" class="btn" onclick={use.open}>{t(use.where)}</button>
+              <div class="row-end">
+                {#if on}<button type="button" class="btn" onclick={use.open}>{t(use.where)}</button>{/if}
+                <input type="checkbox" class="switch" role="switch" aria-label={t(use.title)} checked={on} onchange={(event) => session.setAiFeature(use.feature, event.currentTarget.checked)} />
+              </div>
             </div>
           {/each}
         </section>
-        <p class="note stand">{t("Your words go to the AI only when you use one of these. With an AI on this computer, nothing leaves the building.")}</p>
+        <p class="note stand">{t("Switch off what your church doesn't want; its buttons disappear. Your words go to the AI only when you use one of these. With an AI on this computer, nothing leaves the building.")}</p>
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>
@@ -2125,6 +2130,7 @@
   .settings-body :global(.row .field.grow) { width: auto; flex: 1; }
   .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
   .ai-ok { color: var(--presence, #3fb950); }
+  .ai-off .row-copy { opacity: 0.6; }
   .ai-uses-title { margin: 22px 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .ai-connected { display: inline-flex; align-items: center; gap: 6px; }
   .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }

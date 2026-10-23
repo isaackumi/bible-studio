@@ -245,7 +245,8 @@ import {
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
 import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, slideOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
-import { aiReady, modelsRequest, parseModels, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
+import { aiFeatureOn, aiReady, modelsRequest, parseModels, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiFeature, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
+import { parseHeardVerses, versesRequest, VERSE_ASK_GAP_SECONDS, type HeardVerse } from "../ai/verses";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -1759,7 +1760,7 @@ class Session {
   /** Translate a finished line into the chosen languages, one request at a time. */
   private translateCaption(id: number) {
     const languages = this.workspace.captions.languages;
-    if (!languages.length || !aiReady(this.workspace.ai)) return;
+    if (!languages.length || !aiReady(this.workspace.ai) || !aiFeatureOn(this.workspace.ai, "captions")) return;
     this.translating = this.translating.then(async () => {
       const line = this.captions.lines.find((entry) => entry.id === id);
       if (!line) return;
@@ -4838,13 +4839,49 @@ class Session {
     return aiReady(this.workspace.ai);
   }
 
+  /** Whether the church has this AI feature switched on (Settings › AI assistant). */
+  aiOn = (feature: AiFeature): boolean => aiFeatureOn(this.workspace.ai, feature);
+
+  setAiFeature = (feature: AiFeature, on: boolean) => {
+    this.setAiSettings({ features: { ...this.workspace.ai.features, [feature]: on } });
+  };
+
+  /** Refuse a feature that is not set up or switched off, saying which. */
+  private aiFor(feature: AiFeature): AiSettings {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    if (!aiFeatureOn(settings, feature)) throw new Error(t("This AI feature is switched off in Settings › AI assistant."));
+    return settings;
+  }
+
+  private verseAskedAt = 0;
+  private verseAsking = false;
+
+  /**
+   * Verses the preacher paraphrased or described, from the church's AI. Empty when the feature is
+   * off, a question is already out, or one was asked in the last few seconds.
+   */
+  versesFromSpeech = async (heard: string): Promise<HeardVerse[]> => {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings) || !aiFeatureOn(settings, "verses") || this.verseAsking) return [];
+    if (Date.now() - this.verseAskedAt < VERSE_ASK_GAP_SECONDS * 1000) return [];
+    this.verseAsking = true;
+    this.verseAskedAt = Date.now();
+    try {
+      return parseHeardVerses(replyText(settings.provider, await this.aiPost(versesRequest(settings, heard))));
+    } catch {
+      return [];
+    } finally {
+      this.verseAsking = false;
+    }
+  };
+
   /**
    * Summarize sermon notes into a short summary and screen-ready points with the church's own
    * AI service. Nothing is sent anywhere until the operator asks.
    */
   summarizeSermon = async (input: { title: string; notes: string }): Promise<SermonSummary> => {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    const settings = this.aiFor("summary");
     if (!input.notes.trim()) throw new Error(t("Write some notes first; the summary is made from them."));
     const reply = await this.aiPost(summaryRequest(settings, input));
     return parseSummary(replyText(settings.provider, reply));
@@ -4852,8 +4889,7 @@ class Session {
 
   /** AI slide generation: a deck from notes, a passage or a topic, saved to the slide library. */
   generateSlides = async (input: { source: SlideSource; text: string; title?: string; count: number; addToService?: boolean; sectionId?: string }): Promise<SlideDeck> => {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    const settings = this.aiFor("slides");
     if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : t("Write some notes first; the slides are made from them."));
     const reply = await this.aiPost(slidesRequest(settings, input));
     const outline = parseSlides(replyText(settings.provider, reply));
@@ -4904,8 +4940,7 @@ class Session {
 
   /** Songs the AI thinks the typed words are: a title, a line remembered, or what it is about. */
   findSongsWithAi = async (query: string): Promise<SongMatch[]> => {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    const settings = this.aiFor("songLookup");
     if (!query.trim()) throw new Error(t("Type a title, a line you remember, or what the song is about."));
     const songs = parseSongMatches(replyText(settings.provider, await this.aiPost(findSongRequest(settings, query))));
     if (!songs.length) throw new Error(t("The AI found no song for that. Try other words."));
@@ -4914,7 +4949,7 @@ class Session {
 
   /** A public-domain hymn's words, as a new song to check and save. Never for copyrighted songs. */
   hymnWithAi = async (match: SongMatch, folder: string): Promise<Song> => {
-    const settings = this.workspace.ai;
+    const settings = this.aiFor("songLookup");
     if (!wordsAreFree(match)) throw new Error(t("These words are under copyright. Get the song from SongSelect."));
     const words = parseHymn(replyText(settings.provider, await this.aiPost(hymnRequest(settings, match))));
     const parsed = parseLyrics(words);
@@ -4924,8 +4959,7 @@ class Session {
 
   /** Songs for a sermon: picks from the church's own library first, then a few it could add. */
   suggestSongsWithAi = async (input: { title: string; notes: string }): Promise<{ library: Array<{ song: Song; why: string }>; others: Array<{ title: string; authors: string; why: string }> }> => {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    const settings = this.aiFor("songSuggest");
     if (!input.notes.trim() && !input.title.trim()) throw new Error(t("Give the sermon a title or some notes first."));
     const songs = [...this.songs].sort((a, b) => a.title.localeCompare(b.title));
     const picks = parseSongSuggestions(replyText(settings.provider, await this.aiPost(suggestSongsRequest(settings, { ...input, songs }))), songs.length);
@@ -4937,7 +4971,8 @@ class Session {
     const settings = this.workspace.ai;
     if (settings.provider !== "local" && !settings.key) throw new Error(t("Paste your key first."));
     if (!settings.model) throw new Error(t("Choose a model first. Find models lists them."));
-    const result = await this.summarizeSermon({ title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." });
+    // The test works whichever features are switched on.
+    const result = parseSummary(replyText(settings.provider, await this.aiPost(summaryRequest(settings, { title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." }))));
     return result.points.length ? tn(result.points.length, "Connected. The test made {n} point.", "Connected. The test made {n} points.") : t("Connected.");
   };
 

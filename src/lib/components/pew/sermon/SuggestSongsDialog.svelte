@@ -80,7 +80,7 @@
           <li>
             <div class="what"><strong>{other.title}</strong>{#if other.authors}<span class="by">{other.authors}</span>{/if}{#if other.why}<span class="why">{other.why}</span>{/if}</div>
             <div class="acts">
-              <button type="button" class="btn" onclick={() => { session.lookUpSongWithAi(other.title + (other.authors ? `, ${other.authors}` : "")); onclose(); }}><Icon name="sparkles" size={13} /> {t("Look up")}</button>
+              {#if session.aiOn("songLookup")}<button type="button" class="btn" onclick={() => { session.lookUpSongWithAi(other.title + (other.authors ? `, ${other.authors}` : "")); onclose(); }}><Icon name="sparkles" size={13} /> {t("Look up")}</button>{/if}
               <button type="button" class="btn" onclick={() => void openExternal(songSelectUrl({ title: other.title, ccli: "" })).catch(() => {})}><Icon name="globe" size={13} /> {t("SongSelect")}</button>
             </div>
           </li>

@@ -56,7 +56,7 @@
 <div class="decks">
   <div class="bar">
     <button type="button" class="new-deck" onclick={createNew}>{t("+ Create new")}</button>
-    <button type="button" class="new-deck ghost" title={t("Write a deck from notes, a passage or a topic with your AI service")} onclick={() => (aiOpen = true)}>✦ {t("Make with AI")}</button>
+    {#if session.aiOn("slides")}<button type="button" class="new-deck ghost" title={t("Write a deck from notes, a passage or a topic with your AI service")} onclick={() => (aiOpen = true)}>✦ {t("Make with AI")}</button>{/if}
     <button type="button" class="new-deck ghost" title={t("Bring in a PowerPoint (.pptx) as an editable deck, or a PDF as a deck of pages")} onclick={() => pptxInput?.click()}>{t("Import PowerPoint or PDF")}</button>
     <input
       bind:this={pptxInput}

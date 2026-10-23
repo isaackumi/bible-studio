@@ -388,7 +388,7 @@
         <div class="makers">
           <button type="button" class="make primary" onclick={() => void newDeck()}><Icon name="plus" size={14} /> {t("New slides")}</button>
           <button type="button" class="make" disabled={!!busy} onclick={() => deckInput?.click()}><Icon name="download" size={14} /> {t("Import PowerPoint or PDF")}</button>
-          <button type="button" class="make ai" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>
+          {#if session.aiOn("slides")}<button type="button" class="make ai" onclick={() => (aiOpen = true)}><Icon name="sparkles" size={14} /> {t("Make with AI")}</button>{/if}
           {#if busy}<span class="busy" role="status">{busy}</span>{/if}
           <input bind:this={deckInput} type="file" hidden accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label={t("Import PowerPoint or PDF")} onchange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; input.value = ""; if (file) void importDeckFile(file); }} />
         </div>

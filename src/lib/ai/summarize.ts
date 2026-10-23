@@ -8,8 +8,18 @@ export type AiProvider = "anthropic" | "openai" | "gemini" | "local";
 
 export const AI_PROVIDERS: readonly AiProvider[] = ["anthropic", "openai", "gemini", "local"];
 
+/** What the AI is used for; each can be switched off in Settings › AI assistant. */
+export type AiFeature = "summary" | "slides" | "songSuggest" | "songLookup" | "captions" | "verses";
+
+export const AI_FEATURES: readonly AiFeature[] = ["summary", "slides", "songSuggest", "songLookup", "captions", "verses"];
+
+/** On unless switched off, except verses by meaning: it sends what the preacher says while listening. */
+const FEATURE_DEFAULTS: Record<AiFeature, boolean> = { summary: true, slides: true, songSuggest: true, songLookup: true, captions: true, verses: false };
+
 export type AiSettings = {
   provider: AiProvider;
+  /** Features switched away from their default; absent ones follow FEATURE_DEFAULTS. */
+  features?: Partial<Record<AiFeature, boolean>>;
   /** The church's own key. Kept on this computer only. Empty for an AI on this computer. */
   key: string;
   model: string;
@@ -49,12 +59,23 @@ export function sanitizeAiSettings(value: unknown): AiSettings {
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const baseUrl = text(record.baseUrl, 300);
   const provider = providerOf(record.provider, baseUrl);
+  const saved = record.features && typeof record.features === "object" ? (record.features as Record<string, unknown>) : {};
+  const features: Partial<Record<AiFeature, boolean>> = {};
+  for (const feature of AI_FEATURES) {
+    if (typeof saved[feature] === "boolean" && saved[feature] !== FEATURE_DEFAULTS[feature]) features[feature] = saved[feature];
+  }
   return {
     provider,
     key: text(record.key, 400),
     model: text(record.model, 120) || AI_DEFAULTS[provider].model,
     baseUrl: provider === "local" ? baseUrl : "",
+    ...(Object.keys(features).length ? { features } : {}),
   };
+}
+
+/** Whether the church uses the AI for this (whether it is set up is aiReady). */
+export function aiFeatureOn(settings: Pick<AiSettings, "features">, feature: AiFeature): boolean {
+  return settings.features?.[feature] ?? FEATURE_DEFAULTS[feature];
 }
 
 /** Where requests go: the company's own address, or the AI app on this computer. */

@@ -698,9 +698,11 @@
       <ToolMenu label={t("Import songs")} tip={t("Add songs from files")} className="desk-btn" align="left">
         {#snippet trigger()}<Icon name="download" size={14} /> {t("Import")}{/snippet}
         {#snippet children(close)}
-          <button type="button" role="menuitem" onclick={() => { aiSongOpen = true; close(); }}><Icon name="sparkles" size={16} /> {t("Look up a song with AI…")}</button>
-          <p class="menu-note">{t("Songs you don't have yet: words for old hymns, SongSelect for the rest.")}</p>
-          <div class="menu-sep"></div>
+          {#if session.aiOn("songLookup")}
+            <button type="button" role="menuitem" onclick={() => { aiSongOpen = true; close(); }}><Icon name="sparkles" size={16} /> {t("Look up a song with AI…")}</button>
+            <p class="menu-note">{t("Songs you don't have yet: words for old hymns, SongSelect for the rest.")}</p>
+            <div class="menu-sep"></div>
+          {/if}
           <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> {t("Lyric files…")}</button>
           <p class="menu-note">{t("Plain text, ChordPro, SongSelect, OpenLyrics (.xml, .zip) from OpenLP and FreeShow, or ProPresenter (.pro, .pro6, .proBundle).")}</p>
           <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> {t("A whole folder…")}</button>
