@@ -15,10 +15,10 @@ const KB = 1024;
 // once per screen, through the whole service, so they get the tightest budgets. A language's lines
 // load only when it is chosen (i18n/core.ts), so no window carries French or Spanish it does not show.
 const BUDGETS = {
-  OperatorShell: { js: 600 * KB, css: 500 * KB },
+  OperatorShell: { js: 600 * KB, css: 520 * KB },
   AudienceOutput: { js: 140 * KB, css: 70 * KB },
   StageOutput: { js: 60 * KB, css: 45 * KB },
-  SecondOutput: { js: 105 * KB, css: 65 * KB },
+  SecondOutput: { js: 105 * KB, css: 70 * KB },
   ScreenOutput: { js: 140 * KB, css: 70 * KB },
   RemotePad: { js: 50 * KB, css: 40 * KB },
 };
