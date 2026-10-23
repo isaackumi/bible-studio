@@ -8,6 +8,7 @@ mod entitlement;
 mod signin;
 mod db;
 mod diagnostics;
+mod places;
 mod displays;
 mod remote;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -34,7 +35,7 @@ fn with_db<T>(state: &State<Db>, f: impl FnOnce(&rusqlite::Connection) -> Result
 /// The library that could not be opened and was set aside at launch (its file name), for the desk to say once.
 struct StartupNotice(Mutex<Option<String>>);
 
-/// One entry of a pictures folder: a picture, or a folder inside it.
+/// One entry of a pictures folder: a picture, a video, or a folder inside it.
 #[derive(serde::Serialize)]
 struct FolderEntry {
     name: String,
@@ -42,6 +43,28 @@ struct FolderEntry {
     kind: &'static str,
     bytes: u64,
     modified: u64,
+    /// A folder: how many pictures and videos are directly inside it (shown on its tile).
+    items: u32,
+}
+
+/// What a file is by its name: a picture, a video, or neither.
+fn media_kind(name: &str) -> Option<&'static str> {
+    let ext = std::path::Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" => Some("image"),
+        "mp4" | "m4v" | "mov" | "webm" => Some("video"),
+        _ => None,
+    }
+}
+
+/// Pictures and videos directly inside a folder (counting stops at 9999).
+fn media_count(dir: &std::path::Path) -> u32 {
+    std::fs::read_dir(dir)
+        .map(|entries| entries.flatten().take(20_000).filter(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            !name.starts_with('.') && media_kind(&name).is_some()
+        }).take(9999).count() as u32)
+        .unwrap_or(0)
 }
 
 /// The pictures in a folder the person chose (and the folders inside it), shown where they are,
@@ -56,7 +79,8 @@ fn picture_folder(app: AppHandle, path: String) -> Result<Vec<FolderEntry>, Stri
     list_pictures(&dir)
 }
 
-/// A folder's pictures (JPEG, PNG, GIF, BMP, WebP) and the folders inside it; hidden ones left out.
+/// A folder's pictures (JPEG, PNG, GIF, BMP, WebP), videos (MP4, MOV, WebM) and the folders inside
+/// it; hidden ones left out.
 fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
     let mut entries = Vec::new();
     for entry in std::fs::read_dir(dir).map_err(|error| format!("That folder could not be read. {error}"))?.flatten().take(10_000) {
@@ -66,18 +90,24 @@ fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
         }
         let Ok(meta) = entry.metadata() else { continue };
         let modified = meta.modified().ok().and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok()).map(|at| at.as_millis() as u64).unwrap_or(0);
-        let kind = if meta.is_dir() {
-            "folder"
+        let (kind, items) = if meta.is_dir() {
+            ("folder", media_count(&entry.path()))
         } else {
-            let ext = std::path::Path::new(&name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-            match ext.as_str() {
-                "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" => "image",
-                _ => continue,
+            match media_kind(&name) {
+                Some(kind) => (kind, 0),
+                None => continue,
             }
         };
-        entries.push(FolderEntry { name, path: entry.path().to_string_lossy().to_string(), kind, bytes: meta.len(), modified });
+        entries.push(FolderEntry { name, path: entry.path().to_string_lossy().to_string(), kind, bytes: meta.len(), modified, items });
     }
     Ok(entries)
+}
+
+/// Where pictures usually are on this computer: Pictures, Desktop, and synced cloud drives.
+#[tauri::command(async)]
+fn picture_places(app: AppHandle) -> Vec<places::Place> {
+    let path = app.path();
+    places::find(path.home_dir().ok(), path.picture_dir().ok(), path.desktop_dir().ok())
 }
 
 /// Get ready for the browser to come back after signing in: the port it returns to.
@@ -869,6 +899,7 @@ pub fn run() {
             startup_notice,
             signin_listen,
             picture_folder,
+            picture_places,
             pco_get,
             easyworship_songs,
             ai_post,
@@ -1003,16 +1034,21 @@ mod backup_tests {
 #[cfg(test)]
 mod vmix_tests {
     #[test]
-    fn lists_only_pictures_and_folders() {
+    fn lists_pictures_videos_and_folders() {
         let dir = std::env::temp_dir().join(format!("cs-pictures-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("Easter")).unwrap();
+        for name in ["one.jpg", "two.mov", "notes.txt"] {
+            std::fs::write(dir.join("Easter").join(name), b"x").unwrap();
+        }
         for name in ["a.JPG", "b.png", "c.bmp", "notes.txt", ".hidden.png", "clip.mp4"] {
             std::fs::write(dir.join(name), b"x").unwrap();
         }
         let mut found: Vec<(String, &str)> = super::list_pictures(&dir).unwrap().into_iter().map(|entry| (entry.name, entry.kind)).collect();
         found.sort();
-        assert_eq!(found, vec![("Easter".to_string(), "folder"), ("a.JPG".to_string(), "image"), ("b.png".to_string(), "image"), ("c.bmp".to_string(), "image")]);
+        assert_eq!(found, vec![("Easter".to_string(), "folder"), ("a.JPG".to_string(), "image"), ("b.png".to_string(), "image"), ("c.bmp".to_string(), "image"), ("clip.mp4".to_string(), "video")]);
+        let easter = super::list_pictures(&dir).unwrap().into_iter().find(|entry| entry.kind == "folder").unwrap();
+        assert_eq!(easter.items, 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

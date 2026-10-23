@@ -1,17 +1,39 @@
-// Pictures straight from a folder on this computer: no importing or copying. Choose a folder (or a
-// pinned one), see its pictures, put one on Preview, step through them, or run them as a slideshow
-// on the screen (every few seconds, looping, with a cut or a fade). The operator stays in charge: a
+// Pictures and videos straight from a folder on this computer: no importing or copying. Choose a
+// folder (a pinned one, or a place such as Pictures or a synced Google Drive), see what is in it, put
+// one on Preview, step through them, or run them as a slideshow on the screen (every few seconds for
+// a picture, to the end for a video, looping, with a cut or a fade). The operator stays in charge: a
 // slideshow stops by itself the moment anything else goes LIVE.
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { presentImage } from "../domain/present";
+import { presentImage, presentVideo } from "../domain/present";
 import type { TransitionKind } from "../domain/types";
 import { t } from "../i18n/core";
 import { isDesktop } from "../platform/runtime";
 import { session } from "./session.svelte";
 import { audienceRoom, whenAudienceOpens } from "./rooms.svelte";
 
-export type FolderEntry = { name: string; path: string; kind: "image" | "folder"; bytes: number; modified: number };
+export type FolderEntry = { name: string; path: string; kind: "image" | "video" | "folder"; bytes: number; modified: number; items: number };
+/** Where pictures usually are: Pictures, Desktop, and cloud drives synced by their own apps. */
+export type Place = { name: string; path: string; kind: "pictures" | "desktop" | "google-drive" | "icloud" | "dropbox" | "onedrive" };
+
+/** Each folder keeps its own colour (from its name), so it is found again at a glance. */
+const FOLDER_COLORS = ["#f59e0b", "#3b82f6", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
+export function folderColor(name: string): string {
+  let hash = 0;
+  for (const char of name.toLowerCase()) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return FOLDER_COLORS[hash % FOLDER_COLORS.length]!;
+}
+
+/** The folders above and including this one, for a path to click back through (the last few). */
+export function crumbsOf(path: string, keep = 4): Array<{ name: string; path: string }> {
+  const crumbs: Array<{ name: string; path: string }> = [];
+  let at: string | null = path;
+  while (at && crumbs.length < keep) {
+    crumbs.unshift({ name: folderName(at), path: at });
+    at = parentOf(at);
+  }
+  return crumbs;
+}
 
 const PINNED_KEY = "church-studio:picture-folders";
 const LAST_KEY = "church-studio:picture-folder";
@@ -49,6 +71,7 @@ class Pictures {
   folder = $state<string | null>(null);
   entries = $state<FolderEntry[]>([]);
   pinned = $state<string[]>(typeof localStorage === "undefined" ? [] : read<string[]>(PINNED_KEY, []));
+  places = $state<Place[]>([]);
   error = $state("");
   loading = $state(false);
   /** The picture on Preview (its place in the folder). */
@@ -59,12 +82,14 @@ class Pictures {
   /** What the slideshow last put on Program, so it knows when the operator has taken over. */
   private shownId: string | null = null;
 
-  readonly images = $derived(this.entries.filter((entry) => entry.kind === "image"));
+  /** Pictures and videos, in the order they show (and play in a slideshow). */
+  readonly images = $derived(this.entries.filter((entry) => entry.kind !== "folder"));
   readonly folders = $derived(this.entries.filter((entry) => entry.kind === "folder"));
 
   show = () => {
     audienceRoom.hide();
     this.open = true;
+    if (isDesktop() && !this.places.length) void invoke<Place[]>("picture_places").then((found) => (this.places = found)).catch(() => {});
     if (!this.folder && isDesktop()) {
       const last = typeof localStorage === "undefined" ? null : read<string | null>(LAST_KEY, null);
       if (last) void this.openFolder(last);
@@ -112,7 +137,9 @@ class Pictures {
 
   private model(index: number) {
     const entry = this.images[index];
-    return entry ? { model: presentImage({ theme: session.theme(), imageUrl: this.url(entry) }), id: `picture:${entry.path}` } : null;
+    if (!entry) return null;
+    const model = entry.kind === "video" ? presentVideo({ theme: session.theme(), videoUrl: this.url(entry), loop: false }) : presentImage({ theme: session.theme(), imageUrl: this.url(entry) });
+    return { model, id: `picture:${entry.path}` };
   }
 
   /** Put a picture on Preview (Program does not change). */
@@ -152,6 +179,11 @@ class Pictures {
   private schedule() {
     clearTimeout(this.timer);
     if (!this.slideshow.running || this.slideshow.paused) return;
+    // A video plays to its end; the next comes once it has (checked twice a second).
+    if (this.images[this.current]?.kind === "video") {
+      this.timer = setTimeout(() => (session.programVideoDone() === false ? this.schedule() : void this.tick()), 500);
+      return;
+    }
     this.timer = setTimeout(() => void this.tick(), this.slideshow.seconds * 1000);
   }
 
@@ -195,12 +227,14 @@ class Pictures {
     this.slideshow = { ...this.slideshow, ...patch };
   };
 
-  /** Keep a picture for the service: it is copied into the library and added to the running order. */
+  /** Keep a picture or video for the service: it is copied into the library and added to the running order. */
   addToService = async (index: number) => {
     const entry = this.images[index];
     if (!entry) return;
     const asset = await session.importImage(entry.path);
-    if (asset) session.addImage(asset.id, asset.name);
+    if (!asset) return;
+    if (asset.kind === "video") session.addVideo(asset.id, asset.name, { loop: false });
+    else session.addImage(asset.id, asset.name);
   };
 }
 

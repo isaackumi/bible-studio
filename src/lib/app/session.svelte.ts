@@ -3639,6 +3639,20 @@ class Session {
     return 0;
   }
 
+  /**
+   * Whether the video on Program has played to its end (a slideshow waits for it before moving on).
+   * Null when Program is not a video; false while its length is still being read.
+   */
+  programVideoDone = (): boolean | null => {
+    const model = this.live.program.model;
+    const video = model.layout === "video" ? model.video : undefined;
+    if (!video?.url) return null;
+    const stopAt = endPoint(video, this.videoLength(video.url));
+    if (stopAt === null || !video.control) return false;
+    // Paused by the operator is not finished: only reaching the end counts.
+    return videoPosition(video.control) >= stopAt - 0.15;
+  };
+
   /** When the video on Program reaches its end: hold, clear, or hand over to the next item. */
   private videoTick() {
     if (!this.controlsAudience && !this.desktop()) return;

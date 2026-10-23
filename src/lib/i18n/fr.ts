@@ -4140,4 +4140,11 @@ export const fr: Readonly<Record<string, string>> = {
   "This Wi-Fi": "Ce Wi-Fi",
   "The phone remote cannot reach the internet. It tries again by itself.": "La télécommande ne joint pas internet. Elle réessaie toute seule.",
   "Open beside the desk": "Ouvrir à côté du pupitre",
+  "Folder path": "Chemin du dossier",
+  "Go to": "Aller à",
+  "No pictures or videos in this folder (JPEG, PNG, GIF, BMP, WebP, MP4, MOV or WebM).": "Aucune image ni vidéo dans ce dossier (JPEG, PNG, GIF, BMP, WebP, MP4, MOV ou WebM).",
+  "Videos play to the end before the next. The slideshow steps aside the moment anything else goes LIVE.": "Les vidéos jouent jusqu’au bout avant la suivante. Le diaporama s’efface dès que quelque chose d’autre passe en DIRECT.",
+  "{n} video": "{n} vidéo",
+  "{n} videos": "{n} vidéos",
+  "Desktop": "Bureau",
 };
