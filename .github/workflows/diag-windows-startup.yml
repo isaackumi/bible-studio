@@ -15,14 +15,14 @@ jobs:
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: v0.3.0
+      VERSION: v0.4.1
     steps:
       # An upgrade, as most churches have it: the previous version run once first, so it leaves a
       # library that the new version has to open and move forward.
       - name: Install and run the previous version first
         shell: pwsh
         run: |
-          gh release download v0.2.9 -R ${{ github.repository }} -p "*x64-setup.exe" -D previous
+          gh release download v0.4.0 -R ${{ github.repository }} -p "*x64-setup.exe" -D previous
           $setup = Get-ChildItem previous\*.exe | Select-Object -First 1
           Start-Process $setup.FullName -ArgumentList "/S" -Wait
           $exe = Get-ChildItem -Recurse "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "*.exe" -ErrorAction SilentlyContinue |
@@ -84,7 +84,7 @@ jobs:
           foreach ($root in "$env:LOCALAPPDATA\app.churchstudio.present", "$env:APPDATA\app.churchstudio.present") {
             if (Test-Path $root) {
               Get-ChildItem -Recurse $root | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String -Width 400 | Tee-Object -Append out\files.txt
-              Get-ChildItem -Recurse $root -Include *.log, *.json -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName ("out\" + $_.Name) -ErrorAction SilentlyContinue }
+              Get-ChildItem -Recurse $root -Include *.log, *.json -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "EBWebView" } | ForEach-Object { Copy-Item $_.FullName ("out\" + $_.Name) -ErrorAction SilentlyContinue }
             } else { "missing: $root" | Tee-Object -Append out\files.txt }
           }
           Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddMinutes(-15) } -ErrorAction SilentlyContinue |
