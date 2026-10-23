@@ -4036,4 +4036,15 @@ export const es: Readonly<Record<string, string>> = {
   "or go to": "o entra en",
   "and enter": "e introduce",
   "Pictures: show a folder of pictures, or run it as a slideshow": "Imágenes: muestra una carpeta de imágenes o pásala como presentación",
+  // What's new in 0.4.0
+  "Design your own slides": "Diseña tus propias diapositivas",
+  "A design studio with templates for any screen shape, gradients, shapes, icons, pictures and lower thirds. Find it with the Studio button at the top.": "Un estudio de diseño con plantillas para cualquier forma de pantalla, degradados, formas, iconos, imágenes y rótulos. Ábrelo con el botón Studio de arriba.",
+  "Questions, quizzes and polls from phones": "Preguntas, concursos y encuestas desde los teléfonos",
+  "Open a room in Audience: people scan the QR code, or type the code on the screen, then ask, vote and play Bible games. Nothing reaches the screen until you put it there.": "Abre una sala en Público: la gente escanea el código QR, o escribe el código de la pantalla, y pregunta, vota y juega a juegos bíblicos. Nada llega a la pantalla hasta que tú lo pones.",
+  "Pictures from a folder, as a slideshow": "Imágenes de una carpeta, en presentación",
+  "Show pictures straight from any folder, without importing, or run them as a slideshow that fades on its own. Find it with the Pictures button at the top.": "Muestra imágenes directamente desde cualquier carpeta, sin importarlas, o pásalas como presentación con fundido. Botón Imágenes arriba.",
+  "Phones and TVs as screens, and videos from a link": "Teléfonos y televisores como pantallas, y vídeos desde un enlace",
+  "Any browser can show what your screen shows, over the internet. Play a video file or a live HLS stream from a web address.": "Cualquier navegador puede mostrar lo que muestra tu pantalla, por internet. Reproduce un archivo de vídeo o una emisión HLS en directo desde una dirección web.",
+  "Lighter, tidier and easier to fix": "Más ligero, más ordenado y más fácil de arreglar",
+  "The app is 20 MB smaller, the desk keeps Program and Go LIVE in sight on laptops, and if Church Studio ever stops responding it tells us where, so we can fix it.": "La aplicación pesa 20 MB menos, el escritorio mantiene Programa y EN VIVO a la vista en portátiles, y si Church Studio deja de responder nos dice dónde, para poder arreglarlo.",
 };

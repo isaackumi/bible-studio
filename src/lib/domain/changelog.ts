@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.0",
+    date: "2026-10-23",
+    highlights: [
+      { icon: "stage", title: msg("Design your own slides"), text: msg("A design studio with templates for any screen shape, gradients, shapes, icons, pictures and lower thirds. Find it with the Studio button at the top.") },
+      { icon: "users", title: msg("Questions, quizzes and polls from phones"), text: msg("Open a room in Audience: people scan the QR code, or type the code on the screen, then ask, vote and play Bible games. Nothing reaches the screen until you put it there.") },
+      { icon: "media", title: msg("Pictures from a folder, as a slideshow"), text: msg("Show pictures straight from any folder, without importing, or run them as a slideshow that fades on its own. Find it with the Pictures button at the top.") },
+      { icon: "screens", title: msg("Phones and TVs as screens, and videos from a link"), text: msg("Any browser can show what your screen shows, over the internet. Play a video file or a live HLS stream from a web address.") },
+      { icon: "speed", title: msg("Lighter, tidier and easier to fix"), text: msg("The app is 20 MB smaller, the desk keeps Program and Go LIVE in sight on laptops, and if Church Studio ever stops responding it tells us where, so we can fix it.") },
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-10-22",
     highlights: [

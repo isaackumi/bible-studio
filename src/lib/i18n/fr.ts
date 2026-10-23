@@ -4117,4 +4117,15 @@ export const fr: Readonly<Record<string, string>> = {
   "or go to": "ou allez sur",
   "and enter": "et entrez",
   "Pictures: show a folder of pictures, or run it as a slideshow": "Images : afficher un dossier d’images, ou le faire défiler en diaporama",
+  // What's new in 0.4.0
+  "Design your own slides": "Concevez vos propres diapositives",
+  "A design studio with templates for any screen shape, gradients, shapes, icons, pictures and lower thirds. Find it with the Studio button at the top.": "Un studio de création avec des modèles pour toute forme d’écran, des dégradés, des formes, des icônes, des images et des bandeaux. Ouvrez-le avec le bouton Studio en haut.",
+  "Questions, quizzes and polls from phones": "Questions, quiz et sondages depuis les téléphones",
+  "Open a room in Audience: people scan the QR code, or type the code on the screen, then ask, vote and play Bible games. Nothing reaches the screen until you put it there.": "Ouvrez une salle dans Assemblée : on scanne le QR code, ou on tape le code affiché, puis on pose des questions, on vote et on joue à des jeux bibliques. Rien n’arrive à l’écran sans vous.",
+  "Pictures from a folder, as a slideshow": "Des images d’un dossier, en diaporama",
+  "Show pictures straight from any folder, without importing, or run them as a slideshow that fades on its own. Find it with the Pictures button at the top.": "Affichez des images directement depuis un dossier, sans les importer, ou faites-les défiler en diaporama avec fondu. Bouton Images en haut.",
+  "Phones and TVs as screens, and videos from a link": "Téléphones et téléviseurs comme écrans, et vidéos par lien",
+  "Any browser can show what your screen shows, over the internet. Play a video file or a live HLS stream from a web address.": "N’importe quel navigateur peut afficher ce que montre votre écran, par internet. Lisez un fichier vidéo ou un flux HLS en direct depuis une adresse web.",
+  "Lighter, tidier and easier to fix": "Plus léger, plus clair et plus facile à réparer",
+  "The app is 20 MB smaller, the desk keeps Program and Go LIVE in sight on laptops, and if Church Studio ever stops responding it tells us where, so we can fix it.": "L’application pèse 20 Mo de moins, le pupitre garde Direct et le bouton DIRECT visibles sur les portables, et si Church Studio cesse de répondre, il nous dit où, pour que nous puissions corriger.",
 };
