@@ -526,6 +526,14 @@ fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> 
     storage::unused_media(&conn, &media)
 }
 
+/// Every picture and video with where it is used (Settings › Storage › Review files).
+#[tauri::command]
+fn storage_media_usage(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::MediaUse>, String> {
+    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
+    storage::media_usage(&conn, &media)
+}
+
 /// Delete unused pictures and videos: Media entries by id, leftover files by path.
 #[tauri::command(async)]
 fn storage_remove_unused(app: tauri::AppHandle, db: tauri::State<'_, db::Db>, ids: Vec<String>, files: Vec<String>) -> Result<(), String> {
@@ -1057,6 +1065,7 @@ pub fn run() {
             storage_clear_cache,
             storage_compact,
             storage_unused_media,
+            storage_media_usage,
             storage_remove_unused,
             whisper_download,
             whisper_cancel,

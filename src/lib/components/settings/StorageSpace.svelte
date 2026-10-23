@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { session } from "../../app/session.svelte";
   import { isDesktop } from "../../platform/runtime";
-  import { t, tn } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
   import { assetUrl } from "../../db/api";
   import PickList, { type PickItem } from "../PickList.svelte";
 
@@ -15,35 +15,42 @@
   let busy = $state<"" | "cache" | "compact" | "model" | "find" | "remove">("");
   let note = $state("");
   type Unused = { id: string; name: string; path: string; bytes: number };
-  let unused = $state<Unused[] | null>(null);
+  /** Every picture and video, with the parts of the library that use it (none: unused). */
+  type MediaUse = Unused & { usedIn: string[] };
+  let unused = $state<MediaUse[] | null>(null);
   const keyOf = (item: Unused) => item.id || item.path;
   const PICTURE = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
   const VIDEO = /\.(mp4|m4v|mov|webm)$/i;
+  const PLACES: Record<string, string> = { songs: msg("songs"), services: msg("services"), sermons: msg("sermons"), themes: msg("themes"), workspace: msg("slides, looks and settings") };
   const unusedItems = $derived<PickItem[]>(
     (unused ?? []).map((item) => {
       const picture = PICTURE.test(item.path);
       const video = VIDEO.test(item.path);
+      const kind = video ? t("Video") : picture ? t("Picture") : t("File");
+      const used = item.usedIn.length > 0;
       return {
         key: keyOf(item),
         name: item.name,
         bytes: item.bytes,
         thumb: picture ? assetUrl(item.path) : null,
         icon: video ? "video" : picture ? "media" : "files",
-        detail: video ? t("Video") : picture ? t("Picture") : t("File"),
-        tag: item.id ? undefined : t("leftover file"),
+        detail: used ? t("{kind} · used in {places}", { kind, places: item.usedIn.map((table) => t(PLACES[table] ?? table)).join(", ") }) : t("{kind} · used nowhere", { kind }),
+        tag: used ? t("in use") : item.id ? t("not used") : t("leftover file"),
+        locked: used,
       };
     }),
   );
 
+  /** Every file, used and not, so the two can be compared; only the unused ones can be ticked. */
   async function findUnused() {
     busy = "find";
     note = "";
     // Save first, so the search sees every song, service and setting as they are now.
     await session.flushSave().catch(() => {});
-    unused = await invoke<Unused[]>("storage_unused_media").catch(() => []);
+    unused = await invoke<MediaUse[]>("storage_media_usage").catch(() => []);
     busy = "";
     if (unused && !unused.length) {
-      note = t("Every picture and video is used somewhere. Nothing to clear.");
+      note = t("No pictures or videos have been added to Media yet.");
       unused = null;
     }
   }
@@ -122,7 +129,7 @@
     </div>
     <div class="row">
       <div class="row-copy"><strong>{t("Pictures and videos")} · {size(usage.media)}</strong><span>{unusedBytes === null ? t("Files added to Media. Find the ones nothing uses: no song, service, sermon, slide, look, theme or setting.") : unusedBytes ? t("Files added to Media. {size} of it is used nowhere: no song, service, sermon, slide, look, theme or setting.", { size: size(unusedBytes) }) : t("Files added to Media. Every one is used somewhere.")}</span></div>
-      <button type="button" class="btn" disabled={!!busy || unusedBytes === 0} onclick={() => void findUnused()}>{busy === "find" ? t("Looking…") : t("Find unused")}</button>
+      <button type="button" class="btn" disabled={!!busy} onclick={() => void findUnused()}>{busy === "find" ? t("Looking…") : t("Review files")}</button>
     </div>
     {#if usage.models}
       <div class="row">
@@ -139,14 +146,16 @@
 
 {#if unused?.length}
   <PickList
-    title={t("Pictures and videos nothing uses")}
-    intro={t("Nothing in a song, service, sermon, slide, look, theme or setting points to these. Untick any you want to keep. Removed files leave Media for good; a backup keeps the library, not media files.")}
+    title={t("Pictures and videos")}
+    intro={t("Every file in Media, with where it is used. Files in use cannot be ticked. The rest are ticked to remove; untick any you want to keep. Removed files leave Media for good; a backup keeps the library, not media files.")}
     items={unusedItems}
-    picked={unusedItems.map((item) => item.key)}
+    picked={unusedItems.filter((item) => !item.locked).map((item) => item.key)}
     filters={[
+      { id: "unused", label: t("Not used"), match: (item) => !item.locked },
+      { id: "used", label: t("In use"), match: (item) => !!item.locked },
       { id: "picture", label: t("Pictures"), match: (item) => item.icon === "media" },
       { id: "video", label: t("Videos"), match: (item) => item.icon === "video" },
-      { id: "leftover", label: t("Leftover files"), match: (item) => !!item.tag },
+      { id: "leftover", label: t("Leftover files"), match: (item) => item.tag === t("leftover file") },
     ]}
     action={{ danger: true, label: (count, bytes) => tn(count, "Remove {n} file", "Remove {n} files") + (bytes ? ` · ${size(bytes)}` : ""), run: removePicked }}
     onclose={() => (unused = null)}

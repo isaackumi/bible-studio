@@ -14,6 +14,8 @@
     tag?: string;
     /** Short text in a badge in place of a picture ("KJV"). */
     badge?: string;
+    /** Shown for the record but cannot be ticked (a file that is in use). */
+    locked?: boolean;
   };
   export type PickFilter = { id: string; label: string; match: (item: PickItem) => boolean };
 </script>
@@ -92,7 +94,8 @@
   const pickedItems = $derived(items.filter((item) => picked.has(item.key)));
   const pickedBytes = $derived(pickedItems.reduce((sum, item) => sum + (item.bytes ?? 0), 0));
   const shownPicked = $derived(shown.filter((item) => picked.has(item.key)).length);
-  const allShown = $derived(shown.length > 0 && shownPicked === shown.length);
+  const shownFree = $derived(shown.filter((item) => !item.locked).length);
+  const allShown = $derived(shownFree > 0 && shownPicked === shownFree);
 
   function set(next: Set<string>) {
     picked = next;
@@ -101,6 +104,7 @@
   }
 
   function toggle(key: string) {
+    if (items.find((item) => item.key === key)?.locked) return;
     const next = new Set(picked);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -111,6 +115,7 @@
   function toggleShown() {
     const next = new Set(picked);
     for (const item of shown) {
+      if (item.locked) continue;
       if (allShown) next.delete(item.key);
       else next.add(item.key);
     }
@@ -199,7 +204,7 @@
       {/if}
       <div class="head">
         <label class="all">
-          <input type="checkbox" checked={allShown} indeterminate={shownPicked > 0 && !allShown} disabled={!shown.length} onchange={toggleShown} />
+          <input type="checkbox" checked={allShown} indeterminate={shownPicked > 0 && !allShown} disabled={!shownFree} onchange={toggleShown} />
           <span>{allShown ? t("Untick all shown") : t("Tick all shown")}</span>
         </label>
         <span class="count" aria-live="polite">{tn(pickedItems.length, "{n} ticked", "{n} ticked")} · {tn(shown.length, "{n} shown", "{n} shown")}</span>
@@ -210,9 +215,9 @@
       <ul class="rows" bind:this={list} aria-label={title}>
         {#each shown as item (item.key)}
           {@const on = picked.has(item.key)}
-          <li class:on>
+          <li class:on class:locked={item.locked}>
             <label>
-              <input class="tick" type="checkbox" checked={on} onchange={() => toggle(item.key)} />
+              <input class="tick" type="checkbox" checked={on} disabled={item.locked} onchange={() => toggle(item.key)} />
               <span class="thumb" aria-hidden="true">
                 {#if item.thumb && !broken.has(item.key)}
                   <img src={item.thumb} alt="" loading="lazy" decoding="async" onerror={() => (broken = new Set(broken).add(item.key))} />
@@ -295,6 +300,8 @@
   .copy span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bytes { flex: none; font-size: 12.5px; font-weight: 650; color: var(--muted); font-variant-numeric: tabular-nums; }
   .on .bytes { color: var(--ink); }
+  li.locked label { cursor: default; }
+  li.locked .tick { opacity: 0.35; }
   .row-end { flex: none; display: flex; gap: 6px; }
   /* Row buttons come from the caller; they look like the list's own. */
   .row-end :global(button) { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }

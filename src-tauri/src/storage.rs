@@ -91,20 +91,44 @@ pub struct Unused {
     pub bytes: u64,
 }
 
+/// A Media entry (or leftover file) and where it is used: the tables that mention it, none if unused.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaUse {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub bytes: u64,
+    pub used_in: Vec<&'static str>,
+}
+
+const DOCUMENT_TABLES: [&str; 5] = ["songs", "services", "sermons", "themes", "workspace"];
+
 /**
  * Pictures and videos nothing uses: no song, service, sermon, theme, slide deck, look or setting
  * mentions their id or file name. Also files left in the media folder that no Media entry points
  * to. Nothing is deleted here; the church chooses.
  */
 pub fn unused_media(conn: &rusqlite::Connection, media_dir: &Path) -> Result<Vec<Unused>, String> {
-    let mut everything = String::new();
-    for table in ["songs", "services", "sermons", "themes", "workspace"] {
+    Ok(media_usage(conn, media_dir)?
+        .into_iter()
+        .filter(|entry| entry.used_in.is_empty())
+        .map(|entry| Unused { id: entry.id, name: entry.name, path: entry.path, bytes: entry.bytes })
+        .collect())
+}
+
+/// Every Media entry with where it is used, so the church can see used and unused side by side.
+pub fn media_usage(conn: &rusqlite::Connection, media_dir: &Path) -> Result<Vec<MediaUse>, String> {
+    let mut documents: Vec<(&'static str, String)> = Vec::new();
+    for table in DOCUMENT_TABLES {
         let mut statement = conn.prepare(&format!("SELECT document FROM {table}")).map_err(|error| error.to_string())?;
         let rows = statement.query_map([], |row| row.get::<_, String>(0)).map_err(|error| error.to_string())?;
+        let mut everything = String::new();
         for row in rows.flatten() {
             everything.push_str(&row);
             everything.push('\n');
         }
+        documents.push((table, everything));
     }
     let mut statement = conn.prepare("SELECT id, name, path FROM media_assets").map_err(|error| error.to_string())?;
     let assets: Vec<(String, String, String)> = statement
@@ -113,13 +137,15 @@ pub fn unused_media(conn: &rusqlite::Connection, media_dir: &Path) -> Result<Vec
         .flatten()
         .collect();
     let file_name = |path: &str| Path::new(path).file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default();
-    let mut unused = Vec::new();
+    let mut usage = Vec::new();
     for (id, name, path) in &assets {
         let file = file_name(path);
-        let used = everything.contains(id.as_str()) || (!file.is_empty() && everything.contains(file.as_str()));
-        if !used {
-            unused.push(Unused { id: id.clone(), name: name.clone(), path: path.clone(), bytes: size_of(Path::new(path)) });
-        }
+        let used_in = documents
+            .iter()
+            .filter(|(_, text)| text.contains(id.as_str()) || (!file.is_empty() && text.contains(file.as_str())))
+            .map(|(table, _)| *table)
+            .collect();
+        usage.push(MediaUse { id: id.clone(), name: name.clone(), path: path.clone(), bytes: size_of(Path::new(path)), used_in });
     }
     // Files in the media folder that no entry points to (left by an interrupted import).
     let known: std::collections::HashSet<String> = assets.iter().map(|(_, _, path)| file_name(path)).collect();
@@ -128,12 +154,12 @@ pub fn unused_media(conn: &rusqlite::Connection, media_dir: &Path) -> Result<Vec
             let path = entry.path();
             let name = file_name(&path.to_string_lossy());
             if path.is_file() && !name.starts_with('.') && !known.contains(&name) {
-                unused.push(Unused { id: String::new(), name: name.clone(), path: path.display().to_string(), bytes: size_of(&path) });
+                usage.push(MediaUse { id: String::new(), name: name.clone(), path: path.display().to_string(), bytes: size_of(&path), used_in: Vec::new() });
             }
         }
     }
-    unused.sort_by_key(|entry| std::cmp::Reverse(entry.bytes));
-    Ok(unused)
+    usage.sort_by_key(|entry| std::cmp::Reverse(entry.bytes));
+    Ok(usage)
 }
 
 /// Remove a leftover file, only if it sits in the app's own media folder.
@@ -236,6 +262,12 @@ mod tests {
         let names: Vec<&str> = unused.iter().map(|item| item.name.as_str()).collect();
         assert!(names.contains(&"lonely.mp4") && names.contains(&"leftover.mov"));
         assert!(!names.contains(&"used.jpg") && !names.contains(&"byname.png"));
+        // The full picture says where each one is used, so used and unused can be compared.
+        let usage = media_usage(&conn, &media).unwrap();
+        let used_in = |name: &str| usage.iter().find(|item| item.name == name).unwrap().used_in.clone();
+        assert_eq!(used_in("used.jpg"), vec!["songs"]);
+        assert_eq!(used_in("byname.png"), vec!["workspace"]);
+        assert!(used_in("lonely.mp4").is_empty() && used_in("leftover.mov").is_empty());
         assert!(remove_leftover(&media, "/etc/hosts").is_err());
         remove_leftover(&media, &media.join("leftover.mov").display().to_string()).unwrap();
         std::fs::remove_dir_all(dir).unwrap();
