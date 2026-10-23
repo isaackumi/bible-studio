@@ -2,7 +2,8 @@
 // and polls. One small page, no app, any connection. Words from the room are always set as text,
 // never as HTML, so nothing anyone types can run on another person's phone.
 
-import { CHOICE_STYLES, PLAYER_COLORS } from "../src/lib/domain/game-colors";
+import { CHOICE_STYLES, PLAYER_COLORS, TEAMS } from "../src/lib/domain/game-colors";
+import { PHONE_WORDS, phoneWord, type PhoneLanguage } from "./room-words";
 
 // The answer shapes, the same as on the big screen, so a player can match their tile at a glance.
 const SHAPE_PATHS: Record<(typeof CHOICE_STYLES)[number]["shape"], string> = {
@@ -15,11 +16,12 @@ const SHAPE_PATHS: Record<(typeof CHOICE_STYLES)[number]["shape"], string> = {
 };
 const SHAPE_SVG = CHOICE_STYLES.map((style) => `<svg viewBox="0 0 24 24" aria-hidden="true">${SHAPE_PATHS[style.shape]}</svg>`);
 
-export function roomPage(code: string, origin: string): string {
+export function roomPage(code: string, origin: string, language: PhoneLanguage = "en"): string {
   const safe = code.replace(/[^A-Z0-9]/g, "");
-  if (!safe) return entryPage();
+  const w = (text: string) => phoneWord(language, text);
+  if (!safe) return entryPage(language);
   return `<!doctype html>
-<html lang="en">
+<html lang="${language}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -80,6 +82,7 @@ export function roomPage(code: string, origin: string): string {
   .me { display: inline-flex; align-items: center; gap: 7px; max-width: 50%; padding: 4px 10px 4px 4px; border-radius: 999px; background: color-mix(in srgb, var(--me, var(--accent)) 22%, transparent); font-size: 13px; font-weight: 750; }
   .me i { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--me, var(--accent)); color: #fff; font-style: normal; font-size: 12px; }
   .me span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team { padding: 4px 10px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
   .activity { border-color: color-mix(in srgb, var(--me, var(--accent)) 45%, var(--line)); }
   .clock { float: right; min-width: 44px; height: 44px; margin: -4px 0 6px 10px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 3px solid var(--accent); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
   .clock.hurry { border-color: #e21b3c; color: #ff8a8a; animation: beat 0.5s ease-in-out infinite alternate; }
@@ -109,12 +112,12 @@ export function roomPage(code: string, origin: string): string {
 </head>
 <body>
 <main>
-  <header><h1 id="room">Joining…</h1><span class="me hidden" id="me"><i id="me-n"></i><span id="me-name"></span></span><span class="code" id="code">${safe}</span></header>
+  <header><h1 id="room">${w("Joining…")}</h1><span class="me hidden" id="me"><i id="me-n"></i><span id="me-name"></span></span><span class="team hidden" id="team"></span><span class="code" id="code">${safe}</span></header>
 
   <section id="join" class="card hidden">
-    <label for="name">Your name (optional)</label>
-    <input id="name" maxlength="40" autocomplete="given-name" placeholder="Shown with your questions">
-    <button class="primary" id="join-btn">Join</button>
+    <label for="name">${w("Your name (optional)")}</label>
+    <input id="name" maxlength="40" autocomplete="given-name" placeholder="${w("Shown with your questions")}">
+    <button class="primary" id="join-btn">${w("Join")}</button>
     <p class="note" id="join-note"></p>
   </section>
 
@@ -122,21 +125,21 @@ export function roomPage(code: string, origin: string): string {
     <div id="activity" class="card activity hidden"></div>
 
     <div id="ask-card" class="card">
-      <label for="question">Ask a question</label>
-      <textarea id="question" maxlength="280" placeholder="Type your question…"></textarea>
+      <label for="question">${w("Ask a question")}</label>
+      <textarea id="question" maxlength="280" placeholder="${w("Type your question…")}"></textarea>
       <div class="row"><span id="ask-hint"></span><span id="count">0 / 280</span></div>
-      <button class="primary" id="ask-btn">Send question</button>
+      <button class="primary" id="ask-btn">${w("Send question")}</button>
       <p class="note" id="ask-note"></p>
     </div>
 
     <div class="tabs" role="tablist">
-      <button class="on" data-sort="top" role="tab" aria-selected="true">Top</button>
-      <button data-sort="new" role="tab" aria-selected="false">Newest</button>
+      <button class="on" data-sort="top" role="tab" aria-selected="true">${w("Top")}</button>
+      <button data-sort="new" role="tab" aria-selected="false">${w("Newest")}</button>
     </div>
     <ol id="list"></ol>
   </section>
 
-  <section id="ended" class="card hidden"><p>This room has ended. Thank you for joining.</p></section>
+  <section id="ended" class="card hidden"><p>${w("This room has ended. Thank you for joining.")}</p></section>
 </main>
 <script>
 (function () {
@@ -144,6 +147,8 @@ export function roomPage(code: string, origin: string): string {
   var COLORS = ${JSON.stringify(PLAYER_COLORS)};
   var SHAPES = ${JSON.stringify(SHAPE_SVG)};
   var lastReveal = "", lastData = null;
+  var LANG = ${JSON.stringify(language)}, W = ${JSON.stringify(PHONE_WORDS[language])}, TEAMS = ${JSON.stringify(TEAMS)};
+  function tr(text, values) { var line = W[text] || text; for (var key in values || {}) line = line.split("{" + key + "}").join(String(values[key])); return line; }
   var API = ${JSON.stringify(origin)} + "/v1/rooms/" + CODE;
   var KEY = "cs-room-" + CODE;
   var pid = null, sort = "top", last = null, timer = null, busy = false;
@@ -153,7 +158,7 @@ export function roomPage(code: string, origin: string): string {
   function show(id, on) { $(id).classList.toggle("hidden", !on); }
   function post(path, body) {
     return fetch(API + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; }); });
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || tr("Something went wrong.")); return d; }); });
   }
   function note(id, text, kind) { var n = $(id); n.textContent = text || ""; n.className = "note" + (kind ? " " + kind : ""); }
 
@@ -171,7 +176,7 @@ export function roomPage(code: string, origin: string): string {
     busy = true; $("ask-btn").disabled = true;
     post("/ask", { pid: pid, text: text }).then(function (d) {
       $("question").value = ""; count();
-      note("ask-note", d.state === "pending" ? "Sent. It appears here once the church puts it through." : "Sent.", "ok");
+      note("ask-note", d.state === "pending" ? tr("Sent. It appears here once the church puts it through.") : tr("Sent."), "ok");
       refresh();
     }).catch(function (e) {
       if (/Join/.test(e.message)) { try { localStorage.removeItem(KEY); } catch (x) {} pid = null; show("live", false); show("join", true); }
@@ -198,20 +203,20 @@ export function roomPage(code: string, origin: string): string {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return sort === "top" ? (b.votes - a.votes) || (b.at - a.at) : b.at - a.at;
     });
-    if (!items.length) { list.appendChild(el("li", "empty", d.room.moderate ? "No questions up yet. Yours appears once the church puts it through." : "No questions yet. Ask the first one.")); }
+    if (!items.length) { list.appendChild(el("li", "empty", d.room.moderate ? tr("No questions up yet. Yours appears once the church puts it through.") : tr("No questions yet. Ask the first one."))); }
     items.forEach(function (q) {
       var li = el("li", "q" + (q.featured ? " featured" : ""));
       var text = el("div", "text"); text.appendChild(el("span", null, q.text));
       if (q.name) text.appendChild(el("span", "who", q.name));
-      if (q.pinned) text.appendChild(el("span", "badge pin", "Pinned"));
-      if (q.answered) text.appendChild(el("span", "badge done", "Answered"));
+      if (q.pinned) text.appendChild(el("span", "badge pin", tr("Pinned")));
+      if (q.answered) text.appendChild(el("span", "badge done", tr("Answered")));
       var b = el("button", "vote" + (q.mine ? " mine" : ""));
-      b.setAttribute("aria-label", (q.mine ? "Take back your vote for: " : "Vote for: ") + q.text);
+      b.setAttribute("aria-label", (q.mine ? tr("Take back your vote for: ") : tr("Vote for: ")) + q.text);
       b.innerHTML = arrow; b.appendChild(el("span", null, String(q.votes)));
       b.onclick = function () { vote(q.id); };
       li.appendChild(text); li.appendChild(b); list.appendChild(li);
     });
-    $("ask-hint").textContent = d.waiting ? d.waiting + " of yours waiting" : "";
+    $("ask-hint").textContent = d.waiting ? tr("{n} of yours waiting", { n: d.waiting }) : "";
     show("ask-card", d.room.open);
   }
 
@@ -219,7 +224,7 @@ export function roomPage(code: string, origin: string): string {
     var a = d.activity, box = $("activity");
     if (!a || a.kind === "none") { show("activity", false); return; }
     show("activity", true); box.textContent = "";
-    box.appendChild(el("div", "meta", (a.kind === "quiz" ? "Question " + a.round + " of " + a.total : "Poll") + (a.game ? " · " + a.game : "")));
+    box.appendChild(el("div", "meta", (a.kind === "quiz" ? tr("Question {n} of {total}", { n: a.round, total: a.total }) : tr("Poll")) + (a.game ? " · " + a.game : "")));
     box.appendChild(el("h2", null, a.question.prompt));
     // Reading time first: the answers wait, and the clock starts when they open.
     var opensIn = a.phase === "open" && a.opensAt ? Math.max(0, a.opensAt - a.now) : 0;
@@ -251,17 +256,17 @@ export function roomPage(code: string, origin: string): string {
       grid.appendChild(b);
     });
     box.appendChild(grid);
-    var status = a.phase === "open" ? (reading ? "Get ready… the answers open in a moment." : a.answered !== null ? "Answer in. Wait for the others…" : "") : a.phase === "closed" ? "Time is up!" : a.kind === "quiz" ? "" : "Thanks for voting.";
+    var status = a.phase === "open" ? (reading ? tr("Get ready… the answers open in a moment.") : a.answered !== null ? tr("Answer in. Wait for the others…") : "") : a.phase === "closed" ? tr("Time is up!") : a.kind === "quiz" ? "" : tr("Thanks for voting.");
     if (status) box.appendChild(el("p", "note", status));
     if (a.phase === "reveal" && a.kind === "quiz") {
       var win = a.answered !== null && a.answered === a.correct;
       var card = el("div", "result " + (win ? "win" : a.answered === null ? "none" : "miss"));
-      card.appendChild(el("strong", null, win ? "Correct!" : a.answered === null ? "No answer this time" : "Not this time"));
+      card.appendChild(el("strong", null, win ? tr("Correct!") : a.answered === null ? tr("No answer this time") : tr("Not this time")));
       if (win && a.gain) { var g = el("span", "gain", "+0"); card.appendChild(g); countUp(g, a.gain); }
       var facts = el("div", "facts");
-      if (win && a.streak > 1) facts.appendChild(el("span", null, "\u{1F525} " + a.streak + " in a row"));
-      if (a.rank) facts.appendChild(el("span", null, ordinal(a.rank) + " of " + a.players));
-      if (a.score != null) facts.appendChild(el("span", null, a.score.toLocaleString() + " points"));
+      if (win && a.streak > 1) facts.appendChild(el("span", null, "\u{1F525} " + tr("{n} in a row", { n: a.streak })));
+      if (a.rank) facts.appendChild(el("span", null, tr("{place} of {players}", { place: ordinal(a.rank), players: a.players })));
+      if (a.score != null) facts.appendChild(el("span", null, tr("{n} points", { n: a.score.toLocaleString() })));
       if (facts.childNodes.length) card.appendChild(facts);
       box.appendChild(card);
       var revealKey = a.round + ":" + a.game;
@@ -274,7 +279,11 @@ export function roomPage(code: string, origin: string): string {
     }
   }
 
-  function ordinal(n) { var t = n % 100; return n + (t >= 11 && t <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] || "th")); }
+  function ordinal(n) {
+    if (LANG === "fr") return n + (n === 1 ? "er" : "e");
+    if (LANG === "es") return n + ".º";
+    var t = n % 100; return n + (t >= 11 && t <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] || "th"));
+  }
   function countUp(node, to) {
     var start = performance.now(), length = 900;
     var step = function (now) { var p = Math.min(1, (now - start) / length), e = 1 - Math.pow(1 - p, 3); node.textContent = "+" + Math.round(to * e).toLocaleString(); if (p < 1) requestAnimationFrame(step); };
@@ -285,14 +294,18 @@ export function roomPage(code: string, origin: string): string {
     var color = COLORS[((d.me.n % COLORS.length) + COLORS.length) % COLORS.length];
     document.documentElement.style.setProperty("--me", color);
     $("me-n").textContent = (d.me.name || "?").charAt(0).toUpperCase();
-    $("me-name").textContent = d.me.name || "Guest";
+    $("me-name").textContent = d.me.name || tr("Guest");
     show("me", true); show("code", false);
+    // Team mode: the team's name in its colour, beside the player's own.
+    var team = d.me.team != null ? TEAMS[d.me.team] : null;
+    if (team) { $("team").textContent = tr("Team {name}", { name: tr(team.name) }); $("team").style.background = team.color; }
+    show("team", !!team);
   }
 
   function refresh() {
     clearTimeout(timer);
     fetch(API + "/state?pid=" + encodeURIComponent(pid || ""), { cache: "no-store" }).then(function (r) {
-      if (r.status === 404) { show("live", false); show("join", false); show("ended", true); $("room").textContent = "Room ended"; return null; }
+      if (r.status === 404) { show("live", false); show("join", false); show("ended", true); $("room").textContent = tr("Room ended"); return null; }
       return r.json();
     }).then(function (d) {
       if (!d) return;
@@ -321,14 +334,15 @@ export function roomPage(code: string, origin: string): string {
 }
 
 /** /j with no code: for the back rows, who read the code off the screen instead of scanning it. */
-function entryPage(): string {
+function entryPage(language: PhoneLanguage = "en"): string {
+  const w = (text: string) => phoneWord(language, text);
   return `<!doctype html>
-<html lang="en">
+<html lang="${language}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111013">
-<title>Join a room · Church Studio</title>
+<title>${w("Join a room")} · Church Studio</title>
 <style>
   :root { --bg: #111013; --panel: #1b1a1f; --line: #2c2a31; --ink: #f6f3ee; --muted: #a39d96; --accent: #fa4f00; }
   * { box-sizing: border-box; }
@@ -347,12 +361,12 @@ function entryPage(): string {
 </head>
 <body>
 <main>
-  <h1>Join a room</h1>
-  <p>Enter the code shown on the screen.</p>
+  <h1>${w("Join a room")}</h1>
+  <p>${w("Enter the code shown on the screen.")}</p>
   <form id="f" autocomplete="off">
     <div class="boxes" id="boxes"></div>
     <div class="bad" id="note" role="status"></div>
-    <button id="go" type="submit" disabled>Join</button>
+    <button id="go" type="submit" disabled>${w("Join")}</button>
   </form>
 </main>
 <script>
@@ -399,13 +413,13 @@ function entryPage(): string {
     const value = code();
     if (value.length !== SIZE) return;
     go.disabled = true;
-    go.textContent = "Joining…";
+    go.textContent = ${JSON.stringify(w("Joining…"))};
     // Check the room is open before leaving this page, so a typo is fixed here.
     const found = await fetch("/v1/rooms/" + value + "/state").then((r) => r.status !== 404).catch(() => true);
     if (found) { location.href = "/j/" + value; return; }
-    go.textContent = "Join";
+    go.textContent = ${JSON.stringify(w("Join"))};
     update();
-    note.textContent = "No room with that code. Check the screen and try again.";
+    note.textContent = ${JSON.stringify(w("No room with that code. Check the screen and try again."))};
     inputs[0].focus();
     inputs[0].select();
   });

@@ -30,6 +30,8 @@
 //   GET  /r/:code                        the phone remote over the internet (→ /app/remote.html?room=)
 
 import { RELAY, RemoteRelay } from "./relay.ts";
+import { MOST_TEAMS } from "../src/lib/domain/game-colors.ts";
+import { phoneLanguage, type PhoneLanguage } from "./room-words.ts";
 
 export type QuestionState = "pending" | "approved" | "rejected" | "archived";
 export type Question = {
@@ -75,7 +77,7 @@ const opensAt = (activity: { openedAt: number; opensAt?: number }) => activity.o
  * Someone who joined. `n` is their public number (join order) and picks their colour; `gain` is what
  * the last revealed question gave them, `before` their score before it, `streak` right answers in a row.
  */
-export type Participant = { name: string; joinedAt: number; score: number; ip: string; n?: number; gain?: number; before?: number; streak?: number };
+export type Participant = { name: string; joinedAt: number; score: number; ip: string; n?: number; gain?: number; before?: number; streak?: number; team?: number };
 
 /** How many player colours there are (the desk and phones share the same list, by number). */
 export const PLAYER_COLORS = 12;
@@ -132,6 +134,8 @@ export type RoomState = {
    * desk shares it: the Program frame as the desk sent it, and a number that goes up with each.
    */
   screen?: { on: boolean; revision: number; frame: string; at: number };
+  /** Team mode: how many teams (2 to 4); absent or 0, everyone plays for themselves. */
+  teams?: number;
 };
 
 export type RoomStorage = { get(): Promise<RoomState | null>; put(state: RoomState): Promise<void>; drop(): Promise<void> };
@@ -216,6 +220,29 @@ function standing(state: RoomState, pid: string) {
   return { gain: person.gain ?? 0, streak: person.streak ?? 0, rank: me?.rank ?? null, players: all.length };
 }
 
+/** Teams take turns by join order, so they stay even as people arrive. */
+const teamOf = (n: number, teams: number) => ((n % teams) + teams) % teams;
+
+/**
+ * Team standings, best first: each team's average score (so a small team can win) and what it
+ * gained on the last question. Null when the room plays without teams.
+ */
+export function teamRanking(state: RoomState): Array<{ team: number; players: number; score: number; gain: number }> | null {
+  const count = state.teams ?? 0;
+  if (count < 2) return null;
+  const teams = Array.from({ length: count }, (_, team) => ({ team, players: 0, total: 0, gained: 0 }));
+  for (const person of Object.values(state.participants)) {
+    const entry = teams[person.team ?? teamOf(person.n ?? 0, count)];
+    if (!entry) continue;
+    entry.players += 1;
+    entry.total += person.score;
+    entry.gained += person.gain ?? 0;
+  }
+  return teams
+    .map((entry) => ({ team: entry.team, players: entry.players, score: entry.players ? Math.round(entry.total / entry.players) : 0, gain: entry.players ? Math.round(entry.gained / entry.players) : 0 }))
+    .sort((a, b) => b.score - a.score || a.team - b.team);
+}
+
 /** The first right answer to the question that is open (a quiz): who, and how quickly. */
 export function fastest(state: RoomState): { n: number; name: string; ms: number } | null {
   const activity = state.activity;
@@ -295,7 +322,7 @@ export class RoomCore {
     const pid = randomId(12);
     // Each joiner a number of their own, which picks their colour on the screen and their phone.
     const n = Object.keys(state.participants).length;
-    state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0 };
+    state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0, ...(state.teams && state.teams >= 2 ? { team: teamOf(n, state.teams) } : {}) };
     await this.save(state);
     return { ok: true, data: { pid, room: { name: state.name, code: state.code }, n } };
   }
@@ -315,7 +342,7 @@ export class RoomCore {
         waiting: mine,
         activity: publicActivity(state, known, this.now()),
         ...(state.activity.kind !== "none" && state.activity.phase === "reveal" && state.activity.kind === "quiz" ? { leaderboard: leaderboard(state, 5) } : {}),
-        ...(known ? { me: { n: state.participants[known]!.n ?? 0, name: state.participants[known]!.name } } : {}),
+        ...(known ? { me: { n: state.participants[known]!.n ?? 0, name: state.participants[known]!.name, ...(state.teams && state.teams >= 2 ? { team: state.participants[known]!.team ?? teamOf(state.participants[known]!.n ?? 0, state.teams) } : {}) } } : {}),
       },
     };
   }
@@ -408,6 +435,7 @@ export class RoomCore {
         leaderboard: leaderboard(state, 10),
         ranking: ranking(state, 10),
         fastest: fastest(state),
+        teams: teamRanking(state),
         // Who is here, newest last (the lobby shows names popping in).
         joined: Object.values(state.participants)
           .sort((a, b) => a.joinedAt - b.joinedAt)
@@ -475,7 +503,7 @@ export class RoomCore {
    * The desk runs quizzes and polls: it sends each question to open it, then closes it and reveals
    * the answer. Scores are given at reveal: points for a right answer, more for a quicker one.
    */
-  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown }): Promise<Result<{ ok: true }>> {
+  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown; teams?: unknown }): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
@@ -518,6 +546,16 @@ export class RoomCore {
     } else if (input.action === "end") {
       state.activity = { kind: "none" };
       state.answers = {};
+    } else if (input.action === "teams") {
+      // 0 (or 1): everyone for themselves. 2 to 4: everyone is placed in a team, evenly by join order.
+      const count = Math.min(MOST_TEAMS, Math.max(0, Math.round(Number(input.teams) || 0)));
+      if (count >= 2) {
+        state.teams = count;
+        for (const person of Object.values(state.participants)) person.team = teamOf(person.n ?? 0, count);
+      } else {
+        delete state.teams;
+        for (const person of Object.values(state.participants)) delete person.team;
+      }
     } else if (input.action === "reset-scores") {
       for (const person of Object.values(state.participants)) Object.assign(person, { score: 0, before: 0, gain: 0, streak: 0 });
     } else return fail(400, "Unknown action.");
@@ -695,7 +733,8 @@ export type RoomNamespace = { idFromName(name: string): unknown; get(id: unknown
  * The public routes: open a room (the desk), and everything a phone does in one. `limit` is the
  * per-address rate limiter (api.ts tooFast); `page` draws the audience page.
  */
-export async function handleRooms(request: Request, rooms: RoomNamespace | undefined, origin: string, page: (code: string, origin: string) => string, limit?: (key: string) => Promise<boolean>): Promise<Response | null> {
+export async function handleRooms(request: Request, rooms: RoomNamespace | undefined, origin: string, page: (code: string, origin: string, language?: PhoneLanguage) => string, limit?: (key: string) => Promise<boolean>): Promise<Response | null> {
+  const language = phoneLanguage(request.headers.get("accept-language"));
   const url = new URL(request.url);
   const path = url.pathname;
   if (request.method === "OPTIONS" && path.startsWith("/v1/rooms")) return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type" } });
@@ -703,13 +742,13 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
   const displayPage = path.match(/^\/d\/([A-Za-z0-9]{6})$/);
   if (displayPage && request.method === "GET") return Response.redirect(`${origin}/app/?receiver=${displayPage[1]!.toUpperCase()}`, 302);
   // The short address on the screen: type the code in by hand.
-  if ((path === "/j" || path === "/j/") && request.method === "GET") return new Response(page("", origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if ((path === "/j" || path === "/j/") && request.method === "GET") return new Response(page("", origin, language), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   // The phone remote's short address (typed when the QR code cannot be scanned).
   const remotePage = path.match(/^\/r\/([A-Za-z0-9]{6})$/);
   if (remotePage && request.method === "GET") return Response.redirect(`${origin}/app/remote.html?room=${remotePage[1]!.toUpperCase()}`, 302);
   const joinPage = path.match(/^\/j\/([A-Za-z0-9]{6})$/);
   if (joinPage && request.method === "GET") {
-    return new Response(page(joinPage[1]!.toUpperCase(), origin), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+    return new Response(page(joinPage[1]!.toUpperCase(), origin, language), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   }
   if (!path.startsWith("/v1/rooms")) return null;
   if (!rooms) return json(503, { error: "Rooms are not set up on this server yet." });

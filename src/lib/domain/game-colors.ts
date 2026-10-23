@@ -14,3 +14,13 @@ export const CHOICE_STYLES: Array<{ color: string; shape: "triangle" | "diamond"
   { color: "#864cbf", shape: "star" },
   { color: "#0aa3a3", shape: "hexagon" },
 ];
+
+/** Team mode: up to four teams, each a colour and a name (the name is translated where it is shown). */
+export const TEAMS = [
+  { name: "Red", color: "#e21b3c" },
+  { name: "Blue", color: "#1368ce" },
+  { name: "Gold", color: "#d89e00" },
+  { name: "Green", color: "#26890c" },
+] as const;
+
+export const MOST_TEAMS = TEAMS.length;

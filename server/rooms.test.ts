@@ -160,6 +160,31 @@ describe("rooms: quizzes and polls", () => {
     expect(host.ranking.top.find((entry) => entry.name === "Kofi")!.gain).toBe(1250);
   });
 
+  it("splits players into even teams and ranks teams by their average score", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const pids: string[] = [];
+    for (const name of ["Ama", "Kofi", "Esi"]) pids.push(data<{ pid: string }>(await core.join(name, "")).pid);
+    data(await core.activity(hostKey, { action: "teams", teams: 2 }));
+    // A latecomer joins the next team in turn: Ama and Esi Red (0), Kofi and Yaw Blue (1).
+    pids.push(data<{ pid: string }>(await core.join("Yaw", "")).pid);
+    expect(data<{ me: { team: number } }>(await core.view(pids[3]!)).me.team).toBe(1);
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", game: "G", round: 1, total: 1, question: { prompt: "Q", choices: ["right", "wrong"], correct: 0, seconds: 0, points: 1000 } }));
+    // Only Kofi is right: Blue's average is half his points; Red scores nothing.
+    data(await core.answer(pids[1]!, 0));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    const host = data<{ teams: Array<{ team: number; players: number; score: number }> }>(await core.hostView(hostKey));
+    const kofi = data<{ ranking: { top: Array<{ name: string; score: number }> } }>(await core.hostView(hostKey)).ranking.top.find((entry) => entry.name === "Kofi")!.score;
+    expect(host.teams).toEqual([
+      { team: 1, players: 2, score: Math.round(kofi / 2), gain: Math.round(kofi / 2) },
+      { team: 0, players: 2, score: 0, gain: 0 },
+    ]);
+    // Teams off: no standings, and phones no longer say a team.
+    data(await core.activity(hostKey, { action: "teams", teams: 0 }));
+    expect(data<{ teams: unknown }>(await core.hostView(hostKey)).teams).toBeNull();
+    expect(data<{ me: { team?: number } }>(await core.view(pids[0]!)).me.team).toBeUndefined();
+  });
+
   it("runs a poll with no right answer, and refuses a quiz question without one", async () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
