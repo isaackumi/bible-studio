@@ -13,6 +13,7 @@
     "test": "vitest run",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:server": "tsc -p server",
+    "check:windows": "cd src-tauri && PATH=\"/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH\" cargo xwin clippy --target x86_64-pc-windows-msvc --all-targets -- -D warnings",
     "budget": "TAURI_ENV_PLATFORM=linux vite build && node scripts/bundle-budget.mjs",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",

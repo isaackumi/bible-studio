@@ -20,10 +20,9 @@ pub fn cloud_storage_place(folder: &str, dir: &Path) -> Option<Place> {
         ("google-drive", format!("Google Drive ({account})"))
     } else if folder == "Dropbox" || folder.starts_with("Dropbox-") {
         ("dropbox", "Dropbox".to_string())
-    } else if let Some(account) = folder.strip_prefix("OneDrive-") {
-        ("onedrive", format!("OneDrive ({account})"))
     } else {
-        return None;
+        let account = folder.strip_prefix("OneDrive-")?;
+        ("onedrive", format!("OneDrive ({account})"))
     };
     // Google Drive keeps the person's files in "My Drive" (the account folder also holds "Shared drives").
     let path = if kind == "google-drive" && dir.join("My Drive").is_dir() { dir.join("My Drive") } else { dir.to_path_buf() };
