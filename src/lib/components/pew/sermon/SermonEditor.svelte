@@ -9,6 +9,7 @@
   import type { SermonSummary } from "../../../ai/summarize";
   import type { PresentationItem, Sermon, SermonSection } from "../../../domain/types";
   import AiSlidesDialog from "../../decks/AiSlidesDialog.svelte";
+  import SuggestSongsDialog from "./SuggestSongsDialog.svelte";
   import Icon from "../../Icon.svelte";
   import ItemThumb from "../ItemThumb.svelte";
   import { msg, t, tn } from "../../../i18n/core";
@@ -268,6 +269,7 @@
   let summary = $state<SermonSummary | null>(null);
   let summaryError = $state("");
   let aiSlides = $state<{ notes: string; title: string } | null>(null);
+  let songIdeas = $state<{ notes: string; title: string } | null>(null);
 
   function notesFor(value: Draft): string {
     const parts = [value.notes.trim()];
@@ -320,6 +322,7 @@
 
 <svelte:window onkeydown={onKey} />
 {#if aiSlides}<AiSlidesDialog notes={aiSlides.notes} title={aiSlides.title} onclose={() => (aiSlides = null)} />{/if}
+{#if songIdeas}<SuggestSongsDialog notes={songIdeas.notes} title={songIdeas.title} onclose={() => (songIdeas = null)} />{/if}
 
 <form class="editor" onsubmit={(event) => { event.preventDefault(); void save(); }}>
   <div class="head">
@@ -333,6 +336,7 @@
         <Icon name="sparkles" size={14} /> {summarizing ? t("Summarizing…") : t("Summarize")}
       </button>
       <button type="button" class="desk-btn ai-btn" data-tip={t("Make a slide deck from these notes with your AI service")} onclick={() => (aiSlides = { notes: notesFor(draft), title: draft.title })}><Icon name="stage" size={14} /> {t("Make slides")}</button>
+      <button type="button" class="desk-btn ai-btn" data-tip={t("Songs that fit this sermon, from your library first")} onclick={() => (songIdeas = { notes: notesFor(draft), title: draft.title })}><Icon name="note" size={14} /> {t("Suggest songs")}</button>
       <button type="button" class="desk-btn ghost" class:armed={armedCancel} onclick={cancel}>{armedCancel ? t("Discard changes?") : t("Cancel")}</button>
       <button type="submit" class="desk-btn primary" title={t("Save (⌘S)")}>{t("Save")}</button>
     </div>

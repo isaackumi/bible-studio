@@ -146,7 +146,8 @@ import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonErr
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
-import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
+import { cleanCcli, cleanFolder, creditFor, lyricsFor, parseLyrics, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
+import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
@@ -4888,6 +4889,48 @@ class Session {
       throw error;
     }
   }
+
+  /**
+   * Look up a song with AI, asked for elsewhere (Settings, a sermon's suggestions): what to look up
+   * ("" to let the operator type), waiting until the Songs page opens it. null: nothing asked.
+   */
+  aiSongLookup = $state<string | null>(null);
+
+  lookUpSongWithAi = (query = "") => {
+    this.aiSongLookup = query;
+    this.settingsOpen = false;
+    this.goToDesk("presenter", "songs");
+  };
+
+  /** Songs the AI thinks the typed words are: a title, a line remembered, or what it is about. */
+  findSongsWithAi = async (query: string): Promise<SongMatch[]> => {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    if (!query.trim()) throw new Error(t("Type a title, a line you remember, or what the song is about."));
+    const songs = parseSongMatches(replyText(settings.provider, await this.aiPost(findSongRequest(settings, query))));
+    if (!songs.length) throw new Error(t("The AI found no song for that. Try other words."));
+    return songs;
+  };
+
+  /** A public-domain hymn's words, as a new song to check and save. Never for copyrighted songs. */
+  hymnWithAi = async (match: SongMatch, folder: string): Promise<Song> => {
+    const settings = this.workspace.ai;
+    if (!wordsAreFree(match)) throw new Error(t("These words are under copyright. Get the song from SongSelect."));
+    const words = parseHymn(replyText(settings.provider, await this.aiPost(hymnRequest(settings, match))));
+    const parsed = parseLyrics(words);
+    if (!parsed.sections.length) throw new Error(t("The AI answer was not in the expected shape. Try again."));
+    return sanitizeSong({ id: crypto.randomUUID(), title: match.title, author: match.authors, sections: parsed.sections, folder, ...(match.ccli ? { ccli: match.ccli } : {}) });
+  };
+
+  /** Songs for a sermon: picks from the church's own library first, then a few it could add. */
+  suggestSongsWithAi = async (input: { title: string; notes: string }): Promise<{ library: Array<{ song: Song; why: string }>; others: Array<{ title: string; authors: string; why: string }> }> => {
+    const settings = this.workspace.ai;
+    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
+    if (!input.notes.trim() && !input.title.trim()) throw new Error(t("Give the sermon a title or some notes first."));
+    const songs = [...this.songs].sort((a, b) => a.title.localeCompare(b.title));
+    const picks = parseSongSuggestions(replyText(settings.provider, await this.aiPost(suggestSongsRequest(settings, { ...input, songs }))), songs.length);
+    return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
+  };
 
   /** A tiny request to check the key and model work. */
   testAi = async (): Promise<string> => {

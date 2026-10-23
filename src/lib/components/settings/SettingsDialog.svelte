@@ -155,7 +155,7 @@
       label: msg("Connected services"),
       items: [
         { id: "planning", title: msg("Planning Center"), icon: "list", color: "#2266e3", about: msg("Bring upcoming plans in as services."), keywords: "planning center pco services plan import" },
-        { id: "ai", title: msg("AI assistant"), icon: "sparkles", color: "#7c3aed", about: msg("Claude, ChatGPT, Gemini or an AI on this computer, for summaries, slides and captions."), keywords: "ai llm claude anthropic openai chatgpt gpt gemini google ollama lm studio local key model summary sermon notes slides captions translate" },
+        { id: "ai", title: msg("AI assistant"), icon: "sparkles", color: "#7c3aed", about: msg("Claude, ChatGPT, Gemini or an AI on this computer, for sermons, slides, songs and captions."), keywords: "ai llm claude anthropic openai chatgpt gpt gemini google ollama lm studio local key model summary sermon notes slides captions translate song songs hymn songselect suggest" },
       ],
     },
     {
@@ -618,6 +618,20 @@
   function close() {
     session.settingsOpen = false;
   }
+
+  function openSermonPage() {
+    close();
+    session.goToDesk("presenter", "sermon");
+  }
+
+  /** Everything the AI assistant is used for, each with a way there. */
+  const AI_USES: Array<{ title: string; about: string; where: string; open: () => void }> = [
+    { title: msg("Sermon summary"), about: msg("Turns sermon notes into a short summary and points to show. Sermon page › Summarize."), where: msg("Open Sermon"), open: openSermonPage },
+    { title: msg("Slides from notes, a passage or a topic"), about: msg("Writes a slide deck in your theme, ready to edit. Sermon page › Make slides."), where: msg("Open Sermon"), open: openSermonPage },
+    { title: msg("Songs for a sermon"), about: msg("Picks songs from your library that fit the sermon, and names a few you could add. Sermon page › Suggest songs."), where: msg("Open Sermon"), open: openSermonPage },
+    { title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
+    { title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
+  ];
 
   function setMode(mode: OutputMode) {
     if (profile.outputMode !== mode) void session.setOutputMode(mode);
@@ -1316,7 +1330,16 @@
             </div>
           </div>
         </section>
-        <p class="note stand">{t("The AI writes sermon summaries (Sermon › Summarize), makes slides from notes, a passage or a topic (Make slides with AI), and translates live captions (Settings › Captions). Your words go to the AI only when you use one of these.")}</p>
+        <h3 class="ai-uses-title">{t("What the AI can do")}</h3>
+        <section class="rows" aria-label={t("What the AI can do")}>
+          {#each AI_USES as use (use.title)}
+            <div class="row">
+              <div class="row-copy"><strong>{t(use.title)}</strong><span>{t(use.about)}</span></div>
+              <button type="button" class="btn" onclick={use.open}>{t(use.where)}</button>
+            </div>
+          {/each}
+        </section>
+        <p class="note stand">{t("Your words go to the AI only when you use one of these. With an AI on this computer, nothing leaves the building.")}</p>
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>
@@ -2102,6 +2125,7 @@
   .settings-body :global(.row .field.grow) { width: auto; flex: 1; }
   .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
   .ai-ok { color: var(--presence, #3fb950); }
+  .ai-uses-title { margin: 22px 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .ai-connected { display: inline-flex; align-items: center; gap: 6px; }
   .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
   .settings-body :global(.pill.ok) { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }

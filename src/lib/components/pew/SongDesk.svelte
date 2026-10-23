@@ -25,6 +25,7 @@
   import { quickFilter, sortSongs, withLetters, type SongSort } from "../../domain/song-browse";
   import AddToService from "./AddToService.svelte";
   import ToolMenu from "../ToolMenu.svelte";
+  import AiSongDialog from "./AiSongDialog.svelte";
   import { t, tn } from "../../i18n/core";
 
   // Songs window: library in folders, the song's sections one click from Preview, and detection
@@ -51,6 +52,16 @@
   let dirInput = $state<HTMLInputElement | null>(null);
   /** Song packs show only when asked for, from the Import menu. */
   let showPacks = $state(false);
+  /** Look up a song with AI. Settings › AI assistant can ask for it too. */
+  let aiSongOpen = $state(false);
+  let aiSongQuery = $state("");
+  $effect(() => {
+    const asked = session.aiSongLookup;
+    if (asked === null) return;
+    session.aiSongLookup = null;
+    aiSongQuery = asked;
+    aiSongOpen = true;
+  });
 
   // Detection
   let follow = $state(false);
@@ -530,6 +541,15 @@
     pasteText = "";
   }
 
+  /** A hymn the AI wrote out: a new song in the editor, saved only when the operator says so. */
+  function editWritten(song: Song) {
+    if (!leaveDraft()) return;
+    edit(song);
+    if (draft) draft.isNew = true;
+    draftStart = "";
+    note = t("The AI wrote these words. Check every line before Sunday, then Save.");
+  }
+
   function edit(song: Song) {
     draft = {
       id: song.id,
@@ -667,6 +687,10 @@
   }
 </script>
 
+{#if aiSongOpen}
+  <AiSongDialog query={aiSongQuery} folder={targetFolder} onclose={() => { aiSongOpen = false; aiSongQuery = ""; }} onwords={editWritten} onopen={(song) => { if (leaveDraft()) selectedId = song.id; }} onimport={() => fileInput?.click()} />
+{/if}
+
 <section class="song-desk">
   <!-- Library -->
   <LibrarySidebar title={t("Songs")} icon="note" count={session.songs.length} storageKey="songs">
@@ -674,6 +698,9 @@
       <ToolMenu label={t("Import songs")} tip={t("Add songs from files")} className="desk-btn" align="left">
         {#snippet trigger()}<Icon name="download" size={14} /> {t("Import")}{/snippet}
         {#snippet children(close)}
+          <button type="button" role="menuitem" onclick={() => { aiSongOpen = true; close(); }}><Icon name="sparkles" size={16} /> {t("Look up a song with AI…")}</button>
+          <p class="menu-note">{t("Songs you don't have yet: words for old hymns, SongSelect for the rest.")}</p>
+          <div class="menu-sep"></div>
           <button type="button" role="menuitem" onclick={() => { fileInput?.click(); close(); }}><Icon name="files" size={16} /> {t("Lyric files…")}</button>
           <p class="menu-note">{t("Plain text, ChordPro, SongSelect, OpenLyrics (.xml, .zip) from OpenLP and FreeShow, or ProPresenter (.pro, .pro6, .proBundle).")}</p>
           <button type="button" role="menuitem" onclick={() => { dirInput?.click(); close(); }}><Icon name="folder" size={16} /> {t("A whole folder…")}</button>
