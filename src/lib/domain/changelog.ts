@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.4",
+    date: "2026-10-23",
+    highlights: [
+      { icon: "mic", title: msg("Listening with ElevenLabs or Deepgram"), text: msg("Bring your own key in Settings › Audio & voice for sharper listening that knows your church's words and the Bible's book names, in the app and in a web browser alike.") },
+      { icon: "pdf", title: msg("PDFs that scroll like a web page"), text: msg("Choose Scroll as one long page on a PDF: every screen glides to where you are, and Next moves a little over half a screen. Scroll with the mouse over Program, or jump to a page.") },
+      { icon: "video", title: msg("YouTube and Vimeo from a link"), text: msg("Add to service › YouTube takes a pasted link and can play it again in a loop, with or without sound.") },
+      { icon: "laptop", title: msg("Better on Windows"), text: msg("If Windows keeps the microphone from Church Studio, listening now says which switch to turn on and opens that page of Settings. Shortcuts and help read Ctrl and Windows Settings.") },
+      { icon: "check", title: msg("Fixes"), text: msg("Bible quizzes use the Bible the desk reads from. Music from a slideshow's Test, or from a game, stops when you move on.") },
+    ],
+  },
+  {
     version: "0.4.3",
     date: "2026-10-23",
     highlights: [

@@ -4479,4 +4479,13 @@ export const fr: Readonly<Record<string, string>> = {
   "The microphone or speech recognition is blocked for this site.": "Le micro ou la reconnaissance vocale est bloqué pour ce site.",
   "Then listen again.": "Puis relancez l’écoute.",
   "Streaming and recording work on a Mac for now. On this computer, OBS can capture the audience window and stream or record it.": "Le direct et l’enregistrement fonctionnent sur Mac pour l’instant. Sur cet ordinateur, OBS peut capturer la fenêtre de l’assemblée et la diffuser ou l’enregistrer.",
+  "Listening with ElevenLabs or Deepgram": "L’écoute avec ElevenLabs ou Deepgram",
+  "Bring your own key in Settings › Audio & voice for sharper listening that knows your church's words and the Bible's book names, in the app and in a web browser alike.": "Ajoutez votre propre clé dans Réglages › Audio et voix pour une écoute plus précise, qui connaît les mots de votre église et les noms des livres de la Bible, dans l’app comme dans un navigateur.",
+  "PDFs that scroll like a web page": "Des PDF qui défilent comme une page web",
+  "Choose Scroll as one long page on a PDF: every screen glides to where you are, and Next moves a little over half a screen. Scroll with the mouse over Program, or jump to a page.": "Choisissez Faire défiler en une longue page sur un PDF : chaque écran glisse jusqu’à votre position, et Suivant avance d’un peu plus d’un demi-écran. Faites défiler avec la souris sur le Programme, ou allez à une page.",
+  "YouTube and Vimeo from a link": "YouTube et Vimeo depuis un lien",
+  "Add to service › YouTube takes a pasted link and can play it again in a loop, with or without sound.": "Ajouter au culte › YouTube accepte un lien collé et peut le rejouer en boucle, avec ou sans le son.",
+  "Better on Windows": "Mieux sous Windows",
+  "If Windows keeps the microphone from Church Studio, listening now says which switch to turn on and opens that page of Settings. Shortcuts and help read Ctrl and Windows Settings.": "Si Windows empêche Church Studio d’utiliser le micro, l’écoute indique maintenant quel bouton activer et ouvre cette page des Paramètres. Les raccourcis et l’aide parlent de Ctrl et des Paramètres Windows.",
+  "Bible quizzes use the Bible the desk reads from. Music from a slideshow's Test, or from a game, stops when you move on.": "Les quiz bibliques utilisent la Bible que lit le pupitre. La musique de l’essai d’un diaporama, ou d’un jeu, s’arrête quand vous passez à autre chose.",
 };

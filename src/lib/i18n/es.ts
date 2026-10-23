@@ -4398,4 +4398,13 @@ export const es: Readonly<Record<string, string>> = {
   "The microphone or speech recognition is blocked for this site.": "El micrófono o el reconocimiento de voz están bloqueados para este sitio.",
   "Then listen again.": "Luego vuelve a escuchar.",
   "Streaming and recording work on a Mac for now. On this computer, OBS can capture the audience window and stream or record it.": "La transmisión y la grabación funcionan en Mac por ahora. En este equipo, OBS puede capturar la ventana de la congregación y transmitirla o grabarla.",
+  "Listening with ElevenLabs or Deepgram": "Escucha con ElevenLabs o Deepgram",
+  "Bring your own key in Settings › Audio & voice for sharper listening that knows your church's words and the Bible's book names, in the app and in a web browser alike.": "Añade tu propia clave en Ajustes › Audio y voz para una escucha más precisa que conoce las palabras de tu iglesia y los nombres de los libros de la Biblia, en la app y en un navegador por igual.",
+  "PDFs that scroll like a web page": "PDF que se desplazan como una página web",
+  "Choose Scroll as one long page on a PDF: every screen glides to where you are, and Next moves a little over half a screen. Scroll with the mouse over Program, or jump to a page.": "Elige Desplazar como una página larga en un PDF: cada pantalla se desliza hasta donde estás, y Siguiente avanza algo más de media pantalla. Desplázate con el ratón sobre el Programa, o salta a una página.",
+  "YouTube and Vimeo from a link": "YouTube y Vimeo desde un enlace",
+  "Add to service › YouTube takes a pasted link and can play it again in a loop, with or without sound.": "Añadir al servicio › YouTube acepta un enlace pegado y puede repetirlo en bucle, con o sin sonido.",
+  "Better on Windows": "Mejor en Windows",
+  "If Windows keeps the microphone from Church Studio, listening now says which switch to turn on and opens that page of Settings. Shortcuts and help read Ctrl and Windows Settings.": "Si Windows impide que Church Studio use el micrófono, la escucha ahora dice qué interruptor activar y abre esa página de Configuración. Los atajos y la ayuda hablan de Ctrl y de la Configuración de Windows.",
+  "Bible quizzes use the Bible the desk reads from. Music from a slideshow's Test, or from a game, stops when you move on.": "Los cuestionarios bíblicos usan la Biblia que lee el escritorio. La música de la prueba de una presentación, o de un juego, se detiene al pasar a otra cosa.",
 };
