@@ -38,6 +38,8 @@ export function crumbsOf(path: string, keep = 4): Array<{ name: string; path: st
 }
 
 const PINNED_KEY = "church-studio:picture-folders";
+/** The playlist the slideshow keeps for its own music. */
+const MUSIC_KEY = "church-studio:slideshow-playlist";
 const OPTIONS_KEY = "church-studio:slideshow";
 const LAST_KEY = "church-studio:picture-folder";
 const MOST_PINNED = 12;
@@ -304,20 +306,31 @@ class Pictures {
   };
 
   /** The slideshow's playlist, made the first time music is added here. */
-  private musicPlaylist(): string {
-    const chosen = this.slideshow.playlistId && session.workspace.playlists.some((list) => list.id === this.slideshow.playlistId) ? this.slideshow.playlistId : null;
-    return chosen ?? session.createPlaylist(t("Slideshow music")).id;
+  /**
+   * The slideshow's own playlist ("Slideshow music"), made the first time songs are chosen. Choosing
+   * songs changes only this one, never the church's other playlists.
+   */
+  private ownPlaylist(): string {
+    const saved = read<string | null>(MUSIC_KEY, null);
+    if (saved && session.workspace.playlists.some((list) => list.id === saved)) return saved;
+    const id = session.createPlaylist(t("Slideshow music")).id;
+    write(MUSIC_KEY, id);
+    return id;
   }
 
-  /** Pick songs on this computer for the slideshow; music switches on with them. */
-  addMusic = async () => {
+  /** The songs chosen from the music library (in the order given); music is on when there are any. */
+  useMusic = (trackIds: string[]) => {
+    const playlistId = this.ownPlaylist();
+    session.setPlaylistTracks(playlistId, trackIds);
+    this.setOptions({ music: trackIds.length > 0, playlistId });
+  };
+
+  /** Songs from this computer, into the music library (the ids of those added). */
+  importMusic = async (): Promise<string[]> => {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const picked = await open({ multiple: true, filters: [{ name: "Audio", extensions: ["mp3", "m4a", "aac", "wav", "ogg", "oga", "flac"] }] });
     const paths = Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : [];
-    if (!paths.length) return;
-    const playlistId = this.musicPlaylist();
-    const added = await session.importAudio(paths, playlistId);
-    if (added.length) this.setOptions({ music: true, playlistId });
+    return paths.length ? session.importAudio(paths, null) : [];
   };
 
   /** Hear the slideshow's music now (or pause it), before the pictures start. */

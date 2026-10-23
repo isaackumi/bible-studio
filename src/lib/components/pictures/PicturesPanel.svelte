@@ -4,6 +4,7 @@
   import { msg, t, tn } from "../../i18n/core";
   import type { SlideTransition } from "../../domain/slideshow";
   import Icon from "../Icon.svelte";
+  import PickList, { type PickItem } from "../PickList.svelte";
   import { session } from "../../app/session.svelte";
 
   // Pictures straight from a folder: a grid to pick from, Preview or straight to the screen, and a
@@ -19,12 +20,40 @@
   const shownFolders = $derived(showEmpty ? pictures.folders : pictures.folders.filter((entry) => !isEmpty(entry)));
   const show = $derived(pictures.slideshow);
   const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
+  /** The songs the slideshow will play (its playlist's, in order). */
+  const chosenTracks = $derived(show.playlistId ? session.playlistTracks(show.playlistId) : []);
+
+  // Choose music: the church's music library first; songs from this computer join the library.
+  let musicPicking = $state(false);
+  let justImported = $state<string[]>([]);
+  let importing = $state(false);
+  const libraryItems = $derived<PickItem[]>(
+    session.audioTracks.map((track) => ({
+      key: track.id,
+      name: track.name.replace(/\.[a-z0-9]+$/i, ""),
+      detail: session.workspace.playlists.filter((list) => list.trackIds.includes(track.id)).map((list) => list.name).join(", ") || t("In the music library"),
+      icon: "note",
+    })),
+  );
+  function openMusic() {
+    justImported = [];
+    musicPicking = true;
+  }
+  async function importMusic() {
+    importing = true;
+    try {
+      const added = await pictures.importMusic();
+      justImported = [...justImported, ...added];
+    } finally {
+      importing = false;
+    }
+  }
   /** What is switched on in each group, in a few words, for its closed heading. */
   const playingOn = $derived([show.loop ? "" : t("Plays once"), show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "", show.kenBurns ? t("Slow zoom") : "", show.watch ? t("New pictures join") : ""].filter(Boolean).join(", "));
   const screenOn = $derived(
     [show.title && show.titleText ? t("Title") : "", show.clock ? t("Clock") : "", show.captions ? t("Captions") : "", show.countdown ? t("Countdown") : "", show.themeBackground ? "" : t("Black background"), show.fill ? t("Fill the screen") : ""].filter(Boolean).join(", "),
   );
-  const musicOn = $derived(show.music && playlists.length ? (playlists.find((list) => list.id === show.playlistId)?.name ?? playlists[0]!.name) : "");
+  const musicOn = $derived(show.music && chosenTracks.length ? tn(chosenTracks.length, "{n} song", "{n} songs") : "");
 
   // The preview's clock, as the screen shows it (ticks only while the full window shows it).
   let clockNow = $state(new Date());
@@ -286,17 +315,22 @@
 
         <details class="options" open={wide || undefined}>
           <summary><span>{t("Background music")}</span>{#if musicOn}<small>♪ {musicOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
-          <label class="opt"><input type="checkbox" class="switch" checked={show.music} onchange={(event) => { const on = event.currentTarget.checked; if (on && !playlists.length) { event.currentTarget.checked = false; void pictures.addMusic(); } else pictures.setOptions({ music: on, playlistId: show.playlistId ?? playlists[0]?.id ?? null }); }} /><span><b>{t("Music")}</b>{t("Songs play under the pictures, start again at the end, and fade out when the slideshow stops.")}</span></label>
-          {#if show.music && playlists.length}
-            {@const listId = show.playlistId ?? playlists[0]?.id ?? null}
-            {@const ours = session.audio.playlistId === listId && !!session.audio.current}
-            <div class="sub music">
-              <select aria-label={t("Playlist")} value={listId} onchange={(event) => pictures.setOptions({ playlistId: event.currentTarget.value })}>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.music && chosenTracks.length > 0} onchange={(event) => { const on = event.currentTarget.checked; if (on && !chosenTracks.length) { event.currentTarget.checked = false; openMusic(); } else pictures.setOptions({ music: on }); }} /><span><b>{t("Music")}</b>{t("Songs play under the pictures, start again at the end, and fade out when the slideshow stops.")}</span></label>
+          <div class="sub music">
+            <button type="button" class="btn" onclick={openMusic}><Icon name="note" size={13} /> {chosenTracks.length ? t("Change music…") : t("Choose music…")}</button>
+            {#if playlists.length > 1}
+              <select aria-label={t("Or play a playlist")} value={show.playlistId ?? ""} onchange={(event) => pictures.setOptions({ music: true, playlistId: event.currentTarget.value })}>
                 {#each playlists as list (list.id)}<option value={list.id}>{list.name} · {tn(list.trackIds.length, "{n} song", "{n} songs")}</option>{/each}
               </select>
-              <button type="button" class="btn" onclick={() => void pictures.addMusic()}><Icon name="plus" size={13} /> {t("Add music…")}</button>
+            {/if}
+            {#if chosenTracks.length}
+              {@const ours = session.audio.playlistId === show.playlistId && !!session.audio.current}
               <button type="button" class="btn" aria-pressed={ours && session.audio.playing} onclick={() => void pictures.testMusic()}><Icon name={ours && session.audio.playing ? "pause" : "play"} size={13} /> {ours && session.audio.playing ? t("Pause") : t("Test")}</button>
-            </div>
+            {/if}
+          </div>
+          {#if chosenTracks.length}
+            <p class="sub tracks">{tn(chosenTracks.length, "{n} song", "{n} songs")}: {chosenTracks.slice(0, 3).map((track) => track.name.replace(/\.[a-z0-9]+$/i, "")).join(", ")}{chosenTracks.length > 3 ? "…" : ""}</p>
+            {@const ours = session.audio.playlistId === show.playlistId && !!session.audio.current}
             <div class="sub music-volume">
               <Icon name="sound" size={14} />
               <input type="range" min="0" max="1" step="0.05" aria-label={t("Music volume")} value={session.audio.volume} oninput={(event) => session.setAudioVolume(Number(event.currentTarget.value))} />
@@ -307,8 +341,6 @@
                 {:else}{t("Press Test to hear it.")}{/if}
               </span>
             </div>
-          {:else if !playlists.length}
-            <button type="button" class="btn sub-btn" onclick={() => void pictures.addMusic()}><Icon name="plus" size={13} /> {t("Add music…")}</button>
           {/if}
         </details>
         {#if pictures.slideshow.running}<p class="note">{t("Changes apply from the next picture; the title and clock at once; order, countdown and music from the next start.")}</p>{/if}
@@ -318,6 +350,23 @@
   </div>
   {/if}
 </aside>
+
+{#if musicPicking}
+  <PickList
+    title={t("Choose music for the slideshow")}
+    intro={t("Tick the songs to play under the pictures. Songs from this computer go into the music library too.")}
+    items={libraryItems}
+    picked={chosenTracks.map((track) => track.id)}
+    also={justImported}
+    empty={t("No music in the library yet. Import songs from this computer.")}
+    action={{ allowNone: true, label: (count) => (count ? tn(count, "Use {n} song", "Use {n} songs") : t("No music")), run: (keys) => { pictures.useMusic(keys); musicPicking = false; } }}
+    onclose={() => (musicPicking = false)}
+  >
+    {#snippet extra()}
+      <button type="button" class="btn import-btn" disabled={importing} onclick={() => void importMusic()}><Icon name="plus" size={13} /> {importing ? t("Importing…") : t("Import from computer…")}</button>
+    {/snippet}
+  </PickList>
+{/if}
 
 <style>
   .pictures { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(var(--drawer-w, 420px), 100vw); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; text-align: left; }
@@ -329,7 +378,7 @@
   .pictures.wide { left: 0; width: auto; z-index: 60; padding: 18px 22px; overflow: hidden; border-left: 0; box-shadow: none; }
   .wide .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 440px); gap: 20px; }
   .wide .browse { min-height: 0; overflow: auto; padding-right: 4px; }
-  .wide .control { min-height: 0; overflow: auto; padding-right: 4px; }
+  .wide .control { min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 4px; }
   .wide .grid { max-height: none; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
   .wide .grid li { contain-intrinsic-size: 170px 117px; }
   .wide .folders { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
@@ -341,7 +390,6 @@
   .big-clock { position: absolute; right: 10px; top: 10px; padding: 3px 9px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .big-clock.low { top: auto; bottom: 10px; }
   .big-caption { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 4px 10px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sub-btn { justify-self: start; margin-left: 46px; display: inline-flex; align-items: center; gap: 5px; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .title { min-width: 0; }
   h2 { margin: 0; font-size: 17px; font-weight: 750; }
@@ -399,10 +447,10 @@
   .grid button { display: block; width: 100%; aspect-ratio: 16 / 11; padding: 0; border: 2px solid transparent; border-radius: 8px; background: #000; overflow: hidden; cursor: pointer; }
   .grid button.on { border-color: var(--accent); }
   .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .slideshow { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .slideshow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
   h3 { margin: 0; font-size: 13px; font-weight: 700; }
   /* The player: the picture, start or stop, and the two other things to do with it. */
-  .player { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
+  .player { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
   .picker { display: flex; align-items: center; gap: 6px; }
   .picker .one-line { flex: 1; min-width: 0; font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .picker .count { flex: none; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
@@ -429,17 +477,19 @@
   .options summary small { flex: 1; min-width: 0; color: var(--accent); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .options summary :global(svg) { margin-left: auto; color: var(--muted); transition: transform 150ms; }
   .options[open] summary :global(svg) { transform: rotate(180deg); }
-  .options[open] { display: grid; gap: 10px; }
+  .options[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .opt { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
   .opt input { flex: none; margin-top: 2px; }
   .opt span { display: grid; gap: 1px; color: var(--muted); font-size: 12px; line-height: 1.4; }
   .opt b { color: var(--ink); font-size: 12.5px; font-weight: 650; }
-  .sub { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 46px; color: var(--muted); font-size: 12px; }
+  .sub { display: flex; align-items: center; gap: 6px; min-width: 0; margin: -4px 0 0 46px; color: var(--muted); font-size: 12px; }
   .sub .text { flex: 1; min-width: 0; }
   .sub .num { width: 64px; }
   .sub input, .sub select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; }
   .music { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .music select { flex: 1; min-width: 140px; }
+  .music select { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+  .tracks { margin-top: -2px; display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .import-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
   .music .btn { display: inline-flex; align-items: center; gap: 5px; }
   .music-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); }
   .music-volume input { flex: 0 1 140px; accent-color: var(--accent); }

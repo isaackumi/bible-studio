@@ -1406,6 +1406,8 @@ class Session {
   };
   removePlaylist = (id: string) => this.savePlaylists(this.workspace.playlists.filter((list) => list.id !== id));
   addToPlaylist = (id: string, trackIds: string[]) => this.updatePlaylist(id, (list) => addTracks(list, trackIds));
+  /** A playlist's songs, replaced all at once (in the order given). */
+  setPlaylistTracks = (id: string, trackIds: string[]) => this.updatePlaylist(id, (list) => ({ ...list, trackIds: [...new Set(trackIds)] }));
   removeFromPlaylist = (id: string, index: number) => this.updatePlaylist(id, (list) => removeTrackAt(list, index));
   moveInPlaylist = (id: string, from: number, to: number) => this.updatePlaylist(id, (list) => moveTrack(list, from, to));
 

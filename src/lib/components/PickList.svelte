@@ -36,6 +36,8 @@
     filters = [],
     action,
     row,
+    extra,
+    also = [],
     empty = "",
     onclose,
   }: {
@@ -56,6 +58,10 @@
     };
     /** Extra buttons on a row (e.g. "Use as logo"). */
     row?: Snippet<[PickItem]>;
+    /** Extra buttons beside the search (e.g. "Import from computer…"). */
+    extra?: Snippet;
+    /** Keys to tick as they arrive (things just added while the list is open). */
+    also?: string[];
     empty?: string;
     onclose: () => void;
   } = $props();
@@ -72,6 +78,15 @@
   let search = $state<HTMLInputElement | undefined>();
   let list = $state<HTMLUListElement | undefined>();
   let broken = $state(new Set<string>());
+
+  // Things added while the list is open come in ticked.
+  let seenAlso = new Set<string>(untrack(() => also));
+  $effect(() => {
+    const fresh = also.filter((key) => !seenAlso.has(key));
+    if (!fresh.length) return;
+    seenAlso = new Set([...seenAlso, ...fresh]);
+    untrack(() => set(new Set([...picked, ...fresh])));
+  });
 
   // Sizes are what people clear space by, so a list with sizes starts largest first.
   $effect.pre(() => {
@@ -187,6 +202,7 @@
           <input bind:this={search} type="search" autofocus placeholder={t("Search {count}", { count: items.length })} aria-label={t("Search")} bind:value={query} />
           {#if query}<button type="button" class="clear" aria-label={t("Clear search")} onclick={() => { query = ""; search?.focus(); }}><Icon name="close" size={12} /></button>{:else}<kbd aria-hidden="true">/</kbd>{/if}
         </label>
+        {#if extra}{@render extra()}{/if}
         {#if hasBytes}
           <div class="seg" role="radiogroup" aria-label={t("Sort")}>
             <button type="button" role="radio" aria-checked={sort === "size"} class:on={sort === "size"} onclick={() => (sort = "size")}>{t("Largest")}</button>

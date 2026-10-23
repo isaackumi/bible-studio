@@ -96,10 +96,11 @@
 </div>
 
 <style>
+  /* Above every drawer and full-window panel (60), below the menus opened inside it (70) and the tour. */
   .layer {
     position: fixed;
     inset: 0;
-    z-index: 30;
+    z-index: 65;
     display: grid;
     place-items: center;
   }
