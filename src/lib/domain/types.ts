@@ -166,6 +166,8 @@ export type PresentationModel = {
   timer?: TimerPaint;
   /** layout "image": the picture slowly zooms and drifts for this many seconds (a slideshow's Ken Burns). */
   kenBurns?: number;
+  /** A picture or video fills the whole frame, cropping its edges (absent: shown whole). */
+  imageFit?: "cover";
   /** layout "image": words over the picture as a lower third (a slideshow's file names). */
   caption?: string;
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */

@@ -14,6 +14,12 @@ describe("slideshow choices", () => {
     expect(saved.watch).toBe(true);
   });
 
+  it("keeps the title, clock, background and fill choices, tidying the title", () => {
+    const options = cleanSlideOptions({ title: true, titleText: "  Welcome   to\nGrace Chapel ", clock: true, themeBackground: false, fill: true });
+    expect(options).toMatchObject({ title: true, titleText: "Welcome to Grace Chapel", clock: true, themeBackground: false, fill: true });
+    expect(cleanSlideOptions(null)).toMatchObject({ title: false, titleText: "", clock: false, themeBackground: true, fill: false });
+  });
+
   it("plays in folder order from the chosen picture, or newest first", () => {
     const entries = [{ modified: 10 }, { modified: 30 }, { modified: 20 }];
     expect(slideOrder(entries, "name", 1)).toEqual([1, 0, 2]);

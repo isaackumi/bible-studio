@@ -157,8 +157,17 @@ export function paintOverlays(overlays: ScreenOverlay[], resolve: (assetId: stri
  * Overlays that belong to what is showing rather than to the church's list: a picture's caption (a
  * slideshow's file name, as a lower third) and a slideshow's countdown ("Service starts in 4:59").
  */
-export function slideOverlays(model: { layout: string; caption?: string }, countdown: { label: string; endsAt: number } | null): PaintedOverlay[] {
+export function slideOverlays(model: { layout: string; caption?: string }, countdown: { label: string; endsAt: number } | null, banner: { title: string; clock: boolean } | null = null): PaintedOverlay[] {
   const extra: PaintedOverlay[] = [];
+  // A slideshow's own title across the top, and the time in the corner, for as long as it runs.
+  if (banner?.title) {
+    const { on: _on, assetId: _asset, ...title } = newOverlay("banner", "", "slide-title");
+    extra.push({ ...title, text: banner.title, edge: "top", spot: "top", size: "l", fill: "dark", imageUrl: null });
+  }
+  if (banner?.clock) {
+    const { on: _on, assetId: _asset, ...clock } = newOverlay("clock", "", "slide-clock");
+    extra.push({ ...clock, corner: "top-right", spot: banner.title ? "bottom-right" : "top-right", size: "m", fill: "dark", imageUrl: null });
+  }
   if (model.layout === "image" && model.caption) {
     const { on: _on, assetId: _asset, ...caption } = newOverlay("lower-third", "", "picture-caption");
     extra.push({ ...caption, text: model.caption, subtitle: "", showLabel: false, imageUrl: null });

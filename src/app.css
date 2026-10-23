@@ -356,6 +356,8 @@ button { cursor: pointer; }
 .comp-layer.edge-framed::after { border-radius: inherit; border: 3px solid color-mix(in srgb, var(--edge-color, #fff) 35%, transparent); }
 .comp-layer.fit-cover :is(.frame img.cover, .frame video.cover) { object-fit: cover; }
 /* A slideshow's slow zoom (Ken Burns): grows and drifts toward a corner, on the compositor only. */
+/* A slideshow can fill the screen with each picture, cropping its edges. */
+.frame :is(img, video).cover.fill-screen { object-fit: cover; }
 .frame img.cover.drift { object-fit: cover; transform-origin: var(--drift-from, 50% 50%); animation: picture-drift var(--drift, 8s) linear both; will-change: transform; }
 @keyframes picture-drift { from { transform: scale(1); } to { transform: scale(1.14); } }
 @media (prefers-reduced-motion: reduce) { .frame img.cover.drift { animation: none; } }

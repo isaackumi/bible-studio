@@ -13,16 +13,39 @@
   const crumbs = $derived(pictures.folder ? crumbsOf(pictures.folder) : []);
   const show = $derived(pictures.slideshow);
   const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
-  /** What is switched on, in a few words, for the closed Options heading. */
-  const optionsOn = $derived(
-    [
-      show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "",
-      show.kenBurns ? t("Slow zoom") : "",
-      show.captions ? t("Captions") : "",
-      show.countdown ? t("Countdown") : "",
-      show.music && playlists.length ? t("Music") : "",
-    ].filter(Boolean).join(", "),
+  /** What is switched on in each group, in a few words, for its closed heading. */
+  const playingOn = $derived([show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "", show.kenBurns ? t("Slow zoom") : "", show.watch ? t("New pictures join") : ""].filter(Boolean).join(", "));
+  const screenOn = $derived(
+    [show.title && show.titleText ? t("Title") : "", show.clock ? t("Clock") : "", show.captions ? t("Captions") : "", show.countdown ? t("Countdown") : "", show.themeBackground ? "" : t("Black background"), show.fill ? t("Fill the screen") : ""].filter(Boolean).join(", "),
   );
+  const musicOn = $derived(show.music && playlists.length ? (playlists.find((list) => list.id === show.playlistId)?.name ?? playlists[0]!.name) : "");
+
+  // The preview's clock, as the screen shows it (ticks only while the full window shows it).
+  let clockNow = $state(new Date());
+  $effect(() => {
+    if (!wide || !show.clock) return;
+    const timer = setInterval(() => (clockNow = new Date()), 15_000);
+    return () => clearInterval(timer);
+  });
+
+  // The whole window: a big grid to pick from, the chosen picture large, and every setting in view.
+  const WIDE_KEY = "church-studio:pictures-wide";
+  let wide = $state(readWide());
+  function readWide(): boolean {
+    try {
+      return localStorage.getItem(WIDE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function toggleWide() {
+    wide = !wide;
+    try {
+      localStorage.setItem(WIDE_KEY, wide ? "1" : "0");
+    } catch {
+      // Remembered for this visit only.
+    }
+  }
 
   /** How pictures change, with a line on what each looks like. */
   const CHANGES: Array<{ id: SlideTransition; label: string; tip: string }> = [
@@ -62,18 +85,23 @@
   }
 </script>
 
-<aside class="pictures dock-drawer" aria-label={t("Pictures")}>
+<aside class="pictures dock-drawer" class:wide aria-label={t("Pictures")}>
   <header>
     <div class="title">
       <h2>{t("Pictures")}</h2>
       <p>{pictures.folder ? [tn(pictures.images.length - videos, "{n} picture", "{n} pictures"), videos ? tn(videos, "{n} video", "{n} videos") : "", pictures.folders.length ? tn(pictures.folders.length, "{n} folder", "{n} folders") : ""].filter(Boolean).join(" · ") : t("From any folder on this computer, without copying")}</p>
     </div>
-    <button type="button" class="icon-btn" aria-label={t("Close")} onclick={() => pictures.hide()}><Icon name="close" size={16} /></button>
+    <div class="head-tools">
+      <button type="button" class="icon-btn" aria-pressed={wide} aria-label={wide ? t("Back to the side") : t("Full window")} data-tip={wide ? t("Back to the side") : t("Full window: a big grid and every setting in view")} onclick={toggleWide}><Icon name={wide ? "shrink" : "expand"} size={16} /></button>
+      <button type="button" class="icon-btn" aria-label={t("Close")} onclick={() => pictures.hide()}><Icon name="close" size={16} /></button>
+    </div>
   </header>
 
   {#if !isDesktop()}
     <p class="note">{t("Pictures from a folder are in the desktop app. Here, import pictures in Media.")}</p>
   {:else}
+  <div class="layout">
+  <div class="browse">
     <div class="bar">
       <button type="button" class="btn accent" onclick={() => pictures.choose()}>{t("Choose folder…")}</button>
       {#if pictures.folder}
@@ -139,7 +167,21 @@
       {:else if !pictures.loading && !pictures.folders.length}
         <p class="note">{t("No pictures or videos in this folder (JPEG, PNG, GIF, BMP, WebP, MP4, MOV or WebM).")}</p>
       {/if}
+    {:else}
+      <p class="note">{t("Choose a folder of pictures: announcements, a photo album, a picture loop for the walk-in. Nothing is copied.")}</p>
+    {/if}
+  </div>
 
+  {#if pictures.folder}
+  <div class="control">
+      {#if wide && selected}
+        <figure class="big" class:fill={show.fill} class:black={!show.themeBackground}>
+          {#if selected.kind === "video"}<video src={pictures.url(selected)} muted playsinline preload="metadata"></video>{:else}<img src={pictures.url(selected)} alt={selected.name} />{/if}
+          {#if show.title && show.titleText}<figcaption class="big-title">{show.titleText}</figcaption>{/if}
+          {#if show.clock}<span class="big-clock" class:low={show.title && !!show.titleText}>{clockNow.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>{/if}
+          {#if show.captions}<figcaption class="big-caption">{selected.name.replace(/\.[a-z0-9]+$/i, "")}</figcaption>{/if}
+        </figure>
+      {/if}
       <div class="now">
         <span class="one-line">{selected ? selected.name : t("Click a picture for Preview; double-click shows it now.")}</span>
         <div class="row">
@@ -176,9 +218,9 @@
             <b>{t("{seconds} s", { seconds: pictures.slideshow.transitionSeconds.toFixed(1) })}</b>
           </label>
         {/if}
-        <!-- Each extra is the church's to switch on or off; remembered on this computer. -->
-        <details class="options">
-          <summary><span>{t("Options")}</span>{#if optionsOn}<small>{optionsOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
+        <!-- Every choice is the church's to switch on or off, in three groups; remembered on this computer. -->
+        <details class="options" open={wide || undefined}>
+          <summary><span>{t("Playing")}</span>{#if playingOn}<small>{playingOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
           <div class="field">
             <span>{t("Order")}</span>
             <div class="seg" role="radiogroup" aria-label={t("Order")}>
@@ -188,7 +230,16 @@
             </div>
           </div>
           <label class="opt"><input type="checkbox" class="switch" checked={show.kenBurns} onchange={(event) => pictures.setOptions({ kenBurns: event.currentTarget.checked })} /><span><b>{t("Slow zoom")}</b>{t("Each picture slowly zooms and drifts, so stills feel alive.")}</span></label>
-          <label class="opt"><input type="checkbox" class="switch" checked={show.captions} onchange={(event) => pictures.setOptions({ captions: event.currentTarget.checked })} /><span><b>{t("Names as captions")}</b>{t("A picture's file name shows along the bottom: name a file “Youth Night – Friday 7pm”.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.watch} onchange={(event) => pictures.setOptions({ watch: event.currentTarget.checked })} /><span><b>{t("Pick up new pictures")}</b>{t("Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.")}</span></label>
+        </details>
+
+        <details class="options" open={wide || undefined}>
+          <summary><span>{t("On the screen")}</span>{#if screenOn}<small>{screenOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.title} onchange={(event) => pictures.setOptions({ title: event.currentTarget.checked })} /><span><b>{t("Title at the top")}</b>{t("Words across the top for the whole slideshow: a welcome, an event, a theme.")}</span></label>
+          {#if show.title}
+            <div class="sub"><input class="text" maxlength="120" aria-label={t("Title")} placeholder={t("Welcome to Grace Chapel")} value={show.titleText} oninput={(event) => pictures.setOptions({ titleText: event.currentTarget.value })} /></div>
+          {/if}
+          <label class="opt"><input type="checkbox" class="switch" checked={show.clock} onchange={(event) => pictures.setOptions({ clock: event.currentTarget.checked })} /><span><b>{t("Clock")}</b>{t("The time of day in the top corner.")}</span></label>
           <label class="opt"><input type="checkbox" class="switch" checked={show.countdown} onchange={(event) => pictures.setOptions({ countdown: event.currentTarget.checked })} /><span><b>{t("Countdown")}</b>{t("A countdown over the pictures; it leaves the screen at zero.")}</span></label>
           {#if show.countdown}
             <div class="sub">
@@ -197,6 +248,13 @@
               <span>{t("min")}</span>
             </div>
           {/if}
+          <label class="opt"><input type="checkbox" class="switch" checked={show.captions} onchange={(event) => pictures.setOptions({ captions: event.currentTarget.checked })} /><span><b>{t("Names as captions")}</b>{t("A picture's file name shows along the bottom: name a file “Youth Night – Friday 7pm”.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.themeBackground} onchange={(event) => pictures.setOptions({ themeBackground: event.currentTarget.checked })} /><span><b>{t("Theme background")}</b>{t("The theme's colour or motion shows around a picture that does not fill the screen. Off: plain black.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.fill} onchange={(event) => pictures.setOptions({ fill: event.currentTarget.checked })} /><span><b>{t("Fill the screen")}</b>{t("Each picture fills the whole screen, trimming its edges if its shape differs. Off: the whole picture shows.")}</span></label>
+        </details>
+
+        <details class="options" open={wide || undefined}>
+          <summary><span>{t("Background music")}</span>{#if musicOn}<small>♪ {musicOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
           <label class="opt"><input type="checkbox" class="switch" checked={show.music} onchange={(event) => { const on = event.currentTarget.checked; if (on && !playlists.length) { event.currentTarget.checked = false; void pictures.addMusic(); } else pictures.setOptions({ music: on, playlistId: show.playlistId ?? playlists[0]?.id ?? null }); }} /><span><b>{t("Music")}</b>{t("Songs play under the pictures, start again at the end, and fade out when the slideshow stops.")}</span></label>
           {#if show.music && playlists.length}
             {@const listId = show.playlistId ?? playlists[0]?.id ?? null}
@@ -218,10 +276,11 @@
                 {:else}{t("Press Test to hear it.")}{/if}
               </span>
             </div>
+          {:else if !playlists.length}
+            <button type="button" class="btn sub-btn" onclick={() => void pictures.addMusic()}><Icon name="plus" size={13} /> {t("Add music…")}</button>
           {/if}
-          <label class="opt"><input type="checkbox" class="switch" checked={show.watch} onchange={(event) => pictures.setOptions({ watch: event.currentTarget.checked })} /><span><b>{t("Pick up new pictures")}</b>{t("Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.")}</span></label>
-          {#if pictures.slideshow.running}<p class="note">{t("Changes apply from the next picture; order, countdown and music from the next start.")}</p>{/if}
         </details>
+        {#if pictures.slideshow.running}<p class="note">{t("Changes apply from the next picture; the title and clock at once; order, countdown and music from the next start.")}</p>{/if}
         <div class="row">
           {#if !pictures.slideshow.running}
             <button type="button" class="btn accent" disabled={!pictures.images.length} onclick={() => pictures.start()}>{selected ? t("Start from this picture") : t("Start slideshow")}</button>
@@ -236,15 +295,35 @@
         </div>
         <p class="note">{videos ? t("Videos play to the end before the next. The slideshow steps aside the moment anything else goes LIVE.") : t("The slideshow steps aside the moment anything else goes LIVE.")}</p>
       </section>
-    {:else}
-      <p class="note">{t("Choose a folder of pictures: announcements, a photo album, a picture loop for the walk-in. Nothing is copied.")}</p>
-    {/if}
+  </div>
+  {/if}
+  </div>
   {/if}
 </aside>
 
 <style>
   .pictures { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(var(--drawer-w, 420px), 100vw); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow: auto; background: var(--panel); color: var(--ink); border-left: 1px solid var(--line); box-shadow: -24px 0 60px rgb(0 0 0 / 0.35); font-size: 13px; text-align: left; }
   .pictures > :global(*) { width: 100%; flex: none; }
+  .head-tools { display: flex; gap: 2px; }
+  .layout, .browse, .control { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .browse > :global(*), .control > :global(*) { flex: none; }
+  /* Full window: pick on the left in a big grid; the chosen picture large and every setting on the right. */
+  .pictures.wide { left: 0; width: auto; z-index: 60; padding: 18px 22px; overflow: hidden; border-left: 0; box-shadow: none; }
+  .wide .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 440px); gap: 20px; }
+  .wide .browse { min-height: 0; overflow: auto; padding-right: 4px; }
+  .wide .control { min-height: 0; overflow: auto; padding-right: 4px; }
+  .wide .grid { max-height: none; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .wide .grid li { contain-intrinsic-size: 170px 117px; }
+  .wide .folders { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .big { position: relative; margin: 0; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--frame-bg, #111); border: 1px solid var(--line); }
+  .big.black { background: #000; }
+  .big img, .big video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .big.fill img, .big.fill video { object-fit: cover; }
+  .big-title { position: absolute; left: 0; right: 0; top: 0; padding: 8px 12px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 14px; font-weight: 700; text-align: center; }
+  .big-clock { position: absolute; right: 10px; top: 10px; padding: 3px 9px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .big-clock.low { top: auto; bottom: 10px; }
+  .big-caption { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 4px 10px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub-btn { justify-self: start; margin-left: 46px; display: inline-flex; align-items: center; gap: 5px; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .title { min-width: 0; }
   h2 { margin: 0; font-size: 17px; font-weight: 750; }

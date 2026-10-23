@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newOverlay, paintOverlays, sanitizeOverlays } from "./screen-overlays";
+import { newOverlay, paintOverlays, sanitizeOverlays, slideOverlays } from "./screen-overlays";
 
 describe("screen overlays", () => {
   it("starts each kind off, with sensible words", () => {
@@ -36,5 +36,13 @@ describe("how a countdown or name card looks", () => {
     expect(plain!.cover).toBeUndefined();
     expect(plain!.showLabel).toBeUndefined();
     expect(plain!.fill).toBeUndefined();
+  });
+
+  it("puts a slideshow's title across the top and the clock in a corner", () => {
+    const painted = slideOverlays({ layout: "image" }, null, { title: "Welcome to Grace Chapel", clock: true });
+    expect(painted.map((overlay) => [overlay.kind, overlay.spot])).toEqual([["banner", "top"], ["clock", "bottom-right"]]);
+    expect(painted[0]!.text).toBe("Welcome to Grace Chapel");
+    expect(slideOverlays({ layout: "image" }, null, { title: "", clock: true }).map((overlay) => overlay.spot)).toEqual(["top-right"]);
+    expect(slideOverlays({ layout: "image" }, null, null)).toEqual([]);
   });
 });

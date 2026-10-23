@@ -27,6 +27,15 @@ export type SlideOptions = {
   playlistId: string | null;
   /** New pictures added to the folder (a shared Drive folder) join while it runs. */
   watch: boolean;
+  /** Words across the top of the pictures ("Welcome to Grace Chapel"), for the whole slideshow. */
+  title: boolean;
+  titleText: string;
+  /** The time of day in the top corner. */
+  clock: boolean;
+  /** The theme's colour, gradient or motion around a picture that does not fill the screen; off: black. */
+  themeBackground: boolean;
+  /** Pictures fill the whole screen (the edges may be cropped) instead of showing whole. */
+  fill: boolean;
 };
 
 export const DEFAULT_SLIDE_OPTIONS: SlideOptions = {
@@ -43,6 +52,11 @@ export const DEFAULT_SLIDE_OPTIONS: SlideOptions = {
   music: false,
   playlistId: null,
   watch: true,
+  title: false,
+  titleText: "",
+  clock: false,
+  themeBackground: true,
+  fill: false,
 };
 
 /** Saved choices, cleaned: anything missing or out of range takes its default. */
@@ -64,6 +78,11 @@ export function cleanSlideOptions(value: unknown): SlideOptions {
     music: flag("music"),
     playlistId: typeof input.playlistId === "string" ? input.playlistId : null,
     watch: flag("watch"),
+    title: flag("title"),
+    titleText: typeof input.titleText === "string" ? input.titleText.replace(/\s+/g, " ").trim().slice(0, 120) : "",
+    clock: flag("clock"),
+    themeBackground: flag("themeBackground"),
+    fill: flag("fill"),
   };
 }
 

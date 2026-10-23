@@ -6798,6 +6798,16 @@ class Session {
 
   /** A countdown over a Pictures slideshow ("Service starts in 4:59"), laid over each picture. */
   slideCountdown = $state<{ label: string; endsAt: number } | null>(null);
+  /** A running slideshow's title across the top and clock in the corner (null: none). */
+  slideBanner = $state<{ title: string; clock: boolean } | null>(null);
+
+  setSlideBanner = async (banner: { title: string; clock: boolean } | null) => {
+    const next = banner && (banner.title || banner.clock) ? banner : null;
+    if (JSON.stringify(next) === JSON.stringify(this.slideBanner)) return;
+    this.slideBanner = next;
+    this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
+    await this.pushProgram();
+  };
 
   /**
    * Something live that keeps changing (a game's answers coming in, its leaderboard): if this
@@ -6818,7 +6828,7 @@ class Session {
 
   /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
   private withScreenOverlays = (model: PresentationModel): PresentationModel => {
-    const painted = [...paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.screenCountdown() : null), ...slideOverlays(model, this.slideCountdown)];
+    const painted = [...paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.screenCountdown() : null), ...slideOverlays(model, this.slideCountdown, this.slideBanner)];
     if (painted.length === 0) {
       if (!model.overlays) return model;
       const { overlays: _gone, ...rest } = model;

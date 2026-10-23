@@ -150,7 +150,10 @@ class Pictures {
     // In a running slideshow, a picture zooms for as long as it shows (and a little into the change).
     const kenBurns = show.running && show.kenBurns ? show.seconds + 2 : undefined;
     const caption = show.running && show.captions ? captionOf(entry.name) : undefined;
-    const model = entry.kind === "video" ? presentVideo({ theme: session.theme(), videoUrl: this.url(entry), loop: false }) : presentImage({ theme: session.theme(), imageUrl: this.url(entry), kenBurns, caption });
+    // Theme background off: plain black around a picture that does not fill the screen.
+    const fill = show.themeBackground ? undefined : "#000000";
+    const shown = entry.kind === "video" ? presentVideo({ theme: session.theme(), videoUrl: this.url(entry), loop: false }) : presentImage({ theme: session.theme(), imageUrl: this.url(entry), kenBurns, caption, fill, cover: show.fill });
+    const model = entry.kind === "video" ? { ...shown, ...(fill ? { fill } : {}), ...(show.fill ? { imageFit: "cover" as const } : {}) } : shown;
     return { model, id: `picture:${entry.path}` };
   }
 
@@ -208,6 +211,7 @@ class Pictures {
       // At zero the countdown leaves the screen; the pictures carry on until the operator moves on.
       this.countdownTimer = setTimeout(() => void session.setSlideCountdown(null), endsAt - Date.now());
     }
+    void session.setSlideBanner(this.banner());
     if (this.slideshow.watch) {
       clearInterval(this.watchTimer);
       this.watchTimer = setInterval(() => void this.pickUpNew(), 20_000);
@@ -291,6 +295,7 @@ class Pictures {
     this.slideshow = { ...this.slideshow, running: false, paused: false };
     if (!wasRunning) return;
     if (session.slideCountdown) void session.setSlideCountdown(null);
+    if (session.slideBanner) void session.setSlideBanner(null);
     if (session.slideshowMusic) {
       session.slideshowMusic = false;
       session.audio.fadeOut(4);
@@ -337,7 +342,15 @@ class Pictures {
     const options = cleanSlideOptions({ ...this.slideshow, ...patch });
     this.slideshow = { ...options, running, paused };
     write(OPTIONS_KEY, options);
+    // The title and clock follow at once while it runs (typing the title shows on the screen).
+    if (running) void session.setSlideBanner(this.banner());
   };
+
+  /** What goes over the pictures for the whole slideshow: its title and the clock. */
+  private banner(): { title: string; clock: boolean } {
+    const show = this.slideshow;
+    return { title: show.title ? show.titleText : "", clock: show.clock };
+  }
 
   /** Keep a picture or video for the service: it is copied into the library and added to the running order. */
   addToService = async (index: number) => {

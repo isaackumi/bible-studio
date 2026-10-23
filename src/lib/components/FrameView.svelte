@@ -308,7 +308,7 @@
         <!-- Thumbnails: the first frame, silent and paused. -->
         <video class="cover" use:release src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
       {:else}
-        <video class="cover" use:streamSource={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
+        <video class="cover" class:fill-screen={model.imageFit === "cover"} use:streamSource={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
       {/if}
     {/key}
   {:else if model.layout === "shape" && model.shape}
@@ -355,7 +355,7 @@
   {:else if model.layout === "image" && model.imageUrl}
     <!-- Keyed, so each picture of a slideshow starts its own slow zoom. -->
     {#key model.imageUrl}
-      <img class="cover" class:drift={!!model.kenBurns} style:--drift="{model.kenBurns ?? 0}s" style:--drift-from={driftFrom(model.imageUrl)} src={model.imageUrl} alt="" />
+      <img class="cover" class:fill-screen={model.imageFit === "cover"} class:drift={!!model.kenBurns} style:--drift="{model.kenBurns ?? 0}s" style:--drift-from={driftFrom(model.imageUrl)} src={model.imageUrl} alt="" />
     {/key}
   {:else if model.layout === "logo" && model.imageUrl === DEFAULT_LOGO_URL}
     <!-- The Church Studio mark stands in for a church's own logo, so the church's name goes under it. -->
