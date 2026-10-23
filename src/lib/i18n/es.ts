@@ -4082,4 +4082,13 @@ export const es: Readonly<Record<string, string>> = {
   "Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.": "Las imágenes añadidas a la carpeta mientras funciona (una carpeta de Drive compartida) se suman a la presentación.",
   "Slow zoom": "Zoom lento",
   "{count} new pictures joined the slideshow.": "{count} imágenes nuevas se sumaron a la presentación.",
+  // What's new in 0.4.1
+  "Settings always in reach": "Ajustes siempre a mano",
+  "The top bar fits any screen and text size: the desks are two small groups, and the tools on the right, with Settings, never leave the screen.": "La barra superior cabe en cualquier pantalla y tamaño de texto: los escritorios son dos grupos pequeños, y las herramientas de la derecha, con Ajustes, no salen de la pantalla.",
+  "The phone remote over the internet": "El mando del teléfono por internet",
+  "In Settings \u203a Phone remote, choose Internet: a phone on mobile data or another Wi-Fi controls the desk, after you approve it here. Wi-Fi stays the default.": "En Ajustes › Control desde el teléfono, elige Internet: un teléfono con datos móviles u otra Wi-Fi controla el escritorio, después de que lo apruebes aquí. La Wi-Fi sigue siendo la opción por defecto.",
+  "Pictures: folders, Google Drive and videos": "Imágenes: carpetas, Google Drive y vídeos",
+  "Folders show as coloured tiles with a path to click back through. Google Drive, iCloud, Dropbox and OneDrive appear when synced to this computer, and videos play in a slideshow to the end.": "Las carpetas aparecen como mosaicos de colores con una ruta para volver atrás. Google Drive, iCloud, Dropbox y OneDrive aparecen cuando están sincronizados, y los vídeos se reproducen hasta el final en una presentación.",
+  "Slideshow options": "Opciones de la presentación",
+  "Switch on what you want: shuffle or newest first, a slow zoom, file names as captions, a countdown over the pictures, music that fades when it ends, and new pictures joining as they arrive.": "Activa lo que quieras: aleatorio o las más nuevas primero, un zoom lento, nombres como rótulos, una cuenta atrás sobre las imágenes, música que se desvanece al final e imágenes nuevas que se suman al llegar.",
 };

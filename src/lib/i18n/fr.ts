@@ -4163,4 +4163,13 @@ export const fr: Readonly<Record<string, string>> = {
   "Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.": "Les images ajoutées au dossier pendant qu’il tourne (un dossier Drive partagé) rejoignent le diaporama.",
   "Slow zoom": "Zoom lent",
   "{count} new pictures joined the slideshow.": "{count} nouvelles images ont rejoint le diaporama.",
+  // What's new in 0.4.1
+  "Settings always in reach": "Réglages toujours à portée",
+  "The top bar fits any screen and text size: the desks are two small groups, and the tools on the right, with Settings, never leave the screen.": "La barre du haut tient sur tout écran et toute taille de texte : les pupitres forment deux petits groupes, et les outils à droite, Réglages compris, ne quittent plus l’écran.",
+  "The phone remote over the internet": "La télécommande par internet",
+  "In Settings \u203a Phone remote, choose Internet: a phone on mobile data or another Wi-Fi controls the desk, after you approve it here. Wi-Fi stays the default.": "Dans Réglages › Télécommande sur téléphone, choisissez Internet : un téléphone sur données mobiles ou un autre Wi-Fi pilote le pupitre, une fois approuvé ici. Le Wi-Fi reste le choix par défaut.",
+  "Pictures: folders, Google Drive and videos": "Images : dossiers, Google Drive et vidéos",
+  "Folders show as coloured tiles with a path to click back through. Google Drive, iCloud, Dropbox and OneDrive appear when synced to this computer, and videos play in a slideshow to the end.": "Les dossiers s’affichent en tuiles colorées avec un chemin pour revenir en arrière. Google Drive, iCloud, Dropbox et OneDrive apparaissent quand ils sont synchronisés, et les vidéos jouent jusqu’au bout dans un diaporama.",
+  "Slideshow options": "Options du diaporama",
+  "Switch on what you want: shuffle or newest first, a slow zoom, file names as captions, a countdown over the pictures, music that fades when it ends, and new pictures joining as they arrive.": "Activez ce que vous voulez : aléatoire ou plus récentes d’abord, un zoom lent, les noms en légende, un compte à rebours sur les images, une musique qui s’estompe à la fin, et les nouvelles images qui arrivent.",
 };

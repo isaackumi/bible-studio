@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.1",
+    date: "2026-10-23",
+    highlights: [
+      { icon: "layout", title: msg("Settings always in reach"), text: msg("The top bar fits any screen and text size: the desks are two small groups, and the tools on the right, with Settings, never leave the screen.") },
+      { icon: "phone", title: msg("The phone remote over the internet"), text: msg("In Settings \u203a Phone remote, choose Internet: a phone on mobile data or another Wi-Fi controls the desk, after you approve it here. Wi-Fi stays the default.") },
+      { icon: "folder", title: msg("Pictures: folders, Google Drive and videos"), text: msg("Folders show as coloured tiles with a path to click back through. Google Drive, iCloud, Dropbox and OneDrive appear when synced to this computer, and videos play in a slideshow to the end.") },
+      { icon: "media", title: msg("Slideshow options"), text: msg("Switch on what you want: shuffle or newest first, a slow zoom, file names as captions, a countdown over the pictures, music that fades when it ends, and new pictures joining as they arrive.") },
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-10-23",
     highlights: [
