@@ -3,12 +3,25 @@
   import { isDesktop } from "../../platform/runtime";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
+  import { session } from "../../app/session.svelte";
 
   // Pictures straight from a folder: a grid to pick from, Preview or straight to the screen, and a
   // slideshow that runs on its own until the operator takes over.
   const selected = $derived(pictures.images[pictures.current] ?? null);
   const videos = $derived(pictures.images.filter((entry) => entry.kind === "video").length);
   const crumbs = $derived(pictures.folder ? crumbsOf(pictures.folder) : []);
+  const show = $derived(pictures.slideshow);
+  const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
+  /** What is switched on, in a few words, for the closed Options heading. */
+  const optionsOn = $derived(
+    [
+      show.order === "newest" ? t("Newest first") : show.order === "shuffle" ? t("Shuffle") : "",
+      show.kenBurns ? t("Slow zoom") : "",
+      show.captions ? t("Captions") : "",
+      show.countdown ? t("Countdown") : "",
+      show.music && show.playlistId ? t("Music") : "",
+    ].filter(Boolean).join(", "),
+  );
 
   /** Each kind of place keeps one colour, so Google Drive or Dropbox is spotted at once. */
   const PLACE_COLORS: Record<Place["kind"], string> = { pictures: "#3b82f6", desktop: "#64748b", "google-drive": "#22c55e", icloud: "#38bdf8", dropbox: "#2563eb", onedrive: "#0ea5e9" };
@@ -144,6 +157,38 @@
           </div>
           <label class="loop"><input type="checkbox" class="switch" checked={pictures.slideshow.loop} onchange={(event) => pictures.setOptions({ loop: event.currentTarget.checked })} /> {t("Loop")}</label>
         </div>
+        <!-- Each extra is the church's to switch on or off; remembered on this computer. -->
+        <details class="options">
+          <summary><span>{t("Options")}</span>{#if optionsOn}<small>{optionsOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
+          <div class="field">
+            <span>{t("Order")}</span>
+            <div class="seg" role="radiogroup" aria-label={t("Order")}>
+              {#each [["name", t("In order")], ["newest", t("Newest first")], ["shuffle", t("Shuffle")]] as [id, label] (id)}
+                <button type="button" role="radio" aria-checked={show.order === id} class:on={show.order === id} onclick={() => pictures.setOptions({ order: id as "name" | "newest" | "shuffle" })}>{label}</button>
+              {/each}
+            </div>
+          </div>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.kenBurns} onchange={(event) => pictures.setOptions({ kenBurns: event.currentTarget.checked })} /><span><b>{t("Slow zoom")}</b>{t("Each picture slowly zooms and drifts, so stills feel alive.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.captions} onchange={(event) => pictures.setOptions({ captions: event.currentTarget.checked })} /><span><b>{t("Names as captions")}</b>{t("A picture's file name shows along the bottom: name a file “Youth Night – Friday 7pm”.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.countdown} onchange={(event) => pictures.setOptions({ countdown: event.currentTarget.checked })} /><span><b>{t("Countdown")}</b>{t("A countdown over the pictures; it leaves the screen at zero.")}</span></label>
+          {#if show.countdown}
+            <div class="sub">
+              <input class="text" aria-label={t("Countdown words")} value={show.countdownLabel === "Service starts in" ? t("Service starts in") : show.countdownLabel} onchange={(event) => pictures.setOptions({ countdownLabel: event.currentTarget.value })} />
+              <input class="num" type="number" min="1" max="120" aria-label={t("Minutes")} value={show.countdownMinutes} onchange={(event) => pictures.setOptions({ countdownMinutes: Number(event.currentTarget.value) })} />
+              <span>{t("min")}</span>
+            </div>
+          {/if}
+          <label class="opt"><input type="checkbox" class="switch" checked={show.music} disabled={!playlists.length} onchange={(event) => pictures.setOptions({ music: event.currentTarget.checked, playlistId: show.playlistId ?? playlists[0]?.id ?? null })} /><span><b>{t("Music")}</b>{playlists.length ? t("A playlist plays with the pictures and fades out when the slideshow stops.") : t("Add music to a playlist (Audio, at the top) to play it with the pictures.")}</span></label>
+          {#if show.music && playlists.length}
+            <div class="sub">
+              <select aria-label={t("Playlist")} value={show.playlistId ?? playlists[0]?.id} onchange={(event) => pictures.setOptions({ playlistId: event.currentTarget.value })}>
+                {#each playlists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
+              </select>
+            </div>
+          {/if}
+          <label class="opt"><input type="checkbox" class="switch" checked={show.watch} onchange={(event) => pictures.setOptions({ watch: event.currentTarget.checked })} /><span><b>{t("Pick up new pictures")}</b>{t("Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.")}</span></label>
+          {#if pictures.slideshow.running}<p class="note">{t("Changes apply from the next picture; order, countdown and music from the next start.")}</p>{/if}
+        </details>
         <div class="row">
           {#if !pictures.slideshow.running}
             <button type="button" class="btn accent" disabled={!pictures.images.length} onclick={() => pictures.start()}>{selected ? t("Start from this picture") : t("Start slideshow")}</button>
@@ -219,4 +264,19 @@
   .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .seg button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
   .loop { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .options { border-top: 1px solid var(--line); padding-top: 8px; }
+  .options summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 700; }
+  .options summary::-webkit-details-marker { display: none; }
+  .options summary small { flex: 1; min-width: 0; color: var(--accent); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .options summary :global(svg) { margin-left: auto; color: var(--muted); transition: transform 150ms; }
+  .options[open] summary :global(svg) { transform: rotate(180deg); }
+  .options[open] { display: grid; gap: 10px; }
+  .opt { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+  .opt input { flex: none; margin-top: 2px; }
+  .opt span { display: grid; gap: 1px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .opt b { color: var(--ink); font-size: 12.5px; font-weight: 650; }
+  .sub { display: flex; align-items: center; gap: 6px; margin: -4px 0 0 46px; color: var(--muted); font-size: 12px; }
+  .sub .text { flex: 1; min-width: 0; }
+  .sub .num { width: 64px; }
+  .sub input, .sub select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; }
 </style>

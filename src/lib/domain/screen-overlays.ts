@@ -153,6 +153,23 @@ export function paintOverlays(overlays: ScreenOverlay[], resolve: (assetId: stri
     );
 }
 
+/**
+ * Overlays that belong to what is showing rather than to the church's list: a picture's caption (a
+ * slideshow's file name, as a lower third) and a slideshow's countdown ("Service starts in 4:59").
+ */
+export function slideOverlays(model: { layout: string; caption?: string }, countdown: { label: string; endsAt: number } | null): PaintedOverlay[] {
+  const extra: PaintedOverlay[] = [];
+  if (model.layout === "image" && model.caption) {
+    const { on: _on, assetId: _asset, ...caption } = newOverlay("lower-third", "", "picture-caption");
+    extra.push({ ...caption, text: model.caption, subtitle: "", showLabel: false, imageUrl: null });
+  }
+  if (countdown) {
+    const { on: _on, assetId: _asset, ...painted } = newOverlay("countdown", "", "slide-countdown");
+    extra.push({ ...painted, text: countdown.label, spot: "top", size: "l", showLabel: true, fill: "dark", imageUrl: null, endsAt: countdown.endsAt, section: countdown.label });
+  }
+  return extra;
+}
+
 export function sanitizePaintedOverlays(value: unknown): PaintedOverlay[] {
   if (!Array.isArray(value)) return [];
   return sanitizeOverlays(value.map((entry) => ({ ...(entry as object), on: true }))).map((overlay, index) => {

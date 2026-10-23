@@ -8,6 +8,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { presentImage, presentVideo } from "../domain/present";
 import type { TransitionKind } from "../domain/types";
 import { t } from "../i18n/core";
+import { captionOf, cleanSlideOptions, slideOrder, type SlideOptions } from "../domain/slideshow";
 import { isDesktop } from "../platform/runtime";
 import { session } from "./session.svelte";
 import { audienceRoom, whenAudienceOpens } from "./rooms.svelte";
@@ -36,6 +37,7 @@ export function crumbsOf(path: string, keep = 4): Array<{ name: string; path: st
 }
 
 const PINNED_KEY = "church-studio:picture-folders";
+const OPTIONS_KEY = "church-studio:slideshow";
 const LAST_KEY = "church-studio:picture-folder";
 const MOST_PINNED = 12;
 
@@ -77,8 +79,14 @@ class Pictures {
   /** The picture on Preview (its place in the folder). */
   current = $state(-1);
 
-  slideshow = $state<{ running: boolean; paused: boolean; seconds: number; loop: boolean; transition: TransitionKind }>({ running: false, paused: false, seconds: 6, loop: true, transition: "fade" });
+  /** The church's choices (remembered), and whether one is running now. */
+  slideshow = $state<SlideOptions & { running: boolean; paused: boolean }>({ ...cleanSlideOptions(typeof localStorage === "undefined" ? null : read<unknown>(OPTIONS_KEY, null)), running: false, paused: false });
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** The order this run plays in (places in `images`), and where it is in it. */
+  private sequence: number[] = [];
+  private position = 0;
+  private countdownTimer: ReturnType<typeof setTimeout> | undefined;
+  private watchTimer: ReturnType<typeof setInterval> | undefined;
   /** What the slideshow last put on Program, so it knows when the operator has taken over. */
   private shownId: string | null = null;
 
@@ -138,7 +146,11 @@ class Pictures {
   private model(index: number) {
     const entry = this.images[index];
     if (!entry) return null;
-    const model = entry.kind === "video" ? presentVideo({ theme: session.theme(), videoUrl: this.url(entry), loop: false }) : presentImage({ theme: session.theme(), imageUrl: this.url(entry) });
+    const show = this.slideshow;
+    // In a running slideshow, a picture zooms for as long as it shows (and a little into the change).
+    const kenBurns = show.running && show.kenBurns ? show.seconds + 2 : undefined;
+    const caption = show.running && show.captions ? captionOf(entry.name) : undefined;
+    const model = entry.kind === "video" ? presentVideo({ theme: session.theme(), videoUrl: this.url(entry), loop: false }) : presentImage({ theme: session.theme(), imageUrl: this.url(entry), kenBurns, caption });
     return { model, id: `picture:${entry.path}` };
   }
 
@@ -169,11 +181,50 @@ class Pictures {
 
   // --- Slideshow ------------------------------------------------------------------------------
 
-  start = async (from = Math.max(0, this.current)) => {
+  start = async (from = this.current) => {
     if (!this.images.length) return;
     this.slideshow = { ...this.slideshow, running: true, paused: false };
-    await this.showNow(from, this.slideshow.transition);
+    this.sequence = slideOrder(this.images, this.slideshow.order, from);
+    this.position = 0;
+    // Music first, so the first picture's take does not fade it (session.slideshowMusic).
+    if (this.slideshow.music && this.slideshow.playlistId) {
+      session.slideshowMusic = true;
+      await session.playPlaylist(this.slideshow.playlistId);
+    }
+    if (this.slideshow.countdown) {
+      const endsAt = Date.now() + this.slideshow.countdownMinutes * 60_000;
+      void session.setSlideCountdown({ label: t(this.slideshow.countdownLabel), endsAt });
+      clearTimeout(this.countdownTimer);
+      // At zero the countdown leaves the screen; the pictures carry on until the operator moves on.
+      this.countdownTimer = setTimeout(() => void session.setSlideCountdown(null), endsAt - Date.now());
+    }
+    if (this.slideshow.watch) {
+      clearInterval(this.watchTimer);
+      this.watchTimer = setInterval(() => void this.pickUpNew(), 20_000);
+    }
+    await this.showNow(this.sequence[0]!, this.slideshow.transition);
     this.schedule();
+  };
+
+  /** Pictures added to the folder while it runs (someone filling a shared Drive folder) join the end. */
+  private pickUpNew = async () => {
+    if (!this.folder || !this.slideshow.running) return;
+    const folder = this.folder;
+    const before = new Set(this.images.map((entry) => entry.path));
+    const shownPath = this.images[this.current]?.path;
+    try {
+      const entries = await invoke<FolderEntry[]>("picture_folder", { path: folder });
+      if (this.folder !== folder || !this.slideshow.running) return;
+      const added = entries.filter((entry) => entry.kind !== "folder" && !before.has(entry.path));
+      if (!added.length) return;
+      this.entries = [...this.entries, ...added];
+      // Places stay true for what is already in the order; the new ones play next round.
+      this.current = this.images.findIndex((entry) => entry.path === shownPath);
+      for (const entry of added) this.sequence.push(this.images.findIndex((image) => image.path === entry.path));
+      session.notify(t("{count} new pictures joined the slideshow.", { count: added.length }));
+    } catch {
+      // The folder is gone or offline for a moment: the slideshow carries on with what it has.
+    }
   };
 
   private schedule() {
@@ -193,12 +244,22 @@ class Pictures {
       this.stop();
       return;
     }
-    const next = this.current + 1;
-    if (next >= this.images.length && !this.slideshow.loop) {
-      this.stop();
-      return;
+    let position = this.position + 1;
+    if (position >= this.sequence.length) {
+      if (!this.slideshow.loop) {
+        this.stop();
+        return;
+      }
+      // A new round: a shuffled show mixes again (and does not repeat the last picture first).
+      position = 0;
+      if (this.slideshow.order === "shuffle") {
+        const mixed = slideOrder(this.images, "shuffle", -1);
+        if (mixed.length > 1 && mixed[0] === this.current) mixed.push(mixed.shift()!);
+        this.sequence = mixed;
+      }
     }
-    await this.showNow(next % this.images.length, this.slideshow.transition);
+    this.position = position;
+    await this.showNow(this.sequence[position]!, this.slideshow.transition);
     this.schedule();
   };
 
@@ -214,17 +275,30 @@ class Pictures {
 
   stop = () => {
     clearTimeout(this.timer);
+    clearTimeout(this.countdownTimer);
+    clearInterval(this.watchTimer);
+    const wasRunning = this.slideshow.running;
     this.slideshow = { ...this.slideshow, running: false, paused: false };
+    if (!wasRunning) return;
+    if (session.slideCountdown) void session.setSlideCountdown(null);
+    if (session.slideshowMusic) {
+      session.slideshowMusic = false;
+      session.audio.fadeOut(4);
+    }
   };
 
   /** 1–30 seconds a picture; a running slideshow keeps going at the new pace. */
   setSeconds = (seconds: number) => {
-    this.slideshow = { ...this.slideshow, seconds: Math.min(30, Math.max(1, Math.round(seconds))) };
+    this.setOptions({ seconds });
     this.schedule();
   };
 
-  setOptions = (patch: Partial<{ loop: boolean; transition: TransitionKind }>) => {
-    this.slideshow = { ...this.slideshow, ...patch };
+  /** Change a choice; it is remembered for next time (on this computer). */
+  setOptions = (patch: Partial<SlideOptions>) => {
+    const { running, paused } = this.slideshow;
+    const options = cleanSlideOptions({ ...this.slideshow, ...patch });
+    this.slideshow = { ...options, running, paused };
+    write(OPTIONS_KEY, options);
   };
 
   /** Keep a picture or video for the service: it is copied into the library and added to the running order. */

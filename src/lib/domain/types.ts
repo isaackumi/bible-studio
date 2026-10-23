@@ -161,6 +161,10 @@ export type PresentationModel = {
   backgroundVideoUrl?: string | null;
   layers?: PaintedLayer[];
   timer?: TimerPaint;
+  /** layout "image": the picture slowly zooms and drifts for this many seconds (a slideshow's Ken Burns). */
+  kenBurns?: number;
+  /** layout "image": words over the picture as a lower third (a slideshow's file names). */
+  caption?: string;
   /** Effects (bold, italic, …) after theme and item styles are merged; font/size/color/align live on theme. */
   style?: TextStyle;
   /** layout "video": the file to play. Operator monitors are always muted; the audience plays sound unless muted. */

@@ -202,6 +202,13 @@
 
   // Shadows under shapes and icons: drawn once with the page (a still layer costs nothing after).
   const SHADOWS: Record<string, string> = { soft: "0 12px 32px rgba(0, 0, 0, 0.35)", strong: "0 18px 48px rgba(0, 0, 0, 0.6)" };
+
+  /** Where a picture's slow zoom starts from: one of four corners, the same each time for a picture. */
+  function driftFrom(url: string): string {
+    let hash = 0;
+    for (let index = 0; index < url.length; index += 1) hash = (hash * 31 + url.charCodeAt(index)) >>> 0;
+    return ["20% 25%", "80% 30%", "25% 75%", "75% 70%"][hash % 4]!;
+  }
 </script>
 
 {#snippet words()}
@@ -343,7 +350,10 @@
   {:else if model.layout === "qr" && model.qr}
     <QrView qr={model.qr} />
   {:else if model.layout === "image" && model.imageUrl}
-    <img class="cover" src={model.imageUrl} alt="" />
+    <!-- Keyed, so each picture of a slideshow starts its own slow zoom. -->
+    {#key model.imageUrl}
+      <img class="cover" class:drift={!!model.kenBurns} style:--drift="{model.kenBurns ?? 0}s" style:--drift-from={driftFrom(model.imageUrl)} src={model.imageUrl} alt="" />
+    {/key}
   {:else if model.layout === "logo" && model.imageUrl === DEFAULT_LOGO_URL}
     <!-- The Church Studio mark stands in for a church's own logo, so the church's name goes under it. -->
     <div class="logo-lockup" style:color={model.theme.color} style:font-family={model.theme.fontFamily}>

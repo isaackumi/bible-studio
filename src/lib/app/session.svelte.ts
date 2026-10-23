@@ -243,7 +243,7 @@ import {
 } from "../workspace/layout";
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
-import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
+import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, slideOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
 import { aiReady, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
@@ -6684,9 +6684,21 @@ class Session {
     this.message = alert.until ? t("Alert on Program for {seconds} s.", { seconds: input.seconds }) : t("Alert on Program until you clear it.");
   };
 
+  /** A Pictures slideshow is playing its own music: its picture changes do not fade it. */
+  slideshowMusic = false;
+
+  /** A countdown over a Pictures slideshow ("Service starts in 4:59"), laid over each picture. */
+  slideCountdown = $state<{ label: string; endsAt: number } | null>(null);
+
+  setSlideCountdown = async (countdown: { label: string; endsAt: number } | null) => {
+    this.slideCountdown = countdown;
+    this.live = replaceProgramModel(this.live, this.live.program.model, "cut");
+    await this.pushProgram();
+  };
+
   /** Overlays that are on, stamped onto a Program frame (the same object back when nothing changes). */
   private withScreenOverlays = (model: PresentationModel): PresentationModel => {
-    const painted = paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.screenCountdown() : null);
+    const painted = [...paintOverlays(this.workspace?.overlays ?? [], (id) => this.mediaSrc(id), this.service ? this.screenCountdown() : null), ...slideOverlays(model, this.slideCountdown)];
     if (painted.length === 0) {
       if (!model.overlays) return model;
       const { overlays: _gone, ...rest } = model;
@@ -7138,8 +7150,10 @@ class Session {
       const today = new Date().toDateString();
       if (section && (this.sectionStartsDay !== today || this.sectionStarts[section.id] === undefined)) this.startSection(section.id);
     }
-    // Walk-in music (a looping playlist) fades out when the service goes live; a backing track plays on.
-    if ((action === "take" || action === "cut") && this.workspace.audio.fadeOnLive && this.audio.playing && this.audio.loop) {
+    // Walk-in music (a looping playlist) fades out when the service goes live; a backing track plays on,
+    // and so does a slideshow's music while the slideshow changes its own pictures.
+    const slideshowStep = this.slideshowMusic && (this.live.program.sourceId ?? "").startsWith("picture:");
+    if ((action === "take" || action === "cut") && this.workspace.audio.fadeOnLive && this.audio.playing && this.audio.loop && !slideshowStep) {
       this.audio.fadeOut(4);
     }
     // A song the congregation now sees counts for CCLI reporting (once per day).

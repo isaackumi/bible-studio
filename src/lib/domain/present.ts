@@ -100,7 +100,8 @@ export function presentVideo(input: BuildBase & { videoUrl: string | null | unde
   };
 }
 
-export function presentImage(input: BuildBase & { imageUrl: string }): PresentationModel {
+export function presentImage(input: BuildBase & { imageUrl: string; kenBurns?: number; caption?: string }): PresentationModel {
+  const caption = input.caption?.replace(/\s+/g, " ").trim().slice(0, 120);
   return {
     layout: "image",
     theme: input.theme,
@@ -109,5 +110,7 @@ export function presentImage(input: BuildBase & { imageUrl: string }): Presentat
     lines: [],
     imageUrl: input.imageUrl,
     backgroundImageUrl: null,
+    ...(input.kenBurns && input.kenBurns > 0 ? { kenBurns: Math.min(120, input.kenBurns) } : {}),
+    ...(caption ? { caption } : {}),
   };
 }
