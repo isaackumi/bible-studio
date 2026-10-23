@@ -1419,7 +1419,7 @@ class Session {
     return list.trackIds.map((trackId) => byId.get(trackId)).filter((track): track is MediaAsset => !!track);
   };
 
-  playPlaylist = async (id: string, index = 0) => {
+  playPlaylist = async (id: string, index = 0, options: { loop?: boolean } = {}) => {
     const list = this.workspace.playlists.find((entry) => entry.id === id);
     const tracks = this.playlistTracks(id);
     if (!list || !tracks.length) {
@@ -1428,7 +1428,7 @@ class Session {
     }
     void this.measureTracks(tracks);
     this.backingSongId = null;
-    await this.audio.play(tracks, index, { playlistId: id, loop: list.loop });
+    await this.audio.play(tracks, index, { playlistId: id, loop: options.loop ?? list.loop });
   };
 
   /** Add audio files (paths from the desktop picker, or browser files), optionally to a playlist. */

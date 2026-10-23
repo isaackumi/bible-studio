@@ -50,6 +50,7 @@
   import Moon from "@lucide/svelte/icons/moon";
   import Music from "@lucide/svelte/icons/music";
   import Play from "@lucide/svelte/icons/play";
+  import Pause from "@lucide/svelte/icons/pause";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Scissors from "@lucide/svelte/icons/scissors";
   import Square from "@lucide/svelte/icons/square";
@@ -131,6 +132,7 @@
     "pin-off": PinOff,
     minus: Minus,
     play: Play,
+    pause: Pause,
     scissors: Scissors,
     square: Square,
     moon: Moon,

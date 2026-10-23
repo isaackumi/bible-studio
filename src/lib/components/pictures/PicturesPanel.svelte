@@ -19,7 +19,7 @@
       show.kenBurns ? t("Slow zoom") : "",
       show.captions ? t("Captions") : "",
       show.countdown ? t("Countdown") : "",
-      show.music && show.playlistId ? t("Music") : "",
+      show.music && playlists.length ? t("Music") : "",
     ].filter(Boolean).join(", "),
   );
 
@@ -178,12 +178,26 @@
               <span>{t("min")}</span>
             </div>
           {/if}
-          <label class="opt"><input type="checkbox" class="switch" checked={show.music} disabled={!playlists.length} onchange={(event) => pictures.setOptions({ music: event.currentTarget.checked, playlistId: show.playlistId ?? playlists[0]?.id ?? null })} /><span><b>{t("Music")}</b>{playlists.length ? t("A playlist plays with the pictures and fades out when the slideshow stops.") : t("Add music to a playlist (Audio, at the top) to play it with the pictures.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.music} onchange={(event) => { const on = event.currentTarget.checked; if (on && !playlists.length) { event.currentTarget.checked = false; void pictures.addMusic(); } else pictures.setOptions({ music: on, playlistId: show.playlistId ?? playlists[0]?.id ?? null }); }} /><span><b>{t("Music")}</b>{t("Songs play under the pictures, start again at the end, and fade out when the slideshow stops.")}</span></label>
           {#if show.music && playlists.length}
-            <div class="sub">
-              <select aria-label={t("Playlist")} value={show.playlistId ?? playlists[0]?.id} onchange={(event) => pictures.setOptions({ playlistId: event.currentTarget.value })}>
-                {#each playlists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
+            {@const listId = show.playlistId ?? playlists[0]?.id ?? null}
+            {@const ours = session.audio.playlistId === listId && !!session.audio.current}
+            <div class="sub music">
+              <select aria-label={t("Playlist")} value={listId} onchange={(event) => pictures.setOptions({ playlistId: event.currentTarget.value })}>
+                {#each playlists as list (list.id)}<option value={list.id}>{list.name} · {tn(list.trackIds.length, "{n} song", "{n} songs")}</option>{/each}
               </select>
+              <button type="button" class="btn" onclick={() => void pictures.addMusic()}><Icon name="plus" size={13} /> {t("Add music…")}</button>
+              <button type="button" class="btn" aria-pressed={ours && session.audio.playing} onclick={() => void pictures.testMusic()}><Icon name={ours && session.audio.playing ? "pause" : "play"} size={13} /> {ours && session.audio.playing ? t("Pause") : t("Test")}</button>
+            </div>
+            <div class="sub music-volume">
+              <Icon name="sound" size={14} />
+              <input type="range" min="0" max="1" step="0.05" aria-label={t("Music volume")} value={session.audio.volume} oninput={(event) => session.setAudioVolume(Number(event.currentTarget.value))} />
+              <span class="music-now" class:warn={!!session.audio.error || session.audio.volume === 0}>
+                {#if session.audio.error}{session.audio.error === "Press play to start the music." ? t("The computer held the music back. Press Test to start it.") : session.audio.error}
+                {:else if session.audio.volume === 0}{t("The volume is at zero.")}
+                {:else if ours && session.audio.playing}♪ {session.audio.current?.name.replace(/\.[a-z0-9]+$/i, "")}
+                {:else}{t("Press Test to hear it.")}{/if}
+              </span>
             </div>
           {/if}
           <label class="opt"><input type="checkbox" class="switch" checked={show.watch} onchange={(event) => pictures.setOptions({ watch: event.currentTarget.checked })} /><span><b>{t("Pick up new pictures")}</b>{t("Pictures added to the folder while it runs (a shared Drive folder) join the slideshow.")}</span></label>
@@ -279,4 +293,11 @@
   .sub .text { flex: 1; min-width: 0; }
   .sub .num { width: 64px; }
   .sub input, .sub select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; }
+  .music { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .music select { flex: 1; min-width: 140px; }
+  .music .btn { display: inline-flex; align-items: center; gap: 5px; }
+  .music-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .music-volume input { flex: 0 1 140px; accent-color: var(--accent); }
+  .music-now { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .music-now.warn { color: #f5a524; white-space: normal; }
 </style>

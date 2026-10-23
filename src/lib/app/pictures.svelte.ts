@@ -187,9 +187,10 @@ class Pictures {
     this.sequence = slideOrder(this.images, this.slideshow.order, from);
     this.position = 0;
     // Music first, so the first picture's take does not fade it (session.slideshowMusic).
+    // It loops for as long as the pictures run, whatever the playlist's own setting.
     if (this.slideshow.music && this.slideshow.playlistId) {
       session.slideshowMusic = true;
-      await session.playPlaylist(this.slideshow.playlistId);
+      if (session.audio.playlistId !== this.slideshow.playlistId || !session.audio.playing) await session.playPlaylist(this.slideshow.playlistId, 0, { loop: true });
     }
     if (this.slideshow.countdown) {
       const endsAt = Date.now() + this.slideshow.countdownMinutes * 60_000;
@@ -285,6 +286,34 @@ class Pictures {
       session.slideshowMusic = false;
       session.audio.fadeOut(4);
     }
+  };
+
+  /** The slideshow's playlist, made the first time music is added here. */
+  private musicPlaylist(): string {
+    const chosen = this.slideshow.playlistId && session.workspace.playlists.some((list) => list.id === this.slideshow.playlistId) ? this.slideshow.playlistId : null;
+    return chosen ?? session.createPlaylist(t("Slideshow music")).id;
+  }
+
+  /** Pick songs on this computer for the slideshow; music switches on with them. */
+  addMusic = async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({ multiple: true, filters: [{ name: "Audio", extensions: ["mp3", "m4a", "aac", "wav", "ogg", "oga", "flac"] }] });
+    const paths = Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : [];
+    if (!paths.length) return;
+    const playlistId = this.musicPlaylist();
+    const added = await session.importAudio(paths, playlistId);
+    if (added.length) this.setOptions({ music: true, playlistId });
+  };
+
+  /** Hear the slideshow's music now (or pause it), before the pictures start. */
+  testMusic = async () => {
+    const id = this.slideshow.playlistId;
+    if (!id) return;
+    if (session.audio.playlistId === id && session.audio.current) {
+      await session.audio.toggle();
+      return;
+    }
+    await session.playPlaylist(id, 0, { loop: true });
   };
 
   /** 1–30 seconds a picture; a running slideshow keeps going at the new pace. */
