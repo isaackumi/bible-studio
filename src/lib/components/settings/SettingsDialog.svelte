@@ -27,7 +27,7 @@
   import { canUse } from "../../platform/capabilities";
   import { APP_VERSION, isDesktop, openExternal } from "../../platform/runtime";
   import { SITE_URL } from "../../domain/billing";
-  import { openPrivacySettings, prepareListening } from "../../voice/listen";
+  import { onWindows, openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import BrandMark from "../BrandMark.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
@@ -104,10 +104,12 @@
     }
   }
 
+  const windows = onWindows();
+
   async function allowMicrophone() {
-    audioNote = "macOS may ask for the microphone…";
+    audioNote = windows ? t("Checking the microphone…") : t("macOS may ask for the microphone…");
     const blocked = await prepareListening();
-    audioNote = blocked ?? t("Microphone and Speech Recognition are allowed for Church Studio.");
+    audioNote = blocked?.message ?? (windows ? t("Windows lets Church Studio use the microphone.") : t("Microphone and Speech Recognition are allowed for Church Studio."));
     if (blocked) void openPrivacySettings();
   }
 
@@ -1603,9 +1605,9 @@
           </div>
           {#if canUse("voice-detect") && isDesktop()}
             <div class="row">
-              <div class="row-copy"><strong>{t("Microphone permission")}</strong><span>{audioNote || t("If macOS refused the mic, turn Church Studio on under Microphone and Speech Recognition.")}</span></div>
+              <div class="row-copy"><strong>{t("Microphone permission")}</strong><span>{audioNote || (windows ? t("Windows does not ask. If listening hears nothing, turn on the microphone for desktop apps in Windows Settings.") : t("If macOS refused the mic, turn Church Studio on under Microphone and Speech Recognition."))}</span></div>
               <div class="row-end">
-                <button type="button" class="btn primary" onclick={() => void allowMicrophone()}>{t("Allow")}</button>
+                <button type="button" class="btn primary" onclick={() => void allowMicrophone()}>{windows ? t("Check") : t("Allow")}</button>
                 <button type="button" class="btn" onclick={() => void openPrivacySettings()}>{t("Privacy settings")}</button>
               </div>
             </div>

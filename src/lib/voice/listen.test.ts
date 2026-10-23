@@ -26,9 +26,19 @@ describe("voice listen", () => {
   });
 
   it("names the System Settings toggle when macOS has denied the mic", () => {
-    expect(accessMessage({ microphone: "denied", speech: "granted" })).toContain("Microphone");
-    expect(accessMessage({ microphone: "granted", speech: "denied" })).toContain("Speech Recognition");
-    expect(accessMessage({ microphone: "granted", speech: "granted" })).toBeNull();
+    expect(accessMessage({ microphone: "denied", speech: "granted" }, false)).toContain("Microphone");
+    expect(accessMessage({ microphone: "granted", speech: "denied" }, false)).toContain("Speech Recognition");
+    expect(accessMessage({ microphone: "granted", speech: "granted" }, false)).toBeNull();
+  });
+
+  it("names the Windows switch that keeps the microphone away, since Windows never asks", () => {
+    const windows = (microphone: string, blocked?: string) => accessMessage({ microphone, speech: "unsupported", blocked }, true);
+    expect(windows("denied", "desktop")).toContain("Let desktop apps access your microphone");
+    expect(windows("denied", "apps")).toContain("Let apps access your microphone");
+    expect(windows("denied", "device")).toContain("Microphone access");
+    expect(windows("denied", "policy")).toContain("administrator");
+    expect(windows("none")).toContain("no microphone");
+    expect(windows("granted")).toBeNull();
   });
 });
 

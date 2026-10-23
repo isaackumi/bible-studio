@@ -211,6 +211,7 @@ import {
   type VoiceCommand,
 } from "../voice/commands";
 import {
+  onWindows,
   openPrivacySettings,
   prepareListening,
   startListening,
@@ -265,6 +266,9 @@ const DEFAULTS_KEY = "church-studio.service-defaults";
 const LEADER_OVERLAY = "service-leader";
 /** A trial setup should have started (it was offline then). */
 const AUTO_TRIAL_KEY = "cs-auto-trial";
+/** Below this the microphone gives digital silence: blocked, muted or unplugged, not a quiet room. */
+const SILENT_LEVEL = 0.005;
+const SILENCE_HINT_MS = 10_000;
 /** The last sign-in reminder given during the trial ("halfway", "ending"). */
 const TRIAL_NUDGE_KEY = "cs-trial-nudge";
 function readFlag(key: string): string | null {
@@ -2781,14 +2785,17 @@ class Session {
     const blocked = await prepareListening();
     if (this.voice.status !== "starting") return;
     if (blocked) {
-      this.voice = { ...this.voice, status: "error", error: "denied", message: blocked };
+      this.voice = { ...this.voice, status: "error", error: blocked.kind, message: blocked.message };
       return;
     }
+    // A blocked or muted microphone gives silence, not an error (Windows never asks a desktop app).
+    let soundReached = false;
     const handlers = {
       onHeard: (text: string, final: boolean, alternatives: string[], latest: string) =>
         this.handleVoiceHeard(text, final, alternatives, latest),
       onLevel: (level: number) => {
         this.voice.level = level;
+        if (level > SILENT_LEVEL) soundReached = true;
       },
       onError: (message: string, kind: ListenErrorKind) => {
         this.voice = { ...this.voice, status: "error", error: kind, message, level: 0 };
@@ -2814,11 +2821,23 @@ class Session {
     const cloudKey = engine === "elevenlabs" || engine === "deepgram" ? this.workspace.voice.speechKeys?.[engine] : undefined;
     if ((engine === "elevenlabs" || engine === "deepgram") && cloudKey) {
       this.stopVoiceEngine = startCloudListening(handlers, { service: engine, key: cloudKey, words, filter });
+      this.watchForSilence(this.stopVoiceEngine, () => soundReached);
       return;
     }
     const local = engine === "accurate" ? "accurate" : "system";
     this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, words, local) : startListening(handlers, filter);
+    this.watchForSilence(this.stopVoiceEngine, () => soundReached);
   };
+
+  /** Still nothing from the microphone after a while: say where to look instead of waiting quietly. */
+  private watchForSilence(engine: (() => void) | null, reached: () => boolean) {
+    window.setTimeout(() => {
+      if (this.stopVoiceEngine !== engine || this.voice.status !== "listening" || reached()) return;
+      this.voice.message = onWindows()
+        ? t("Nothing is reaching the microphone. Check it is plugged in and not muted, and that Windows Settings › Privacy & security › Microphone lets desktop apps use it.")
+        : t("Nothing is reaching the microphone. Check it is plugged in, not muted, and chosen as the computer's input.");
+    }, SILENCE_HINT_MS);
+  }
 
   stopVoice = (message = t("Listening stopped.")) => {
     const stop = this.stopVoiceEngine;

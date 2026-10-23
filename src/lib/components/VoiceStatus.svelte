@@ -55,6 +55,8 @@
   {/if}
   {#if voice.status === "error" && voice.error === "denied" && isDesktop()}
     <button type="button" class="desk-btn" onclick={session.openVoicePrivacy}>{t("Open Privacy settings")}</button>
+  {:else if voice.status === "error" && voice.error === "no-mic" && isDesktop()}
+    <button type="button" class="desk-btn" onclick={session.openVoicePrivacy}>{t("Open Sound settings")}</button>
   {/if}
 </div>
 

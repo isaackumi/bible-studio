@@ -4,7 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "../platform/runtime";
 import { t } from "../i18n/core";
 
-export type ListenAccess = { microphone: string; speech: string };
+/** `blocked` (Windows): which privacy switch is off when the microphone is "denied". */
+export type ListenAccess = { microphone: string; speech: string; blocked?: string };
 
 /** Why listening could not run. The desk shows a different state for each. */
 export type ListenErrorKind = "denied" | "no-mic" | "unsupported" | "network" | "failed";
@@ -21,7 +22,33 @@ export type ListenHandlers = {
 /** Consecutive Web Speech "network" errors before listening gives up instead of looping silently. */
 export const NETWORK_RETRIES = 3;
 
-export function accessMessage(access: ListenAccess): string | null {
+/** Where the computer's settings for the microphone live. */
+export type PrivacyPane = "microphone" | "speech" | "screen" | "sound";
+
+export function onWindows(): boolean {
+  return typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
+}
+
+/** Windows never asks a desktop app for the microphone: each switch that blocks it is named. */
+function windowsMessage(access: ListenAccess): string | null {
+  if (access.microphone === "none") {
+    return t("Windows found no microphone. Plug one in, or choose it under Settings › System › Sound › Input.");
+  }
+  if (access.microphone !== "denied") return null;
+  switch (access.blocked) {
+    case "policy":
+      return t("This computer's administrator turned off the microphone for apps. Ask them to allow it.");
+    case "device":
+      return t("Windows has the microphone turned off. In Settings › Privacy & security › Microphone, turn on Microphone access.");
+    case "apps":
+      return t("Windows keeps apps from the microphone. In Settings › Privacy & security › Microphone, turn on Let apps access your microphone.");
+    default:
+      return t("Windows keeps desktop apps from the microphone. In Settings › Privacy & security › Microphone, turn on Let desktop apps access your microphone.");
+  }
+}
+
+export function accessMessage(access: ListenAccess, windows = onWindows()): string | null {
+  if (windows) return windowsMessage(access);
   if (access.microphone === "denied") {
     return t("macOS blocked the microphone. In System Settings → Privacy & Security → Microphone, turn on Church Studio.");
   }
@@ -31,18 +58,26 @@ export function accessMessage(access: ListenAccess): string | null {
   return null;
 }
 
-export async function prepareListening(): Promise<string | null> {
+/** The settings page that fixes the last refusal: Sound when Windows found no microphone. */
+let fixPane: PrivacyPane = "microphone";
+
+/** Ask for (macOS) or check (Windows) the microphone before listening. Null when it may be used. */
+export async function prepareListening(): Promise<{ message: string; kind: ListenErrorKind } | null> {
   if (!isDesktop()) return null;
   try {
     const access = await invoke<ListenAccess>("request_listen_access");
-    return accessMessage(access);
+    const message = accessMessage(access);
+    if (!message) return null;
+    const missing = access.microphone === "none";
+    fixPane = missing ? "sound" : "microphone";
+    return { message, kind: missing ? "no-mic" : "denied" };
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    return { message: error instanceof Error ? error.message : String(error), kind: "denied" };
   }
 }
 
-/** System Settings › Privacy at the microphone, or (`screen`) at Screen & System Audio Recording. */
-export async function openPrivacySettings(pane: "microphone" | "screen" = "microphone"): Promise<void> {
+/** The computer's privacy settings at the microphone, or at the page that fixed the last refusal. */
+export async function openPrivacySettings(pane: PrivacyPane = fixPane): Promise<void> {
   if (!isDesktop()) return;
   await invoke("open_privacy_settings", { pane });
 }

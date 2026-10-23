@@ -5,6 +5,10 @@ use serde::Serialize;
 pub struct ListenAccess {
     pub microphone: String,
     pub speech: String,
+    /// Windows: which privacy switch is off when `microphone` is "denied" ("device", "apps",
+    /// "desktop" or "policy"), so the desk can name it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<String>,
 }
 
 /// Open System Settings › Privacy at the microphone, or (`screen`) at Screen & System Audio Recording.
@@ -18,10 +22,26 @@ pub fn open_privacy_settings(pane: Option<&str>) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         Ok(())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // Windows has no screen-recording switch; "sound" is where a missing or muted mic is fixed.
+        let page = match pane {
+            Some("speech") => "ms-settings:privacy-speech",
+            Some("sound") => "ms-settings:sound",
+            _ => "ms-settings:privacy-microphone",
+        };
+        std::process::Command::new("explorer.exe")
+            .arg(page)
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = pane;
-        Err("Privacy settings are opened on macOS.".into())
+        Err("Privacy settings are opened on macOS and Windows.".into())
     }
 }
 
@@ -174,7 +194,56 @@ mod helper {
 /// Windows: the offline recognizer built into Windows, through a bundled PowerShell script.
 #[cfg(target_os = "windows")]
 mod windows {
+    use super::ListenAccess;
     use tauri::Manager;
+
+    const CONSENT: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+
+    /// Windows never asks a desktop app for the microphone: it hands over silence when a privacy
+    /// switch is off. Read the switches, so the desk can say which one to turn on.
+    pub fn access() -> ListenAccess {
+        let blocked = blocked_switch();
+        let microphone = if blocked.is_some() {
+            "denied"
+        } else if has_microphone() {
+            "granted"
+        } else {
+            "none"
+        };
+        ListenAccess { microphone: microphone.into(), speech: "unsupported".into(), blocked: blocked.map(str::to_string) }
+    }
+
+    fn denies(root: &windows_registry::Key, path: &str) -> bool {
+        root.open(path)
+            .and_then(|key| key.get_string("Value"))
+            .is_ok_and(|value| value.trim().eq_ignore_ascii_case("Deny"))
+    }
+
+    fn blocked_switch() -> Option<&'static str> {
+        // An organization's policy: 2 = always deny.
+        let policy = windows_registry::LOCAL_MACHINE
+            .open(r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy")
+            .and_then(|key| key.get_u32("LetAppsAccessMicrophone"))
+            .ok();
+        if policy == Some(2) {
+            return Some("policy");
+        }
+        if denies(windows_registry::LOCAL_MACHINE, CONSENT) {
+            return Some("device");
+        }
+        if denies(windows_registry::CURRENT_USER, CONSENT) {
+            return Some("apps");
+        }
+        if denies(windows_registry::CURRENT_USER, &format!(r"{CONSENT}\NonPackaged")) {
+            return Some("desktop");
+        }
+        None
+    }
+
+    fn has_microphone() -> bool {
+        use cpal::traits::HostTrait;
+        cpal::default_host().default_input_device().is_some()
+    }
 
     /// With the filter on, the recognizer hears audio cleaned here instead of the microphone.
     pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: crate::noise::Filter, words: &str) -> Result<(), String> {
@@ -211,11 +280,16 @@ pub fn request_access() -> Result<ListenAccess, String> {
         }
         macos::request_access()
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        Ok(windows::access())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Ok(ListenAccess {
             microphone: "unsupported".into(),
             speech: "unsupported".into(),
+            blocked: None,
         })
     }
 }
@@ -394,6 +468,7 @@ mod macos {
         Ok(ListenAccess {
             microphone: request_microphone()?,
             speech: request_speech()?,
+            blocked: None,
         })
     }
 
