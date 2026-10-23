@@ -257,12 +257,12 @@
 
       <section class="slideshow" aria-label={t("Slideshow settings")}>
         <h3>{t("Slideshow settings")}</h3>
-        <label class="field">
+        <label class="setting">
           <span>{t("Each picture")}</span>
           <input type="range" min="1" max="30" step="1" value={pictures.slideshow.seconds} aria-label={t("Seconds for each picture")} oninput={(event) => pictures.setSeconds(Number(event.currentTarget.value))} />
           <b>{tn(pictures.slideshow.seconds, "{n} second", "{n} seconds")}</b>
         </label>
-        <div class="field">
+        <div class="setting">
           <span>{t("Change")}</span>
           <div class="seg changes" role="radiogroup" aria-label={t("How pictures change")}>
             {#each CHANGES as change (change.id)}
@@ -271,7 +271,7 @@
           </div>
         </div>
         {#if pictures.slideshow.transition !== "cut"}
-          <label class="field">
+          <label class="setting">
             <span>{t("Change takes")}</span>
             <input type="range" min="0.3" max="3" step="0.1" value={pictures.slideshow.transitionSeconds} aria-label={t("Seconds for each change")} oninput={(event) => pictures.setOptions({ transitionSeconds: Number(event.currentTarget.value) })} />
             <b>{t("{seconds} s", { seconds: pictures.slideshow.transitionSeconds.toFixed(1) })}</b>
@@ -280,7 +280,7 @@
         <!-- Every choice is the church's to switch on or off, in three groups; remembered on this computer. -->
         <details class="options" open={wide || undefined}>
           <summary><span>{t("Playing")}</span>{#if playingOn}<small>{playingOn}</small>{/if}<Icon name="chevron-down" size={14} /></summary>
-          <div class="field">
+          <div class="setting">
             <span>{t("Order")}</span>
             <div class="seg" role="radiogroup" aria-label={t("Order")}>
               {#each [["name", t("In order")], ["newest", t("Newest first")], ["shuffle", t("Shuffle")]] as [id, label] (id)}
@@ -447,7 +447,46 @@
   .grid button { display: block; width: 100%; aspect-ratio: 16 / 11; padding: 0; border: 2px solid transparent; border-radius: 8px; background: #000; overflow: hidden; cursor: pointer; }
   .grid button.on { border-color: var(--accent); }
   .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .slideshow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  /* Settings: one rhythm. Labels share a column, toggles sit in a column of their own, and anything
+     a toggle opens lines up under its words. */
+  .slideshow { --toggle: 40px; --toggle-gap: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 14px 14px 10px; border: 1px solid var(--line); border-radius: 12px; }
+  .slideshow > h3 { margin: 0 0 6px; }
+  .setting { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 36px; color: var(--muted); font-size: 12.5px; }
+  .setting input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .setting b { min-width: 64px; color: var(--ink); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .seg { display: inline-flex; flex-wrap: wrap; justify-self: start; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, currentColor 7%, transparent); }
+  .seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .seg button:hover:not(.on) { color: var(--ink); }
+  .seg button.on { background: var(--panel-2, #2a2a30); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
+  .setting .seg { grid-column: 2 / -1; }
+  .options { margin-top: 6px; border-top: 1px solid var(--line); }
+  .options summary { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; list-style: none; font-size: 13px; font-weight: 700; }
+  .options summary::-webkit-details-marker { display: none; }
+  .options summary small { flex: 1; min-width: 0; color: var(--accent); font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .options summary :global(svg) { margin-left: auto; color: var(--muted); transition: transform 150ms; }
+  .options[open] summary :global(svg) { transform: rotate(180deg); }
+  /* A <details> does not lay out its contents as a grid, so the spacing is margins on each row. */
+  .options[open] { padding-bottom: 4px; }
+  .options > :not(summary) { margin: 0 0 14px; }
+  .options > .opt:has(+ .sub) { margin-bottom: 8px; }
+  .options > .sub + .sub { margin-top: -6px; }
+  .opt { display: grid; grid-template-columns: var(--toggle) minmax(0, 1fr); gap: var(--toggle-gap); align-items: start; cursor: pointer; }
+  .opt input { margin: 1px 0 0; }
+  .opt span { display: grid; gap: 2px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .opt b { color: var(--ink); font-size: 13px; font-weight: 650; line-height: 1.3; }
+  /* What a toggle opens: under its words, not under the toggle. */
+  .sub { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 12px; }
+  .options > .sub { margin-left: calc(var(--toggle) + var(--toggle-gap)); }
+  .sub .text { flex: 1; min-width: 0; }
+  .sub .num { width: 64px; }
+  .sub input, .sub select { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; }
+  .music { flex-wrap: wrap; }
+  .music select { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+  .music .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; }
+  .tracks { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .music-volume input { flex: 0 1 150px; accent-color: var(--accent); }
+  .music-now { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .music-now.warn { color: #f5a524; white-space: normal; }
   h3 { margin: 0; font-size: 13px; font-weight: 700; }
   /* The player: the picture, start or stop, and the two other things to do with it. */
   .player { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
@@ -464,35 +503,6 @@
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--onair, #f21b1b); animation: blink 1.4s ease-in-out infinite; }
   @keyframes blink { 50% { opacity: 0.3; } }
   @media (prefers-reduced-motion: reduce) { .live i { animation: none; } }
-  .field { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
-  .field input[type="range"] { flex: 1; }
-  .field b { min-width: 76px; color: var(--ink); font-weight: 650; text-align: right; }
-  .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, currentColor 7%, transparent); }
-  .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-  .seg button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
-  .seg.changes { flex-wrap: wrap; }
-  .options { border-top: 1px solid var(--line); padding-top: 8px; }
-  .options summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 700; }
-  .options summary::-webkit-details-marker { display: none; }
-  .options summary small { flex: 1; min-width: 0; color: var(--accent); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .options summary :global(svg) { margin-left: auto; color: var(--muted); transition: transform 150ms; }
-  .options[open] summary :global(svg) { transform: rotate(180deg); }
-  .options[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .opt { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-  .opt input { flex: none; margin-top: 2px; }
-  .opt span { display: grid; gap: 1px; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  .opt b { color: var(--ink); font-size: 12.5px; font-weight: 650; }
-  .sub { display: flex; align-items: center; gap: 6px; min-width: 0; margin: -4px 0 0 46px; color: var(--muted); font-size: 12px; }
-  .sub .text { flex: 1; min-width: 0; }
-  .sub .num { width: 64px; }
-  .sub input, .sub select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; }
-  .music { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .music select { flex: 1 1 140px; min-width: 0; max-width: 100%; }
-  .tracks { margin-top: -2px; display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .import-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
-  .music .btn { display: inline-flex; align-items: center; gap: 5px; }
-  .music-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); }
-  .music-volume input { flex: 0 1 140px; accent-color: var(--accent); }
-  .music-now { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .music-now.warn { color: #f5a524; white-space: normal; }
+
 </style>

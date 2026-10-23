@@ -4316,4 +4316,5 @@ export const es: Readonly<Record<string, string>> = {
   "Import from computer…": "Importar del ordenador…",
   "Use {n} song": "Usar {n} canción",
   "Use {n} songs": "Usar {n} canciones",
+  "Search questions or names": "Buscar preguntas o nombres",
 };

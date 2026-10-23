@@ -134,6 +134,8 @@
     </div>
 
     {#if tab === "questions"}
+      <!-- How questions come in, which to show, and finding one: together, above the list. -->
+      <div class="q-tools">
       <div class="switches">
         <label><input type="checkbox" class="switch" checked={view?.room.open ?? true} onchange={(event) => audienceRoom.settings({ open: event.currentTarget.checked })} /> {t("Taking questions")}</label>
         <label><input type="checkbox" class="switch" checked={view?.room.moderate ?? true} onchange={(event) => audienceRoom.settings({ moderate: event.currentTarget.checked })} /> {t("Hold for approval")}</label>
@@ -144,13 +146,18 @@
         {/each}
       </div>
       <div class="find">
-        <input type="search" placeholder={t("Search questions")} aria-label={t("Search questions")} bind:value={query} />
+        <label class="search">
+          <Icon name="search" size={15} />
+          <input type="text" placeholder={t("Search questions or names")} aria-label={t("Search questions")} bind:value={query} />
+          {#if query}<button type="button" class="clear" aria-label={t("Clear search")} onclick={() => (query = "")}><Icon name="close" size={13} /></button>{/if}
+        </label>
         <select aria-label={t("Order")} bind:value={sort}>
           <option value="top">{t("Most votes")}</option>
           <option value="trending">{t("Trending")}</option>
           <option value="newest">{t("Newest")}</option>
           <option value="oldest">{t("Oldest")}</option>
         </select>
+      </div>
       </div>
       <ol class="list">
         {#each shown as question (question.id)}
@@ -225,16 +232,20 @@
   .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
   .tabs button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
   .tabs b { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; }
-  .switches { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); }
+  .q-tools { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .switches { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); }
   .switches label { display: flex; align-items: center; gap: 6px; }
   .filters { display: flex; flex-wrap: wrap; gap: 6px; }
   .filters button { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .filters button span { margin-left: 4px; opacity: 0.7; }
   .filters button.on { border-color: transparent; background: var(--ink); color: var(--panel); }
-  .find { display: flex; gap: 6px; }
-  .find input, .find select { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: inherit; font: inherit; }
-  .find input { flex: 1 1 auto; width: 100%; min-width: 0; }
-  .find select { flex: none; width: auto; }
+  .find { display: flex; gap: 8px; }
+  .search { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: var(--muted); cursor: text; }
+  .search:focus-within { border-color: var(--accent); color: var(--ink); }
+  .search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
+  .search .clear { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+  .search .clear:hover { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--ink); }
+  .find select { flex: none; width: auto; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: inherit; font: inherit; font-size: 12.5px; }
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .list li { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field, rgb(255 255 255 / 0.02)); }
   .list li.featured { border-color: #f2c46b; }

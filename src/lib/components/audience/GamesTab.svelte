@@ -392,12 +392,13 @@
   .game strong { font-size: 13px; }
   .game span { color: var(--muted); font-size: 12px; }
   .note { margin: 0; color: var(--muted); font-size: 12px; }
-  .find { display: grid; gap: 6px; }
-  .search { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); }
-  .search:focus-within { border-color: var(--accent); }
-  .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; outline: none; }
+  .find { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: var(--muted); }
+  .search:focus-within { border-color: var(--accent); color: var(--ink); }
+  .search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
+  .search .x { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; font-size: 16px; }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-  .chips button { height: 24px; padding: 0 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+  .chips button { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
   .chips button.on { background: var(--ink); border-color: var(--ink); color: var(--panel); }
   .btn.icon { width: 28px; padding: 0; display: inline-grid; place-items: center; }
   .btn.armed { border-color: var(--danger, #ff6b6b); color: var(--danger, #ff6b6b); }
