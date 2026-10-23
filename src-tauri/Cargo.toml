@@ -53,6 +53,10 @@ cpal = "0.15"
 nnnoiseless = { version = "0.5", default-features = false }
 whisper-rs = { version = "0.16", features = ["log_backend"] }
 
+# The computer's id (license binding) read straight from the registry: already part of Tauri's build.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-registry = "0.6"
+
 [profile.release]
 codegen-units = 1
 lto = true

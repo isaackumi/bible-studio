@@ -141,9 +141,27 @@ fn hardware_id() -> Option<String> {
     line.split('"').nth(3).map(str::to_string)
 }
 
+/// Windows: the MachineGuid, read in this process (a few microseconds). Starting reg.exe for it took
+/// 4–5 s on a fresh Windows (a console program from a window app), on the main thread at launch:
+/// long enough for Windows to call the desk "Not responding". reg.exe stays as the fallback, so a
+/// computer's id never changes.
 #[cfg(target_os = "windows")]
 fn hardware_id() -> Option<String> {
-    let output = std::process::Command::new("reg").args(["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"]).output().ok()?;
+    let direct = windows_registry::LOCAL_MACHINE
+        .open(r"SOFTWARE\Microsoft\Cryptography")
+        .and_then(|key| key.get_string("MachineGuid"))
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty());
+    if direct.is_some() {
+        return direct;
+    }
+    use std::os::windows::process::CommandExt;
+    let output = std::process::Command::new("reg")
+        .args(["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"])
+        .creation_flags(0x0800_0000) // no console window
+        .output()
+        .ok()?;
     String::from_utf8_lossy(&output.stdout).split_whitespace().last().map(str::to_string)
 }
 
