@@ -248,6 +248,9 @@ describe("server API", () => {
     expect(home).toContain("Is it an alternative to ProPresenter or EasyWorship?");
     const { INDEXNOW_KEY } = await import("./api");
     expect(await (await handleApi(new Request(`https://keys.test/${INDEXNOW_KEY}.txt`), config)).text()).toBe(INDEXNOW_KEY);
+    const bing = await handleApi(new Request("https://keys.test/BingSiteAuth.xml"), config);
+    expect(bing.headers.get("content-type")).toContain("xml");
+    expect(await bing.text()).toContain("<user>272107FAAAFFA1D285614330D422B926</user>");
     // An address that is not there: a page for people, JSON for the app.
     const lost = await handleApi(new Request("https://keys.test/no-such-page"), config);
     expect(lost.status).toBe(404);

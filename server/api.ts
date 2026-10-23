@@ -248,6 +248,8 @@ const POLICIES_UPDATED = "2026-10-21";
 
 /** IndexNow's key for this site: Bing and others are told of new pages at once (see deploy-site.yml). Public by design. */
 export const INDEXNOW_KEY = "34a4867a826cb0db20eac1271c1a63a5";
+/** Bing Webmaster Tools' proof that this site is ours (public by design, like the IndexNow key). */
+export const BING_SITE_AUTH = "272107FAAAFFA1D285614330D422B926";
 
 /**
  * Who may read the site. Everyone may read the public pages; the AI assistants' crawlers are named
@@ -307,6 +309,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === "/llms.txt") return text200(llmsTxt(origin, await releasedVersion(config)), "text/markdown; charset=utf-8");
     if (path === "/llms-full.txt") return text200(llmsFullTxt(origin, site, await releasedVersion(config)), "text/markdown; charset=utf-8");
     if (path === `/${INDEXNOW_KEY}.txt`) return text200(INDEXNOW_KEY, "text/plain; charset=utf-8");
+    if (path === "/BingSiteAuth.xml") return text200(`<?xml version="1.0"?>\n<users>\n\t<user>${BING_SITE_AUTH}</user>\n</users>\n`, "application/xml; charset=utf-8");
     if (path === "/sitemap.xml") return text200(sitemap(origin), "application/xml; charset=utf-8");
     if (path === "/terms") return html(200, termsPage(site));
     if (path === "/privacy") return html(200, privacyPage(site));
