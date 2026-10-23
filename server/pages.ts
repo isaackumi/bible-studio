@@ -93,7 +93,9 @@ const METHOD_LABELS: Record<string, { label: string; icon: string }> = {
 
 /** The browser side of signing the app in: choose how, then tap the number the app shows. */
 export function signinPage({ state, id, mode = "number", device, place, email, methods = [], choices = [], retry = false }: SigninView): string {
-  const asked = `<b>${escape(device ?? "your computer")}</b>${place ? ` in ${escape(place)}` : ""}`;
+  // Computers are named "Church Studio · Mac": the page already says Church Studio, so name the computer alone.
+  const computer = (device ?? "").replace(/^Church Studio\s*·\s*/i, "").trim() || "your computer";
+  const asked = `<b>${escape(computer)}</b>${place ? ` in ${escape(place)}` : ""}`;
   const social = methods.filter((method) => METHOD_LABELS[method]);
   const body =
     state === "missing"
@@ -177,8 +179,8 @@ export function signinPage({ state, id, mode = "number", device, place, email, m
   .method { display: flex; align-items: center; justify-content: center; gap: 10px; height: 46px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-weight: 650; cursor: pointer; transition: border-color .15s, transform .1s; }
   .method:hover { border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); } .method:active { transform: scale(.99); }
   .or { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--muted); font-size: 13px; } .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-  .email { display: grid; gap: 10px; }
-  .email input { height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
+  .email { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .email input { box-sizing: border-box; width: 100%; min-width: 0; height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
   .email input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
   .email button { height: 46px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } .email button:hover { filter: brightness(1.06); }
   .sent { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
@@ -198,8 +200,8 @@ export function signinPage({ state, id, mode = "number", device, place, email, m
   @media (max-width: 460px) { .sent-actions { grid-template-columns: 1fr; } }
   .email button:disabled { opacity: .7; cursor: default; }
   .msg { min-height: 20px; margin: 14px 0 0; font-size: 14px; color: var(--muted); } .msg.good { color: var(--good); font-weight: 650; }
-  .code { display: grid; gap: 10px; margin-bottom: 20px; }
-  .code input { height: 56px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-size: 26px; font-weight: 800; letter-spacing: .3em; text-align: center; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .code { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 20px; }
+  .code input { box-sizing: border-box; width: 100%; min-width: 0; height: 56px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-size: 26px; font-weight: 800; letter-spacing: .3em; text-align: center; text-transform: uppercase; font-variant-numeric: tabular-nums; }
   .code input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 1px; }
   button.primary { width: 100%; height: 46px; margin-bottom: 20px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 750; cursor: pointer; } button.primary:hover { filter: brightness(1.06); }
   .code button.primary { margin-bottom: 0; }
