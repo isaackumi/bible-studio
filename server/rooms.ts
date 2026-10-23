@@ -66,7 +66,10 @@ export type ActivityQuestion = {
  */
 export type Activity =
   | { kind: "none" }
-  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number };
+  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number };
+
+/** When answers open: after the reading time, if the desk asked for one. */
+const opensAt = (activity: { openedAt: number; opensAt?: number }) => activity.opensAt ?? activity.openedAt;
 
 /**
  * Someone who joined. `n` is their public number (join order) and picks their colour; `gain` is what
@@ -195,7 +198,8 @@ export function publicActivity(state: RoomState, pid: string | null, now: number
     total: activity.total,
     phase: activity.phase,
     question,
-    endsAt: activity.question.seconds ? activity.openedAt + activity.question.seconds * 1000 : null,
+    opensAt: opensAt(activity),
+    endsAt: activity.question.seconds ? opensAt(activity) + activity.question.seconds * 1000 : null,
     now,
     answered: mine ? mine.choice : null,
     ...(reveal ? { correct: activity.kind === "quiz" ? correct : undefined, counts } : {}),
@@ -210,6 +214,18 @@ function standing(state: RoomState, pid: string) {
   const all = ranking(state, Number.MAX_SAFE_INTEGER).top;
   const me = all.find((entry) => entry.n === (person.n ?? -1));
   return { gain: person.gain ?? 0, streak: person.streak ?? 0, rank: me?.rank ?? null, players: all.length };
+}
+
+/** The first right answer to the question that is open (a quiz): who, and how quickly. */
+export function fastest(state: RoomState): { n: number; name: string; ms: number } | null {
+  const activity = state.activity;
+  if (activity.kind !== "quiz") return null;
+  let best: { pid: string; at: number } | null = null;
+  for (const [pid, answer] of Object.entries(state.answers)) {
+    if (answer.choice === activity.question.correct && (!best || answer.at < best.at)) best = { pid, at: answer.at };
+  }
+  const person = best && state.participants[best.pid];
+  return best && person ? { n: person.n ?? 0, name: person.name || "Guest", ms: Math.max(0, best.at - opensAt(activity)) } : null;
 }
 
 /** The top of the leaderboard (names and scores only). */
@@ -366,7 +382,7 @@ export class RoomCore {
     const activity = state.activity;
     if (activity.kind === "none" || activity.phase !== "open") return fail(409, "Answers are closed.");
     const now = this.now();
-    if (activity.question.seconds && now > activity.openedAt + activity.question.seconds * 1000 + 1500) return fail(409, "Time is up.");
+    if (activity.question.seconds && now > opensAt(activity) + activity.question.seconds * 1000 + 1500) return fail(409, "Time is up.");
     const index = Number(choice);
     if (!Number.isInteger(index) || index < 0 || index >= activity.question.choices.length) return fail(400, "Choose one of the answers.");
     if (state.answers[pid]) return fail(409, "You have answered already.");
@@ -391,6 +407,7 @@ export class RoomCore {
         answered: Object.keys(state.answers).length,
         leaderboard: leaderboard(state, 10),
         ranking: ranking(state, 10),
+        fastest: fastest(state),
         // Who is here, newest last (the lobby shows names popping in).
         joined: Object.values(state.participants)
           .sort((a, b) => a.joinedAt - b.joinedAt)
@@ -458,7 +475,7 @@ export class RoomCore {
    * The desk runs quizzes and polls: it sends each question to open it, then closes it and reveals
    * the answer. Scores are given at reveal: points for a right answer, more for a quicker one.
    */
-  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown }): Promise<Result<{ ok: true }>> {
+  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown }): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
@@ -468,7 +485,9 @@ export class RoomCore {
       if (!question) return fail(400, "A question needs words and two or more answers.");
       const kind = input.kind === "poll" ? "poll" : "quiz";
       if (kind === "quiz" && question.correct === undefined) return fail(400, "Mark the right answer.");
-      state.activity = { kind, game: clean(input.game, 80), round: Math.max(1, Number(input.round) || 1), total: Math.max(1, Number(input.total) || 1), question, phase: "open", openedAt: now };
+      // Reading time first (up to ten seconds): the clock and the quick bonus start when it ends.
+      const readMs = Math.min(10_000, Math.max(0, Math.round(Number(input.readMs) || 0)));
+      state.activity = { kind, game: clean(input.game, 80), round: Math.max(1, Number(input.round) || 1), total: Math.max(1, Number(input.total) || 1), question, phase: "open", openedAt: now, ...(readMs ? { opensAt: now + readMs } : {}) };
       state.answers = {};
     } else if (input.action === "close") {
       if (state.activity.kind === "none") return fail(409, "Nothing is open.");
@@ -488,7 +507,7 @@ export class RoomCore {
           // Up to half as many points again for answering quickly, and 100 more for each right
           // answer in a row after the first (up to 500).
           const seconds = activity.question.seconds || 30;
-          const quick = Math.max(0, 1 - (answer.at - activity.openedAt) / (seconds * 1000));
+          const quick = Math.min(1, Math.max(0, 1 - (answer.at - opensAt(activity)) / (seconds * 1000)));
           person.streak = (person.streak ?? 0) + 1;
           const gain = Math.round(activity.question.points * (1 + quick / 2)) + Math.min(500, (person.streak - 1) * 100);
           person.gain = gain;

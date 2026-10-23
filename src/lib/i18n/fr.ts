@@ -4425,4 +4425,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Book reading": "Lecture d’un livre",
   "A topic": "Un sujet",
   "Open AI settings": "Ouvrir les réglages de l’IA",
+  "Get ready countdown": "Compte à rebours Préparez-vous",
+  "Each question shows alone for 4 seconds to read, then the answers open and the clock starts.": "Chaque question s’affiche seule 4 secondes pour la lire, puis les réponses s’ouvrent et le chrono démarre.",
+  "Runs by itself": "Se déroule tout seul",
+  "After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.": "Après chaque réponse, le classement, puis la question suivante, sans un clic ; le podium à la fin. L’écran doit suivre le jeu.",
 };

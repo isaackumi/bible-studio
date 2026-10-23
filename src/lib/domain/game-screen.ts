@@ -22,6 +22,10 @@ export type GameScreenData = {
   counts: number[];
   /** When answers close, on this computer's clock (ms); null: until the operator stops them. */
   endsAt: number | null;
+  /** When answers open, after the reading time (ms); null: already open, or no reading time. */
+  opensAt: number | null;
+  /** The first right answer, once answers are closed: who, and how quickly. */
+  fastest: { n: number; name: string; ms: number } | null;
   seconds: number;
   answered: number;
   players: number;

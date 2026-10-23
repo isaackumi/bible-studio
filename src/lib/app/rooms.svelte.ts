@@ -31,7 +31,7 @@ export type RoomQuestion = {
 export type ActivityQuestion = { id: string; prompt: string; choices: string[]; correct?: number; seconds: number; points: number; image?: string };
 export type RoomActivity =
   | { kind: "none" }
-  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number };
+  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number };
 
 export type HostView = {
   room: { name: string; code: string; open: boolean; moderate: boolean; createdAt: number };
@@ -45,6 +45,8 @@ export type HostView = {
   ranking?: { players: number; top: GamePlayer[]; bottom: GamePlayer[] };
   /** Who joined, newest last (the game lobby). */
   joined?: Array<{ n: number; name: string }>;
+  /** The first right answer to the open question: who, and how quickly. */
+  fastest?: { n: number; name: string; ms: number } | null;
 };
 
 type Saved = { code: string; hostKey: string; joinUrl: string };
@@ -53,6 +55,11 @@ const POLL_MS = 2000;
 /** While a game is on the screen or answers are coming in: every second, so the screen keeps up. */
 const GAME_POLL_MS = 1000;
 const GAME_PREFS = "church-studio:game-screen";
+/** Reading time before answers open, when the Get ready countdown is on. */
+const READ_MS = 4000;
+/** Running by itself: how long the answer stays up, then the leaderboard, before the next question. */
+const AUTO_RESULTS_MS = 6000;
+const AUTO_BOARD_MS = 7000;
 
 function readSaved(): Saved | null {
   try {
@@ -138,7 +145,7 @@ class AudienceRoom {
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
   settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
-  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores"; kind?: "quiz" | "poll"; game?: string; round?: number; total?: number; question?: ActivityQuestion }) => this.call("activity", input);
+  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores"; kind?: "quiz" | "poll"; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number }) => this.call("activity", input);
 
   /** Ask the room what is new; while the panel is open, again every two seconds. */
   poll = async (): Promise<void> => {
@@ -265,8 +272,10 @@ class AudienceRoom {
     const question = this.question;
     if (!run || !question) return;
     this.askedAt = Date.now();
+    this.opensAt = this.askedAt + (this.ready ? READ_MS : 0);
     const opened = await this.activity({
       action: "open",
+      readMs: this.ready ? READ_MS : 0,
       kind: run.game.kind,
       game: run.game.title,
       round: run.index + 1,
@@ -279,6 +288,7 @@ class AudienceRoom {
   stopAnswers = () => this.activity({ action: "close" });
   reveal = async () => {
     const shown = await this.activity({ action: "reveal" });
+    this.revealedAt = Date.now();
     if (shown && this.follow) await this.showGame("results", true);
   };
 
@@ -309,20 +319,41 @@ class AudienceRoom {
   follow = $state(readPrefs().follow);
   /** Music and sound effects on the audience screen. */
   sounds = $state(readPrefs().sounds);
+  /** A few seconds to read each question before the answers open and the clock starts. */
+  ready = $state(readPrefs().ready);
+  /** The game runs by itself: the answer, the leaderboard and the next question, each in turn. */
+  auto = $state(readPrefs().auto);
   private askedAt = 0;
+  private opensAt = 0;
+  private revealedAt = 0;
+  private stepping = false;
   private lastGame: { title: string; ranking: NonNullable<HostView["ranking"]> } | null = null;
   private stageKey = "";
 
   setFollow = (on: boolean) => {
     this.follow = on;
-    writePrefs({ follow: on, sounds: this.sounds });
+    this.savePrefs();
   };
 
   setSounds = (on: boolean) => {
     this.sounds = on;
-    writePrefs({ follow: this.follow, sounds: on });
+    this.savePrefs();
     void this.refreshScreen();
   };
+
+  setReady = (on: boolean) => {
+    this.ready = on;
+    this.savePrefs();
+  };
+
+  setAuto = (on: boolean) => {
+    this.auto = on;
+    this.savePrefs();
+  };
+
+  private savePrefs() {
+    writePrefs({ follow: this.follow, sounds: this.sounds, ready: this.ready, auto: this.auto });
+  }
 
   private get screenId(): string {
     return `room:${this.current?.code ?? ""}:game-screen`;
@@ -349,7 +380,9 @@ class AudienceRoom {
       correct: stage === "results" || stage === "leaderboard" ? (question?.correct ?? null) : null,
       counts: choices.map((_, index) => view?.answers[index] ?? 0),
       // Running while answers are open; at zero once they close (time up, or stopped early).
-      endsAt: live && question?.seconds ? (live.phase === "open" ? this.askedAt + question.seconds * 1000 : Math.min(Date.now(), this.askedAt + question.seconds * 1000)) : null,
+      endsAt: live && question?.seconds ? (live.phase === "open" ? this.opensAt + question.seconds * 1000 : Math.min(Date.now(), this.opensAt + question.seconds * 1000)) : null,
+      opensAt: live && live.phase === "open" ? this.opensAt : null,
+      fastest: live && live.phase !== "open" ? (view?.fastest ?? null) : null,
       seconds: question?.seconds ?? 0,
       answered: live ? (view?.answered ?? 0) : 0,
       players: ranking?.players ?? view?.people ?? 0,
@@ -386,9 +419,26 @@ class AudienceRoom {
     const run = this.playing;
     const question = this.question;
     const activity = this.view?.activity;
-    if (this.follow && stage === "question" && run && question?.seconds && activity && activity.kind !== "none" && activity.phase === "open" && activity.question.id === question.id && Date.now() > this.askedAt + question.seconds * 1000 + 1200) {
+    const live = activity && activity.kind !== "none" && question && activity.question.id === question.id ? activity : null;
+    if (this.follow && stage === "question" && run && question?.seconds && live?.phase === "open" && Date.now() > this.opensAt + question.seconds * 1000 + 1200) {
       await this.reveal();
       return;
+    }
+    // Running by itself: after the answer, the leaderboard (a quiz), then the next question or the podium.
+    if (this.auto && this.follow && run && live?.phase === "reveal" && !this.stepping) {
+      const since = Date.now() - this.revealedAt;
+      const quiz = run.game.kind === "quiz";
+      const last = run.index + 1 >= run.game.questions.length;
+      const step = async (what: () => Promise<void>) => {
+        this.stepping = true;
+        try {
+          await what();
+        } finally {
+          this.stepping = false;
+        }
+      };
+      if (quiz && stage === "results" && since > AUTO_RESULTS_MS) return step(() => this.showGame("leaderboard", true));
+      if ((quiz ? stage === "leaderboard" && since > AUTO_RESULTS_MS + AUTO_BOARD_MS : stage === "results" && since > AUTO_RESULTS_MS)) return step(() => (last ? this.finish() : this.next()));
     }
     const data = this.gameScreen(stage);
     await session.refreshSource(this.screenId, presentGame(session.theme(), { ...data, key: this.stageKey }));
@@ -402,16 +452,18 @@ class AudienceRoom {
 
 export const audienceRoom = new AudienceRoom();
 
-function readPrefs(): { follow: boolean; sounds: boolean } {
+type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean };
+
+function readPrefs(): GamePrefs {
   try {
-    const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as { follow?: unknown; sounds?: unknown } | null;
-    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false };
+    const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as Partial<Record<keyof GamePrefs, unknown>> | null;
+    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true };
   } catch {
-    return { follow: true, sounds: true };
+    return { follow: true, sounds: true, ready: true, auto: false };
   }
 }
 
-function writePrefs(prefs: { follow: boolean; sounds: boolean }) {
+function writePrefs(prefs: GamePrefs) {
   try {
     localStorage.setItem(GAME_PREFS, JSON.stringify(prefs));
   } catch {

@@ -207,6 +207,8 @@
     <div class="switches">
       <label><input type="checkbox" class="switch" checked={audienceRoom.follow} onchange={(event) => audienceRoom.setFollow(event.currentTarget.checked)} /> <span>{t("Screen follows the game")}<small>{t("Each question, answer and the podium go to the screen as they happen; when time is up, the answer shows by itself.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.sounds} onchange={(event) => audienceRoom.setSounds(event.currentTarget.checked)} /> <span>{t("Game sounds")}<small>{t("Music while people join and answer, ticks, a gong, a drumroll and a fanfare, on the audience screen.")}</small></span></label>
+      <label><input type="checkbox" class="switch" checked={audienceRoom.ready} onchange={(event) => audienceRoom.setReady(event.currentTarget.checked)} /> <span>{t("Get ready countdown")}<small>{t("Each question shows alone for 4 seconds to read, then the answers open and the clock starts.")}</small></span></label>
+      <label><input type="checkbox" class="switch" checked={audienceRoom.auto} disabled={!audienceRoom.follow} onchange={(event) => audienceRoom.setAuto(event.currentTarget.checked)} /> <span>{t("Runs by itself")}<small>{t("After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.")}</small></span></label>
     </div>
     {#if audienceRoom.view?.leaderboard.length}
       <ol class="board">

@@ -83,6 +83,8 @@ export function roomPage(code: string, origin: string): string {
   .activity { border-color: color-mix(in srgb, var(--me, var(--accent)) 45%, var(--line)); }
   .clock { float: right; min-width: 44px; height: 44px; margin: -4px 0 6px 10px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 3px solid var(--accent); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
   .clock.hurry { border-color: #e21b3c; color: #ff8a8a; animation: beat 0.5s ease-in-out infinite alternate; }
+  .clock.ready { border-color: var(--gold); color: var(--gold); }
+  .choice:disabled:not(.dim):not(.right) { opacity: 0.55; }
   @keyframes beat { to { transform: scale(1.1); } }
   /* After the answer: right or not, the points won, a streak, and where I stand. */
   .result { margin: 14px 0 2px; padding: 16px; border-radius: 16px; text-align: center; color: #fff; animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
@@ -141,7 +143,7 @@ export function roomPage(code: string, origin: string): string {
   var CODE = ${JSON.stringify(safe)};
   var COLORS = ${JSON.stringify(PLAYER_COLORS)};
   var SHAPES = ${JSON.stringify(SHAPE_SVG)};
-  var lastReveal = "";
+  var lastReveal = "", lastData = null;
   var API = ${JSON.stringify(origin)} + "/v1/rooms/" + CODE;
   var KEY = "cs-room-" + CODE;
   var pid = null, sort = "top", last = null, timer = null, busy = false;
@@ -219,11 +221,20 @@ export function roomPage(code: string, origin: string): string {
     show("activity", true); box.textContent = "";
     box.appendChild(el("div", "meta", (a.kind === "quiz" ? "Question " + a.round + " of " + a.total : "Poll") + (a.game ? " · " + a.game : "")));
     box.appendChild(el("h2", null, a.question.prompt));
-    if (a.endsAt && a.phase === "open") {
+    // Reading time first: the answers wait, and the clock starts when they open.
+    var opensIn = a.phase === "open" && a.opensAt ? Math.max(0, a.opensAt - a.now) : 0;
+    var reading = opensIn > 0;
+    if (reading) {
+      var ready = el("div", "clock ready"); box.insertBefore(ready, box.lastChild);
+      var readStart = Date.now();
+      var readTick = function () { var left = Math.max(0, opensIn - (Date.now() - readStart)); ready.textContent = String(Math.max(1, Math.ceil(left / 1000))); if (left > 0 && document.body.contains(ready)) requestAnimationFrame(readTick); };
+      readTick();
+      setTimeout(function () { if (lastData === d) { last = null; drawActivity(d); } }, opensIn + 20);
+    } else if (a.endsAt && a.phase === "open") {
       var clock = el("div", "clock"); box.insertBefore(clock, box.lastChild);
       var bar = el("div", "timer"), fill = el("i"); bar.appendChild(fill); box.appendChild(bar);
-      var span = a.endsAt - a.now, start = Date.now();
-      var tick = function () { var left = Math.max(0, span - (Date.now() - start)), secs = Math.ceil(left / 1000); fill.style.transform = "scaleX(" + (span ? left / span : 0) + ")"; clock.textContent = String(secs); clock.classList.toggle("hurry", secs <= 5); if (left > 0 && document.body.contains(fill)) requestAnimationFrame(tick); };
+      var span = a.endsAt - Math.max(a.now, a.opensAt || 0), start = Date.now() - Math.max(0, a.now - (a.opensAt || a.now));
+      var tick = function () { var left = Math.max(0, Math.min(span, span - (Date.now() - start))), secs = Math.ceil(left / 1000); fill.style.transform = "scaleX(" + (span ? left / span : 0) + ")"; clock.textContent = String(secs); clock.classList.toggle("hurry", secs <= 5); if (left > 0 && document.body.contains(fill)) requestAnimationFrame(tick); };
       tick();
     }
     var total = (a.counts || []).reduce(function (s, n) { return s + n; }, 0);
@@ -235,12 +246,12 @@ export function roomPage(code: string, origin: string): string {
       if (reveal && a.counts) { var f = el("i", "fill"); f.style.width = (total ? (a.counts[i] / total) * 100 : 0) + "%"; b.appendChild(f); }
       var mark = el("span", "mark"); mark.innerHTML = SHAPES[i] || ""; b.appendChild(mark); b.appendChild(el("span", "label", choice));
       if (reveal && a.counts) b.appendChild(el("span", "count", String(a.counts[i])));
-      b.disabled = a.phase !== "open" || a.answered !== null;
+      b.disabled = a.phase !== "open" || a.answered !== null || reading;
       b.onclick = function () { if (navigator.vibrate) navigator.vibrate(30); answer(i); };
       grid.appendChild(b);
     });
     box.appendChild(grid);
-    var status = a.phase === "open" ? (a.answered !== null ? "Answer in. Wait for the others…" : "") : a.phase === "closed" ? "Time is up!" : a.kind === "quiz" ? "" : "Thanks for voting.";
+    var status = a.phase === "open" ? (reading ? "Get ready… the answers open in a moment." : a.answered !== null ? "Answer in. Wait for the others…" : "") : a.phase === "closed" ? "Time is up!" : a.kind === "quiz" ? "" : "Thanks for voting.";
     if (status) box.appendChild(el("p", "note", status));
     if (a.phase === "reveal" && a.kind === "quiz") {
       var win = a.answered !== null && a.answered === a.correct;
@@ -290,7 +301,7 @@ export function roomPage(code: string, origin: string): string {
       if (!pid) { show("join", true); return; }
       show("live", true);
       var key = JSON.stringify(d);
-      if (key !== last) { last = key; drawMe(d); drawQuestions(d); drawActivity(d); }
+      if (key !== last) { last = key; lastData = d; drawMe(d); drawQuestions(d); drawActivity(d); }
       timer = setTimeout(refresh, d.activity && d.activity.kind !== "none" && d.activity.phase === "open" ? 1500 : 2500);
     }).catch(function () { timer = setTimeout(refresh, 4000); });
   }

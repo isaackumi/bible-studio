@@ -15,10 +15,18 @@
   onDestroy(() => sound?.close());
 
   // --- The clock ------------------------------------------------------------------------------
+  // Ticks only while a question is up: the other stages have nothing timed, so nothing to redraw.
   let now = $state(Date.now());
-  const clock = setInterval(() => (now = Date.now()), 200);
-  onDestroy(() => clearInterval(clock));
-  const left = $derived(data.stage === "question" && data.endsAt ? Math.max(0, Math.ceil((data.endsAt - now) / 1000)) : null);
+  $effect(() => {
+    if (data.stage !== "question") return;
+    now = Date.now();
+    const clock = setInterval(() => (now = Date.now()), 200);
+    return () => clearInterval(clock);
+  });
+  /** Reading time: the question alone, then the answers open and the clock starts. */
+  const reading = $derived(data.stage === "question" && data.opensAt !== null && now < data.opensAt);
+  const readLeft = $derived(reading && data.opensAt ? Math.max(1, Math.ceil((data.opensAt - now) / 1000)) : 0);
+  const left = $derived(data.stage === "question" && !reading && data.endsAt ? Math.max(0, Math.ceil((data.endsAt - now) / 1000)) : null);
   const ringShare = $derived(data.endsAt && data.seconds ? Math.max(0, Math.min(1, (data.endsAt - now) / (data.seconds * 1000))) : 1);
 
   // --- Sound follows the stage ------------------------------------------------------------------
@@ -37,8 +45,10 @@
     heardKey = key;
     lastTick = -1;
     if (stage === "lobby") sound.play("lobby");
-    else if (stage === "question") sound.play("question");
-    else if (stage === "results") {
+    else if (stage === "question") {
+      if (reading) sound.stop();
+      else sound.play("question");
+    } else if (stage === "results") {
       sound.stop();
       sound.chime();
     } else if (stage === "leaderboard") {
@@ -47,6 +57,19 @@
     } else if (stage === "podium") {
       sound.stop();
       sound.fanfare();
+    }
+  });
+  // Get ready: a tick for each second of reading, then the music starts as the answers open.
+  let lastRead = -1;
+  $effect(() => {
+    if (!sound || !data.sounds || data.stage !== "question") return;
+    if (!reading) {
+      sound.play("question");
+      return;
+    }
+    if (readLeft !== lastRead) {
+      lastRead = readLeft;
+      sound.tick();
     }
   });
   // The last five seconds tick and the music hurries; at zero, the gong.
@@ -145,6 +168,15 @@
   });
 
   const totalAnswers = $derived(data.counts.reduce((sum, count) => sum + count, 0));
+  const rightCount = $derived(data.correct !== null ? (data.counts[data.correct] ?? 0) : 0);
+  /** How the room did, as a game show would say it. */
+  const verdict = $derived(
+    totalAnswers === 0 ? "" : rightCount === totalAnswers ? "Everyone got it!" : rightCount === 0 ? "Nobody got that one." : rightCount / totalAnswers >= 0.75 ? "Most of you got it." : rightCount / totalAnswers >= 0.4 ? "A tricky one." : "A hard one!",
+  );
+  /** The lobby shows the newest names; past that, a count. */
+  const MOST_NAMES = 30;
+  const names = $derived(data.joined.slice(-MOST_NAMES));
+  const moreNames = $derived(Math.max(0, data.players - names.length));
   const most = $derived(Math.max(1, ...data.counts));
   const promptSize = $derived(data.prompt.length > 180 ? 4.2 : data.prompt.length > 110 ? 5 : data.prompt.length > 60 ? 6 : 7);
   const podium = $derived([data.top[1], data.top[0], data.top[2]]);
@@ -182,25 +214,29 @@
       </div>
       {#if data.join}<div class="qr"><QrView qr={{ data: data.join.url, style: "rounded", dark: "#111111", light: "#ffffff", caption: "" }} /></div>{/if}
       <div class="names">
-        {#each data.joined as person (person.n)}
+        {#each names as person (person.n)}
           <span class="bubble" style:--c={playerColor(person.n)}>{person.name}</span>
         {:else}
           <span class="waiting">Waiting for the first player…</span>
         {/each}
+        {#if moreNames > 0}<span class="bubble more">+{moreNames} more</span>{/if}
       </div>
     </section>
   {:else if data.stage === "question" || data.stage === "results"}
     <section class="ask">
-      <div class="prompt-row">
-        {#if data.stage === "question"}
+      <div class="prompt-row" class:reading>
+        {#if data.stage === "question" && !reading}
           <div class="ring" class:urgent={left !== null && left <= 5} aria-label="Seconds left">
             <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="track" /><circle cx="50" cy="50" r="44" class="run" style:stroke-dashoffset={276.5 * (1 - ringShare)} /></svg>
             <b>{left ?? "∞"}</b>
           </div>
         {/if}
-        <h1 class="prompt" style:font-size="{promptSize}cqmin">{data.prompt}</h1>
-        {#if data.stage === "question"}<div class="answered"><b>{data.answered}</b><span>{data.answered === 1 ? "answer" : "answers"}</span></div>{/if}
+        <h1 class="prompt" style:font-size="{reading ? promptSize + 1 : promptSize}cqmin">{data.prompt}</h1>
+        {#if data.stage === "question" && !reading}<div class="answered"><b>{data.answered}</b><span>{data.answered === 1 ? "answer" : "answers"}</span></div>{/if}
       </div>
+      {#if reading}
+        <div class="ready" aria-live="polite"><span>Get ready…</span>{#key readLeft}<b>{readLeft}</b>{/key}</div>
+      {/if}
       {#if data.stage === "results"}
         <div class="bars">
           {#each data.choices as _choice, i (i)}
@@ -213,7 +249,7 @@
           {/each}
         </div>
       {/if}
-      <div class="tiles" class:three={data.choices.length > 4}>
+      <div class="tiles" class:three={data.choices.length > 4} class:hidden={reading}>
         {#each data.choices as choice, i (i)}
           {@const style = CHOICE_STYLES[i]!}
           <div class="tile" style:--c={style.color} class:right={data.stage === "results" && data.correct === i} class:dim={data.stage === "results" && data.correct !== null && data.correct !== i}>
@@ -223,7 +259,13 @@
           </div>
         {/each}
       </div>
-      {#if data.stage === "results" && data.correct === null}<p class="foot">{totalAnswers} {totalAnswers === 1 ? "vote" : "votes"}</p>{/if}
+      {#if data.stage === "results"}
+        <p class="foot">
+          {#if data.correct === null}{totalAnswers} {totalAnswers === 1 ? "vote" : "votes"}
+          {:else}<span>{rightCount} of {totalAnswers} got it right.</span> {#if verdict}<span>{verdict}</span>{/if}{/if}
+          {#if data.fastest}<span class="fast">⚡ Fastest: {data.fastest.name} · {(data.fastest.ms / 1000).toFixed(1)}s</span>{/if}
+        </p>
+      {/if}
     </section>
   {:else if data.stage === "leaderboard"}
     <section class="board">
@@ -260,6 +302,7 @@
           {#if player}
             {@const place = player.rank}
             <div class="step p{place}" style:--c={playerColor(player.n)} style:--d="{place === 1 ? 1.2 : place === 2 ? 0.6 : 0}s">
+              {#if place === 1}<svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18l1.5-11-5.5 4L12 4l-5 7-5.5-4Z" fill="#ffd166" /><path d="M3 19h18v2H3z" fill="#f5a524" /></svg>{/if}
               <span class="who">{player.name}</span>
               <span class="pts">{player.score.toLocaleString()}</span>
               <div class="block"><b>{place}</b></div>
@@ -275,10 +318,11 @@
   .game { position: absolute; inset: 0; container-type: size; overflow: hidden; color: #fff; font-family: "Inter Variable", Inter, system-ui, sans-serif; background: #1a0b3d; }
   /* A moving night of colour behind it all. */
   .bg { position: absolute; inset: 0; overflow: hidden; }
-  .bg i { position: absolute; width: 70cqmax; height: 70cqmax; border-radius: 50%; filter: blur(8cqmin); opacity: 0.55; animation: drift 18s ease-in-out infinite alternate; }
-  .bg i:nth-child(1) { left: -20cqw; top: -30cqh; background: #6d28d9; }
-  .bg i:nth-child(2) { right: -25cqw; top: -10cqh; background: #db2777; animation-duration: 22s; }
-  .bg i:nth-child(3) { left: 20cqw; bottom: -50cqh; background: #2563eb; animation-duration: 26s; }
+  /* Soft-edged discs drawn as gradients (a blur filter would be re-rendered on every frame of the drift). */
+  .bg i { position: absolute; width: 90cqmax; height: 90cqmax; border-radius: 50%; opacity: 0.6; background: radial-gradient(circle, var(--g) 0%, color-mix(in srgb, var(--g) 70%, transparent) 30%, transparent 68%); animation: drift 18s ease-in-out infinite alternate; will-change: transform; }
+  .bg i:nth-child(1) { left: -30cqw; top: -40cqh; --g: #6d28d9; }
+  .bg i:nth-child(2) { right: -35cqw; top: -20cqh; --g: #db2777; animation-duration: 22s; }
+  .bg i:nth-child(3) { left: 10cqw; bottom: -60cqh; --g: #2563eb; animation-duration: 26s; }
   @keyframes drift { to { transform: translate(8cqw, 6cqh) scale(1.15); } }
   .shp { position: absolute; width: 7cqmin; height: 7cqmin; opacity: 0.12; background: #fff; animation: float 14s ease-in-out infinite; }
   .s1 { left: 6cqw; top: 70cqh; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
@@ -290,7 +334,7 @@
 
   .top { position: absolute; z-index: 2; left: 3cqw; right: 3cqw; top: 3cqh; display: flex; align-items: center; gap: 1.4cqmin; }
   .title { font-size: 3.2cqmin; font-weight: 800; letter-spacing: -0.02em; margin-right: auto; text-shadow: 0 0.4cqmin 2cqmin rgb(0 0 0 / 0.35); }
-  .pill { padding: 0.9cqmin 2cqmin; border-radius: 99px; background: rgb(255 255 255 / 0.16); backdrop-filter: blur(8px); font-size: 2.2cqmin; font-weight: 700; }
+  .pill { padding: 0.9cqmin 2cqmin; border-radius: 99px; background: rgb(0 0 0 / 0.28); font-size: 2.2cqmin; font-weight: 700; }
 
   /* Lobby */
   .lobby { position: absolute; inset: 12cqh 4cqw 4cqh; display: grid; grid-template-columns: 1.2fr 0.8fr; grid-template-rows: auto 1fr; gap: 3cqmin 4cqw; z-index: 1; }
@@ -307,6 +351,7 @@
   .names { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 1.4cqmin; overflow: hidden; }
   .bubble { padding: 1.2cqmin 2.6cqmin; border-radius: 99px; background: var(--c); font-size: 3cqmin; font-weight: 800; box-shadow: 0 0.8cqmin 0 rgb(0 0 0 / 0.25); animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+  .bubble.more { background: rgb(255 255 255 / 0.18); box-shadow: none; }
   .waiting { font-size: 3cqmin; opacity: 0.7; }
 
   /* A question */
@@ -314,6 +359,11 @@
   .prompt-row { display: flex; align-items: center; gap: 2.4cqmin; min-height: 0; flex: 1; }
   .prompt { flex: 1; margin: 0; padding: 3cqmin 3.4cqmin; border-radius: 2.2cqmin; background: #fff; color: #111; text-align: center; font-weight: 800; line-height: 1.18; letter-spacing: -0.02em; box-shadow: 0 1cqmin 0 rgb(0 0 0 / 0.2); animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   @keyframes rise { from { transform: translateY(3cqh) scale(0.96); opacity: 0; } }
+  .prompt-row.reading { justify-content: center; padding: 0 8cqw; }
+  .prompt-row.reading .prompt { flex: none; width: 100%; }
+  .ready { display: flex; align-items: center; justify-content: center; gap: 3cqmin; flex: 1; font-size: 4cqmin; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.9; }
+  .ready b { display: grid; place-items: center; width: 16cqmin; height: 16cqmin; border-radius: 50%; background: #ffd166; color: #1a0b3d; font-size: 9cqmin; font-weight: 900; animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .tiles.hidden { visibility: hidden; }
   .ring { position: relative; flex: none; width: 15cqmin; height: 15cqmin; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .ring circle { fill: rgb(0 0 0 / 0.25); stroke-width: 9; }
@@ -342,7 +392,8 @@
   .bar svg { flex: none; width: 4cqmin; height: 4cqmin; }
   .bar b { flex: none; }
   .bar.dim { opacity: 0.35; }
-  .foot { margin: 0; text-align: center; font-size: 2.8cqmin; font-weight: 700; opacity: 0.85; }
+  .foot { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.6cqmin 2.4cqmin; margin: 0; text-align: center; font-size: 2.8cqmin; font-weight: 700; opacity: 0.9; }
+  .foot .fast { color: #ffd166; animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: 0.8s; }
 
   /* Leaderboard */
   .board { position: absolute; inset: 11cqh 14cqw 3cqh; display: flex; flex-direction: column; z-index: 1; }
@@ -368,6 +419,7 @@
   .podium canvas { position: absolute; inset: -9cqh -6cqw 0; width: calc(100% + 12cqw); height: calc(100% + 9cqh); pointer-events: none; z-index: 3; }
   .steps { flex: 1; display: flex; justify-content: center; align-items: flex-end; gap: 2cqmin; }
   .step { display: flex; flex-direction: column; align-items: center; width: 26cqmin; animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d); }
+  .crown { width: 7cqmin; height: 7cqmin; margin-bottom: -0.6cqmin; filter: drop-shadow(0 0.4cqmin 0.6cqmin rgb(0 0 0 / 0.3)); animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: 2s; }
   .who { max-width: 100%; padding: 1cqmin 2.2cqmin; border-radius: 99px; background: var(--c); font-size: 3.4cqmin; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 0.8cqmin 0 rgb(0 0 0 / 0.25); }
   .pts { margin: 1cqmin 0 1.4cqmin; font-size: 3.2cqmin; font-weight: 800; opacity: 0.9; font-variant-numeric: tabular-nums; }
   .block { width: 100%; display: grid; place-items: start center; padding-top: 2cqmin; border-radius: 1.6cqmin 1.6cqmin 0 0; background: linear-gradient(180deg, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.75)); color: #1a0b3d; }

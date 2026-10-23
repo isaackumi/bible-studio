@@ -140,6 +140,26 @@ describe("rooms: quizzes and polls", () => {
     expect(mine.activity).toMatchObject({ gain: second!.gain, streak: 1, rank: 2, players: 13 });
   });
 
+  it("gives reading time before answers open, and names the fastest right answer", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const kofi = data<{ pid: string }>(await core.join("Kofi", "")).pid;
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", game: "G", round: 1, total: 1, question: { prompt: "Q", choices: ["right", "wrong"], correct: 0, seconds: 20, points: 1000 }, readMs: 4000 }));
+    const phone = data<View>(await core.view(ama));
+    const now = Number(phone.activity.now);
+    expect(phone.activity).toMatchObject({ opensAt: now + 4000, endsAt: now + 24_000 });
+    // Answering while still reading counts as the quickest possible, never more.
+    data(await core.answer(ama, 0));
+    advance(14_000);
+    data(await core.answer(kofi, 0));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    const host = data<{ fastest: { name: string; ms: number } | null; ranking: { top: Array<{ name: string; gain: number }> } }>(await core.hostView(hostKey));
+    expect(host.fastest).toEqual({ n: 0, name: "Ama", ms: 0 });
+    expect(host.ranking.top.find((entry) => entry.name === "Ama")!.gain).toBe(1500);
+    expect(host.ranking.top.find((entry) => entry.name === "Kofi")!.gain).toBe(1250);
+  });
+
   it("runs a poll with no right answer, and refuses a quiz question without one", async () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
