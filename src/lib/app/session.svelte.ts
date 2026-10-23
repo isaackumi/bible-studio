@@ -3,17 +3,12 @@ import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
-import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
-import { healthRows, healthTips, type Frames, type HealthFacts } from "../domain/health";
-import { problemReport, readProblems } from "./diagnostics";
-import { aiCheck, backupCheck, internetCheck, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck, type ReadyCheck } from "../domain/readiness";
-import { isOnlineTranslation } from "../bible/online-bibles";
-import { SERVER_URL } from "../domain/billing";
+import { recordingMinutes } from "../domain/readiness";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
@@ -151,9 +146,10 @@ import { deskNotes, deskNotesRich, sanitizeSermon, sermonAudienceItem, sermonErr
 import { readZip } from "../domain/zip";
 import { dropToFree, redeemCode, sanitizeProfile, validEmail, FREE_LISTEN_MINUTES, listenAllowance, planIncludes, TRIAL_DAYS, type PlanFeature, type PlanId } from "../domain/plans";
 import { sanitizeSongPacks, type SongPack } from "../domain/song-packs";
-import { cleanCcli, cleanFolder, creditFor, lyricsFor, parseLyrics, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
-import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
-import { gameRequest, parseGame, type GameAudience, type GameLevel, type GameSource } from "../ai/games";
+import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sanitizeSong, songError, songFromFile } from "../domain/song";
+import type { SongMatch } from "../ai/songs";
+import { AiAssistant, sermonText } from "./ai-assistant";
+import { ServiceChecks } from "./service-checks.svelte";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
@@ -198,7 +194,7 @@ import { canUse } from "../platform/capabilities";
 import { styleModel } from "../domain/text-style";
 import type { Game } from "../domain/games";
 import { MOST_REPORTS, type GameReport } from "../domain/game-report";
-import { createDeck, deckFromOutline, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
+import { createDeck, deckFromPageImages, deckItem, deckPageText, deckSource, sanitizeDeck, stepDeckPage, type SlideDeck } from "../domain/decks";
 import { sanitizeAlert, withAlert } from "../domain/overlays";
 import { dataUrlToBlob, exportThemePackage, readThemePackage, themePackageFileName } from "../domain/theme-package";
 import { controlTimers, createTimer, presentTimer, timerDisplay, timerFromPaint, timersIn, type TimerAction } from "../domain/timer";
@@ -252,8 +248,7 @@ import {
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
 import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, slideOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
-import { aiFeatureOn, aiReady, modelsRequest, parseModels, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiFeature, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
-import { parseHeardVerses, versesRequest, VERSE_ASK_GAP_SECONDS, type HeardVerse } from "../ai/verses";
+import { aiFeatureOn, aiReady, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiFeature, type AiSettings } from "../ai/summarize";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -1783,7 +1778,7 @@ class Session {
       if (!line) return;
       const context = this.captions.lines.filter((entry) => entry.id < id).slice(-2).map((entry) => entry.text).join(" ");
       try {
-        const reply = await this.aiPost(translateRequest(this.workspace.ai, line.text, languages, context));
+        const reply = await this.assistant.post(translateRequest(this.workspace.ai, line.text, languages, context));
         const translations = parseTranslations(replyText(this.workspace.ai.provider, reply), languages);
         if (Object.keys(translations).length) this.captions = withTranslation(this.captions, id, translations);
       } catch (error) {
@@ -4638,8 +4633,8 @@ class Session {
     }
     // A recording that would run out of room partway through the service is stopped before it starts.
     if (options.record && !options.pattern) {
-      const room = await this.recordRoom();
-      const minutes = room === null ? null : recordingMinutes(room, this.recordKbps());
+      const room = await this.checks.recordRoom();
+      const minutes = room === null ? null : recordingMinutes(room, this.checks.recordKbps());
       if (minutes !== null && minutes < 10) {
         this.broadcastFailed(t("Only about {minutes} minutes of recording fit on this computer. Free some space, or choose another recordings folder.", { minutes }), "space");
         return false;
@@ -4910,85 +4905,24 @@ class Session {
     this.setAiSettings({ features: { ...this.workspace.ai.features, [feature]: on } });
   };
 
-  /** Refuse a feature that is not set up or switched off, saying which. */
-  private aiFor(feature: AiFeature): AiSettings {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
-    if (!aiFeatureOn(settings, feature)) throw new Error(t("This AI feature is switched off in Settings › AI assistant."));
-    return settings;
-  }
+  /** The church's own AI (ai-assistant.ts): every feature, behind its switch in Settings › AI assistant. */
+  private assistant = new AiAssistant({
+    settings: () => this.workspace.ai,
+    songs: () => this.songs,
+    saveDeck: (deck) => this.saveDeck(deck),
+    addDeckToService: (deckId, sectionId) => this.addDeckToService(deckId, sectionId),
+    say: (message) => (this.message = message),
+  });
 
-  private verseAskedAt = 0;
-  private verseAsking = false;
-
-  /**
-   * Verses the preacher paraphrased or described, from the church's AI. Empty when the feature is
-   * off, a question is already out, or one was asked in the last few seconds.
-   */
-  versesFromSpeech = async (heard: string): Promise<HeardVerse[]> => {
-    const settings = this.workspace.ai;
-    if (!aiReady(settings) || !aiFeatureOn(settings, "verses") || this.verseAsking) return [];
-    if (Date.now() - this.verseAskedAt < VERSE_ASK_GAP_SECONDS * 1000) return [];
-    this.verseAsking = true;
-    this.verseAskedAt = Date.now();
-    try {
-      return parseHeardVerses(replyText(settings.provider, await this.aiPost(versesRequest(settings, heard))));
-    } catch {
-      return [];
-    } finally {
-      this.verseAsking = false;
-    }
-  };
-
-  /**
-   * Summarize sermon notes into a short summary and screen-ready points with the church's own
-   * AI service. Nothing is sent anywhere until the operator asks.
-   */
-  summarizeSermon = async (input: { title: string; notes: string }): Promise<SermonSummary> => {
-    const settings = this.aiFor("summary");
-    if (!input.notes.trim()) throw new Error(t("Write some notes first; the summary is made from them."));
-    const reply = await this.aiPost(summaryRequest(settings, input));
-    return parseSummary(replyText(settings.provider, reply));
-  };
-
-  /** AI slide generation: a deck from notes, a passage or a topic, saved to the slide library. */
-  generateSlides = async (input: { source: SlideSource; text: string; title?: string; count: number; addToService?: boolean; sectionId?: string }): Promise<SlideDeck> => {
-    const settings = this.aiFor("slides");
-    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : t("Write some notes first; the slides are made from them."));
-    const reply = await this.aiPost(slidesRequest(settings, input));
-    const outline = parseSlides(replyText(settings.provider, reply));
-    const deck = deckFromOutline(input.title?.trim() || outline.title, outline.slides);
-    this.saveDeck(deck);
-    if (input.addToService) await this.addDeckToService(deck.id, input.sectionId);
-    this.message = t("{name}: {pages} made. Edit them on the Production Desk › Media › Slides.", { name: deck.name, pages: tn(deck.pages.length, "{n} slide", "{n} slides") });
-    return deck;
-  };
-
-  /** The models the chosen AI offers, for Settings › AI assistant. */
-  aiModels = async (): Promise<string[]> => {
-    const settings = this.workspace.ai;
-    if (settings.provider !== "local" && !settings.key) throw new Error(t("Paste your key first."));
-    const models = parseModels(await this.aiReach(() => api.aiGet(modelsRequest(settings))));
-    if (!models.length) throw new Error(settings.provider === "local" ? t("No models yet. Download one in Ollama or LM Studio first.") : t("The AI service listed no models for this key."));
-    return models;
-  };
-
-  private aiPost(request: AiRequest): Promise<unknown> {
-    return this.aiReach(() => api.aiPost(request));
-  }
-
-  /** When nothing answers on this computer, the AI app is most likely closed: say so. */
-  private async aiReach(send: () => Promise<unknown>): Promise<unknown> {
-    try {
-      return await send();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (this.workspace.ai.provider === "local" && /could not be reached|failed to fetch|load failed|connection refused/i.test(message)) {
-        throw new Error(t("Nothing answered on this computer. Open Ollama or LM Studio, and check the address."));
-      }
-      throw error;
-    }
-  }
+  versesFromSpeech = (heard: string) => this.assistant.versesFromSpeech(heard);
+  summarizeSermon = (input: Parameters<AiAssistant["summarizeSermon"]>[0]) => this.assistant.summarizeSermon(input);
+  generateSlides = (input: Parameters<AiAssistant["generateSlides"]>[0]) => this.assistant.generateSlides(input);
+  aiModels = () => this.assistant.models();
+  findSongsWithAi = (query: string) => this.assistant.findSongs(query);
+  hymnWithAi = (match: SongMatch, folder: string) => this.assistant.hymn(match, folder);
+  suggestSongsWithAi = (input: { title: string; notes: string }) => this.assistant.suggestSongs(input);
+  makeGameWithAi = (input: Parameters<AiAssistant["makeGame"]>[0]) => this.assistant.makeGame(input);
+  sermonText = sermonText;
 
   /**
    * Look up a song with AI, asked for elsewhere (Settings, a sermon's suggestions): what to look up
@@ -5002,200 +4936,15 @@ class Session {
     this.goToDesk("presenter", "songs");
   };
 
-  /** Songs the AI thinks the typed words are: a title, a line remembered, or what it is about. */
-  findSongsWithAi = async (query: string): Promise<SongMatch[]> => {
-    const settings = this.aiFor("songLookup");
-    if (!query.trim()) throw new Error(t("Type a title, a line you remember, or what the song is about."));
-    const songs = parseSongMatches(replyText(settings.provider, await this.aiPost(findSongRequest(settings, query))));
-    if (!songs.length) throw new Error(t("The AI found no song for that. Try other words."));
-    return songs;
-  };
+  /** Readiness, Performance and the support file (service-checks.svelte.ts). */
+  private checks = new ServiceChecks(this, () => this.desktop());
 
-  /** A public-domain hymn's words, as a new song to check and save. Never for copyrighted songs. */
-  hymnWithAi = async (match: SongMatch, folder: string): Promise<Song> => {
-    const settings = this.aiFor("songLookup");
-    if (!wordsAreFree(match)) throw new Error(t("These words are under copyright. Get the song from SongSelect."));
-    const words = parseHymn(replyText(settings.provider, await this.aiPost(hymnRequest(settings, match))));
-    const parsed = parseLyrics(words);
-    if (!parsed.sections.length) throw new Error(t("The AI answer was not in the expected shape. Try again."));
-    return sanitizeSong({ id: crypto.randomUUID(), title: match.title, author: match.authors, sections: parsed.sections, folder, ...(match.ccli ? { ccli: match.ccli } : {}) });
-  };
-
-  /** Songs for a sermon: picks from the church's own library first, then a few it could add. */
-  suggestSongsWithAi = async (input: { title: string; notes: string }): Promise<{ library: Array<{ song: Song; why: string }>; others: Array<{ title: string; authors: string; why: string }> }> => {
-    const settings = this.aiFor("songSuggest");
-    if (!input.notes.trim() && !input.title.trim()) throw new Error(t("Give the sermon a title or some notes first."));
-    const songs = [...this.songs].sort((a, b) => a.title.localeCompare(b.title));
-    const picks = parseSongSuggestions(replyText(settings.provider, await this.aiPost(suggestSongsRequest(settings, { ...input, songs }))), songs.length);
-    return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
-  };
-
-  /** A sermon as plain words for the AI: its notes, then each part's name, notes, slides and verses. */
-  sermonText(sermon: Sermon): string {
-    const parts = [sermon.notes.trim()];
-    for (const section of sermon.sections) {
-      const lines = [section.name, section.notes, ...section.items.map((item) => (item.slide ? `${item.slide.heading}\n${item.slide.body}` : item.bible ? item.title : ""))].map((line) => line.trim()).filter(Boolean);
-      if (lines.length) parts.push(lines.join("\n"));
-    }
-    return parts.filter(Boolean).join("\n\n");
-  }
-
-  /** A quiz written by the AI, not saved: the operator checks every question in the editor first. */
-  makeGameWithAi = async (input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): Promise<Game> => {
-    const settings = this.aiFor("games");
-    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : input.source === "reading" ? t("Paste the summary of what was read first.") : input.source === "text" ? t("Paste some text first.") : t("This sermon has no notes yet. Add notes or a summary first."));
-    return parseGame(replyText(settings.provider, await this.aiPost(gameRequest(settings, input))), input);
-  };
-
-  /** Recording speed in kbps: the chosen quality's video plus the sound. */
-  private recordKbps(): number {
-    return QUALITIES[this.workspace.broadcast.quality].videoKbps + 192;
-  }
-
-  /** Room left for recordings, in bytes (desktop only; null when it cannot be told). */
-  private recordRoom(): Promise<number | null> {
-    return this.desktop() ? invoke<number | null>("record_room", { folder: this.workspace.broadcast.recordFolder || null }).catch(() => null) : Promise.resolve(null);
-  }
-
-  /** Readiness check: everything the service depends on, checked in one go, worst first. */
-  checkReady = async (): Promise<ReadyCheck[]> => {
-    const desktop = this.desktop();
-    const media = new Map(this.media.map((asset) => [asset.id, asset]));
-    const songs = new Set(this.songs.map((song) => song.id));
-    const decks = new Set(this.decks.map((deck) => deck.id));
-    const items = this.service?.sections.flatMap((section) => section.items) ?? [];
-    // What each item needs: a file (by its place in `paths`), or a song or deck that must exist.
-    const paths: string[] = [];
-    const needs = items.map((item) => {
-      const assetId = item.image?.assetId ?? item.video?.assetId ?? item.slide?.imageId ?? null;
-      if (assetId) {
-        const asset = media.get(assetId);
-        if (!asset) return { title: item.title, gone: true, path: -1 };
-        paths.push(asset.path);
-        return { title: item.title, gone: false, path: paths.length - 1 };
-      }
-      if (item.lyric) return { title: item.title, gone: !songs.has(item.lyric.songId), path: -1 };
-      if (item.deck) return { title: item.title, gone: !decks.has(item.deck.deckId), path: -1 };
-      return { title: item.title, gone: false, path: -1 };
-    });
-    const facts = desktop ? await invoke<{ missing: number[]; libraryOk: boolean }>("ready_facts", { paths: desktop ? paths : [] }).catch(() => null) : null;
-    const missingFiles = new Set(facts?.missing ?? []);
-    const missing = needs.filter((need) => need.gone || (need.path >= 0 && missingFiles.has(need.path))).map((need) => need.title || t("Untitled"));
-
-    const ai = this.workspace.ai;
-    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games"] as const).some((feature) => aiFeatureOn(ai, feature));
-    const needed = [
-      ...(aiUsed && ai.provider !== "local" ? [t("the AI")] : []),
-      ...(this.remoteVia === "internet" && this.remoteDevices.length ? [t("the phone remote")] : []),
-      ...(items.some((item) => item.bible && isOnlineTranslation(item.bible.translationId)) ? [t("online Bibles")] : []),
-      ...("url" in streamTarget(this.workspace.broadcast) ? [t("streaming")] : []),
-    ];
-    const online = needed.length ? await this.reachable() : true;
-
-    const checks: Array<ReadyCheck | null> = [
-      screenCheck({ online: this.output.online, displayName: this.output.displayName, screens: this.output.displays.length, mode: this.output.mode, os: typeof navigator === "undefined" ? "other" : /Windows/i.test(navigator.userAgent) ? "windows" : /Mac/i.test(navigator.userAgent) ? "mac" : "other" }),
-      serviceCheck({ name: this.service?.name ?? null, missing }),
-      desktop ? spaceCheck({ free: await this.recordRoom(), kbps: this.recordKbps() }) : null,
-      backupCheck({ folder: this.workspace.backup.folder, lastAt: this.workspace.backup.lastAt ?? null, now: Date.now(), desktop }),
-      planCheck({ plan: this.plan, endsAt: this.ent.endsAt, renewBy: this.ent.kind === "license" ? this.ent.renewBy : null, now: Date.now(), dateText: (time) => new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "long" }) }),
-      facts ? libraryCheck(facts.libraryOk) : null,
-      internetCheck(online, needed),
-      aiUsed && online ? aiCheck({ problem: await this.aiModels().then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error))) }) : null,
-    ];
-    return sortChecks(checks.filter((check): check is ReadyCheck => check !== null));
-  };
-
-  /** The audience window's last smoothness measurement (Settings › Performance). */
-  lastFrames = $state<Frames | null>(null);
-
-  /** Ask the audience window to watch its frames for a few seconds. Null when it is closed or quiet. */
-  measureSmoothness = async (): Promise<Frames | null> => {
-    if (!this.desktop() || !this.output.online) return null;
-    const answer = new Promise<Frames | null>((resolve) => {
-      let stop = () => {};
-      const timer = setTimeout(() => { stop(); resolve(null); }, 9000);
-      void listen<Frames>("audience-frames", (event) => { clearTimeout(timer); stop(); resolve(event.payload); }).then((unlisten) => (stop = unlisten));
-    });
-    await emit("measure-frames", { ms: 5000 }).catch(() => {});
-    this.lastFrames = await answer;
-    return this.lastFrames;
-  };
-
-  /** What the core knows about this computer and recent launches (desktop), unprocessed: for support. */
-  private async healthRaw() {
-    if (!this.desktop()) return null;
-    type Raw = { startups: Array<{ at: number; ms: number; steps: Array<[string, number]> }>; hangs: Array<{ at: number; seconds: number; during: string }>; memory: { total: number; available: number; app: number }; libraryFree: number | null; uptimeSecs: number };
-    const [raw, usage, unused] = await Promise.all([
-      invoke<Raw>("health_facts").catch(() => null),
-      invoke<{ library: number; media: number; models: number; cache: number }>("storage_usage").catch(() => null),
-      invoke<Array<{ bytes: number }>>("storage_unused_media").catch(() => [] as Array<{ bytes: number }>),
-    ]);
-    return { raw, usage, unusedBytes: unused.reduce((sum, item) => sum + item.bytes, 0) };
-  }
-
-  /** Settings › Performance: how it is running here, and what to do about it. */
-  checkHealth = async () => {
-    const found = await this.healthRaw();
-    const facts: HealthFacts = {
-      launches: found?.raw?.startups.map((startup) => startup.ms) ?? [],
-      hangs: found?.raw?.hangs ?? [],
-      memory: found?.raw?.memory ?? null,
-      libraryFree: found?.raw?.libraryFree ?? null,
-      frames: this.lastFrames,
-      audienceOpen: this.output.online,
-      spare: { model: this.workspace.voice.engine === "accurate" ? 0 : (found?.usage?.models ?? 0), cache: found?.usage?.cache ?? 0, unused: found?.unusedBytes ?? 0 },
-      dateText: (at) => new Date(at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "long" }),
-    };
-    return { rows: healthRows(facts), tips: healthTips(facts), desktop: this.desktop() };
-  };
-
-  /**
-   * The support file: everything a developer needs to see what went wrong, and nothing private (no
-   * keys, passwords, songs, sermons or notes). The church saves it and sends it in; nothing is sent by itself.
-   */
-  supportFile = async (): Promise<string> => {
-    const desktop = this.desktop();
-    const [found, crashLog, logTail, ready] = await Promise.all([
-      this.healthRaw(),
-      desktop ? invoke<string>("crash_log").catch(() => "") : Promise.resolve(""),
-      desktop ? invoke<string>("diagnostic_log").catch(() => "") : Promise.resolve(""),
-      this.checkReady().catch(() => []),
-    ]);
-    const mb = (bytes: number | null | undefined) => (bytes === null || bytes === undefined ? "unknown" : `${Math.round(bytes / 1_000_000)} MB`);
-    const when = (secs: number) => new Date(secs * 1000).toISOString();
-    const raw = found?.raw;
-    const sections: Array<[string, string]> = [
-      ["Plan", `${this.plan} (${this.ent.kind ?? "none"}${this.ent.reason ? `, free because: ${this.ent.reason}` : ""}${this.ent.endsAt ? `, ends ${new Date(this.ent.endsAt).toISOString()}` : ""}${this.ent.renewBy ? `, renew by ${new Date(this.ent.renewBy).toISOString()}` : ""})`],
-      ["Screens", [`audience: ${this.output.online ? "open" : "closed"} (${this.output.mode}) on ${this.output.displayName || "-"}`, ...this.output.displays.map((display) => `- ${display.name} ${display.width}x${display.height}${display.primary ? " (primary)" : ""}`)].join("\n")],
-      ["Readiness", ready.map((check) => `- [${check.state}] ${check.id}: ${t(check.title, check.values)}`).join("\n")],
-      ["Launches (ms until the desk was ready)", (raw?.startups ?? []).map((startup) => `- ${when(startup.at)}: ${startup.ms} ms; ${startup.steps.map(([name, ms]) => `${name} ${ms}`).join(", ")}`).join("\n")],
-      ["Freezes, last 30 days", (raw?.hangs ?? []).map((hang) => `- ${when(hang.at)}: ${hang.seconds}s while ${hang.during}`).join("\n") || "none"],
-      ["Memory", raw ? `computer ${mb(raw.memory.available)} free of ${mb(raw.memory.total)}; app core ${mb(raw.memory.app)}; up ${raw.uptimeSecs}s` : ""],
-      ["Space", found ? `library drive free ${mb(raw?.libraryFree)}; library ${mb(found.usage?.library)}, media ${mb(found.usage?.media)}, speech model ${mb(found.usage?.models)}, cache ${mb(found.usage?.cache)}, unused media ${mb(found.unusedBytes)}` : ""],
-      ["Smoothness", this.lastFrames ? `${this.lastFrames.fps} fps, ${this.lastFrames.hiccups} hiccups, worst ${this.lastFrames.worstMs} ms` : "not measured"],
-      ["Settings (no keys)", [`language ${this.workspace.appearance.language ?? "en"}`, `listening ${this.workspace.voice.engine ?? "system"}`, `AI ${aiReady(this.workspace.ai) ? this.workspace.ai.provider : "off"}${this.workspace.ai.features ? ` ${JSON.stringify(this.workspace.ai.features)}` : ""}`, `recording ${this.workspace.broadcast.quality}`, `backup ${this.workspace.backup.folder ? `on, last ${this.workspace.backup.lastAt || "never"}` : "off"}`].join("; ")],
-      ["Log (last lines)", logTail],
-    ];
-    return problemReport({
-      version: APP_VERSION,
-      platform: desktop ? "Desktop app" : "Browser",
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-      counts: { songs: this.songs.length, services: this.services.length, sermons: this.sermons.length, decks: this.decks.length, media: this.media.length },
-      problems: readProblems(),
-      crashLog,
-      sections,
-    });
-  };
-
-  /** Whether the internet answers (a quick request; the address is never shown). */
-  private async reachable(): Promise<boolean> {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
-    try {
-      await fetch(SERVER_URL, { method: "HEAD", mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(5000) });
-      return true;
-    } catch {
-      return false;
-    }
+  checkReady = () => this.checks.ready();
+  checkHealth = () => this.checks.health();
+  measureSmoothness = () => this.checks.measureSmoothness();
+  supportFile = () => this.checks.supportFile();
+  get lastFrames() {
+    return this.checks.lastFrames;
   }
 
   /** A tiny request to check the key and model work. */
@@ -5204,7 +4953,7 @@ class Session {
     if (settings.provider !== "local" && !settings.key) throw new Error(t("Paste your key first."));
     if (!settings.model) throw new Error(t("Choose a model first. Find models lists them."));
     // The test works whichever features are switched on.
-    const result = parseSummary(replyText(settings.provider, await this.aiPost(summaryRequest(settings, { title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." }))));
+    const result = parseSummary(replyText(settings.provider, await this.assistant.post(summaryRequest(settings, { title: "Test", notes: "God is love. Point one: he made us. Point two: he saves us (John 3:16)." }))));
     return result.points.length ? tn(result.points.length, "Connected. The test made {n} point.", "Connected. The test made {n} points.") : t("Connected.");
   };
 
