@@ -27,6 +27,8 @@ ureq = "3"
 ring = "0.17"
 sha2 = "0.10"
 base64 = "0.22"
+reflink-copy = "0.1"
+fs4 = "1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

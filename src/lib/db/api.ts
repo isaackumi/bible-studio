@@ -120,7 +120,8 @@ export const api = {
         if (source.type.startsWith("image/") || isSvg(source, source.name)) return api.importMediaBytes(source.name, source);
         return Promise.reject(new Error("Use Import… to choose the file from this computer."));
       }
-      return invoke<MediaAsset>("import_media", { path: source }).then(shrinkImported);
+      // A file already in Media comes back as it is: never shrunk again, so it is never replaced.
+      return invoke<MediaAsset>("import_media", { path: source }).then((asset) => (asset.existing ? asset : shrinkImported(asset)));
     }
     if (typeof source === "string") return Promise.reject(new Error("This browser import needs the image file, not a path."));
     if (source.type.startsWith("image/") || isSvg(source, source.name)) return api.importMediaBytes(source.name, source);

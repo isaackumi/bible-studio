@@ -373,7 +373,8 @@ pub fn media_list(conn: &Connection) -> Result<Vec<Value>, String> {
     Ok(out)
 }
 
-pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result<Value, String> {
+/// A file to add to Media: its name, extension and kind, or why it cannot be added.
+pub fn media_source(source: &Path) -> Result<(String, String, &'static str), String> {
     if !source.exists() {
         return Err("That image file could not be found.".into());
     }
@@ -388,7 +389,7 @@ pub fn import_media(conn: &Connection, app: &AppHandle, source: &Path) -> Result
         .and_then(|n| n.to_str())
         .unwrap_or("image")
         .to_string();
-    store_media(conn, app, &name, &ext, kind, |dest| fs::copy(source, dest).map(|_| ()).map_err(|e| e.to_string()))
+    Ok((name, ext, kind))
 }
 
 /// Image, video or audio, by extension. Anything else is refused.
@@ -443,6 +444,13 @@ fn store_media(
     kind: &str,
     write: impl FnOnce(&Path) -> Result<(), String>,
 ) -> Result<Value, String> {
+    let (id, dest) = media_dest(app, ext)?;
+    write(&dest)?;
+    record_media(conn, &id, name, &dest, kind)
+}
+
+/// A new file name in the media folder: its id and path.
+pub fn media_dest(app: &AppHandle, ext: &str) -> Result<(String, PathBuf), String> {
     let id = Uuid::new_v4().to_string();
     let dir = app
         .path()
@@ -451,14 +459,18 @@ fn store_media(
         .join("media");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dest = dir.join(format!("{id}.{ext}"));
-    write(&dest)?;
+    Ok((id, dest))
+}
+
+/// The library's record of a file now in the media folder (the file goes if it cannot be recorded).
+pub fn record_media(conn: &Connection, id: &str, name: &str, dest: &Path, kind: &str) -> Result<Value, String> {
     let created = chrono_now();
     let path = dest.to_string_lossy().to_string();
     if let Err(error) = conn.execute(
         "INSERT INTO media_assets (id, name, path, kind, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![id, name, path, kind, created],
     ) {
-        let _ = fs::remove_file(&dest);
+        let _ = fs::remove_file(dest);
         return Err(error.to_string());
     }
     Ok(serde_json::json!({

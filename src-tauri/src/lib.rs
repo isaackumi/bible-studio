@@ -314,9 +314,48 @@ fn media_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::media_list)
 }
 
+/// Facts for the Ready for Sunday check: which of these files are missing, and whether the library
+/// reads back whole. The church sees only the outcome, in its own words.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadyFacts {
+    missing: Vec<usize>,
+    library_ok: bool,
+}
+
+#[tauri::command(async)]
+fn ready_facts(db: State<Db>, paths: Vec<String>) -> ReadyFacts {
+    let missing = paths.iter().enumerate().filter(|(_, path)| !std::path::Path::new(path).is_file()).map(|(index, _)| index).collect();
+    let library_ok = with_db(&db, |conn| conn.query_row("PRAGMA quick_check", [], |row| row.get::<_, String>(0)).map_err(|error| error.to_string()))
+        .map(|answer| answer == "ok")
+        .unwrap_or(false);
+    ReadyFacts { missing, library_ok }
+}
+
+/// Room left where recordings are saved, in bytes (None when it cannot be told).
+#[tauri::command(async)]
+fn record_room(folder: Option<String>) -> Option<u64> {
+    let file = broadcast::record_path(folder.as_deref(), "x");
+    storage::free_space(file.parent()?)
+}
+
+/// Add a file to Media. A file already there (the same bytes) is not stored twice: its entry comes
+/// back marked `existing`. The copy (a clone where the drive allows) happens outside the library's
+/// lock, so a long video does not hold up saving.
 #[tauri::command(async)]
 fn import_media(app: AppHandle, db: State<Db>, path: String) -> Result<Value, String> {
-    with_db(&db, |conn| db::import_media(conn, &app, std::path::Path::new(&path)))
+    let source = std::path::Path::new(&path);
+    let (name, ext, kind) = db::media_source(source)?;
+    let kept: Vec<Value> = with_db(&db, db::media_list)?.into_iter().filter(|asset| asset["kind"] == kind).collect();
+    let paths: Vec<std::path::PathBuf> = kept.iter().map(|asset| std::path::PathBuf::from(asset["path"].as_str().unwrap_or_default())).collect();
+    if let Some(index) = storage::same_file(source, &paths) {
+        let mut found = kept[index].clone();
+        found["existing"] = Value::Bool(true);
+        return Ok(found);
+    }
+    let (id, dest) = db::media_dest(&app, &ext)?;
+    storage::clone_or_copy(source, &dest)?;
+    with_db(&db, |conn| db::record_media(conn, &id, &name, &dest, kind))
 }
 
 /// Raw image bytes in the request body; the name is URL-encoded in `x-media-name`.
@@ -331,6 +370,13 @@ fn import_media_bytes(app: AppHandle, db: State<Db>, request: tauri::ipc::Reques
         .and_then(|value| value.to_str().ok())
         .map(percent_decode)
         .unwrap_or_else(|| "image".into());
+    let kept: Vec<Value> = with_db(&db, db::media_list)?.into_iter().filter(|asset| asset["kind"] == "image").collect();
+    let paths: Vec<std::path::PathBuf> = kept.iter().map(|asset| std::path::PathBuf::from(asset["path"].as_str().unwrap_or_default())).collect();
+    if let Some(index) = storage::same_bytes(bytes, &paths) {
+        let mut found = kept[index].clone();
+        found["existing"] = Value::Bool(true);
+        return Ok(found);
+    }
     with_db(&db, |conn| db::import_media_bytes(conn, &app, &name, bytes))
 }
 
@@ -923,6 +969,8 @@ pub fn run() {
             pco_get,
             easyworship_songs,
             ai_post,
+            ready_facts,
+            record_room,
             ai_get,
             crash_log,
             diagnostic_log,

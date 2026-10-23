@@ -404,6 +404,8 @@ export type MediaAsset = {
   path: string;
   kind: "image" | "video" | "audio";
   createdAt: string;
+  /** Set on an import that found the same file already in Media (nothing new was stored). */
+  existing?: boolean;
 };
 
 export type RecentPassage = BibleItem;

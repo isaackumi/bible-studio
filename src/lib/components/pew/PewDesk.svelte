@@ -850,6 +850,7 @@
           <button type="button" role="menuitem" onclick={() => { close(); session.startTour(mode); }}>{@render icon("help")} {t("Tour this page")}</button>
           <button type="button" role="menuitem" onclick={() => { sheet = sheet === "help" ? null : "help"; close(); }}>{@render icon("help")} {t("How this desk works")}</button>
           <div class="menu-sep"></div>
+          <button type="button" role="menuitem" onclick={() => { session.openSettings("ready"); close(); }}>{@render icon("check")} {t("Ready for Sunday…")}</button>
           <button type="button" role="menuitem" onclick={() => { session.openSettings("appearance"); close(); }}>{@render icon("settings")} {t("Settings…")} <span class="menu-key">⌘,</span></button>
         {/snippet}
       </ToolMenu>

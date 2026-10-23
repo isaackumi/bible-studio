@@ -9,6 +9,9 @@ import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type Activation
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
+import { aiCheck, backupCheck, internetCheck, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck, type ReadyCheck } from "../domain/readiness";
+import { isOnlineTranslation } from "../bible/online-bibles";
+import { SERVER_URL } from "../domain/billing";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
@@ -4584,6 +4587,16 @@ class Session {
       this.broadcastFailed(t("macOS needs your permission to capture the audience window."), "permission");
       return false;
     }
+    // A recording that would run out of room partway through the service is stopped before it starts.
+    if (options.record && !options.pattern) {
+      const room = await this.recordRoom();
+      const minutes = room === null ? null : recordingMinutes(room, this.recordKbps());
+      if (minutes !== null && minutes < 10) {
+        this.broadcastFailed(t("Only about {minutes} minutes of recording fit on this computer. Free some space, or choose another recordings folder.", { minutes }), "space");
+        return false;
+      }
+      if (minutes !== null && minutes < 90) this.warn(t("Recording: room for about {minutes} minutes. Free some space before a long service.", { minutes }));
+    }
     if (!this.broadcastUnlisten) this.broadcastUnlisten = await listen<{ line: string }>("broadcast-status", (event) => this.onBroadcastLine(event.payload.line));
     const quality = QUALITIES[settings.quality];
     this.broadcastState = { status: "starting", streaming: options.stream, recording: options.record, live: false, pattern: options.pattern === true, seconds: 0, kbps: 0, message: t("Starting…"), saved: null };
@@ -4605,13 +4618,15 @@ class Session {
    * Streaming or recording could not start (or stopped): said where it is seen, with the one thing to
    * do about it, not only inside the closed menu.
    */
-  private broadcastFailed = (message: string, fix: "permission" | "settings" | null = null) => {
+  private broadcastFailed = (message: string, fix: "permission" | "settings" | "space" | null = null) => {
     this.broadcastState = { ...this.broadcastState, status: "error", message };
     const actions: Array<{ label: string; run: () => void }> = [];
     if (fix === "permission") {
       actions.push({ label: t("Open Screen Recording settings"), run: () => { void openPrivacySettings("screen").catch(() => {}); this.dismissToast(); } });
     } else if (fix === "settings") {
       actions.push({ label: t("Stream & record settings"), run: () => { this.openSettings("broadcast"); this.dismissToast(); } });
+    } else if (fix === "space") {
+      actions.push({ label: t("Free up space"), run: () => { this.openSettings("storage"); this.dismissToast(); } });
     }
     this.notify(t("Streaming and recording did not start"), {
       detail: fix === "permission" ? t("Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.") : message,
@@ -4965,6 +4980,75 @@ class Session {
     const picks = parseSongSuggestions(replyText(settings.provider, await this.aiPost(suggestSongsRequest(settings, { ...input, songs }))), songs.length);
     return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
   };
+
+  /** Recording speed in kbps: the chosen quality's video plus the sound. */
+  private recordKbps(): number {
+    return QUALITIES[this.workspace.broadcast.quality].videoKbps + 192;
+  }
+
+  /** Room left for recordings, in bytes (desktop only; null when it cannot be told). */
+  private recordRoom(): Promise<number | null> {
+    return this.desktop() ? invoke<number | null>("record_room", { folder: this.workspace.broadcast.recordFolder || null }).catch(() => null) : Promise.resolve(null);
+  }
+
+  /** Ready for Sunday: everything the service depends on, checked in one go, worst first. */
+  checkReady = async (): Promise<ReadyCheck[]> => {
+    const desktop = this.desktop();
+    const media = new Map(this.media.map((asset) => [asset.id, asset]));
+    const songs = new Set(this.songs.map((song) => song.id));
+    const decks = new Set(this.decks.map((deck) => deck.id));
+    const items = this.service?.sections.flatMap((section) => section.items) ?? [];
+    // What each item needs: a file (by its place in `paths`), or a song or deck that must exist.
+    const paths: string[] = [];
+    const needs = items.map((item) => {
+      const assetId = item.image?.assetId ?? item.video?.assetId ?? item.slide?.imageId ?? null;
+      if (assetId) {
+        const asset = media.get(assetId);
+        if (!asset) return { title: item.title, gone: true, path: -1 };
+        paths.push(asset.path);
+        return { title: item.title, gone: false, path: paths.length - 1 };
+      }
+      if (item.lyric) return { title: item.title, gone: !songs.has(item.lyric.songId), path: -1 };
+      if (item.deck) return { title: item.title, gone: !decks.has(item.deck.deckId), path: -1 };
+      return { title: item.title, gone: false, path: -1 };
+    });
+    const facts = desktop ? await invoke<{ missing: number[]; libraryOk: boolean }>("ready_facts", { paths: desktop ? paths : [] }).catch(() => null) : null;
+    const missingFiles = new Set(facts?.missing ?? []);
+    const missing = needs.filter((need) => need.gone || (need.path >= 0 && missingFiles.has(need.path))).map((need) => need.title || t("Untitled"));
+
+    const ai = this.workspace.ai;
+    const aiUsed = aiReady(ai) && (["summary", "slides", "songSuggest", "songLookup", "captions", "verses"] as const).some((feature) => aiFeatureOn(ai, feature));
+    const needed = [
+      ...(aiUsed && ai.provider !== "local" ? [t("the AI")] : []),
+      ...(this.remoteVia === "internet" && this.remoteDevices.length ? [t("the phone remote")] : []),
+      ...(items.some((item) => item.bible && isOnlineTranslation(item.bible.translationId)) ? [t("online Bibles")] : []),
+      ...("url" in streamTarget(this.workspace.broadcast) ? [t("streaming")] : []),
+    ];
+    const online = needed.length ? await this.reachable() : true;
+
+    const checks: Array<ReadyCheck | null> = [
+      screenCheck({ online: this.output.online, displayName: this.output.displayName, screens: this.output.displays.length, mode: this.output.mode }),
+      serviceCheck({ name: this.service?.name ?? null, missing }),
+      desktop ? spaceCheck({ free: await this.recordRoom(), kbps: this.recordKbps() }) : null,
+      backupCheck({ folder: this.workspace.backup.folder, lastAt: this.workspace.backup.lastAt ?? null, now: Date.now(), desktop }),
+      planCheck({ plan: this.plan, endsAt: this.ent.endsAt, renewBy: this.ent.kind === "license" ? this.ent.renewBy : null, now: Date.now(), dateText: (time) => new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "long" }) }),
+      facts ? libraryCheck(facts.libraryOk) : null,
+      internetCheck(online, needed),
+      aiUsed && online ? aiCheck({ problem: await this.aiModels().then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error))) }) : null,
+    ];
+    return sortChecks(checks.filter((check): check is ReadyCheck => check !== null));
+  };
+
+  /** Whether the internet answers (a quick request; the address is never shown). */
+  private async reachable(): Promise<boolean> {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+    try {
+      await fetch(SERVER_URL, { method: "HEAD", mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(5000) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   /** A tiny request to check the key and model work. */
   testAi = async (): Promise<string> => {
@@ -7075,8 +7159,9 @@ class Session {
   importImage = async (source: string | File) => {
     try {
       const asset = await api.importMedia(source);
-      this.media = [asset, ...this.media.filter((entry) => entry.id !== asset.id)];
-      this.message = t("{name} saved. Preview it, then LIVE.", { name: asset.name });
+      const { existing, ...kept } = asset;
+      this.media = [kept, ...this.media.filter((entry) => entry.id !== kept.id)];
+      this.message = existing ? t("{name} is already in Media, so it was not saved twice.", { name: kept.name }) : t("{name} saved. Preview it, then LIVE.", { name: kept.name });
       return asset;
     } catch (error) {
       this.warn(errorText(error, t("The image was not saved.")));

@@ -146,6 +146,62 @@ pub fn remove_leftover(media_dir: &Path, path: &str) -> Result<(), String> {
     std::fs::remove_file(file).map_err(|error| error.to_string())
 }
 
+/// Bring a file into the media folder. Where the drive can (APFS on a Mac, btrfs or xfs on Linux,
+/// ReFS on Windows) this is a clone: instant, no extra space, and still a file of its own when the
+/// original is moved or deleted. Elsewhere it is a plain copy.
+pub fn clone_or_copy(source: &Path, dest: &Path) -> Result<(), String> {
+    reflink_copy::reflink_or_copy(source, dest).map(|_| ()).map_err(|error| error.to_string())
+}
+
+/// Which of `kept` holds exactly the same bytes as `source`: compared by size first, so only a file
+/// of the same size is read through.
+pub fn same_file(source: &Path, kept: &[PathBuf]) -> Option<usize> {
+    let size = std::fs::metadata(source).ok()?.len();
+    let mut digest: Option<[u8; 32]> = None;
+    for (index, path) in kept.iter().enumerate() {
+        if std::fs::metadata(path).map(|meta| meta.len()).ok() != Some(size) || path == source {
+            continue;
+        }
+        if digest.is_none() {
+            digest = Some(fingerprint(source)?);
+        }
+        if fingerprint(path) == digest {
+            return Some(index);
+        }
+    }
+    None
+}
+
+/// Which of `kept` holds exactly these bytes (a picture made smaller in the window, say).
+pub fn same_bytes(bytes: &[u8], kept: &[PathBuf]) -> Option<usize> {
+    use sha2::{Digest, Sha256};
+    let digest: [u8; 32] = Sha256::digest(bytes).into();
+    kept.iter().position(|path| std::fs::metadata(path).map(|meta| meta.len()).ok() == Some(bytes.len() as u64) && fingerprint(path) == Some(digest))
+}
+
+fn fingerprint(path: &Path) -> Option<[u8; 32]> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 1 << 20];
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Some(hasher.finalize().into())
+}
+
+/// Space left for Church Studio on the drive that holds `path`, in bytes.
+pub fn free_space(path: &Path) -> Option<u64> {
+    // The folder may not exist yet (no recording made): ask about the nearest one that does.
+    let existing = path.ancestors().find(|ancestor| ancestor.exists())?;
+    fs4::available_space(existing).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +248,27 @@ mod tests {
         compact(&conn).unwrap();
         let value: String = conn.query_row("SELECT v FROM t", [], |row| row.get(0)).unwrap();
         assert_eq!(value, "kept");
+    }
+
+    #[test]
+    fn finds_the_same_file_and_clones() {
+        let dir = std::env::temp_dir().join(format!("cs-same-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.png");
+        let b = dir.join("b.png");
+        let c = dir.join("c.png");
+        let source = dir.join("new.png");
+        std::fs::write(&a, b"one picture").unwrap();
+        std::fs::write(&b, b"two picture").unwrap();
+        std::fs::write(&c, b"other size, longer").unwrap();
+        std::fs::write(&source, b"two picture").unwrap();
+        assert_eq!(super::same_file(&source, &[a.clone(), c.clone(), b.clone()]), Some(2));
+        assert_eq!(super::same_file(&source, &[a.clone(), c.clone()]), None);
+        assert_eq!(super::same_bytes(b"one picture", &[b.clone(), a.clone()]), Some(1));
+        let copy = dir.join("copy.png");
+        super::clone_or_copy(&source, &copy).unwrap();
+        assert_eq!(std::fs::read(&copy).unwrap(), b"two picture");
+        assert!(super::free_space(&dir.join("not-made-yet/sub")).unwrap() > 0);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
