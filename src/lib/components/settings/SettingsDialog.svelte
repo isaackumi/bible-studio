@@ -40,7 +40,7 @@
   import { checkoutUrl, FEATURE_LABELS, FREE_LISTEN_MINUTES, maskedLicense, supportMailto, initials, PLANS, planById, TRIAL_DAYS, yearlyDeal } from "../../domain/plans";
   import ThemeLibrary from "./ThemeLibrary.svelte";
   import PickList from "../PickList.svelte";
-  import { AI_DEFAULTS } from "../../ai/summarize";
+  import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
 
@@ -155,7 +155,7 @@
       label: msg("Connected services"),
       items: [
         { id: "planning", title: msg("Planning Center"), icon: "list", color: "#2266e3", about: msg("Bring upcoming plans in as services."), keywords: "planning center pco services plan import" },
-        { id: "ai", title: msg("AI assistant"), icon: "sparkles", color: "#7c3aed", about: msg("Your own AI key, for sermon summaries."), keywords: "ai llm claude anthropic openai gpt ollama key summary sermon notes" },
+        { id: "ai", title: msg("AI assistant"), icon: "sparkles", color: "#7c3aed", about: msg("Claude, ChatGPT, Gemini or an AI on this computer, for summaries, slides and captions."), keywords: "ai llm claude anthropic openai chatgpt gpt gemini google ollama lm studio local key model summary sermon notes slides captions translate" },
       ],
     },
     {
@@ -335,6 +335,9 @@
   let aiBusy = $state(false);
   let aiNote = $state("");
   let aiOk = $state(false);
+  let aiModels = $state<string[]>([]);
+  let modelsBusy = $state(false);
+  let modelsNote = $state("");
   let pcoError = $state("");
   let pcoTypes = $state<Array<{ id: string; name: string }>>([]);
   let pcoType = $state("");
@@ -1253,28 +1256,54 @@
         {@const ai = session.workspace.ai}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{t("Service")}</strong><span>{t("Claude (Anthropic), or anything that speaks the OpenAI API: OpenAI itself, or a model on this computer through Ollama or LM Studio.")}</span></div>
-            <select class="field" aria-label={t("AI service")} value={ai.provider} onchange={(event) => { const provider = event.currentTarget.value === "openai" ? "openai" : "anthropic"; session.setAiSettings({ provider, model: AI_DEFAULTS[provider].model, baseUrl: "" }); aiNote = ""; }}>
-              <option value="anthropic">{t("Claude (Anthropic)")}</option>
-              <option value="openai">{t("OpenAI or compatible")}</option>
+            <div class="row-copy"><strong>{t("Which AI")}</strong><span>{t("Claude, ChatGPT and Gemini work over the internet with a key from their website. An AI on this computer works without a key or the internet.")}</span></div>
+            <select class="field" aria-label={t("AI service")} value={ai.provider} onchange={(event) => { const provider = AI_PROVIDERS.find((name) => name === event.currentTarget.value) ?? "anthropic"; session.setAiSettings({ provider, key: provider === ai.provider ? ai.key : "", model: AI_DEFAULTS[provider].model, baseUrl: provider === "local" ? AI_DEFAULTS.local.baseUrl : "" }); aiNote = ""; aiModels = []; modelsNote = ""; }}>
+              <option value="anthropic">{t("Claude (by Anthropic)")}</option>
+              <option value="openai">{t("ChatGPT (by OpenAI)")}</option>
+              <option value="gemini">{t("Gemini (by Google)")}</option>
+              <option value="local">{t("An AI on this computer")}</option>
             </select>
           </div>
-          <div class="row">
-            <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("Make one at console.anthropic.com › API keys.") : t("From platform.openai.com › API keys. A model on this computer needs no key.")} {t("It stays on this computer and is only used when you ask for a summary.")}</span></div>
-            <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; }} />
-          </div>
-          <div class="row">
-            <div class="row-copy"><strong>{t("Model")}</strong><span>{ai.provider === "anthropic" ? t("claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.") : t("For example gpt-4o-mini, or llama3.1 on Ollama.")}</span></div>
-            <input class="field" aria-label={t("AI model")} value={ai.model} onchange={(event) => session.setAiSettings({ model: event.currentTarget.value })} />
-          </div>
-          {#if ai.provider === "openai"}
+          {#if ai.provider === "local"}
             <div class="row">
-              <div class="row-copy"><strong>{t("Address")}</strong><span>{t("Leave empty for OpenAI. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")}</span></div>
-              <input class="field" aria-label={t("AI address")} placeholder="https://api.openai.com/v1" value={ai.baseUrl} onchange={(event) => session.setAiSettings({ baseUrl: event.currentTarget.value })} />
+              <div class="row-copy"><strong>{t("Set it up once")}</strong><span>{t("Install Ollama (ollama.com) or LM Studio (lmstudio.ai), download a model in it, and keep the app open while you use Church Studio. Nothing leaves this computer.")}</span></div>
+            </div>
+            <div class="row">
+              <div class="row-copy"><strong>{t("Which app")}</strong><span>{t("Where the AI app listens on this computer. Pick yours, or type another address.")}</span></div>
+              <div class="row-end">
+                {#each LOCAL_AI_APPS as app (app.name)}
+                  <button type="button" class="btn" class:primary={ai.baseUrl === app.baseUrl} onclick={() => { session.setAiSettings({ baseUrl: app.baseUrl }); aiNote = ""; aiModels = []; modelsNote = ""; }}>{app.name}</button>
+                {/each}
+                <input class="field" aria-label={t("AI address")} placeholder={AI_DEFAULTS.local.baseUrl} value={ai.baseUrl} onchange={(event) => { session.setAiSettings({ baseUrl: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
+              </div>
+            </div>
+          {:else}
+            <div class="row">
+              <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("Get one at console.anthropic.com › API Keys.") : ai.provider === "openai" ? t("Get one at platform.openai.com › API keys.") : t("Get one at aistudio.google.com › Get API key. Google has a free tier.")} {t("It stays on this computer. The company may charge you for what you use.")}</span></div>
+              <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} onchange={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
             </div>
           {/if}
           <div class="row">
-            <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a two-line test to the service.")}</span></div>
+            <div class="row-copy"><strong>{t("Model")}</strong><span class:form-error={!!modelsNote}>{modelsNote || (ai.provider === "anthropic" ? t("The version of the AI to use. claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.") : t("The version of the AI to use. Press Find models to see the ones you can use."))}</span></div>
+            <div class="row-end">
+              {#if aiModels.length}
+                <select class="field" aria-label={t("AI model")} value={ai.model} onchange={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }}>
+                  {#if !aiModels.includes(ai.model)}<option value={ai.model}>{ai.model || t("Choose a model")}</option>{/if}
+                  {#each aiModels as model (model)}<option value={model}>{model}</option>{/each}
+                </select>
+              {:else}
+                <input class="field" aria-label={t("AI model")} placeholder={t("Model name")} value={ai.model} onchange={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }} />
+              {/if}
+              <button type="button" class="btn" disabled={modelsBusy || (ai.provider !== "local" && !ai.key)} onclick={async () => {
+                modelsBusy = true;
+                modelsNote = "";
+                try { aiModels = await session.aiModels(); if (!session.workspace.ai.model) session.setAiSettings({ model: aiModels[0] }); } catch (error) { modelsNote = error instanceof Error ? error.message : String(error); }
+                modelsBusy = false;
+              }}>{modelsBusy ? t("Looking…") : t("Find models")}</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk}>{aiNote || t("Sends a short test to the AI.")}</span></div>
             <button type="button" class="btn" disabled={!session.aiReady || aiBusy} onclick={async () => {
               aiBusy = true;
               try { aiNote = await session.testAi(); aiOk = true; } catch (error) { aiNote = error instanceof Error ? error.message : String(error); aiOk = false; }
@@ -1282,7 +1311,7 @@
             }}>{aiBusy ? t("Checking…") : t("Test")}</button>
           </div>
         </section>
-        <p class="note stand">{t("Used on the Sermon page: Summarize turns your notes into a short summary and sermon points you can show. Your notes go to the service you chose only when you press it; the service's own terms and charges apply.")}</p>
+        <p class="note stand">{t("The AI writes sermon summaries (Sermon › Summarize), makes slides from notes, a passage or a topic (Make slides with AI), and translates live captions (Settings › Captions). Your words go to the AI only when you use one of these.")}</p>
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>

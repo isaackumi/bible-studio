@@ -766,11 +766,21 @@ fn ai_url_allowed(url: &str) -> bool {
     }
 }
 
-/// POST a request to the church's own AI service (sermon summaries). The reply body comes back
-/// as text whatever the status, since the services explain errors in it. Long timeout: a summary
-/// can take a while on a local model.
+/// POST a request to the church's own AI service (sermon summaries, slides, captions). The reply
+/// body comes back as text whatever the status, since the services explain errors in it.
 #[tauri::command]
 async fn ai_post(url: String, headers: std::collections::HashMap<String, String>, body: String) -> Result<String, String> {
+    ai_send(url, headers, Some(body)).await
+}
+
+/// GET from the church's AI service: the list of models its key can use.
+#[tauri::command]
+async fn ai_get(url: String, headers: std::collections::HashMap<String, String>) -> Result<String, String> {
+    ai_send(url, headers, None).await
+}
+
+/// Long timeout: a summary can take a while on a model running on this computer.
+async fn ai_send(url: String, headers: std::collections::HashMap<String, String>, body: Option<String>) -> Result<String, String> {
     if !ai_url_allowed(&url) {
         return Err("The AI address must start with https:// (or be a model on this computer).".into());
     }
@@ -780,13 +790,23 @@ async fn ai_post(url: String, headers: std::collections::HashMap<String, String>
             .timeout_global(Some(std::time::Duration::from_secs(120)))
             .build()
             .into();
-        let mut request = agent.post(&url);
-        for (name, value) in &headers {
-            request = request.header(name.as_str(), value.as_str());
+        let mut response = match body {
+            Some(body) => {
+                let mut request = agent.post(&url);
+                for (name, value) in &headers {
+                    request = request.header(name.as_str(), value.as_str());
+                }
+                request.send(body.as_bytes())
+            }
+            None => {
+                let mut request = agent.get(&url);
+                for (name, value) in &headers {
+                    request = request.header(name.as_str(), value.as_str());
+                }
+                request.call()
+            }
         }
-        let mut response = request
-            .send(body.as_bytes())
-            .map_err(|error| format!("The AI service could not be reached. {error}"))?;
+        .map_err(|error| format!("The AI service could not be reached. {error}"))?;
         response
             .body_mut()
             .read_to_string()
@@ -903,6 +923,7 @@ pub fn run() {
             pco_get,
             easyworship_songs,
             ai_post,
+            ai_get,
             crash_log,
             diagnostic_log,
             backup_write,

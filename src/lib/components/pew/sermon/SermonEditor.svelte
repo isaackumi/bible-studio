@@ -329,7 +329,7 @@
     </div>
     <div class="actions">
       <button type="button" class="desk-btn" class:on={outlineOpen} onclick={() => (outlineOpen = !outlineOpen)} data-tip={t("Paste your notes: headings become sections, references become scripture")}><Icon name="list" size={14} /> {t("Outline from notes")}</button>
-      <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? t("Make a summary and points from your notes") : t("Set up your AI key first")} onclick={() => void summarize()}>
+      <button type="button" class="desk-btn ai-btn" disabled={summarizing} data-tip={session.aiReady ? t("Make a summary and points from your notes") : t("Set up the AI first")} onclick={() => void summarize()}>
         <Icon name="sparkles" size={14} /> {summarizing ? t("Summarizing…") : t("Summarize")}
       </button>
       <button type="button" class="desk-btn ai-btn" data-tip={t("Make a slide deck from these notes with your AI service")} onclick={() => (aiSlides = { notes: notesFor(draft), title: draft.title })}><Icon name="stage" size={14} /> {t("Make slides")}</button>

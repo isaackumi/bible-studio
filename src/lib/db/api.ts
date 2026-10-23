@@ -175,6 +175,17 @@ export const api = {
       throw new Error(text.trim().slice(0, 200) || "The AI service sent an empty reply.");
     }
   },
+  /** The models the church's AI key can use (same route as aiPost). */
+  aiGet: async (request: { url: string; headers: Record<string, string> }): Promise<unknown> => {
+    const text = desktop()
+      ? await invoke<string>("ai_get", { url: request.url, headers: request.headers })
+      : await fetch(request.url, { headers: request.headers }).then((response) => response.text());
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(text.trim().slice(0, 200) || "The AI service sent an empty reply.");
+    }
+  },
   /** Planning Center requests: through the desktop app (the API refuses web pages). */
   pcoGet: async (url: string, authorization: string): Promise<unknown> => {
     if (!desktop()) throw new Error("Planning Center import works in the desktop app.");

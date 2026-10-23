@@ -122,7 +122,7 @@
       <strong>{t("Languages")}</strong>
       <span>
         {#if session.aiReady}{t("Each phrase is translated with your AI service as it is said; phones choose their language. Up to four.")}
-        {:else}{t("Translation uses your own AI key.")} <button type="button" class="link" onclick={onai}>{t("Add it in AI assistant")}</button>.{/if}
+        {:else}{t("Translation uses your own AI.")} <button type="button" class="link" onclick={onai}>{t("Set it up in AI assistant")}</button>.{/if}
       </span>
     </div>
     <div class="langs">

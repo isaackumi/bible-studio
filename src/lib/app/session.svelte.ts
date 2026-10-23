@@ -244,7 +244,7 @@ import {
 import { favoritesFirst, isFavorite, isFavoritePassage, toggleFavorite, toggleFavoritePassage, type FavoriteKind } from "../domain/favorites";
 import { songLists } from "../domain/song-lists";
 import { newOverlay, OVERLAY_KINDS, paintOverlays, sanitizeOverlays, slideOverlays, type OverlayKind, type ScreenOverlay } from "../domain/screen-overlays";
-import { aiReady, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
+import { aiReady, modelsRequest, parseModels, parseSummary, replyText, sanitizeAiSettings, summaryRequest, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 
 const fixedShape = (shape: unknown) => sanitizeScreenShape(shape) !== "auto";
 
@@ -1764,7 +1764,7 @@ class Session {
       if (!line) return;
       const context = this.captions.lines.filter((entry) => entry.id < id).slice(-2).map((entry) => entry.text).join(" ");
       try {
-        const reply = await api.aiPost(translateRequest(this.workspace.ai, line.text, languages, context));
+        const reply = await this.aiPost(translateRequest(this.workspace.ai, line.text, languages, context));
         const translations = parseTranslations(replyText(this.workspace.ai.provider, reply), languages);
         if (Object.keys(translations).length) this.captions = withTranslation(this.captions, id, translations);
       } catch (error) {
@@ -4843,18 +4843,18 @@ class Session {
    */
   summarizeSermon = async (input: { title: string; notes: string }): Promise<SermonSummary> => {
     const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Add your AI key in Settings › AI assistant first."));
+    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
     if (!input.notes.trim()) throw new Error(t("Write some notes first; the summary is made from them."));
-    const reply = await api.aiPost(summaryRequest(settings, input));
+    const reply = await this.aiPost(summaryRequest(settings, input));
     return parseSummary(replyText(settings.provider, reply));
   };
 
   /** AI slide generation: a deck from notes, a passage or a topic, saved to the slide library. */
   generateSlides = async (input: { source: SlideSource; text: string; title?: string; count: number; addToService?: boolean; sectionId?: string }): Promise<SlideDeck> => {
     const settings = this.workspace.ai;
-    if (!aiReady(settings)) throw new Error(t("Add your AI key in Settings › AI assistant first."));
+    if (!aiReady(settings)) throw new Error(t("Set up the AI in Settings › AI assistant first."));
     if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : t("Write some notes first; the slides are made from them."));
-    const reply = await api.aiPost(slidesRequest(settings, input));
+    const reply = await this.aiPost(slidesRequest(settings, input));
     const outline = parseSlides(replyText(settings.provider, reply));
     const deck = deckFromOutline(input.title?.trim() || outline.title, outline.slides);
     this.saveDeck(deck);
@@ -4862,6 +4862,32 @@ class Session {
     this.message = t("{name}: {pages} made. Edit them on the Production Desk › Media › Slides.", { name: deck.name, pages: tn(deck.pages.length, "{n} slide", "{n} slides") });
     return deck;
   };
+
+  /** The models the chosen AI offers, for Settings › AI assistant. */
+  aiModels = async (): Promise<string[]> => {
+    const settings = this.workspace.ai;
+    if (settings.provider !== "local" && !settings.key) throw new Error(t("Paste your key first."));
+    const models = parseModels(await this.aiReach(() => api.aiGet(modelsRequest(settings))));
+    if (!models.length) throw new Error(settings.provider === "local" ? t("No models yet. Download one in Ollama or LM Studio first.") : t("The AI service listed no models for this key."));
+    return models;
+  };
+
+  private aiPost(request: AiRequest): Promise<unknown> {
+    return this.aiReach(() => api.aiPost(request));
+  }
+
+  /** When nothing answers on this computer, the AI app is most likely closed: say so. */
+  private async aiReach(send: () => Promise<unknown>): Promise<unknown> {
+    try {
+      return await send();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (this.workspace.ai.provider === "local" && /could not be reached|failed to fetch|load failed|connection refused/i.test(message)) {
+        throw new Error(t("Nothing answered on this computer. Open Ollama or LM Studio, and check the address."));
+      }
+      throw error;
+    }
+  }
 
   /** A tiny request to check the key and model work. */
   testAi = async (): Promise<string> => {

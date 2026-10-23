@@ -1,45 +1,72 @@
-// Sermon notes → a short summary and screen-ready points, with the church's own AI key.
-// Two kinds of service: Anthropic (Claude) and anything that speaks the OpenAI chat API
-// (OpenAI itself, or a model on this computer through Ollama or LM Studio). This file only
-// builds the request and reads the answer; the app sends it (through Rust on the desktop).
+// Sermon notes → a short summary and screen-ready points, with the church's own AI. Four choices:
+// Claude, ChatGPT and Gemini, each with a key from the company's website, or an AI running on this
+// computer (Ollama, LM Studio) that needs no key and no internet. Claude has its own API; the other
+// three speak the OpenAI chat API. This file only builds the request and reads the answer; the app
+// sends it (through Rust on the desktop).
 
-export type AiProvider = "anthropic" | "openai";
+export type AiProvider = "anthropic" | "openai" | "gemini" | "local";
+
+export const AI_PROVIDERS: readonly AiProvider[] = ["anthropic", "openai", "gemini", "local"];
 
 export type AiSettings = {
   provider: AiProvider;
-  /** The church's own key. Kept on this computer only. Empty for local models that need none. */
+  /** The church's own key. Kept on this computer only. Empty for an AI on this computer. */
   key: string;
   model: string;
-  /** OpenAI-style only: another address, e.g. http://localhost:11434/v1 for Ollama. */
+  /** "local" only: where the AI app listens, e.g. http://localhost:11434/v1 for Ollama. */
   baseUrl: string;
 };
 
+/** Each service's address and a good starting model. An AI on this computer has no default model: it is whatever the church downloaded. */
 export const AI_DEFAULTS: Record<AiProvider, { model: string; baseUrl: string }> = {
   anthropic: { model: "claude-sonnet-5-5", baseUrl: "https://api.anthropic.com" },
-  openai: { model: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
+  openai: { model: "gpt-6.1-sol", baseUrl: "https://api.openai.com/v1" },
+  gemini: { model: "gemini-3.8-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  local: { model: "", baseUrl: "http://localhost:11434/v1" },
 };
+
+/** The apps that run an AI on this computer, and where each listens by default. */
+export const LOCAL_AI_APPS = [
+  { name: "Ollama", baseUrl: "http://localhost:11434/v1" },
+  { name: "LM Studio", baseUrl: "http://localhost:1234/v1" },
+] as const;
 
 export function emptyAiSettings(): AiSettings {
   return { provider: "anthropic", key: "", model: AI_DEFAULTS.anthropic.model, baseUrl: "" };
 }
 
+/** Settings saved before Gemini and "on this computer" were their own choices said "openai" with another address. */
+function providerOf(provider: unknown, baseUrl: string): AiProvider {
+  if (provider === "anthropic" || provider === "gemini" || provider === "local") return provider;
+  if (provider !== "openai") return "anthropic";
+  if (!baseUrl || /^https:\/\/api\.openai\.com/i.test(baseUrl)) return "openai";
+  if (/generativelanguage\.googleapis\.com/i.test(baseUrl)) return "gemini";
+  return "local";
+}
+
 export function sanitizeAiSettings(value: unknown): AiSettings {
   const record = value && typeof value === "object" ? (value as Partial<AiSettings>) : {};
-  const provider: AiProvider = record.provider === "openai" ? "openai" : "anthropic";
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const baseUrl = text(record.baseUrl, 300);
+  const provider = providerOf(record.provider, baseUrl);
   return {
     provider,
     key: text(record.key, 400),
     model: text(record.model, 120) || AI_DEFAULTS[provider].model,
-    baseUrl: text(record.baseUrl, 300),
+    baseUrl: provider === "local" ? baseUrl : "",
   };
+}
+
+/** Where requests go: the company's own address, or the AI app on this computer. */
+function baseOf(settings: AiSettings): string {
+  const base = settings.provider === "local" ? settings.baseUrl || AI_DEFAULTS.local.baseUrl : AI_DEFAULTS[settings.provider].baseUrl;
+  return base.replace(/\/+$/, "");
 }
 
 export function aiReady(settings: AiSettings): boolean {
   if (!settings.model) return false;
-  // A local OpenAI-style server (Ollama, LM Studio) needs an address but no key.
-  if (settings.provider === "openai" && settings.baseUrl && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(settings.baseUrl)) return true;
-  return settings.key.length > 0;
+  // An AI on this computer needs no key.
+  return settings.provider === "local" || settings.key.length > 0;
 }
 
 export type SermonSummary = {
@@ -62,19 +89,12 @@ export function summaryRequest(settings: AiSettings, input: { title: string; not
   return chatRequest(settings, INSTRUCTIONS, message, { maxTokens: 1500, temperature: 0.3 });
 }
 
-/** One instruction and one message to the church's AI service (Claude, or any OpenAI-style API). */
+/** One instruction and one message to the church's AI (Claude, or any OpenAI-style API). */
 export function chatRequest(settings: AiSettings, system: string, message: string, options: { maxTokens: number; temperature: number }): AiRequest {
   if (settings.provider === "anthropic") {
-    const base = (settings.baseUrl || AI_DEFAULTS.anthropic.baseUrl).replace(/\/+$/, "");
     return {
-      url: `${base}/v1/messages`,
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": settings.key,
-        "anthropic-version": "2023-06-01",
-        // Allowed when the call comes straight from the app's window (browser version).
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
+      url: `${baseOf(settings)}/v1/messages`,
+      headers: { ...anthropicHeaders(settings.key), "content-type": "application/json" },
       body: JSON.stringify({
         model: settings.model,
         max_tokens: options.maxTokens,
@@ -83,32 +103,74 @@ export function chatRequest(settings: AiSettings, system: string, message: strin
       }),
     };
   }
-  const base = (settings.baseUrl || AI_DEFAULTS.openai.baseUrl).replace(/\/+$/, "");
   return {
-    url: `${base}/chat/completions`,
-    headers: {
-      "content-type": "application/json",
-      ...(settings.key ? { authorization: `Bearer ${settings.key}` } : {}),
-    },
+    url: `${baseOf(settings)}/chat/completions`,
+    headers: { ...bearer(settings.key), "content-type": "application/json" },
     body: JSON.stringify({
       model: settings.model,
       messages: [
         { role: "system", content: system },
         { role: "user", content: message },
       ],
-      temperature: options.temperature,
+      // OpenAI's newer models refuse any temperature but their own; the others take it.
+      ...(settings.provider === "openai" ? {} : { temperature: options.temperature }),
     }),
   };
 }
 
+function anthropicHeaders(key: string): Record<string, string> {
+  return {
+    "x-api-key": key,
+    "anthropic-version": "2023-06-01",
+    // Allowed when the call comes straight from the app's window (browser version).
+    "anthropic-dangerous-direct-browser-access": "true",
+  };
+}
+
+function bearer(key: string): Record<string, string> {
+  return key ? { authorization: `Bearer ${key}` } : {};
+}
+
+/** Ask the service which models this key can use. */
+export function modelsRequest(settings: AiSettings): { url: string; headers: Record<string, string> } {
+  return settings.provider === "anthropic"
+    ? { url: `${baseOf(settings)}/v1/models?limit=100`, headers: anthropicHeaders(settings.key) }
+    : { url: `${baseOf(settings)}/models`, headers: bearer(settings.key) };
+}
+
+// Models that do something else (speech, pictures, search), left out of the list of writers.
+const NOT_FOR_WRITING = /embed|tts|whisper|transcri|dall-e|image|imagen|veo|sora|banana|audio|realtime|live|moderation|search|aqa/i;
+
+/** The model names from a models list (every service answers {data: [{id}]}), writers only. */
+export function parseModels(reply: unknown): string[] {
+  const record = recordOf(reply);
+  throwIfError(record);
+  const data = Array.isArray(record.data) ? record.data : [];
+  const ids = data
+    .map((model) => (model && typeof model === "object" ? (model as { id?: unknown }).id : undefined))
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .map((id) => id.replace(/^models\//, ""))
+    .filter((id) => !NOT_FOR_WRITING.test(id));
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}
+
+/** An answer as an object; Gemini sometimes wraps its error in a one-item list. */
+function recordOf(reply: unknown): Record<string, unknown> {
+  const value = Array.isArray(reply) && reply.length === 1 ? reply[0] : reply;
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function throwIfError(record: Record<string, unknown>) {
+  const error = record.error as { message?: unknown } | string | undefined;
+  if (!error) return;
+  const message = typeof error === "string" ? error : typeof error.message === "string" ? error.message : "The AI service returned an error.";
+  throw new Error(friendlyError(message));
+}
+
 /** The model's text from either API's reply, or a readable error. */
 export function replyText(provider: AiProvider, reply: unknown): string {
-  const record = reply && typeof reply === "object" ? (reply as Record<string, unknown>) : {};
-  const error = record.error as { message?: unknown } | string | undefined;
-  if (error) {
-    const message = typeof error === "string" ? error : typeof error.message === "string" ? error.message : "The AI service returned an error.";
-    throw new Error(friendlyError(message));
-  }
+  const record = recordOf(reply);
+  throwIfError(record);
   if (provider === "anthropic") {
     const content = Array.isArray(record.content) ? record.content : [];
     const text = content.map((part) => (part && typeof part === "object" && (part as { type?: unknown }).type === "text" ? String((part as { text?: unknown }).text ?? "") : "")).join("");
@@ -122,7 +184,7 @@ export function replyText(provider: AiProvider, reply: unknown): string {
 }
 
 function friendlyError(message: string): string {
-  if (/invalid.*(api[- ]?key|x-api-key)|incorrect api key|authentication/i.test(message)) return "The AI service did not accept the key. Check it in Settings › AI assistant.";
+  if (/invalid.*(api[- ]?key|x-api-key)|incorrect api key|api key not valid|authentication/i.test(message)) return "The AI service did not accept the key. Check it in Settings › AI assistant.";
   if (/model/i.test(message) && /not.*found|does not exist|invalid/i.test(message)) return `That model name was not found: ${message}`;
   if (/credit|quota|billing|insufficient/i.test(message)) return "The AI account has no credit left. Top it up with the provider.";
   return message;

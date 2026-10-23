@@ -53,7 +53,7 @@
   {#if !ready}
     <div class="setup">
       <Icon name="sparkles" size={22} />
-      <p>{t("Slides are written by your own AI service (Claude or any OpenAI-style service, or a model on this computer). Add its key once.")}</p>
+      <p>{t("Slides are written by your own AI: Claude, ChatGPT, Gemini, or an AI on this computer. Set it up once.")}</p>
       <button type="button" class="primary" onclick={() => { session.openSettings("ai"); onclose(); }}>{t("Set up the AI assistant")}</button>
     </div>
   {:else if made}
