@@ -4348,4 +4348,10 @@ export const es: Readonly<Record<string, string>> = {
   "Each question shows alone for 4 seconds to read, then the answers open and the clock starts.": "Cada pregunta se muestra sola 4 segundos para leerla; luego se abren las respuestas y arranca el reloj.",
   "Runs by itself": "Funciona solo",
   "After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.": "Tras cada respuesta, la clasificación y luego la siguiente pregunta, sin clics; el podio al final. La pantalla debe seguir el juego.",
+  "Pasted text": "Texto pegado",
+  "Title (optional)": "Título (opcional)",
+  "Youth camp recap": "Resumen del campamento juvenil",
+  "The text": "El texto",
+  "Paste a summary, an article, notes, or questions you have written: the quiz is made from it.": "Pega un resumen, un artículo, notas o preguntas que hayas escrito: el cuestionario sale de ahí.",
+  "Paste some text first.": "Pega primero un texto.",
 };

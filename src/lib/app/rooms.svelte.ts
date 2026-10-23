@@ -201,6 +201,7 @@ class AudienceRoom {
       await serverCall(`/v1/rooms/${saved.code}/share`, { hostKey: saved.hostKey, on: false });
       return;
     }
+    if (this.sharing) return;
     this.sharing = true;
     // Every change to Program goes out (at most four times a second; the newest always wins).
     this.stopWatching = $effect.root(() => {

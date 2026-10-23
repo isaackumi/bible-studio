@@ -5,7 +5,7 @@ import { chatRequest, type AiRequest, type AiSettings } from "./summarize";
 // the church is reading together (its summary pasted in), a Bible passage, or a topic. It comes
 // back as an ordinary game, opened in the editor for the operator to check before anyone plays.
 
-export type GameSource = "sermon" | "reading" | "passage" | "topic";
+export type GameSource = "sermon" | "reading" | "text" | "passage" | "topic";
 export type GameLevel = "easy" | "mixed" | "hard";
 export type GameAudience = "everyone" | "youth" | "children";
 
@@ -23,6 +23,7 @@ Answer with JSON only: {"title": "...", "description": "...", "questions": [{"pr
 const WHAT: Record<GameSource, string> = {
   sermon: "Write the quiz from today's sermon, so the church can see who was listening. Cover its main points in order.",
   reading: "Write the quiz from this book the church is reading together. Cover the main ideas and events of the summary.",
+  text: "Write the quiz from this text: a summary, an article, notes, or questions someone has already written. If it already holds questions, use them, tidied, with believable wrong answers; otherwise ask about what it says.",
   passage: "Write the quiz about this Bible passage: what happens, who is in it, and what it teaches.",
   topic: "Write the quiz about this topic, for a church gathering.",
 };

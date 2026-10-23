@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { stream as streamSource } from "../display/stream";
+  import { release, stream as streamSource } from "../display/stream";
   import RichView from "./RichView.svelte";
   import { DEFAULT_LOGO_INK_URL, DEFAULT_LOGO_URL, darkText } from "../brand/logo";
   import InlineRich from "./InlineRich.svelte";
@@ -265,7 +265,7 @@
   {#if backdrop?.type === "motion"}
     <MotionBackground motion={backdrop.motionId} tint={backdrop.tint} base={backdrop.base} {still} />
   {:else if backdrop?.type === "video" && model.backgroundVideoUrl}
-    <video class="backdrop-video" src={still ? `${model.backgroundVideoUrl}#t=0.1` : model.backgroundVideoUrl} autoplay={!still} loop muted playsinline preload={still ? "metadata" : "auto"} style:object-fit={look.objectFit} style:transform={look.transform} style:filter={look.filter}></video>
+    <video class="backdrop-video" use:release src={still ? `${model.backgroundVideoUrl}#t=0.1` : model.backgroundVideoUrl} autoplay={!still} loop muted playsinline preload={still ? "metadata" : "auto"} style:object-fit={look.objectFit} style:transform={look.transform} style:filter={look.filter}></video>
   {/if}
   {#if imageLayer}<div class="backdrop-image" aria-hidden="true" style:background-image={`url("${imageLayer}")`} style:background-size={look.size} style:transform={look.transform} style:filter={look.filter}></div>{/if}
   {#if dim > 0}<div class="backdrop-dim" style:opacity={dim} aria-hidden="true"></div>{/if}
@@ -307,7 +307,7 @@
       <!-- svelte-ignore a11y_media_has_caption -- operator media on a projection screen; captions belong in the file -->
       {#if still}
         <!-- Thumbnails: the first frame, silent and paused. -->
-        <video class="cover" src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
+        <video class="cover" use:release src="{model.video.url}#t=0.1" muted playsinline preload="metadata"></video>
       {:else}
         <video class="cover" use:streamSource={model.video.url} loop={model.video.loop && model.video.stop === undefined} playsinline preload="auto" use:playClip={{ muted: !audio || model.video.muted, control: model.video.control, start: model.video.start, stop: model.video.stop, loop: model.video.loop }}></video>
       {/if}

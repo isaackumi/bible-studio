@@ -4429,4 +4429,10 @@ export const fr: Readonly<Record<string, string>> = {
   "Each question shows alone for 4 seconds to read, then the answers open and the clock starts.": "Chaque question s’affiche seule 4 secondes pour la lire, puis les réponses s’ouvrent et le chrono démarre.",
   "Runs by itself": "Se déroule tout seul",
   "After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.": "Après chaque réponse, le classement, puis la question suivante, sans un clic ; le podium à la fin. L’écran doit suivre le jeu.",
+  "Pasted text": "Texte collé",
+  "Title (optional)": "Titre (facultatif)",
+  "Youth camp recap": "Récap du camp des jeunes",
+  "The text": "Le texte",
+  "Paste a summary, an article, notes, or questions you have written: the quiz is made from it.": "Collez un résumé, un article, des notes ou des questions que vous avez écrites : le quiz en est tiré.",
+  "Paste some text first.": "Collez d’abord un texte.",
 };

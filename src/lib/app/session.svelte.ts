@@ -3666,6 +3666,7 @@ class Session {
       const done = () => {
         this.videoLengths.set(url, probe.duration);
         probe.removeAttribute("src");
+        probe.load();
       };
       probe.onloadedmetadata = () => {
         if (Number.isFinite(probe.duration)) return done();
@@ -5030,7 +5031,7 @@ class Session {
   /** A quiz written by the AI, not saved: the operator checks every question in the editor first. */
   makeGameWithAi = async (input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): Promise<Game> => {
     const settings = this.aiFor("games");
-    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : input.source === "reading" ? t("Paste the summary of what was read first.") : t("This sermon has no notes yet. Add notes or a summary first."));
+    if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : input.source === "reading" ? t("Paste the summary of what was read first.") : input.source === "text" ? t("Paste some text first.") : t("This sermon has no notes yet. Add notes or a summary first."));
     return parseGame(replyText(settings.provider, await this.aiPost(gameRequest(settings, input))), input);
   };
 

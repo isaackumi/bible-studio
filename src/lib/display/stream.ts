@@ -57,6 +57,30 @@ export function stream(node: HTMLVideoElement, url: string) {
     update: attach,
     destroy() {
       detach?.();
+      releaseVideo(node);
     },
   };
+}
+
+/**
+ * Let go of a video's decoder and buffers when its element leaves the page. A detached element
+ * keeps them until it is collected (tens of MB each, and WebKit allows only so many at once), so a
+ * service with many clips would climb in memory. A Svelte action: `use:release`.
+ */
+export function release(node: HTMLVideoElement) {
+  return {
+    destroy() {
+      releaseVideo(node);
+    },
+  };
+}
+
+export function releaseVideo(node: HTMLVideoElement) {
+  try {
+    node.pause();
+    node.removeAttribute("src");
+    node.load();
+  } catch {
+    // Already gone.
+  }
 }

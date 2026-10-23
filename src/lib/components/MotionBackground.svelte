@@ -51,20 +51,22 @@
   .still i, .still i::before, .still i::after { animation-play-state: paused !important; }
 
   /* Aurora: three soft color fields drifting across the sky. */
-  .blob { width: 1500px; height: 900px; border-radius: 50%; filter: blur(120px); mix-blend-mode: screen; opacity: 0.55; }
-  .blob.a { left: -300px; top: -200px; background: radial-gradient(closest-side, var(--tint), transparent); animation: drift-a 26s ease-in-out infinite alternate; }
-  .blob.b { right: -400px; top: 100px; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 55%, #6a5cff), transparent); animation: drift-b 32s ease-in-out infinite alternate; }
-  .blob.c { left: 300px; bottom: -500px; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 60%, #00b3ff), transparent); animation: drift-c 38s ease-in-out infinite alternate; opacity: 0.4; }
+  /* The soft edges are in the gradients themselves: a blur filter would be redrawn on every frame of
+     the drift, which kept a core busy for the whole service on small church PCs. */
+  .blob { width: 1800px; height: 1200px; border-radius: 50%; mix-blend-mode: screen; opacity: 0.55; will-change: transform; --soft: color-mix(in srgb, var(--blob) 45%, transparent); background: radial-gradient(closest-side, var(--blob) 0%, var(--soft) 35%, transparent 100%); }
+  .blob.a { left: -450px; top: -350px; --blob: var(--tint); animation: drift-a 26s ease-in-out infinite alternate; }
+  .blob.b { right: -550px; top: -50px; --blob: color-mix(in srgb, var(--tint) 55%, #6a5cff); animation: drift-b 32s ease-in-out infinite alternate; }
+  .blob.c { left: 150px; bottom: -650px; --blob: color-mix(in srgb, var(--tint) 60%, #00b3ff); animation: drift-c 38s ease-in-out infinite alternate; opacity: 0.4; }
   @keyframes drift-a { to { transform: translate(420px, 160px) scale(1.2); } }
   @keyframes drift-b { to { transform: translate(-520px, -120px) scale(0.85); } }
   @keyframes drift-c { to { transform: translate(260px, -260px) scale(1.15); } }
 
   /* Light rays: slow rotating beams from above. */
-  .rays { left: 50%; top: -1400px; width: 3200px; height: 3200px; margin-left: -1600px; border-radius: 50%;
+  .rays { will-change: transform; left: 50%; top: -1400px; width: 3200px; height: 3200px; margin-left: -1600px; border-radius: 50%;
     background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tint) 34%, transparent) 0deg 4deg, transparent 4deg 13deg);
     mask-image: radial-gradient(closest-side, black 18%, transparent 72%); animation: spin 90s linear infinite; opacity: 0.8; }
   .rays.slow { animation-duration: 140s; animation-direction: reverse; opacity: 0.45; }
-  .sun { left: 50%; top: -260px; width: 900px; height: 600px; margin-left: -450px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 80%, white), transparent); filter: blur(30px); opacity: 0.65; animation: breathe 9s ease-in-out infinite; }
+  .sun { left: 50%; top: -290px; width: 960px; height: 660px; margin-left: -480px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 80%, white) 0%, color-mix(in srgb, var(--tint) 50%, transparent) 45%, transparent 100%); opacity: 0.65; will-change: transform; animation: breathe 9s ease-in-out infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes breathe { 50% { opacity: 0.4; transform: scale(1.08); } }
 
@@ -92,7 +94,7 @@
   @keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(var(--sway), -1200px); opacity: 0; } }
 
   /* Clouds: soft white masses drifting across a sky. */
-  .cloud { height: 420px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 85%, transparent), transparent); filter: blur(40px); opacity: 0.75; }
+  .cloud { height: 520px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--tint) 85%, transparent) 0%, color-mix(in srgb, var(--tint) 60%, transparent) 30%, color-mix(in srgb, var(--tint) 28%, transparent) 60%, color-mix(in srgb, var(--tint) 8%, transparent) 85%, transparent 100%); opacity: 0.75; will-change: transform; }
   .cloud.c1 { width: 1100px; top: 80px; left: -600px; animation: sail 70s linear infinite; }
   .cloud.c2 { width: 900px; top: 520px; left: -500px; animation: sail 95s linear -40s infinite; opacity: 0.55; }
   .cloud.c3 { width: 1300px; top: -120px; left: -700px; animation: sail 120s linear -70s infinite; opacity: 0.6; }

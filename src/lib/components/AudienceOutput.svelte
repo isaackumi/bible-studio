@@ -1,6 +1,7 @@
 <script lang="ts">
   import { emit, listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
+  import { keepScreenAwake } from "../platform/keep-awake";
   import { acceptProgramPacket, readLocal, readOwner, readStandbyLocal, subscribeLocal, subscribeStandbyLocal } from "../display/channel";
   import { frameBackground } from "../domain/backgrounds";
   import { cameraDeviceId, camerasIn, openCamera, planFeeds, stopCameraStream, type CameraFeeds } from "../domain/camera";
@@ -53,6 +54,8 @@
     shown = packet;
     revision = packet.revision;
     if (fresh) {
+      // A cut while a move is still running: stop the move, or its filled-in frames would linger.
+      if (!moving) incomingLayer?.getAnimations().forEach((animation) => animation.cancel());
       fading = moving && packet.transition === "fade";
       fadeMs = packet.transitionMs;
       clearTimeout(outgoingTimer);
@@ -226,6 +229,7 @@
       fillable = !desktop && !document.fullscreenElement;
     };
     document.addEventListener("fullscreenchange", onFullscreen);
+    const stopAwake = keepScreenAwake();
     let stopRelay = () => {};
     if (relayed) void startRelay().then((stop) => (stopRelay = stop));
     if (!desktop) {
@@ -235,6 +239,7 @@
       const stopStandby = subscribeStandbyLocal((ids) => (standby = ids));
       return () => {
         closed = true;
+        stopAwake();
         stopRelay();
         retries.forEach((timer) => clearTimeout(timer));
         dropFeeds(Object.keys(feeds));
@@ -272,6 +277,7 @@
     return () => {
       closed = true;
       stopRelay();
+      stopAwake();
       retries.forEach((timer) => clearTimeout(timer));
       dropFeeds(Object.keys(feeds));
       unlistenStandby();

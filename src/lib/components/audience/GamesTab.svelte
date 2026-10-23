@@ -56,6 +56,7 @@
   const SOURCES: Array<{ id: GameSource; label: string; icon: string }> = [
     { id: "sermon", label: msg("Today's sermon"), icon: "book" },
     { id: "reading", label: msg("Book reading"), icon: "bible" },
+    { id: "text", label: msg("Pasted text"), icon: "pencil" },
     { id: "passage", label: msg("Bible passage"), icon: "bible" },
     { id: "topic", label: msg("A topic"), icon: "sparkles" },
   ];
@@ -138,6 +139,9 @@
     {:else if aiSource === "reading"}
       <label>{t("Book and chapters")}<input bind:value={aiTitle} maxlength="120" placeholder={t("The Pilgrim's Progress, chapters 1 to 3")} /></label>
       <label>{t("Summary of what was read")}<textarea class="tall" bind:value={aiText} maxlength="30000" placeholder={t("Paste or type the summary. The questions come only from it.")}></textarea></label>
+    {:else if aiSource === "text"}
+      <label>{t("Title (optional)")}<input bind:value={aiTitle} maxlength="120" placeholder={t("Youth camp recap")} /></label>
+      <label>{t("The text")}<textarea class="tall" bind:value={aiText} maxlength="30000" placeholder={t("Paste a summary, an article, notes, or questions you have written: the quiz is made from it.")}></textarea></label>
     {:else if aiSource === "passage"}
       <label>{t("Bible passage")}<input bind:value={aiText} maxlength="200" placeholder={t("Jonah 1 to 4, or the story of Ruth")} /></label>
     {:else}
@@ -278,7 +282,7 @@
   .maker { padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
   .maker-head { display: flex; justify-content: space-between; align-items: center; }
   .maker-head strong { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
-  .sources { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
   .sources button { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; text-align: left; }
   .sources button.on { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
   .maker label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }

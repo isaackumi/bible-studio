@@ -308,10 +308,22 @@ export function startListening(handlers: ListenHandlers, filter: NoiseFilter = "
     analyser.fftSize = 512;
     source.connect(analyser);
     const samples = new Uint8Array(analyser.fftSize);
+    // The meter is drawn at most ~15 times a second, and only when the level moved: the desk
+    // would otherwise redraw at 60 Hz for the whole sermon.
+    let lastAt = 0;
+    let lastLevel = -1;
     const tick = () => {
       if (stopped) return;
-      analyser.getByteTimeDomainData(samples);
-      handlers.onLevel?.(rms(samples));
+      const now = performance.now();
+      if (now - lastAt >= 66) {
+        lastAt = now;
+        analyser.getByteTimeDomainData(samples);
+        const level = rms(samples);
+        if (Math.abs(level - lastLevel) >= 0.01) {
+          lastLevel = level;
+          handlers.onLevel?.(level);
+        }
+      }
       frame = requestAnimationFrame(tick);
     };
     tick();

@@ -11,6 +11,11 @@ describe("AI quiz maker", () => {
     expect(message).toContain("children aged 7 to 12");
   });
 
+  it("makes a quiz from any pasted text, questions included", () => {
+    const body = JSON.parse(gameRequest({ ...emptyAiSettings(), key: "k" }, { source: "text", title: "Recap", text: "1. Who led Israel out of Egypt?", count: 5, level: "mixed", audience: "everyone" }).body);
+    expect(body.messages[0].content).toContain("questions someone has already written");
+  });
+
   it("reads the quiz as a game, timed by level, dropping unusable questions", () => {
     const game = parseGame('```json\n{"title":"Grace quiz","questions":[{"prompt":"By what are we saved?","choices":["Grace","Works","Luck","Law"],"correct":0},{"prompt":"","choices":["a"]},{"prompt":"Which letter?","choices":["Romans","Ephesians","James","Jude"],"correct":1}]}\n```', { title: "", level: "hard" });
     expect(game.title).toBe("Grace quiz");
