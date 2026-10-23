@@ -1,0 +1,46 @@
+# Temporary: build this branch on Windows, install it, run it, and read how long each startup step takes.
+name: Diagnose Windows startup timing
+
+on:
+  push:
+    branches: ["diag/windows-timing"]
+
+jobs:
+  timing:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Build the installer (unsigned, no updater)
+        shell: pwsh
+        run: npx tauri build --bundles nsis --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'
+      - name: Install, run twice (first launch, then a second), collect the log
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem -Recurse src-tauri\target\release\bundle\nsis\*.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList "/S" -Wait
+          $exe = Get-ChildItem -Recurse "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "*.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Church Studio" -and $_.Name -notmatch "uninstall" } | Select-Object -First 1
+          foreach ($run in 1, 2) {
+            $p = Start-Process $exe.FullName -PassThru
+            Start-Sleep -Seconds 25
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          }
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item "$env:LOCALAPPDATA\app.churchstudio.present\logs\*.log" out -ErrorAction SilentlyContinue
+          Get-Content out\church-studio.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-timing
+          path: out
