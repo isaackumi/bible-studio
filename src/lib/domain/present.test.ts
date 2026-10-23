@@ -53,3 +53,16 @@ describe("two translations side by side", async () => {
     expect(presentScripture({ theme: defaultTheme(), reference: "John 3:16", attribution: null, verses: [], second: { attribution: "x", verses: [] } }).parallel).toBeUndefined();
   });
 });
+
+describe("a video from a link", () => {
+  it("plays a YouTube link in its own player, looping and muted when asked", async () => {
+    const { presentWeb } = await import("./present");
+    const { emptyModel } = await import("./theme");
+    const theme = emptyModel({ id: "t" } as never).theme;
+    const model = presentWeb({ theme, url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", mute: true, loop: true });
+    expect(model.layout).toBe("web");
+    expect(model.web).toMatchObject({ kind: "youtube", mute: true });
+    expect(model.web!.url).toContain("loop=1");
+    expect(presentWeb({ theme, url: "not a link" }).layout).toBe("empty");
+  });
+});

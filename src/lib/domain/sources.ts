@@ -50,7 +50,7 @@ export type SourceFields =
   | { type: "image"; assetId: string; name: string; imageUrl: string }
   | { type: "video"; assetId: string; name: string; videoUrl: string; loop: boolean; muted: boolean }
   | { type: "qr"; data: string; pattern: "square" | "rounded" | "dots"; dark: string; light: string; caption: string }
-  | { type: "web"; url: string; zoom: number; mute: boolean }
+  | { type: "web"; url: string; zoom: number; mute: boolean; loop: boolean }
   | { type: "ndi"; name: string };
 
 /** Payload entry for a style: omitted entirely when no style is set. */
@@ -274,7 +274,7 @@ export function buildSource(fields: SourceFields): SourceRef {
     case "ndi":
       return sourceRef("ndi", fields.name || "ndi", fields.name ? ndiShortName(fields.name) : "NDI source", { name: fields.name, label: fields.name ? ndiShortName(fields.name) : "NDI source" });
     case "web":
-      return sourceRef("web", "web", webTarget(fields.url)?.label ?? "Website", { url: fields.url.trim(), zoom: String(fields.zoom), mute: String(fields.mute) });
+      return sourceRef("web", "web", webTarget(fields.url)?.label ?? "Website", { url: fields.url.trim(), zoom: String(fields.zoom), mute: String(fields.mute), loop: String(fields.loop) });
     case "qr":
       return sourceRef("qr", "qr", fields.caption || "QR code", {
         data: fields.data,
@@ -340,7 +340,7 @@ export function fieldsFromSource(source: SourceRef): SourceFields | null {
       return { type: "ndi", name: p.name ?? "" };
     case "web": {
       const zoom = Number(p.zoom);
-      return { type: "web", url: p.url ?? "", zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1, mute: p.mute === "true" };
+      return { type: "web", url: p.url ?? "", zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1, mute: p.mute === "true", loop: p.loop === "true" };
     }
     case "qr":
       return {
@@ -387,7 +387,7 @@ export function defaultFields(type: SourceKind, ctx: { cameras: { deviceId: stri
     case "qr":
       return { type: "qr", data: "https://", pattern: "rounded", dark: "#000000", light: "#ffffff", caption: "" };
     case "web":
-      return { type: "web", url: "", zoom: 1, mute: false };
+      return { type: "web", url: "", zoom: 1, mute: false, loop: false };
     case "ndi":
       return { type: "ndi", name: "" };
   }

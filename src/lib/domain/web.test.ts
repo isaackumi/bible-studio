@@ -36,4 +36,13 @@ describe("muted players for desk monitors", () => {
     expect(mutedUrl("https://player.vimeo.com/video/1?muted=0", "vimeo")).toContain("muted=1");
     expect(mutedUrl("https://example.org/", "website")).toBe("https://example.org/");
   });
+
+  it("loops a YouTube video as its own playlist, and a Vimeo video with loop", () => {
+    const youtube = new URL(webTarget("https://youtu.be/dQw4w9WgXcQ", { loop: true })!.url);
+    expect(youtube.searchParams.get("loop")).toBe("1");
+    expect(youtube.searchParams.get("playlist")).toBe("dQw4w9WgXcQ");
+    expect(new URL(webTarget("https://youtu.be/dQw4w9WgXcQ")!.url).searchParams.get("loop")).toBeNull();
+    expect(webTarget("https://vimeo.com/76979871", { loop: true })!.url).toContain("&loop=1");
+  });
 });
+

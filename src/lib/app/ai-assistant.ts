@@ -9,7 +9,7 @@ import { deckFromOutline, type SlideDeck } from "../domain/decks";
 import type { Game } from "../domain/games";
 import { parseLyrics, sanitizeSong } from "../domain/song";
 import type { Sermon, Song } from "../domain/types";
-import { t, tn } from "../i18n/core";
+import { currentLanguage, t, tn } from "../i18n/core";
 
 /** What the assistant needs from the session: the church's AI settings and songs, and where results go. */
 export type AiHost = {
@@ -150,7 +150,7 @@ export class AiAssistant {
   makeGame = async (input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): Promise<Game> => {
     const settings = this.settingsFor("games");
     if (!input.text.trim()) throw new Error(input.source === "topic" ? t("Type a topic first.") : input.source === "passage" ? t("Type a Bible passage first.") : input.source === "reading" ? t("Paste the summary of what was read first.") : input.source === "text" ? t("Paste some text first.") : t("This sermon has no notes yet. Add notes or a summary first."));
-    return parseGame(replyText(settings.provider, await this.post(gameRequest(settings, input))), input);
+    return parseGame(replyText(settings.provider, await this.post(gameRequest(settings, { ...input, language: currentLanguage() }))), input);
   };
 }
 

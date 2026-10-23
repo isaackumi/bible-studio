@@ -1676,7 +1676,7 @@ function compileSourceBase(source: SourceRef, ctx: CompileContext): Presentation
   }
   if (source.type === "web") {
     const zoom = Number(payload.zoom);
-    const target = webTarget(payload.url ?? "", { mute: payload.mute === "true" });
+    const target = webTarget(payload.url ?? "", { mute: payload.mute === "true", loop: payload.loop === "true" });
     return {
       layout: "web",
       theme: ctx.theme,

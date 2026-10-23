@@ -277,6 +277,8 @@ export type PresentationItem = {
   /** Trim (seconds) and what happens at the end; older items only have loop. */
   video?: { assetId: string; loop: boolean; muted: boolean; start?: number; stop?: number; end?: import("./video-play").VideoEnd };
   announcement?: import("./announcement").AnnouncementWords;
+  /** A YouTube or Vimeo video (or any web page) from a link, played in its own player. */
+  web?: { url: string; mute: boolean; loop: boolean };
   deck?: { deckId: string };
   /** Text styling for slide and announcement items. */
   style?: TextStyle;

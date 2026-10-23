@@ -9,6 +9,7 @@ describe("AI quiz maker", () => {
     expect(message).toContain("who was listening");
     expect(message).toContain("Write 15 questions");
     expect(message).toContain("children aged 7 to 12");
+    expect(message).toContain("Write everything in English.");
   });
 
   it("makes a quiz from any pasted text, questions included", () => {

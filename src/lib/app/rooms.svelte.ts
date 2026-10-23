@@ -259,7 +259,10 @@ class AudienceRoom {
 
   /** Made fresh from the Bible on this computer (the first translation installed). */
   makeFromBible = async (kind: "which-book" | "finish-verse"): Promise<Game | null> => {
-    const translationId = session.translations.find((entry) => !entry.id.startsWith("api:"))?.id ?? session.translations[0]?.id;
+    // The Bible the desk reads from (the church's choice), then the King James, then any other on
+    // this computer: never simply the first installed, which may be another language.
+    const installed = (id: string | null | undefined) => (id && session.translations.some((entry) => entry.id === id) ? id : undefined);
+    const translationId = installed(session.workspace.deskTranslationId) ?? installed("kjv") ?? session.translations.find((entry) => !entry.id.startsWith("api:"))?.id ?? session.translations[0]?.id;
     if (!translationId) return null;
     const verses = await Promise.all(
       WELL_KNOWN.map(async (ref) => {

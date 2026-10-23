@@ -1,5 +1,6 @@
 import { richIsEmpty, richLines, type RichDoc } from "./rich-text";
 import { emptyModel } from "./theme";
+import { webTarget } from "./web";
 import type { PresentationLine, PresentationModel, Theme, VerseText } from "./types";
 
 type BuildBase = {
@@ -76,6 +77,13 @@ export function presentText(
 export function presentImageOrEmpty(theme: Theme, imageUrl: string | null | undefined): PresentationModel {
   if (!imageUrl) return emptyModel(theme);
   return presentImage({ theme, imageUrl });
+}
+
+/** A YouTube or Vimeo video (or a web page) from a link, in its own player; sound on the audience screen only. */
+export function presentWeb(input: BuildBase & { url: string; mute?: boolean; loop?: boolean }): PresentationModel {
+  const target = webTarget(input.url, { mute: input.mute, loop: input.loop });
+  if (!target) return emptyModel(input.theme);
+  return { layout: "web", theme: input.theme, reference: target.label, attribution: null, lines: [], imageUrl: null, backgroundImageUrl: null, web: { url: target.url, kind: target.kind, label: target.label, zoom: 1, mute: input.mute ?? false } };
 }
 
 /** A video frame. A missing file paints the empty frame instead of a broken player. */

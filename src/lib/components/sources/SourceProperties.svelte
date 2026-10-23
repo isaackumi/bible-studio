@@ -433,6 +433,15 @@
             <button type="button" role="radio" class="choice" aria-checked={fields.mute} onclick={() => fields.type === "web" && (fields = { ...fields, mute: true })}>{t("Off")}</button>
           </span>
         </div>
+        {#if target.kind !== "website"}
+          <div class="row">
+            <span>{t("At the end")}</span>
+            <span class="inline" role="radiogroup" aria-label={t("At the end")}>
+              <button type="button" role="radio" class="choice" aria-checked={!fields.loop} onclick={() => fields.type === "web" && (fields = { ...fields, loop: false })}>{t("Stop")}</button>
+              <button type="button" role="radio" class="choice" aria-checked={fields.loop} onclick={() => fields.type === "web" && (fields = { ...fields, loop: true })}>{t("Play again (loop)")}</button>
+            </span>
+          </div>
+        {/if}
       {/if}
       {#if target?.kind === "website"}
         <div class="row">

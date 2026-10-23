@@ -36,7 +36,7 @@ function youtubeId(url: URL): string | null {
  * What a pasted link should show. `autoplay` and `mute` apply to video players; a page that
  * plays sound on the projector should be the operator's choice.
  */
-export function webTarget(raw: string, options: { autoplay?: boolean; mute?: boolean } = {}): WebTarget | null {
+export function webTarget(raw: string, options: { autoplay?: boolean; mute?: boolean; loop?: boolean } = {}): WebTarget | null {
   const clean = cleanWebUrl(raw);
   if (!clean) return null;
   const url = new URL(clean);
@@ -48,13 +48,18 @@ export function webTarget(raw: string, options: { autoplay?: boolean; mute?: boo
     const start = url.searchParams.get("t")?.replace(/s$/, "");
     const params = new URLSearchParams({ autoplay: play, mute, rel: "0", modestbranding: "1", playsinline: "1" });
     if (start && /^\d+$/.test(start)) params.set("start", start);
+    // YouTube loops one video only when it is also its own playlist.
+    if (options.loop) {
+      params.set("loop", "1");
+      params.set("playlist", yt);
+    }
     return { kind: "youtube", url: `https://www.youtube-nocookie.com/embed/${yt}?${params}`, label: "YouTube" };
   }
 
   const host = url.hostname.replace(/^www\./, "");
   if (host === "vimeo.com" || host === "player.vimeo.com") {
     const id = url.pathname.match(/(\d{5,})/)?.[1];
-    if (id) return { kind: "vimeo", url: `https://player.vimeo.com/video/${id}?autoplay=${play}&muted=${mute}&title=0&byline=0`, label: "Vimeo" };
+    if (id) return { kind: "vimeo", url: `https://player.vimeo.com/video/${id}?autoplay=${play}&muted=${mute}&title=0&byline=0${options.loop ? "&loop=1" : ""}`, label: "Vimeo" };
   }
 
   if (host === "docs.google.com" && /^\/presentation\/d\//.test(url.pathname)) {

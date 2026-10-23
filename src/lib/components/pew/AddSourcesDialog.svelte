@@ -1,8 +1,9 @@
 <script lang="ts" module>
-  export type AddKind = "song" | "scripture" | "text" | "announcement" | "slides" | "media" | "look";
+  export type AddKind = "song" | "scripture" | "text" | "announcement" | "slides" | "media" | "video-link" | "look";
 </script>
 
 <script lang="ts">
+  import { webTarget } from "../../domain/web";
   import TextWords from "../TextWords.svelte";
   import { richIsEmpty, richLines, type RichDoc } from "../../domain/rich-text";
   import { untrack } from "svelte";
@@ -33,6 +34,7 @@
     { id: "announcement", label: msg("Announcement"), icon: "alerts", hint: msg("News with a design") },
     { id: "slides", label: msg("Slides"), icon: "stage", hint: msg("A deck, PowerPoint too") },
     { id: "media", label: msg("Media"), icon: "media", hint: msg("A picture or a video") },
+    { id: "video-link", label: msg("YouTube"), icon: "video", hint: msg("A YouTube or Vimeo video") },
     { id: "look", label: msg("Look"), icon: "studio", hint: msg("A saved composition") },
   ];
 
@@ -153,6 +155,20 @@
   let rich = $state<RichDoc | null>(null);
   let annLabel = $state(untrack(() => t("Announcement")));
   let annDesign = $state<AnnouncementDesign>("card");
+  // A YouTube or Vimeo video from its link: it plays in its own player, looping if asked.
+  let videoLink = $state("");
+  let videoLoop = $state(false);
+  let videoSound = $state(true);
+  const videoTarget = $derived(videoLink.trim() ? webTarget(videoLink) : null);
+
+  async function addVideoLink(event: SubmitEvent) {
+    event.preventDefault();
+    if (!videoTarget) return;
+    await session.addWebVideo(videoLink, { mute: !videoSound, loop: videoLoop, sectionId: target ?? undefined });
+    note(`web:${videoLink}`, videoTarget.kind === "youtube" ? t("YouTube video") : videoTarget.kind === "vimeo" ? t("Vimeo video") : videoTarget.label);
+    videoLink = "";
+  }
+
   function addText(event: SubmitEvent) {
     event.preventDefault();
     if (!target || (!heading.trim() && richIsEmpty(rich))) return;
@@ -422,6 +438,24 @@
             <p class="empty">{t("No pictures or videos yet. Import them with the button above.")}</p>
           {/each}
         </div>
+      {:else if tab === "video-link"}
+        <form class="compose" onsubmit={addVideoLink}>
+          <label>
+            <span>{t("Link")}</span>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input bind:value={videoLink} autofocus placeholder={t("Paste a YouTube or Vimeo link")} aria-label={t("YouTube or Vimeo link")} />
+          </label>
+          <p class="hint">
+            {#if !videoLink.trim()}{t("Copy the link from YouTube (Share › Copy) and paste it here. It plays in YouTube's own player, so the computer needs the internet.")}
+            {:else if !videoTarget}{t("That does not look like a web address.")}
+            {:else if videoTarget.kind === "youtube"}{t("A YouTube video.")}
+            {:else if videoTarget.kind === "vimeo"}{t("A Vimeo video.")}
+            {:else}{t("Not a YouTube or Vimeo video: it will show the page {label}.", { label: videoTarget.label })}{/if}
+          </p>
+          <label class="switch-row"><input type="checkbox" class="switch" bind:checked={videoLoop} /> <span><b>{t("Loop")}</b>{t("Play again from the start each time it ends.")}</span></label>
+          <label class="switch-row"><input type="checkbox" class="switch" bind:checked={videoSound} /> <span><b>{t("Sound")}</b>{t("On the audience screen; the desk always plays it silent.")}</span></label>
+          <button type="submit" class="primary wide" disabled={!videoTarget}><Icon name="plus" size={14} /> {t("Add video")}</button>
+        </form>
       {:else if tab === "look"}
         <div class="makers">
           <button type="button" class="make primary" onclick={() => void newLook()}><Icon name="plus" size={14} /> {t("New look")}</button>
@@ -515,7 +549,11 @@
   .compose { display: grid; gap: 10px; max-width: 640px; }
   .compose label { display: grid; gap: 4px; }
   .compose label span { font-size: 11px; font-weight: 700; color: var(--muted); }
-  .compose input { padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; }
+  .compose .hint { margin: -4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .switch-row { display: grid !important; grid-template-columns: 40px 1fr; gap: 12px !important; align-items: start; cursor: pointer; }
+  .switch-row span { display: grid; gap: 2px; font-size: 12px !important; font-weight: 500 !important; color: var(--muted); }
+  .switch-row b { color: var(--ink); font-size: 13px; font-weight: 650; }
+  .compose input:not(.switch) { padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; resize: vertical; }
   .designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .designs button { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); font: inherit; text-align: left; }
   .designs button small { font-size: 11px; color: var(--muted); }

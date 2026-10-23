@@ -40,9 +40,13 @@ const AUDIENCE: Record<GameAudience, string> = {
   children: "For children aged 7 to 12: short words, simple questions.",
 };
 
-export function gameRequest(settings: AiSettings, input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience }): AiRequest {
+const LANGUAGE: Record<"en" | "fr" | "es", string> = { en: "English", fr: "French", es: "Spanish" };
+
+export function gameRequest(settings: AiSettings, input: { source: GameSource; title: string; text: string; count: number; level: GameLevel; audience: GameAudience; language?: "en" | "fr" | "es" }): AiRequest {
   const count = Math.min(15, Math.max(3, Math.round(input.count)));
-  const message = `${WHAT[input.source]} ${LEVEL[input.level]} ${AUDIENCE[input.audience]} Write ${count} questions.\n\n${input.title ? `Title: ${input.title}\n\n` : ""}${input.text.slice(0, 30_000)}`;
+  // Always in the church's own language, even when the material quotes another (a Twi sermon note).
+  const language = `Write everything in ${LANGUAGE[input.language ?? "en"]}.`;
+  const message = `${WHAT[input.source]} ${LEVEL[input.level]} ${AUDIENCE[input.audience]} ${language} Write ${count} questions.\n\n${input.title ? `Title: ${input.title}\n\n` : ""}${input.text.slice(0, 30_000)}`;
   return chatRequest(settings, INSTRUCTIONS, message, { maxTokens: 3500, temperature: 0.5 });
 }
 

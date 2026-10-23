@@ -84,7 +84,7 @@ function shortcutLabelForUndo(): string {
 function errorText(error: unknown, fallback = String(error)): string {
   return error instanceof Error ? error.message : fallback;
 }
-import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo } from "../domain/present";
+import { presentImageOrEmpty, presentLyrics, presentScripture, presentText, presentVideo, presentWeb } from "../domain/present";
 import {
   cameraDeviceId,
   camerasIn,
@@ -150,6 +150,7 @@ import { cleanCcli, cleanFolder, creditFor, lyricsFor, sanitizeFolderNames, sani
 import type { SongMatch } from "../ai/songs";
 import { AiAssistant, sermonText } from "./ai-assistant";
 import { ServiceChecks } from "./service-checks.svelte";
+import { webTarget } from "../domain/web";
 import { documentAssets, pageAt, pageStart, scrollLength, stepScroll } from "../domain/document-scroll";
 import { LiveNotes } from "./live-notes.svelte";
 import { CLOUD_SPEECH, KeyRefused, startCloudListening, testSpeechKey, type CloudSpeech } from "../voice/cloud-listen";
@@ -2178,6 +2179,7 @@ class Session {
       const trim = cleanTrim(item.video);
       return presentVideo({ theme, videoUrl: this.mediaSrc(item.video.assetId), loop: end === "loop", muted: item.video.muted, ...trim, end });
     }
+    if (item.kind === "web" && item.web) return presentWeb({ theme, url: item.web.url, mute: item.web.mute, loop: item.web.loop });
     if (item.kind === "deck" && item.deck) {
       const deck = this.decks.find((entry) => entry.id === item.deck?.deckId);
       const page = deck?.pages[0];
@@ -5229,6 +5231,23 @@ class Session {
       video: { assetId, loop: options.loop ?? false, muted: options.muted ?? false },
     };
     this.insertItem(target, item);
+    void this.selectItem(item.id);
+  };
+
+  /** A YouTube or Vimeo video from its link, into the service (it plays in its own player). */
+  addWebVideo = async (url: string, options: { mute: boolean; loop: boolean; sectionId?: string }) => {
+    const target = webTarget(url, options);
+    if (!target) {
+      this.warn(t("That does not look like a web address."));
+      return;
+    }
+    const section = (options.sectionId && this.service?.sections.some((entry) => entry.id === options.sectionId) ? options.sectionId : null) ?? (await this.sectionForMedia());
+    if (!section) {
+      this.warn(t("Add a section first."));
+      return;
+    }
+    const item: PresentationItem = { id: uid(), kind: "web", title: target.kind === "youtube" ? t("YouTube video") : target.kind === "vimeo" ? t("Vimeo video") : target.label, web: { url: url.trim(), mute: options.mute, loop: options.loop } };
+    this.insertItem(section, item);
     void this.selectItem(item.id);
   };
 
