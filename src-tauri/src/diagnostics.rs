@@ -62,7 +62,8 @@ impl log::Log for Logger {
         if !self.enabled(record.metadata()) {
             return;
         }
-        let line = format!("[{}] {} {}: {}\n", unix_secs(), record.level(), record.target(), record.args());
+        // Milliseconds since launch beside the time, so a slow step shows how slow.
+        let line = format!("[{}] +{}ms {} {}: {}\n", unix_secs(), since_start_ms(), record.level(), record.target(), record.args());
         eprint!("{line}");
         let mut sink = lock(&self.sink);
         if let Some(file) = sink.file.as_mut() {
@@ -124,6 +125,10 @@ static COMMAND: Mutex<(String, u64)> = Mutex::new((String::new(), 0));
 pub fn doing(what: &str) {
     let mut doing = lock(&DOING);
     if doing.0 != what {
+        // Each step in the log, so a slow start says which step took the time.
+        if what != "running" {
+            log::info!("step: {what}");
+        }
         *doing = (what.to_string(), since_start_ms());
     }
 }
