@@ -109,6 +109,8 @@ class Pictures {
 
   hide = () => {
     this.open = false;
+    // Music heard with Test was only a try: it stops with the window (a running slideshow keeps its own).
+    if (session.musicAudition && !this.slideshow.running) session.endMusicAudition();
   };
 
   choose = async () => {
@@ -205,6 +207,8 @@ class Pictures {
     // It loops for as long as the pictures run, whatever the playlist's own setting.
     if (this.slideshow.music && this.slideshow.playlistId) {
       session.slideshowMusic = true;
+      // What Test started is now the slideshow's own music.
+      session.musicAudition = false;
       if (session.audio.playlistId !== this.slideshow.playlistId || !session.audio.playing) await session.playPlaylist(this.slideshow.playlistId, 0, { loop: true });
     }
     if (this.slideshow.countdown) {
@@ -333,15 +337,20 @@ class Pictures {
     return paths.length ? session.importAudio(paths, null) : [];
   };
 
-  /** Hear the slideshow's music now (or pause it), before the pictures start. */
+  /**
+   * Hear the slideshow's music now (or pause it), before the pictures start. It is only a try: it
+   * stops when Pictures closes or anything goes LIVE, until the slideshow itself starts it.
+   */
   testMusic = async () => {
     const id = this.slideshow.playlistId;
     if (!id) return;
     if (session.audio.playlistId === id && session.audio.current) {
       await session.audio.toggle();
+      if (!session.audio.playing) session.musicAudition = false;
       return;
     }
     await session.playPlaylist(id, 0, { loop: true });
+    session.musicAudition = true;
   };
 
   /** 1–30 seconds a picture; a running slideshow keeps going at the new pace. */

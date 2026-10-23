@@ -6979,6 +6979,14 @@ class Session {
 
   /** A Pictures slideshow is playing its own music: its picture changes do not fade it. */
   slideshowMusic = false;
+  /** Music started with a slideshow's Test: a try, stopped when Pictures closes or anything goes LIVE. */
+  musicAudition = false;
+
+  endMusicAudition = () => {
+    this.musicAudition = false;
+    if (this.audio.playing) this.audio.fadeOut(1.5);
+    else this.audio.stop();
+  };
 
   /** A countdown over a Pictures slideshow ("Service starts in 4:59"), laid over each picture. */
   slideCountdown = $state<{ label: string; endsAt: number } | null>(null);
@@ -7469,6 +7477,8 @@ class Session {
     // Walk-in music (a looping playlist) fades out when the service goes live; a backing track plays on,
     // and so does a slideshow's music while the slideshow changes its own pictures.
     const slideshowStep = this.slideshowMusic && (this.live.program.sourceId ?? "").startsWith("picture:");
+    // Music heard with a slideshow's Test never plays on under the service, whatever Fade on LIVE says.
+    if ((action === "take" || action === "cut") && this.musicAudition && !slideshowStep) this.endMusicAudition();
     if ((action === "take" || action === "cut") && this.workspace.audio.fadeOnLive && this.audio.playing && this.audio.loop && !slideshowStep) {
       this.audio.fadeOut(4);
     }

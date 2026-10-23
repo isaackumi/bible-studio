@@ -44,9 +44,11 @@
     if (key === heardKey) return;
     heardKey = key;
     lastTick = -1;
-    if (stage === "lobby") sound.play("lobby");
-    else if (stage === "question") {
-      if (reading) sound.stop();
+    if (stage === "lobby") {
+      if (data.music !== false) sound.play("lobby");
+      else sound.stop();
+    } else if (stage === "question") {
+      if (reading || data.music === false) sound.stop();
       else sound.play("question");
     } else if (stage === "results") {
       sound.stop();
@@ -59,12 +61,17 @@
       sound.fanfare();
     }
   });
+  // The game ended (or sounds went off) while its frame is still up: the music stops at once.
+  $effect(() => {
+    if (sound && (!data.sounds || data.music === false)) sound.stop();
+  });
+
   // Get ready: a tick for each second of reading, then the music starts as the answers open.
   let lastRead = -1;
   $effect(() => {
     if (!sound || !data.sounds || data.stage !== "question") return;
     if (!reading) {
-      sound.play("question");
+      if (data.music !== false) sound.play("question");
       return;
     }
     if (readLeft !== lastRead) {

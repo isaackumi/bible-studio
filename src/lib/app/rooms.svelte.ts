@@ -460,6 +460,7 @@ class AudienceRoom {
       joined: view?.joined ?? [],
       join: saved ? { code: saved.code, at, url: saved.joinUrl } : null,
       sounds: this.sounds,
+      music: this.sounds && this.playing !== null,
       key: `${stage}:${question?.id ?? ""}:${live?.phase === "open" ? "open" : ""}`,
       teams: view?.teams ? view.teams.map((team) => ({ ...team, name: t(TEAMS[team.team]?.name ?? ""), color: TEAMS[team.team]?.color ?? "#888888" })) : null,
       words: Object.fromEntries(GAME_WORDS.map((line) => [line, t(line)])),

@@ -38,6 +38,8 @@ export type GameScreenData = {
   join: { code: string; at: string; url: string } | null;
   /** Music and sound effects on the audience screen. */
   sounds: boolean;
+  /** The lobby and question music: only while a game is running (a frame left up after it is quiet). */
+  music?: boolean;
   /** Changes with every new question or stage, so the screen knows to start its moves again. */
   key: string;
   /** Team standings, best first (team mode); null when everyone plays for themselves. */
