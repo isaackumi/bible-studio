@@ -4317,4 +4317,11 @@ export const es: Readonly<Record<string, string>> = {
   "Use {n} song": "Usar {n} canción",
   "Use {n} songs": "Usar {n} canciones",
   "Search questions or names": "Buscar preguntas o nombres",
+  "On the Sermon page or in Preach mode, Take live notes keeps everything heard, and every few minutes your AI turns it into clean notes and puts misheard words right. You accept each version.": "En la página Sermón o en modo Predicación, Tomar notas en directo guarda todo lo oído y, cada pocos minutos, tu IA lo convierte en notas limpias y corrige las palabras mal oídas. Tú aceptas cada versión.",
+  "Teams, and who was listening": "Equipos, y quién estaba escuchando",
+  "Play quizzes in two to four teams. When a quiz ends, a report shows how many got each question right, the hardest one and the top players. Quizzes group by sermon series, with a series final.": "Juega cuestionarios en dos a cuatro equipos. Al terminar, un informe muestra cuántos acertaron cada pregunta, la más difícil y los mejores jugadores. Los cuestionarios se agrupan por serie de sermones, con una final de la serie.",
+  "Picture slideshows, full window": "Presentaciones de imágenes a ventana completa",
+  "Open Pictures to the whole window: a big grid, the picture large, and every setting in view. Add a title across the top, the clock, music from your library, a black background or pictures that fill the screen.": "Abre Imágenes a ventana completa: una cuadrícula grande, la imagen en grande y todos los ajustes a la vista. Añade un título arriba, el reloj, música de tu biblioteca, un fondo negro o imágenes que llenan la pantalla.",
+  "See what takes the space": "Ver qué ocupa espacio",
+  "Settings › Storage › Review files lists every picture and video with where it is used. Only the unused ones can be removed.": "Ajustes › Almacenamiento › Revisar archivos muestra cada imagen y vídeo con dónde se usa. Solo se pueden quitar los que no se usan.",
 };

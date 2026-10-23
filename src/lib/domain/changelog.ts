@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.3",
+    date: "2026-10-23",
+    highlights: [
+      { icon: "mic", title: msg("Live sermon notes"), text: msg("On the Sermon page or in Preach mode, Take live notes keeps everything heard, and every few minutes your AI turns it into clean notes and puts misheard words right. You accept each version.") },
+      { icon: "users", title: msg("Teams, and who was listening"), text: msg("Play quizzes in two to four teams. When a quiz ends, a report shows how many got each question right, the hardest one and the top players. Quizzes group by sermon series, with a series final.") },
+      { icon: "media", title: msg("Picture slideshows, full window"), text: msg("Open Pictures to the whole window: a big grid, the picture large, and every setting in view. Add a title across the top, the clock, music from your library, a black background or pictures that fill the screen.") },
+      { icon: "folder", title: msg("See what takes the space"), text: msg("Settings › Storage › Review files lists every picture and video with where it is used. Only the unused ones can be removed.") },
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-10-24",
     highlights: [

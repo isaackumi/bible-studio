@@ -4398,4 +4398,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Use {n} song": "Utiliser {n} chanson",
   "Use {n} songs": "Utiliser {n} chansons",
   "Search questions or names": "Chercher des questions ou des noms",
+  "On the Sermon page or in Preach mode, Take live notes keeps everything heard, and every few minutes your AI turns it into clean notes and puts misheard words right. You accept each version.": "Sur la page Sermon ou en mode Prédication, Prendre des notes en direct garde tout ce qui est entendu, et toutes les quelques minutes votre IA en fait des notes propres en corrigeant les mots mal entendus. Vous acceptez chaque version.",
+  "Teams, and who was listening": "Des équipes, et qui écoutait",
+  "Play quizzes in two to four teams. When a quiz ends, a report shows how many got each question right, the hardest one and the top players. Quizzes group by sermon series, with a series final.": "Jouez les quiz en deux à quatre équipes. À la fin d’un quiz, un rapport montre combien ont trouvé chaque question, la plus difficile et les meilleurs joueurs. Les quiz se rangent par série de prédications, avec une finale de série.",
+  "Picture slideshows, full window": "Diaporamas d’images en plein écran",
+  "Open Pictures to the whole window: a big grid, the picture large, and every setting in view. Add a title across the top, the clock, music from your library, a black background or pictures that fill the screen.": "Ouvrez Images en plein écran : une grande grille, l’image en grand et tous les réglages en vue. Ajoutez un titre en haut, l’horloge, de la musique de votre bibliothèque, un fond noir ou des images qui remplissent l’écran.",
+  "See what takes the space": "Voir ce qui prend de la place",
+  "Settings › Storage › Review files lists every picture and video with where it is used. Only the unused ones can be removed.": "Réglages › Stockage › Passer les fichiers en revue liste chaque image et vidéo avec l’endroit où elle sert. Seules les inutilisées peuvent être supprimées.",
 };
