@@ -348,10 +348,10 @@ function mix() {
   $("versions").innerHTML = bars(S.versions.map((r) => [r[0] === "unknown" ? "unknown" : "v" + r[0], r[1]]));
 }
 
-const TABS = [["computers", "Computers"], ["accounts", "Accounts"], ["licenses", "Licenses"], ["trials", "Trials"], ["checkouts", "Sales"], ["promos", "Promo codes"], ["activity", "Activity"], ["approvals", "Approvals"]];
+const TABS = [["computers", "Computers"], ["accounts", "Accounts"], ["licenses", "Licenses"], ["trials", "Trials"], ["checkouts", "Sales"], ["promos", "Promo codes"], ["cloud", "Cloud space"], ["activity", "Activity"], ["approvals", "Approvals"]];
 function tabs() {
   const pending = APPROVALS.filter((a) => a.status === "pending" && !a.expired).length;
-  const count = { computers: D.computers.length, accounts: D.accounts.length, licenses: D.licenses.length, trials: D.trials.length, checkouts: D.checkouts.length, promos: D.promos.length, activity: AUDIT.length, approvals: pending };
+  const count = { computers: D.computers.length, accounts: D.accounts.length, licenses: D.licenses.length, trials: D.trials.length, checkouts: D.checkouts.length, promos: D.promos.length, cloud: (D.cloud ? D.cloud.licences : []).length, activity: AUDIT.length, approvals: pending };
   $("tabs").innerHTML = TABS.map((t) => '<button role="tab" data-tab="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '<span class="count' + (t[0] === "approvals" && pending ? " hot" : "") + '">' + count[t[0]] + "</span></button>").join("");
 }
 
@@ -378,8 +378,9 @@ function table(def, items, q) {
 
 function draw() {
   const q = $("q").value.trim().toLowerCase();
-  $("search").hidden = tab === "promos";
+  $("search").hidden = tab === "promos" || tab === "cloud";
   if (tab === "promos") return promos();
+  if (tab === "cloud") return cloud();
   const items = tab === "activity" ? AUDIT : tab === "approvals" ? APPROVALS : D[tab];
   let note = "";
   if (tab === "activity") note = '<p class="note">Every change and every refused attempt, newest first. Nobody can remove entries; each one was also emailed to the alert address.</p>';
@@ -394,6 +395,26 @@ function promos() {
   let h = '<div class="table" style="margin-bottom:14px">' + (D.promos.length ? "<table><thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Ends</th><th>Note</th><th></th></tr></thead><tbody>" + D.promos.map((p) => "<tr><td><b class=mono>" + esc(p.code) + "</b> " + (live(p) ? '<span class="tag good">live</span>' : '<span class="tag">ended</span>') + "</td><td>" + (p.percentOff ? '<span class="tag orange">' + p.percentOff + "% off</span>" : "") + (p.amountOff ? '<span class="tag orange">' + money(p.amountOff) + " off</span>" : "") + (p.trialDays ? '<span class="tag blue">+' + p.trialDays + " trial days</span>" : "") + '</td><td><span class="seats">' + p.used + (p.maxUses ? " / " + p.maxUses + '<span class="track"><i style="width:' + Math.min(100, (p.used / p.maxUses) * 100) + '%;background:var(--accent)"></i></span>' : "") + "</span></td><td>" + (p.expiresAt ? two(date(p.expiresAt), ago(p.expiresAt)) : "—") + '</td><td class="muted small">' + esc(p.note || "") + '</td><td style="text-align:right">' + (live(p) && can("owner") ? '<button class="sm danger" data-end="' + esc(p.code) + '">End now</button>' : "") + "</td></tr>").join("") + "</tbody></table>" : '<div class="empty">No codes yet.</div>') + "</div>";
   if (can("owner")) h += '<div class="card"><h2>New promo code</h2><form class="grid" id="promo-form"><label class="field">Code<input name="code" required placeholder="EASTER25" style="text-transform:uppercase"></label><label class="field">% off<input name="percentOff" type="number" min="1" max="100" placeholder="—"></label><label class="field">$ off<input name="amountOff" type="number" min="1" step="0.01" placeholder="—"></label><label class="field">Extra trial days<input name="trialDays" type="number" min="1" placeholder="—"></label><label class="field">Plan<select name="plans"><option value="">Any plan</option><option value="premium">Premium</option><option value="church">Church</option></select></label><label class="field">Uses<input name="maxUses" type="number" min="1" max="' + L.mostUses + '" required placeholder="50"></label><label class="field">Ends<input name="expiresAt" type="date" required></label><button class="hot">Create code</button></form><p class="note">Over ' + L.percentOff + "% or " + money(L.amountOff) + " off, over " + L.trialDays + " trial days or over " + L.maxUses + " uses, a code waits for an owner’s approval by email. Codes run at most " + L.longestDays + " days.</p></div>";
   else h += '<p class="note">Only an owner can create or end codes.</p>';
+  $("list").innerHTML = h;
+}
+
+function cloud() {
+  const C = D.cloud || { limits: { premiumGb: 5, churchGb: 15, maxFileGb: 2, totalCapGb: 500 }, totalBytes: 0, monthlyCents: 0, licences: [] };
+  const gb = (bytes) => (bytes / 1e9).toFixed(bytes >= 1e10 ? 0 : 1) + " GB";
+  const capBytes = C.limits.totalCapGb * 1e9;
+  const share = Math.min(100, Math.round((C.totalBytes / capBytes) * 100));
+  let h = '<div class="stats3"><div><b>' + gb(C.totalBytes) + "</b><span>used by every church together, of " + C.limits.totalCapGb + ' GB</span></div><div><b>' + money(C.monthlyCents) + "</b><span>estimated bill a month ($0.015 a GB past the first 10 GB; downloads are free)</span></div><div><b>" + C.licences.length + "</b><span>licenses with something in the cloud</span></div></div>";
+  h += '<div class="meter" style="height:6px;margin:8px 0 14px;border-radius:6px;background:var(--panel2);overflow:hidden"><i style="display:block;height:100%;width:' + share + '%;background:' + (share >= 100 ? "var(--bad)" : share >= 80 ? "var(--orange, #f80)" : "var(--accent)") + '"></i></div>';
+  if (can("owner")) {
+    h += '<div class="card"><h2>Limits</h2><form class="grid" id="cloud-form">'
+      + '<label class="field">Premium, GB<input name="premiumGb" type="number" min="1" step="1" value="' + C.limits.premiumGb + '"></label>'
+      + '<label class="field">Church, GB<input name="churchGb" type="number" min="1" step="1" value="' + C.limits.churchGb + '"></label>'
+      + '<label class="field">Largest file, GB<input name="maxFileGb" type="number" min="1" step="1" value="' + C.limits.maxFileGb + '"></label>'
+      + '<label class="field">Everyone together, GB<input name="totalCapGb" type="number" min="1" step="1" value="' + C.limits.totalCapGb + '"></label>'
+      + '<button class="hot">Save limits</button></form><p class="note">Lowering a limit deletes nothing: a church over it cannot add pictures or videos until it is back under, and its Cloud space screen says so. At the total cap, uploads pause for everyone and you get an email (80% warns first).</p></div>';
+    h += '<div class="card"><h2>A different limit for one license</h2><form class="grid" id="cap-form"><label class="field">License (8 characters)<input name="license" required pattern="[0-9a-f]{8}" placeholder="0a0b0c0d"></label><label class="field">GB (blank: back to the plan\'s)<input name="gb" type="number" min="1" step="1" placeholder="—"></label><button class="hot">Set cap</button></form></div>';
+  } else h += '<p class="note">Only an owner can change the limits.</p>';
+  h += '<div class="table"><table><thead><tr><th>License</th><th>Plan</th><th>Used</th><th>Limit</th><th>Last change</th></tr></thead><tbody>' + (C.licences.map((l) => "<tr><td><span class=mono>" + esc(l.license) + "</span></td><td>" + planTag(l.plan) + "</td><td>" + gb(l.usedBytes) + (l.usedBytes > l.limitBytes ? ' <span class="tag bad">over</span>' : "") + "</td><td>" + gb(l.limitBytes) + (l.capGb ? ' <span class="tag blue">own cap</span>' : "") + "</td><td>" + (l.at ? two(date(l.at), ago(l.at)) : "—") + "</td></tr>").join("") || '<tr><td colspan="5" class="dim">Nothing in the cloud yet.</td></tr>') + "</tbody></table></div>";
   $("list").innerHTML = h;
 }
 
@@ -524,6 +545,12 @@ document.addEventListener("submit", (event) => {
     if (def.danger && !confirm(def.label + "? " + def.hint())) return;
     return run(body, def.label);
   }
+  if (el.id === "cloud-form") {
+    const body = { action: "set-cloud-limits" };
+    for (const key of ["premiumGb", "churchGb", "maxFileGb", "totalCapGb"]) if (f[key]) body[key] = Number(f[key]);
+    return run(body, "Limits saved");
+  }
+  if (el.id === "cap-form") return run({ action: "set-cloud-cap", license: f.license, ...(f.gb ? { gb: Number(f.gb) } : { gb: "" }) }, f.gb ? "Cap set" : "Cap cleared");
   if (el.id === "promo-form") {
     const body = { action: "create-promo", code: f.code, maxUses: Number(f.maxUses), expiresAt: f.expiresAt + "T23:59:59Z" };
     if (f.percentOff) body.percentOff = Number(f.percentOff);

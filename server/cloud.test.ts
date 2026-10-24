@@ -139,6 +139,18 @@ describe("cloud space", () => {
     expect((await call("/v1/cloud/push", { token: b.token, device: "b-pc", changes: [{ col: "song", id: "s", at: 1, doc: {} }] })).status).toBe(200);
   });
 
+  it("lowering a limit deletes nothing: the church sees it is over, and new files wait", async () => {
+    const { call, upload, person, config } = setup();
+    const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium" }, ["laptop"]);
+    await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH, bytes: 9, name: "f.png", kind: "image", mediaId: "m1" });
+    await upload(HASH, token, "laptop", "123456789");
+    await putJson(config.store, "cloudcap:0a0b0c0d", { gb: 0.000000005 });
+    const status = await call("/v1/cloud/status", { token, device: "laptop" });
+    expect(status.data).toMatchObject({ usedBytes: 9, limitBytes: 5, over: true });
+    expect((await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH2, bytes: 1, name: "g.png", kind: "image", mediaId: "m2" })).data).toMatchObject({ upload: false, full: true, usedBytes: 9 });
+    expect((await call("/v1/cloud/media/list", { token, device: "laptop" })).data.items).toHaveLength(1);
+  });
+
   it("a lapsed licence is read-only, and still readable", async () => {
     const { call, person, now } = setup();
     const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2026-10-01" }, ["laptop"]);

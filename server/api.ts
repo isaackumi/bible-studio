@@ -13,7 +13,7 @@
 //   Accounts (optional; see accounts.ts): /v1/signin/*, /v1/account*, /signin/:id, /auth/*
 //   /admin, /admin/api/*                                       (the admin console, behind Cloudflare Access: admin.ts)
 
-import type { LibraryNamespace, R2Like } from "./cloud-config";
+import { cloudLimits, licenceLimitBytes, type LibraryNamespace, type R2Like } from "./cloud-config";
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, noteLicenseEmail, signinRoute, type Account, type Identity } from "./accounts.ts";
@@ -584,6 +584,25 @@ export async function stats(config: ApiConfig) {
     downloads: await downloadReport(config.usage, config.fetcher ?? fetch),
     promos: (await listPromos(config.store)).map((promo) => ({ code: promo.code, used: promo.used, maxUses: promo.maxUses ?? null, expiresAt: promo.expiresAt ?? null })),
   };
+}
+
+/** Cloud space across every licence: the limits, the total, the estimated bill, and who uses most. */
+export async function cloudDetails(config: ApiConfig) {
+  const limits = await cloudLimits(config.store);
+  const used = await config.store.list("cloudused:");
+  const licences = [];
+  for (const entry of used) {
+    const license = entry.key.slice("cloudused:".length);
+    const plan = (String(entry.meta?.plan) === "church" ? "church" : "premium") as LicensePlan;
+    const capGb = (await getJson<{ gb?: number }>(config.store, `cloudcap:${license}`))?.gb ?? null;
+    const record = await getJson<{ usedBytes?: number; at?: number }>(config.store, entry.key);
+    licences.push({ license, plan, usedBytes: Number(entry.meta?.usedBytes) || 0, capGb, limitBytes: await licenceLimitBytes(config.store, license, plan), at: record?.at ?? 0 });
+  }
+  licences.sort((a, b) => b.usedBytes - a.usedBytes);
+  const totalBytes = licences.reduce((sum, item) => sum + item.usedBytes, 0);
+  // R2's price: $0.015 a GB a month, the first 10 GB free; downloads cost nothing.
+  const monthlyCents = Math.round(Math.max(0, totalBytes / 1e9 - 10) * 1.5);
+  return { limits, totalBytes, monthlyCents, licences: licences.slice(0, 50) };
 }
 
 export async function listPromos(store: Store): Promise<Promo[]> {

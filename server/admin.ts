@@ -17,8 +17,9 @@
 //   POST /admin/api/action   {action, …}                 → {ok, …} | 202 {pending, approval}
 //   POST /admin/api/approve  {id, token, decline?}
 
+import { setCloudLimits } from "./cloud-config";
 import { ownershipOf } from "./ownership.ts";
-import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial, markMoved } from "./api.ts";
+import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial, markMoved, cloudDetails } from "./api.ts";
 import type { Account, LinkedLicense } from "./accounts.ts";
 import { licenseKeyEmail } from "./email.ts";
 import { adminPage } from "./admin-page.ts";
@@ -73,6 +74,8 @@ const ACTIONS = {
   resume: "owner",
   refund: "owner",
   "create-promo": "owner",
+  "set-cloud-limits": "owner",
+  "set-cloud-cap": "owner",
   "end-promo": "owner",
 } as const satisfies Record<string, AdminRole>;
 export type AdminAction = keyof typeof ACTIONS;
@@ -300,6 +303,8 @@ const CHANGE_WORDS: Record<AdminAction, (input: Record<string, unknown>) => stri
   resume: (input) => `restore license ${text(input.license, 16)}`,
   refund: (input) => `revoke license ${text(input.license, 16)} for a refund`,
   "create-promo": (input) => `create promo code ${text(input.code, 40).toUpperCase()}`,
+  "set-cloud-limits": (input) => `set cloud space limits ${["premiumGb", "churchGb", "maxFileGb", "totalCapGb"].filter((key) => typeof input[key] === "number").map((key) => `${key}=${input[key]}`).join(" ") || "(nothing)"}`,
+  "set-cloud-cap": (input) => `${typeof input.gb === "number" ? `cap cloud space for license ${text(input.license, 16)} at ${input.gb} GB` : `clear the cloud space cap on license ${text(input.license, 16)}`}`,
   "end-promo": (input) => `end promo code ${text(input.code, 40).toUpperCase()}`,
 };
 
@@ -343,6 +348,24 @@ async function perform(config: ApiConfig, admin: Admin, action: AdminAction, inp
     // Ended, not deleted: the record of who used it stays.
     await putJson(store, `promo:${code}`, { ...promo, expiresAt: Math.min(promo.expiresAt ?? now, now) }, { used: promo.used });
     return { ok: true, detail: `${code} ended after ${promo.used} uses` };
+  }
+  if (action === "set-cloud-limits") {
+    const patch: Record<string, number> = {};
+    for (const key of ["premiumGb", "churchGb", "maxFileGb", "totalCapGb"]) if (typeof input[key] === "number") patch[key] = input[key] as number;
+    if (!Object.keys(patch).length) return { ok: false, error: "Give at least one limit, in GB." };
+    const limits = await setCloudLimits(store, patch);
+    return { ok: true, detail: `Premium ${limits.premiumGb} GB · Church ${limits.churchGb} GB · largest file ${limits.maxFileGb} GB · everyone together ${limits.totalCapGb} GB`, data: { limits } };
+  }
+  if (action === "set-cloud-cap") {
+    const id = licenseId(input.license);
+    if (!id) return { ok: false, error: "Which license (8 characters)?" };
+    if (typeof input.gb === "number") {
+      if (!Number.isFinite(input.gb) || input.gb <= 0 || input.gb > 100_000) return { ok: false, error: "A cap is a number of GB." };
+      await putJson(store, `cloudcap:${id}`, { gb: input.gb, by: admin.email, at: now });
+      return { ok: true, detail: `License ${id} may keep ${input.gb} GB in the cloud` };
+    }
+    await store.delete(`cloudcap:${id}`);
+    return { ok: true, detail: `License ${id} is back on its plan's cloud space` };
   }
   if (action === "mark-team") {
     const device = text(input.device, 80);
@@ -622,7 +645,7 @@ export async function adminRoute(request: Request, config: ApiConfig, path: stri
       case "/admin/api/stats":
         return json(200, await stats(config));
       case "/admin/api/details":
-        return json(200, { ...(await richDetails(config)), promos: await listPromos(config.store) });
+        return json(200, { ...(await richDetails(config)), promos: await listPromos(config.store), cloud: await cloudDetails(config) });
       case "/admin/api/audit": {
         // Keys count down with time, so sorted they are newest first (as Cloudflare KV lists them).
         const entries = (await config.store.list("audit:")).sort((x, y) => (x.key < y.key ? -1 : 1)).slice(0, 300);

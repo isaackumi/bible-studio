@@ -4,6 +4,7 @@ import { decide, parseAdminUsers, setupOf, type Admin } from "./admin";
 import { handleApi, type ApiConfig } from "./api";
 import { mockProvider } from "./billing";
 import { getJson, memoryStore, putJson } from "./store";
+import { cloudLimits, licenceLimitBytes } from "./cloud-config";
 
 const pair = licenseKeyPair();
 const DAY = 86_400_000;
@@ -59,6 +60,38 @@ async function setup(users = "owner@heitech.test:owner,help@heitech.test:support
   };
   return { config, as, mails, access, tokenFor, license, advance: (ms: number) => (clock += ms), now: () => clock };
 }
+
+describe("admin: cloud space", () => {
+  it("an owner sets the limits and a per-licence cap; support may not", async () => {
+    const { as, config, license } = await setup();
+    await license("0a0b0c0d", "pastor@grace.org");
+    expect((await as("help@heitech.test", "/admin/api/action", { action: "set-cloud-limits", premiumGb: 8 })).status).toBe(403);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "set-cloud-limits", premiumGb: 8, churchGb: 30, maxFileGb: 3, totalCapGb: 2000 })).status).toBe(200);
+    expect(await cloudLimits(config.store)).toEqual({ premiumGb: 8, churchGb: 30, maxFileGb: 3, totalCapGb: 2000 });
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "set-cloud-cap", license: "0a0b0c0d", gb: 40 })).status).toBe(200);
+    expect(await licenceLimitBytes(config.store, "0a0b0c0d", "church")).toBe(40e9);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "set-cloud-cap", license: "0a0b0c0d", gb: "" })).status).toBe(200);
+    expect(await licenceLimitBytes(config.store, "0a0b0c0d", "church")).toBe(30e9);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "set-cloud-cap", license: "zz", gb: 1 })).status).not.toBe(200);
+  });
+
+  it("details list cloud use, the caps and the estimated bill", async () => {
+    const { as, config, license } = await setup();
+    await license("0a0b0c0d", "pastor@grace.org");
+    await putJson(config.store, "cloudused:0a0b0c0d", { usedBytes: 12e9, plan: "church", at: 1 }, { usedBytes: 12e9, plan: "church" });
+    await putJson(config.store, "cloudused:1a1b1c1d", { usedBytes: 3e9, plan: "premium", at: 1 }, { usedBytes: 3e9, plan: "premium" });
+    await putJson(config.store, "cloudcap:0a0b0c0d", { gb: 20 });
+    const details = (await as("owner@heitech.test", "/admin/api/details")).data as { cloud: { limits: { premiumGb: number }; totalBytes: number; monthlyCents: number; licences: Array<{ license: string; usedBytes: number; capGb: number | null; limitBytes: number }> } };
+    expect(details.cloud.limits.premiumGb).toBe(5);
+    expect(details.cloud.totalBytes).toBe(15e9);
+    // $0.015 a GB a month past the first 10 GB: 5 GB → 7.5 cents.
+    expect(details.cloud.monthlyCents).toBe(8);
+    expect(details.cloud.licences).toEqual([
+      { license: "0a0b0c0d", plan: "church", usedBytes: 12e9, capGb: 20, limitBytes: 20e9, at: 1 },
+      { license: "1a1b1c1d", plan: "premium", usedBytes: 3e9, capGb: null, limitBytes: 5e9, at: 1 },
+    ]);
+  });
+});
 
 describe("admin: seats and moves", () => {
   it("release-device blocks that computer until the license is moved back", async () => {
