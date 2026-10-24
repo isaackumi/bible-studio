@@ -1,0 +1,760 @@
+{
+ "templates": [
+  {
+   "id": "1-1",
+   "name": "Youth Night",
+   "category": "Kids & youth",
+   "layout": "centred",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Fridays · 7 pm",
+    "title": "YOUTH NIGHT",
+    "subtitle": "Games · Worship · Real talk",
+    "icon": "flame"
+   }
+  },
+  {
+   "id": "1-2",
+   "name": "Youth Night",
+   "category": "Kids & youth",
+   "layout": "big-type",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Fridays · 7 pm",
+    "title": "YOUTH NIGHT",
+    "subtitle": "Games · Worship · Real talk",
+    "icon": "flame"
+   }
+  },
+  {
+   "id": "1-3",
+   "name": "Youth Night",
+   "category": "Kids & youth",
+   "layout": "big-icon",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Fridays · 7 pm",
+    "title": "YOUTH NIGHT",
+    "subtitle": "Games · Worship · Real talk",
+    "icon": "flame"
+   }
+  },
+  {
+   "id": "2-1",
+   "name": "Time for kids church!",
+   "category": "Kids & youth",
+   "layout": "split-right",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Kids church",
+    "title": "Time for kids church!",
+    "subtitle": "Ages 3–11, follow your teachers",
+    "icon": "star"
+   }
+  },
+  {
+   "id": "2-2",
+   "name": "Time for kids church!",
+   "category": "Kids & youth",
+   "layout": "ribbon",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Kids church",
+    "title": "Time for kids church!",
+    "subtitle": "Ages 3–11, follow your teachers",
+    "icon": "star"
+   }
+  },
+  {
+   "id": "2-3",
+   "name": "Time for kids church!",
+   "category": "Kids & youth",
+   "layout": "centred",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Kids church",
+    "title": "Time for kids church!",
+    "subtitle": "Ages 3–11, follow your teachers",
+    "icon": "star"
+   }
+  },
+  {
+   "id": "3-1",
+   "name": "Adventure Week",
+   "category": "Kids & youth",
+   "layout": "card",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Holiday Bible club",
+    "title": "Adventure Week",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "4–8 August"
+     },
+     {
+      "icon": "clock",
+      "text": "9 am – 12 noon"
+     }
+    ],
+    "icon": "tent"
+   }
+  },
+  {
+   "id": "3-2",
+   "name": "Adventure Week",
+   "category": "Kids & youth",
+   "layout": "columns",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Holiday Bible club",
+    "title": "Adventure Week",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "4–8 August"
+     },
+     {
+      "icon": "clock",
+      "text": "9 am – 12 noon"
+     }
+    ],
+    "icon": "tent"
+   }
+  },
+  {
+   "id": "3-3",
+   "name": "Adventure Week",
+   "category": "Kids & youth",
+   "layout": "banner",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Holiday Bible club",
+    "title": "Adventure Week",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "4–8 August"
+     },
+     {
+      "icon": "clock",
+      "text": "9 am – 12 noon"
+     }
+    ],
+    "icon": "tent"
+   }
+  },
+  {
+   "id": "4-1",
+   "name": "Memory verse",
+   "category": "Kids & youth",
+   "layout": "circles",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "title": "Memory verse",
+    "subtitle": "“Be kind one to another.” Ephesians 4:32",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "4-2",
+   "name": "Memory verse",
+   "category": "Kids & youth",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "title": "Memory verse",
+    "subtitle": "“Be kind one to another.” Ephesians 4:32",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "4-3",
+   "name": "Memory verse",
+   "category": "Kids & youth",
+   "layout": "card",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "modern",
+   "copy": {
+    "title": "Memory verse",
+    "subtitle": "“Be kind one to another.” Ephesians 4:32",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "5-1",
+   "name": "Ask Anything",
+   "category": "Kids & youth",
+   "layout": "banner",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Teens",
+    "title": "Ask Anything",
+    "subtitle": "Text your questions in tonight",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "5-2",
+   "name": "Ask Anything",
+   "category": "Kids & youth",
+   "layout": "frame",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Teens",
+    "title": "Ask Anything",
+    "subtitle": "Text your questions in tonight",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "5-3",
+   "name": "Ask Anything",
+   "category": "Kids & youth",
+   "layout": "circles",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Teens",
+    "title": "Ask Anything",
+    "subtitle": "Text your questions in tonight",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "6-1",
+   "name": "Kids Volunteers",
+   "category": "Kids & youth",
+   "layout": "split",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Join the team",
+    "title": "Kids Volunteers",
+    "subtitle": "Help us teach the next generation",
+    "icon": "hand-helping"
+   }
+  },
+  {
+   "id": "6-2",
+   "name": "Kids Volunteers",
+   "category": "Kids & youth",
+   "layout": "band",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Join the team",
+    "title": "Kids Volunteers",
+    "subtitle": "Help us teach the next generation",
+    "icon": "hand-helping"
+   }
+  },
+  {
+   "id": "6-3",
+   "name": "Kids Volunteers",
+   "category": "Kids & youth",
+   "layout": "banner",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Join the team",
+    "title": "Kids Volunteers",
+    "subtitle": "Help us teach the next generation",
+    "icon": "hand-helping"
+   }
+  },
+  {
+   "id": "7-1",
+   "name": "Game Time!",
+   "category": "Kids & youth",
+   "layout": "big-type",
+   "palette": {
+    "name": "Lime",
+    "bg": {
+     "kind": "solid",
+     "color": "#0e0e10"
+    },
+    "ink": "#ffffff",
+    "soft": "#b0b0b8",
+    "accent": "#b6f23a",
+    "onAccent": "#0e0e10",
+    "card": "#ffffff12",
+    "deep": "#0e0e10"
+   },
+   "fonts": "classic",
+   "copy": {
+    "title": "Game Time!",
+    "subtitle": "Find your team colour",
+    "icon": "party-popper"
+   }
+  },
+  {
+   "id": "7-2",
+   "name": "Game Time!",
+   "category": "Kids & youth",
+   "layout": "big-icon",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "caps",
+   "copy": {
+    "title": "Game Time!",
+    "subtitle": "Find your team colour",
+    "icon": "party-popper"
+   }
+  },
+  {
+   "id": "7-3",
+   "name": "Game Time!",
+   "category": "Kids & youth",
+   "layout": "split",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "clean",
+   "copy": {
+    "title": "Game Time!",
+    "subtitle": "Find your team colour",
+    "icon": "party-popper"
+   }
+  },
+  {
+   "id": "8-1",
+   "name": "Youth Camp",
+   "category": "Kids & youth",
+   "layout": "split",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Summer",
+    "title": "Youth Camp",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "2–6 August"
+     },
+     {
+      "icon": "tent",
+      "text": "Sign up by 20 July"
+     }
+    ],
+    "icon": "mountain"
+   }
+  },
+  {
+   "id": "8-2",
+   "name": "Youth Camp",
+   "category": "Kids & youth",
+   "layout": "card",
+   "palette": {
+    "name": "Electric",
+    "bg": {
+     "kind": "linear",
+     "angle": 135,
+     "stops": [
+      {
+       "color": "#120428",
+       "at": 0
+      },
+      {
+       "color": "#3a0ca3",
+       "at": 60
+      },
+      {
+       "color": "#f72585",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e2d4ff",
+    "accent": "#4cc9f0",
+    "onAccent": "#120428",
+    "card": "#ffffff1f",
+    "deep": "#120428"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Summer",
+    "title": "Youth Camp",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "2–6 August"
+     },
+     {
+      "icon": "tent",
+      "text": "Sign up by 20 July"
+     }
+    ],
+    "icon": "mountain"
+   }
+  },
+  {
+   "id": "8-3",
+   "name": "Youth Camp",
+   "category": "Kids & youth",
+   "layout": "columns",
+   "palette": {
+    "name": "Crayon",
+    "bg": {
+     "kind": "solid",
+     "color": "#fff6d6"
+    },
+    "ink": "#1f2a5a",
+    "soft": "#4a5584",
+    "accent": "#ff5a36",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fff6d6"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Summer",
+    "title": "Youth Camp",
+    "rows": [
+     {
+      "icon": "calendar",
+      "text": "2–6 August"
+     },
+     {
+      "icon": "tent",
+      "text": "Sign up by 20 July"
+     }
+    ],
+    "icon": "mountain"
+   }
+  }
+ ]
+}

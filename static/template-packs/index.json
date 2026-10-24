@@ -1,0 +1,44 @@
+[
+  {
+    "id": "advent-christmas",
+    "name": "Advent & Christmas",
+    "description": "Candles, carols and the nativity: Advent Sundays, carol services, Christmas Eve and Christmas Day.",
+    "file": "advent-christmas.json",
+    "count": 24
+  },
+  {
+    "id": "easter",
+    "name": "Easter & Holy Week",
+    "description": "Palm Sunday to Easter morning: Maundy Thursday, Good Friday, sunrise services and the empty tomb.",
+    "file": "easter.json",
+    "count": 24
+  },
+  {
+    "id": "youth-kids",
+    "name": "Youth & kids",
+    "description": "Bright, loud pages for youth nights, kids' church, holiday Bible clubs and camps.",
+    "file": "youth-kids.json",
+    "count": 24
+  },
+  {
+    "id": "outreach",
+    "name": "Missions & outreach",
+    "description": "Mission Sundays, food drives, community days and partners around the world.",
+    "file": "outreach.json",
+    "count": 18
+  },
+  {
+    "id": "life-events",
+    "name": "Weddings, funerals & dedications",
+    "description": "Gentle pages for the big days: weddings, memorial services, baby dedications and anniversaries.",
+    "file": "life-events.json",
+    "count": 18
+  },
+  {
+    "id": "sermon-series",
+    "name": "Sermon series",
+    "description": "Title pages for a run of Sundays: series art, part numbers and big-idea slides.",
+    "file": "sermon-series.json",
+    "count": 18
+  }
+]

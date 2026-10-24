@@ -7,11 +7,27 @@ import { addIconElement, addQrElement, addShapeElement, addTextElement } from ".
 import { assignLayerSource, createComposition, setCompositionBackground, setLayerAnimation, type Composition, type LayerAnimation, type LayerBounds } from "./composition";
 import { encodeFill, GRADIENT_PRESETS, type Fill } from "./fill";
 import { SCREEN_FONTS } from "./fonts";
-import type { IconNode } from "./icon";
+import { TEMPLATE_ICONS, type TemplateIcon } from "./template-icons";
 import type { TextStyle } from "./types";
 import { msg } from "../i18n/core";
 
-export type TemplateCategory = "Welcome" | "Announcements" | "Scripture" | "Sermon" | "Giving" | "Lower thirds";
+export type TemplateCategory =
+  | "Welcome"
+  | "Announcements"
+  | "Events"
+  | "Scripture"
+  | "Sermon"
+  | "Worship"
+  | "Prayer"
+  | "Giving"
+  | "Communion"
+  | "Baptism"
+  | "Kids & youth"
+  | "Christmas"
+  | "Easter"
+  | "Seasons"
+  | "Thank you"
+  | "Lower thirds";
 
 export type PageTemplate = {
   id: string;
@@ -23,28 +39,32 @@ export type PageTemplate = {
   build: (aspect: number) => Composition;
 };
 
-export const TEMPLATE_CATEGORIES: TemplateCategory[] = ["Welcome", "Announcements", "Scripture", "Sermon", "Giving", "Lower thirds"];
+export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
+  "Welcome",
+  "Announcements",
+  "Events",
+  "Scripture",
+  "Sermon",
+  "Worship",
+  "Prayer",
+  "Giving",
+  "Communion",
+  "Baptism",
+  "Kids & youth",
+  "Christmas",
+  "Easter",
+  "Seasons",
+  "Thank you",
+  "Lower thirds",
+];
 
-const SERIF = SCREEN_FONTS.find((font) => font.id === "instrument-serif")!.family;
-const SANS = SCREEN_FONTS.find((font) => font.id === "figtree")!.family;
+export const SERIF = SCREEN_FONTS.find((font) => font.id === "instrument-serif")!.family;
+export const SANS = SCREEN_FONTS.find((font) => font.id === "figtree")!.family;
 
-const preset = (id: string): Fill => GRADIENT_PRESETS.find((entry) => entry.id === id)!.fill;
-
-// The few icons the templates use, as the Lucide shapes the page keeps (icon.ts).
-const ICONS: Record<string, IconNode[]> = {
-  church: [["path", { d: "M10 9h4" }], ["path", { d: "M12 7v5" }], ["path", { d: "M14 21v-3a2 2 0 0 0-4 0v3" }], ["path", { d: "m18 9 3.52 2.147a1 1 0 0 1 .48.854V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6.999a1 1 0 0 1 .48-.854L6 9" }], ["path", { d: "M6 21V7a1 1 0 0 1 .376-.782l5-3.999a1 1 0 0 1 1.249.001l5 4A1 1 0 0 1 18 7v14" }]],
-  calendar: [["path", { d: "M8 2v3" }], ["path", { d: "M16 2v3" }], ["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }], ["path", { d: "M3 9h18" }]],
-  "map-pin": [["path", { d: "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" }], ["circle", { cx: "12", cy: "10", r: "3" }]],
-  music: [["path", { d: "M9 18V5l12-2v13" }], ["circle", { cx: "6", cy: "18", r: "3" }], ["circle", { cx: "18", cy: "16", r: "3" }]],
-  mic: [["path", { d: "M12 19v3" }], ["path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }], ["rect", { x: "9", y: "2", width: "6", height: "13", rx: "3" }]],
-  "book-open": [["path", { d: "M12 5v16" }], ["path", { d: "M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" }]],
-  clock: [["circle", { cx: "12", cy: "12", r: "10" }], ["path", { d: "M12 6v6l4 2" }]],
-  "hand-heart": [["path", { d: "M11 14h2a2 2 0 0 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16" }], ["path", { d: "m14.45 13.39 5.05-4.694C20.196 8 21 6.85 21 5.75a2.75 2.75 0 0 0-4.797-1.837.276.276 0 0 1-.406 0A2.75 2.75 0 0 0 11 5.75c0 1.2.802 2.248 1.5 2.946L16 11.95" }], ["path", { d: "m2 15 6 6" }], ["path", { d: "m7 20 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a1 1 0 0 0-2.75-2.91" }]],
-  sparkles: [["path", { d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" }], ["path", { d: "M20 2v4" }], ["path", { d: "M22 4h-4" }], ["circle", { cx: "4", cy: "20", r: "2" }]],
-};
+export const preset = (id: string): Fill => GRADIENT_PRESETS.find((entry) => entry.id === id)!.fill;
 
 /** A page being built: each step adds one element and may give it how it comes in. */
-class Build {
+export class Build {
   page: Composition;
   /** Text grows a little smaller on narrow screens; the box fitting does the rest. */
   readonly scale: number;
@@ -93,8 +113,8 @@ class Build {
     return this.motion(animation);
   }
 
-  icon(name: keyof typeof ICONS, bounds: LayerBounds, color: string, animation?: Partial<LayerAnimation>) {
-    this.page = addIconElement(this.page, { name, nodes: ICONS[name]! }, bounds);
+  icon(name: TemplateIcon, bounds: LayerBounds, color: string, animation?: Partial<LayerAnimation>) {
+    this.page = addIconElement(this.page, { name, nodes: TEMPLATE_ICONS[name] }, bounds);
     const layer = this.page.layers.at(-1)!;
     this.page = assignLayerSource(this.page, layer.id, { ...layer.source, payload: { ...layer.source.payload, color } });
     return this.motion(animation);
@@ -106,10 +126,10 @@ class Build {
   }
 }
 
-const solid = (color: string): Fill => ({ kind: "solid", color });
-const rise = (delayMs = 0, durationMs = 600): Partial<LayerAnimation> => ({ entrance: "slide-up", durationMs, delayMs, easing: "ease-out" });
-const fade = (delayMs = 0, durationMs = 700): Partial<LayerAnimation> => ({ entrance: "fade", durationMs, delayMs, easing: "ease-out" });
-const fromLeft = (delayMs = 0, durationMs = 550): Partial<LayerAnimation> => ({ entrance: "slide-right", durationMs, delayMs, easing: "ease-out" });
+export const solid = (color: string): Fill => ({ kind: "solid", color });
+export const rise = (delayMs = 0, durationMs = 600): Partial<LayerAnimation> => ({ entrance: "slide-up", durationMs, delayMs, easing: "ease-out" });
+export const fade = (delayMs = 0, durationMs = 700): Partial<LayerAnimation> => ({ entrance: "fade", durationMs, delayMs, easing: "ease-out" });
+export const fromLeft = (delayMs = 0, durationMs = 550): Partial<LayerAnimation> => ({ entrance: "slide-right", durationMs, delayMs, easing: "ease-out" });
 
 export const PAGE_TEMPLATES: PageTemplate[] = [
   {

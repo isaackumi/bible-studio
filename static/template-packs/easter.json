@@ -1,0 +1,853 @@
+{
+ "templates": [
+  {
+   "id": "1-1",
+   "name": "Hosanna",
+   "category": "Easter",
+   "layout": "centred",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Palm Sunday",
+    "title": "Hosanna",
+    "subtitle": "Blessed is he that cometh in the name of the Lord",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "1-2",
+   "name": "Hosanna",
+   "category": "Easter",
+   "layout": "big-type",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Palm Sunday",
+    "title": "Hosanna",
+    "subtitle": "Blessed is he that cometh in the name of the Lord",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "1-3",
+   "name": "Hosanna",
+   "category": "Easter",
+   "layout": "big-icon",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Palm Sunday",
+    "title": "Hosanna",
+    "subtitle": "Blessed is he that cometh in the name of the Lord",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "2-1",
+   "name": "The Last Supper",
+   "category": "Easter",
+   "layout": "split-right",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Maundy Thursday",
+    "title": "The Last Supper",
+    "subtitle": "Communion service · 7:00 pm",
+    "icon": "wine"
+   }
+  },
+  {
+   "id": "2-2",
+   "name": "The Last Supper",
+   "category": "Easter",
+   "layout": "ribbon",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Maundy Thursday",
+    "title": "The Last Supper",
+    "subtitle": "Communion service · 7:00 pm",
+    "icon": "wine"
+   }
+  },
+  {
+   "id": "2-3",
+   "name": "The Last Supper",
+   "category": "Easter",
+   "layout": "centred",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Maundy Thursday",
+    "title": "The Last Supper",
+    "subtitle": "Communion service · 7:00 pm",
+    "icon": "wine"
+   }
+  },
+  {
+   "id": "3-1",
+   "name": "It Is Finished",
+   "category": "Easter",
+   "layout": "card",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Good Friday",
+    "title": "It Is Finished",
+    "subtitle": "John 19:30",
+    "icon": "cross"
+   }
+  },
+  {
+   "id": "3-2",
+   "name": "It Is Finished",
+   "category": "Easter",
+   "layout": "underline",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Good Friday",
+    "title": "It Is Finished",
+    "subtitle": "John 19:30",
+    "icon": "cross"
+   }
+  },
+  {
+   "id": "3-3",
+   "name": "It Is Finished",
+   "category": "Easter",
+   "layout": "split-right",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Good Friday",
+    "title": "It Is Finished",
+    "subtitle": "John 19:30",
+    "icon": "cross"
+   }
+  },
+  {
+   "id": "4-1",
+   "name": "He Is Risen",
+   "category": "Easter",
+   "layout": "circles",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Easter Sunday",
+    "title": "He Is Risen",
+    "subtitle": "He is risen indeed!",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "4-2",
+   "name": "He Is Risen",
+   "category": "Easter",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Easter Sunday",
+    "title": "He Is Risen",
+    "subtitle": "He is risen indeed!",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "4-3",
+   "name": "He Is Risen",
+   "category": "Easter",
+   "layout": "card",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Easter Sunday",
+    "title": "He Is Risen",
+    "subtitle": "He is risen indeed!",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "5-1",
+   "name": "Sunrise Service",
+   "category": "Easter",
+   "layout": "banner",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Easter morning",
+    "title": "Sunrise Service",
+    "rows": [
+     {
+      "icon": "clock",
+      "text": "6:00 am"
+     },
+     {
+      "icon": "map-pin",
+      "text": "Church garden"
+     }
+    ],
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "5-2",
+   "name": "Sunrise Service",
+   "category": "Easter",
+   "layout": "list",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Easter morning",
+    "title": "Sunrise Service",
+    "rows": [
+     {
+      "icon": "clock",
+      "text": "6:00 am"
+     },
+     {
+      "icon": "map-pin",
+      "text": "Church garden"
+     }
+    ],
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "5-3",
+   "name": "Sunrise Service",
+   "category": "Easter",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Easter morning",
+    "title": "Sunrise Service",
+    "rows": [
+     {
+      "icon": "clock",
+      "text": "6:00 am"
+     },
+     {
+      "icon": "map-pin",
+      "text": "Church garden"
+     }
+    ],
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "6-1",
+   "name": "The Tomb Is Empty",
+   "category": "Easter",
+   "layout": "split",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "title": "The Tomb Is Empty",
+    "subtitle": "Luke 24:6",
+    "icon": "flower-2"
+   }
+  },
+  {
+   "id": "6-2",
+   "name": "The Tomb Is Empty",
+   "category": "Easter",
+   "layout": "band",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "modern",
+   "copy": {
+    "title": "The Tomb Is Empty",
+    "subtitle": "Luke 24:6",
+    "icon": "flower-2"
+   }
+  },
+  {
+   "id": "6-3",
+   "name": "The Tomb Is Empty",
+   "category": "Easter",
+   "layout": "banner",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "title": "The Tomb Is Empty",
+    "subtitle": "Luke 24:6",
+    "icon": "flower-2"
+   }
+  },
+  {
+   "id": "7-1",
+   "name": "Services this week",
+   "category": "Easter",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Holy week",
+    "title": "Services this week",
+    "body": "Thursday · Communion, 7 pm\nFriday · Good Friday, 10 am\nSunday · Sunrise service, 6 am\nSunday · Easter celebration, 10 am",
+    "icon": "calendar"
+   }
+  },
+  {
+   "id": "7-2",
+   "name": "Services this week",
+   "category": "Easter",
+   "layout": "split",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Holy week",
+    "title": "Services this week",
+    "body": "Thursday · Communion, 7 pm\nFriday · Good Friday, 10 am\nSunday · Sunrise service, 6 am\nSunday · Easter celebration, 10 am",
+    "icon": "calendar"
+   }
+  },
+  {
+   "id": "7-3",
+   "name": "Services this week",
+   "category": "Easter",
+   "layout": "card",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Holy week",
+    "title": "Services this week",
+    "body": "Thursday · Communion, 7 pm\nFriday · Good Friday, 10 am\nSunday · Sunrise service, 6 am\nSunday · Easter celebration, 10 am",
+    "icon": "calendar"
+   }
+  },
+  {
+   "id": "8-1",
+   "name": "Because He Lives",
+   "category": "Easter",
+   "layout": "ribbon",
+   "palette": {
+    "name": "Ivory",
+    "bg": {
+     "kind": "solid",
+     "color": "#fbf7f1"
+    },
+    "ink": "#2c2a28",
+    "soft": "#77706a",
+    "accent": "#a88a5a",
+    "onAccent": "#ffffff",
+    "card": "#ffffffcc",
+    "deep": "#fbf7f1"
+   },
+   "fonts": "modern",
+   "copy": {
+    "title": "Because He Lives",
+    "subtitle": "Join us this Easter",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "8-2",
+   "name": "Because He Lives",
+   "category": "Easter",
+   "layout": "centred",
+   "palette": {
+    "name": "Lily",
+    "bg": {
+     "kind": "linear",
+     "angle": 170,
+     "stops": [
+      {
+       "color": "#fffaf0",
+       "at": 0
+      },
+      {
+       "color": "#f3e6c8",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#3b2a12",
+    "soft": "#7a6440",
+    "accent": "#c99a2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffffaa",
+    "deep": "#fffaf0"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "title": "Because He Lives",
+    "subtitle": "Join us this Easter",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "8-3",
+   "name": "Because He Lives",
+   "category": "Easter",
+   "layout": "big-type",
+   "palette": {
+    "name": "Passion",
+    "bg": {
+     "kind": "linear",
+     "angle": 160,
+     "stops": [
+      {
+       "color": "#0c0507",
+       "at": 0
+      },
+      {
+       "color": "#4a0d18",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#e7c3c8",
+    "accent": "#c9a24a",
+    "onAccent": "#0c0507",
+    "card": "#ffffff14",
+    "deep": "#0c0507"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "title": "Because He Lives",
+    "subtitle": "Join us this Easter",
+    "icon": "sparkles"
+   }
+  }
+ ]
+}

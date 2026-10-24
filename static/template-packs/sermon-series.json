@@ -1,0 +1,628 @@
+{
+ "templates": [
+  {
+   "id": "1-1",
+   "name": "Unshaken",
+   "category": "Sermon",
+   "layout": "centred",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "New series",
+    "title": "UNSHAKEN",
+    "subtitle": "Faith for uncertain times",
+    "icon": "mountain"
+   }
+  },
+  {
+   "id": "1-2",
+   "name": "Unshaken",
+   "category": "Sermon",
+   "layout": "big-type",
+   "palette": {
+    "name": "Slate",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#1d232c",
+       "at": 0
+      },
+      {
+       "color": "#3a4552",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#c3ccd8",
+    "accent": "#e8e2d0",
+    "onAccent": "#1d232c",
+    "card": "#ffffff14",
+    "deep": "#1d232c"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "New series",
+    "title": "UNSHAKEN",
+    "subtitle": "Faith for uncertain times",
+    "icon": "mountain"
+   }
+  },
+  {
+   "id": "1-3",
+   "name": "Unshaken",
+   "category": "Sermon",
+   "layout": "big-icon",
+   "palette": {
+    "name": "Ocean",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#031b2e",
+       "at": 0
+      },
+      {
+       "color": "#0b5f8a",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#cde7f5",
+    "accent": "#ffd166",
+    "onAccent": "#031b2e",
+    "card": "#ffffff1a",
+    "deep": "#031b2e"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "New series",
+    "title": "UNSHAKEN",
+    "subtitle": "Faith for uncertain times",
+    "icon": "mountain"
+   }
+  },
+  {
+   "id": "2-1",
+   "name": "Rooted",
+   "category": "Sermon",
+   "layout": "split-right",
+   "palette": {
+    "name": "Slate",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#1d232c",
+       "at": 0
+      },
+      {
+       "color": "#3a4552",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#c3ccd8",
+    "accent": "#e8e2d0",
+    "onAccent": "#1d232c",
+    "card": "#ffffff14",
+    "deep": "#1d232c"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Part 1",
+    "title": "Rooted",
+    "subtitle": "Colossians 2:7",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "2-2",
+   "name": "Rooted",
+   "category": "Sermon",
+   "layout": "ribbon",
+   "palette": {
+    "name": "Ocean",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#031b2e",
+       "at": 0
+      },
+      {
+       "color": "#0b5f8a",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#cde7f5",
+    "accent": "#ffd166",
+    "onAccent": "#031b2e",
+    "card": "#ffffff1a",
+    "deep": "#031b2e"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Part 1",
+    "title": "Rooted",
+    "subtitle": "Colossians 2:7",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "2-3",
+   "name": "Rooted",
+   "category": "Sermon",
+   "layout": "centred",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Part 1",
+    "title": "Rooted",
+    "subtitle": "Colossians 2:7",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "3-1",
+   "name": "The Parables",
+   "category": "Sermon",
+   "layout": "card",
+   "palette": {
+    "name": "Ocean",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#031b2e",
+       "at": 0
+      },
+      {
+       "color": "#0b5f8a",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#cde7f5",
+    "accent": "#ffd166",
+    "onAccent": "#031b2e",
+    "card": "#ffffff1a",
+    "deep": "#031b2e"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "The Parables",
+    "subtitle": "Stories Jesus told",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "3-2",
+   "name": "The Parables",
+   "category": "Sermon",
+   "layout": "underline",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "The Parables",
+    "subtitle": "Stories Jesus told",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "3-3",
+   "name": "The Parables",
+   "category": "Sermon",
+   "layout": "split-right",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "The Parables",
+    "subtitle": "Stories Jesus told",
+    "icon": "book-open"
+   }
+  },
+  {
+   "id": "4-1",
+   "name": "God is not finished with you",
+   "category": "Sermon",
+   "layout": "circles",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Big idea",
+    "title": "God is not finished with you",
+    "subtitle": "Philippians 1:6",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "4-2",
+   "name": "God is not finished with you",
+   "category": "Sermon",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Big idea",
+    "title": "God is not finished with you",
+    "subtitle": "Philippians 1:6",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "4-3",
+   "name": "God is not finished with you",
+   "category": "Sermon",
+   "layout": "card",
+   "palette": {
+    "name": "Slate",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#1d232c",
+       "at": 0
+      },
+      {
+       "color": "#3a4552",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#c3ccd8",
+    "accent": "#e8e2d0",
+    "onAccent": "#1d232c",
+    "card": "#ffffff14",
+    "deep": "#1d232c"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Big idea",
+    "title": "God is not finished with you",
+    "subtitle": "Philippians 1:6",
+    "icon": "sparkles"
+   }
+  },
+  {
+   "id": "5-1",
+   "name": "Psalms of Summer",
+   "category": "Sermon",
+   "layout": "banner",
+   "palette": {
+    "name": "Bold",
+    "bg": {
+     "kind": "solid",
+     "color": "#111111"
+    },
+    "ink": "#ffffff",
+    "soft": "#bdbdbd",
+    "accent": "#ff4d2e",
+    "onAccent": "#ffffff",
+    "card": "#ffffff12",
+    "deep": "#111111"
+   },
+   "fonts": "clean",
+   "copy": {
+    "eyebrow": "This month",
+    "title": "Psalms of Summer",
+    "subtitle": "Songs for every season of the soul",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "5-2",
+   "name": "Psalms of Summer",
+   "category": "Sermon",
+   "layout": "frame",
+   "palette": {
+    "name": "Slate",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#1d232c",
+       "at": 0
+      },
+      {
+       "color": "#3a4552",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#c3ccd8",
+    "accent": "#e8e2d0",
+    "onAccent": "#1d232c",
+    "card": "#ffffff14",
+    "deep": "#1d232c"
+   },
+   "fonts": "classic",
+   "copy": {
+    "eyebrow": "This month",
+    "title": "Psalms of Summer",
+    "subtitle": "Songs for every season of the soul",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "5-3",
+   "name": "Psalms of Summer",
+   "category": "Sermon",
+   "layout": "circles",
+   "palette": {
+    "name": "Ocean",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#031b2e",
+       "at": 0
+      },
+      {
+       "color": "#0b5f8a",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#cde7f5",
+    "accent": "#ffd166",
+    "onAccent": "#031b2e",
+    "card": "#ffffff1a",
+    "deep": "#031b2e"
+   },
+   "fonts": "caps",
+   "copy": {
+    "eyebrow": "This month",
+    "title": "Psalms of Summer",
+    "subtitle": "Songs for every season of the soul",
+    "icon": "sun"
+   }
+  },
+  {
+   "id": "6-1",
+   "name": "Fruit of the Spirit",
+   "category": "Sermon",
+   "layout": "list",
+   "palette": {
+    "name": "Slate",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#1d232c",
+       "at": 0
+      },
+      {
+       "color": "#3a4552",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#c3ccd8",
+    "accent": "#e8e2d0",
+    "onAccent": "#1d232c",
+    "card": "#ffffff14",
+    "deep": "#1d232c"
+   },
+   "fonts": "engraved",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "Fruit of the Spirit",
+    "body": "Love · Joy · Peace\nPatience · Kindness · Goodness\nFaithfulness · Gentleness · Self-control",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "6-2",
+   "name": "Fruit of the Spirit",
+   "category": "Sermon",
+   "layout": "side-bar",
+   "palette": {
+    "name": "Ocean",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#031b2e",
+       "at": 0
+      },
+      {
+       "color": "#0b5f8a",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#cde7f5",
+    "accent": "#ffd166",
+    "onAccent": "#031b2e",
+    "card": "#ffffff1a",
+    "deep": "#031b2e"
+   },
+   "fonts": "modern",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "Fruit of the Spirit",
+    "body": "Love · Joy · Peace\nPatience · Kindness · Goodness\nFaithfulness · Gentleness · Self-control",
+    "icon": "leaf"
+   }
+  },
+  {
+   "id": "6-3",
+   "name": "Fruit of the Spirit",
+   "category": "Sermon",
+   "layout": "split",
+   "palette": {
+    "name": "Sunrise",
+    "bg": {
+     "kind": "linear",
+     "angle": 180,
+     "stops": [
+      {
+       "color": "#2a1b4a",
+       "at": 0
+      },
+      {
+       "color": "#c2547a",
+       "at": 60
+      },
+      {
+       "color": "#ffb36b",
+       "at": 100
+      }
+     ]
+    },
+    "ink": "#ffffff",
+    "soft": "#ffe3cf",
+    "accent": "#ffe08a",
+    "onAccent": "#2a1b4a",
+    "card": "#ffffff1f",
+    "deep": "#2a1b4a"
+   },
+   "fonts": "editorial",
+   "copy": {
+    "eyebrow": "Series",
+    "title": "Fruit of the Spirit",
+    "body": "Love · Joy · Peace\nPatience · Kindness · Goodness\nFaithfulness · Gentleness · Self-control",
+    "icon": "leaf"
+   }
+  }
+ ]
+}

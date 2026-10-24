@@ -168,6 +168,15 @@ export default {
     if (path === "/app") return Response.redirect(`${url.origin}/app/`, 301);
     if (path.startsWith("/app/") && env.ASSETS) {
       const file = await env.ASSETS.fetch(request);
+      // Template packs: the desktop app downloads them from here, so a new pack reaches every church
+      // without a release.
+      if (path.startsWith("/app/template-packs/") && file.ok) {
+        const headers = new Headers(file.headers);
+        headers.set("access-control-allow-origin", "*");
+        headers.set("cache-control", "public, max-age=3600");
+        return new Response(file.body, { status: file.status, headers });
+      }
+      if (path.startsWith("/app/template-packs/")) return new Response("Not found", { status: 404, headers: { "access-control-allow-origin": "*" } });
       return file.status === 404 ? env.ASSETS.fetch(new Request(`${url.origin}/app/`, request)) : file;
     }
     if (path === "/paddle/webhook") return handle(request, env, fetch, Date.now(), apiConfig(env));

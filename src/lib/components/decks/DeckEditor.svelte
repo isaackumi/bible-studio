@@ -23,6 +23,8 @@
   import PageCanvas from "./PageCanvas.svelte";
   import GradientEditor from "./GradientEditor.svelte";
   import TemplateGallery from "./TemplateGallery.svelte";
+  import type { StudioActions, StudioPanel } from "./StudioPanels.svelte";
+  import { assignLayerSource } from "../../domain/composition";
   import { encodeFill, sanitizeFill, type Fill } from "../../domain/fill";
   import type { IconNode } from "../../domain/icon";
   import { t } from "../../i18n/core";
@@ -165,8 +167,19 @@
     selectedId = next.layers.at(-1)?.id ?? null;
     imageMenu = false;
   }
-  // Opened from search as "New page from a template": the gallery comes up straight away.
-  let templates = $state(untrack(() => startWith === "templates"));
+  /** The full-size template gallery, over the studio. */
+  let templates = $state(false);
+  /** The panel open beside the canvas; Templates first, so a church sees them straight away. */
+  let panel = $state<StudioPanel | null>("templates");
+  /** The template browser, loaded with the panel (it carries every template). */
+  const browser = import("./TemplateBrowser.svelte");
+  /** The other panels (ready-made text, shapes, icons, backgrounds), loaded with the first one opened. */
+  let panels = $state<Promise<typeof import("./StudioPanels.svelte")> | null>(null);
+  $effect(() => {
+    if (panel && panel !== "templates" && !panels) panels = import("./StudioPanels.svelte");
+  });
+  /** Where a chosen template goes: a new page after this one, or in place of this one. */
+  let placeTemplate = $state<"new" | "replace">(untrack(() => (startWith !== "templates" && (draft.pages[0]?.layers.length ?? 0) === 0 && draft.pages.length === 1 ? "replace" : "new")));
   /** An element copied with ⌘C / Ctrl+C, pasted with ⌘V on any page of this deck. */
   let clipboard: CompositionLayer | null = null;
   /** The church's screen shape, so templates are laid out for it. */
@@ -176,10 +189,45 @@
   });
   function addTemplatePage(next: Composition) {
     templates = false;
+    selectedId = null;
+    if (placeTemplate === "replace") {
+      commitPage({ ...next, id: page.id });
+      return;
+    }
     commitDeck(insertPage(draft, next, pageIndex));
     pageIndex = pageIndex + 1;
-    selectedId = null;
   }
+  const actions: StudioActions = {
+    addText: (pieces) => {
+      let next = page;
+      for (const piece of pieces) next = addTextElement(next, piece.words, piece.bounds, piece.style, piece.name);
+      const added = next.layers.slice(page.layers.length).map((layer) => layer.id);
+      if (added.length > 1) next = setLayerGroup(next, added, `group:${Math.random().toString(36).slice(2, 8)}`);
+      commitPage(next);
+      pickLayer(added[0] ?? null);
+    },
+    addShape: (kind, fill, bounds, extra = {}) => {
+      let next = addShapeElement(page, kind, encodeFill(fill), bounds);
+      const layer = next.layers.at(-1)!;
+      if (Object.keys(extra).length) next = assignLayerSource(next, layer.id, { ...layer.source, payload: { ...layer.source.payload, ...extra } });
+      commitPage(next);
+      selectedId = layer.id;
+    },
+    addIcon: (icon) => addIcon(icon),
+    openIcons: () => void openIcons(),
+    addQr: () => addQr(),
+    addImage: (asset) => addImage(asset),
+    setImageBackground: (asset) => setBackground({ type: "image", assetId: asset.id, imageUrl: mediaUrl(session.media.find((entry) => entry.id === asset.id) ?? null) ?? "" }),
+    setFill: (fill) => setPageFill(fill),
+    setClear: () => setClear(),
+  };
+  const RAIL: Array<{ id: StudioPanel; label: string; icon: string }> = [
+    { id: "templates", label: "Templates", icon: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" },
+    { id: "text", label: "Text", icon: "M4 7V4h16v3M9 20h6M12 4v16" },
+    { id: "elements", label: "Elements", icon: "M8.3 10a.7.7 0 0 1-.6-1L11.4 3a.7.7 0 0 1 1.2 0L16.3 9a.7.7 0 0 1-.6 1zM3 14h7v7H3zM17.5 21a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" },
+    { id: "pictures", label: "Pictures", icon: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" },
+    { id: "background", label: "Background", icon: "M12 22a10 10 0 1 1 0-20c5.5 0 10 4 10 9a5 5 0 0 1-5 5h-1.8a1.5 1.5 0 0 0-1.1 2.5A1.5 1.5 0 0 1 12 22zM7.5 10.5h.01M12 7.5h.01M16.5 10.5h.01" },
+  ];
 
   /** The icon picker, loaded only when opened (with the whole icon set). */
   let iconPicker = $state<null | typeof import("./IconPicker.svelte").default>(null);
@@ -287,6 +335,7 @@
       event.preventDefault();
       // A window over the studio closes first; the studio only on the next Escape.
       if (templates) templates = false;
+      else if (panel && !selectedId && !editingText && !iconPicker) panel = null;
       else if (iconPicker) iconPicker = null;
       else if (editingText) editingText = null;
       else if (selectedId) selectedId = null;
@@ -311,40 +360,39 @@
     <button type="button" class="close" class:warn={confirmClose} onclick={close}>{confirmClose ? t("Discard changes?") : t("Close")}</button>
   </header>
 
-  <div class="body">
-    <aside class="pages" aria-label={t("Pages")}>
-      <ol>
-        {#each draft.pages as entry, index (entry.id)}
-          <li
-            class:on={index === pageIndex}
-            class:drop={dragFrom !== null && dragFrom !== index}
-            draggable="true"
-            ondragstart={() => (dragFrom = index)}
-            ondragover={(event) => event.preventDefault()}
-            ondrop={(event) => {
-              event.preventDefault();
-              if (dragFrom !== null && dragFrom !== index) {
-                commitDeck(movePage(draft, dragFrom, index));
-                pageIndex = index;
-              }
-              dragFrom = null;
-            }}
-            ondragend={() => (dragFrom = null)}
-          >
-            <button type="button" class="page" aria-label={t("Page {index}", { index: index + 1 })} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
-              <span class="num">{index + 1}</span>
-              <DeckThumb page={entry} />
-            </button>
-            <div class="page-actions">
-              <button type="button" aria-label={t("Duplicate page {index}", { index: index + 1 })} onclick={() => commitDeck(duplicatePage(draft, index))}>{t("Duplicate")}</button>
-              <button type="button" aria-label={t("Delete page {index}", { index: index + 1 })} disabled={draft.pages.length <= 1} onclick={() => { commitDeck(removePage(draft, index)); pageIndex = Math.max(0, Math.min(pageIndex, draft.pages.length - 1)); }}>{t("Delete")}</button>
-            </div>
-          </li>
-        {/each}
-      </ol>
-      <button type="button" class="add-page" onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>{t("+ Add new page")}</button>
-      <button type="button" class="add-page template" onclick={() => (templates = true)}>{t("From a template")}</button>
-    </aside>
+  <div class="body" class:panel-open={!!panel}>
+    <nav class="rail" aria-label={t("Studio tools")}>
+      {#each RAIL as item (item.id)}
+        <button type="button" class:on={panel === item.id} aria-pressed={panel === item.id} onclick={() => (panel = panel === item.id ? null : item.id)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={item.icon} /></svg>
+          <span>{t(item.label)}</span>
+        </button>
+      {/each}
+    </nav>
+
+    {#if panel}
+      <aside class="side" aria-label={t(RAIL.find((item) => item.id === panel)?.label ?? "")}>
+        <div class="side-head">
+          <h2>{t(RAIL.find((item) => item.id === panel)?.label ?? "")}</h2>
+          <button type="button" class="side-close" aria-label={t("Close panel")} onclick={() => (panel = null)}>‹</button>
+        </div>
+        {#if panel === "templates"}
+          <div class="place" role="radiogroup" aria-label={t("Where a template goes")}>
+            <button type="button" role="radio" aria-checked={placeTemplate === "new"} class:on={placeTemplate === "new"} onclick={() => (placeTemplate = "new")}>{t("Add as a new page")}</button>
+            <button type="button" role="radio" aria-checked={placeTemplate === "replace"} class:on={placeTemplate === "replace"} onclick={() => (placeTemplate = "replace")}>{t("Replace this page")}</button>
+          </div>
+          {#await browser}
+            <p class="loading">{t("Loading templates…")}</p>
+          {:then module}
+            <module.default aspect={screenAspect} onpick={addTemplatePage} onexpand={() => (templates = true)} />
+          {/await}
+        {:else}
+          <div class="side-scroll">
+            {#await panels then module}{#if module}<module.default {panel} {actions} />{/if}{/await}
+          </div>
+        {/if}
+      </aside>
+    {/if}
 
     <main class="work">
       <div class="toolbar" role="toolbar" aria-label={t("Add to page")}>
@@ -367,6 +415,8 @@
           {/if}
         </span>
         <button type="button" onclick={addQr}>{t("QR code")}</button>
+        <span class="divider"></span>
+        <button type="button" class="tpl" onclick={() => (templates = true)}>{t("Templates")}</button>
       </div>
       <div class="canvas-area">
         <PageCanvas
@@ -380,11 +430,46 @@
           onedittext={(id) => (editingText = id)}
         />
       </div>
-      <label class="zoom">
-        <span>{t("Zoom")}</span>
-        <input type="range" min="40" max="100" step="5" aria-label={t("Zoom")} bind:value={zoom} />
-        <span>{zoom}%</span>
-      </label>
+      <div class="strip-bar">
+        <label class="zoom">
+          <span>{t("Zoom")}</span>
+          <input type="range" min="40" max="100" step="5" aria-label={t("Zoom")} bind:value={zoom} />
+          <span>{zoom}%</span>
+        </label>
+        <span class="page-of">{t("Page {index} of {count}", { index: pageIndex + 1, count: draft.pages.length })}</span>
+        <span class="page-actions">
+          <button type="button" onclick={() => commitDeck(duplicatePage(draft, pageIndex))}>{t("Duplicate page")}</button>
+          <button type="button" disabled={draft.pages.length <= 1} onclick={() => { commitDeck(removePage(draft, pageIndex)); pageIndex = Math.max(0, Math.min(pageIndex, draft.pages.length - 1)); selectedId = null; }}>{t("Delete page")}</button>
+        </span>
+      </div>
+      <ol class="pages" aria-label={t("Pages")}>
+        {#each draft.pages as entry, index (entry.id)}
+          <li
+            class:on={index === pageIndex}
+            class:drop={dragFrom !== null && dragFrom !== index}
+            draggable="true"
+            ondragstart={() => (dragFrom = index)}
+            ondragover={(event) => event.preventDefault()}
+            ondrop={(event) => {
+              event.preventDefault();
+              if (dragFrom !== null && dragFrom !== index) {
+                commitDeck(movePage(draft, dragFrom, index));
+                pageIndex = index;
+              }
+              dragFrom = null;
+            }}
+            ondragend={() => (dragFrom = null)}
+          >
+            <button type="button" class="page" style:--aspect={screenAspect} aria-label={t("Page {index}", { index: index + 1 })} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
+              <DeckThumb page={entry} />
+            </button>
+            <span class="num">{index + 1}</span>
+          </li>
+        {/each}
+        <li class="add">
+          <button type="button" class="add-page" aria-label={t("Add a blank page")} title={t("Add a blank page")} onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>+</button>
+        </li>
+      </ol>
     </main>
 
     <aside class="inspect" aria-label={t("Inspector")}>
@@ -493,18 +578,38 @@
   .save:disabled { opacity: 0.45; cursor: default; }
   .close { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
   .close.warn { background: #c8102e; border-color: #c8102e; color: #fff; }
-  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; }
-  .pages { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
-  .pages ol { list-style: none; margin: 0; padding: 10px; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
-  .pages li { border-radius: 10px; padding: 6px; border: 1px solid transparent; }
-  .pages li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-  .page { display: flex; gap: 6px; width: 100%; border: 0; background: none; color: var(--ink); cursor: pointer; padding: 0; text-align: left; }
-  .num { width: 16px; color: var(--muted); }
-  .page-actions { display: flex; gap: 4px; margin-top: 4px; padding-left: 22px; }
-  .page-actions button { font-size: 11px; min-height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--field); color: var(--muted); cursor: pointer; }
-  .add-page { margin: 10px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
-  .add-page.template { margin-top: 0; background: transparent; }
-  .work { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 20px; gap: 12px; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 0) 0 0 / 22px 22px; }
+  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr) 300px; }
+  .body.panel-open { grid-template-columns: 72px 340px minmax(0, 1fr) 300px; }
+  .rail { display: flex; flex-direction: column; gap: 4px; padding: 10px 6px; border-right: 1px solid var(--line); background: var(--panel); }
+  .rail button { display: grid; justify-items: center; gap: 4px; padding: 9px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+  .rail button svg { width: 22px; height: 22px; }
+  .rail button:hover { color: var(--ink); background: var(--field); }
+  .rail button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--panel); }
+  .side-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; }
+  .side-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+  .side-close { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: 16px; cursor: pointer; }
+  .side-scroll { flex: 1; min-height: 0; overflow: auto; }
+  .place { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 10px 14px 0; padding: 3px; border-radius: 10px; background: var(--field); }
+  .place button { height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .place button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); }
+  .loading { margin: 14px; color: var(--muted); font-size: 12px; }
+  .pages { list-style: none; margin: 0; padding: 4px 2px 2px; display: flex; gap: 10px; overflow-x: auto; flex: none; align-items: flex-end; }
+  .pages li { position: relative; flex: none; display: grid; justify-items: center; gap: 3px; }
+  .pages li.drop .page { outline: 1px dashed var(--accent); }
+  .page { display: block; width: 128px; aspect-ratio: var(--aspect, 16 / 9); max-height: 110px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; cursor: pointer; }
+  .pages li.on .page { border-color: var(--accent); }
+  .num { font-size: 11px; color: var(--muted); }
+  .add-page { width: 56px; height: 72px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; margin-bottom: 18px; }
+  .add-page:hover { color: var(--ink); border-color: var(--accent); }
+  .strip-bar { display: flex; align-items: center; gap: 14px; flex: none; }
+  .page-of { flex: 1; text-align: center; color: var(--muted); font-size: 12px; }
+  .page-actions { display: flex; gap: 6px; }
+  .page-actions button { font-size: 11.5px; min-height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--field); color: var(--muted); cursor: pointer; }
+  .page-actions button:disabled { opacity: 0.45; cursor: default; }
+  .divider { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--line); }
+  .toolbar > button.tpl { color: var(--accent); }
+  .work { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 12px 18px 10px; gap: 10px; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 0) 0 0 / 22px 22px; }
   .toolbar { align-self: center; display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
   .toolbar > button, .menu-wrap > button { min-height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); cursor: pointer; font-weight: 600; }
   .toolbar > button:hover, .menu-wrap > button:hover { background: var(--field); }
@@ -514,7 +619,7 @@
   .menu button:hover { background: var(--field); }
   .canvas-area { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; }
   .canvas-area > :global(*) { flex: 1; }
-  .zoom { align-self: center; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .zoom { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .inspect { border-left: 1px solid var(--line); padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
   .inspect h3 { margin: 0; font-size: 14px; }
   .field-row { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
@@ -529,7 +634,7 @@
   .text-edit textarea { border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); padding: 8px; font: 16px/1.4 var(--font-ui); resize: vertical; }
   .text-edit button { align-self: flex-end; min-height: 32px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer; }
   :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
-  @media (max-width: 1100px) { .body { grid-template-columns: 180px minmax(0, 1fr) 260px; } }
+  @media (max-width: 1280px) { .body.panel-open { grid-template-columns: 72px 300px minmax(0, 1fr) 260px; } .body { grid-template-columns: 72px minmax(0, 1fr) 260px; } }
   .align-together { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .align-together button { height: 28px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
   .align-together button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
