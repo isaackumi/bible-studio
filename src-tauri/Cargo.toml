@@ -26,6 +26,8 @@ ureq = "3"
 # Licensing: checking the server's signed leases (Ed25519) and hashing the hardware id.
 ring = "0.17"
 sha2 = "0.10"
+# The .churchstudio file (bundle.rs): media stored as is, the library deflated.
+zip = { version = "4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 base64 = "0.22"
 reflink-copy = "0.1"
 fs4 = "1"
