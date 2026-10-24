@@ -1,6 +1,6 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { formatBytes, moveFileName, MOVE_EXTENSION } from "../../app/move";
+  import { formatBytes, movedAt, moveFileName, MOVE_EXTENSION } from "../../app/move";
   import { t } from "../../i18n/core";
   import { isDesktop } from "../../platform/runtime";
 
@@ -69,7 +69,7 @@
       {#if peek}
         <div class="row">
           <div class="row-copy">
-            <strong>{t("From {computer}, saved {date}", { computer: peek.computer || t("another computer"), date: new Date(peek.createdAt).toLocaleDateString() })}</strong>
+            <strong>{t("From {computer}, saved {date}", { computer: peek.computer || t("another computer"), date: movedAt(peek.createdAt).toLocaleDateString() })}</strong>
             <span>{t("{files} media files, {size}. Everything here stays; this adds to it.", { files: peek.media, size: formatBytes(peek.bytes) })}</span>
           </div>
           <div class="row-end">

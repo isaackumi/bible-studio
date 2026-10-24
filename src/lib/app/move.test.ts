@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMoveLibrary, formatBytes, moveFileName, restoreMoveLibrary } from "./move";
+import { buildMoveLibrary, formatBytes, movedAt, moveFileName, restoreMoveLibrary } from "./move";
 
 const ID = "0b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b";
 const day = new Date(2026, 9, 24, 12);
@@ -11,6 +11,12 @@ describe("moving to a new computer", () => {
 
   it("moveFileName without a church name", () => {
     expect(moveFileName("  ", day)).toBe("Church Studio 2026-10-24.churchstudio");
+  });
+
+  it("movedAt reads the file's time in seconds, and an ISO date too", () => {
+    expect(movedAt("1792800000").toISOString()).toBe("2026-10-24T00:00:00.000Z");
+    expect(movedAt("2026-10-24T10:00:00Z").toISOString()).toBe("2026-10-24T10:00:00.000Z");
+    expect(Number.isNaN(movedAt("garbage").getTime())).toBe(true);
   });
 
   it("formatBytes reads like a file size", () => {

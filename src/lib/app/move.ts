@@ -37,3 +37,8 @@ export function formatBytes(bytes: number): string {
   if (bytes >= GB) return `${(bytes / GB).toFixed(bytes < 10 * GB ? 1 : 0)} GB`;
   return `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
 }
+
+/** When the file was saved: the app writes seconds since 1970; an ISO date reads too. */
+export function movedAt(createdAt: string): Date {
+  return /^\d+$/.test(createdAt) ? new Date(Number(createdAt) * 1000) : new Date(createdAt);
+}
