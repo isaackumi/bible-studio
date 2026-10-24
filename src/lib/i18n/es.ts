@@ -4319,6 +4319,7 @@ export const es: Readonly<Record<string, string>> = {
   "{service} stopped answering: {reason}": "{service} dejó de responder: {reason}",
   "{service} stopped answering. Check the internet connection.": "{service} dejó de responder. Revisa la conexión a internet.",
   "{service} reconnecting…": "Reconectando con {service}…",
+  "The microphone is busy in another app (a call or a recording). Close it there, then listen again.": "Otra aplicación está usando el micrófono (una llamada o una grabación). Ciérrala y vuelve a escuchar.",
   "The microphone is blocked. Allow it for this page, then listen again.": "El micrófono está bloqueado. Permítelo en esta página y vuelve a escuchar.",
   "No microphone was found.": "No se encontró ningún micrófono.",
   "{service} refused the connection. Check the key in Settings › Audio & voice, and that this network allows it.": "{service} rechazó la conexión. Revisa la clave en Ajustes › Audio y voz, y que esta red lo permita.",
@@ -4823,4 +4824,5 @@ export const es: Readonly<Record<string, string>> = {
   "{n} question waiting": "{n} pregunta en espera",
   "{n} questions waiting": "{n} preguntas en espera",
   "{n} s left": "Quedan {n} s",
+  "Church Studio sets Windows' sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.": "Church Studio ajusta la salida de sonido de Windows, así la música, los videos y YouTube suenan ahí, y devuelve la anterior cuando Church Studio se cierra.",
 };

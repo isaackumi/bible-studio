@@ -107,6 +107,16 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Whisper (whisper.cpp) built for every customer's processor, not the build machine's: by
+          # default it uses whatever the runner has (AVX-512 on some), which crashes on most church
+          # PCs. AVX2 with FMA and F16C runs on nearly every PC from 2013 on; the app checks for it
+          # before Accurate starts (whisper.rs), so an older one is told, not crashed. On Apple
+          # silicon the x86 flags do nothing.
+          GGML_NATIVE: "OFF"
+          GGML_AVX: "ON"
+          GGML_AVX2: "ON"
+          GGML_FMA: "ON"
+          GGML_F16C: "ON"
         with:
           # Into the one draft made above. It stays a draft until every platform is in (publish
           # below): installed copies and the download buttons read the latest release.

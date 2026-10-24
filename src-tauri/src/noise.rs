@@ -150,17 +150,20 @@ impl Drop for Feed {
 /// Open the default microphone and run the chain on its own thread. `sink` gets each cleaned
 /// 16 kHz chunk as little-endian 16-bit PCM and returns false to stop (the helper closed);
 /// `levels` gets (room, cleaned) loudness about twelve times a second.
+/// `lost` is told once if the microphone goes away mid-run (unplugged, or Windows took it).
 pub fn start(
     mix: f32,
     mut sink: impl FnMut(&[u8]) -> bool + Send + 'static,
     mut levels: impl FnMut(f32, f32) + Send + 'static,
+    lost: impl FnOnce(String) + Send + 'static,
 ) -> Result<Feed, String> {
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
     let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
     let thread = std::thread::spawn(move || {
         let (tx, rx) = mpsc::channel::<Vec<f32>>();
-        let (stream, rate) = match open_microphone(tx) {
+        let failed: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let (stream, rate) = match open_microphone(tx, failed.clone()) {
             Ok(opened) => opened,
             Err(message) => {
                 let _ = ready_tx.send(Err(message));
@@ -173,8 +176,30 @@ pub fn start(
         let mut bytes = Vec::new();
         let (mut room_sq, mut room_n, mut clean_sq, mut clean_n) = (0.0f32, 0usize, 0.0f32, 0usize);
         let mut last_level = Instant::now();
+        // A working microphone sends something (silence too) many times a second: nothing for a
+        // few seconds, or an error from the device, means it has gone.
+        let mut last_audio = Instant::now();
+        let mut lost = Some(lost);
         while !flag.load(Ordering::SeqCst) {
-            let Ok(chunk) = rx.recv_timeout(Duration::from_millis(100)) else { continue };
+            let reason = failed.lock().unwrap_or_else(|poison| poison.into_inner()).take().or_else(|| {
+                (last_audio.elapsed() > Duration::from_secs(5)).then(|| "The microphone stopped sending sound (unplugged, or taken by another app).".to_string())
+            });
+            if let Some(reason) = reason {
+                log::warn!("microphone lost: {reason}");
+                if let Some(tell) = lost.take() {
+                    tell(reason);
+                }
+                break;
+            }
+            let chunk = match rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(chunk) => chunk,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    *failed.lock().unwrap_or_else(|poison| poison.into_inner()) = Some("The microphone stopped.".into());
+                    continue;
+                }
+            };
+            last_audio = Instant::now();
             cleaned.clear();
             cleaner.push(&chunk, &mut cleaned);
             room_sq += chunk.iter().map(|s| s * s).sum::<f32>();
@@ -214,8 +239,9 @@ pub fn start(
     }
 }
 
-/// The default input, downmixed to mono (-1..1) and sent as it arrives.
-fn open_microphone(tx: mpsc::Sender<Vec<f32>>) -> Result<(cpal::Stream, f64), String> {
+/// The default input as mono (-1..1), sent as it arrives. An error from the device is kept in
+/// `failed` for the reading loop to report.
+fn open_microphone(tx: mpsc::Sender<Vec<f32>>, failed: Arc<Mutex<Option<String>>>) -> Result<(cpal::Stream, f64), String> {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     let host = cpal::default_host();
     let device = host.default_input_device().ok_or("No microphone is available.")?;
@@ -224,9 +250,26 @@ fn open_microphone(tx: mpsc::Sender<Vec<f32>>) -> Result<(cpal::Stream, f64), St
     let rate = f64::from(config.sample_rate().0);
     let format = config.sample_format();
     let stream_config: cpal::StreamConfig = config.into();
-    let on_error = |error| log::warn!("microphone stream: {error}");
+    let on_error = move |error: cpal::StreamError| {
+        log::warn!("microphone stream: {error}");
+        // The device is gone (unplugged, or Windows switched it off): listening stops and says so.
+        if matches!(error, cpal::StreamError::DeviceNotAvailable) {
+            *failed.lock().unwrap_or_else(|poison| poison.into_inner()) = Some("The microphone was disconnected.".into());
+        }
+    };
+    /// One channel's worth: the loudest channel in this buffer, not an average of all of them. A
+    /// church mixer's USB feed has 18 or 32 channels with the pastor on one; averaging them made
+    /// speech 25–30 dB too quiet to hear. A mono or stereo microphone sounds the same either way.
     fn mono<T: Copy>(data: &[T], channels: usize, to_f32: impl Fn(T) -> f32) -> Vec<f32> {
-        data.chunks(channels).map(|frame| frame.iter().map(|s| to_f32(*s)).sum::<f32>() / channels as f32).collect()
+        if channels <= 1 {
+            return data.iter().map(|s| to_f32(*s)).collect();
+        }
+        let frames = data.len() / channels;
+        let loudest = (0..channels)
+            .map(|channel| (channel, (0..frames).map(|frame| to_f32(data[frame * channels + channel]).powi(2)).sum::<f32>()))
+            .fold((0, -1.0f32), |best, next| if next.1 > best.1 { next } else { best })
+            .0;
+        (0..frames).map(|frame| to_f32(data[frame * channels + loudest])).collect()
     }
     let stream = match format {
         cpal::SampleFormat::F32 => device.build_input_stream(
@@ -273,9 +316,14 @@ pub fn start_test(app: tauri::AppHandle, filter: Filter) -> Result<(), String> {
     stop_test();
     use tauri::Emitter;
     // Off still runs the chain at zero mix, so both meters move and match.
-    let feed = start(filter.mix(), |_| true, move |room, clean| {
-        let _ = app.emit("noise-test", TestLevel { room, clean });
-    })?;
+    let feed = start(
+        filter.mix(),
+        |_| true,
+        move |room, clean| {
+            let _ = app.emit("noise-test", TestLevel { room, clean });
+        },
+        |reason| log::warn!("mic check: {reason}"),
+    )?;
     *TEST.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(feed);
     Ok(())
 }
@@ -377,6 +425,7 @@ mod tests {
                 true
             },
             move |room, clean| seen.lock().unwrap().push((room, clean)),
+            |reason| panic!("microphone lost: {reason}"),
         )
         .expect("microphone opens");
         std::thread::sleep(Duration::from_secs(2));

@@ -54,8 +54,13 @@ $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
 Emit @{ kind = "status"; message = "Listening. Speak a reference or read a verse." }
 
 $lastLevel = [DateTime]::MinValue
+# Church Studio's process: if it is gone (a crash, or quit without stopping), this ends too, so the
+# microphone is never left open behind it.
+$parent = 0
+[int]::TryParse("$env:CHURCH_STUDIO_PARENT", [ref]$parent) | Out-Null
 while ($true) {
   $event = Wait-Event -Timeout 1
+  if ($parent -gt 0 -and -not (Get-Process -Id $parent -ErrorAction SilentlyContinue)) { exit 0 }
   if (-not $event) { continue }
   try {
     switch ($event.SourceIdentifier) {
@@ -68,7 +73,11 @@ while ($true) {
         Emit @{ kind = "phrase"; text = $result.Text; final = $true; alternatives = $alternatives }
       }
       "done" {
+        # With the app's cleaned audio, the stream ending is how listening stops. Hearing the
+        # microphone itself, it means Windows lost it (unplugged, or taken by another app).
         if ($Stdin) { exit 0 }
+        Emit @{ kind = "error"; message = "Windows stopped hearing the microphone (unplugged, or taken by another app)." }
+        exit 1
       }
       "lvl" {
         if ($Stdin) { break }

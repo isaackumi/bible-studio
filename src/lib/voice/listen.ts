@@ -433,7 +433,9 @@ export type AccurateProgress = { received: number; total: number; done: boolean;
 
 export async function accurateModel(): Promise<AccurateModel> {
   if (!isDesktop()) return { installed: false, downloading: false, bytes: 0, unsupported: true };
-  return invoke<AccurateModel>("whisper_status");
+  // An older processor cannot run it: the download is not offered at all.
+  const status = await invoke<AccurateModel & { supported?: boolean }>("whisper_status");
+  return { installed: status.installed, downloading: status.downloading, bytes: status.bytes, unsupported: status.supported === false };
 }
 
 /** Download the model; `onProgress` hears each step and the end (with an error, if it failed). */

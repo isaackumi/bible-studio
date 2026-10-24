@@ -18,7 +18,21 @@ pub fn open(app: &AppHandle) -> Result<(Db, Option<String>), String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("church.db");
     let resources = resource_dir(app);
-    match open_at(&path, &resources) {
+    // Antivirus or a backup reading the file at that moment (common on Windows) locks it for a
+    // second or two: wait it out before setting a good library aside. A damaged file is set aside
+    // at once; anything else after a few tries, as before.
+    let mut opened = open_at(&path, &resources);
+    for _ in 0..4 {
+        match &opened {
+            Err(error) if !damaged(error) => {
+                log::warn!("The library is busy, trying again: {error}");
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                opened = open_at(&path, &resources);
+            }
+            _ => break,
+        }
+    }
+    match opened {
         Ok(conn) => Ok((Db(Mutex::new(conn)), None)),
         Err(error) => {
             log::error!("The library could not be opened: {error}");
@@ -33,9 +47,16 @@ pub fn open(app: &AppHandle) -> Result<(Db, Option<String>), String> {
     }
 }
 
+/// SQLite's words for a file that is not (or no longer) a readable database.
+fn damaged(error: &str) -> bool {
+    let error = error.to_lowercase();
+    error.contains("not a database") || error.contains("malformed") || error.contains("encrypted") || error.contains("corrupt")
+}
+
 fn open_at(path: &Path, resources: &Path) -> Result<Connection, String> {
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
-    conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 3000;")
+    // The wait for a lock first, so switching to WAL waits too instead of failing at once.
+    conn.execute_batch("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
         .map_err(|e| e.to_string())?;
     migrate_keeping_copy(&conn, path)?;
     // The bundled Bibles: a missing one is logged, not fatal (the others, and downloads, still work).

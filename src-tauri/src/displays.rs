@@ -3,9 +3,13 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Monitor, PhysicalPosition, WebviewUrl,
+    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder,
 };
+#[cfg(target_os = "windows")]
+use tauri::PhysicalSize;
+#[cfg(not(target_os = "windows"))]
+use tauri::{LogicalPosition, LogicalSize};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -151,9 +155,15 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
     let assigned = lock(&output.audience_key).clone();
     let candidates = monitors
         .iter()
-        .map(|monitor| DisplayCandidate {
-            key: display_key_in(monitor, &monitors),
-            primary: Some(monitor_key(monitor).as_str()) == primary_key.as_deref(),
+        .map(|monitor| {
+            let key = display_key_in(monitor, &monitors);
+            let size = monitor.size();
+            let old = display_key(&raw_monitor_name(monitor), size.width, size.height, monitor.scale_factor());
+            DisplayCandidate {
+                alias: (old != key).then_some(old),
+                key,
+                primary: Some(monitor_key(monitor).as_str()) == primary_key.as_deref(),
+            }
         })
         .collect::<Vec<_>>();
     // Where the operator window is now: the audience never opens on top of it.
@@ -433,7 +443,7 @@ fn logical_points(x: i32, y: i32, width: u32, height: u32, scale: f64) -> (f64, 
 }
 
 fn audience_window(app: &AppHandle) -> WebviewWindowBuilder<'_, tauri::Wry, AppHandle> {
-    WebviewWindowBuilder::new(app, "audience", WebviewUrl::default())
+    let builder = WebviewWindowBuilder::new(app, "audience", WebviewUrl::default())
         .initialization_script("window.__CHURCH_STUDIO_SURFACE__='audience';")
         .title("Audience")
         .decorations(false)
@@ -443,7 +453,12 @@ fn audience_window(app: &AppHandle) -> WebviewWindowBuilder<'_, tauri::Wry, AppH
         .focused(false)
         .visible_on_all_workspaces(true)
         .resizable(false)
-        .shadow(false)
+        .shadow(false);
+    // Windows activates a window each time it is shown; the audience window must never take the
+    // operator's keyboard (arrow keys, LIVE) when it appears or comes back with a projector.
+    #[cfg(target_os = "windows")]
+    let builder = builder.focusable(false);
+    builder
 }
 
 fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, String> {
@@ -479,15 +494,32 @@ fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<
             return Ok(());
         }
     }
-    let (x, y, width, height) = logical_frame(monitor);
-    window
-        .set_size(LogicalSize::new(width, height))
-        .map_err(|e| e.to_string())?;
-    window
-        .set_position(LogicalPosition::new(x, y))
-        .map_err(|e| e.to_string())?;
-    log::info!("AUDIENCE_PLACE logical={x},{y} {width}x{height} fullscreen={fullscreen}");
-    Ok(())
+    // Windows: tao gives a monitor's place and size in real pixels, and a window placed in points
+    // is converted with the scale of the screen it is on now, not the one it is going to (so a 150%
+    // projector beside a 100% laptop got a window too small, or on the laptop). Pixels throughout:
+    // onto the screen first, then its size once Windows has applied that screen's scaling.
+    #[cfg(target_os = "windows")]
+    {
+        let position = monitor.position();
+        let size = monitor.size();
+        window.set_position(PhysicalPosition::new(position.x, position.y)).map_err(|e| e.to_string())?;
+        window.set_size(PhysicalSize::new(size.width, size.height)).map_err(|e| e.to_string())?;
+        window.set_position(PhysicalPosition::new(position.x, position.y)).map_err(|e| e.to_string())?;
+        log::info!("AUDIENCE_PLACE physical={},{} {}x{} fullscreen={fullscreen}", position.x, position.y, size.width, size.height);
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let (x, y, width, height) = logical_frame(monitor);
+        window
+            .set_size(LogicalSize::new(width, height))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(LogicalPosition::new(x, y))
+            .map_err(|e| e.to_string())?;
+        log::info!("AUDIENCE_PLACE logical={x},{y} {width}x{height} fullscreen={fullscreen}");
+        Ok(())
+    }
 }
 
 /// Set the window to an AppKit frame (points, bottom-left origin) in one call.
@@ -685,6 +717,13 @@ fn frame_matches(window: &WebviewWindow, monitor: &Monitor) -> bool {
     let Ok(size) = window.outer_size() else {
         return false;
     };
+    // Windows: both sides in real pixels (see place).
+    #[cfg(target_os = "windows")]
+    {
+        let (target, area) = (monitor.position(), monitor.size());
+        return (position.x - target.x).abs() <= 8 && (position.y - target.y).abs() <= 8 && size.width.abs_diff(area.width) <= 8 && size.height.abs_diff(area.height) <= 8;
+    }
+    #[allow(unreachable_code)]
     let (x, y, width, height) = screen_frame(monitor);
     let scale = window.scale_factor().unwrap_or(1.0);
     let target_x = (x * scale).round() as i32;
@@ -728,15 +767,27 @@ fn focus_operator(app: &AppHandle) {
 struct DisplayCandidate {
     key: String,
     primary: bool,
+    /** The key an earlier version gave this screen (Windows: by its \\.\DISPLAYn number), so an
+     * assignment saved then still finds it. */
+    alias: Option<String>,
 }
 
 /// The audience display: the assigned one; otherwise a display the operator window is not on,
 /// external first (so dragging the desk onto the external screen sends the audience to the other).
 fn choose_index(candidates: &[DisplayCandidate], assigned: Option<&str>, operator: Option<&str>) -> Option<usize> {
-    if let Some(key) = assigned {
-        return candidates.iter().position(|candidate| candidate.key == key);
-    }
     let free = |candidate: &DisplayCandidate| Some(candidate.key.as_str()) != operator;
+    if let Some(key) = assigned {
+        if let Some(index) = candidates.iter().position(|candidate| candidate.key == key || candidate.alias.as_deref() == Some(key)) {
+            return Some(index);
+        }
+        // The same screen under a new key: a projector that warms up at another resolution, or a
+        // change of scaling. By name; never another screen (it could be the operator's own).
+        let name = key.split('|').next().unwrap_or_default();
+        if let Some(index) = candidates.iter().position(|candidate| candidate.key.split('|').next() == Some(name) && free(candidate)) {
+            return Some(index);
+        }
+        return None;
+    }
     candidates
         .iter()
         .position(|candidate| !candidate.primary && free(candidate))
@@ -767,7 +818,20 @@ fn display_key(name: &str, width: u32, height: u32, scale: f64) -> String {
 
 fn display_key_of(monitor: &Monitor) -> String {
     let size = monitor.size();
-    display_key(&raw_monitor_name(monitor), size.width, size.height, monitor.scale_factor())
+    display_key(&stable_name(monitor), size.width, size.height, monitor.scale_factor())
+}
+
+/// The name a screen is known by from one day to the next. On Windows, tao's name is the display's
+/// number (\\.\DISPLAY2), which changes when it is re-plugged or a dock is used; the monitor's own
+/// name (from its EDID: "DELL U2415", "EPSON PJ") stays.
+fn stable_name(monitor: &Monitor) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(name) = friendly_name(monitor) {
+            return name;
+        }
+    }
+    raw_monitor_name(monitor)
 }
 
 /// A monitor's key among the ones connected: its name, size and scale, and where it sits only
@@ -825,7 +889,59 @@ fn friendly_name(monitor: &Monitor) -> Option<String> {
 
 #[cfg(not(target_os = "macos"))]
 fn friendly_name(_monitor: &Monitor) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        return windows_monitor_names().remove(&raw_monitor_name(_monitor));
+    }
+    #[allow(unreachable_code)]
     None
+}
+
+/// Each active display's GDI name (\\.\DISPLAY2) and its monitor's own name, from Windows' display
+/// configuration (the name Windows Settings › Display shows).
+#[cfg(target_os = "windows")]
+fn windows_monitor_names() -> std::collections::HashMap<String, String> {
+    use windows::Win32::Devices::Display::{
+        DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_MODE_INFO,
+        DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME, DISPLAYCONFIG_TARGET_DEVICE_NAME, QDC_ONLY_ACTIVE_PATHS,
+    };
+    let mut names = std::collections::HashMap::new();
+    let text = |wide: &[u16]| String::from_utf16_lossy(&wide[..wide.iter().position(|&c| c == 0).unwrap_or(wide.len())]).trim().to_string();
+    unsafe {
+        let (mut path_count, mut mode_count) = (0u32, 0u32);
+        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count).is_err() {
+            return names;
+        }
+        let mut paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_count as usize];
+        let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
+        if QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &mut path_count, paths.as_mut_ptr(), &mut mode_count, modes.as_mut_ptr(), None).is_err() {
+            return names;
+        }
+        paths.truncate(path_count as usize);
+        for path in &paths {
+            let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
+            source.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            source.header.size = std::mem::size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
+            source.header.adapterId = path.sourceInfo.adapterId;
+            source.header.id = path.sourceInfo.id;
+            if DisplayConfigGetDeviceInfo(&mut source.header) != 0 {
+                continue;
+            }
+            let mut target = DISPLAYCONFIG_TARGET_DEVICE_NAME::default();
+            target.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+            target.header.size = std::mem::size_of::<DISPLAYCONFIG_TARGET_DEVICE_NAME>() as u32;
+            target.header.adapterId = path.targetInfo.adapterId;
+            target.header.id = path.targetInfo.id;
+            if DisplayConfigGetDeviceInfo(&mut target.header) != 0 {
+                continue;
+            }
+            let monitor = text(&target.monitorFriendlyDeviceName);
+            if !monitor.is_empty() {
+                names.insert(text(&source.viewGdiDeviceName), monitor);
+            }
+        }
+    }
+    names
 }
 
 /// How well an NSScreen frame (Cocoa) matches a tao monitor (top-left points). Lower is better.
@@ -895,6 +1011,7 @@ mod tests {
         DisplayCandidate {
             key: key.into(),
             primary,
+            alias: None,
         }
     }
 

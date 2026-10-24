@@ -273,6 +273,9 @@ export function startCloudListening(handlers: ListenHandlers, options: { service
       stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: options.filter !== "off", autoGainControl: true } });
     } catch (error) {
       const denied = error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
+      // Windows hands a microphone to one app at a time when that app asks for it alone.
+      const busy = error instanceof DOMException && (error.name === "NotReadableError" || error.name === "AbortError");
+      if (busy) return fail(t("The microphone is busy in another app (a call or a recording). Close it there, then listen again."));
       fail(denied ? t("The microphone is blocked. Allow it for this page, then listen again.") : t("No microphone was found."), denied ? "denied" : "no-mic");
       return;
     }

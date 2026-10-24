@@ -11,7 +11,7 @@
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -46,7 +46,24 @@ pub struct ModelStatus {
     pub installed: bool,
     pub downloading: bool,
     pub bytes: u64,
+    /** This computer's processor can run Whisper as it is built (see `processor_ok`). */
+    pub supported: bool,
 }
+
+/// Whisper is built for AVX2 with FMA and F16C (release.yml), which nearly every PC since 2013 has.
+/// An older or budget processor without them would crash on the first word, so it is told instead.
+pub fn processor_ok() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") && std::arch::is_x86_feature_detected!("f16c")
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        true
+    }
+}
+
+const OLD_PROCESSOR: &str = "This computer's processor is too old for Accurate listening (it needs AVX2). Use System listening, or ElevenLabs or Deepgram in Settings › Audio & voice.";
 
 #[derive(Clone, Serialize)]
 struct Progress {
@@ -63,13 +80,35 @@ static DOWNLOADING: AtomicBool = AtomicBool::new(false);
 static RUN: AtomicU64 = AtomicU64::new(0);
 
 fn model_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("models");
-    Ok(dir.join(MODEL_FILE))
+    // On Windows the app's data folder roams with a domain profile; a 60 MB model belongs in the
+    // local one. One downloaded before into the roaming folder is moved across.
+    #[cfg(target_os = "windows")]
+    {
+        let local = app.path().app_local_data_dir().map_err(|error| error.to_string())?.join("models").join(MODEL_FILE);
+        if !local.exists() {
+            if let Ok(old) = app.path().app_data_dir().map(|dir| dir.join("models").join(MODEL_FILE)) {
+                if old.exists() {
+                    if let Some(parent) = local.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if std::fs::rename(&old, &local).is_err() {
+                        return Ok(old);
+                    }
+                }
+            }
+        }
+        Ok(local)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("models");
+        Ok(dir.join(MODEL_FILE))
+    }
 }
 
 pub fn status(app: &tauri::AppHandle) -> ModelStatus {
     let installed = model_path(app).ok().and_then(|path| std::fs::metadata(path).ok()).is_some_and(|meta| meta.len() == MODEL_BYTES);
-    ModelStatus { installed, downloading: DOWNLOADING.load(Ordering::SeqCst), bytes: MODEL_BYTES }
+    ModelStatus { installed, downloading: DOWNLOADING.load(Ordering::SeqCst), bytes: MODEL_BYTES, supported: processor_ok() }
 }
 
 pub fn delete(app: &tauri::AppHandle) -> Result<(), String> {
@@ -109,7 +148,7 @@ pub fn download(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn fetch(app: &tauri::AppHandle, path: &PathBuf, run: u64) -> Result<(), String> {
+fn fetch(app: &tauri::AppHandle, path: &Path, run: u64) -> Result<(), String> {
     let dir = path.parent().ok_or("No folder for the model.")?;
     std::fs::create_dir_all(dir).map_err(|error| format!("Could not make the models folder. {error}"))?;
     let part = path.with_extension(format!("part{run}"));
@@ -156,7 +195,7 @@ fn fetch(app: &tauri::AppHandle, path: &PathBuf, run: u64) -> Result<(), String>
         let _ = std::fs::remove_file(&part);
         return Err("Download cancelled.".into());
     }
-    std::fs::rename(&part, path).map_err(|error| format!("Could not save the model. {error}"))?;
+    crate::storage::rename_patiently(&part, path).map_err(|error| format!("Could not save the model. {error}"))?;
     Ok(())
 }
 
@@ -192,6 +231,9 @@ fn context(app: &tauri::AppHandle) -> Result<Arc<whisper_rs::WhisperContext>, St
 
 /// Start listening with Whisper. `mix` is the noise filter's share of cleaned signal (0 = off).
 pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(), String> {
+    if !processor_ok() {
+        return Err(OLD_PROCESSOR.into());
+    }
     stop();
     *STOPPED_AT.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
     let context = context(&app)?;
@@ -199,6 +241,7 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
     let audio: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let sink_audio = audio.clone();
     let levels_app = app.clone();
+    let lost_app = app.clone();
     let feed = crate::noise::start(
         mix,
         move |bytes| {
@@ -209,6 +252,12 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
         move |_room, clean| {
             let line = format!(r#"{{"kind":"level","value":{:.3}}}"#, (clean * 4.0).min(1.0));
             let _ = levels_app.emit("listen-phrase", crate::voice::ListenLine { run, line });
+        },
+        // The microphone went away mid-sermon: the desk is told, and this run ends.
+        move |reason| {
+            let line = serde_json::json!({ "kind": "error", "message": reason }).to_string();
+            let _ = lost_app.emit("listen-phrase", crate::voice::ListenLine { run, line });
+            let _ = lost_app.emit("listen-phrase", crate::voice::ListenLine { run, line: r#"{"kind":"end"}"#.into() });
         },
     )?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -320,6 +369,10 @@ fn transcribe(state: &mut whisper_rs::WhisperState, samples: &[f32], prompt: &st
     params.set_print_special(false);
     params.set_print_timestamps(false);
     params.set_initial_prompt(prompt);
+    // On a PC (no Mac graphics to lean on), encode only as much as this phrase needs, not Whisper's
+    // full 30-second window each step: about 50 frames a second of audio, with room to spare.
+    #[cfg(target_os = "windows")]
+    params.set_audio_ctx((samples.len() as i32 / 320 + 64).min(1500));
     state.full(params, samples).ok()?;
     let mut text = String::new();
     for index in 0..state.full_n_segments() {
@@ -375,7 +428,17 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
             continue;
         }
         let paused = window.len() > PAUSE + RATE && speech_ended(take);
-        let Some(text) = transcribe(&mut state, take, &prompt, threads) else { continue };
+        let Some(text) = transcribe(&mut state, take, &prompt, threads) else {
+            // A failed decode still lets go of what is older than one phrase, so the buffer (and the
+            // copy made each step) cannot grow for the rest of the sermon.
+            let mut buffer = audio.lock().unwrap_or_else(|poison| poison.into_inner());
+            if buffer.len() > LONGEST {
+                let excess = buffer.len() - LONGEST;
+                buffer.drain(..excess);
+                decoded_len = 0;
+            }
+            continue;
+        };
         decoded_len = window.len();
         let final_phrase = paused || full;
         if !is_noise(&text) && !echoes_prompt(&text, &prompt) && (final_phrase || text != last_text) {

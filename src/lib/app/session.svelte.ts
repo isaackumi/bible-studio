@@ -1570,7 +1570,13 @@ class Session {
   startRoomOutput = () => {
     if (!this.desktop() || this.roomOutputTimer) return;
     void this.checkRoomOutputs();
-    this.roomOutputTimer = setInterval(() => void this.checkRoomOutputs(), 4000);
+    // A check still running (a slow sound driver) is not stacked up behind another.
+    let checking = false;
+    this.roomOutputTimer = setInterval(() => {
+      if (checking) return;
+      checking = true;
+      void this.checkRoomOutputs().finally(() => (checking = false));
+    }, 4000);
   };
 
   private readRoomOutputs = async (): Promise<boolean> => {
@@ -1636,6 +1642,13 @@ class Session {
 
   /** Puts the congregation's sound where the choice says, and tells the desk when a plug changed it. */
   private applyRoomOutput = async (before: AudioOutputDevice[] | null, chosenNow = false) => {
+    // An output keeps its name when the computer gives it a new id (Windows ids changed in 0.5.1):
+    // the church's choice follows it by name.
+    const chosenId = this.workspace.audio.audience;
+    if (chosenId !== "auto" && this.workspace.audio.audienceName && !this.roomOutputs.some((output) => output.id === chosenId)) {
+      const same = this.roomOutputs.find((output) => output.name === this.workspace.audio.audienceName);
+      if (same) this.setAudio({ audience: same.id });
+    }
     const audio = this.workspace.audio;
     const plan = planOutput(before, this.roomOutputs, audio.audience || "auto", this.audienceScreenNames(), { chosenNow, chosenName: audio.audienceName || t("The chosen output"), skip: audio.audienceSkip });
     this.roomOutput = plan.decision;
@@ -1648,7 +1661,9 @@ class Session {
           await this.readRoomOutputs();
           this.roomDefaultId = plan.switchTo.id;
         } catch (error) {
+          // The computer would not switch (Windows can refuse): the music at least goes there.
           this.warn(String(error));
+          await this.routeMusicTo(plan.switchTo.name);
           return;
         }
       }
@@ -3878,6 +3893,11 @@ class Session {
           if (Number.isFinite(probe.duration)) done();
         };
         probe.currentTime = 1e7;
+      };
+      // A file that cannot be read keeps no length (0: the slideshow does not wait for it).
+      probe.onerror = () => {
+        probe.removeAttribute("src");
+        probe.load();
       };
       probe.src = url;
     }

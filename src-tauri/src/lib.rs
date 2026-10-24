@@ -231,32 +231,32 @@ fn get_program(output: State<Output>) -> Value {
         .clone()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn workspace_load(db: State<Db>) -> Result<Option<Value>, String> {
     with_db(&db, db::workspace_load)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn workspace_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::workspace_save(conn, &document))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn theme_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::theme_list)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn theme_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::theme_delete(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn theme_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::theme_save(conn, &document))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn song_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::song_list)
 }
@@ -266,52 +266,52 @@ fn song_search(db: State<Db>, query: String) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| db::song_search(conn, &query))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn song_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::song_save(conn, &document))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn service_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::service_delete(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn media_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::media_delete(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn song_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::song_delete(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn sermon_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::sermon_list)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn sermon_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::sermon_save(conn, &document))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn sermon_delete(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| db::sermon_delete(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn service_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::service_list)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn service_get(db: State<Db>, id: String) -> Result<Option<Value>, String> {
     with_db(&db, |conn| db::service_get(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn service_save(db: State<Db>, document: Value) -> Result<(), String> {
     with_db(&db, |conn| db::service_save(conn, &document))
 }
@@ -321,7 +321,7 @@ fn import_library(db: State<Db>, snapshot: Value) -> Result<(), String> {
     with_db(&db, |conn| db::import_library(conn, &snapshot))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn media_list(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, db::media_list)
 }
@@ -442,7 +442,7 @@ fn percent_decode(input: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_translations(db: State<Db>) -> Result<Vec<Value>, String> {
     with_db(&db, bible::translations)
 }
@@ -471,22 +471,22 @@ fn bible_source(db: State<Db>, translation_id: String) -> Result<Vec<Vec<Vec<Str
     with_db(&db, |conn| bible::source_books(conn, &translation_id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_remove(db: State<Db>, id: String) -> Result<(), String> {
     with_db(&db, |conn| bible::remove_translation(conn, &id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_books(db: State<Db>, translation_id: String) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| bible::books(conn, &translation_id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_verses(db: State<Db>, translation_id: String, book_ord: i32, chapter: i32) -> Result<Vec<Value>, String> {
     with_db(&db, |conn| bible::verses(conn, &translation_id, book_ord, chapter))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn bible_passage(
     db: State<Db>,
     translation_id: String,
@@ -505,7 +505,7 @@ fn bible_search(db: State<Db>, translation_id: String, query: String) -> Result<
     with_db(&db, |conn| bible::search(conn, &translation_id, &query))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn request_listen_access() -> Result<voice::ListenAccess, String> {
     voice::request_access()
 }
@@ -526,7 +526,7 @@ fn storage_usage(app: tauri::AppHandle) -> Result<storage::Usage, String> {
     storage::usage(&app)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_clear_cache(app: tauri::AppHandle) -> u64 {
     storage::clear_cache(&app)
 }
@@ -539,7 +539,7 @@ fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> 
 }
 
 /// Every picture and video with where it is used (Settings › Storage › Review files).
-#[tauri::command]
+#[tauri::command(async)]
 fn storage_media_usage(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::MediaUse>, String> {
     let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
@@ -567,7 +567,7 @@ fn storage_compact(db: tauri::State<'_, db::Db>) -> Result<(), String> {
 }
 
 /// Accurate listening's model: whether it is here, and getting or removing it.
-#[tauri::command]
+#[tauri::command(async)]
 fn whisper_status(app: tauri::AppHandle) -> serde_json::Value {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
@@ -601,7 +601,7 @@ fn whisper_cancel(app: tauri::AppHandle) {
     let _ = app;
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn whisper_delete(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
@@ -615,7 +615,7 @@ fn whisper_delete(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /// Mic check: room and cleaned levels arrive as `noise-test` events until stopped.
-#[tauri::command]
+#[tauri::command(async)]
 fn start_noise_test(app: tauri::AppHandle, filter: String) -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
@@ -682,7 +682,7 @@ fn ndi_key_words(cue: String, body: String) {
     ndi::key_words(&cue, &body);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn stop_noise_test() {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     noise::stop_test();
@@ -738,7 +738,7 @@ fn backup_write(dir: String, name: String, contents: String) -> Result<(), Strin
     let name = backup_file_name(&name)?;
     let temp = folder.join(format!("{name}.partial"));
     std::fs::write(&temp, contents).map_err(|error| format!("The backup could not be written. {error}"))?;
-    std::fs::rename(&temp, folder.join(name)).map_err(|error| format!("The backup could not be saved. {error}"))?;
+    storage::rename_patiently(&temp, &folder.join(name)).map_err(|error| format!("The backup could not be saved. {error}"))?;
     let mut backups: Vec<String> = std::fs::read_dir(&folder)
         .map_err(|error| error.to_string())?
         .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
@@ -774,7 +774,7 @@ fn backup_latest(dir: String) -> Result<Option<(String, String)>, String> {
 }
 
 /// The desktop crash log (Rust panics), for a problem report. Empty when nothing crashed.
-#[tauri::command]
+#[tauri::command(async)]
 fn crash_log(app: tauri::AppHandle) -> String {
     use tauri::Manager;
     app.path()
@@ -786,7 +786,7 @@ fn crash_log(app: tauri::AppHandle) -> String {
 }
 
 /// The last lines of church-studio.log, sent with a crash or hang report.
-#[tauri::command]
+#[tauri::command(async)]
 fn diagnostic_log(app: tauri::AppHandle) -> String {
     diagnostics::log_path(&app).map(|path| diagnostics::log_tail(&path, 60)).unwrap_or_default()
 }
@@ -1113,6 +1113,8 @@ pub fn run() {
             // The Mac's sound output back to what it was before Church Studio chose one.
             if let tauri::RunEvent::Exit = event {
                 audio_out::restore();
+                // The speech helper and the microphone end with the app.
+                voice::stop_transcribe();
             }
         });
 }

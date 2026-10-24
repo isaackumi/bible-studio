@@ -49,7 +49,12 @@ fn pick(have: &[String], wanted: &[&str]) -> String {
 pub fn read_songs(folder: &str) -> Result<Vec<EasyWorshipSong>, String> {
     let (songs_path, words_path) = find_databases(Path::new(folder), 4)
         .ok_or("No EasyWorship songs here. Choose the folder that holds Songs.db and SongWords.db (EasyWorship › Databases › Data).")?;
-    let open = |path: &Path| Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|error| format!("{}: {error}", path.display()));
+    // EasyWorship open at the same time holds its files now and then: wait rather than fail.
+    let open = |path: &Path| {
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|error| format!("{}: {error}", path.display()))?;
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        Ok::<_, String>(conn)
+    };
     let songs_db = open(&songs_path)?;
     let words_db = open(&words_path)?;
     let have = columns(&songs_db, "song");

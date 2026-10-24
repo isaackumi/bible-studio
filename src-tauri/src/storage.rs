@@ -228,6 +228,22 @@ pub fn free_space(path: &Path) -> Option<u64> {
     fs4::available_space(existing).ok()
 }
 
+/// Rename a file just written, trying again for a moment: on Windows antivirus, OneDrive or Dropbox
+/// often hold a new file for a fraction of a second, and the rename fails with "access denied".
+pub fn rename_patiently(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    let mut tries = 0;
+    loop {
+        match std::fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(error) if tries < 8 && matches!(error.kind(), std::io::ErrorKind::PermissionDenied) || tries < 8 && error.raw_os_error() == Some(32) => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(100 * tries));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,3 +320,4 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
+

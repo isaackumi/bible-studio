@@ -33,13 +33,14 @@ pub struct AudioOutputs {
     pub can_set_default: bool,
 }
 
-#[tauri::command]
+/// Off the main thread: reading the outputs can take a moment (Bluetooth, a sleeping HDMI screen).
+#[tauri::command(async)]
 pub fn audio_outputs() -> AudioOutputs {
-    AudioOutputs { outputs: platform::outputs(), can_set_default: cfg!(target_os = "macos") }
+    AudioOutputs { outputs: platform::outputs(), can_set_default: cfg!(any(target_os = "macos", target_os = "windows")) }
 }
 
-/// Make this output the computer's sound output (a Mac). The first change remembers what was there.
-#[tauri::command]
+/// Make this output the computer's sound output (a Mac, or Windows). The first change remembers what was there.
+#[tauri::command(async)]
 pub fn set_audio_output(id: String) -> Result<(), String> {
     platform::set_default(&id)
 }
@@ -182,12 +183,86 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
+    //! Windows' own list of sound outputs (the MMDevice API): each output's name, the adapter it
+    //! belongs to and its form factor, read without opening the device. The default output is set
+    //! through IPolicyConfig, which Windows' own Sound settings use; it is not in the SDK, but it has
+    //! kept the same shape since Windows 7 and tools like EarTrumpet and SoundSwitch rely on it.
+    #![allow(non_snake_case)]
     use super::AudioOutput;
-    use cpal::traits::{DeviceTrait, HostTrait};
+    use std::ffi::c_void;
+    use std::sync::Mutex;
+    use windows::core::{interface, Interface, IUnknown, IUnknown_Vtbl, GUID, HRESULT, PCWSTR, PWSTR};
+    use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+    use windows::Win32::Foundation::PROPERTYKEY;
+    use windows::Win32::Media::Audio::{eCommunications, eConsole, eMultimedia, eRender, ERole, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, PKEY_AudioEndpoint_FormFactor, DEVICE_STATE_ACTIVE};
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
+
+    // The method names and order are the interface's own (its table of functions), so they stay as
+    // Windows has them (non_snake_case is allowed for this module).
+    #[interface("f8679f50-850a-41cf-9c72-430f290290c8")]
+    unsafe trait IPolicyConfig: IUnknown {
+        fn GetMixFormat(&self, device: PCWSTR, format: *mut *mut c_void) -> HRESULT;
+        fn GetDeviceFormat(&self, device: PCWSTR, default: i32, format: *mut *mut c_void) -> HRESULT;
+        fn ResetDeviceFormat(&self, device: PCWSTR) -> HRESULT;
+        fn SetDeviceFormat(&self, device: PCWSTR, endpoint: *mut c_void, mix: *mut c_void) -> HRESULT;
+        fn GetProcessingPeriod(&self, device: PCWSTR, default: i32, default_period: *mut i64, minimum: *mut i64) -> HRESULT;
+        fn SetProcessingPeriod(&self, device: PCWSTR, period: *mut i64) -> HRESULT;
+        fn GetShareMode(&self, device: PCWSTR, mode: *mut c_void) -> HRESULT;
+        fn SetShareMode(&self, device: PCWSTR, mode: *mut c_void) -> HRESULT;
+        fn GetPropertyValue(&self, device: PCWSTR, fx: i32, key: *const PROPERTYKEY, value: *mut c_void) -> HRESULT;
+        fn SetPropertyValue(&self, device: PCWSTR, fx: i32, key: *const PROPERTYKEY, value: *mut c_void) -> HRESULT;
+        fn SetDefaultEndpoint(&self, device: PCWSTR, role: ERole) -> HRESULT;
+        fn SetEndpointVisibility(&self, device: PCWSTR, visible: i32) -> HRESULT;
+    }
+    const CLSID_POLICY_CONFIG: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+    /// The adapter an output belongs to ("USB Audio CODEC", "NVIDIA High Definition Audio").
+    const PKEY_DEVICE_INTERFACE_FRIENDLY_NAME: PROPERTYKEY = PROPERTYKEY { fmtid: GUID::from_u128(0x026e516e_b814_414b_83cd_856d6fef4822), pid: 2 };
+    /// EndpointFormFactor: a display's own audio (HDMI or DisplayPort).
+    const DIGITAL_AUDIO_DISPLAY_DEVICE: u32 = 9;
+
+    /// (what Windows had, what Church Studio set), by endpoint id, from the first change.
+    static CHANGED: Mutex<Option<(String, String)>> = Mutex::new(None);
+
+    fn enumerator() -> Option<IMMDeviceEnumerator> {
+        unsafe {
+            // Any thread a command runs on: an apartment of its own, or the one it already has.
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).ok()
+        }
+    }
+
+    fn take(text: PWSTR) -> Option<String> {
+        if text.is_null() {
+            return None;
+        }
+        let value = unsafe { text.to_string() }.ok();
+        unsafe { CoTaskMemFree(Some(text.0 as *const c_void)) };
+        value
+    }
+
+    fn id_of(device: &IMMDevice) -> Option<String> {
+        take(unsafe { device.GetId() }.ok()?)
+    }
+
+    fn default_id(enumerator: &IMMDeviceEnumerator) -> Option<String> {
+        id_of(&unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }.ok()?)
+    }
+
+    /// How an output is connected, from its form factor and its name and adapter's.
+    pub(super) fn transport(name: &str, adapter: &str, form: u32) -> &'static str {
+        if form == DIGITAL_AUDIO_DISPLAY_DEVICE {
+            return if format!("{name} {adapter}").to_lowercase().contains("displayport") { "displayport" } else { "hdmi" };
+        }
+        let named = by_name(&format!("{name} ({adapter})"));
+        if named != "unknown" {
+            return named;
+        }
+        by_name(adapter)
+    }
 
     /// WASAPI names say how a device is connected ("Speakers (Realtek…)", "DELL U2415 (NVIDIA High
     /// Definition Audio)", "Speakers (USB Audio CODEC)").
-    pub(super) fn transport(name: &str) -> &'static str {
+    pub(super) fn by_name(name: &str) -> &'static str {
         let lower = name.to_lowercase();
         if lower.contains("bluetooth") || lower.contains("hands-free") || lower.contains("headset (") {
             "bluetooth"
@@ -207,22 +282,70 @@ mod platform {
     }
 
     pub fn outputs() -> Vec<AudioOutput> {
-        let host = cpal::default_host();
-        let default = host.default_output_device().and_then(|device| device.name().ok());
-        let Ok(devices) = host.output_devices() else { return Vec::new() };
-        let mut seen = std::collections::HashSet::new();
-        devices
-            .filter_map(|device| device.name().ok())
-            .filter(|name| seen.insert(name.clone()))
-            .map(|name| AudioOutput { id: name.clone(), transport: transport(&name).into(), is_default: Some(&name) == default.as_ref(), name })
+        let Some(enumerator) = enumerator() else { return Vec::new() };
+        let default = default_id(&enumerator);
+        let Ok(collection) = (unsafe { enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) }) else { return Vec::new() };
+        let count = unsafe { collection.GetCount() }.unwrap_or(0);
+        (0..count)
+            .filter_map(|index| {
+                let device = unsafe { collection.Item(index) }.ok()?;
+                let id = id_of(&device)?;
+                let store = unsafe { device.OpenPropertyStore(STGM_READ) }.ok()?;
+                let text = |key: &PROPERTYKEY| unsafe { store.GetValue(key) }.ok().map(|value| value.to_string()).filter(|value| !value.is_empty());
+                let name = text(&PKEY_Device_FriendlyName).unwrap_or_else(|| id.clone());
+                let adapter = text(&PKEY_DEVICE_INTERFACE_FRIENDLY_NAME).unwrap_or_default();
+                let form = unsafe { store.GetValue(&PKEY_AudioEndpoint_FormFactor) }.ok().and_then(|value| u32::try_from(&value).ok()).unwrap_or(10);
+                Some(AudioOutput { is_default: Some(&id) == default.as_ref(), transport: transport(&name, &adapter, form).into(), id, name })
+            })
             .collect()
     }
 
-    pub fn set_default(_id: &str) -> Result<(), String> {
-        Err("Windows chooses its sound output in Settings › System › Sound.".into())
+    fn make_default(id: &str) -> Result<(), String> {
+        let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        let policy: IPolicyConfig = unsafe { CoCreateInstance(&CLSID_POLICY_CONFIG, None, CLSCTX_ALL) }.map_err(|error| format!("Windows did not let Church Studio choose the sound output ({error})."))?;
+        let wide: Vec<u16> = id.encode_utf16().chain(std::iter::once(0)).collect();
+        // Everyday sound and media; calls (the communications default) are left as they are.
+        for role in [eConsole, eMultimedia] {
+            unsafe { policy.SetDefaultEndpoint(PCWSTR(wide.as_ptr()), role) }.ok().map_err(|error| format!("Windows did not switch its sound output ({error})."))?;
+        }
+        let _ = eCommunications;
+        Ok(())
     }
 
-    pub fn restore() {}
+    pub fn set_default(id: &str) -> Result<(), String> {
+        let enumerator = enumerator().ok_or("Windows' sound outputs could not be read.")?;
+        if !outputs().iter().any(|output| output.id == id) {
+            return Err("That sound output is not connected.".into());
+        }
+        let before = default_id(&enumerator);
+        if before.as_deref() == Some(id) {
+            return Ok(());
+        }
+        make_default(id)?;
+        let mut changed = CHANGED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        match changed.as_mut() {
+            Some((_, set)) => *set = id.to_string(),
+            None => *changed = before.map(|before| (before, id.to_string())),
+        }
+        log::info!("Sound output set to {id}");
+        Ok(())
+    }
+
+    pub fn restore() {
+        let Some((before, set)) = CHANGED.lock().ok().and_then(|mut changed| changed.take()) else { return };
+        let Some(enumerator) = enumerator() else { return };
+        if default_id(&enumerator).as_deref() != Some(set.as_str()) {
+            return;
+        }
+        if outputs().iter().any(|output| output.id == before) {
+            let _ = make_default(&before);
+        }
+    }
+
+    #[allow(dead_code)]
+    fn _assert_interface(policy: &IPolicyConfig) -> IUnknown {
+        policy.cast().expect("an IPolicyConfig is an IUnknown")
+    }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -273,10 +396,12 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[test]
     fn reads_how_a_windows_output_is_connected() {
-        use super::platform::transport;
-        assert_eq!(transport("Speakers (Realtek(R) Audio)"), "built-in");
-        assert_eq!(transport("DELL U2415 (NVIDIA High Definition Audio)"), "hdmi");
-        assert_eq!(transport("Speakers (Focusrite USB Audio)"), "usb");
-        assert_eq!(transport("CABLE Input (VB-Audio Virtual Cable)"), "virtual");
+        use super::platform::{by_name, transport};
+        assert_eq!(by_name("Speakers (Realtek(R) Audio)"), "built-in");
+        assert_eq!(by_name("DELL U2415 (NVIDIA High Definition Audio)"), "hdmi");
+        assert_eq!(by_name("Speakers (Focusrite USB Audio)"), "usb");
+        assert_eq!(by_name("CABLE Input (VB-Audio Virtual Cable)"), "virtual");
+        assert_eq!(transport("DELL U2415", "NVIDIA High Definition Audio", 9), "hdmi");
+        assert_eq!(transport("Speakers", "USB Audio CODEC", 1), "usb");
     }
 }

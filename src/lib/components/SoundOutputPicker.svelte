@@ -61,7 +61,7 @@
         {/each}
       </ul>
       {#if session.canSetRoomOutput}
-        <p class="hint">{t("Church Studio sets this Mac's sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.")}</p>
+        <p class="hint">{computerOs() === "windows" ? t("Church Studio sets Windows' sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.") : t("Church Studio sets this Mac's sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.")}</p>
       {:else}
         <p class="hint">{t("The music and sound pad play there. Videos and YouTube on the audience screen play through Windows' own sound output: set it to the same one in Windows Settings › System › Sound.")}</p>
         <button type="button" class="btn" onclick={() => void invoke("open_privacy_settings", { pane: "sound" }).catch(() => {})}>{t("Open sound settings")}</button>

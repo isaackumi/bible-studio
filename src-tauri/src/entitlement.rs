@@ -191,7 +191,7 @@ fn persist(app: &AppHandle, saved: &Saved) {
         if let Ok(text) = serde_json::to_string(saved) {
             let temp = path.with_extension("json.tmp");
             if std::fs::write(&temp, text).is_ok() {
-                let _ = std::fs::rename(&temp, &path);
+                let _ = crate::storage::rename_patiently(&temp, &path);
             }
         }
     }

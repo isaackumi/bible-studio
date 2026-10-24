@@ -4400,6 +4400,7 @@ export const fr: Readonly<Record<string, string>> = {
   "{service} stopped answering: {reason}": "{service} ne répond plus : {reason}",
   "{service} stopped answering. Check the internet connection.": "{service} ne répond plus. Vérifiez la connexion internet.",
   "{service} reconnecting…": "Reconnexion à {service}…",
+  "The microphone is busy in another app (a call or a recording). Close it there, then listen again.": "Le microphone est pris par une autre application (un appel ou un enregistrement). Fermez-la, puis relancez l’écoute.",
   "The microphone is blocked. Allow it for this page, then listen again.": "Le microphone est bloqué. Autorisez-le pour cette page, puis relancez l’écoute.",
   "No microphone was found.": "Aucun microphone trouvé.",
   "{service} refused the connection. Check the key in Settings › Audio & voice, and that this network allows it.": "{service} a refusé la connexion. Vérifiez la clé dans Réglages › Audio et voix, et que ce réseau l’autorise.",
@@ -4904,4 +4905,5 @@ export const fr: Readonly<Record<string, string>> = {
   "{n} question waiting": "{n} question en attente",
   "{n} questions waiting": "{n} questions en attente",
   "{n} s left": "{n} s restantes",
+  "Church Studio sets Windows' sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.": "Church Studio règle la sortie audio de Windows : musique, vidéos et YouTube y passent tous, et la sortie d’avant revient quand Church Studio se ferme.",
 };

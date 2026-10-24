@@ -118,6 +118,8 @@ mod helper {
         stdin: Option<std::process::ChildStdin>,
         /// Filtered mode: this app captures and cleans the mic and streams it down stdin.
         feed: Option<crate::noise::Feed>,
+        /// Set by Stop: the helper ending then is not news.
+        stopped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     }
 
     static RUNNING: std::sync::Mutex<Option<Running>> = std::sync::Mutex::new(None);
@@ -128,15 +130,31 @@ mod helper {
         let mut child = command
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::piped())
             .spawn()
             .map_err(|error| format!("Could not start the speech helper. {error}"))?;
         let stdout = child.stdout.take().ok_or("The speech helper produced no transcript stream.")?;
+        // What the helper says when it fails (PowerShell blocked by policy or antivirus, no speech
+        // recognizer installed): the last line is passed on, so the desk says why it stopped.
+        let said: std::sync::Arc<std::sync::Mutex<Option<String>>> = Default::default();
+        if let Some(stderr) = child.stderr.take() {
+            let keep = said.clone();
+            std::thread::spawn(move || {
+                for line in std::io::BufRead::lines(std::io::BufReader::new(stderr)).map_while(Result::ok) {
+                    let line = line.trim();
+                    if !line.is_empty() {
+                        *keep.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(line.chars().take(300).collect());
+                    }
+                }
+            });
+        }
+        let stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut stdin = child.stdin.take().ok_or("The speech helper could not be stopped later.")?;
         let (stdin, feed) = match feed {
             None => (Some(stdin), None),
             Some(mix) => {
                 let levels_app = app.clone();
+                let lost_app = app.clone();
                 let started = crate::noise::start(
                     mix,
                     move |bytes| std::io::Write::write_all(&mut stdin, bytes).is_ok(),
@@ -144,6 +162,12 @@ mod helper {
                         use tauri::Emitter;
                         let line = format!(r#"{{"kind":"level","value":{:.3}}}"#, (clean * 4.0).min(1.0));
                         let _ = levels_app.emit("listen-phrase", super::ListenLine { run, line });
+                    },
+                    // The microphone went away: say so (the helper's input closes, and it ends).
+                    move |reason| {
+                        use tauri::Emitter;
+                        let line = serde_json::json!({ "kind": "error", "message": reason }).to_string();
+                        let _ = lost_app.emit("listen-phrase", super::ListenLine { run, line });
                     },
                 );
                 match started {
@@ -157,6 +181,7 @@ mod helper {
                 }
             }
         };
+        let ended_by_stop = stopped.clone();
         std::thread::spawn(move || {
             use tauri::Emitter;
             let reader = std::io::BufReader::new(stdout);
@@ -164,11 +189,19 @@ mod helper {
                 let Ok(line) = line else { break };
                 let _ = app.emit("listen-phrase", super::ListenLine { run, line });
             }
+            // It ended by itself: pass on why, if it said.
+            if !ended_by_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                std::thread::sleep(Duration::from_millis(150));
+                if let Some(reason) = said.lock().unwrap_or_else(|poison| poison.into_inner()).take() {
+                    let line = serde_json::json!({ "kind": "error", "message": format!("The speech helper stopped: {reason}") }).to_string();
+                    let _ = app.emit("listen-phrase", super::ListenLine { run, line });
+                }
+            }
             let end = super::ListenLine { run, line: r#"{"kind":"end"}"#.into() };
             let _ = app.emit("listen-phrase", end);
         });
         let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
-        *guard = Some(Running { child, stdin, feed });
+        *guard = Some(Running { child, stdin, feed, stopped });
         Ok(())
     }
 
@@ -176,10 +209,19 @@ mod helper {
         let mut guard = RUNNING.lock().unwrap_or_else(|poison| poison.into_inner());
         let Some(mut running) = guard.take() else { return };
         drop(guard);
-        // Closing the feed closes the helper's input, which ends it; otherwise ask it to stop.
+        running.stopped.store(true, std::sync::atomic::Ordering::SeqCst);
+        // Filtered: end the helper first, then the feed. The feed's thread may be stuck writing to
+        // a helper that stopped reading; once the helper is gone its write fails and it returns.
+        // Off the caller's thread, so Stop never waits on either.
         if let Some(feed) = running.feed.take() {
-            feed.stop();
+            std::thread::spawn(move || {
+                let _ = running.child.kill();
+                let _ = running.child.wait();
+                feed.stop();
+            });
+            return;
         }
+        // Plain microphone: ask it to stop, then make sure.
         if let Some(stdin) = running.stdin.as_mut() {
             let _ = std::io::Write::write_all(stdin, b"stop\n");
         }
@@ -256,6 +298,8 @@ mod windows {
         let mut command = std::process::Command::new("powershell.exe");
         command.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
         command.env("CHURCH_STUDIO_WORDS", words);
+        // The helper watches for this process and ends if it is gone (a crash leaves no other trace).
+        command.env("CHURCH_STUDIO_PARENT", std::process::id().to_string());
         if filter != crate::noise::Filter::Off {
             command.arg("-Stdin");
         }
