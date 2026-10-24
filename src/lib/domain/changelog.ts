@@ -10,6 +10,16 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.0",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "users", title: msg("Pick someone at random"), text: msg("Audience › Pick someone spins through the names of everyone here and lands on a winner, a volunteer or who reads next. Or split the room into random groups.") },
+      { icon: "list", title: msg("Ready-made polls, and anonymous ones"), text: msg("Six sample polls to try, from service feedback to planning a picnic. A poll can be anonymous: no names on the screen. Remove any sample you don't need.") },
+      { icon: "check", title: msg("Games, smoother"), text: msg("Question 1 waits until someone has joined, a quiz opens with a Back bar (Esc works too), and games you've played say when, with Play again.") },
+      { icon: "pencil", title: msg("A tidier quiz editor"), text: msg("Labelled fields, answers that line up, and Save at the foot.") },
+    ],
+  },
+  {
     version: "0.4.9",
     date: "2026-10-24",
     highlights: [

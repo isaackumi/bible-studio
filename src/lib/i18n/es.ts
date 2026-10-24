@@ -4774,4 +4774,12 @@ export const es: Readonly<Record<string, string>> = {
   "{n} question, ready to play.": "{n} pregunta, lista para jugar.",
   "{n} questions, ready to play.": "{n} preguntas, listas para jugar.",
   "Answers": "Respuestas",
+  "Pick someone at random": "Elegir a alguien al azar",
+  "Audience › Pick someone spins through the names of everyone here and lands on a winner, a volunteer or who reads next. Or split the room into random groups.": "Audiencia › Elegir a alguien pasa por los nombres de todos los presentes y se detiene en un ganador, un voluntario o quién lee después. O divide la sala en grupos al azar.",
+  "Ready-made polls, and anonymous ones": "Encuestas listas, y anónimas",
+  "Six sample polls to try, from service feedback to planning a picnic. A poll can be anonymous: no names on the screen. Remove any sample you don't need.": "Seis encuestas de ejemplo para probar, desde opiniones sobre el servicio hasta planear un picnic. Una encuesta puede ser anónima: ningún nombre en la pantalla. Quita los ejemplos que no necesites.",
+  "Games, smoother": "Juegos más fluidos",
+  "Question 1 waits until someone has joined, a quiz opens with a Back bar (Esc works too), and games you've played say when, with Play again.": "La pregunta 1 espera a que alguien se una, un cuestionario se abre con una barra Volver (Esc también), y los juegos ya jugados dicen cuándo, con Jugar otra vez.",
+  "A tidier quiz editor": "Un editor de cuestionarios más ordenado",
+  "Labelled fields, answers that line up, and Save at the foot.": "Campos con nombre, respuestas alineadas y Guardar al pie.",
 };
