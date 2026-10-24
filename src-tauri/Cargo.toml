@@ -41,6 +41,8 @@ objc2-app-kit = "0.3.2"
 objc2-foundation = { version = "0.3.2", features = ["NSDate", "NSRunLoop"] }
 objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
 objc2-speech = { version = "0.3.2", features = ["SFSpeechRecognizer", "block2"] }
+# Sound outputs (audio_out.rs): already built for cpal, with the same features.
+coreaudio-sys = { version = "0.2", default-features = false, features = ["audio_unit", "core_audio"] }
 # Whisper on the Mac's graphics (Metal).
 whisper-rs = { version = "0.16", features = ["log_backend", "metal"] }
 

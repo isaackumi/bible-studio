@@ -2,6 +2,7 @@
 #![allow(clippy::collapsible_if)]
 
 
+mod audio_out;
 mod easyworship;
 mod bible;
 mod entitlement;
@@ -1097,15 +1098,23 @@ pub fn run() {
             start_remote_lan,
             remote_lan_status,
             stop_remote_lan,
-            remote_reply
+            remote_reply,
+            audio_out::audio_outputs,
+            audio_out::set_audio_output
         ]);
             move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
                 diagnostics::command(invoke.message.command());
                 handler(invoke)
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Church Studio");
+        .build(tauri::generate_context!())
+        .expect("error while running Church Studio")
+        .run(|_app, event| {
+            // The Mac's sound output back to what it was before Church Studio chose one.
+            if let tauri::RunEvent::Exit = event {
+                audio_out::restore();
+            }
+        });
 }
 
 #[cfg(test)]

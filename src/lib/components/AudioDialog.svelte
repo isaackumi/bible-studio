@@ -1,8 +1,8 @@
 <script lang="ts">
+  import SoundOutputPicker from "./SoundOutputPicker.svelte";
   import { session } from "../app/session.svelte";
   import { formatDuration } from "../domain/playlists";
   import { isDesktop } from "../platform/runtime";
-  import { computerOs } from "../platform/os";
   import DeskDialog from "./sources/DeskDialog.svelte";
   import Icon from "./Icon.svelte";
   import { t } from "../i18n/core";
@@ -31,7 +31,6 @@
   const pad = $derived(audio.pad);
   let padInput = $state<HTMLInputElement | undefined>();
   let padNote = $state("");
-  let outputNote = $state("");
   let walkMinutes = $state(10);
   let walkNote = $state("");
   /** Seconds left in walk-in, ticking. */
@@ -185,17 +184,10 @@
         <h3 class="view-title">{t("Music settings")}</h3>
         <div class="settings">
           <div class="setting">
-            <div class="setting-copy"><strong>{t("Sound output")}</strong><span>{t("Where the music and the sound pad play: the computer's speakers, or the sound desk's USB interface.")}</span></div>
-            {#if session.canChooseAudioOutput}
-              <select aria-label={t("Sound output")} value={audio.outputId} onchange={async (event) => { outputNote = (await session.setAudioOutput(event.currentTarget.value)) ?? ""; }}>
-                <option value="">{t("Computer default")}</option>
-                {#each session.audioOutputs as output (output.id)}<option value={output.id}>{output.label}</option>{/each}
-              </select>
-            {:else}
-              <span class="setting-note">{computerOs() === "windows" ? t("This computer chooses the output in its own sound settings: Windows Settings › System › Sound › Output.") : computerOs() === "mac" ? t("This computer chooses the output in its own sound settings: System Settings › Sound › Output.") : t("This computer chooses the output in its own sound settings.")}</span>
-            {/if}
+            <div class="setting-copy"><strong>{t("Sound output")}</strong><span>{t("Where the room hears the music, the sound pad and videos. More in Settings › Sound & voice.")}</span></div>
+            <SoundOutputPicker compact />
           </div>
-          {#if outputNote}<p class="note" role="status">{outputNote}</p>{/if}
+
           <label class="setting">
             <div class="setting-copy"><strong>{t("Even volume")}</strong><span>{t("Loud tracks are turned down to match the rest, so nobody rides the fader during walk-in. {n} of {total} tracks measured.", { n: measured, total: session.audioTracks.length })}</span></div>
             <input type="checkbox" class="switch" role="switch" checked={audio.even} onchange={(event) => session.setEvenVolume(event.currentTarget.checked)} />
@@ -399,8 +391,7 @@
   .setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
   .setting-copy { display: grid; gap: 2px; min-width: 0; }
   .setting-copy strong { font-size: 13px; }
-  .setting-copy span, .setting-note { font-size: 12px; color: var(--muted); line-height: 1.4; }
-  .setting-note { max-width: 260px; text-align: right; }
-  .setting select { max-width: 240px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+  .setting-copy span { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .setting > :global(.picker) { max-width: 260px; }
   .setting input[type="range"] { width: 140px; flex: none; }
 </style>

@@ -12,6 +12,7 @@
   import SettingsSearch from "./SettingsSearch.svelte";
   import type { SettingEntry } from "../../settings/search";
   import { tick } from "svelte";
+  import SoundOutputPicker from "../SoundOutputPicker.svelte";
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
@@ -156,7 +157,7 @@
     {
       label: msg("Sound & devices"),
       items: [
-        { id: "audio", title: msg("Sound & voice"), icon: "audio", color: "#3e63dd", about: msg("Microphone, listening and voice commands."), keywords: "microphone voice speech listen detection" },
+        { id: "audio", title: msg("Sound & voice"), icon: "audio", color: "#3e63dd", about: msg("Sound output, microphone, listening and voice commands."), keywords: "sound output speakers usb interface hdmi mixer microphone voice speech listen detection" },
         { id: "remote", title: msg("Phone remote"), icon: "phone", color: "#30a46c", about: msg("Pair a phone as a controller. It is never a display."), keywords: "phone tablet pair qr lan" },
       ],
     },
@@ -1564,6 +1565,13 @@
           </div>
         </section>
       {:else if section === "audio"}
+        <p class="section-label">{t("Sound output")}</p>
+        <section class="rows">
+          <div class="row stack">
+            <div class="row-copy"><strong>{t("Where the room hears Church Studio")}</strong><span>{t("Music, the sound pad, and videos on the audience screen. Automatic uses the church's sound system when it is plugged in (an audio interface, or the audience screen's own speakers) and this computer's otherwise.")}</span></div>
+            <SoundOutputPicker />
+          </div>
+        </section>
         <AudioSettings />
         <p class="section-label">{t("Timer sounds")}</p>
         <section class="rows">

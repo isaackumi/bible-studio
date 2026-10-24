@@ -129,6 +129,7 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { clampScreen, sanitizeSongLines, screensOf, type SongLines, type SongScreen } from "../domain/song-screens";
 import { addTracks, MAX_CROSSFADE, moveTrack, removeTrackAt, type AudioSettings, type Playlist } from "../domain/playlists";
 import { AudioDeck, SoundPad, canChooseOutput } from "../audio/deck.svelte";
+import { outputsKey, planOutput, sanitizeTransport, type AudioOutputDevice, type OutputDecision } from "../audio/outputs";
 import { evenGain, measureUrl } from "../audio/loudness";
 import { readBibleFile, verseCount } from "../bible/import";
 import { stageChords, type ChordLine } from "../domain/chords";
@@ -604,6 +605,7 @@ class Session {
       this.workspace = await this.loadWorkspace();
       this.workspaceLoaded = true;
       this.applyAudioSettings();
+      this.startRoomOutput();
       // Screens from last time come back on their monitors (after the display list is in).
       setTimeout(() => {
         this.broadcastScreens();
@@ -1548,6 +1550,105 @@ class Session {
     const ok = await this.audio.setOutput(deviceId);
     return ok || !deviceId ? null : t("This computer could not switch the music to that output. Choose it in the computer's sound settings instead.");
   };
+
+  // The congregation's sound output (desktop): the room's sound system when one is connected,
+  // the computer's own when none is (audio/outputs.ts). Checked every few seconds, so an interface
+  // plugged in or pulled out mid-service is noticed; the output changes only when one comes or
+  // goes, or the church chooses, so a change made in the computer's own settings is left alone.
+
+  /** Sound outputs the computer has (desktop), with how each is connected. */
+  roomOutputs = $state<AudioOutputDevice[]>([]);
+  /** Church Studio sets the computer's sound output itself (a Mac); elsewhere it routes the music. */
+  canSetRoomOutput = $state(false);
+  /** The last choice made, and why. */
+  roomOutput = $state<OutputDecision | null>(null);
+  private roomOutputsKey = "";
+  private roomOutputTimer: ReturnType<typeof setInterval> | undefined;
+
+  startRoomOutput = () => {
+    if (!this.desktop() || this.roomOutputTimer) return;
+    void this.checkRoomOutputs();
+    this.roomOutputTimer = setInterval(() => void this.checkRoomOutputs(), 4000);
+  };
+
+  private readRoomOutputs = async (): Promise<boolean> => {
+    const result = await invoke<{ outputs?: unknown; canSetDefault?: unknown }>("audio_outputs").catch(() => null);
+    if (!result || !Array.isArray(result.outputs)) return false;
+    this.roomOutputs = result.outputs.flatMap((entry) => {
+      const record = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+      return typeof record.id === "string" && record.id ? [{ id: record.id, name: typeof record.name === "string" && record.name ? record.name : record.id, transport: sanitizeTransport(record.transport), isDefault: record.isDefault === true }] : [];
+    });
+    this.canSetRoomOutput = result.canSetDefault === true;
+    return true;
+  };
+
+  checkRoomOutputs = async () => {
+    const before = this.roomOutputsKey ? this.roomOutputs : null;
+    if (!(await this.readRoomOutputs())) return;
+    // A different audience screen can mean a different output too (its own speakers).
+    const key = `${outputsKey(this.roomOutputs)}#${this.audienceScreenNames().join("|")}`;
+    if (key === this.roomOutputsKey) return;
+    this.roomOutputsKey = key;
+    await this.applyRoomOutput(before);
+  };
+
+  /** "auto", or one output by its id: kept with the workspace, used straight away. */
+  setRoomOutput = async (choice: string) => {
+    const output = this.roomOutputs.find((entry) => entry.id === choice);
+    this.setAudio({ audience: output ? output.id : "auto", audienceName: output?.name ?? "" });
+    await this.applyRoomOutput(null, true);
+  };
+
+  /** Puts the congregation's sound where the choice says, and tells the desk when a plug changed it. */
+  private applyRoomOutput = async (before: AudioOutputDevice[] | null, chosenNow = false) => {
+    const audio = this.workspace.audio;
+    const plan = planOutput(before, this.roomOutputs, audio.audience || "auto", this.audienceScreenNames(), { chosenNow, chosenName: audio.audienceName || t("The chosen output") });
+    this.roomOutput = plan.decision;
+    const target = plan.decision.output;
+    if (!target) return;
+    if (this.canSetRoomOutput) {
+      if (plan.switchTo) {
+        try {
+          await invoke("set_audio_output", { id: plan.switchTo.id });
+          await this.readRoomOutputs();
+        } catch (error) {
+          this.warn(String(error));
+          return;
+        }
+      }
+      // The music follows the computer's sound output, as videos on the audience screens do.
+      if (audio.outputId) this.setAudio({ outputId: "" });
+      void this.audio.setOutput("");
+      this.soundPad.setOutput("");
+    } else {
+      await this.routeMusicTo(target.name);
+    }
+    const notice = plan.notice;
+    const change = t("Change it in Settings › Sound & voice.");
+    if (notice?.kind === "unplugged") {
+      this.notify(t("{name} was unplugged", { name: notice.name }), { detail: t("Sound now goes to {output}. It goes back when {name} is plugged in again.", { output: notice.output, name: notice.name }), ms: 12_000 });
+    } else if (notice?.kind === "moved") {
+      const why = { "plugged-in": t("It was just plugged in."), unplugged: t("The output it used was unplugged."), screen: t("It is the audience screen's own sound."), other: "" }[notice.cause];
+      this.notify(t("Sound now goes to {output}", { output: notice.output }), { detail: `${why} ${change}`.trim(), ms: 10_000 });
+    } else if (notice?.kind === "start") {
+      this.message = t("Sound goes to {output}. Change it in Settings › Sound & voice.", { output: notice.output });
+    }
+  };
+
+  /** Where the computer cannot be told (Windows), the music itself goes to the output, found by name. */
+  private routeMusicTo = async (name: string) => {
+    const media = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+    if (!media?.enumerateDevices || !this.canChooseAudioOutput) return;
+    const devices = await media.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+    const match = devices.find((device) => device.kind === "audiooutput" && device.deviceId && device.deviceId !== "default" && device.label && (device.label === name || device.label.includes(name) || name.includes(device.label)));
+    const id = match?.deviceId ?? "";
+    if (id === this.workspace.audio.outputId) return;
+    this.setAudio({ outputId: id });
+    this.soundPad.setOutput(id);
+    await this.audio.setOutput(id);
+  };
+
+  private audienceScreenNames = () => this.output.displays.filter((display) => display.audience).map((display) => display.name);
 
   // Backing tracks: a song with one plays it when the song goes live.
 
