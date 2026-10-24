@@ -30,6 +30,7 @@
     } catch {
       // Storage blocked: the bar sits where it starts.
     }
+    requestAnimationFrame(keepInside);
     const tick = setInterval(() => (now = Date.now()), 200);
     return () => clearInterval(tick);
   });
@@ -82,31 +83,64 @@
     else void session.startDeckLoop(deckId, seconds, liveIndex ?? pageIndex);
   };
 
-  // Dragged by its handle; kept inside the window; remembered.
+  // Dragged by its handle anywhere in the window (the studio fills it, so the bar can sit over the
+  // side panels too); kept inside the window; remembered. The grip captures the pointer, so a fast
+  // drag that leaves the handle still follows the hand.
   function startDrag(event: PointerEvent) {
-    if (!bar) return;
+    if (!bar || event.button !== 0) return;
+    event.preventDefault();
+    const grip = event.currentTarget as HTMLElement;
     const rect = bar.getBoundingClientRect();
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
-    dragging = true;
+    const place = (ev: PointerEvent) => {
+      x = Math.round(Math.min(Math.max(8, ev.clientX - offsetX), window.innerWidth - rect.width - 8));
+      y = Math.round(Math.min(Math.max(8, ev.clientY - offsetY), window.innerHeight - rect.height - 8));
+    };
     const move = (ev: PointerEvent) => {
-      x = Math.min(Math.max(8, ev.clientX - offsetX), window.innerWidth - rect.width - 8);
-      y = Math.min(Math.max(8, ev.clientY - offsetY), window.innerHeight - rect.height - 8);
+      // The first real move starts the drag; a plain click on the grip moves nothing.
+      if (!dragging && Math.hypot(ev.clientX - event.clientX, ev.clientY - event.clientY) < 3) return;
+      dragging = true;
+      place(ev);
     };
     const stop = () => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", stop);
+      grip.removeEventListener("pointercancel", stop);
+      if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+      if (!dragging) return;
       dragging = false;
       remember();
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", stop);
+    grip.addEventListener("pointercancel", stop);
+    try {
+      grip.setPointerCapture(event.pointerId);
+    } catch {
+      // A pointer the browser will not hand over: the drag still works while the hand stays on the grip.
+    }
+  }
+
+  /** Where the bar starts: centred over the canvas column, above the page strip. */
+  let centre = $state(typeof window === "undefined" ? 0 : window.innerWidth / 2);
+  /** A bar left where it no longer fits (the window shrank) comes back inside. */
+  function keepInside() {
+    if (!bar) return;
+    const column = bar.parentElement?.getBoundingClientRect();
+    if (column) centre = column.left + column.width / 2;
+    if (x === null || y === null) return;
+    x = Math.max(8, Math.min(x, window.innerWidth - bar.offsetWidth - 8));
+    y = Math.max(8, Math.min(y, window.innerHeight - bar.offsetHeight - 8));
   }
   const toggleFold = () => {
     folded = !folded;
     remember();
+    requestAnimationFrame(keepInside);
   };
 </script>
+
+<svelte:window onresize={keepInside} />
 
 <div
   bind:this={bar}
@@ -116,7 +150,7 @@
   class:has-live={liveIndex !== null}
   role="toolbar"
   aria-label={t("Show controls")}
-  style:left={x === null ? "50%" : `${x}px`}
+  style:left={x === null ? `${centre}px` : `${x}px`}
   style:top={y === null ? "auto" : `${y}px`}
   style:bottom={y === null ? "182px" : "auto"}
   style:transform={x === null ? "translateX(-50%)" : "none"}
@@ -166,7 +200,8 @@
 <style>
   /* Glass: the canvas shows through, the edge catches the light, the shadow lifts it. */
   .showbar {
-    position: absolute;
+    position: fixed;
+    z-index: 38;
     z-index: 6;
     display: flex;
     align-items: center;
@@ -187,6 +222,7 @@
   .showbar.folded { padding: 6px 12px 6px 6px; border-radius: 999px; }
   .grip { display: grid; place-items: center; width: 22px; height: 34px; border: 0; border-radius: 10px; background: none; color: rgb(255 255 255 / 0.45); cursor: grab; touch-action: none; }
   .grip:hover { color: #fff; background: rgb(255 255 255 / 0.08); }
+  .showbar.dragging, .showbar.dragging .grip { cursor: grabbing; }
   .state { display: flex; align-items: center; gap: 9px; min-width: 150px; padding: 0 6px; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
   .state.small { min-width: 0; cursor: pointer; }
   .dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: rgb(255 255 255 / 0.28); }
