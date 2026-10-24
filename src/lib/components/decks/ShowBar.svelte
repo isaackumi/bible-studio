@@ -86,22 +86,42 @@
   // Dragged by its handle anywhere in the window (the studio fills it, so the bar can sit over the
   // side panels too); kept inside the window; remembered. The grip captures the pointer, so a fast
   // drag that leaves the handle still follows the hand.
+  //
+  // Smoothness: the bar is a blurred glass panel, so moving it through `left`/`top` would re-lay-out
+  // and re-blur on every pointer event (several per frame). While dragging, the position is written
+  // once per animation frame as a transform, straight to the element, on the compositor; the state
+  // (and the saved spot) is set once when the hand lets go.
   function startDrag(event: PointerEvent) {
     if (!bar || event.button !== 0) return;
     event.preventDefault();
     const grip = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
+    const el = bar;
+    const rect = el.getBoundingClientRect();
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
-    const place = (ev: PointerEvent) => {
-      x = Math.round(Math.min(Math.max(8, ev.clientX - offsetX), window.innerWidth - rect.width - 8));
-      y = Math.round(Math.min(Math.max(8, ev.clientY - offsetY), window.innerHeight - rect.height - 8));
+    const maxX = window.innerWidth - rect.width - 8;
+    const maxY = window.innerHeight - rect.height - 8;
+    let atX = rect.left;
+    let atY = rect.top;
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
+      el.style.transform = `translate3d(${atX}px, ${atY}px, 0)`;
     };
     const move = (ev: PointerEvent) => {
       // The first real move starts the drag; a plain click on the grip moves nothing.
-      if (!dragging && Math.hypot(ev.clientX - event.clientX, ev.clientY - event.clientY) < 3) return;
-      dragging = true;
-      place(ev);
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - event.clientX, ev.clientY - event.clientY) < 3) return;
+        dragging = true;
+        // From here the element is placed by its transform alone, from the window's corner.
+        el.style.left = "0";
+        el.style.top = "0";
+        el.style.bottom = "auto";
+        paint();
+      }
+      atX = Math.min(Math.max(8, ev.clientX - offsetX), maxX);
+      atY = Math.min(Math.max(8, ev.clientY - offsetY), maxY);
+      if (!frame) frame = requestAnimationFrame(paint);
     };
     const stop = () => {
       grip.removeEventListener("pointermove", move);
@@ -109,6 +129,14 @@
       grip.removeEventListener("pointercancel", stop);
       if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
       if (!dragging) return;
+      if (frame) cancelAnimationFrame(frame);
+      // The state takes over at the same spot, so nothing moves on the hand-over.
+      x = Math.round(atX);
+      y = Math.round(atY);
+      el.style.transform = "";
+      el.style.left = "";
+      el.style.top = "";
+      el.style.bottom = "";
       dragging = false;
       remember();
     };
@@ -150,10 +178,10 @@
   class:has-live={liveIndex !== null}
   role="toolbar"
   aria-label={t("Show controls")}
-  style:left={x === null ? `${centre}px` : `${x}px`}
-  style:top={y === null ? "auto" : `${y}px`}
+  style:left={x === null ? `${centre}px` : "0"}
+  style:top={y === null ? "auto" : "0"}
   style:bottom={y === null ? "182px" : "auto"}
-  style:transform={x === null ? "translateX(-50%)" : "none"}
+  style:transform={x === null || y === null ? "translateX(-50%)" : `translate3d(${x}px, ${y}px, 0)`}
 >
   <button type="button" class="grip" aria-label={t("Move the show controls")} title={t("Drag to move")} onpointerdown={startDrag}><Icon name="grip" size={14} /></button>
   {#if folded}
@@ -202,7 +230,7 @@
   .showbar {
     position: fixed;
     z-index: 38;
-    z-index: 6;
+    will-change: transform;
     display: flex;
     align-items: center;
     gap: 8px;
