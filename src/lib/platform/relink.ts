@@ -3,7 +3,7 @@
 // each address is rebuilt from the id for this computer's media folder.
 
 /** The media folder's file name in an address, whatever the separators (plain or URL-encoded). */
-const MEDIA_FILE = /(?:\/|%2F|%5C|\\)media(?:\/|%2F|%5C|\\)([0-9a-f-]{36})\.([a-z0-9]{2,5})/i;
+export const MEDIA_FILE = /(?:\/|%2F|%5C|\\)media(?:\/|%2F|%5C|\\)([0-9a-f-]{36})\.([a-z0-9]{2,5})/i;
 
 /** A copy of `value` with every media address this computer knows rewritten by `urlFor`. */
 export function relinkMedia<T>(value: T, urlFor: (id: string) => string | null): T {
