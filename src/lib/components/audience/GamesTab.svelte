@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/sounds";
   import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
   import { quizPacks } from "../../app/starter.svelte";
@@ -252,6 +253,17 @@
       <summary>{t("How the game runs")}</summary>
       <label><input type="checkbox" class="switch" checked={audienceRoom.follow} onchange={(event) => audienceRoom.setFollow(event.currentTarget.checked)} /> <span>{t("Screen follows the game")}<small>{t("Each question, answer and the podium go to the screen as they happen; when time is up, the answer shows by itself.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.sounds} onchange={(event) => audienceRoom.setSounds(event.currentTarget.checked)} /> <span>{t("Game sounds")}<small>{t("Music while people join and answer, ticks, a gong, a drumroll and a fanfare, on the audience screen.")}</small></span></label>
+      {#if audienceRoom.sounds}
+        <div class="music" role="radiogroup" aria-label={t("Music style")}>
+          <span>{t("Music style")}</span>
+          {#each Object.entries(MUSIC_STYLE_INFO) as [id, info] (id)}
+            <div class="style" class:on={audienceRoom.musicStyle === id}>
+              <button type="button" role="radio" aria-checked={audienceRoom.musicStyle === id} onclick={() => audienceRoom.setMusicStyle(id as MusicStyle)}><strong>{t(info.name)}</strong><small>{t(info.hint)}</small></button>
+              {#if id !== "surprise"}<button type="button" class="hear" aria-label={t("Listen to {name}", { name: t(info.name) })} title={t("Listen here, on this computer")} onclick={() => audienceRoom.hearMusic(id as MusicStyle)}>{audienceRoom.hearing === id ? "■" : "▶"}</button>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
       <label><input type="checkbox" class="switch" checked={audienceRoom.ready} onchange={(event) => audienceRoom.setReady(event.currentTarget.checked)} /> <span>{t("Get ready countdown")}<small>{t("Each question shows alone for 4 seconds to read, then the answers open and the clock starts.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.auto} disabled={!audienceRoom.follow} onchange={(event) => audienceRoom.setAuto(event.currentTarget.checked)} /> <span>{t("Runs by itself")}<small>{t("After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.")}</small></span></label>
     </details>
@@ -504,4 +516,11 @@
   .teams-board i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; }
   .link { justify-self: start; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 2px 0; }
   @media (prefers-reduced-motion: reduce) { .answers li > i { transition: none; } }
+  .music { display: grid; gap: 6px; padding: 4px 0 6px; }
+  .music > span { color: var(--muted); font-size: 12px; font-weight: 650; }
+  .style { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .style.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .style > button:first-child { flex: 1; display: grid; gap: 1px; padding: 6px 10px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+  .style small { color: var(--muted); font-size: 11px; }
+  .hear { width: 36px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
 </style>

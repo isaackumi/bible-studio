@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
   import { CHOICE_PATHS, CHOICE_STYLES, ordinal, playerColor, say, sayCount, type GamePlayer, type GameScreenData } from "../../domain/game-screen";
-  import { GameSound } from "../../game/sounds";
+  import { GameSound, sanitizeMusicStyle } from "../../game/sounds";
   import QrView from "../QrView.svelte";
 
   // The game show on the screen. Each stage has its own moves: names pop into the lobby, the clock
@@ -36,6 +36,7 @@
   $effect(() => {
     const { key, stage, sounds } = data;
     if (!sound) return;
+    sound.setStyle(sanitizeMusicStyle(data.musicStyle));
     if (!sounds) {
       sound.stop();
       heardKey = key;

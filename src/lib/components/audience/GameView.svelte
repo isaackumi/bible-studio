@@ -2,6 +2,7 @@
   import { audienceRoom } from "../../app/rooms.svelte";
   import { MOST_TEAMS, TEAMS } from "../../domain/game-colors";
   import { questionsAsText, ready, type Game } from "../../domain/games";
+  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/sounds";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
   import ChoiceMark from "./ChoiceMark.svelte";
@@ -22,7 +23,12 @@
   const description = $derived(builtIn && game.description ? t(game.description) : game.description);
   const quiz = $derived(game.kind === "quiz");
   const notReady = $derived(game.questions.filter((question) => !ready(question, game.kind)).length);
-  const seconds = $derived(game.questions.reduce((sum, question) => sum + (question.seconds || 20) + 8, 0));
+  const pool = $derived(game.questions.filter((question) => ready(question, game.kind)).length);
+  const play = $derived(audienceRoom.playSettings(game));
+  /** The questions one play asks: all, or the number chosen from the pool. */
+  const perPlay = $derived(play.count > 0 ? Math.min(play.count, pool) : pool);
+  const COUNTS = [5, 10, 15, 20, 25, 30];
+  const seconds = $derived(Math.round((game.questions.reduce((sum, question) => sum + (question.seconds || 20) + 8, 0) * perPlay) / Math.max(1, game.questions.length)));
   let armed = $state(false);
   let copied = $state(false);
 
@@ -63,6 +69,28 @@
           </button>
         {/each}
       </div>
+    {/if}
+    {#if pool > 1}
+      <div class="teams" role="radiogroup" aria-label={t("Questions each time")}>
+        <span>{t("Questions each time")}</span>
+        <button type="button" role="radio" aria-checked={perPlay === pool} class:on={perPlay === pool} onclick={() => audienceRoom.setPlaySettings(game, { ...play, count: 0 })}>{t("All {n}", { n: pool })}</button>
+        {#each COUNTS.filter((count) => count < pool) as count (count)}
+          <button type="button" role="radio" aria-checked={perPlay === count} class:on={perPlay === count} onclick={() => audienceRoom.setPlaySettings(game, { mix: true, count })}>{count}</button>
+        {/each}
+        <label class="mix"><input type="checkbox" checked={play.mix} onchange={(event) => audienceRoom.setPlaySettings(game, { ...play, mix: event.currentTarget.checked })} /> {t("New order each time")}</label>
+      </div>
+      {#if perPlay < pool}
+        <p class="hint">{t("Each play picks {n} of the {total} questions at random, ones the room has not had lately first, so a replay feels new.", { n: perPlay, total: pool })}</p>
+      {/if}
+    {/if}
+    {#if audienceRoom.sounds}
+      <label class="teams">
+        <span>{t("Music style")}</span>
+        <select class="style-pick" value={audienceRoom.musicStyle} onchange={(event) => audienceRoom.setMusicStyle(event.currentTarget.value as MusicStyle)}>
+          {#each Object.entries(MUSIC_STYLE_INFO) as [id, info] (id)}<option value={id}>{t(info.name)}</option>{/each}
+        </select>
+        {#if audienceRoom.musicStyle !== "surprise"}<button type="button" class:on={audienceRoom.hearing === audienceRoom.musicStyle} onclick={() => audienceRoom.hearMusic(audienceRoom.musicStyle)}>{audienceRoom.hearing === audienceRoom.musicStyle ? t("Stop") : t("Listen")}</button>{/if}
+      </label>
     {/if}
     <div class="buttons">
       <button type="button" class="btn accent big" onclick={onplay}><Icon name="play" size={14} /> {quiz ? t("Play this quiz") : t("Run this poll")}</button>
@@ -123,6 +151,8 @@
   .teams > span { color: var(--muted); font-size: 12px; margin-right: 2px; }
   .teams button { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .teams button.on { border-color: var(--accent); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
+  .style-pick { height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 12px; padding: 0 6px; }
+  .mix { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; color: var(--muted); font-size: 12px; cursor: pointer; }
   .teams i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
   .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }

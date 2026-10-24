@@ -40,6 +40,8 @@ export type GameScreenData = {
   sounds: boolean;
   /** The lobby and question music: only while a game is running (a frame left up after it is quiet). */
   music?: boolean;
+  /** The music's style (game/sounds.ts). */
+  musicStyle?: string;
   /** Changes with every new question or stage, so the screen knows to start its moves again. */
   key: string;
   /** Team standings, best first (team mode); null when everyone plays for themselves. */

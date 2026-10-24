@@ -95,8 +95,40 @@ export function newGame(title = "New game"): Game {
 }
 
 /** Mix the answers (the right one keeps being right). */
+/** A fair shuffle (Fisher–Yates): every order equally likely. */
+export function shuffle<T>(items: readonly T[], random = Math.random): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
+/** How a game is played each time: how many of its questions (0, all), and in a new order or as written. */
+export type PlaySettings = { count: number; mix: boolean };
+
+/** A quiz mixes its questions each time; a poll keeps the order it was written in. */
+export const defaultPlay = (game: Game): PlaySettings => ({ count: 0, mix: game.kind === "quiz" });
+
+/**
+ * The questions for one play: the ready ones, mixed when the settings say, and only `count` of them
+ * when the pool has more. Questions asked last time (`asked`, by their words) come last, so a
+ * replay asks ones the room has not just seen, until the pool runs out.
+ */
+export function drawQuestions(game: Game, settings: PlaySettings, asked: readonly string[] = [], random = Math.random): GameQuestion[] {
+  const pool = game.questions.filter((question) => ready(question, game.kind));
+  const ordered = settings.mix ? shuffle(pool, random) : pool;
+  const count = settings.count > 0 ? Math.min(settings.count, pool.length) : pool.length;
+  if (count >= pool.length || !asked.length) return ordered.slice(0, count);
+  const seen = new Set(asked);
+  const fresh = ordered.filter((question) => !seen.has(question.prompt));
+  const again = ordered.filter((question) => seen.has(question.prompt));
+  return [...fresh, ...again].slice(0, count);
+}
+
 export function shuffled(question: GameQuestion, random = Math.random): GameQuestion {
-  const order = question.choices.map((_, index) => index).sort(() => random() - 0.5);
+  const order = shuffle(question.choices.map((_, index) => index), random);
   return { ...question, choices: order.map((index) => question.choices[index]!), correct: question.correct === null ? null : order.indexOf(question.correct) };
 }
 

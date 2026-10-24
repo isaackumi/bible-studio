@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_GAMES, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame, seriesFinal, questionsFromText, questionsAsText } from "./games";
+import { BUILT_IN_GAMES, defaultPlay, drawQuestions, shuffle, type Game, finishTheVerseGame, newGame, ready, sanitizeGame, shuffled, whichBookGame, seriesFinal, questionsFromText, questionsAsText } from "./games";
 
 describe("games", () => {
   it("built-in games are all ready to play, with the right answer among the answers", () => {
@@ -81,5 +81,52 @@ describe("questions typed or pasted as text", () => {
     const game = { ...newGame("Test"), questions: questionsFromText("Who built the ark?\nMoses\n* Noah") };
     expect(questionsAsText(game)).toBe("Who built the ark?\nMoses\n* Noah");
     expect(questionsFromText(questionsAsText(game))[0]?.correct).toBe(1);
+  });
+});
+
+describe("each play's questions", () => {
+  const pool = (n: number): Game => ({ ...newGame("Pool"), questions: Array.from({ length: n }, (_, i) => ({ id: `q${i}`, prompt: `Question ${i}`, choices: ["A", "B"], correct: 0, seconds: 20, points: 1000 })) });
+  const seeded = (seed: number) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+
+  it("asks every ready question in a new order each time", () => {
+    const game = pool(12);
+    const first = drawQuestions(game, { count: 0, mix: true }, [], seeded(1)).map((q) => q.prompt);
+    const second = drawQuestions(game, { count: 0, mix: true }, [], seeded(7)).map((q) => q.prompt);
+    expect(first).toHaveLength(12);
+    expect(new Set(first).size).toBe(12);
+    expect(first).not.toEqual(second);
+  });
+
+  it("keeps the written order when mixing is off", () => {
+    expect(drawQuestions(pool(5), { count: 0, mix: false }).map((q) => q.id)).toEqual(["q0", "q1", "q2", "q3", "q4"]);
+  });
+
+  it("draws a few from a bigger pool, the ones not asked last time first", () => {
+    const game = pool(20);
+    const first = drawQuestions(game, { count: 8, mix: true }, [], seeded(3));
+    expect(first).toHaveLength(8);
+    const second = drawQuestions(game, { count: 8, mix: true }, first.map((q) => q.prompt), seeded(4));
+    expect(second.some((q) => first.some((f) => f.prompt === q.prompt))).toBe(false);
+    // Only 4 not yet asked: they come first, then some asked before.
+    const third = drawQuestions(game, { count: 8, mix: true }, [...first, ...second].map((q) => q.prompt), seeded(5));
+    expect(third.slice(0, 4).every((q) => ![...first, ...second].some((f) => f.prompt === q.prompt))).toBe(true);
+    expect(third).toHaveLength(8);
+  });
+
+  it("asks all of a pool smaller than the number asked for, and skips questions not ready", () => {
+    const game = pool(3);
+    game.questions.push({ id: "blank", prompt: "", choices: ["", ""], correct: 0, seconds: 20, points: 1000 });
+    expect(drawQuestions(game, { count: 10, mix: true })).toHaveLength(3);
+  });
+
+  it("mixes a quiz by default and keeps a poll in order", () => {
+    expect(defaultPlay(pool(2))).toEqual({ count: 0, mix: true });
+    expect(defaultPlay({ ...pool(2), kind: "poll" })).toEqual({ count: 0, mix: false });
+  });
+
+  it("shuffles fairly", () => {
+    const counts = [0, 0, 0];
+    for (let i = 0; i < 3000; i++) counts[shuffle([0, 1, 2]).indexOf(0)]! += 1;
+    for (const count of counts) expect(count).toBeGreaterThan(850);
   });
 });

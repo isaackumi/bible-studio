@@ -5,7 +5,8 @@
 // The room's host key is kept on this computer only (it is what lets this desk run the room).
 
 import { serverCall } from "../domain/billing";
-import { finishTheVerseGame, ready, shuffled, whichBookGame, WELL_KNOWN, type Game } from "../domain/games";
+import { defaultPlay, drawQuestions, finishTheVerseGame, ready, shuffled, whichBookGame, WELL_KNOWN, type Game, type PlaySettings } from "../domain/games";
+import { GameSound, sanitizeMusicStyle, type MusicStyle } from "../game/sounds";
 import { api } from "../db/api";
 import { presentQr } from "../domain/overlays";
 import { presentText } from "../domain/present";
@@ -239,13 +240,34 @@ class AudienceRoom {
   /** The game being played: its questions (answers mixed), and which one is up. */
   playing = $state<{ game: Game; index: number } | null>(null);
 
-  /** Start a game: only questions ready to run, answers mixed so the right one moves about. */
+  /** How each game is played: how many of its questions, mixed or not (kept on this computer). */
+  plays = $state<Record<string, PlaySettings>>(readPlays().settings);
+  /** The questions each game asked lately (by their words), so a replay asks others first. */
+  private asked: Record<string, string[]> = readPlays().asked;
+
+  playSettings = (game: Game): PlaySettings => this.plays[game.id] ?? defaultPlay(game);
+
+  setPlaySettings = (game: Game, settings: PlaySettings) => {
+    this.plays = { ...this.plays, [game.id]: { count: Math.max(0, Math.round(settings.count)), mix: settings.mix } };
+    writePlays(this.plays, this.asked);
+  };
+
+  /**
+   * Start a game: its questions for this play (a new order, or a few from the pool, the ones not
+   * asked lately first), answers mixed so the right one moves about.
+   */
   play = (game: Game) => {
-    const questions = game.questions.filter((question) => ready(question, game.kind)).map((question) => (game.kind === "quiz" ? shuffled(question) : question));
+    const pool = game.questions.filter((question) => ready(question, game.kind));
+    const drawn = drawQuestions(game, this.playSettings(game), this.asked[game.id] ?? []);
+    const questions = drawn.map((question) => (game.kind === "quiz" ? shuffled(question) : question));
     if (!questions.length) {
       this.error = t("This game has no questions ready to play yet.");
       return;
     }
+    // Asked lately: added to until every question has had its turn, then it starts again.
+    const lately = [...new Set([...(this.asked[game.id] ?? []), ...drawn.map((question) => question.prompt)])];
+    this.asked = { ...this.asked, [game.id]: lately.length >= pool.length ? drawn.map((question) => question.prompt) : lately };
+    writePlays(this.plays, this.asked);
     this.playing = { game: { ...game, questions }, index: 0 };
     this.lastGame = null;
     this.recentGames = [game.id, ...this.recentGames.filter((id) => id !== game.id)].slice(0, MOST_RECENT);
@@ -339,6 +361,8 @@ class AudienceRoom {
   follow = $state(readPrefs().follow);
   /** Music and sound effects on the audience screen. */
   sounds = $state(readPrefs().sounds);
+  /** The style of the game music. */
+  musicStyle = $state<MusicStyle>(readPrefs().musicStyle);
   /** Games played lately, newest first (their ids), for the Games tab's Recently played. */
   recentGames = $state<string[]>(readRecent());
 
@@ -410,6 +434,35 @@ class AudienceRoom {
     void this.refreshScreen();
   };
 
+  setMusicStyle = (style: MusicStyle) => {
+    this.musicStyle = style;
+    this.savePrefs();
+    void this.refreshScreen();
+  };
+
+  /** A few seconds of a style's question music, on this computer, to choose by ear. */
+  private sampler: GameSound | null = null;
+  private samplerTimer: ReturnType<typeof setTimeout> | undefined;
+  hearing = $state<MusicStyle | null>(null);
+  hearMusic = (style: MusicStyle) => {
+    clearTimeout(this.samplerTimer);
+    this.sampler?.close();
+    if (this.hearing === style) {
+      this.sampler = null;
+      this.hearing = null;
+      return;
+    }
+    this.sampler = new GameSound();
+    this.sampler.setStyle(style);
+    this.sampler.play("question");
+    this.hearing = style;
+    this.samplerTimer = setTimeout(() => {
+      this.sampler?.close();
+      this.sampler = null;
+      this.hearing = null;
+    }, 8000);
+  };
+
   setReady = (on: boolean) => {
     this.ready = on;
     this.savePrefs();
@@ -421,7 +474,7 @@ class AudienceRoom {
   };
 
   private savePrefs() {
-    writePrefs({ follow: this.follow, sounds: this.sounds, ready: this.ready, auto: this.auto, teams: this.teams });
+    writePrefs({ follow: this.follow, sounds: this.sounds, ready: this.ready, auto: this.auto, teams: this.teams, musicStyle: this.musicStyle });
   }
 
   private get screenId(): string {
@@ -461,6 +514,7 @@ class AudienceRoom {
       join: saved ? { code: saved.code, at, url: saved.joinUrl } : null,
       sounds: this.sounds,
       music: this.sounds && this.playing !== null,
+      musicStyle: this.musicStyle,
       key: `${stage}:${question?.id ?? ""}:${live?.phase === "open" ? "open" : ""}`,
       teams: view?.teams ? view.teams.map((team) => ({ ...team, name: t(TEAMS[team.team]?.name ?? ""), color: TEAMS[team.team]?.color ?? "#888888" })) : null,
       words: Object.fromEntries(GAME_WORDS.map((line) => [line, t(line)])),
@@ -549,15 +603,15 @@ function writeRecent(ids: string[]) {
   }
 }
 
-type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean; teams: number };
+type GamePrefs = { follow: boolean; sounds: boolean; ready: boolean; auto: boolean; teams: number; musicStyle: MusicStyle };
 
 function readPrefs(): GamePrefs {
   try {
     const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as Partial<Record<keyof GamePrefs, unknown>> | null;
     const teams = Math.round(Number(saved?.teams) || 0);
-    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true, teams: teams >= 2 && teams <= MOST_TEAMS ? teams : 0 };
+    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true, teams: teams >= 2 && teams <= MOST_TEAMS ? teams : 0, musicStyle: sanitizeMusicStyle(saved?.musicStyle) };
   } catch {
-    return { follow: true, sounds: true, ready: true, auto: false, teams: 0 };
+    return { follow: true, sounds: true, ready: true, auto: false, teams: 0, musicStyle: "classic" };
   }
 }
 
@@ -566,5 +620,33 @@ function writePrefs(prefs: GamePrefs) {
     localStorage.setItem(GAME_PREFS, JSON.stringify(prefs));
   } catch {
     // Storage refused: the choice lasts until this window closes.
+  }
+}
+
+const GAME_PLAYS = "church-studio:game-plays";
+
+function readPlays(): { settings: Record<string, PlaySettings>; asked: Record<string, string[]> } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(GAME_PLAYS) ?? "null") as { settings?: unknown; asked?: unknown } | null;
+    const settings: Record<string, PlaySettings> = {};
+    for (const [id, value] of Object.entries(saved?.settings && typeof saved.settings === "object" ? saved.settings : {})) {
+      const entry = value as Partial<PlaySettings> | null;
+      if (entry && typeof entry === "object") settings[id] = { count: Math.max(0, Math.round(Number(entry.count) || 0)), mix: entry.mix !== false };
+    }
+    const asked: Record<string, string[]> = {};
+    for (const [id, value] of Object.entries(saved?.asked && typeof saved.asked === "object" ? saved.asked : {})) {
+      if (Array.isArray(value)) asked[id] = value.filter((entry): entry is string => typeof entry === "string").slice(0, 200);
+    }
+    return { settings, asked };
+  } catch {
+    return { settings: {}, asked: {} };
+  }
+}
+
+function writePlays(settings: Record<string, PlaySettings>, asked: Record<string, string[]>) {
+  try {
+    localStorage.setItem(GAME_PLAYS, JSON.stringify({ settings, asked }));
+  } catch {
+    // Storage refused: the choices last until this window closes.
   }
 }
