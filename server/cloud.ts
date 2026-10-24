@@ -25,6 +25,8 @@ const DAY = 86_400_000;
 const GB = 1e9;
 /** Days a lapsed plan's cloud copy stays readable before it is wiped. */
 export const LAPSE_DAYS = 90;
+/** The biggest file one upload may carry through the worker (its request body limit). */
+export const UPLOAD_BYTES = 95_000_000;
 
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "cache-control": "no-store" };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS } });
@@ -39,7 +41,7 @@ async function access(config: ApiConfig, token: string, device: string, name: st
   if (!account) return json(401, { signedOut: true, error: "Sign in to use cloud space." });
   if (!device) return json(400, { error: "Which computer?" });
   const now = config.now();
-  let best: { licence: string; plan: LicensePlan; endsAt: number | null } | null = null;
+  let best: { licence: string; plan: LicensePlan; endsAt: number | null; rank: number } | null = null;
   let removed = false;
   for (const entry of account.licenses) {
     const read = readAnyLicense(config, entry.key);
@@ -49,8 +51,10 @@ async function access(config: ApiConfig, token: string, device: string, name: st
       removed = true;
       continue;
     }
-    const rank = read.license.plan === "church" ? 2 : 1;
-    if (!best || rank > (best.plan === "church" ? 2 : 1)) best = { licence: read.license.id, plan: read.license.plan, endsAt: await keyEnds(config, read.license) };
+    const endsAt = await keyEnds(config, read.license);
+    // A plan still running beats an ended one; then Church beats Premium.
+    const rank = (endsAt === null || now < endsAt ? 10 : 0) + (read.license.plan === "church" ? 2 : 1);
+    if (!best || rank > best.rank) best = { licence: read.license.id, plan: read.license.plan, endsAt, rank };
   }
   if (!best) return removed ? json(403, { removed: true, error: "The owner of this licence took you off it. Ask them to add you again." }) : json(402, { plan: "free", error: "Cloud space comes with Premium and Church." });
   const seats = ((await getJson<Device[]>(config.store, `act:${best.licence}`)) ?? []).filter((seat) => now - Date.parse(seat.seenAt) < STALE_DAYS * DAY);
@@ -75,14 +79,26 @@ async function ownerEmail(config: ApiConfig, licence: string): Promise<string> {
   return (await getJson<{ email?: string }>(config.store, `license:${licence}`))?.email ?? "";
 }
 
-type Lapse = { endsAt: number; email: string; sent: number[] };
+type Lapse = { endsAt: number; email: string; sent: number[]; wiped?: boolean };
 
-/** A plan that ended: the cloud copy turns read-only now, the owner hears once, and it is wiped 90 days after the end. */
-async function lapseIfEnded(config: ApiConfig, who: Access): Promise<void> {
-  if (!who.ended || who.endsAt === null) return;
-  await library(config, who.licence, "lapse", { readOnly: true, wipeAt: who.endsAt + LAPSE_DAYS * DAY });
+/**
+ * A plan that ended: the cloud copy turns read-only now, the owner hears once, and it is wiped 90
+ * days after the end. A plan renewed before then: writable again, the wipe is off.
+ */
+async function renewedOrLapsed(config: ApiConfig, who: Access): Promise<void> {
   const key = `cloud:lapse:${who.licence}`;
-  if (await config.store.get(key)) return;
+  if (!who.ended) {
+    const lapse = await getJson<Lapse>(config.store, key);
+    if (lapse && !lapse.wiped) {
+      await library(config, who.licence, "lapse", { readOnly: false, wipeAt: null });
+      await config.store.delete(key);
+    }
+    return;
+  }
+  if (who.endsAt === null) return;
+  const lapse = await getJson<Lapse>(config.store, key);
+  if (lapse) return;
+  await library(config, who.licence, "lapse", { readOnly: true, wipeAt: who.endsAt + LAPSE_DAYS * DAY });
   const email = await ownerEmail(config, who.licence);
   await putJson(config.store, key, { endsAt: who.endsAt, email, sent: [0] } satisfies Lapse, { endsAt: who.endsAt });
   if (email && config.mail) await config.mail(email, "Your cloud copy stays for 90 days", `${planName(who.plan)} has ended, so Church Studio has stopped syncing between your computers. Everything on each computer stays there. Your cloud copy can still be read for 90 days (until ${dayOf(who.endsAt + LAPSE_DAYS * DAY)}); after that it is removed. Renewing in Settings › Account at any time before then picks up where you left off.`);
@@ -101,8 +117,19 @@ export async function runCloudCron(config: ApiConfig): Promise<void> {
     const lapse = await getJson<Lapse>(config.store, entry.key);
     if (!lapse) continue;
     const days = Math.floor((now - lapse.endsAt) / DAY);
+    if (lapse.wiped) continue;
     if (days >= LAPSE_DAYS) {
-      await config.store.delete(entry.key);
+      // The library object wipes its rows itself; the files are ours to remove. The record of the
+      // lapse stays a year, so the ended plan is not told again and again.
+      if (config.cloud) {
+        let cursor: string | undefined;
+        do {
+          const page = await config.cloud.list({ prefix: `lib/${licence}/`, cursor });
+          if (page.objects.length) await config.cloud.delete(page.objects.map((object) => object.key));
+          cursor = page.truncated ? page.cursor : undefined;
+        } while (cursor);
+      }
+      await putJson(config.store, entry.key, { ...lapse, wiped: true }, { endsAt: lapse.endsAt }, 365 * 86_400);
       await config.store.delete(`cloudused:${licence}`);
       continue;
     }
@@ -119,9 +146,18 @@ export async function totalUsedBytes(store: Store): Promise<number> {
   return (await store.list("cloudused:")).reduce((sum, entry) => sum + (Number(entry.meta?.usedBytes) || 0), 0);
 }
 
-/** After anything that changes a licence's use: the mirror the admin page reads, and the total-cap warnings. */
+/**
+ * After anything that changes a licence's use: the mirror the admin page reads, and the total-cap
+ * warnings. The store allows one write a second per key: a burst of uploads may see one refused,
+ * and the next change rewrites it, so a refusal never fails the upload itself.
+ */
 async function noteUsage(config: ApiConfig, who: Access, usedBytes: number): Promise<void> {
-  await putJson(config.store, `cloudused:${who.licence}`, { usedBytes, plan: who.plan, at: config.now() }, { usedBytes, plan: who.plan });
+  const key = `cloudused:${who.licence}`;
+  try {
+    await putJson(config.store, key, { usedBytes, plan: who.plan, at: config.now() }, { usedBytes, plan: who.plan });
+  } catch {
+    return;
+  }
   const limits = await cloudLimits(config.store);
   const cap = limits.totalCapGb * GB;
   const total = await totalUsedBytes(config.store);
@@ -146,11 +182,16 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
 
   // The file itself, up or down, named in the address.
   if (file && (request.method === "PUT" || request.method === "GET")) {
-    const who = await access(config, text(url.searchParams.get("token"), 80), text(url.searchParams.get("device"), 80), "");
+    // The token travels in a header, never the address: addresses end up in logs.
+    const who = await access(config, text(request.headers.get("authorization"), 90).replace(/^Bearer\s+/i, ""), text(request.headers.get("x-device"), 80), "");
     if (who instanceof Response) return who;
+    await renewedOrLapsed(config, who);
     const hash = file[1]!;
     const key = `lib/${who.licence}/${hash}`;
     if (request.method === "GET") {
+      // Only a file the library still lists: a wiped or removed file is gone even if a copy lingers.
+      const listed = await library(config, who.licence, "claim", { hash });
+      if (listed.status !== 200 || !listed.data.storedAt) return json(404, { error: "That file is not in the cloud." });
       const object = await config.cloud.get(key);
       if (!object) return json(404, { error: "That file is not in the cloud." });
       return new Response(object.body, { status: 200, headers: { ...CORS, "content-type": object.httpMetadata?.contentType || "application/octet-stream", "content-length": String(object.size) } });
@@ -160,9 +201,18 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
     if (claim.status !== 200) return json(409, { error: "Claim the file first." });
     if (claim.data.storedAt) return json(200, { usedBytes: Number((await library(config, who.licence, "status", {})).data.usedBytes) || 0, stored: true });
     if (!request.body) return json(400, { error: "The file is missing." });
+    // The body must be the size that was claimed: the limit was checked against that size.
+    const claimed = Number(claim.data.bytes) || 0;
+    const declared = Number(request.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared !== claimed) return json(400, { error: "The file is not the size that was claimed." });
+    if (claimed > UPLOAD_BYTES) return json(413, { tooLarge: true, error: `A file over ${Math.round(UPLOAD_BYTES / 1e6)} MB cannot be sent this way yet.` });
     const contentType = text(request.headers.get("content-type"), 100) || "application/octet-stream";
     await config.cloud.put(key, request.body, { httpMetadata: { contentType } });
-    const bytes = (await config.cloud.head(key))?.size ?? Number(claim.data.bytes) ?? 0;
+    const bytes = (await config.cloud.head(key))?.size ?? 0;
+    if (bytes !== claimed) {
+      await config.cloud.delete(key);
+      return json(400, { error: "The file is not the size that was claimed." });
+    }
     const done = await library(config, who.licence, "mediaDone", { hash, bytes });
     if (done.status !== 200) return pass(done);
     await noteUsage(config, who, Number(done.data.usedBytes) || 0);
@@ -173,10 +223,11 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
   const body = ((await request.json().catch(() => null)) ?? null) as Record<string, unknown> | null;
   if (!body) return json(400, { error: "Bad request." });
   const route = url.pathname.slice("/v1/cloud/".length);
-  if ((route === "push" || route === "media/claim") && (await tooFast(config, request, "cloud"))) return json(429, { error: "Too many requests from this network. Wait a minute and try again." });
+  // Pushes are few (one every few minutes per computer); claims and pulls are many and already need an account.
+  if (route === "push" && (await tooFast(config, request, "cloud"))) return json(429, { error: "Too many requests from this network. Wait a minute and try again." });
   const who = await access(config, text(body.token, 80), text(body.device, 80), text(body.name, 60));
   if (who instanceof Response) return who;
-  await lapseIfEnded(config, who);
+  await renewedOrLapsed(config, who);
   const readOnly = () => json(403, { readOnly: true, error: `${planName(who.plan)} has ended: the cloud copy can be read but not changed.` });
 
   switch (route) {
@@ -193,6 +244,7 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
       return json(200, { ...status.data, licence: who.licence, plan: who.plan, limitBytes, usedBytes, over: usedBytes > limitBytes, endsAt: who.endsAt });
     }
     case "settings":
+      if (who.ended) return readOnly();
       return pass(await library(config, who.licence, "settings", { syncVideos: body.syncVideos }));
     case "media/claim": {
       if (who.ended) return readOnly();
@@ -206,6 +258,7 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
     case "media/list":
       return pass(await library(config, who.licence, "media", {}));
     case "media/remove": {
+      if (who.ended) return readOnly();
       const hash = text(body.hash, 64);
       const removed = await library(config, who.licence, "removeMedia", { hash, everywhere: body.everywhere === true });
       if (removed.status !== 200) return pass(removed);
@@ -221,6 +274,7 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
       if (who.ended) return readOnly();
       return pass(await library(config, who.licence, "restore", { col: text(body.col, 40), id: text(body.id, 200) }));
     case "bin/empty":
+      if (who.ended) return readOnly();
       return pass(await library(config, who.licence, "emptyBin", {}));
     default:
       return json(404, { error: "Unknown cloud call." });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LibraryCore, memoryLibraryStore, type Change } from "./library";
+import { DOC_BYTES, LibraryCore, memoryLibraryStore, PUSH_CHANGES, type Change } from "./library";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 9, 24, 10);
@@ -38,8 +38,9 @@ describe("the library object", () => {
     expect(pulled.changes).toHaveLength(1);
     expect((pulled.changes[0]!.doc as { title: string }).title).toBe("Newest");
     const history = data<{ versions: Array<{ at: number; device: string; doc: { title: string } }> }>(await lib.history({ col: "song", id: "s1" }));
-    expect(history.versions.map((version) => version.doc.title)).toEqual(["Older edit"]);
-    expect(history.versions[0]!.device).toBe("a");
+    // Both the replaced version and the edit that lost are there to get back, newest first.
+    expect(history.versions.map((version) => version.doc.title)).toEqual(["Older edit", "Even older"]);
+    expect(history.versions.map((version) => version.device)).toEqual(["a", "b"]);
     // History ages out after 30 days.
     await lib.ageOut(T0 + 31 * DAY);
     expect(data<{ versions: unknown[] }>(await lib.history({ col: "song", id: "s1" })).versions).toEqual([]);
@@ -68,9 +69,11 @@ describe("the library object", () => {
     const first = data<{ changes: Change[]; more: boolean; seq: number }>(await lib.pull({ since: 0 }));
     expect(first.changes).toHaveLength(500);
     expect(first.more).toBe(true);
-    const rest = data<{ changes: Change[]; more: boolean }>(await lib.pull({ since: 500 }));
+    // With more to come, `seq` is where to continue from, not the end of the library.
+    expect(first.seq).toBe(500);
+    const rest = data<{ changes: Change[]; more: boolean; seq: number }>(await lib.pull({ since: first.seq }));
     expect(rest.changes).toHaveLength(120);
-    expect(rest.more).toBe(false);
+    expect(rest).toMatchObject({ more: false, seq: 620 });
   });
 
   it("counts a file once however many claims", async () => {
@@ -103,6 +106,29 @@ describe("the library object", () => {
     expect(data(await lib.claimMedia({ hash: "h1", bytes: 1000, name: "x.png", kind: "image", mediaId: "m1", device: "a", now: T0 + 26 * 3_600_000, ...limits }))).toMatchObject({ upload: true });
   });
 
+  it("refuses a push with a record too big, or too much at once, leaving nothing half-applied", async () => {
+    const lib = library();
+    const big = { id: "s9", title: "x".repeat(DOC_BYTES + 1) };
+    const result = await lib.push({ device: "a", now: T0, changes: [song("s1", "Fine", T0), { col: "song", id: "s9", at: T0, doc: big }] });
+    expect(result).toMatchObject({ ok: false, status: 413 });
+    expect(data<{ changes: Change[]; seq: number }>(await lib.pull({ since: 0 }))).toMatchObject({ changes: [], seq: 0 });
+    const many = Array.from({ length: PUSH_CHANGES + 1 }, (_, n) => song(`s${n}`, "t", T0));
+    expect(await lib.push({ device: "a", now: T0, changes: many })).toMatchObject({ ok: false, status: 413 });
+  });
+
+  it("counts pending claims toward the limit, and a second id for the same file", async () => {
+    const lib = library();
+    const small = { ...limits, limitBytes: 1500 };
+    expect(data(await lib.claimMedia({ hash: "h1", bytes: 1000, name: "a.png", kind: "image", mediaId: "m1", device: "a", now: T0, ...small }))).toMatchObject({ upload: true });
+    expect(data(await lib.claimMedia({ hash: "h2", bytes: 1000, name: "b.png", kind: "image", mediaId: "m2", device: "b", now: T0, ...small }))).toMatchObject({ upload: false, full: true });
+    data(await lib.mediaDone({ hash: "h1", bytes: 1000, now: T0 }));
+    // Another computer knows the same file by another id: both ids count as uses.
+    expect(data(await lib.claimMedia({ hash: "h1", bytes: 1000, name: "a.png", kind: "image", mediaId: "m1-other", device: "b", now: T0, ...small }))).toMatchObject({ stored: true });
+    data(await lib.push({ device: "b", now: T0, changes: [{ col: "theme", id: "t", at: T0, doc: { background: { assetId: "m1-other" } } }, { col: "theme", id: "t2", at: T0, doc: { background: { assetId: "m10" } } }] }));
+    const list = data<{ items: Array<{ usedIn: number }> }>(await lib.media({ now: T0 }));
+    expect(list.items[0]!.usedIn).toBe(1);
+  });
+
   it("remove everywhere writes deletions for the records that used it", async () => {
     const lib = library();
     data(await lib.claimMedia({ hash: "h1", bytes: 1000, name: "bg.png", kind: "image", mediaId: "m1", device: "a", now: T0, ...limits }));
@@ -130,6 +156,14 @@ describe("the library object", () => {
     await lib.ageOut(T0 + 91 * DAY);
     expect(data<{ changes: Change[]; seq: number }>(await lib.pull({ since: 0 }))).toMatchObject({ changes: [], seq: 0 });
     expect(data<{ readOnly: boolean }>(await lib.status({ now: T0 + 91 * DAY })).readOnly).toBe(false);
+    // Renewed in time: writable again, and the wipe is off.
+    const again = library();
+    data(await again.push({ device: "a", now: T0, changes: [song("s1", "Kept", T0)] }));
+    data(await again.lapse({ readOnly: true, wipeAt: T0 + 90 * DAY }));
+    data(await again.lapse({ readOnly: false, wipeAt: null }));
+    expect((await again.push({ device: "a", now: T0 + 1, changes: [song("s2", "Yes", T0 + 1)] })).ok).toBe(true);
+    await again.ageOut(T0 + 91 * DAY);
+    expect(data<{ changes: Change[] }>(await again.pull({ since: 0 })).changes).toHaveLength(2);
   });
 
   it("remembers the computers that sync and the videos switch", async () => {

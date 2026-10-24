@@ -22,6 +22,7 @@ import { roomPage } from "./room-page.ts";
 
 // Each room (Q&A, quizzes, polls) is one Durable Object (rooms.ts).
 export { RoomObject } from "./rooms.ts";
+export { LibraryObject } from "./library";
 
 export type Env = {
   /** The web demo's files (npm run build:web → server/web), served under /app. */

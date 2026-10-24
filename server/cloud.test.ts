@@ -39,11 +39,11 @@ function setup() {
     const response = (await handleCloud(new Request(`https://keys.test${path}`, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), config))!;
     return { status: response.status, data: ((await response.json().catch(() => ({}))) ?? {}) as Record<string, any> };
   };
-  const upload = async (hash: string, token: string, device: string, bytes: string) => {
-    const response = (await handleCloud(new Request(`https://keys.test/v1/cloud/media/${hash}?token=${token}&device=${device}`, { method: "PUT", headers: { "content-type": "image/png" }, body: bytes }), config))!;
+  const upload = async (hash: string, token: string, device: string, bytes: string, length = bytes.length) => {
+    const response = (await handleCloud(new Request(`https://keys.test/v1/cloud/media/${hash}`, { method: "PUT", headers: { "content-type": "image/png", "content-length": String(length), authorization: `Bearer ${token}`, "x-device": device }, body: bytes }), config))!;
     return { status: response.status, data: ((await response.json().catch(() => ({}))) ?? {}) as Record<string, any> };
   };
-  const download = async (hash: string, token: string, device: string) => handleCloud(new Request(`https://keys.test/v1/cloud/media/${hash}?token=${token}&device=${device}`), config);
+  const download = async (hash: string, token: string, device: string) => handleCloud(new Request(`https://keys.test/v1/cloud/media/${hash}`, { headers: { authorization: `Bearer ${token}`, "x-device": device } }), config);
   /** A signed-in person on a licence, with computers on its seats. */
   const person = async (id: string, email: string, licence: { id: string; plan: "premium" | "church"; until?: string | null }, devices: string[], role: "owner" | "member" | "removed" = "owner") => {
     const key = signLicense({ plan: licence.plan, until: licence.until === undefined ? "2027-06-01" : licence.until, id: Uint8Array.from(licence.id.match(/../g)!.map((pairOf) => parseInt(pairOf, 16))) }, pair.secretKey);
@@ -180,11 +180,64 @@ describe("cloud space", () => {
     expect((await call("/v1/cloud/pull", { token, device: "laptop", since: 0 })).data).toMatchObject({ seq: 0, changes: [] });
   });
 
+  it("an upload must be the size it claimed, and the token never travels in the address", async () => {
+    const { call, upload, person, config } = setup();
+    const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium" }, ["laptop"]);
+    await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH, bytes: 3, name: "f.png", kind: "image", mediaId: "m1" });
+    expect((await upload(HASH, token, "laptop", "much more than three")).status).toBe(400);
+    expect((await upload(HASH, token, "laptop", "abc")).status).toBe(200);
+    const byQuery = (await handleCloud(new Request(`https://keys.test/v1/cloud/media/${HASH}?token=${token}&device=laptop`), config))!;
+    expect(byQuery.status).toBe(401);
+  });
+
+  it("prefers a plan still running over one that ended", async () => {
+    const { call, person } = setup();
+    await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "church", until: "2026-10-01" }, ["laptop"]);
+    const { token } = await person("ama", "ama@grace.org", { id: "1a1b1c1d", plan: "premium" }, ["laptop"]);
+    const status = await call("/v1/cloud/status", { token, device: "laptop" });
+    expect(status.data).toMatchObject({ plan: "premium", licence: "1a1b1c1d", readOnly: false });
+  });
+
+  it("renewing lifts the lapse: writable again, the wipe is off", async () => {
+    const { call, person, config, now, mails } = setup();
+    const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2026-10-01" }, ["laptop"]);
+    expect((await call("/v1/cloud/status", { token, device: "laptop" })).data.readOnly).toBe(true);
+    expect(mails).toHaveLength(1);
+    // Renewed: the account's key now runs on.
+    await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2027-10-01" }, []);
+    const status = await call("/v1/cloud/status", { token, device: "laptop" });
+    expect(status.data).toMatchObject({ readOnly: false, wipeAt: null });
+    expect((await call("/v1/cloud/push", { token, device: "laptop", changes: [{ col: "song", id: "s1", at: now(), doc: {} }] })).status).toBe(200);
+    expect(await config.store.get("cloud:lapse:0a0b0c0d")).toBeNull();
+  });
+
+  it("the wipe removes the files too, and the lapse is not announced again", async () => {
+    const { call, upload, person, config, mails, advance, libraries, now } = setup();
+    const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium" }, ["laptop"]);
+    await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH, bytes: 3, name: "f.png", kind: "image", mediaId: "m1" });
+    await upload(HASH, token, "laptop", "abc");
+    expect((await config.cloud!.list({ prefix: "lib/0a0b0c0d/" })).objects).toHaveLength(1);
+    await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2026-10-01" }, []);
+    expect((await call("/v1/cloud/status", { token, device: "laptop" })).data.readOnly).toBe(true);
+    advance(91 * DAY);
+    await libraries.core("0a0b0c0d").ageOut(now());
+    await runCloudCron(config);
+    expect((await config.cloud!.list({ prefix: "lib/0a0b0c0d/" })).objects).toHaveLength(0);
+    await putJson(config.store, "act:0a0b0c0d", [{ device: "laptop", name: "PC", seenAt: new Date(now()).toISOString() }]);
+    const sent = mails.length;
+    await call("/v1/cloud/status", { token, device: "laptop" });
+    await runCloudCron(config);
+    expect(mails).toHaveLength(sent);
+  });
+
   it("a lapsed licence is read-only, and still readable", async () => {
     const { call, person, now } = setup();
     const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2026-10-01" }, ["laptop"]);
     expect(await call("/v1/cloud/push", { token, device: "laptop", changes: [{ col: "song", id: "s1", at: now(), doc: {} }] })).toMatchObject({ status: 403, data: { readOnly: true } });
     expect(await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH, bytes: 1, name: "f", kind: "image", mediaId: "m" })).toMatchObject({ status: 403, data: { readOnly: true } });
+    expect((await call("/v1/cloud/bin/empty", { token, device: "laptop" })).status).toBe(403);
+    expect((await call("/v1/cloud/media/remove", { token, device: "laptop", hash: HASH, everywhere: true })).status).toBe(403);
+    expect((await call("/v1/cloud/settings", { token, device: "laptop", syncVideos: false })).status).toBe(403);
     expect(await call("/v1/cloud/pull", { token, device: "laptop", since: 0 })).toMatchObject({ status: 200 });
     const status = await call("/v1/cloud/status", { token, device: "laptop" });
     expect(status.data.readOnly).toBe(true);

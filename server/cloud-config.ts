@@ -49,6 +49,7 @@ export type R2Like = {
   get(key: string): Promise<R2Object | null>;
   delete(key: string | string[]): Promise<void>;
   head(key: string): Promise<{ size: number } | null>;
+  list(options: { prefix: string; cursor?: string }): Promise<{ objects: Array<{ key: string; size: number }>; truncated: boolean; cursor?: string }>;
 };
 
 export function memoryR2(): R2Like {
@@ -69,6 +70,9 @@ export function memoryR2(): R2Like {
     async head(key) {
       const found = objects.get(key);
       return found ? { size: found.bytes.length } : null;
+    },
+    async list({ prefix }) {
+      return { objects: [...objects.entries()].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, size: value.bytes.length })), truncated: false };
     },
   };
 }

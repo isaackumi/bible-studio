@@ -16,16 +16,23 @@ export const BIN_DAYS = 30;
 /** A claim to upload that never finished is forgotten after this long. */
 export const CLAIM_HOURS = 24;
 export const PAGE = 500;
+/** One record's document, as JSON, at most this big; one push at most this many changes and bytes. */
+export const DOC_BYTES = 1_000_000;
+export const PUSH_CHANGES = 2000;
+export const PUSH_BYTES = 12_000_000;
 
 export type RecordRow = { col: string; id: string; at: number; device: string; seq: number; doc: unknown | null; deletedAt: number | null };
 export type HistoryRow = { col: string; id: string; at: number; device: string; doc: unknown; until: number };
-export type MediaRow = { hash: string; mediaId: string; name: string; kind: string; bytes: number; storedAt: number | null; claimedAt: number; device: string };
+/** `aliases`: other ids computers know this same file by (the same bytes added twice). */
+export type MediaRow = { hash: string; mediaId: string; aliases: string[]; name: string; kind: string; bytes: number; storedAt: number | null; claimedAt: number; device: string };
 export type DeviceRow = { device: string; name: string; lastSyncAt: number };
 
 /** The object's storage, as the rules see it: a Map in tests, SQLite in the object. */
 export type LibraryStore = {
   getRecord(col: string, id: string): Promise<RecordRow | null>;
   putRecord(row: RecordRow): Promise<void>;
+  /** One push's writes together: all land or none (the object runs them in one transaction). */
+  writeBatch(batch: { records: RecordRow[]; history: HistoryRow[]; seq: number }): Promise<void>;
   removeRecord(col: string, id: string): Promise<void>;
   /** Rows with seq > since, oldest first, at most `limit`. */
   recordsSince(since: number, limit: number): Promise<RecordRow[]>;
@@ -80,28 +87,37 @@ export class LibraryCore {
   async push(input: { device: string; name?: string; now: number; changes: Change[] }): Promise<Result<{ seq: number; applied: number; conflicts: Array<{ col: string; id: string; keptAt: number }> }>> {
     if (await this.readOnly()) return fail(403, "This plan has ended: the cloud copy can be read but not changed.");
     const changes = Array.isArray(input.changes) ? input.changes : [];
+    if (changes.length > PUSH_CHANGES) return fail(413, `At most ${PUSH_CHANGES} changes in one push.`);
+    let total = 0;
     for (const change of changes) {
       if (!COLLECTIONS.has(change.col)) return fail(400, `Unknown collection: ${text(change.col, 40)}`);
       if (!text(change.id, 200) || whole(change.at) === null) return fail(400, "A change needs an id and a time.");
+      const size = change.doc === null || change.doc === undefined ? 0 : JSON.stringify(change.doc).length;
+      if (size > DOC_BYTES) return fail(413, `One record is too big to sync (${text(change.col, 40)} ${text(change.id, 60)}).`);
+      total += size;
+      if (total > PUSH_BYTES) return fail(413, "Too much at once: send fewer changes in one push.");
     }
+    // Everything is worked out first, then written together, so a failure leaves nothing half done.
     let seq = await this.seq();
-    let applied = 0;
+    const records: RecordRow[] = [];
+    const history: HistoryRow[] = [];
     const conflicts: Array<{ col: string; id: string; keptAt: number }> = [];
     for (const change of changes) {
-      const existing = await this.store.getRecord(change.col, change.id);
+      const existing = records.find((row) => row.col === change.col && row.id === change.id) ?? (await this.store.getRecord(change.col, change.id));
       if (existing && existing.at >= change.at) {
         conflicts.push({ col: change.col, id: change.id, keptAt: existing.at });
+        // The losing version is kept too: the church can get it back from the record's history.
+        if (change.doc !== null && change.doc !== undefined) history.push({ col: change.col, id: change.id, at: change.at, device: input.device, doc: change.doc, until: input.now + HISTORY_DAYS * DAY });
         continue;
       }
-      if (existing && existing.doc !== null && existing.deletedAt === null) await this.store.addHistory({ col: existing.col, id: existing.id, at: existing.at, device: existing.device, doc: existing.doc, until: input.now + HISTORY_DAYS * DAY });
+      if (existing && existing.doc !== null && existing.deletedAt === null) history.push({ col: existing.col, id: existing.id, at: existing.at, device: existing.device, doc: existing.doc, until: input.now + HISTORY_DAYS * DAY });
       seq += 1;
-      applied += 1;
       const deleting = change.doc === null || change.doc === undefined;
-      await this.store.putRecord({ col: change.col, id: change.id, at: change.at, device: input.device, seq, doc: deleting ? (existing?.doc ?? null) : change.doc, deletedAt: deleting ? change.at : null });
+      records.push({ col: change.col, id: change.id, at: change.at, device: input.device, seq, doc: deleting ? (existing?.doc ?? null) : change.doc, deletedAt: deleting ? change.at : null });
     }
-    await this.store.setMeta("seq", String(seq));
+    await this.store.writeBatch({ records, history, seq });
     await this.touch(input.device, input.name, input.now);
-    return ok({ seq, applied, conflicts });
+    return ok({ seq, applied: records.length, conflicts });
   }
 
   /** Everything since a sequence number, oldest first, a page at a time (deletions as doc: null). */
@@ -110,9 +126,11 @@ export class LibraryCore {
     const limit = Math.min(PAGE, whole(input.limit) ?? PAGE) || PAGE;
     const rows = await this.store.recordsSince(since, limit + 1);
     const more = rows.length > limit;
-    const changes = rows.slice(0, limit).map((row) => ({ col: row.col, id: row.id, at: row.at, doc: row.deletedAt !== null ? null : row.doc }));
+    const page = rows.slice(0, limit);
+    const changes = page.map((row) => ({ col: row.col, id: row.id, at: row.at, doc: row.deletedAt !== null ? null : row.doc }));
     if (input.device) await this.touch(input.device, input.name, input.now ?? Date.now());
-    return ok({ seq: await this.seq(), changes, more });
+    // `seq` is where to continue from: the last row handed over while more waits, else the library's latest.
+    return ok({ seq: more ? page[page.length - 1]!.seq : await this.seq(), changes, more });
   }
 
   async history(input: { col: string; id: string }): Promise<Result<{ versions: Array<{ at: number; device: string; doc: unknown }> }>> {
@@ -145,6 +163,11 @@ export class LibraryCore {
     return (await this.store.listMedia()).reduce((sum, row) => sum + (row.storedAt !== null ? row.bytes : 0), 0);
   }
 
+  /** Uploads under way count too, so several claims at once cannot overshoot the limit together. */
+  private async claimedBytes(): Promise<number> {
+    return (await this.store.listMedia()).reduce((sum, row) => sum + row.bytes, 0);
+  }
+
   /** May this file go up? Already stored: no upload and no second count. */
   async claimMedia(input: { hash: string; bytes: number; name: string; kind: string; mediaId: string; device: string; now: number; limitBytes: number; maxFileBytes: number; paused: boolean }): Promise<Result<{ upload: boolean; stored: boolean; full?: boolean; tooLarge?: boolean; paused?: boolean; usedBytes: number; limitBytes: number }>> {
     // The worker checks the hash is a real SHA-256; here any name up to 64 characters will do.
@@ -154,11 +177,17 @@ export class LibraryCore {
     const usedBytes = await this.usedBytes();
     const existing = await this.store.getMedia(hash);
     const base = { stored: false, usedBytes, limitBytes: input.limitBytes };
-    if (existing?.storedAt !== null && existing !== null) return ok({ ...base, upload: false, stored: true });
+    const mediaId = text(input.mediaId, 80);
+    if (existing && existing.storedAt !== null) {
+      // The same bytes under another id on this computer: remembered, so its uses count.
+      if (mediaId && mediaId !== existing.mediaId && !existing.aliases.includes(mediaId)) await this.store.putMedia({ ...existing, aliases: [...existing.aliases, mediaId].slice(0, 20) });
+      return ok({ ...base, upload: false, stored: true });
+    }
     if (input.paused) return ok({ ...base, upload: false, paused: true });
     if (bytes > input.maxFileBytes) return ok({ ...base, upload: false, tooLarge: true });
-    if (usedBytes + bytes > input.limitBytes) return ok({ ...base, upload: false, full: true });
-    await this.store.putMedia({ hash, mediaId: text(input.mediaId, 80), name: text(input.name, 200), kind: text(input.kind, 20), bytes, storedAt: null, claimedAt: input.now, device: input.device });
+    const claimed = (await this.claimedBytes()) - (existing?.bytes ?? 0);
+    if (claimed + bytes > input.limitBytes) return ok({ ...base, upload: false, full: true });
+    await this.store.putMedia({ hash, mediaId, aliases: existing?.aliases ?? [], name: text(input.name, 200), kind: text(input.kind, 20), bytes, storedAt: null, claimedAt: input.now, device: input.device });
     return ok({ ...base, upload: true });
   }
 
@@ -175,10 +204,16 @@ export class LibraryCore {
     return ok({ usedBytes: await this.usedBytes() });
   }
 
-  /** Records (not deleted) whose text mentions a media id: where a file is used. */
-  private async usersOf(mediaId: string): Promise<RecordRow[]> {
-    if (!mediaId) return [];
-    return (await this.store.allRecords()).filter((row) => row.deletedAt === null && row.doc !== null && JSON.stringify(row.doc).includes(mediaId));
+  /** Records (not deleted) whose text mentions one of a file's ids, whole: "img1" is not "img10". */
+  private async usersOf(row: MediaRow): Promise<RecordRow[]> {
+    const ids = [row.mediaId, ...row.aliases].filter(Boolean);
+    if (!ids.length) return [];
+    const patterns = ids.map((id) => new RegExp(`(^|[^A-Za-z0-9_-])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9_-]|$)`));
+    return (await this.store.allRecords()).filter((record) => {
+      if (record.deletedAt !== null || record.doc === null) return false;
+      const json = JSON.stringify(record.doc);
+      return patterns.some((pattern) => pattern.test(json));
+    });
   }
 
   async media(input: { now: number }): Promise<Result<{ items: Array<{ hash: string; mediaId: string; name: string; kind: string; bytes: number; usedIn: number; lastUsedAt: number | null; storedAt: number }>; usedBytes: number; binBytes: number }>> {
@@ -186,7 +221,7 @@ export class LibraryCore {
     const rows = (await this.store.listMedia()).filter((row) => row.storedAt !== null);
     const items = [];
     for (const row of rows) {
-      const users = await this.usersOf(row.mediaId);
+      const users = await this.usersOf(row);
       items.push({ hash: row.hash, mediaId: row.mediaId, name: row.name, kind: row.kind, bytes: row.bytes, usedIn: users.length, lastUsedAt: users.length ? Math.max(...users.map((user) => user.at)) : null, storedAt: row.storedAt! });
     }
     items.sort((a, b) => b.bytes - a.bytes);
@@ -198,7 +233,7 @@ export class LibraryCore {
     const row = await this.store.getMedia(text(input.hash, 64));
     if (!row) return fail(404, "That file is not in the cloud.");
     if (input.everywhere) {
-      const users = await this.usersOf(row.mediaId);
+      const users = await this.usersOf(row);
       if (users.length) await this.push({ device: "cloud", now: input.now, changes: users.map((user) => ({ col: user.col, id: user.id, at: input.now, doc: null })) });
     }
     await this.store.removeMedia(row.hash);
@@ -253,6 +288,11 @@ export function memoryLibraryStore(): LibraryStore {
   return {
     getRecord: async (col, id) => records.get(key(col, id)) ?? null,
     putRecord: async (row) => void records.set(key(row.col, row.id), structuredClone(row)),
+    writeBatch: async (batch) => {
+      for (const row of batch.records) records.set(key(row.col, row.id), structuredClone(row));
+      for (const row of batch.history) history.push(structuredClone(row));
+      meta.set("seq", String(batch.seq));
+    },
     removeRecord: async (col, id) => void records.delete(key(col, id)),
     recordsSince: async (since, limit) => [...records.values()].filter((row) => row.seq > since).sort((a, b) => a.seq - b.seq).slice(0, limit).map((row) => structuredClone(row)),
     allRecords: async () => [...records.values()].map((row) => structuredClone(row)),
@@ -262,9 +302,9 @@ export function memoryLibraryStore(): LibraryStore {
       for (let i = history.length - 1; i >= 0; i--) if (history[i]!.until <= now) history.splice(i, 1);
     },
     getMedia: async (hash) => media.get(hash) ?? null,
-    putMedia: async (row) => void media.set(row.hash, { ...row }),
+    putMedia: async (row) => void media.set(row.hash, { ...row, aliases: [...row.aliases] }),
     removeMedia: async (hash) => void media.delete(hash),
-    listMedia: async () => [...media.values()].map((row) => ({ ...row })),
+    listMedia: async () => [...media.values()].map((row) => ({ ...row, aliases: [...row.aliases] })),
     putDevice: async (row) => void devices.set(row.device, { ...row }),
     listDevices: async () => [...devices.values()].map((row) => ({ ...row })),
     getMeta: async (name) => meta.get(name) ?? null,
@@ -282,21 +322,28 @@ export function memoryLibraryStore(): LibraryStore {
 /** Cloudflare's SQLite in a Durable Object: the part of the API this file uses. */
 export type SqlStorage = { exec<T = Record<string, unknown>>(query: string, ...bindings: unknown[]): { toArray(): T[] } };
 
-export function sqlLibraryStore(sql: SqlStorage): LibraryStore {
+/** `transaction`: the object's `storage.transactionSync`, so one push lands whole or not at all. */
+export function sqlLibraryStore(sql: SqlStorage, transaction: <T>(fn: () => T) => T = (fn) => fn()): LibraryStore {
   sql.exec(`CREATE TABLE IF NOT EXISTS records (col TEXT NOT NULL, id TEXT NOT NULL, at INTEGER NOT NULL, device TEXT NOT NULL, seq INTEGER NOT NULL, doc TEXT, deleted_at INTEGER, PRIMARY KEY (col, id));
     CREATE INDEX IF NOT EXISTS records_seq ON records (seq);
     CREATE TABLE IF NOT EXISTS history (col TEXT NOT NULL, id TEXT NOT NULL, at INTEGER NOT NULL, device TEXT NOT NULL, doc TEXT NOT NULL, until INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS history_record ON history (col, id);
-    CREATE TABLE IF NOT EXISTS media (hash TEXT PRIMARY KEY, media_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, bytes INTEGER NOT NULL, stored_at INTEGER, claimed_at INTEGER NOT NULL, device TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS media (hash TEXT PRIMARY KEY, media_id TEXT NOT NULL, aliases TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, kind TEXT NOT NULL, bytes INTEGER NOT NULL, stored_at INTEGER, claimed_at INTEGER NOT NULL, device TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS devices (device TEXT PRIMARY KEY, name TEXT NOT NULL, last_sync_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   type R = { col: string; id: string; at: number; device: string; seq: number; doc: string | null; deleted_at: number | null };
   const record = (row: R): RecordRow => ({ col: row.col, id: row.id, at: row.at, device: row.device, seq: row.seq, doc: row.doc === null ? null : JSON.parse(row.doc), deletedAt: row.deleted_at });
-  type M = { hash: string; media_id: string; name: string; kind: string; bytes: number; stored_at: number | null; claimed_at: number; device: string };
-  const mediaRow = (row: M): MediaRow => ({ hash: row.hash, mediaId: row.media_id, name: row.name, kind: row.kind, bytes: row.bytes, storedAt: row.stored_at, claimedAt: row.claimed_at, device: row.device });
+  type M = { hash: string; media_id: string; aliases: string; name: string; kind: string; bytes: number; stored_at: number | null; claimed_at: number; device: string };
+  const mediaRow = (row: M): MediaRow => ({ hash: row.hash, mediaId: row.media_id, aliases: row.aliases ? row.aliases.split(",") : [], name: row.name, kind: row.kind, bytes: row.bytes, storedAt: row.stored_at, claimedAt: row.claimed_at, device: row.device });
   return {
     getRecord: async (col, id) => sql.exec<R>("SELECT * FROM records WHERE col = ? AND id = ?", col, id).toArray().map(record)[0] ?? null,
     putRecord: async (row) => void sql.exec("INSERT OR REPLACE INTO records (col, id, at, device, seq, doc, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)", row.col, row.id, row.at, row.device, row.seq, row.doc === null ? null : JSON.stringify(row.doc), row.deletedAt),
+    writeBatch: async (batch) =>
+      transaction(() => {
+        for (const row of batch.records) sql.exec("INSERT OR REPLACE INTO records (col, id, at, device, seq, doc, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)", row.col, row.id, row.at, row.device, row.seq, row.doc === null ? null : JSON.stringify(row.doc), row.deletedAt);
+        for (const row of batch.history) sql.exec("INSERT INTO history (col, id, at, device, doc, until) VALUES (?, ?, ?, ?, ?, ?)", row.col, row.id, row.at, row.device, JSON.stringify(row.doc), row.until);
+        sql.exec("INSERT OR REPLACE INTO meta (key, value) VALUES ('seq', ?)", String(batch.seq));
+      }),
     removeRecord: async (col, id) => void sql.exec("DELETE FROM records WHERE col = ? AND id = ?", col, id),
     recordsSince: async (since, limit) => sql.exec<R>("SELECT * FROM records WHERE seq > ? ORDER BY seq LIMIT ?", since, limit).toArray().map(record),
     allRecords: async () => sql.exec<R>("SELECT * FROM records").toArray().map(record),
@@ -304,7 +351,7 @@ export function sqlLibraryStore(sql: SqlStorage): LibraryStore {
     historyOf: async (col, id) => sql.exec<{ col: string; id: string; at: number; device: string; doc: string; until: number }>("SELECT * FROM history WHERE col = ? AND id = ?", col, id).toArray().map((row) => ({ ...row, doc: JSON.parse(row.doc) })),
     pruneHistory: async (now) => void sql.exec("DELETE FROM history WHERE until <= ?", now),
     getMedia: async (hash) => sql.exec<M>("SELECT * FROM media WHERE hash = ?", hash).toArray().map(mediaRow)[0] ?? null,
-    putMedia: async (row) => void sql.exec("INSERT OR REPLACE INTO media (hash, media_id, name, kind, bytes, stored_at, claimed_at, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", row.hash, row.mediaId, row.name, row.kind, row.bytes, row.storedAt, row.claimedAt, row.device),
+    putMedia: async (row) => void sql.exec("INSERT OR REPLACE INTO media (hash, media_id, aliases, name, kind, bytes, stored_at, claimed_at, device) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", row.hash, row.mediaId, row.aliases.join(","), row.name, row.kind, row.bytes, row.storedAt, row.claimedAt, row.device),
     removeMedia: async (hash) => void sql.exec("DELETE FROM media WHERE hash = ?", hash),
     listMedia: async () => sql.exec<M>("SELECT * FROM media").toArray().map(mediaRow),
     putDevice: async (row) => void sql.exec("INSERT OR REPLACE INTO devices (device, name, last_sync_at) VALUES (?, ?, ?)", row.device, row.name, row.lastSyncAt),
@@ -317,7 +364,7 @@ export function sqlLibraryStore(sql: SqlStorage): LibraryStore {
 
 // --- The Durable Object -------------------------------------------------------------------------
 
-type LibraryState = { storage: { sql: SqlStorage; setAlarm(at: number): Promise<void> } };
+type LibraryState = { storage: { sql: SqlStorage; setAlarm(at: number): Promise<void>; transactionSync<T>(fn: () => T): T } };
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
@@ -330,7 +377,7 @@ export class LibraryObject {
   private core: LibraryCore;
   // Cloudflare makes the object with (state, env): nothing else may sit in the second place.
   constructor(private state: LibraryState) {
-    this.core = new LibraryCore(sqlLibraryStore(state.storage.sql));
+    this.core = new LibraryCore(sqlLibraryStore(state.storage.sql, (fn) => state.storage.transactionSync(fn)));
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -342,7 +389,12 @@ export class LibraryObject {
     } catch {
       return json(400, { error: "Bad request." });
     }
-    const result = await (this.core[method] as (input: unknown) => Promise<Result<unknown>>).call(this.core, { now: Date.now(), ...input });
+    let result: Result<unknown>;
+    try {
+      result = await (this.core[method] as (input: unknown) => Promise<Result<unknown>>).call(this.core, { now: Date.now(), ...input });
+    } catch (error) {
+      return json(500, { error: `The library could not do that. ${error instanceof Error ? error.message : String(error)}` });
+    }
     // Something changed: the daily tidy-up is due within a day.
     if (method === "push" || method === "claimMedia" || method === "lapse") await this.state.storage.setAlarm(Date.now() + DAY).catch(() => {});
     return result.ok ? json(200, result.data) : json(result.status, { error: result.error });
