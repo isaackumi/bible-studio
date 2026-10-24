@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.9",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "refresh", title: msg("Quizzes that feel new on a replay"), text: msg("Questions come in a new order every time, and a quiz can ask a set number drawn from its pool, the ones the room has not had lately first.") },
+      { icon: "music", title: msg("More game music"), text: msg("Six styles, from Upbeat pop and Arcade to a Gospel shuffle, an Epic final and calm Lo-fi, or Surprise me. Listen before you choose.") },
+      { icon: "check", title: msg("Running a game, clearer"), text: msg("One big button says what happens next: Start question 1, Show the answer, Next. End game stops it and takes it off the screen.") },
+      { icon: "users", title: msg("Who is here now"), text: msg("The room counts the phones that are with you, not everyone who ever joined, and a new game leaves out people who have gone.") },
+      { icon: "phone", title: msg("A join screen that reads well"), text: msg("A bigger QR code that scans easily, and the address on one line, on wide, 4:3 and portrait screens alike.") },
+    ],
+  },
+  {
     version: "0.4.8",
     date: "2026-10-24",
     highlights: [
