@@ -776,8 +776,10 @@
            away again after. Their keys (W, B) work whether or not they show. -->
       <span class="clears" role="group" aria-label={t("Clear and black")}>
         <span class="clears-more">
-          <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
-          <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (W)`} aria-label={t("Clear words")} onclick={() => void session.clearWords()}>{t("CLEAR WORDS")}</button>
+          <span class="clears-row">
+            <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
+            <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (W)`} aria-label={t("Clear words")} onclick={() => void session.clearWords()}>{t("CLEAR WORDS")}</button>
+          </span>
         </span>
         <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
@@ -1647,12 +1649,17 @@
   }
   .steppers { display: flex; gap: 6px; }
   .clears { display: inline-flex; align-items: center; gap: 6px; }
-  .clears-more { display: inline-flex; align-items: center; gap: 6px; max-width: 0; overflow: hidden; opacity: 0; transform: translateX(8px); transition: max-width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .clears:hover .clears-more, .clears:focus-within .clears-more { max-width: 320px; opacity: 1; transform: none; }
+  /* CLEAR WORDS slides out of CLEAR on hover. A grid track from 0fr to 1fr animates to the words'
+     real width (max-width to a guess overshot: done in a third of the time, then a wait before it
+     closed), with the gap folded in so nothing jumps. */
+  .clears-more { display: grid; grid-template-columns: 0fr; margin-right: -6px; opacity: 0; transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease 40ms; }
+  .clears-row { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; padding-right: 6px; transform: translateX(6px); transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .clears:hover .clears-more, .clears:focus-within .clears-more { grid-template-columns: 1fr; margin-right: 0; opacity: 1; transition-delay: 0ms, 0ms, 0ms; }
+  .clears:hover .clears-row, .clears:focus-within .clears-row { transform: none; }
   .clears-main { position: relative; }
   .clears-main::after { content: ""; position: absolute; right: 3px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: currentColor; opacity: 0.45; transition: opacity 160ms ease; }
   .clears:hover .clears-main::after, .clears:focus-within .clears-main::after { opacity: 0; }
-  @media (prefers-reduced-motion: reduce) { .clears-more { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .clears-more, .clears-row { transition: none; } }
   .live-steps { align-items: center; }
   .versions { display: grid; gap: 8px; max-height: 56vh; overflow: auto; }
   .version { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
