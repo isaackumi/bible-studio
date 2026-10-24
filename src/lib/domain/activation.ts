@@ -8,12 +8,23 @@ export const RENEW_EARLY_DAYS = 7;
 export type ActivatedDevice = { device: string; name: string; seenAt: string; you?: boolean };
 
 export type ActivationState = {
-  status: "off" | "checking" | "ok" | "full" | "offline" | "error";
+  /** "moved": the licence left this computer for another (or was released); it is on Free until moved back. */
+  status: "off" | "checking" | "ok" | "full" | "moved" | "offline" | "error";
   seats: number;
   devices: ActivatedDevice[];
   message: string;
+  /** With "moved": the name of the computer that has the licence now ("" after a plain release). */
+  movedTo?: string;
 };
 
 export function idleActivation(): ActivationState {
   return { status: "off", seats: 0, devices: [], message: "" };
+}
+
+/** What the server's refusal means: 409 is a full licence, 403 with `moved` is one that left this computer. */
+export function activationFrom(status: number, data: unknown, offline: boolean): ActivationState["status"] {
+  if (offline) return "offline";
+  if (status === 409) return "full";
+  if (status === 403 && !!data && typeof data === "object" && (data as { moved?: unknown }).moved === true) return "moved";
+  return "error";
 }

@@ -52,6 +52,8 @@
 
 
   let audioNote = $state("");
+  /** The computer whose Move button was pressed once (a second press moves the licence). */
+  let moveArmed = $state<string | null>(null);
 
   // Settings › Bible: import a Bible file (Zefania, OSIS, OpenSong XML).
   let bibleImportNote = $state("");
@@ -1738,10 +1740,14 @@
         {/if}
         {#if ent.source === "license" && session.activation.status !== "off"}
           {@const act = session.activation}
+          {@const planWord = session.workspace.entitlement.plan === "church" ? "Church" : "Premium"}
           <p class="section-label">{t("Computers on this license")}</p>
           <section class="rows">
             {#if act.status === "full"}
-              <div class="row"><div class="row-copy"><strong class="form-error">{t("This license is in use on {n} of {n} computers", { n: act.seats })}</strong><span>{act.message || t("Release one below (a computer no longer used, or the old one), then check again. Until then this computer runs on Free.")}</span></div><button type="button" class="btn primary" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
+              {@const others = act.devices.filter((device) => !device.you && device.device !== session.deviceId)}
+              <div class="row"><div class="row-copy"><strong class="form-error">{others.length === 1 ? t("{plan} is active on {name}", { plan: planWord, name: others[0]!.name }) : t("This license is in use on {n} of {n} computers", { n: act.seats })}</strong><span>{act.message || t("Move it here below (that computer goes back to Free), or release one, then check again. Until then this computer runs on Free.")}</span></div><button type="button" class="btn primary" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
+            {:else if act.status === "moved"}
+              <div class="row"><div class="row-copy"><strong class="form-error">{act.movedTo ? t("{plan} moved to {name}", { plan: planWord, name: act.movedTo }) : t("{plan} was released from this computer", { plan: planWord })}</strong><span>{act.message}</span></div><button type="button" class="btn" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
             {:else if act.status === "offline" || act.status === "error"}
               <div class="row"><div class="row-copy"><strong>{act.status === "offline" ? t("The license server could not be reached") : t("The license server said no")}</strong><span>{act.status === "offline" ? (session.ent.renewBy ? t("No problem for now: this computer keeps its plan offline until {date}.", { date: new Date(session.ent.renewBy).toLocaleDateString() }) : t("Connect to the internet once to start using the key.")) : act.message}</span></div><button type="button" class="btn" onclick={() => void session.checkActivation(true)}>{t("Check again")}</button></div>
             {:else if act.status === "ok"}
@@ -1752,9 +1758,17 @@
             {#each act.devices as device (device.device)}
               <div class="row">
                 <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}{device.you || device.device === session.deviceId ? ` · ${t("this computer")}` : ""}</strong><span>{t("Last seen {date}", { date: new Date(device.seenAt).toLocaleDateString() })}</span></div></div>
-                <button type="button" class="btn" onclick={() => void session.releaseDevice(device.device)}>{t("Release")}</button>
+                <div class="row-end">
+                  {#if (act.status === "full" || act.status === "moved") && !device.you && device.device !== session.deviceId}
+                    <button type="button" class="btn primary" onclick={() => { if (moveArmed !== device.device) { moveArmed = device.device; setTimeout(() => (moveArmed = null), 4000); return; } moveArmed = null; void session.moveLicenseHere(device.device); }}>{moveArmed === device.device ? t("Click again to move it here") : t("Move {plan} here", { plan: planWord })}</button>
+                  {/if}
+                  <button type="button" class="btn" onclick={() => void session.releaseDevice(device.device)}>{t("Release")}</button>
+                </div>
               </div>
             {/each}
+            {#if act.status === "full" || act.status === "moved" || act.status === "ok"}
+              <div class="row"><div class="row-copy"><span>{t("Moving frees that computer: it goes back to Free the next time it is online. Premium can move 2 times in 30 days (Church 3).")}</span></div></div>
+            {/if}
           </section>
         {/if}
 

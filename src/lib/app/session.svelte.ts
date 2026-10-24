@@ -4,7 +4,7 @@ import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } fro
 import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
-import { idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
+import { activationFrom, idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
@@ -6295,11 +6295,40 @@ class Session {
       this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
       return;
     }
-    const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; revoked?: boolean; ended?: boolean };
-    const status: ActivationState["status"] = answer.offline ? "offline" : answer.status === 409 ? "full" : "error";
-    this.activation = { status, seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: answer.error };
+    const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; revoked?: boolean; ended?: boolean; moved?: boolean; to?: string };
+    const status = activationFrom(answer.status, answer.data, answer.offline);
+    this.activation = { status, seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: answer.error, ...(status === "moved" ? { movedTo: typeof data.to === "string" ? data.to : "" } : {}) };
     // A refunded or ended key stops here: no new lease, and the old one is let go.
     if (data.revoked || data.ended) this.ent = await api.entitlementClear().catch(() => this.ent);
+    // The licence moved to another computer (or was released from this one): Free from now, and
+    // said once, with everything the church made left in place.
+    if (status === "moved") {
+      const hadPlan = this.plan !== "free";
+      const plan = this.ent.plan === "church" ? "Church" : "Premium";
+      this.ent = await api.entitlementClear().catch(() => this.ent);
+      if (hadPlan) {
+        this.notify(data.to ? t("{plan} moved to {name}", { plan, name: data.to }) : t("{plan} was released from this computer", { plan }), {
+          detail: t("This computer is on Free now. Your songs, services and slides are still here. To use {plan} here again, move it back in Settings › Account.", { plan }),
+          ms: 20_000,
+        });
+      }
+    }
+  };
+
+  /** Move the licence from another of its computers to this one; that one goes back to Free at its next check-in. */
+  moveLicenseHere = async (from: string) => {
+    const key = this.workspace.entitlement.license;
+    if (!key) return;
+    this.activation = { ...this.activation, status: "checking" };
+    const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/move", { key, device: this.deviceId, name: this.deviceName(), from, ...(this.workspace.profile?.token ? { token: this.workspace.profile.token } : {}) });
+    if (answer.ok) {
+      await this.keepLease(answer.data.lease);
+      this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
+      this.notify(t("{plan} is on this computer now", { plan: this.ent.plan === "church" ? "Church" : "Premium" }));
+      return;
+    }
+    const data = answer.data as { seats?: number; devices?: ActivatedDevice[] };
+    this.activation = { ...this.activation, status: activationFrom(answer.status, answer.data, answer.offline) === "offline" ? "offline" : "full", seats: Number(data.seats) || this.activation.seats, devices: Array.isArray(data.devices) ? data.devices : this.activation.devices, message: answer.error };
   };
 
   /** Free a computer's place on the license (this one or another). */
@@ -6631,12 +6660,13 @@ class Session {
     const answer = await serverCall<{ seats: number; devices: ActivatedDevice[]; lease: string }>("/v1/activate", { key: result.entitlement.license, device: this.deviceId, name: this.deviceName(), token: this.workspace.profile?.token });
     if (!answer.ok) {
       if ((answer.data as { owned?: boolean }).owned) return answer.error;
-      if (answer.status === 409) {
+      const refused = activationFrom(answer.status, answer.data, answer.offline);
+      if (refused === "full" || refused === "moved") {
         this.workspace = { ...this.workspace, entitlement: result.entitlement };
         this.persistSoon();
-        const data = answer.data as { seats?: number; devices?: ActivatedDevice[] };
-        this.activation = { status: "full", seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: "" };
-        return t("This key is in use on all the computers it covers. Release one below, then check again.");
+        const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; to?: string };
+        this.activation = { status: refused, seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: refused === "moved" ? answer.error : "", ...(refused === "moved" ? { movedTo: typeof data.to === "string" ? data.to : "" } : {}) };
+        return refused === "moved" ? answer.error : t("This key is in use on all the computers it covers. Move it here below, or release a computer, then check again.");
       }
       return answer.offline ? t("Connect to the internet once to add the key; after that it works offline.") : answer.error;
     }
