@@ -130,13 +130,12 @@
       if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
       if (!dragging) return;
       if (frame) cancelAnimationFrame(frame);
-      // The state takes over at the same spot, so nothing moves on the hand-over.
+      // The state takes over at the same spot, so nothing moves on the hand-over. The inline styles
+      // are left exactly as the template renders them (Svelte only writes what differs from its
+      // last render, so clearing them here would leave the bar with no position at all).
       x = Math.round(atX);
       y = Math.round(atY);
-      el.style.transform = "";
-      el.style.left = "";
-      el.style.top = "";
-      el.style.bottom = "";
+      el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       dragging = false;
       remember();
     };
