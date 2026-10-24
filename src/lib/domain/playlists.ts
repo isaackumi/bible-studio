@@ -20,6 +20,8 @@ export type AudioSettings = {
   audience: string;
   /** The chosen output's name, to say which one is missing while it is unplugged. */
   audienceName: string;
+  /** Outputs Automatic picked that the church moved away from (a display with no speakers): never picked again. */
+  audienceSkip: string[];
   /** Play every track at a similar loudness (loud tracks are turned down to match). */
   even: boolean;
   /** Seconds one track fades into the next; 0 plays them back to back. */
@@ -48,7 +50,7 @@ export function defaultPlaylists(): Playlist[] {
 }
 
 export function defaultAudioSettings(): AudioSettings {
-  return { volume: 0.8, fadeOnLive: true, outputId: "", audience: "auto", audienceName: "", even: true, crossfade: 3, shuffle: false, levels: {}, pad: [], stopTrackWithSong: true };
+  return { volume: 0.8, fadeOnLive: true, outputId: "", audience: "auto", audienceName: "", audienceSkip: [], even: true, crossfade: 3, shuffle: false, levels: {}, pad: [], stopTrackWithSong: true };
 }
 
 export function sanitizePlaylists(value: unknown): Playlist[] {
@@ -89,6 +91,7 @@ export function sanitizeAudioSettings(value: unknown): AudioSettings {
     outputId: typeof record.outputId === "string" ? record.outputId.slice(0, 200) : "",
     audience: typeof record.audience === "string" && record.audience.trim() ? record.audience.slice(0, 200) : "auto",
     audienceName: typeof record.audienceName === "string" ? record.audienceName.slice(0, 120) : "",
+    audienceSkip: Array.isArray(record.audienceSkip) ? [...new Set(record.audienceSkip.filter((id): id is string => typeof id === "string" && !!id).map((id) => id.slice(0, 200)))].slice(0, 20) : [],
     even: record.even !== false,
     crossfade,
     shuffle: record.shuffle === true,

@@ -30,31 +30,39 @@ const DISPLAYS: readonly Transport[] = ["hdmi", "displayport"];
  */
 export const isRoomOutput = (output: AudioOutputDevice) => INTERFACES.includes(output.transport) || DISPLAYS.includes(output.transport);
 
+/** Not the computer's own speakers, nor a virtual device: something someone connected and chose. */
+const isConnected = (output: AudioOutputDevice) => output.transport !== "built-in" && output.transport !== "virtual";
+
 const byName = (a: AudioOutputDevice, b: AudioOutputDevice) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
  * The output to use, in this order:
  * 1. the output chosen in Church Studio, while it is connected;
- * 2. the computer's own sound output, when it already is the room's (someone set it on purpose);
+ * 2. the computer's own sound output, when it is something connected rather than its own speakers:
+ *    a soundbar, a speaker or an interface someone chose in the computer's settings stays chosen;
  * 3. an audio interface (USB, Thunderbolt…): a church that plugged one in means its mixer;
  * 4. the audience screen's own audio (a projector or TV with speakers, over HDMI or DisplayPort).
  *    Only the audience screen's: a desk monitor lists audio too, often with no speakers behind it;
  * 5. the computer's sound output as it is (its speakers, on a laptop with nothing plugged in).
- * Ties go by name, so the same outputs always give the same answer.
+ * Ties go by name, so the same outputs always give the same answer. `skip` lists outputs the church
+ * moved away from after Automatic picked them (a display with no speakers): never picked again.
  */
-export function chooseOutput(outputs: AudioOutputDevice[], choice: OutputChoice, audienceScreens: string[] = []): OutputDecision {
+export function chooseOutput(outputs: AudioOutputDevice[], choice: OutputChoice, audienceScreens: string[] = [], skip: string[] = []): OutputDecision {
   const chosen = choice !== "auto" && choice ? outputs.find((output) => output.id === choice) : undefined;
   const missing = choice !== "auto" && !!choice && !chosen;
   if (chosen) return { output: chosen, why: "chosen", missing: false };
   const current = outputs.find((output) => output.isDefault) ?? null;
-  if (current && isRoomOutput(current)) return { output: current, why: "default-external", missing };
-  const interfaces = outputs.filter((output) => INTERFACES.includes(output.transport)).sort(byName);
+  if (current && isConnected(current)) return { output: current, why: "default-external", missing };
+  const usable = outputs.filter((output) => !skip.includes(output.id));
+  const interfaces = usable.filter((output) => INTERFACES.includes(output.transport)).sort(byName);
   if (interfaces[0]) return { output: interfaces[0], why: "interface", missing };
-  const displays = outputs.filter((output) => DISPLAYS.includes(output.transport)).sort(byName);
+  const displays = usable.filter((output) => DISPLAYS.includes(output.transport)).sort(byName);
   const screen = displays.find((output) => audienceScreens.some((name) => sameName(name, output.name)));
   if (screen) return { output: screen, why: "display", missing };
-  return { output: current ?? outputs.find((output) => output.transport === "built-in") ?? null, why: "computer", missing };
+  // A virtual output (a meeting app's) is heard by nobody: the computer's own speakers instead.
+  const own = outputs.find((output) => output.transport === "built-in");
+  return { output: (current && current.transport !== "virtual" ? current : (own ?? current)) ?? null, why: "computer", missing };
 }
 
 /** The same outputs, whatever order the computer lists them in: a change means one came or went. */
@@ -96,12 +104,12 @@ export type OutputPlan = {
  * The computer's own sound output is never touched to fall back to it, only to move to the room's
  * (or to what the church chose), so a laptop with nothing plugged in keeps the sound it has.
  */
-export function planOutput(before: AudioOutputDevice[] | null, outputs: AudioOutputDevice[], choice: OutputChoice, audienceScreens: string[], options: { chosenNow?: boolean; chosenName?: string } = {}): OutputPlan {
-  const decision = chooseOutput(outputs, choice, audienceScreens);
+export function planOutput(before: AudioOutputDevice[] | null, outputs: AudioOutputDevice[], choice: OutputChoice, audienceScreens: string[], options: { chosenNow?: boolean; chosenName?: string; skip?: string[] } = {}): OutputPlan {
+  const decision = chooseOutput(outputs, choice, audienceScreens, options.skip);
   const target = decision.output;
   const current = outputs.find((output) => output.isDefault) ?? null;
   if (!target) return { decision, switchTo: null, notice: null };
-  const moving = target.id !== current?.id && (decision.why !== "computer" || !!options.chosenNow);
+  const moving = target.id !== current?.id && (decision.why !== "computer" || !!options.chosenNow || current?.transport === "virtual");
   const switchTo = moving ? target : null;
   if (!before) return { decision, switchTo, notice: moving && !options.chosenNow ? { kind: "start", output: target.name } : null };
   const came = outputs.filter((output) => !before.some((old) => old.id === output.id));
@@ -112,4 +120,15 @@ export function planOutput(before: AudioOutputDevice[] | null, outputs: AudioOut
   if (!moving && !lost) return { decision, switchTo, notice: null };
   const cause = came.some((output) => output.id === target.id) ? "plugged-in" : lost ? "unplugged" : decision.why === "display" ? "screen" : "other";
   return { decision, switchTo, notice: { kind: "moved", output: target.name, cause } };
+}
+
+/**
+ * Someone changed the computer's sound output in its own settings (the Mac's Control Center): the
+ * output it moved to, when the one it left is still connected (an unplug is not a choice).
+ * `lastDefault` is the computer's output at the last check, after any change Church Studio made.
+ */
+export function changedByHand(lastDefault: string | null, outputs: AudioOutputDevice[]): AudioOutputDevice | null {
+  const current = outputs.find((output) => output.isDefault);
+  if (!lastDefault || !current || current.id === lastDefault) return null;
+  return outputs.some((output) => output.id === lastDefault) ? current : null;
 }

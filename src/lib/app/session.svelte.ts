@@ -129,7 +129,7 @@ import { slotFor, songOrder, songSlots, stepSlot } from "../domain/song-order";
 import { clampScreen, sanitizeSongLines, screensOf, type SongLines, type SongScreen } from "../domain/song-screens";
 import { addTracks, MAX_CROSSFADE, moveTrack, removeTrackAt, type AudioSettings, type Playlist } from "../domain/playlists";
 import { AudioDeck, SoundPad, canChooseOutput } from "../audio/deck.svelte";
-import { outputsKey, planOutput, sanitizeTransport, type AudioOutputDevice, type OutputDecision } from "../audio/outputs";
+import { changedByHand, outputsKey, planOutput, sanitizeTransport, type AudioOutputDevice, type OutputDecision } from "../audio/outputs";
 import { evenGain, measureUrl } from "../audio/loudness";
 import { readBibleFile, verseCount } from "../bible/import";
 import { stageChords, type ChordLine } from "../domain/chords";
@@ -1563,6 +1563,8 @@ class Session {
   /** The last choice made, and why. */
   roomOutput = $state<OutputDecision | null>(null);
   private roomOutputsKey = "";
+  /** The computer's sound output at the last check (after any change Church Studio made). */
+  private roomDefaultId: string | null = null;
   private roomOutputTimer: ReturnType<typeof setInterval> | undefined;
 
   startRoomOutput = () => {
@@ -1585,6 +1587,10 @@ class Session {
   checkRoomOutputs = async () => {
     const before = this.roomOutputsKey ? this.roomOutputs : null;
     if (!(await this.readRoomOutputs())) return;
+    // Changed in the computer's own settings (Control Center): that is the church's choice now.
+    const byHand = changedByHand(this.roomDefaultId, this.roomOutputs);
+    this.roomDefaultId = this.roomOutputs.find((output) => output.isDefault)?.id ?? null;
+    if (byHand) this.adoptRoomOutput(byHand);
     // A different audience screen can mean a different output too (its own speakers).
     const key = `${outputsKey(this.roomOutputs)}#${this.audienceScreenNames().join("|")}`;
     if (key === this.roomOutputsKey) return;
@@ -1592,17 +1598,31 @@ class Session {
     await this.applyRoomOutput(before);
   };
 
+  /**
+   * Keeps the output someone chose in the computer's settings. One Automatic had picked and they
+   * left (a display with no speakers behind it) is not picked by Automatic again.
+   */
+  private adoptRoomOutput = (output: AudioOutputDevice) => {
+    const audio = this.workspace.audio;
+    const left = this.roomOutput?.output;
+    const skip = left && this.roomOutput?.why !== "chosen" && left.id !== output.id ? [...audio.audienceSkip.filter((id) => id !== output.id), left.id] : audio.audienceSkip.filter((id) => id !== output.id);
+    this.setAudio({ audience: output.id, audienceName: output.name, audienceSkip: skip });
+    this.roomOutput = { output, why: "chosen", missing: false };
+    this.notify(t("Sound stays on {output}", { output: output.name }), { detail: t("It was chosen in this computer's sound settings, so Church Studio keeps it. Change it in Settings › Sound & voice."), ms: 10_000 });
+  };
+
   /** "auto", or one output by its id: kept with the workspace, used straight away. */
   setRoomOutput = async (choice: string) => {
     const output = this.roomOutputs.find((entry) => entry.id === choice);
-    this.setAudio({ audience: output ? output.id : "auto", audienceName: output?.name ?? "" });
+    // Choosing an output by hand takes it off the never-again list.
+    this.setAudio({ audience: output ? output.id : "auto", audienceName: output?.name ?? "", audienceSkip: this.workspace.audio.audienceSkip.filter((id) => id !== output?.id) });
     await this.applyRoomOutput(null, true);
   };
 
   /** Puts the congregation's sound where the choice says, and tells the desk when a plug changed it. */
   private applyRoomOutput = async (before: AudioOutputDevice[] | null, chosenNow = false) => {
     const audio = this.workspace.audio;
-    const plan = planOutput(before, this.roomOutputs, audio.audience || "auto", this.audienceScreenNames(), { chosenNow, chosenName: audio.audienceName || t("The chosen output") });
+    const plan = planOutput(before, this.roomOutputs, audio.audience || "auto", this.audienceScreenNames(), { chosenNow, chosenName: audio.audienceName || t("The chosen output"), skip: audio.audienceSkip });
     this.roomOutput = plan.decision;
     const target = plan.decision.output;
     if (!target) return;
@@ -1611,6 +1631,7 @@ class Session {
         try {
           await invoke("set_audio_output", { id: plan.switchTo.id });
           await this.readRoomOutputs();
+          this.roomDefaultId = plan.switchTo.id;
         } catch (error) {
           this.warn(String(error));
           return;

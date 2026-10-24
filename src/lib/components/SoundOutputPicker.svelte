@@ -52,7 +52,10 @@
           <li class:on={active?.id === output.id}>
             <span class="tick" aria-hidden="true">{active?.id === output.id ? "✓" : ""}</span>
             <span class="name">{output.name}</span>
-            <span class="tag" class:room={isRoomOutput(output)}>{t(TRANSPORT_LABELS[output.transport])}</span>
+            <span class="tags">
+              {#if audio.audienceSkip.includes(output.id)}<span class="tag" title={t("You moved away from it, so Automatic does not pick it. Choose it above to use it again.")}>{t("Not picked by Automatic")}</span>{/if}
+              <span class="tag" class:room={isRoomOutput(output)}>{t(TRANSPORT_LABELS[output.transport])}</span>
+            </span>
             {#if active?.id === output.id}<span class="sr">{t("In use")}</span>{/if}
           </li>
         {/each}
@@ -85,6 +88,7 @@
   .list li.on { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-weight: 600; }
   .tick { color: var(--accent); }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tags { display: flex; gap: 4px; }
   .tag { padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; font-weight: 600; }
   .tag.room { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

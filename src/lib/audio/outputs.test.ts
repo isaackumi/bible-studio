@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseOutput, outputsKey, planOutput, type AudioOutputDevice } from "./outputs";
+import { changedByHand, chooseOutput, outputsKey, planOutput, type AudioOutputDevice } from "./outputs";
 
 const speakers: AudioOutputDevice = { id: "BuiltInSpeakerDevice", name: "MacBook Pro Speakers", transport: "built-in", isDefault: true };
 const dell: AudioOutputDevice = { id: "dell", name: "DELL U2415", transport: "displayport", isDefault: false };
@@ -35,9 +35,19 @@ describe("choosing the congregation's sound output", () => {
     expect(chooseOutput([speakers, tv, dell], "auto", ["Samsung TV", "DELL U2415"]).output?.id).toBe("dell");
   });
 
-  it("never picks headphones, AirPlay or a meeting app by itself", () => {
-    expect(chooseOutput([{ ...speakers, isDefault: false }, { ...airpods, isDefault: true }, teams], "auto")).toMatchObject({ output: { id: "airpods" }, why: "computer" });
+  it("never picks headphones, AirPlay or a meeting app by itself, but keeps one the computer is using", () => {
     expect(chooseOutput([speakers, airpods, teams], "auto").output?.id).toBe("BuiltInSpeakerDevice");
+    expect(chooseOutput([{ ...speakers, isDefault: false }, { ...teams, isDefault: true }, airpods], "auto").output?.id).toBe("BuiltInSpeakerDevice");
+  });
+
+  it("keeps a Bluetooth soundbar the Mac already plays through, over the audience screen's audio", () => {
+    const soundbar: AudioOutputDevice = { id: "88-D0-39-B1-67-F6:output", name: "HT-S100F", transport: "bluetooth", isDefault: true };
+    expect(chooseOutput([{ ...speakers, isDefault: false }, dell, soundbar, teams], "auto", ["DELL U2415"])).toMatchObject({ output: soundbar, why: "default-external" });
+  });
+
+  it("never picks again an output the church moved away from", () => {
+    expect(chooseOutput([speakers, dell], "auto", ["DELL U2415"], ["dell"])).toMatchObject({ output: speakers, why: "computer" });
+    expect(chooseOutput([speakers, dell, usb], "auto", ["DELL U2415"], ["usb"]).output?.id).toBe("dell");
   });
 
   it("keeps a chosen output, even the laptop's own, while it is connected", () => {
@@ -94,5 +104,19 @@ describe("when outputs come and go", () => {
 
   it("follows the audience screen to its own speakers", () => {
     expect(planOutput([home, dell], [home, dell], "auto", ["DELL U2415"])).toMatchObject({ switchTo: { id: "dell" }, notice: { kind: "moved", cause: "screen" } });
+  });
+});
+
+describe("a change made in the computer's own settings", () => {
+  const soundbar: AudioOutputDevice = { id: "bar", name: "HT-S100F", transport: "bluetooth", isDefault: false };
+
+  it("is noticed when the output left is still there", () => {
+    expect(changedByHand("dell", [speakers, { ...dell, isDefault: false }, { ...soundbar, isDefault: true }].map((output) => (output.id === "BuiltInSpeakerDevice" ? { ...output, isDefault: false } : output)))?.id).toBe("bar");
+  });
+
+  it("is not a choice when the output was unplugged, nor when nothing changed", () => {
+    expect(changedByHand("usb", [speakers])).toBeNull();
+    expect(changedByHand("BuiltInSpeakerDevice", [speakers, dell])).toBeNull();
+    expect(changedByHand(null, [speakers])).toBeNull();
   });
 });

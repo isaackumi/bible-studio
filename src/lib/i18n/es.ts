@@ -4643,4 +4643,8 @@ export const es: Readonly<Record<string, string>> = {
   "Church Studio finds the church's sound system (a USB audio interface, or the audience screen's own speakers) and plays music, videos and YouTube there, with this computer's speakers as the fallback. Choose another output in Settings › Sound & voice.": "Church Studio encuentra el sistema de sonido de la iglesia (una interfaz de audio USB o los altavoces de la pantalla de la congregación) y reproduce ahí la música, los videos y YouTube, con los altavoces de esta computadora como respaldo. Elige otra salida en Ajustes › Sonido y voz.",
   "Plug in, pull out": "Conectar, desconectar",
   "An interface plugged in during the service takes over; if the one in use is unplugged, the sound moves and the desk says where. On a Mac the old sound output comes back when Church Studio quits.": "Una interfaz conectada durante el servicio toma el relevo; si se desconecta la que está en uso, el sonido se mueve y el escritorio indica adónde. En Mac, la salida de sonido anterior vuelve cuando Church Studio se cierra.",
+  "Sound stays on {output}": "El sonido se queda en {output}",
+  "It was chosen in this computer's sound settings, so Church Studio keeps it. Change it in Settings › Sound & voice.": "Se eligió en la configuración de sonido de esta computadora, así que Church Studio la mantiene. Cámbiala en Ajustes › Sonido y voz.",
+  "You moved away from it, so Automatic does not pick it. Choose it above to use it again.": "La dejaste, así que Automática ya no la elige. Elígela arriba para volver a usarla.",
+  "Not picked by Automatic": "No la elige Automática",
 };
