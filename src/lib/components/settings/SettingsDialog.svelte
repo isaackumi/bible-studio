@@ -1385,6 +1385,7 @@
         <ReadyCheck ongo={(next) => (section = next as SettingsSectionId)} />
       {:else if section === "storage"}
         <StorageSpace />
+        {#await import("./MoveComputer.svelte") then { default: MoveComputer }}<MoveComputer />{/await}
         <p class="section-label">{t("Automatic backup and a second computer")}</p>
         <section class="rows">
           <div class="row">

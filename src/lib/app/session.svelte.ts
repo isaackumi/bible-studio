@@ -12,7 +12,6 @@ import { recordingMinutes } from "../domain/readiness";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
-import { buildMoveLibrary, formatBytes, restoreMoveLibrary } from "./move";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
@@ -1211,6 +1210,7 @@ class Session {
   saveMoveFile = (dest: string): Promise<string> =>
     this.withMoveProgress(async () => {
       await this.flushSave();
+      const { buildMoveLibrary, formatBytes } = await import("./move");
       const library = buildMoveLibrary(await this.exportLibrary(), extrasFrom(this.workspace, await api.sermonList()));
       const summary = await invoke<{ files: number; missing: number; bytes: number }>("move_export", { dest, library, computer: this.deviceName() });
       const saved = t("Saved: {songs} songs, {services} services and {files} media files ({size}).", { songs: this.songs.length, services: this.services.length, files: summary.files, size: formatBytes(summary.bytes) });
@@ -1223,6 +1223,7 @@ class Session {
   /** Bring a .churchstudio file in. Nothing here is deleted; the same item from the file wins. */
   openMoveFile = (path: string): Promise<string> =>
     this.withMoveProgress(async () => {
+      const { restoreMoveLibrary } = await import("./move");
       const result = await invoke<{ library: string; mediaAdded: number }>("move_import", { path });
       this.media = await api.mediaList();
       const byId = new Map(this.#allMedia.map((asset) => [asset.id, asset]));
