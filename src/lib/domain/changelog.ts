@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.1",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "sparkles", title: msg("Word clouds and ratings"), text: msg("A poll can ask for a few words and grow a word cloud on the screen, or a rating from 1 to 5 or 10, shown as bars and an average. You can hide any word.") },
+      { icon: "stage", title: msg("Now running"), text: msg("A small bar under the top shows what keeps going while you work elsewhere (a quiz, a slideshow, music, captions) with its next step and a way back to it.") },
+      { icon: "audio", title: msg("Sound on Windows goes where you choose"), text: msg("The speaker you pick becomes the computer's sound, so music, videos and YouTube all play there, and the computer's own choice comes back when you quit.") },
+      { icon: "mic", title: msg("Listening that tells you what's wrong"), text: msg("An unplugged microphone, or one held by a call in another app, is named instead of going quiet. Accurate listening checks the computer can run it before you download it.") },
+      { icon: "laptop", title: msg("Steadier on Windows"), text: msg("The audience screen lands in the right place on scaled screens and never takes the keyboard, the desk no longer freezes on slow disks, and updates no longer fail with 404.") },
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-10-24",
     highlights: [

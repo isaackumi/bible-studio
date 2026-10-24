@@ -4906,4 +4906,13 @@ export const fr: Readonly<Record<string, string>> = {
   "{n} questions waiting": "{n} questions en attente",
   "{n} s left": "{n} s restantes",
   "Church Studio sets Windows' sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.": "Church Studio règle la sortie audio de Windows : musique, vidéos et YouTube y passent tous, et la sortie d’avant revient quand Church Studio se ferme.",
+  "Word clouds and ratings": "Nuages de mots et notes",
+  "A poll can ask for a few words and grow a word cloud on the screen, or a rating from 1 to 5 or 10, shown as bars and an average. You can hide any word.": "Un sondage peut demander quelques mots et faire grandir un nuage de mots à l’écran, ou une note de 1 à 5 ou à 10, en barres avec la moyenne. Vous pouvez masquer n’importe quel mot.",
+  "A small bar under the top shows what keeps going while you work elsewhere (a quiz, a slideshow, music, captions) with its next step and a way back to it.": "Une petite barre sous le haut montre ce qui continue pendant que vous travaillez ailleurs (un quiz, un diaporama, la musique, les sous-titres), avec l’étape suivante et un moyen d’y revenir.",
+  "Sound on Windows goes where you choose": "Le son sous Windows va où vous voulez",
+  "The speaker you pick becomes the computer's sound, so music, videos and YouTube all play there, and the computer's own choice comes back when you quit.": "La sortie choisie devient le son de l’ordinateur : musique, vidéos et YouTube y passent tous, et le choix de l’ordinateur revient quand vous quittez.",
+  "Listening that tells you what's wrong": "Une écoute qui dit ce qui ne va pas",
+  "An unplugged microphone, or one held by a call in another app, is named instead of going quiet. Accurate listening checks the computer can run it before you download it.": "Un microphone débranché, ou pris par un appel dans une autre application, est signalé au lieu de se taire. L’écoute précise vérifie que l’ordinateur peut la faire tourner avant le téléchargement.",
+  "Steadier on Windows": "Plus stable sous Windows",
+  "The audience screen lands in the right place on scaled screens and never takes the keyboard, the desk no longer freezes on slow disks, and updates no longer fail with 404.": "L’écran du public se place bien sur les écrans mis à l’échelle et ne prend jamais le clavier, le pupitre ne se fige plus sur les disques lents, et les mises à jour n’échouent plus avec 404.",
 };

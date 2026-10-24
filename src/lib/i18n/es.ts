@@ -4825,4 +4825,13 @@ export const es: Readonly<Record<string, string>> = {
   "{n} questions waiting": "{n} preguntas en espera",
   "{n} s left": "Quedan {n} s",
   "Church Studio sets Windows' sound output, so music, videos and YouTube all play there, and puts back the one it had when Church Studio quits.": "Church Studio ajusta la salida de sonido de Windows, así la música, los videos y YouTube suenan ahí, y devuelve la anterior cuando Church Studio se cierra.",
+  "Word clouds and ratings": "Nubes de palabras y valoraciones",
+  "A poll can ask for a few words and grow a word cloud on the screen, or a rating from 1 to 5 or 10, shown as bars and an average. You can hide any word.": "Una encuesta puede pedir unas palabras y hacer crecer una nube en la pantalla, o una valoración de 1 a 5 o a 10, en barras con la media. Puedes ocultar cualquier palabra.",
+  "A small bar under the top shows what keeps going while you work elsewhere (a quiz, a slideshow, music, captions) with its next step and a way back to it.": "Una pequeña barra bajo la parte superior muestra lo que sigue en marcha mientras trabajas en otra cosa (un cuestionario, una presentación, la música, los subtítulos), con el siguiente paso y una forma de volver.",
+  "Sound on Windows goes where you choose": "En Windows, el sonido va donde eliges",
+  "The speaker you pick becomes the computer's sound, so music, videos and YouTube all play there, and the computer's own choice comes back when you quit.": "El altavoz que eliges pasa a ser el sonido del ordenador: la música, los vídeos y YouTube suenan allí, y la elección del ordenador vuelve al salir.",
+  "Listening that tells you what's wrong": "Una escucha que dice qué falla",
+  "An unplugged microphone, or one held by a call in another app, is named instead of going quiet. Accurate listening checks the computer can run it before you download it.": "Un micrófono desconectado, o en uso por una llamada en otra aplicación, se indica en lugar de quedarse en silencio. La escucha precisa comprueba que el ordenador puede usarla antes de descargarla.",
+  "Steadier on Windows": "Más estable en Windows",
+  "The audience screen lands in the right place on scaled screens and never takes the keyboard, the desk no longer freezes on slow disks, and updates no longer fail with 404.": "La pantalla del público se coloca bien en pantallas escaladas y nunca toma el teclado, el escritorio ya no se congela con discos lentos y las actualizaciones ya no fallan con 404.",
 };
