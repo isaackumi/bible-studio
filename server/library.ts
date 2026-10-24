@@ -162,6 +162,12 @@ export class LibraryCore {
     return ok({ ...base, upload: true });
   }
 
+  /** A file's claim, for the worker to check before it takes the upload. */
+  async claim(input: { hash: string }): Promise<Result<MediaRow>> {
+    const row = await this.store.getMedia(text(input.hash, 64));
+    return row ? ok(row) : fail(404, "That file was not claimed.");
+  }
+
   async mediaDone(input: { hash: string; bytes: number; now: number }): Promise<Result<{ usedBytes: number }>> {
     const row = await this.store.getMedia(text(input.hash, 64));
     if (!row) return fail(404, "That file was not claimed.");
@@ -316,7 +322,7 @@ type LibraryState = { storage: { sql: SqlStorage; setAlarm(at: number): Promise<
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 /** Methods the worker may call, by the last part of the path (`https://library/<method>`). */
-const METHODS = ["push", "pull", "history", "bin", "restore", "emptyBin", "claimMedia", "mediaDone", "media", "removeMedia", "devices", "settings", "status", "lapse"] as const;
+const METHODS = ["push", "pull", "history", "bin", "restore", "emptyBin", "claimMedia", "claim", "mediaDone", "media", "removeMedia", "devices", "settings", "status", "lapse"] as const;
 type Method = (typeof METHODS)[number];
 
 /** One licence's library: its rows in the object's SQLite, its rules in LibraryCore. */

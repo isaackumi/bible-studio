@@ -97,7 +97,7 @@ export type ApiConfig = {
 export const SEATS: Record<LicensePlan, number> = { premium: 1, church: 3 };
 
 const DAY = 86_400_000;
-const STALE_DAYS = 60;
+export const STALE_DAYS = 60;
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -143,7 +143,7 @@ export type LicenseRecord = { sub: string | null; email: string; paidUntil: numb
 export const EMAILS_PER_INBOX = 5;
 
 /** Too many requests to this route from this network address in the last minute (Cloudflare's limiter). */
-async function tooFast(config: ApiConfig, request: Request, route: string): Promise<boolean> {
+export async function tooFast(config: ApiConfig, request: Request, route: string): Promise<boolean> {
   const address = request.headers.get("cf-connecting-ip");
   if (!address || !config.limit) return false;
   return !(await config.limit(`${route}:${address}`));
@@ -828,7 +828,7 @@ export async function reinstate(config: ApiConfig, license: string): Promise<voi
 // --- Seats and activation ------------------------------------------------------------------
 
 /** When a key's plan ends: its fixed end date, or (launch offers) a number of days from first use, counted here. */
-async function keyEnds(config: ApiConfig, license: License): Promise<number | null> {
+export async function keyEnds(config: ApiConfig, license: License): Promise<number | null> {
   const record = await getJson<LicenseRecord>(config.store, `license:${license.id}`);
   if (record && typeof record.paidUntil === "number") return record.paidUntil;
   if (license.until) return Date.parse(license.until);

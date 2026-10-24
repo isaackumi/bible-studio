@@ -5,6 +5,7 @@
 // Stateless on purpose: the key id comes from the Paddle transaction id, so a retried webhook
 // makes the very same key instead of a second one.
 
+import { handleCloud } from "./cloud";
 import type { LibraryNamespace, R2Like } from "./cloud-config";
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { latestRelease } from "./downloads.ts";
@@ -192,6 +193,9 @@ export default {
     const rooms = await handleRooms(request, env.ROOMS, env.PUBLIC_URL?.replace(/\/+$/, "") || url.origin, roomPage, config?.limit);
     if (rooms) return rooms;
     if (!config) return new Response("The server is not set up yet (KV binding and signing key).", { status: 503 });
+    // Cloud space: a licence's computers keeping one library (cloud.ts).
+    const cloud = await handleCloud(request, config);
+    if (cloud) return cloud;
     return handleApi(request, config);
   },
 };
