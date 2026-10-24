@@ -5442,11 +5442,12 @@ class Session {
   };
 
   /** A slide deck playing on Program by itself (announcements before the service), looping. */
-  deckLoop = $state<{ deckId: string; seconds: number; index: number } | null>(null);
+  /** `at`: when the page now showing went up, so the desk can show how long until the next. */
+  deckLoop = $state<{ deckId: string; seconds: number; index: number; at: number } | null>(null);
   private loopTimer: ReturnType<typeof setInterval> | undefined;
 
   /** Put a deck on Program and advance it every few seconds, round and round, until stopped. */
-  startDeckLoop = async (deckId: string, seconds = 8) => {
+  startDeckLoop = async (deckId: string, seconds = 8, from = 0) => {
     const deck = this.decks.find((entry) => entry.id === deckId);
     if (!deck || deck.pages.length === 0) return;
     if (!this.desktop() && !this.controlsAudience) {
@@ -5455,16 +5456,28 @@ class Session {
     }
     this.stopDeckLoop();
     const every = Math.min(600, Math.max(3, Math.round(seconds)));
-    this.deckLoop = { deckId, seconds: every, index: 0 };
+    this.deckLoop = { deckId, seconds: every, index: Math.min(Math.max(0, from), deck.pages.length - 1), at: Date.now() };
     await this.showLoopPage();
     this.loopTimer = setInterval(() => {
       const loop = this.deckLoop;
       const current = loop && this.decks.find((entry) => entry.id === loop.deckId);
       if (!loop || !current?.pages.length) return this.stopDeckLoop();
-      this.deckLoop = { ...loop, index: (loop.index + 1) % current.pages.length };
+      this.deckLoop = { ...loop, index: (loop.index + 1) % current.pages.length, at: Date.now() };
       void this.showLoopPage();
     }, every * 1000);
     this.message = t("{name} is looping on Program, a page every {every} seconds. Preview is free for what comes next.", { name: deck.name, every });
+  };
+
+  /** A running loop at a new pace, from the page it is on. */
+  setDeckLoopSeconds = (seconds: number) => {
+    const loop = this.deckLoop;
+    if (loop) void this.startDeckLoop(loop.deckId, seconds, loop.index);
+  };
+
+  /** A running loop moved to a page by hand; the clock to the next starts again from here. */
+  jumpDeckLoop = (index: number) => {
+    const loop = this.deckLoop;
+    if (loop) void this.startDeckLoop(loop.deckId, loop.seconds, index);
   };
 
   stopDeckLoop = () => {

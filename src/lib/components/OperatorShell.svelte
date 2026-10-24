@@ -2,7 +2,6 @@
   import RemoteApproval from "./RemoteApproval.svelte";
   import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
-  import DeckEditor from "./decks/DeckEditor.svelte";
   import { audienceRoom } from "../app/rooms.svelte";
   import { pictures } from "../app/pictures.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
@@ -229,7 +228,10 @@
     {#if session.studio}
       {@const studioDeck = session.decks.find((deck) => deck.id === session.studio?.deckId)}
       {#if studioDeck}
-        {#key studioDeck.id}<DeckEditor deck={studioDeck} startWith={session.studio.start} onclose={() => session.closeStudio()} />{/key}
+        <!-- The studio is its own chunk, fetched when first opened. -->
+        {#await import("./decks/DeckEditor.svelte") then { default: DeckEditor }}
+          {#key studioDeck.id}<DeckEditor deck={studioDeck} startWith={session.studio.start} onclose={() => session.closeStudio()} />{/key}
+        {/await}
       {/if}
     {/if}
     <!-- Its own chunk, loaded just after the desk starts (⌘K works a moment later). -->

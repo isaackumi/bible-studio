@@ -179,13 +179,23 @@
   let showMenu = $state(false);
   let designsMenu = $state(false);
   let loopSeconds = $state(8);
-  /** Saves, leaves the studio, and puts the deck on the screens the way chosen. */
+  /**
+   * Saves and puts the deck on the screens the way chosen. The studio stays open, so the pages can
+   * be driven from here (the show bar); only adding to the service goes to the running order.
+   */
   function present(how: "preview" | "live" | "slideshow" | "service") {
     showMenu = false;
     save();
-    onclose();
+    if (how === "service") onclose();
     void session.showDeck(draft.id, how, { page: pageIndex, seconds: loopSeconds });
   }
+  /** The page of this deck on Program and on Preview, from what the screens show. */
+  const indexOn = (sourceId: string | null) => {
+    const match = sourceId && new RegExp(`^deck:${draft.id}:(\\d+)$`).exec(sourceId);
+    return match ? Number(match[1]) : null;
+  };
+  const liveIndex = $derived(indexOn(session.live.program.sourceId));
+  const previewIndex = $derived(indexOn(session.live.preview.sourceId));
   /** Another design (or a new one) in the studio; this one is saved first. */
   function openDesign(id: string | null) {
     designsMenu = false;
@@ -531,7 +541,8 @@
             }}
             ondragend={() => (dragFrom = null)}
           >
-            <button type="button" class="page" style:--aspect={screenAspect} aria-label={t("Page {index}", { index: index + 1 })} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
+            {#if liveIndex === index}<em class="badge live">{t("LIVE")}</em>{:else if previewIndex === index}<em class="badge preview">{t("PREVIEW")}</em>{/if}
+            <button type="button" class="page" class:is-live={liveIndex === index} style:--aspect={screenAspect} aria-label={t("Page {index}", { index: index + 1 })} aria-current={index === pageIndex} onclick={() => { pageIndex = index; selectedId = null; }}>
               <DeckThumb page={entry} />
             </button>
             <span class="num">{index + 1}</span>
@@ -541,6 +552,9 @@
           <button type="button" class="add-page" aria-label={t("Add a blank page")} title={t("Add a blank page")} onclick={() => { commitDeck(addPage(draft, pageIndex)); pageIndex = pageIndex + 1; selectedId = null; }}>+</button>
         </li>
       </ol>
+      {#await import("./ShowBar.svelte") then { default: ShowBar }}
+        <ShowBar deckId={draft.id} pages={draft.pages.length} {pageIndex} onselect={(index) => (pageIndex = index)} onbefore={() => { if (dirty) save(); }} />
+      {/await}
     </main>
 
     <aside class="inspect" aria-label={t("Inspector")}>
@@ -686,6 +700,10 @@
   .pages li.drop .page { outline: 1px dashed var(--accent); }
   .page { display: block; width: 128px; aspect-ratio: var(--aspect, 16 / 9); max-height: 110px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; cursor: pointer; }
   .pages li.on .page { border-color: var(--accent); }
+  .pages .page.is-live { box-shadow: 0 0 0 2px #ff1414, 0 0 18px rgb(255 20 20 / 0.35); }
+  .badge { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1; padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 800; font-style: normal; letter-spacing: 0.08em; color: #fff; pointer-events: none; }
+  .badge.live { background: #ff1414; }
+  .badge.preview { background: var(--accent); }
   .num { font-size: 11px; color: var(--muted); }
   .add-page { width: 56px; height: 72px; border-radius: 8px; border: 1px dashed var(--line); background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; margin-bottom: 18px; }
   .add-page:hover { color: var(--ink); border-color: var(--accent); }
@@ -705,6 +723,7 @@
   .menu button { text-align: left; min-height: 30px; padding: 0 8px; border-radius: 6px; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
   .menu button:hover { background: var(--field); }
   .canvas-area { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; }
+  main { position: relative; }
   .canvas-area > :global(*) { flex: 1; }
   .zoom { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .inspect { border-left: 1px solid var(--line); padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
