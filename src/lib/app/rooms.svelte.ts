@@ -349,6 +349,8 @@ class AudienceRoom {
     if (!live) return { label: t("Start question {n}", { n: run.index + 1 }), run: () => this.ask() };
     if (live.phase === "open") return { label: t("Stop answers now"), run: () => this.stopAnswers() };
     if (live.phase === "closed") return { label: quiz ? t("Show the answer") : t("Show the results"), run: () => this.reveal() };
+    // A quiz: the leaderboard climbs between the answer and the next question (the podium ends it).
+    if (quiz && this.screenStage !== "leaderboard" && this.screenStage !== "podium") return { label: t("Show the leaderboard"), run: () => this.showGame("leaderboard", this.follow) };
     if (run.index + 1 < run.game.questions.length) return { label: t("Next: question {n}", { n: run.index + 2 }), run: () => this.next() };
     return { label: quiz ? t("Finish with the podium") : t("Finish game"), run: () => this.finish() };
   }
@@ -762,9 +764,10 @@ function readPrefs(): GamePrefs {
   try {
     const saved = JSON.parse(localStorage.getItem(GAME_PREFS) ?? "null") as Partial<Record<keyof GamePrefs, unknown>> | null;
     const teams = Math.round(Number(saved?.teams) || 0);
-    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto === true, teams: teams >= 2 && teams <= MOST_TEAMS ? teams : 0, musicStyle: sanitizeMusicStyle(saved?.musicStyle) };
+    // Running by itself is the default: a quiz moves on like a game show unless the operator wants to press Next.
+    return { follow: saved?.follow !== false, sounds: saved?.sounds !== false, ready: saved?.ready !== false, auto: saved?.auto !== false, teams: teams >= 2 && teams <= MOST_TEAMS ? teams : 0, musicStyle: sanitizeMusicStyle(saved?.musicStyle) };
   } catch {
-    return { follow: true, sounds: true, ready: true, auto: false, teams: 0, musicStyle: "classic" };
+    return { follow: true, sounds: true, ready: true, auto: true, teams: 0, musicStyle: "classic" };
   }
 }
 

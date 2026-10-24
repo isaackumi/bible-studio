@@ -4921,4 +4921,7 @@ export const fr: Readonly<Record<string, string>> = {
   "A change typed just before clicking elsewhere, like a QR code's text, is saved instead of lost.": "Une modification tapée juste avant de cliquer ailleurs, comme le texte d’un code QR, est enregistrée au lieu d’être perdue.",
   "Choosing the audience screen on Windows": "Choisir l’écran du public sous Windows",
   "The audience window now opens on its own thread, so the desk keeps responding while it appears.": "La fenêtre du public s’ouvre désormais à part, et le pupitre continue de répondre pendant qu’elle apparaît.",
+  "Show the leaderboard": "Afficher le classement",
+  "Next question by itself": "Question suivante toute seule",
+  "After each answer: the leaderboard (in a quiz), then the next question, with no clicks; the podium at the end. Off: you press Next each time. Needs the screen to follow the game.": "Après chaque réponse : le classement (dans un quiz), puis la question suivante, sans clic ; le podium à la fin. Désactivé : vous appuyez sur Suivant à chaque fois. L’écran doit suivre le jeu.",
 };

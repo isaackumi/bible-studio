@@ -307,7 +307,7 @@
         </div>
       {/if}
       <label><input type="checkbox" class="switch" checked={audienceRoom.ready} onchange={(event) => audienceRoom.setReady(event.currentTarget.checked)} /> <span>{t("Get ready countdown")}<small>{t("Each question shows alone for 4 seconds to read, then the answers open and the clock starts.")}</small></span></label>
-      <label><input type="checkbox" class="switch" checked={audienceRoom.auto} disabled={!audienceRoom.follow} onchange={(event) => audienceRoom.setAuto(event.currentTarget.checked)} /> <span>{t("Runs by itself")}<small>{t("After each answer, the leaderboard, then the next question, with no clicks; the podium at the end. Needs the screen to follow the game.")}</small></span></label>
+      <label><input type="checkbox" class="switch" checked={audienceRoom.auto} disabled={!audienceRoom.follow} onchange={(event) => audienceRoom.setAuto(event.currentTarget.checked)} /> <span>{t("Next question by itself")}<small>{t("After each answer: the leaderboard (in a quiz), then the next question, with no clicks; the podium at the end. Off: you press Next each time. Needs the screen to follow the game.")}</small></span></label>
     </details>
     {#if audienceRoom.view?.teams}
       <ol class="board teams-board">
