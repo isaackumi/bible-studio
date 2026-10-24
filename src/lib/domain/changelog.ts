@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.5",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "users", title: msg("Quizzes and polls, clearer"), text: msg("Quizzes and polls show as cards you can open, play as everyone or in teams, edit, duplicate or copy. Paste typed questions to make a quiz: a * marks the right answer.") },
+      { icon: "music", title: msg("Samples to start with"), text: msg("18 public-domain hymns on any plan, four quiz packs, and a sample Sunday service with readings, sermon notes and announcements, offered at the end of setup and in Templates.") },
+      { icon: "check", title: msg("Questions from the room read larger"), text: msg("Show the top question on screen in one press.") },
+    ],
+  },
+  {
     version: "0.4.4",
     date: "2026-10-23",
     highlights: [

@@ -4479,4 +4479,10 @@ export const es: Readonly<Record<string, string>> = {
   "Add them": "Añadirlos",
   "Sample service, all filled in": "Servicio de ejemplo, todo completo",
   "Songs, readings, a sermon with notes, announcements and a quiz, ready to run. Opens as a new service.": "Cantos, lecturas, un sermón con notas, anuncios y un cuestionario, listos para usar. Se abre como un servicio nuevo.",
+  "Quizzes and polls, clearer": "Cuestionarios y encuestas, más claros",
+  "Quizzes and polls show as cards you can open, play as everyone or in teams, edit, duplicate or copy. Paste typed questions to make a quiz: a * marks the right answer.": "Los cuestionarios y encuestas aparecen como tarjetas que puedes abrir, jugar todos juntos o por equipos, editar, duplicar o copiar. Pega preguntas escritas para crear un cuestionario: un * marca la respuesta correcta.",
+  "Samples to start with": "Ejemplos para empezar",
+  "18 public-domain hymns on any plan, four quiz packs, and a sample Sunday service with readings, sermon notes and announcements, offered at the end of setup and in Templates.": "18 himnos de dominio público en cualquier plan, cuatro paquetes de cuestionarios y un servicio dominical de ejemplo con lecturas, notas del sermón y anuncios, ofrecidos al final de la configuración y en Plantillas.",
+  "Questions from the room read larger": "Las preguntas de la sala se leen más grandes",
+  "Show the top question on screen in one press.": "Muestra la primera pregunta en pantalla con una sola pulsación.",
 };
