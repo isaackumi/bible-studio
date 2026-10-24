@@ -196,12 +196,37 @@
     </div>
   </section>
 {:else if run && question}
+  {@const quiz = run.game.kind === "quiz"}
+  {@const last = run.index + 1 >= run.game.questions.length}
+  {@const people = audienceRoom.view?.people ?? 0}
   <section class="run">
     <div class="run-head">
       <strong>{run.game.title}</strong>
       <span>{t("Question {n} of {total}", { n: run.index + 1, total: run.game.questions.length })}</span>
     </div>
     <div class="progress" aria-hidden="true">{#each run.game.questions as _q, index (index)}<i class:done={index < run.index} class:now={index === run.index}></i>{/each}</div>
+    <div class="next-step">
+      {#if !live}
+        <button type="button" class="btn accent big step" onclick={() => audienceRoom.ask()}>{t("Start question {n}", { n: run.index + 1 })}</button>
+        <p>{audienceRoom.follow ? (question.seconds ? t("Shows it on the screen and on phones, and starts the {n}-second clock.", { n: question.seconds }) : t("Shows it on the screen and on phones.")) : t("Opens it on phones. The screen stays as it is; change it under How the game runs.")}{#if run.index === 0}{" "}<strong>{tn(people, "{n} person has joined.", "{n} people have joined.")}</strong>{/if}</p>
+      {:else if live.phase === "open"}
+        <button type="button" class="btn accent big step" onclick={() => audienceRoom.stopAnswers()}>{t("Stop answers now")}</button>
+        <p>{tn(audienceRoom.view?.answered ?? 0, "{n} answer in.", "{n} answers in.")} {question.seconds ? t("Answers close by themselves when the clock runs out.") : ""}</p>
+      {:else if live.phase === "closed"}
+        <button type="button" class="btn accent big step" onclick={() => audienceRoom.reveal()}>{quiz ? t("Show the answer") : t("Show the results")}</button>
+        <p>{quiz ? t("Answers are closed. Show which one was right, on the screen and on phones.") : t("Answers are closed. Show how the room voted.")}</p>
+      {:else}
+        <div class="step-row">
+          {#if quiz}<button type="button" class="btn big" onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>{/if}
+          {#if !last}
+            <button type="button" class="btn accent big step" onclick={() => audienceRoom.next()}>{t("Next: question {n}", { n: run.index + 2 })}</button>
+          {:else}
+            <button type="button" class="btn accent big step" onclick={() => audienceRoom.finish()}>{quiz ? t("Finish with the podium") : t("Finish game")}</button>
+          {/if}
+        </div>
+        <p>{quiz ? t("The answer is showing.") : t("The results are showing.")} {last ? t("That was the last question.") : t("Next shows the following question, ready to start.")}</p>
+      {/if}
+    </div>
     <p class="prompt">{question.prompt}</p>
     <ol class="answers">
       {#each question.choices.filter((choice) => choice.trim()) as choice, index (index)}
@@ -217,40 +242,18 @@
         </li>
       {/each}
     </ol>
-    <p class="status">
-      {#if !live}{t("Not asked yet. People see it on their phones when you ask.")}
-      {:else if live.phase === "open"}{tn(audienceRoom.view?.answered ?? 0, "{n} answer in", "{n} answers in")}{question.seconds ? ` · ${t("{n} seconds", { n: question.seconds })}` : ""}
-      {:else if live.phase === "closed"}{t("Answers closed.")}
-      {:else}{run.game.kind === "quiz" ? t("Answer shown on phones.") : t("Results shown on phones.")}{/if}
-    </p>
-    <div class="row">
-      {#if !live}
-        <button type="button" class="btn accent big" onclick={() => audienceRoom.ask()}>{t("Ask on phones")}</button>
-      {:else if live.phase === "open"}
-        <button type="button" class="btn accent big" onclick={() => audienceRoom.stopAnswers()}>{t("Stop answers")}</button>
-      {:else if live.phase === "closed"}
-        <button type="button" class="btn accent big" onclick={() => audienceRoom.reveal()}>{run.game.kind === "quiz" ? t("Show the answer") : t("Show the results")}</button>
-      {:else}
-        {#if run.game.kind === "quiz"}<button type="button" class="btn" onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>{/if}
-        {#if run.index + 1 < run.game.questions.length}
-          <button type="button" class="btn accent big" onclick={() => audienceRoom.next()}>{t("Next question")}</button>
-        {:else}
-          <button type="button" class="btn accent big" onclick={() => audienceRoom.finish()}>{run.game.kind === "quiz" ? t("Finish with the podium") : t("Finish game")}</button>
-        {/if}
-      {/if}
-    </div>
-    <div class="screen">
-      <span>{audienceRoom.follow ? t("On the screen:") : t("On Preview:")}</span>
-      <button type="button" class="btn" class:on={audienceRoom.screenStage === "lobby"} onclick={() => audienceRoom.showGame("lobby", audienceRoom.follow)}>{t("Lobby")}</button>
-      <button type="button" class="btn" class:on={audienceRoom.screenStage === "question"} onclick={() => audienceRoom.showGame("question", audienceRoom.follow)}>{t("Question")}</button>
-      <button type="button" class="btn" class:on={audienceRoom.screenStage === "results"} disabled={!live} onclick={() => audienceRoom.showGame("results", audienceRoom.follow)}>{t("Results")}</button>
-      {#if run.game.kind === "quiz"}
-        <button type="button" class="btn" class:on={audienceRoom.screenStage === "leaderboard"} onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>
-        <button type="button" class="btn" class:on={audienceRoom.screenStage === "podium"} onclick={() => audienceRoom.showGame("podium", audienceRoom.follow)}>{t("Podium")}</button>
-      {/if}
-    </div>
     <details class="switches">
       <summary>{t("How the game runs")}</summary>
+      <div class="screen">
+        <span>{audienceRoom.follow ? t("Put on the screen yourself:") : t("Put on Preview:")}</span>
+        <button type="button" class="btn" class:on={audienceRoom.screenStage === "lobby"} onclick={() => audienceRoom.showGame("lobby", audienceRoom.follow)}>{t("Lobby")}</button>
+        <button type="button" class="btn" class:on={audienceRoom.screenStage === "question"} onclick={() => audienceRoom.showGame("question", audienceRoom.follow)}>{t("Question")}</button>
+        <button type="button" class="btn" class:on={audienceRoom.screenStage === "results"} disabled={!live} onclick={() => audienceRoom.showGame("results", audienceRoom.follow)}>{t("Results")}</button>
+        {#if run.game.kind === "quiz"}
+          <button type="button" class="btn" class:on={audienceRoom.screenStage === "leaderboard"} onclick={() => audienceRoom.showGame("leaderboard", audienceRoom.follow)}>{t("Leaderboard")}</button>
+          <button type="button" class="btn" class:on={audienceRoom.screenStage === "podium"} onclick={() => audienceRoom.showGame("podium", audienceRoom.follow)}>{t("Podium")}</button>
+        {/if}
+      </div>
       <label><input type="checkbox" class="switch" checked={audienceRoom.follow} onchange={(event) => audienceRoom.setFollow(event.currentTarget.checked)} /> <span>{t("Screen follows the game")}<small>{t("Each question, answer and the podium go to the screen as they happen; when time is up, the answer shows by itself.")}</small></span></label>
       <label><input type="checkbox" class="switch" checked={audienceRoom.sounds} onchange={(event) => audienceRoom.setSounds(event.currentTarget.checked)} /> <span>{t("Game sounds")}<small>{t("Music while people join and answer, ticks, a gong, a drumroll and a fanfare, on the audience screen.")}</small></span></label>
       {#if audienceRoom.sounds}
@@ -505,7 +508,12 @@
   .right-tag { position: relative; display: inline-flex; align-items: center; gap: 3px; color: var(--good, #3ccf7a); font-size: 11.5px; font-weight: 700; }
   .answers b { position: relative; min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
   .answers :global(.mark) { position: relative; }
-  .status { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .next-step { display: grid; gap: 6px; padding: 10px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .next-step .step { width: 100%; justify-content: center; }
+  .next-step p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .next-step strong { color: var(--ink); }
+  .step-row { display: flex; gap: 6px; }
+  .step-row .step { flex: 1; }
   .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
   .switches summary { color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer; }
   .switches[open] summary { margin-bottom: 4px; }
