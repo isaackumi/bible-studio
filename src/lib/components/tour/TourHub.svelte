@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fly } from "svelte/transition";
   import { session } from "../../app/session.svelte";
-  import { TOUR_GROUPS, TOURS, tourStatus, type TourId } from "../../tour/steps";
+  import { TOUR_FEATURES, TOUR_GROUPS, TOURS, tourStatus, type TourId } from "../../tour/steps";
   import Icon from "../Icon.svelte";
   import { t, tn } from "../../i18n/core";
 
@@ -61,7 +61,8 @@
         {#each group.tours as id (id)}
           {@const tour = TOURS[id]}
           {@const status = tourStatus(progress, id)}
-          {@const locked = id === "production" && !session.entitled("production")}
+          {@const needs = TOUR_FEATURES[id]}
+          {@const locked = !!needs && !session.entitled(needs)}
           <div class="tour" class:expanded={open === id}>
             <div class="tour-row">
               <button type="button" class="expand" aria-expanded={open === id} aria-label={open === id ? t("Hide steps of the {name} tour", { name: t(tour.name) }) : t("Show steps of the {name} tour", { name: t(tour.name) })} onclick={() => (open = open === id ? null : id)}>

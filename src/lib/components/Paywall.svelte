@@ -37,7 +37,7 @@
   let trialNote = $state("");
 
   const PAID = ["premium", "church"] as const;
-  const BASE: PlanFeature[] = ["presenter", "scripture", "songs", "sermon", "slides", "media", "audience-output"];
+  const BASE: PlanFeature[] = ["presenter", "scripture", "audience-output"];
 
   const yearlySaving = $derived(Math.round((1 - PLANS[1]!.price.yearly / (PLANS[1]!.price.monthly * 12)) * 100));
   /** A feature's name without its explanation ("Production Desk: scenes, cameras, video" → "Production Desk"). */

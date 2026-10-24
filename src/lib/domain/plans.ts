@@ -15,8 +15,12 @@ export type PlanFeature =
   | "scripture"
   | "songs"
   | "sermon"
+  | "service"
   | "slides"
   | "media"
+  | "music"
+  | "audience"
+  | "captions"
   | "audience-output"
   | "production"
   | "voice"
@@ -52,8 +56,12 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   scripture: { label: msg("Scripture with every translation") },
   songs: { label: msg("Song library, folders and imports") },
   sermon: { label: msg("Sermon outlines and desk notes") },
-  slides: { label: msg("Slides and announcements") },
+  service: { label: msg("The running order: plan and run the whole service") },
+  slides: { label: msg("Slides, the design studio and announcements") },
   media: { label: msg("Images and backgrounds") },
+  music: { label: msg("Music, backing tracks and the sound pad") },
+  audience: { label: msg("Phones in the room: Q&A, quizzes, polls and Pick someone") },
+  captions: { label: msg("Live captions on the screen and on phones") },
   "audience-output": { label: msg("Audience output") },
   production: { label: msg("Production Desk: scenes, cameras, video") },
   voice: { label: msg("Voice: verse detection and commands") },
@@ -70,13 +78,15 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   "priority-support": { label: msg("Priority support") },
 };
 
-const FREE: PlanFeature[] = ["presenter", "scripture", "songs", "sermon", "slides", "media", "audience-output"];
-const PREMIUM: PlanFeature[] = [...FREE, "production", "voice", "song-detection", "phone-remote", "stage-display", "screens", "song-packs", "theme-library"];
+// Free is the Bible on the wall: the Presenter desk's Scriptures page and the audience screen.
+// Everything else is Premium (the 14-day trial gives it all first).
+const FREE: PlanFeature[] = ["presenter", "scripture", "audience-output"];
+const PREMIUM: PlanFeature[] = [...FREE, "songs", "sermon", "service", "slides", "media", "music", "audience", "captions", "production", "voice", "song-detection", "phone-remote", "stage-display", "screens", "song-packs", "theme-library"];
 const CHURCH: PlanFeature[] = [...PREMIUM, "ndi", "streaming", "recording", "priority-support", "cloud-sync"];
 
 export const PLANS: Plan[] = [
-  { id: "free", name: msg("Free"), tagline: msg("Everything to put scripture, songs and sermons on screen."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 }, computers: 1 },
-  { id: "premium", name: msg("Premium"), tagline: msg("Production, voice and remote control for a full service."), color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true, computers: 1 },
+  { id: "free", name: msg("Free"), tagline: msg("The Bible on the wall: any verse, any translation, free for ever."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 }, computers: 1 },
+  { id: "premium", name: msg("Premium"), tagline: msg("Songs, sermons, slides, the running order, phones in the room, voice and a production desk."), color: "#fa4f00", features: PREMIUM, price: { monthly: 12, yearly: 120 }, popular: true, computers: 1 },
   { id: "church", name: msg("Church"), tagline: msg("Broadcast, NDI and three computers at once, for larger and multi-campus teams."), color: "#7c5cff", features: CHURCH, price: { monthly: 29, yearly: 290 }, computers: 3 },
 ];
 

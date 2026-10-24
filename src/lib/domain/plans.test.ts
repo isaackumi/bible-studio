@@ -14,7 +14,8 @@ describe("plans", () => {
     expect(planIncludes("church", "song-detection")).toBe(true);
     expect(planFor("phone-remote").id).toBe("premium");
     expect(planFor("cloud-sync").id).toBe("church");
-    expect(planFor("songs").id).toBe("free");
+    expect(planFor("songs").id).toBe("premium");
+    expect(planFor("scripture").id).toBe("free");
   });
 
   it("runs one 14-day Premium trial, then falls back to Free", () => {

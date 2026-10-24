@@ -17,6 +17,7 @@
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
+  import type { PlanFeature } from "../../domain/plans";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { stepVerse } from "../../bible/passage";
   import { formatReference, parseReference } from "../../bible/reference";
@@ -529,6 +530,7 @@
   }
 
   async function queuePassage() {
+    if (!session.requireFeature("service")) return;
     const item = passage();
     if (!item) return;
     await ensureService("Scripture");
@@ -584,7 +586,12 @@
   });
 
   /** Change page; each page keeps its own Preview (Program stays as it is). */
+  /** Pages past Scripture are Premium: the tab shows a tag, and opens the upgrade prompt instead. */
+  const PAGE_FEATURE: Partial<Record<Mode, PlanFeature>> = { songs: "songs", sermon: "sermon", service: "service" };
+
   function setMode(next: Mode): boolean {
+    const needs = PAGE_FEATURE[next];
+    if (needs && !session.requireFeature(needs)) return true;
     const restored = session.switchPage(mode, next);
     mode = next;
     return restored;
@@ -755,7 +762,7 @@
             aria-keyshortcuts={`Alt+${index + 1}`}
             data-tip={t("{label} (Alt+{index})", { label: entry.label, index: index + 1 })}
             onclick={() => pickMode(entry.id)}
-          >{entry.label}</button>
+          >{entry.label}{#if PAGE_FEATURE[entry.id] && !session.entitled(PAGE_FEATURE[entry.id]!)}<em class="lock">{t("Premium")}</em>{/if}</button>
         {/each}
       </nav>
     </div>
@@ -819,11 +826,11 @@
       </ToolMenu>
       {#if session.audio.current && (session.audio.playing || session.audio.fading)}
         <span class="now-audio">
-          <button type="button" class="now-audio-name" aria-label={t("Audio: {name}", { name: session.audio.current.name })} data-tip={t("Audio: playlists and the player")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
+          <button type="button" class="now-audio-name" aria-label={t("Audio: {name}", { name: session.audio.current.name })} data-tip={t("Audio: playlists and the player")} onclick={() => session.openAudio()}><Icon name="audio" size={13} /><span class="chip-name">{session.audio.current.name.replace(/\.[a-z0-9]+$/i, "")}</span></button>
           <button type="button" class="now-audio-btn" aria-label={t("Pause the music")} data-tip={t("Pause")} onclick={() => void session.audio.toggle()}><Icon name="square" size={12} /></button>
         </span>
       {:else}
-        <button type="button" class="desk-btn icon" aria-label={t("Audio")} data-tip={t("Audio: walk-in music, backing tracks, playlists")} onclick={() => (session.audioOpen = true)}><Icon name="audio" size={16} /></button>
+        <button type="button" class="desk-btn icon" aria-label={t("Audio")} data-tip={t("Audio: walk-in music, backing tracks, playlists")} onclick={() => session.openAudio()}><Icon name="audio" size={16} /></button>
       {/if}
       <BroadcastMenu />
       <SwitcherMenu />
@@ -1310,6 +1317,8 @@
   }
   .pb-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
   .pb-modes button.on { background: var(--accent); color: white; }
+  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 9.5px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+  .pb-modes button.on .lock { background: rgb(255 255 255 / 0.22); color: white; }
   .pb-actions {
     margin-left: auto;
     display: flex;

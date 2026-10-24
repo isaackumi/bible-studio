@@ -4919,4 +4919,10 @@ export const es: Readonly<Record<string, string>> = {
   "{n} done": "{n} hecho(s)",
   "{n} tour": "{n} recorrido",
   "{n} tours": "{n} recorridos",
+  "Music, backing tracks and the sound pad": "Música, pistas de acompañamiento y panel de sonidos",
+  "Phones in the room: Q&A, quizzes, polls and Pick someone": "Los teléfonos en la sala: preguntas, cuestionarios, encuestas y elegir a alguien",
+  "Slides, the design studio and announcements": "Diapositivas, el estudio de diseño y anuncios",
+  "Songs, sermons, slides, the running order, phones in the room, voice and a production desk.": "Cantos, sermones, diapositivas, el orden del servicio, los teléfonos en la sala, voz y un escritorio de producción.",
+  "The Bible on the wall: any verse, any translation, free for ever.": "La Biblia en la pared: cualquier versículo, cualquier traducción, gratis para siempre.",
+  "The running order: plan and run the whole service": "El orden del servicio: planificar y dirigir todo el servicio",
 };

@@ -105,6 +105,7 @@ class AudienceRoom {
   }
 
   show = () => {
+    if (!session.requireFeature("audience")) return;
     onShow?.();
     this.open = true;
     void this.poll();
@@ -115,6 +116,7 @@ class AudienceRoom {
 
   /** The panel, on one tab. */
   showTab = (tab: "questions" | "games" | "pick") => {
+    if (!session.requireFeature("audience")) return;
     this.tab = tab;
     this.show();
   };

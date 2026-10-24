@@ -85,7 +85,7 @@
       list.push({ id: "loop", icon: "stage", tone: "on", title: deck?.name ?? t("Slides"), detail: t("Looping · page {n} of {total} · every {s} s", { n: loop.index + 1, total: deck?.pages.length ?? 1, s: loop.seconds }), stop: { label: t("Stop"), run: () => session.stopDeckLoop() } });
     }
     if (session.audio.playing && !session.audioOpen) {
-      list.push({ id: "music", icon: "lyrics", tone: "calm", title: session.audio.current?.name ?? t("Music"), detail: t("Playing"), primary: { label: t("Pause"), run: () => session.audio.toggle() }, open: () => (session.audioOpen = true) });
+      list.push({ id: "music", icon: "lyrics", tone: "calm", title: session.audio.current?.name ?? t("Music"), detail: t("Playing"), primary: { label: t("Pause"), run: () => session.audio.toggle() }, open: () => session.openAudio() });
     }
     const broadcast = session.broadcastState;
     if (broadcast.status === "on" && (broadcast.streaming || broadcast.recording)) {

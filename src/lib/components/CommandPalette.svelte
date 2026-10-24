@@ -109,7 +109,7 @@
       // Pictures from a folder, and slideshows.
       { id: "pic-folder", group: "Media", label: msg("Pictures from a folder"), detail: msg("Show pictures straight from any folder"), icon: "media", run: () => pictures.show(), words: "pictures photos images folder album jpg png gif bmp browse" },
       { id: "pic-slideshow", group: "Media", label: msg("Slideshow"), detail: msg("A folder of pictures on the screen, one after another"), icon: "media", run: () => pictures.show(), words: "slideshow slide show photos loop walk-in announcements auto advance" },
-      { id: "m-music", group: "Media", label: msg("Music and sound pad"), detail: msg("Background music and sounds"), icon: "audio", run: () => (session.audioOpen = true), words: "music audio sound pad play track playlist background" },
+      { id: "m-music", group: "Media", label: msg("Music and sound pad"), detail: msg("Background music and sounds"), icon: "audio", run: () => session.openAudio(), words: "music audio sound pad play track playlist background" },
     );
     for (const group of SETTINGS_GROUPS) {
       for (const entry of group.items) entries.push({ id: `s-${entry.id}`, group: "Settings", label: entry.title, detail: entry.about, icon: entry.icon, run: () => session.openSettings(entry.id), words: `settings ${entry.keywords} ${t(group.label)}` });

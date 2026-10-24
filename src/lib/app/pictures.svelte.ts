@@ -98,6 +98,7 @@ class Pictures {
   readonly folders = $derived(this.entries.filter((entry) => entry.kind === "folder"));
 
   show = () => {
+    if (!session.requireFeature("media")) return;
     audienceRoom.hide();
     this.open = true;
     if (isDesktop() && !this.places.length) void invoke<Place[]>("picture_places").then((found) => (this.places = found)).catch(() => {});

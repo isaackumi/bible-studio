@@ -282,7 +282,7 @@ ${chapter("listen", 1, `It <span class="serif">listens</span>, so you don't have
       ${item("Accurate listening", "Whisper running on your own computer: audio never leaves the building.", "premium", mac.replace("Mac today", "Mac & Windows"))}
       ${item("Verses by meaning", "When the preacher describes a verse, the AI names it. Off until you switch it on.", "free", '<span class="tag tag-os">your AI key</span>')}
       ${item("Follows the singing and the sermon", "Finds the song part being sung, and the sermon slide being preached.", "premium")}
-      ${item("AI that helps you prepare", "Sermon summaries, slide decks from notes or a passage, songs suggested for the sermon.", "free", '<span class="tag tag-os">your AI key</span>')}
+      ${item("AI that helps you prepare", "Sermon summaries, slide decks from notes or a passage, songs suggested for the sermon.", "premium", '<span class="tag tag-os">your AI key</span>')}
     </ul>
   </div>`)}
 
@@ -309,12 +309,12 @@ ${chapter("songs", 3, `Songs, <span class="serif">the way they're sung.</span>`,
       <div class="chords"><div><span class="chord">G &nbsp; &nbsp; &nbsp; &nbsp; C</span>Great is Thy faithfulness</div><div><span class="chord">D &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; G</span>O God my Father</div></div>
     </div>
     <ul class="list reveal d1">
-      ${item("Imports", "ProPresenter (5–7), EasyWorship 6 and 7, SongSelect, OpenLyrics, ChordPro and plain text.", "free")}
+      ${item("Imports", "ProPresenter (5–7), EasyWorship 6 and 7, SongSelect, OpenLyrics, ChordPro and plain text.", "premium")}
       ${item("Chords for the band", "On the stage screen only, transposed to the key you sing in.", "premium")}
-      ${item("Two languages", "A second language under each line, or either on its own.", "free")}
-      ${item("Backing tracks", "A track that starts when its song goes live.", "free")}
-      ${item("CCLI reporting", "Each song counts once a day it's shown; export the report.", "free")}
-      ${item("Look up a song", "Old hymns written out for you to check; SongSelect for the rest.", "free", '<span class="tag tag-os">your AI key</span>')}
+      ${item("Two languages", "A second language under each line, or either on its own.", "premium")}
+      ${item("Backing tracks", "A track that starts when its song goes live.", "premium")}
+      ${item("CCLI reporting", "Each song counts once a day it's shown; export the report.", "premium")}
+      ${item("Look up a song", "Old hymns written out for you to check; SongSelect for the rest.", "premium", '<span class="tag tag-os">your AI key</span>')}
     </ul>
   </div>`)}
 
@@ -341,12 +341,12 @@ ${chapter("service", 4, `The whole service, <span class="serif">on time.</span>`
     </div>
   </div>
   <ul class="list reveal" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-    ${item("Running order", "Parts holding songs, scripture, slides, pictures, video and looks. Templates bring last week back.", "free")}
-    ${item("Timings", "A start time, a length or an end time per part, and a warning when it runs late.", "free")}
-    ${item("Planning Center", "Bring upcoming plans in, with songs and their lyrics.", "free")}
-    ${item("Timers", "Countdown, count-up, clock or to a time, with warning beeps on the desk only.", "free")}
-    ${item("Sermons", "Notes only the desk and stage see, a sermon clock, and outlines made from your notes.", "free")}
-    ${item("Run sheet", "Print or save the order of service as a PDF.", "free")}
+    ${item("Running order", "Parts holding songs, scripture, slides, pictures, video and looks. Templates bring last week back.", "premium")}
+    ${item("Timings", "A start time, a length or an end time per part, and a warning when it runs late.", "premium")}
+    ${item("Planning Center", "Bring upcoming plans in, with songs and their lyrics.", "premium")}
+    ${item("Timers", "Countdown, count-up, clock or to a time, with warning beeps on the desk only.", "premium")}
+    ${item("Sermons", "Notes only the desk and stage see, a sermon clock, and outlines made from your notes.", "premium")}
+    ${item("Run sheet", "Print or save the order of service as a PDF.", "premium")}
   </ul>`)}
 
 ${chapter("screens", 5, `Any screen, <span class="serif">any shape.</span>`, "Projectors, TVs and LED walls. The words always fit, and each extra screen can have its own job.", `
@@ -370,18 +370,18 @@ ${chapter("screens", 5, `Any screen, <span class="serif">any shape.</span>`, "Pr
     ${item("Audience output", "Preview and Program, LIVE, Clear, Black and Logo, and undo on Program.", "free")}
     ${item("Stage display", "Now and next, a clock, timers, notes and chords for the platform; a phone or tablet can be the stage screen.", "premium")}
     ${item("Extra screens", "Up to eight, each with a job: Program, scripture, lyrics, timer, stage or blank.", "premium")}
-    ${item("Screens anywhere", "Any browser shows what your screen shows, over the internet.", "free")}
-    ${item("Overlays and alerts", "A logo bug, ticker, banner, clock or lower third over anything; a nursery call over everything.", "free")}
+    ${item("Screens anywhere", "Any browser shows what your screen shows, over the internet.", "premium")}
+    ${item("Overlays and alerts", "A logo bug, ticker, banner, clock or lower third over anything; a nursery call over everything.", "premium")}
   </ul>`)}
 
 ${chapter("pictures", 6, `Slides and pictures, <span class="serif">beautifully.</span>`, "A design studio for slides, 33 themes, and picture slideshows straight from a folder, with music and real transitions.", `
   <div class="duo flip">
     <ul class="list reveal">
-      ${item("Design studio", "Layered pages with text, shapes, icons, pictures and QR codes; about 400 templates laid out for every screen shape, in 20 palettes, with more packs to download.", "free")}
+      ${item("Design studio", "Layered pages with text, shapes, icons, pictures and QR codes; about 400 templates laid out for every screen shape, in 20 palettes, with more packs to download.", "premium")}
       ${item("Themes", "33 to choose from: animated scenes, photos, video and full editing.", "free", '<span class="tag tag-premium">22 Premium</span>')}
-      ${item("PowerPoint and PDF", "PowerPoint as editable slides with notes; PDF pages as pictures.", "free")}
-      ${item("Pictures from a folder", "Any folder, Google Drive, iCloud, Dropbox or OneDrive, with videos played to the end.", "free")}
-      ${item("Slideshow", "Fade, Push, Zoom, Dip or a Mix, slow zoom, captions, a countdown, music that loops, new pictures joining.", "free")}
+      ${item("PowerPoint and PDF", "PowerPoint as editable slides with notes; PDF pages as pictures.", "premium")}
+      ${item("Pictures from a folder", "Any folder, Google Drive, iCloud, Dropbox or OneDrive, with videos played to the end.", "premium")}
+      ${item("Slideshow", "Fade, Push, Zoom, Dip or a Mix, slow zoom, captions, a countdown, music that loops, new pictures joining.", "premium")}
     </ul>
     <div class="demo reveal d1"><h3>Real transitions, picture to picture</h3><p>The slideshow keeps the old picture on screen while the new one moves in.</p>
       <div class="reel" id="reel"><div class="ph">Youth night</div><div class="ph">Baptisms</div><div class="ph">Harvest</div><div class="ph">Choir</div></div>
@@ -450,11 +450,11 @@ ${chapter("people", 8, `The congregation's phones, <span class="serif">welcome.<
     </div>
   </div>
   <ul class="list reveal" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-    ${item("Live captions", "On the screen and on phones through a QR code, translated into up to four languages by your AI.", "free")}
-    ${item("Rooms for the congregation", "Q&A with upvotes and moderation, polls, quizzes and Bible games from your Bible.", "free")}
-    ${item("A game show on the screen", "Every player in their own colour: a lobby with the code and QR, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as points count up, a podium with confetti. Music and sounds. It can run by itself.", "free")}
-    ${item("Quizzes written by your AI", "From today's sermon, so you see who was listening; from a book you read together, a passage, a topic, or anything pasted. You check every question first.", "free")}
-    ${item("Phones in the game", "Each phone shows its colour, the answer shapes and the clock, then the points won, the streak and the place: 2nd of 23.", "free")}
+    ${item("Live captions", "On the screen and on phones through a QR code, translated into up to four languages by your AI.", "premium")}
+    ${item("Rooms for the congregation", "Q&A with upvotes and moderation, polls, quizzes and Bible games from your Bible.", "premium")}
+    ${item("A game show on the screen", "Every player in their own colour: a lobby with the code and QR, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as points count up, a podium with confetti. Music and sounds. It can run by itself.", "premium")}
+    ${item("Quizzes written by your AI", "From today's sermon, so you see who was listening; from a book you read together, a passage, a topic, or anything pasted. You check every question first.", "premium")}
+    ${item("Phones in the game", "Each phone shows its colour, the answer shapes and the clock, then the points won, the streak and the place: 2nd of 23.", "premium")}
   </ul>`)}
 
 ${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`, "⌘K (Ctrl+K on Windows) goes to anything. Macros run a sequence; a Stream Deck or a phone presses the buttons.", `
@@ -465,7 +465,7 @@ ${chapter("control", 9, `Every action, <span class="serif">one key away.</span>`
       <div class="deck" id="deck"><span>GO LIVE</span><span>NEXT</span><span>PREV</span><span>CLEAR</span><span>BLACK</span><span>LOGO</span><span>WALK-IN</span><span>TIMER</span><span>CUT</span><span>UNDO</span></div>
     </div>
     <ul class="list reveal d1">
-      ${item("Macros", "Up to 24, each up to 20 steps: music, go live, timers, captions, stage messages, OBS and vMix.", "free")}
+      ${item("Macros", "Up to 24, each up to 20 steps: music, go live, timers, captions, stage messages, OBS and vMix.", "premium")}
       ${item("Keyboard", "Every key can be changed; part keys jump to a verse, chorus or bridge.", "free")}
       ${item("Voice commands", "“Next verse”, “give me King James”, and phrases of your own.", "premium")}
       ${item("Stream Deck and Companion", "A link per action for any button that can open a web address.", "premium")}

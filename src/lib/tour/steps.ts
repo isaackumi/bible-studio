@@ -408,6 +408,9 @@ export function placeCard(target: Rect | null, card: { width: number; height: nu
   return { left: clampLeft(centerX), top: clampTop(target.top + target.height - card.height - margin * 2) };
 }
 
+/** The plan feature a tour walks through: locked in the hub, and the upgrade prompt opens instead, without it. */
+export const TOUR_FEATURES: Partial<Record<TourId, import("../domain/plans").PlanFeature>> = { songs: "songs", sermon: "sermon", service: "service", production: "production", audience: "audience", design: "slides", pictures: "media" };
+
 /** Tours grouped by desk, in the order the hub lists them. */
 export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
   { name: msg("Presenter Desk"), tours: ["scriptures", "songs", "sermon", "service"] },

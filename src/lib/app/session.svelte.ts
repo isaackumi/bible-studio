@@ -15,7 +15,7 @@ import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platf
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
-import { emptyTourProgress, type TourId } from "../tour/steps";
+import { emptyTourProgress, TOUR_FEATURES, type TourId } from "../tour/steps";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { screenful, screenStarts, shiftPassage, stepScreenful, stepVerse, versesPerScreen } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
@@ -1394,6 +1394,10 @@ class Session {
   // Audio: walk-in music, backing tracks and playlists, played on this computer.
   audio = new AudioDeck();
   audioOpen = $state(false);
+  /** The music player and sound pad (Premium). */
+  openAudio = () => {
+    if (this.requireFeature("music")) this.audioOpen = true;
+  };
 
   private savePlaylists(playlists: Playlist[]) {
     this.workspace = { ...this.workspace, playlists };
@@ -1907,6 +1911,7 @@ class Session {
 
   /** Start or stop captions. Starting also starts listening if it is off. */
   setCaptions = async (on: boolean) => {
+    if (on && !this.requireFeature("captions")) return;
     if (on && !this.voiceAllowed()) return;
     this.captionsOn = on;
     if (on && this.voice.status !== "listening" && this.voice.status !== "starting") await this.startVoice();
@@ -2369,6 +2374,7 @@ class Session {
   }
 
   selectItem = async (itemId: string, at: "resume" | "exact" | "first" | "last" = "resume") => {
+    if (!this.requireFeature("service")) return;
     if (!this.service) return;
     const found = findItem(this.service, itemId);
     if (!found) return;
@@ -2614,6 +2620,7 @@ class Session {
   };
 
   previewLook = (composition: Composition) => {
+    if (!this.requireFeature("slides")) return;
     this.selectToken++;
     this.songFocus = null;
     this.sermonFocus = null;
@@ -3555,6 +3562,7 @@ class Session {
    * first so it begins now (each part keeps its length), instead of running behind or ahead.
    */
   startService = (move = false) => {
+    if (!this.requireFeature("service")) return;
     this.cancelQueuedStart(false);
     this.advanced.clear();
     this.snoozed.clear();
@@ -4611,6 +4619,7 @@ class Session {
   studio = $state<{ deckId: string; start: "templates" | null } | null>(null);
 
   openStudio = (deckId?: string, start: "templates" | null = null) => {
+    if (!this.requireFeature("slides")) return;
     const deck = deckId ? this.decks.find((entry) => entry.id === deckId) : [...this.decks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
     const chosen = deck ?? createDeck(t("Slides {n}", { n: this.decks.length + 1 }));
     if (!deck) this.saveDeck(chosen);
@@ -4679,6 +4688,7 @@ class Session {
 
   /** Put one deck page on Preview. Program waits for LIVE. */
   previewDeckPage = (deckId: string, index: number) => {
+    if (!this.requireFeature("slides")) return;
     const deck = this.decks.find((entry) => entry.id === deckId);
     const page = deck?.pages[index];
     if (!deck || !page) return;
@@ -5593,6 +5603,7 @@ class Session {
   };
 
   previewSongSection = (song: Song, sectionId: string | null, slot?: number, screen = 0) => {
+    if (!this.requireFeature("songs")) return;
     const clean = sanitizeSong(song);
     const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
     if (!section) {
@@ -5888,8 +5899,9 @@ class Session {
     this.settingsOpen = false;
     this.tourHubOpen = false;
     // Each tour opens the part of the app it walks through.
+    const needs = TOUR_FEATURES[id];
+    if (needs && !this.requireFeature(needs)) return;
     if (id === "production") {
-      if (!this.requireFeature("production")) return;
       if (this.workspace.appearance.desk !== "obs") this.setAppearance({ desk: "obs" });
     } else if (id === "audience") {
       const { audienceRoom } = await import("./rooms.svelte");
@@ -6934,6 +6946,7 @@ class Session {
   };
 
   previewSermonSection = async (sermon: Sermon, sectionId: string | null) => {
+    if (!this.requireFeature("sermon")) return;
     const clean = sanitizeSermon(sermon);
     const section = clean.sections.find((entry) => entry.id === sectionId) ?? clean.sections[0];
     if (!section) {

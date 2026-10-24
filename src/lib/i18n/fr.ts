@@ -5000,4 +5000,10 @@ export const fr: Readonly<Record<string, string>> = {
   "{n} done": "{n} terminé(s)",
   "{n} tour": "{n} visite",
   "{n} tours": "{n} visites",
+  "Music, backing tracks and the sound pad": "Musique, bandes-son et pad de sons",
+  "Phones in the room: Q&A, quizzes, polls and Pick someone": "Les téléphones dans la salle : questions, quiz, sondages et tirage au sort",
+  "Slides, the design studio and announcements": "Diapositives, studio de création et annonces",
+  "Songs, sermons, slides, the running order, phones in the room, voice and a production desk.": "Chants, prédications, diapositives, déroulé du culte, téléphones dans la salle, voix et pupitre de production.",
+  "The Bible on the wall: any verse, any translation, free for ever.": "La Bible au mur : tout verset, toute traduction, gratuit pour toujours.",
+  "The running order: plan and run the whole service": "Le déroulé : planifier et mener tout le culte",
 };
