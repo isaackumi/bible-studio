@@ -10,6 +10,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.4",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "cloud", title: msg("Your library in the cloud"), text: msg("Premium and Church keep songs, services, slides and media in the cloud: every computer on the licence sees the same library, and a new computer gets it all back when it signs in. Settings › Account shows the space used and lets you free some.") },
+      { icon: "laptop", title: msg("Moving to a new computer"), text: msg("Move Premium to this computer in one step; the one it left drops to Free. Or carry the whole library in a .churchstudio file from Settings › Storage, media included.") },
+      { icon: "layout", title: msg("Design studio: show without leaving"), text: msg("Going live keeps the studio open. A glass bar over the canvas says which page is live, steps pages, previews, runs a slideshow at the pace you choose, and can be dragged anywhere or folded to a dot.") },
+      { icon: "sparkles", title: msg("Tours, search, and games"), text: msg("Guided tours for the audience, the design studio, pictures and sound. Go to anything (⌘K / Ctrl+K) finds settings, actions and help. The quiz leaderboard climbs between answers again, and questions move on by themselves.") },
+      { icon: "bible", title: msg("What Free includes"), text: msg("Free is the Bible on the wall: the Scriptures page and the audience screen. Songs, services, slides, media and the rest come with Premium.") },
+    ],
+  },
+  {
     version: "0.5.3",
     date: "2026-10-24",
     highlights: [

@@ -22,6 +22,7 @@
   import Star from "@lucide/svelte/icons/star";
   import Copy from "@lucide/svelte/icons/copy";
   import Laptop from "@lucide/svelte/icons/laptop";
+  import Cloud from "@lucide/svelte/icons/cloud";
   import Check from "@lucide/svelte/icons/check";
   import Download from "@lucide/svelte/icons/download";
   import Trash from "@lucide/svelte/icons/trash-2";
@@ -159,6 +160,7 @@
     pencil: Pencil,
     copy: Copy,
     laptop: Laptop,
+    cloud: Cloud,
     check: Check,
     download: Download,
     trash: Trash,

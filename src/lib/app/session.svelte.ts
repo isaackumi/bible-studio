@@ -234,7 +234,7 @@ import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { countUse, usageCounts, usageSent } from "./usage-counts";
 import type { MessageTone } from "./status-line";
-import { CHANGELOG, whatsNewFor, type Release } from "../domain/changelog";
+import type { Release } from "../domain/changelog";
 import { internetRemote } from "./remote-relay.svelte";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
@@ -6962,7 +6962,8 @@ class Session {
     this.every(6 * 60 * 60_000, () => void this.checkForUpdate(true));
   }
 
-  // What's new: this version's highlights, once, the first time it opens after an update.
+  // What's new: this version's highlights, once, the first time it opens after an update. The
+  // changelog (every version's words) is its own chunk, fetched only when a card is due or asked for.
 
   whatsNew = $state<Release | null>(null);
 
@@ -6970,9 +6971,12 @@ class Session {
     if (typeof localStorage === "undefined") return;
     try {
       const seen = localStorage.getItem("cs-seen-version");
-      // Setup introduces a first install; an update shows its highlights once.
-      this.whatsNew = this.workspace.onboarded ? whatsNewFor(APP_VERSION, seen) : null;
       localStorage.setItem("cs-seen-version", APP_VERSION);
+      // Setup introduces a first install; an update shows its highlights once.
+      if (!this.workspace.onboarded || seen === APP_VERSION) return;
+      void import("../domain/changelog").then(({ whatsNewFor }) => {
+        this.whatsNew = whatsNewFor(APP_VERSION, seen);
+      });
     } catch {
       // Storage blocked: no card.
     }
@@ -6984,7 +6988,9 @@ class Session {
 
   /** The What's new card for this version, asked for (Go to anything › What's new). */
   showWhatsNew = () => {
-    this.whatsNew = CHANGELOG[0] ?? null;
+    void import("../domain/changelog").then(({ CHANGELOG }) => {
+      this.whatsNew = CHANGELOG[0] ?? null;
+    });
   };
 
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
