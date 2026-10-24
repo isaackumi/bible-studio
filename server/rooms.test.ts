@@ -247,3 +247,48 @@ describe("rooms: joining by code", () => {
     expect(room).not.toContain("Enter the code shown on the screen.");
   });
 });
+
+describe("rooms: who is here", () => {
+  type Host = { people: number; joined: Array<{ name: string }> };
+
+  it("counts the phones heard from lately, not everyone who ever joined", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("HERE23", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    data(await core.join("Kofi", ""));
+    expect(data<Host>(await core.hostView(hostKey))).toMatchObject({ people: 2 });
+    // Kofi closes his phone; Ama's keeps checking in.
+    for (let i = 0; i < 20; i++) {
+      advance(2_500);
+      data(await core.view(ama));
+    }
+    const later = data<Host>(await core.hostView(hostKey));
+    expect(later.people).toBe(1);
+    expect(later.joined.map((person) => person.name)).toEqual(["Ama"]);
+  });
+
+  it("leaves people who have gone out of a new game, and keeps those still here", async () => {
+    const { core, advance, peek } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("HERE45", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const kofi = data<{ pid: string }>(await core.join("Kofi", "")).pid;
+    for (let i = 0; i < 60; i++) {
+      advance(2_500);
+      data(await core.view(ama));
+    }
+    data(await core.activity(hostKey, { action: "reset-scores" }));
+    expect(Object.values(peek()!.participants).map((person) => person.name)).toEqual(["Ama"]);
+    // Kofi's phone comes back: it is no longer in the room, so it asks for a name again.
+    expect(data<{ me?: unknown }>(await core.view(kofi)).me).toBeUndefined();
+    expect(await core.answer(kofi, 0)).toMatchObject({ ok: false, status: 401 });
+  });
+
+  it("keeps someone who just joined, and someone away only a moment", async () => {
+    const { core, advance, peek } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("HERE67", ""));
+    data(await core.join("Ama", ""));
+    advance(60_000);
+    data(await core.activity(hostKey, { action: "reset-scores" }));
+    expect(Object.values(peek()!.participants).map((person) => person.name)).toEqual(["Ama"]);
+  });
+});

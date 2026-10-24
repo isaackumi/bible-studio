@@ -21,6 +21,8 @@
   let viewing = $state<string | null>(null);
   let making = $state("");
   let note = $state("");
+  /** End game asks twice, so a stray click does not stop a game. */
+  let endArmed = $state(false);
 
   const mine = $derived(session.workspace.games ?? []);
   const everything = $derived([...mine, ...BUILT_IN_GAMES]);
@@ -203,6 +205,7 @@
     <div class="run-head">
       <strong>{run.game.title}</strong>
       <span>{t("Question {n} of {total}", { n: run.index + 1, total: run.game.questions.length })}</span>
+      <button type="button" class="end-game" class:armed={endArmed} title={t("Stops the game now and takes it off the screen. The room stays open.")} onclick={() => { if (endArmed) { endArmed = false; void audienceRoom.endGame(); } else { endArmed = true; setTimeout(() => (endArmed = false), 4000); } }}>{endArmed ? t("Press again to end the game") : t("End game")}</button>
     </div>
     <div class="progress" aria-hidden="true">{#each run.game.questions as _q, index (index)}<i class:done={index < run.index} class:now={index === run.index}></i>{/each}</div>
     <div class="next-step">
@@ -280,7 +283,6 @@
         {#each audienceRoom.view.leaderboard.slice(0, 5) as entry, index (index)}<li><span>{index + 1}. {entry.name}</span><b>{entry.score}</b></li>{/each}
       </ol>
     {/if}
-    <button type="button" class="link" onclick={() => audienceRoom.finish()}>{t("End the game")}</button>
   </section>
 {:else if viewed}
   <GameView
@@ -293,6 +295,15 @@
     onback={() => (viewing = null)}
   />
 {:else}
+  {#if audienceRoom.gameOnScreen}
+    <div class="after-game" role="status">
+      <div><strong>{t("The game is over, and still on the screen")}</strong><span>{t("Take it off when you are ready to move on, or play again.")}</span></div>
+      <div class="after-buttons">
+        <button type="button" class="btn accent" onclick={() => audienceRoom.takeGameOff()}>{t("Take it off the screen")}</button>
+        {#if recent[0]}<button type="button" class="btn" onclick={() => void play(recent[0]!)}>{t("Play again")}</button>{/if}
+      </div>
+    </div>
+  {/if}
   <section class="games-lib">
     <div class="new-tiles">
       <button type="button" class="tile" onclick={() => create("quiz")}>
@@ -495,6 +506,15 @@
 
   .run-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
   .run-head strong { color: var(--ink); }
+  .run-head { align-items: center; }
+  .run-head span { margin-left: auto; }
+  .end-game { flex: none; height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--danger, #ff6b5e); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .end-game.armed { background: var(--danger, #e5484d); border-color: transparent; color: #fff; }
+  .after-game { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .after-game > div:first-child { display: grid; gap: 2px; }
+  .after-game strong { font-size: 13px; }
+  .after-game span { color: var(--muted); font-size: 12px; }
+  .after-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
   .progress { display: flex; gap: 3px; }
   .progress i { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, currentColor 12%, transparent); }
   .progress i.done { background: color-mix(in srgb, var(--accent) 55%, transparent); }

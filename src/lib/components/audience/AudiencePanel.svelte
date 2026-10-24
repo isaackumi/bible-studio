@@ -97,7 +97,7 @@
   <header>
     <div>
       <h2>{t("Audience")}</h2>
-      <p>{view ? tn(view.people, "{n} person joined", "{n} people joined") : t("Questions, quizzes and polls from people's phones")}</p>
+      <p>{view ? tn(view.people, "{n} person here now", "{n} people here now") : t("Questions, quizzes and polls from people's phones")}</p>
     </div>
     <div class="head-tools">
       <button type="button" class="icon-btn" aria-label={wide ? t("Back to the side") : t("Full window")} data-tip={wide ? t("Back to the side") : t("Full window: more room to run the game")} aria-pressed={wide} onclick={toggleWide}><Icon name={wide ? "shrink" : "expand"} size={16} /></button>
@@ -220,7 +220,7 @@
     {#if audienceRoom.current}
     <footer>
       <!-- Two presses, so a room is never ended by a slip. -->
-      <button type="button" class="link danger" onclick={() => { if (ending) void audienceRoom.end(); else { ending = true; setTimeout(() => (ending = false), 4000); } }}>{ending ? t("Press again to end the room for everyone") : t("End room")}</button>
+      <button type="button" class="link danger" title={t("Everyone's phone is disconnected and the room code stops working. Open a new room any time.")} onclick={() => { if (ending) void audienceRoom.end(); else { ending = true; setTimeout(() => (ending = false), 4000); } }}>{ending ? t("Press again to close the room for everyone") : t("Close the room")}</button>
     </footer>
     {/if}
 </aside>

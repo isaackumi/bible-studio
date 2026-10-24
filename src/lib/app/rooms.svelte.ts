@@ -10,6 +10,7 @@ import { GameSound, sanitizeMusicStyle, type MusicStyle } from "../game/sounds";
 import { api } from "../db/api";
 import { presentQr } from "../domain/overlays";
 import { presentText } from "../domain/present";
+import { emptyModel } from "../domain/theme";
 import { currentLanguage, t } from "../i18n/core";
 import { session } from "./session.svelte";
 import { remoteSafe } from "../display/remote-safe";
@@ -351,6 +352,31 @@ class AudienceRoom {
     }
     this.playing = null;
     await this.activity({ action: "end" });
+  };
+
+  /**
+   * Stop the game now, part-way or at the end: what was played is kept in the report, the game
+   * comes off the screen (its music with it), and phones go back to the room.
+   */
+  endGame = async () => {
+    if (this.playing?.game.kind === "quiz") this.saveReport();
+    this.playing = null;
+    await this.activity({ action: "end" });
+    this.takeGameOff();
+  };
+
+  /** A game frame from this room is on the screen (the podium, after a game). */
+  get gameOnScreen(): boolean {
+    return !!this.current && session.live.program.sourceId === this.screenId;
+  }
+
+  /** The podium (or any game frame) off the screen and Preview, and the last game forgotten. */
+  takeGameOff = () => {
+    if (session.live.program.sourceId === this.screenId) session.clear();
+    // Preview too, so LIVE cannot put an old game frame back up.
+    if (session.live.preview.sourceId === this.screenId) session.previewModel(emptyModel(session.theme()), null);
+    this.screenStage = null;
+    this.lastGame = null;
   };
 
   // --- The game on the screen -----------------------------------------------------------------

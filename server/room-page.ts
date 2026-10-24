@@ -309,6 +309,8 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       return r.json();
     }).then(function (d) {
       if (!d) return;
+      // Left out of a new game after being away: join again with a name.
+      if (pid && !d.me) { try { localStorage.removeItem(KEY); } catch (x) {} pid = null; show("live", false); show("join", true); }
       $("room").textContent = d.room.name;
       document.title = d.room.name + " · Church Studio";
       if (!pid) { show("join", true); return; }

@@ -265,11 +265,36 @@ export function leaderboard(state: RoomState, size = 10) {
 }
 
 /** The rules of a room. Every method loads the room, changes it, and saves it. */
+/** A phone checks in every few seconds while it is open: one heard from this lately is in the room. */
+export const HERE_MS = 30_000;
+/** At a new game, people not heard from for this long have gone and are left out of it. */
+export const GONE_MS = 2 * 60_000;
+
 export class RoomCore {
+  /**
+   * When each person's phone last checked in. Kept in memory, not saved: a phone polls every few
+   * seconds, and writing each poll to storage would cost more than knowing who is here is worth.
+   */
+  private seen = new Map<string, number>();
+
   constructor(
     private store: RoomStorage,
     private now: () => number = () => Date.now(),
   ) {}
+
+  private touch(pid: unknown) {
+    if (typeof pid === "string" && pid) this.seen.set(pid, this.now());
+  }
+
+  /** Last heard from: a check-in, or joining when there has been none since. */
+  private lastSeen(pid: string, person: Participant) {
+    return Math.max(this.seen.get(pid) ?? 0, person.joinedAt);
+  }
+
+  private here(state: RoomState) {
+    const now = this.now();
+    return Object.entries(state.participants).filter(([pid, person]) => now - this.lastSeen(pid, person) <= HERE_MS);
+  }
 
   private async load(): Promise<RoomState | null> {
     const state = await this.store.get();
@@ -324,6 +349,7 @@ export class RoomCore {
     const n = Object.keys(state.participants).length;
     state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0, ...(state.teams && state.teams >= 2 ? { team: teamOf(n, state.teams) } : {}) };
     await this.save(state);
+    this.touch(pid);
     return { ok: true, data: { pid, room: { name: state.name, code: state.code }, n } };
   }
 
@@ -332,6 +358,7 @@ export class RoomCore {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     const known = pid && state.participants[pid] ? pid : null;
+    if (known) this.touch(known);
     const questions = state.questions.filter((question) => question.state === "approved" && !question.hidden).map((question) => publicQuestion(question, known, state));
     const mine = known ? state.questions.filter((question) => question.state === "pending" && state.askedBy[question.id] === known).length : 0;
     return {
@@ -351,6 +378,7 @@ export class RoomCore {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
     if (!state.open) return fail(403, "Questions are closed for now.");
     const words = clean(text, LIMITS.questionLength);
     if (words.length < 3) return fail(400, "Type a question first.");
@@ -382,6 +410,7 @@ export class RoomCore {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
     const question = state.questions.find((entry) => entry.id === questionId && entry.state === "approved" && !entry.hidden);
     if (!question) return fail(404, "That question is not up any more.");
     const voters = state.voters[question.id] ?? [];
@@ -406,6 +435,7 @@ export class RoomCore {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
     const activity = state.activity;
     if (activity.kind === "none" || activity.phase !== "open") return fail(409, "Answers are closed.");
     const now = this.now();
@@ -427,7 +457,8 @@ export class RoomCore {
       ok: true,
       data: {
         room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate, createdAt: state.createdAt },
-        people: Object.keys(state.participants).length,
+        // Here now (phones heard from lately), not everyone who ever joined this room.
+        people: this.here(state).length,
         questions: state.questions.map(({ recent, ...question }) => ({ ...question, trending: recent.filter((at) => this.now() - at < 15 * 60_000).length })),
         activity: state.activity,
         answers: state.activity.kind === "none" ? [] : state.activity.question.choices.map((_, index) => Object.values(state.answers).filter((answer) => answer.choice === index).length),
@@ -437,7 +468,8 @@ export class RoomCore {
         fastest: fastest(state),
         teams: teamRanking(state),
         // Who is here, newest last (the lobby shows names popping in).
-        joined: Object.values(state.participants)
+        joined: this.here(state)
+          .map(([, person]) => person)
           .sort((a, b) => a.joinedAt - b.joinedAt)
           .slice(-40)
           .map((person, index) => ({ n: person.n ?? index, name: person.name || "Guest" })),
@@ -557,6 +589,15 @@ export class RoomCore {
         for (const person of Object.values(state.participants)) delete person.team;
       }
     } else if (input.action === "reset-scores") {
+      // A new game: people who have gone (not heard from for a while) are left out of it, so they
+      // do not fill the leaderboard; anyone still here keeps their place and colour.
+      const now = this.now();
+      for (const [pid, person] of Object.entries(state.participants)) {
+        if (now - this.lastSeen(pid, person) > GONE_MS) {
+          delete state.participants[pid];
+          this.seen.delete(pid);
+        }
+      }
       for (const person of Object.values(state.participants)) Object.assign(person, { score: 0, before: 0, gain: 0, streak: 0 });
     } else return fail(400, "Unknown action.");
     await this.save(state);
