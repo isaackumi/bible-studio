@@ -185,3 +185,7 @@ look: no changes can be made until Access is in front.
   license.
 
 Tests: `npx vitest run server`.
+
+## Cloud space
+
+Media synced between a licence's computers lives in the R2 bucket `church-studio-cloud` (binding `CLOUD`), made once with `npx wrangler r2 bucket create church-studio-cloud`. Each licence's library is a `LibraryObject` Durable Object (binding `LIBRARIES`). Limits per plan are set from the admin page (Cloud space) and kept in KV under `cfg:cloud`; a licence's own cap under `cloudcap:<licence>`.

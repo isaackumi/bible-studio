@@ -5,6 +5,7 @@
 // Stateless on purpose: the key id comes from the Paddle transaction id, so a retried webhook
 // makes the very same key instead of a second one.
 
+import type { LibraryNamespace, R2Like } from "./cloud-config";
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { latestRelease } from "./downloads.ts";
 import { licenseKeyEmail } from "./email.ts";
@@ -51,6 +52,9 @@ export type Env = {
   CLOUDFLARE_ACCOUNT_ID?: string;
   /** Rooms for the audience's phones (durable_objects in wrangler.jsonc). */
   ROOMS?: RoomNamespace;
+  /** Cloud space: the media bucket and the library objects (cloud.ts). */
+  CLOUD?: R2Like;
+  LIBRARIES?: LibraryNamespace;
   /** Cloudflare's rate limiter (ratelimits in wrangler.jsonc): a few requests a minute per key. */
   LIMITS?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** "mock" (built-in test checkout, the default) or "paddle". */
@@ -130,6 +134,8 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     : undefined;
   return {
     store: kvStore(env.ACTIVATIONS),
+    cloud: env.CLOUD,
+    libraries: env.LIBRARIES,
     requireAccount: env.REQUIRE_ACCOUNT === "1",
     usage: env.USAGE ? analyticsEngine(env.USAGE, env.ANALYTICS_TOKEN && env.CLOUDFLARE_ACCOUNT_ID ? { accountId: env.CLOUDFLARE_ACCOUNT_ID, token: env.ANALYTICS_TOKEN } : null, http) : undefined,
     limit: env.LIMITS ? async (key) => (await env.LIMITS!.limit({ key }).catch(() => ({ success: true }))).success : undefined,

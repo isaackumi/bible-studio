@@ -13,6 +13,7 @@
 //   Accounts (optional; see accounts.ts): /v1/signin/*, /v1/account*, /signin/:id, /auth/*
 //   /admin, /admin/api/*                                       (the admin console, behind Cloudflare Access: admin.ts)
 
+import type { LibraryNamespace, R2Like } from "./cloud-config";
 import { LICENSE_PUBLIC_KEY, publicKeyOf, readLicense, signLicense, TEST_LICENSE_SECRET, type License, type LicensePlan } from "../src/lib/domain/license.ts";
 import { signLease, type LeaseKind } from "../src/lib/domain/lease.ts";
 import { accountApi, accountOf, noteLicenseEmail, signinRoute, type Account, type Identity } from "./accounts.ts";
@@ -41,6 +42,9 @@ const DEFAULT_PUBLIC_URL = "https://church-studio.heitechinc.com";
 
 export type ApiConfig = {
   store: Store;
+  /** Cloud space (cloud.ts): where media lives, and the library objects. Missing: cloud sync is off. */
+  cloud?: R2Like;
+  libraries?: LibraryNamespace;
   /** Ed25519 secret key (hex) for license keys and leases. */
   signingKey: string;
   /** Only tests pass a public key; the app embeds the real one. */

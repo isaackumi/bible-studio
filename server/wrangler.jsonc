@@ -56,8 +56,20 @@
   // with the ANALYTICS_TOKEN secret (a Cloudflare API token with Account Analytics Read).
   "analytics_engine_datasets": [{ "binding": "USAGE", "dataset": "church_studio_usage" }],
   // Rooms for the audience's phones (Q&A, quizzes, polls): one Durable Object per room (rooms.ts).
-  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "RoomObject" }] },
-  "migrations": [{ "tag": "rooms-v1", "new_sqlite_classes": ["RoomObject"] }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "RoomObject" },
+      // Cloud space: one library per licence (cloud.ts, library.ts).
+      { "name": "LIBRARIES", "class_name": "LibraryObject" }
+    ]
+  },
+  "migrations": [
+    { "tag": "rooms-v1", "new_sqlite_classes": ["RoomObject"] },
+    { "tag": "library-v1", "new_sqlite_classes": ["LibraryObject"] }
+  ],
+  // Cloud space media, one object per file per licence (lib/<licence>/<sha256>). Made once by hand:
+  //   npx wrangler r2 bucket create church-studio-cloud
+  "r2_buckets": [{ "binding": "CLOUD", "bucket_name": "church-studio-cloud" }],
   "kv_namespaces": [
     // Everything the server keeps: seats, trials, checkouts, subscriptions, promo codes and check-ins.
     { "binding": "ACTIVATIONS", "id": "d2ceebbb59204d8bafd2b212caef5d0e" }
