@@ -4834,4 +4834,8 @@ export const es: Readonly<Record<string, string>> = {
   "An unplugged microphone, or one held by a call in another app, is named instead of going quiet. Accurate listening checks the computer can run it before you download it.": "Un micrófono desconectado, o en uso por una llamada en otra aplicación, se indica en lugar de quedarse en silencio. La escucha precisa comprueba que el ordenador puede usarla antes de descargarla.",
   "Steadier on Windows": "Más estable en Windows",
   "The audience screen lands in the right place on scaled screens and never takes the keyboard, the desk no longer freezes on slow disks, and updates no longer fail with 404.": "La pantalla del público se coloca bien en pantallas escaladas y nunca toma el teclado, el escritorio ya no se congela con discos lentos y las actualizaciones ya no fallan con 404.",
+  "Presenting on Windows, without freezing": "Presentar en Windows, sin bloqueos",
+  "Choosing the screen for the audience no longer makes the app stop responding.": "Elegir la pantalla del público ya no deja la aplicación sin responder.",
+  "Design studio edits are kept": "Los cambios del estudio se conservan",
+  "A change typed just before clicking elsewhere, like a QR code's text, is saved instead of lost.": "Un cambio escrito justo antes de hacer clic en otro lugar, como el texto de un código QR, se guarda en lugar de perderse.",
 };

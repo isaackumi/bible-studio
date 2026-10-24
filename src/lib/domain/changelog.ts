@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.2",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "screens", title: msg("Presenting on Windows, without freezing"), text: msg("Choosing the screen for the audience no longer makes the app stop responding.") },
+      { icon: "pencil", title: msg("Design studio edits are kept"), text: msg("A change typed just before clicking elsewhere, like a QR code's text, is saved instead of lost.") },
+    ],
+  },
+  {
     version: "0.5.1",
     date: "2026-10-24",
     highlights: [
