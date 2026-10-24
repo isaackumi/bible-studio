@@ -21,6 +21,11 @@ export type Game = {
   kind: "quiz" | "poll";
   questions: GameQuestion[];
   updatedAt: string;
+  /**
+   * A poll that never shows who answered what: the screen shows no names, phones say their answer is
+   * anonymous, and nothing ties a vote to a person. Only polls; a quiz needs names for its scores.
+   */
+  anonymous?: boolean;
   /** The sermon series it belongs to (the quiz bank groups by it), and the sermon it came from. */
   series?: string;
   sermonId?: string;
@@ -60,6 +65,7 @@ export function sanitizeGame(value: unknown): Game | null {
     kind,
     questions,
     updatedAt: typeof input.updatedAt === "string" ? input.updatedAt : new Date(0).toISOString(),
+    ...(kind === "poll" && input.anonymous === true ? { anonymous: true } : {}),
     ...(text(input.series, 80) ? { series: text(input.series, 80) } : {}),
     ...(text(input.sermonId, 60) ? { sermonId: text(input.sermonId, 60) } : {}),
   };
@@ -133,7 +139,8 @@ export function shuffled(question: GameQuestion, random = Math.random): GameQues
 }
 
 const q = (prompt: string, choices: string[], correct: number | null = 0, seconds = 20, points = 1000): GameQuestion => ({ id: uid("q"), prompt, choices, correct, seconds, points });
-const game = (id: string, title: string, description: string, questions: GameQuestion[], kind: Game["kind"] = "quiz"): Game => ({ id: `builtin:${id}`, title, description, kind, questions, updatedAt: "2026-10-22T00:00:00.000Z" });
+const game = (id: string, title: string, description: string, questions: GameQuestion[], kind: Game["kind"] = "quiz", anonymous = false): Game => ({ id: `builtin:${id}`, title, description, kind, questions, updatedAt: "2026-10-22T00:00:00.000Z", ...(anonymous ? { anonymous: true } : {}) });
+const poll = (prompt: string, choices: string[], seconds = 30) => q(prompt, choices, null, seconds, 0);
 
 /** Ready to play: each answer here checked against the Bible text (the right answer is listed first, and mixed when played). */
 export const BUILT_IN_GAMES: Game[] = [
@@ -187,6 +194,28 @@ export const BUILT_IN_GAMES: Game[] = [
     q("Which came first?", ["Pentecost", "Saul on the road to Damascus", "Paul's shipwreck on Malta", "The letter to the Romans written"]),
   ]),
   game("worship-poll", "Pick the closing song", "A poll: let the congregation choose.", [q("Which song shall we close with?", ["Amazing Grace", "How Great Thou Art", "Great Is Thy Faithfulness", "Blessed Assurance"], null, 30, 0)], "poll"),
+  game("poll-feedback", "How was today?", "Anonymous feedback after the service.", [
+    poll("How did today's service help you?", ["It encouraged me", "It challenged me", "I learned something new", "I'm still thinking about it"]),
+    poll("How was the length of the service?", ["Too short", "Just right", "A little long", "Too long"]),
+    poll("Would you invite a friend next Sunday?", ["Yes, already have one in mind", "Maybe", "Not yet"]),
+  ], "poll", true),
+  game("poll-icebreaker", "Get to know the room", "Light questions to warm everyone up.", [
+    poll("How did you get to church today?", ["Walked", "Car", "Bus or train", "Watching online"], 20),
+    poll("How long have you been coming here?", ["First visit!", "Less than a year", "1 to 5 years", "Longer than that"], 20),
+    poll("Which Bible character would you have coffee with?", ["Peter", "Mary", "David", "Paul"], 20),
+  ], "poll"),
+  game("poll-prayer", "What shall we pray for?", "Let the room set this week's prayer focus. Anonymous.", [
+    poll("What should we pray for together this week?", ["Families", "Health and healing", "Work and finances", "Our city and nation"]),
+  ], "poll", true),
+  game("poll-next-series", "Choose the next series", "Let the church pick what the preaching covers next.", [
+    poll("Which book should we study next?", ["Psalms", "Acts", "Romans", "Revelation"]),
+    poll("When suits you for a midweek group?", ["Tuesday evening", "Wednesday evening", "Saturday morning", "I can't join one"]),
+  ], "poll"),
+  game("poll-event", "Plan the church picnic", "Decide the details together.", [
+    poll("Which date works best for the picnic?", ["First Saturday", "Second Saturday", "Last Saturday"]),
+    poll("What should we eat?", ["Barbecue", "Bring and share", "Jollof and chicken", "Sandwiches"]),
+    poll("Which activity would you join?", ["Football", "Tug of war", "Board games", "Just chatting"]),
+  ], "poll"),
 ];
 
 // --- Made from the Bible on this computer ------------------------------------------------------

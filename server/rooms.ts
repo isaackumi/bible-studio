@@ -68,7 +68,7 @@ export type ActivityQuestion = {
  */
 export type Activity =
   | { kind: "none" }
-  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number };
+  | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number; anonymous?: boolean };
 
 /** When answers open: after the reading time, if the desk asked for one. */
 const opensAt = (activity: { openedAt: number; opensAt?: number }) => activity.opensAt ?? activity.openedAt;
@@ -206,6 +206,8 @@ export function publicActivity(state: RoomState, pid: string | null, now: number
     endsAt: activity.question.seconds ? opensAt(activity) + activity.question.seconds * 1000 : null,
     now,
     answered: mine ? mine.choice : null,
+    // An anonymous poll: the phone says so (nothing ties a vote to a name anywhere).
+    ...(activity.anonymous ? { anonymous: true } : {}),
     ...(reveal ? { correct: activity.kind === "quiz" ? correct : undefined, counts } : {}),
     ...(reveal && activity.kind === "quiz" && pid ? { score: state.participants[pid]?.score ?? 0, ...standing(state, pid) } : {}),
   };
@@ -471,7 +473,7 @@ export class RoomCore {
         joined: this.here(state)
           .map(([, person]) => person)
           .sort((a, b) => a.joinedAt - b.joinedAt)
-          .slice(-40)
+          .slice(-300)
           .map((person, index) => ({ n: person.n ?? index, name: person.name || "Guest" })),
       },
     };
@@ -547,7 +549,7 @@ export class RoomCore {
       if (kind === "quiz" && question.correct === undefined) return fail(400, "Mark the right answer.");
       // Reading time first (up to ten seconds): the clock and the quick bonus start when it ends.
       const readMs = Math.min(10_000, Math.max(0, Math.round(Number(input.readMs) || 0)));
-      state.activity = { kind, game: clean(input.game, 80), round: Math.max(1, Number(input.round) || 1), total: Math.max(1, Number(input.total) || 1), question, phase: "open", openedAt: now, ...(readMs ? { opensAt: now + readMs } : {}) };
+      state.activity = { kind, game: clean(input.game, 80), round: Math.max(1, Number(input.round) || 1), total: Math.max(1, Number(input.total) || 1), question, phase: "open", openedAt: now, ...(readMs ? { opensAt: now + readMs } : {}), ...(kind === "poll" && input.anonymous === true ? { anonymous: true } : {}) };
       state.answers = {};
     } else if (input.action === "close") {
       if (state.activity.kind === "none") return fail(409, "Nothing is open.");

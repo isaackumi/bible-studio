@@ -167,6 +167,7 @@ export function normalizeWorkspace(input: unknown): Workspace {
     broadcast: sanitizeBroadcast(value.broadcast),
     countdownSize: typeof value.countdownSize === "number" && Number.isFinite(value.countdownSize) ? Math.min(420, Math.max(96, Math.round(value.countdownSize))) : 220,
     games: Array.isArray(value.games) ? value.games.map(sanitizeGame).filter((entry): entry is NonNullable<typeof entry> => entry !== null).slice(0, 200) : [],
+    hiddenGames: Array.isArray(value.hiddenGames) ? [...new Set(value.hiddenGames.filter((id: unknown): id is string => typeof id === "string" && id.startsWith("builtin:")))].slice(0, 100) : [],
     gameReports: Array.isArray(value.gameReports) ? value.gameReports.map(sanitizeReport).filter((entry): entry is NonNullable<typeof entry> => entry !== null).slice(0, MOST_REPORTS) : [],
     decks: Array.isArray(value.decks)
       ? value.decks.map(sanitizeDeck).filter((deck): deck is NonNullable<typeof deck> => deck !== null)

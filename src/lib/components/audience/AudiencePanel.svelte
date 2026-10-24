@@ -4,13 +4,14 @@
   import QrView from "../QrView.svelte";
   import Icon from "../Icon.svelte";
   import GamesTab from "./GamesTab.svelte";
+  import PickTab from "./PickTab.svelte";
 
   // The congregation's phones: a room they join by QR code, the questions they send, and the
   // quizzes and polls the operator runs. A drawer beside the desk, so the service carries on.
   type Filter = "waiting" | "up" | "answered" | "put-away";
   type Sort = "top" | "trending" | "newest" | "oldest";
 
-  let tab = $state<"questions" | "games">("questions");
+  let tab = $state<"questions" | "games" | "pick">("questions");
   let filter = $state<Filter>("waiting");
   let sort = $state<Sort>("top");
   let query = $state("");
@@ -138,9 +139,17 @@
     <div class="tabs" role="tablist">
       <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
       <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} onclick={() => (tab = "games")}>{t("Quizzes and polls")}</button>
+      <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} onclick={() => (tab = "pick")}>{t("Pick someone")}</button>
     </div>
 
-    {#if tab === "questions" && !audienceRoom.current}
+    {#if tab === "pick" && !audienceRoom.current}
+      <div class="start">
+        <p>{t("Open a room and show its QR code. Everyone who joins on their phone goes into the draw: pick a winner or a volunteer, or split the room into groups.")}</p>
+        <button type="button" class="primary" disabled={audienceRoom.busy} onclick={() => audienceRoom.start()}>{audienceRoom.busy ? t("Opening…") : t("Open a room")}</button>
+      </div>
+    {:else if tab === "pick"}
+      <PickTab />
+    {:else if tab === "questions" && !audienceRoom.current}
       <div class="start">
         <p>{t("Open a room and show its QR code. People join on their phones over the internet (no app, no Wi-Fi needed), then ask questions, vote, and play quizzes. Nothing reaches the screen until you put it there.")}</p>
         <button type="button" class="primary" disabled={audienceRoom.busy} onclick={() => audienceRoom.start()}>{audienceRoom.busy ? t("Opening…") : t("Open a room")}</button>
@@ -253,7 +262,7 @@
   .share-head span { display: grid; gap: 2px; }
   .share-head strong { font-size: 13px; }
   .share-head em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
+  .tabs { display: grid; grid-template-columns: 1fr 1.25fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
   .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
   .tabs button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
   .tabs b { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; }

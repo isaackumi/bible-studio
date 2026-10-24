@@ -258,6 +258,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     box.appendChild(grid);
     var status = a.phase === "open" ? (reading ? tr("Get ready… the answers open in a moment.") : a.answered !== null ? tr("Answer in. Wait for the others…") : "") : a.phase === "closed" ? tr("Time is up!") : a.kind === "quiz" ? "" : tr("Thanks for voting.");
     if (status) box.appendChild(el("p", "note", status));
+    if (a.anonymous) box.appendChild(el("p", "note anon", tr("Anonymous: nobody can see what you chose.")));
     if (a.phase === "reveal" && a.kind === "quiz") {
       var win = a.answered !== null && a.answered === a.correct;
       var card = el("div", "result " + (win ? "win" : a.answered === null ? "none" : "miss"));

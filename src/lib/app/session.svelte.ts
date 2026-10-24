@@ -4595,7 +4595,15 @@ class Session {
   };
 
   removeGame = (id: string) => {
-    this.workspace = { ...this.workspace, games: (this.workspace.games ?? []).filter((entry) => entry.id !== id) };
+    // A built-in sample is hidden (it can come back); the church's own is deleted.
+    if (id.startsWith("builtin:")) this.workspace = { ...this.workspace, hiddenGames: [...new Set([...(this.workspace.hiddenGames ?? []), id])] };
+    else this.workspace = { ...this.workspace, games: (this.workspace.games ?? []).filter((entry) => entry.id !== id) };
+    this.persistSoon();
+  };
+
+  /** The built-in samples removed earlier, back in the list. */
+  restoreSampleGames = () => {
+    this.workspace = { ...this.workspace, hiddenGames: [] };
     this.persistSoon();
   };
 

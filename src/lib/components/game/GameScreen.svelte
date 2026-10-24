@@ -60,6 +60,11 @@
     } else if (stage === "podium") {
       sound.stop();
       sound.fanfare();
+    } else if (stage === "groups") {
+      sound.stop();
+      sound.chime();
+    } else if (stage === "pick") {
+      sound.stop();
     }
   });
   // The game ended (or sounds went off) while its frame is still up: the music stops at once.
@@ -189,20 +194,67 @@
   const winningTeam = $derived(data.teams?.length && data.teams[0]!.score > 0 ? data.teams[0]! : null);
   /** The lobby shows the newest names; past that, a count. */
   const MOST_NAMES = 30;
-  const names = $derived(data.joined.slice(-MOST_NAMES));
+  // An anonymous poll names nobody, even in the lobby.
+  const names = $derived(data.anonymous ? [] : data.joined.slice(-MOST_NAMES));
   const moreNames = $derived(Math.max(0, data.players - names.length));
   const most = $derived(Math.max(1, ...data.counts));
   const promptSize = $derived(data.prompt.length > 180 ? 4.2 : data.prompt.length > 110 ? 5 : data.prompt.length > 60 ? 6 : 7);
   const podium = $derived([data.top[1], data.top[0], data.top[2]]);
 
   const shape = (kind: (typeof CHOICE_STYLES)[number]["shape"]): string => CHOICE_PATHS[kind];
+
+  // --- The random picker: a reel of names that slows and lands on each one picked ---------------
+  /** The name the reel shows now, and those it has landed on so far. */
+  let reel = $state("");
+  let landed = $state<Array<{ n: number; name: string }>>([]);
+  let spinning = $state(false);
+  $effect(() => {
+    const pick = data.stage === "pick" ? data.pick : undefined;
+    if (!pick) return;
+    const spin = pick.spin;
+    return untrack(() => runReel(pick, spin));
+  });
+  function runReel(pick: NonNullable<GameScreenData["pick"]>, spin: string) {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const later = (ms: number, run: () => void) => timers.push(setTimeout(run, ms));
+    landed = [];
+    // A monitor or a thumbnail shows the answer at once; the screen spins.
+    if (still || !pick.names.length) {
+      landed = pick.winners;
+      reel = pick.winners.at(-1)?.name ?? "";
+      spinning = false;
+      return () => {};
+    }
+    let at = 0;
+    pick.winners.forEach((winner, index) => {
+      const steps = index === 0 ? 26 : 16;
+      if (data.sounds) later(at, () => sound?.drumroll(index === 0 ? 2.6 : 1.6));
+      for (let step = 0; step < steps; step++) {
+        // Quick at first, slowing to a stop: the gaps grow along a curve.
+        at += 45 + Math.round(320 * (step / steps) ** 2.4);
+        const name = step === steps - 1 ? winner.name : pick.names[Math.floor(Math.random() * pick.names.length)]!;
+        later(at, () => {
+          spinning = step !== steps - 1;
+          reel = name;
+        });
+      }
+      at += 250;
+      later(at, () => {
+        landed = [...landed, winner];
+        if (data.sounds) sound?.fanfare();
+      });
+      at += 1400;
+    });
+    void spin;
+    return () => timers.forEach(clearTimeout);
+  }
 </script>
 
 <div class="game" class:still>
   <div class="bg" aria-hidden="true"><i></i><i></i><i></i><span class="shp s1"></span><span class="shp s2"></span><span class="shp s3"></span><span class="shp s4"></span></div>
 
   <header class="top">
-    <span class="title">{data.stage === "podium" ? "" : data.title}</span>
+    <span class="title">{data.stage === "podium" ? "" : data.stage === "pick" ? say(data, "Picked at random") : data.stage === "groups" ? say(data, "Random groups") : data.title}</span>
     {#if data.stage === "question" || data.stage === "results"}<span class="pill">{say(data, "Question {n} of {total}", { n: data.round, total: data.total })}</span>{/if}
     <span class="pill people">{sayCount(data, data.players, "{n} player", "{n} players")}</span>
   </header>
@@ -226,9 +278,9 @@
         {#each names as person (person.n)}
           <span class="bubble" style:--c={playerColor(person.n)}>{person.name}</span>
         {:else}
-          <span class="waiting">{say(data, "Waiting for the first player…")}</span>
+          {#if !data.anonymous || !data.players}<span class="waiting">{say(data, "Waiting for the first player…")}</span>{/if}
         {/each}
-        {#if moreNames > 0}<span class="bubble more">{say(data, "+{n} more", { n: moreNames })}</span>{/if}
+        {#if moreNames > 0 && !data.anonymous}<span class="bubble more">{say(data, "+{n} more", { n: moreNames })}</span>{/if}
       </div>
     </section>
   {:else if data.stage === "question" || data.stage === "results"}
@@ -275,6 +327,23 @@
           {#if data.fastest}<span class="fast">⚡ {say(data, "Fastest: {name} · {seconds}s", { name: data.fastest.name, seconds: (data.fastest.ms / 1000).toLocaleString(data.lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}</span>{/if}
         </p>
       {/if}
+    </section>
+  {:else if data.stage === "pick" && data.pick}
+    <section class="picker">
+      <p class="kicker">{say(data, data.pick.winners.length > 1 ? "Picked at random" : "And it's…")}</p>
+      <div class="reel" class:spinning>{reel}</div>
+      {#if data.pick.winners.length > 1}
+        <div class="winners">{#each landed as person (person.n)}<span class="bubble" style:--c={playerColor(person.n)}>{person.name}</span>{/each}</div>
+      {/if}
+    </section>
+  {:else if data.stage === "groups" && data.groups}
+    <section class="groups" style:--cols={Math.min(data.groups.length, 4)}>
+      {#each data.groups as group, g (g)}
+        <div class="group" style:--c={playerColor(g)}>
+          <h3>{say(data, "Group {n}", { n: g + 1 })}</h3>
+          <div class="members">{#each group as person, i (person.n)}<span style:animation-delay="{(i * data.groups.length + g) * 70}ms">{person.name}</span>{/each}</div>
+        </div>
+      {/each}
     </section>
   {:else if data.stage === "leaderboard"}
     <section class="board">
@@ -470,4 +539,19 @@
   .p3 .block { height: 22cqh; background: linear-gradient(180deg, #f7c79b, #c97b3d); }
   .podium .foot { margin: -1cqmin 0 0; text-align: center; font-size: 3cqmin; font-weight: 700; opacity: 0.85; }
   .still * { animation: none !important; transition: none !important; }
+  /* The random picker */
+  .picker { position: absolute; inset: 14cqh 6cqw 6cqh; z-index: 1; display: grid; align-content: center; justify-items: center; gap: 4cqmin; text-align: center; }
+  .reel { max-width: 100%; padding: 3cqmin 7cqmin; border-radius: 3cqmin; background: #fff; color: #1a0b3d; font-size: min(14cqmin, 9cqw); font-weight: 900; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 2cqmin 0 rgb(0 0 0 / 0.25), 0 3cqmin 8cqmin rgb(0 0 0 / 0.35); }
+  .reel:empty { display: none; }
+  .reel:not(.spinning) { animation: land 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .reel.spinning { opacity: 0.85; filter: blur(0.15cqmin); }
+  @keyframes land { from { transform: scale(0.8); } }
+  .winners { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.4cqmin; max-width: 90cqw; }
+  /* Random groups */
+  .groups { position: absolute; inset: 12cqh 4cqw 4cqh; z-index: 1; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); align-content: center; align-items: start; gap: 2cqmin; overflow: hidden; }
+  .group { display: grid; grid-template-rows: auto 1fr; gap: 1.2cqmin; min-height: 0; padding: 2cqmin; border-radius: 2cqmin; background: color-mix(in srgb, var(--c) 30%, rgb(0 0 0 / 0.25)); border-top: 0.8cqmin solid var(--c); }
+  .group h3 { margin: 0; font-size: 4cqmin; font-weight: 900; }
+  .members { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 1cqmin; overflow: hidden; }
+  .members span { padding: 0.9cqmin 2cqmin; border-radius: 99px; background: rgb(255 255 255 / 0.16); font-size: 3.2cqmin; font-weight: 750; animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  @container (aspect-ratio < 1) { .groups { grid-template-columns: repeat(min(var(--cols), 2), minmax(0, 1fr)); } }
 </style>

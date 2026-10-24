@@ -63,7 +63,7 @@
   </nav>
 
   <header>
-    <span class="kind" class:poll={!quiz}>{quiz ? t("Quiz") : t("Poll")}</span>
+    <span class="tags"><span class="kind" class:poll={!quiz}>{quiz ? t("Quiz") : t("Poll")}</span>{#if !quiz && game.anonymous}<span class="kind anon">{t("Anonymous")}</span>{/if}{#if builtIn}<span class="kind sample">{t("Sample")}</span>{/if}</span>
     <h3>{title}</h3>
     {#if description}<p class="about">{description}</p>{/if}
     <p class="facts">
@@ -119,7 +119,7 @@
       {/if}
       <button type="button" class="btn" onclick={copyText}>{copied ? t("Copied") : t("Copy as text")}</button>
       {#if ondelete}
-        <button type="button" class="btn danger" class:armed onclick={() => { if (armed) ondelete?.(); else { armed = true; setTimeout(() => (armed = false), 3000); } }}><Icon name="trash" size={14} /> {armed ? t("Click again to delete") : t("Delete")}</button>
+        <button type="button" class="btn danger" class:armed title={builtIn ? t("Removes this sample from your list. Bring samples back at the foot of the list.") : undefined} onclick={() => { if (armed) ondelete?.(); else { armed = true; setTimeout(() => (armed = false), 3000); } }}><Icon name="trash" size={14} /> {armed ? (builtIn ? t("Click again to remove") : t("Click again to delete")) : builtIn ? t("Remove sample") : t("Delete")}</button>
       {/if}
     </div>
     {#if audienceRoom.teams && quiz}<p class="hint">{t("Players are split into teams as they join, evenly. A team's score is its players' average, so a small team can win.")}</p>{/if}
@@ -164,6 +164,9 @@
   .here { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
   header { display: grid; gap: 4px; }
   .kind { justify-self: start; padding: 2px 9px; border-radius: 99px; background: color-mix(in srgb, #d89e00 22%, transparent); color: #e8b53a; font-size: 11.5px; font-weight: 750; }
+  .tags { display: flex; gap: 6px; }
+  .kind.anon { background: color-mix(in srgb, #8e4ec6 22%, transparent); color: #b58be0; }
+  .kind.sample { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--muted); }
   .kind.poll { background: color-mix(in srgb, #1368ce 22%, transparent); color: #6aa6f0; }
   h3 { margin: 2px 0 0; font-size: 19px; font-weight: 750; line-height: 1.25; }
   .about { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }

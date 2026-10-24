@@ -604,6 +604,8 @@ export type Workspace = {
   games: import("./games").Game[];
   /** What each quiz showed once it ended, newest first (who was listening; game-report.ts). */
   gameReports: import("./game-report").GameReport[];
+  /** Built-in samples (quizzes and polls) the church removed from its list; they can come back. */
+  hiddenGames: string[];
   /** Audio playlists (walk-in music, backing tracks). */
   playlists: import("./playlists").Playlist[];
   audio: import("./playlists").AudioSettings;

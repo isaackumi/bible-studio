@@ -6,7 +6,7 @@ import type { PresentationModel, Theme } from "./types";
 // One frame layout ("game") carries it; the desk sends a new frame as the room changes and the
 // screen animates between them.
 
-export type GameStage = "lobby" | "question" | "results" | "leaderboard" | "podium";
+export type GameStage = "lobby" | "question" | "results" | "leaderboard" | "podium" | "pick" | "groups";
 
 /** A player as the screen shows them: their colour number, name and score, and where they were. */
 export type GamePlayer = { n: number; name: string; score: number; before: number; gain: number; streak: number; rank: number; was: number };
@@ -42,6 +42,12 @@ export type GameScreenData = {
   music?: boolean;
   /** The music's style (game/sounds.ts). */
   musicStyle?: string;
+  /** An anonymous poll: no names on the screen. */
+  anonymous?: boolean;
+  /** The random picker: everyone the reel flicks through, who it lands on, and which spin this is. */
+  pick?: { names: string[]; winners: Array<{ n: number; name: string }>; spin: string };
+  /** Random groups, each a list of people (their join number picks their colour). */
+  groups?: Array<Array<{ n: number; name: string }>>;
   /** Changes with every new question or stage, so the screen knows to start its moves again. */
   key: string;
   /** Team standings, best first (team mode); null when everyone plays for themselves. */
@@ -59,6 +65,10 @@ export type GameTeam = { team: number; name: string; color: string; players: num
  */
 export const GAME_WORDS = [
   msg("Join the game"),
+  msg("Picked at random"),
+  msg("And it's…"),
+  msg("Random groups"),
+  msg("Group {n}"),
   msg("Go to {at} and enter"),
   msg("{n} player is in"),
   msg("{n} players are in"),

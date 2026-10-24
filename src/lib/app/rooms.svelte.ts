@@ -7,6 +7,7 @@
 import { serverCall } from "../domain/billing";
 import { defaultPlay, drawQuestions, finishTheVerseGame, ready, shuffled, whichBookGame, WELL_KNOWN, type Game, type PlaySettings } from "../domain/games";
 import { GameSound, sanitizeMusicStyle, type MusicStyle } from "../game/sounds";
+import { makeGroups, pickPeople, type RoomPerson } from "../domain/picker";
 import { api } from "../db/api";
 import { presentQr } from "../domain/overlays";
 import { presentText } from "../domain/present";
@@ -151,7 +152,7 @@ class AudienceRoom {
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
   settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
-  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams"; kind?: "quiz" | "poll"; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
+  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams"; kind?: "quiz" | "poll"; anonymous?: boolean; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
 
   /** Ask the room what is new; while the panel is open, again every two seconds. */
   poll = async (): Promise<void> => {
@@ -314,6 +315,7 @@ class AudienceRoom {
       action: "open",
       readMs: this.ready ? READ_MS : 0,
       kind: run.game.kind,
+      ...(run.game.kind === "poll" && run.game.anonymous ? { anonymous: true } : {}),
       game: run.game.title,
       round: run.index + 1,
       total: run.game.questions.length,
@@ -377,6 +379,56 @@ class AudienceRoom {
     if (session.live.preview.sourceId === this.screenId) session.previewModel(emptyModel(session.theme()), null);
     this.screenStage = null;
     this.lastGame = null;
+  };
+
+  // --- The random picker ---------------------------------------------------------------------
+
+  /** Join numbers picked since the room opened (or since Start again): each spin picks someone new. */
+  picked = $state<number[]>([]);
+  /** The last picks, newest first, for the desk. */
+  pickHistory = $state<Array<{ at: number; people: RoomPerson[] }>>([]);
+  /** The groups made last. */
+  lastGroups = $state<RoomPerson[][] | null>(null);
+  private pickShown: GameScreenData["pick"] | null = null;
+  private groupsShown: GameScreenData["groups"] | null = null;
+
+  /** Everyone here now, by name ("Guest" when they gave none). */
+  get roomPeople(): RoomPerson[] {
+    return (this.view?.joined ?? []).map((person) => ({ n: person.n, name: person.name || t("Guest") }));
+  }
+
+  /** Pick `count` people at random and show the reel on the screen (or Preview). */
+  pick = async (count: number, again: boolean) => {
+    const people = this.roomPeople;
+    const chosen = pickPeople(people, count, this.picked, again);
+    if (!chosen.length) {
+      this.error = people.length ? t("Everyone here has been picked. Press Start again, or allow picking someone twice.") : t("Nobody has joined yet. People join with the code on the screen.");
+      return;
+    }
+    this.error = "";
+    this.picked = [...new Set([...this.picked, ...chosen.map((person) => person.n)])];
+    this.pickHistory = [{ at: Date.now(), people: chosen }, ...this.pickHistory].slice(0, 20);
+    this.pickShown = { names: people.map((person) => person.name), winners: chosen, spin: `${Date.now()}` };
+    await this.showGame("pick", this.follow);
+  };
+
+  /** Split everyone here into `count` groups at random and show them. */
+  makeGroups = async (count: number) => {
+    const people = this.roomPeople;
+    if (people.length < 2) {
+      this.error = t("Groups need at least two people in the room.");
+      return;
+    }
+    this.error = "";
+    const groups = makeGroups(people, count);
+    this.lastGroups = groups;
+    this.groupsShown = groups;
+    await this.showGame("groups", this.follow);
+  };
+
+  resetPicks = () => {
+    this.picked = [];
+    this.pickHistory = [];
   };
 
   // --- The game on the screen -----------------------------------------------------------------
@@ -536,12 +588,17 @@ class AudienceRoom {
       players: ranking?.players ?? view?.people ?? 0,
       top: ranking?.top ?? [],
       bottom: ranking?.bottom ?? [],
-      joined: view?.joined ?? [],
+      // The lobby shows the newest few; the full list is for the picker.
+      joined: (view?.joined ?? []).slice(-40),
+      ...(stage === "pick" && this.pickShown ? { pick: this.pickShown } : {}),
+      ...(stage === "groups" && this.groupsShown ? { groups: this.groupsShown } : {}),
       join: saved ? { code: saved.code, at, url: saved.joinUrl } : null,
       sounds: this.sounds,
       music: this.sounds && this.playing !== null,
       musicStyle: this.musicStyle,
-      key: `${stage}:${question?.id ?? ""}:${live?.phase === "open" ? "open" : ""}`,
+      // An anonymous poll shows how many are in, never who.
+      ...(run?.game.kind === "poll" && run.game.anonymous ? { anonymous: true } : {}),
+      key: `${stage}:${stage === "pick" ? (this.pickShown?.spin ?? "") : stage === "groups" ? String(this.groupsShown?.length ?? 0) + (this.lastGroups?.flat().map((person) => person.n).join(",") ?? "") : (question?.id ?? "")}:${live?.phase === "open" ? "open" : ""}`,
       teams: view?.teams ? view.teams.map((team) => ({ ...team, name: t(TEAMS[team.team]?.name ?? ""), color: TEAMS[team.team]?.color ?? "#888888" })) : null,
       words: Object.fromEntries(GAME_WORDS.map((line) => [line, t(line)])),
       lang: currentLanguage(),

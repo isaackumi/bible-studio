@@ -25,7 +25,9 @@
   let endArmed = $state(false);
 
   const mine = $derived(session.workspace.games ?? []);
-  const everything = $derived([...mine, ...BUILT_IN_GAMES]);
+  const hidden = $derived(new Set(session.workspace.hiddenGames ?? []));
+  const samples = $derived(BUILT_IN_GAMES.filter((game) => !hidden.has(game.id)));
+  const everything = $derived([...mine, ...samples]);
   const viewed = $derived(viewing ? (everything.find((game) => game.id === viewing) ?? null) : null);
   const isBuiltIn = (game: Game) => game.id.startsWith("builtin:");
   const titleOf = (game: Game) => (isBuiltIn(game) ? t(game.title) : game.title);
@@ -308,7 +310,7 @@
     onplay={() => void play(viewed)}
     onedit={() => (editing = structuredClone($state.snapshot(viewed)) as Game)}
     oncopy={() => (editing = copyOf(viewed, isBuiltIn(viewed) ? titleOf(viewed) : t("{title} (copy)", { title: viewed.title })))}
-    ondelete={isBuiltIn(viewed) ? undefined : () => { session.removeGame(viewed.id); viewing = null; }}
+    ondelete={() => { session.removeGame(viewed.id); viewing = null; }}
     onback={() => (viewing = null)}
   />
 {:else}
@@ -394,8 +396,12 @@
             <span class="words"><strong>{t("Finish the verse")}</strong><span>{making === "finish-verse" ? t("Making…") : t("Choose how each verse ends. Different every time.")}</span></span>
           </button>
         </div>
-        {#each BUILT_IN_GAMES as game (game.id)}{@render card(game)}{/each}
+        {#each samples.filter((game) => game.kind === "quiz") as game (game.id)}{@render card(game)}{/each}
       </div>
+      {#if samples.some((game) => game.kind === "poll")}
+        <h3>{t("Ready-made polls")}</h3>
+        <div class="cards">{#each samples.filter((game) => game.kind === "poll") as game (game.id)}{@render card(game)}{/each}</div>
+      {/if}
 
       {#if quizPacks.packs.length}
         <h3>{t("More to add")}</h3>
@@ -414,6 +420,9 @@
         {#if quizPacks.error}<p class="note" role="alert">{quizPacks.error}</p>{/if}
       {/if}
 
+      {#if hidden.size}
+        <p class="note">{tn(hidden.size, "{n} sample is removed from your list.", "{n} samples are removed from your list.")} <button type="button" class="inline-link" onclick={() => session.restoreSampleGames()}>{t("Bring them back")}</button></p>
+      {/if}
       {#if reports.length}
         <h3>{t("Who was listening")}</h3>
         {#if shownReport}
@@ -444,7 +453,7 @@
       {/if}
       <span class="words">
         <strong>{titleOf(game)}</strong>
-        <span>{quiz ? t("Quiz") : t("Poll")} · {tn(game.questions.length, "{n} question", "{n} questions")}{game.series ? ` · ${game.series}` : ""}</span>
+        <span>{quiz ? t("Quiz") : t("Poll")} · {tn(game.questions.length, "{n} question", "{n} questions")}{game.anonymous ? ` · ${t("Anonymous")}` : ""}{game.series ? ` · ${game.series}` : ""}</span>
         {#if before}<span class="played"><Icon name="check" size={11} /> {tn(before.times, "Played once, {when}", "Played {n} times, last {when}", { when: whenPlayed(before.last) })}</span>{/if}
       </span>
     </button>

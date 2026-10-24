@@ -76,6 +76,9 @@
       <strong>{t("Poll")}</strong><span>{t("No right answer. The room sees how everyone voted.")}</span>
     </button>
   </div>
+  {#if !quiz}
+    <label class="anon"><input type="checkbox" class="switch" role="switch" checked={!!game.anonymous} onchange={(event) => (game.anonymous = event.currentTarget.checked || undefined)} /> <span><strong>{t("Anonymous")}</strong>{t("Nobody sees who chose what: no names on the screen, and phones say their answer is anonymous. Good for honest feedback.")}</span></label>
+  {/if}
 
   <details class="more">
     <summary>{t("Description and sermon series")}</summary>
@@ -168,6 +171,9 @@
   input, textarea, select { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 13px; }
   input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   .title { padding: 10px 12px; font-size: 17px; font-weight: 700; }
+  .anon { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+  .anon span { display: grid; gap: 2px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .anon strong { color: var(--ink); font-size: 13px; }
   .kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .kind button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--muted); font: inherit; text-align: left; cursor: pointer; }
   .kind button strong { color: var(--ink); font-size: 13.5px; }

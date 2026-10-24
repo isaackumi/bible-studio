@@ -292,3 +292,16 @@ describe("rooms: who is here", () => {
     expect(Object.values(peek()!.participants).map((person) => person.name)).toEqual(["Ama"]);
   });
 });
+
+describe("rooms: anonymous polls", () => {
+  it("tells phones a poll is anonymous, and never a quiz", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ANON23", ""));
+    const pid = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const question = { prompt: "How was today?", choices: ["Good", "Fine"], seconds: 20, points: 0 };
+    data(await core.activity(hostKey, { action: "open", kind: "poll", anonymous: true, question }));
+    expect(data<{ activity: { anonymous?: boolean } }>(await core.view(pid)).activity.anonymous).toBe(true);
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", anonymous: true, question: { ...question, correct: 0 } }));
+    expect(data<{ activity: { anonymous?: boolean } }>(await core.view(pid)).activity.anonymous).toBeUndefined();
+  });
+});
