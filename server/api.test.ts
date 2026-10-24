@@ -175,6 +175,23 @@ describe("server API", () => {
     expect((await call("/v1/lease", { key, device: "one" })).status).toBe(403);
   });
 
+  it("writes each store key once per move, as KV allows", async () => {
+    const { call, config } = setup();
+    const key = signLicense({ plan: "premium", until: "2027-06-01" }, pair.secretKey);
+    expect((await call("/v1/activate", { key, device: "one", name: "Old" })).status).toBe(200);
+    const writes = new Map<string, number>();
+    const put = config.store.put.bind(config.store);
+    config.store.put = async (name, value, meta) => {
+      writes.set(name, (writes.get(name) ?? 0) + 1);
+      return put(name, value, meta);
+    };
+    expect((await call("/v1/move", { key, device: "two", name: "New", from: "one" })).status).toBe(200);
+    for (const [name, count] of writes) expect({ name, count }).toEqual({ name, count: 1 });
+    // A move needs a computer to move to, and not this one.
+    expect((await call("/v1/move", { key, name: "New", from: "two" })).status).toBe(400);
+    expect((await call("/v1/move", { key, device: "two", name: "New", from: "two" })).status).toBe(400);
+  });
+
   it("moves back the other way, and by the shortened id", async () => {
     const { call } = setup();
     const key = signLicense({ plan: "premium", until: "2027-06-01" }, pair.secretKey);

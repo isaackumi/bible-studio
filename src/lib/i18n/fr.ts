@@ -3283,7 +3283,7 @@ export const fr: Readonly<Record<string, string>> = {
   "Can I cancel any time?": "Puis-je résilier à tout moment ?",
   "Yes. Your plan runs to the end of the period you paid for, then the app returns to Free. Your library stays on your computer either way.": "Oui. Votre forfait court jusqu’à la fin de la période payée, puis l’application revient à Gratuit. Votre bibliothèque reste sur votre ordinateur.",
   "Does it work without internet?": "Fonctionne-t-il sans internet ?",
-  "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 30 days.": "Oui. Church Studio se connecte de temps en temps ; entre deux, il fonctionne hors ligne jusqu’à 30 jours.",
+  "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 14 days.": "Oui. Church Studio se connecte de temps en temps ; entre deux, il fonctionne hors ligne jusqu’à 14 jours.",
   "How many computers?": "Combien d’ordinateurs ?",
   "Premium runs on one computer, Church on three at once (for multi-campus or a second operator). Release a computer any time in Settings.": "Premium fonctionne sur un ordinateur, Église sur trois à la fois (multi-sites ou second opérateur). Libérez un ordinateur à tout moment dans les réglages.",
   "That code is not known.": "Ce code est inconnu.",

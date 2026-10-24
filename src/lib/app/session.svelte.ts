@@ -6198,8 +6198,13 @@ class Session {
     void this.startErrorReports();
     await this.checkIn();
     // While the app stays open (a Saturday rehearsal into Sunday morning), every few hours too.
-    this.every(3 * 60 * 60_000, () => void this.checkIn());
-    await this.checkActivation();
+    this.every(3 * 60 * 60_000, () => {
+      void this.checkIn();
+      void this.checkActivation(true);
+    });
+    // Asked every start, not only when the lease is nearly due: a licence moved to another
+    // computer leaves this one at the next start, as Settings says.
+    await this.checkActivation(true);
     // Offline too long: a paid plan must check in before its lease runs out; say so a week ahead.
     const renewBy = this.ent.kind === "license" ? (this.ent.renewBy ?? 0) : 0;
     const daysLeft = renewBy ? Math.ceil((renewBy - Date.now()) / 86_400_000) : Infinity;
@@ -6327,8 +6332,11 @@ class Session {
       this.notify(t("{plan} is on this computer now", { plan: this.ent.plan === "church" ? "Church" : "Premium" }));
       return;
     }
+    // Refused (too many moves, a computer no longer listed, no connection): the list stays as it
+    // was, with the reason under its heading.
     const data = answer.data as { seats?: number; devices?: ActivatedDevice[] };
-    this.activation = { ...this.activation, status: activationFrom(answer.status, answer.data, answer.offline) === "offline" ? "offline" : "full", seats: Number(data.seats) || this.activation.seats, devices: Array.isArray(data.devices) ? data.devices : this.activation.devices, message: answer.error };
+    const before = this.activation.status === "moved" ? "moved" : "full";
+    this.activation = { ...this.activation, status: answer.offline ? "offline" : before, seats: Number(data.seats) || this.activation.seats, devices: Array.isArray(data.devices) ? data.devices : this.activation.devices, message: answer.error };
   };
 
   /** Free a computer's place on the license (this one or another). */
@@ -6666,6 +6674,8 @@ class Session {
         this.persistSoon();
         const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; to?: string };
         this.activation = { status: refused, seats: Number(data.seats) || 0, devices: Array.isArray(data.devices) ? data.devices : [], message: refused === "moved" ? answer.error : "", ...(refused === "moved" ? { movedTo: typeof data.to === "string" ? data.to : "" } : {}) };
+        // A lease this computer still holds from before the move is let go: Free from now.
+        if (refused === "moved") this.ent = await api.entitlementClear().catch(() => this.ent);
         return refused === "moved" ? answer.error : t("This key is in use on all the computers it covers. Move it here below, or release a computer, then check again.");
       }
       return answer.offline ? t("Connect to the internet once to add the key; after that it works offline.") : answer.error;

@@ -52,9 +52,9 @@ costs the owner money, so every plan that syncs has a limit the owner controls.
 
 ## 2. Licence moves
 
-Exists already: Premium 1 seat, Church 3 (`SEATS`, server/api.ts); a full licence answers 409
-with the list of computers; at most 3 releases per licence in 30 days; leases last 30 days
-(`LEASE_DAYS`).
+Built (2026-10-24): Premium 1 seat, Church 3 (`SEATS`, server/api.ts); a full licence answers 409
+with the list of computers; `/v1/move`; moves and releases limited per plan (`MOVES_PER_30_DAYS`:
+Premium 2, Church 3); leases last 14 days (`LEASE_DAYS`); a moved-away computer gets 403 `moved`.
 
 To add:
 - **Move Premium to this computer**: when the licence is full, the app shows which computer has

@@ -164,7 +164,7 @@
 
   const FAQ = [
     { q: "Can I cancel any time?", a: "Yes. Your plan runs to the end of the period you paid for, then the app returns to Free. Your library stays on your computer either way." },
-    { q: "Does it work without internet?", a: "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 30 days." },
+    { q: "Does it work without internet?", a: "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 14 days." },
     { q: "How many computers?", a: "Premium runs on one computer, Church on three at once (for multi-campus or a second operator). Release a computer any time in Settings." },
   ];
 </script>

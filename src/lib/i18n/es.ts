@@ -3202,7 +3202,7 @@ export const es: Readonly<Record<string, string>> = {
   "Can I cancel any time?": "¿Puedo cancelar cuando quiera?",
   "Yes. Your plan runs to the end of the period you paid for, then the app returns to Free. Your library stays on your computer either way.": "Sí. Tu plan dura hasta el final del período que pagaste, y luego la app vuelve a Gratis. Tu biblioteca se queda en tu computadora en cualquier caso.",
   "Does it work without internet?": "¿Funciona sin internet?",
-  "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 30 days.": "Sí. Church Studio se conecta de vez en cuando; entre conexiones funciona sin conexión hasta 30 días.",
+  "Yes. Church Studio checks in now and then; between check-ins it runs offline for up to 14 days.": "Sí. Church Studio se conecta de vez en cuando; entre conexiones funciona sin conexión hasta 14 días.",
   "How many computers?": "¿Cuántas computadoras?",
   "Premium runs on one computer, Church on three at once (for multi-campus or a second operator). Release a computer any time in Settings.": "Premium funciona en una computadora; Iglesia, en tres a la vez (para varias sedes o un segundo operador). Libera una computadora cuando quieras en Ajustes.",
   "That code is not known.": "Ese código no se reconoce.",
