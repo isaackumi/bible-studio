@@ -4728,4 +4728,6 @@ export const fr: Readonly<Record<string, string>> = {
   "It was chosen in this computer's sound settings, so Church Studio keeps it. Change it in Settings › Sound & voice.": "Elle a été choisie dans les réglages du son de cet ordinateur, donc Church Studio la garde. Modifiez-la dans Réglages › Son et voix.",
   "You moved away from it, so Automatic does not pick it. Choose it above to use it again.": "Vous l’avez quittée, donc Automatique ne la choisit plus. Choisissez-la ci-dessus pour l’utiliser à nouveau.",
   "Not picked by Automatic": "Pas choisie par Automatique",
+  "Sound stays where you put it": "Le son reste là où vous l’avez mis",
+  "A soundbar or speaker the computer already plays through is kept, and a change made in the computer's own sound settings is kept too. An output you move away from, like a screen with no speakers, is not picked again.": "Une barre de son ou une enceinte que l’ordinateur utilise déjà est gardée, tout comme un changement fait dans les réglages du son de l’ordinateur. Une sortie que vous quittez, comme un écran sans haut-parleurs, n’est plus choisie.",
 };

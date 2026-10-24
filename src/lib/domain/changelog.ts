@@ -10,6 +10,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.8",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "audio", title: msg("Sound stays where you put it"), text: msg("A soundbar or speaker the computer already plays through is kept, and a change made in the computer's own sound settings is kept too. An output you move away from, like a screen with no speakers, is not picked again.") },
+    ],
+  },
+  {
     version: "0.4.7",
     date: "2026-10-24",
     highlights: [
