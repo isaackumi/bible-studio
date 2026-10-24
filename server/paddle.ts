@@ -141,7 +141,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
       users: parseAdminUsers(env.ADMIN_USERS),
       alertEmail: env.ADMIN_ALERT_EMAIL || undefined,
     },
-    leaseDays: Number(env.LEASE_DAYS ?? 30) || 30,
+    leaseDays: Number(env.LEASE_DAYS ?? 14) || 14,
     trialDays: Number(env.TRIAL_DAYS ?? 14) || 14,
     graceDays: Number(env.GRACE_DAYS ?? 7) || 7,
     identity: identityOf(env, mail),

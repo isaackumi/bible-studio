@@ -157,8 +157,28 @@ export async function inboxFull(config: ApiConfig, email: string): Promise<boole
 
 const SLOW_DOWN = "Too many requests from this network. Wait a minute and try again.";
 
-/** Releases a key may make in 30 days (a released computer keeps its lease until it checks in). */
-const RELEASES_PER_30_DAYS = 3;
+/**
+ * Moves (and releases) a licence may make in 30 days: a plan that could hop freely would run on any
+ * number of computers in turn. Premium is one laptop; Church has three seats to shuffle.
+ */
+export const MOVES_PER_30_DAYS: Record<LicensePlan, number> = { premium: 2, church: 3 };
+
+/** A computer the licence left (moved or released): no lease until the licence moves back to it. */
+type Moved = { device: string; name: string; at: number; to: string };
+
+async function movedList(config: ApiConfig, licenseId: string): Promise<Moved[]> {
+  const now = config.now();
+  return ((await getJson<Moved[]>(config.store, `moved:${licenseId}`)) ?? []).filter((entry) => now - entry.at < STALE_DAYS * DAY);
+}
+
+/** Record that `device` no longer holds the licence (`to`: the name of the computer that does, or "" for a plain release). */
+export async function markMoved(config: ApiConfig, licenseId: string, device: string, name: string, to: string): Promise<void> {
+  const list = (await movedList(config, licenseId)).filter((entry) => entry.device !== device);
+  await putJson(config.store, `moved:${licenseId}`, [...list, { device, name, at: config.now(), to }]);
+}
+
+const planName = (plan: LicensePlan) => (plan === "church" ? "Church" : "Premium");
+const dayOf = (at: number) => new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
 type Signer = { secret: string; public: string; test: boolean };
 const realSigner = (config: ApiConfig): Signer => ({ secret: config.signingKey, public: config.publicKey ?? LICENSE_PUBLIC_KEY, test: false });
@@ -371,6 +391,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     case "/v1/activate":
     case "/v1/lease":
     case "/v1/release":
+    case "/v1/move":
     case "/v1/devices":
       return seats(config, path, input);
     default:
@@ -828,6 +849,12 @@ export async function activateDevice(config: ApiConfig, keyText: string, device:
   const fresh = (entry: Device) => now - Date.parse(entry.seenAt) < STALE_DAYS * DAY;
   let devices = ((await getJson<Device[]>(config.store, slot)) ?? []).filter(fresh);
   const at = new Date(now).toISOString();
+  // The licence left this computer: no lease until it is moved back here.
+  const moved = (await movedList(config, license.id)).find((entry) => entry.device === device);
+  if (moved && !devices.some((entry) => entry.device === device)) {
+    const where = moved.to ? `was moved to ${moved.to}` : "was released from this computer";
+    return { status: 403, body: { moved: true, to: moved.to, at: moved.at, seats, devices: masked(devices, device), error: `${planName(license.plan)} ${where} on ${dayOf(moved.at)}. To use it here again, move it back from Settings › Account.` } };
+  }
   if (devices.some((entry) => entry.device === device)) devices = devices.map((entry) => (entry.device === device ? { device, name, seenAt: at } : entry));
   else if (devices.length >= seats) return { status: 409, body: { full: true, seats, devices: masked(devices, device) } };
   else devices = [...devices, { device, name, seenAt: at }];
@@ -871,17 +898,30 @@ async function seats(config: ApiConfig, path: string, input: Record<string, unkn
   const now = config.now();
   const saved = ((await getJson<Device[]>(config.store, slot)) ?? []).filter((entry) => now - Date.parse(entry.seenAt) < STALE_DAYS * DAY);
   let devices = saved;
-  if (path === "/v1/release") {
-    // A released computer keeps its lease until it checks in, so releases are limited: otherwise
-    // releasing and activating in turn would run one key on any number of computers.
+  if (path === "/v1/release" || path === "/v1/move") {
+    // Freeing a computer is limited per plan: otherwise releasing and activating in turn would run
+    // one key on any number of computers. The freed computer gets no lease until the licence is
+    // moved back to it.
+    const freeing = path === "/v1/move" ? text(input.from, 80) : device;
+    // The full id, or the shortened one the list shows.
+    const gone = saved.find((entry) => entry.device === freeing || (freeing.length === 8 && entry.device.startsWith(freeing)));
+    if (path === "/v1/move" && !gone) return json(404, { error: "That computer is not on this license.", seats: seatsFor, devices: masked(saved, device) });
     const logKey = `rel:${license.id}`;
     const recent = ((await getJson<number[]>(config.store, logKey)) ?? []).filter((at) => now - at < 30 * DAY);
-    if (recent.length >= RELEASES_PER_30_DAYS) return json(429, { error: `A key can release ${RELEASES_PER_30_DAYS} computers in 30 days. Contact support if you need more.`, seats: seatsFor, devices: masked(saved, device) });
-    // The full id, or the shortened one the list shows.
-    devices = saved.filter((entry) => entry.device !== device && !(device.length === 8 && entry.device.startsWith(device)));
-    if (devices.length !== saved.length) {
+    const allowed = MOVES_PER_30_DAYS[license.plan];
+    if (gone && recent.length >= allowed) return json(429, { error: `${planName(license.plan)} can move ${allowed} times in 30 days. Contact support if you need more.`, seats: seatsFor, devices: masked(saved, device) });
+    if (gone) {
+      devices = saved.filter((entry) => entry.device !== gone.device);
       await putJson(config.store, slot, devices);
       await putJson(config.store, logKey, [...recent, now]);
+      await markMoved(config, license.id, gone.device, gone.name, path === "/v1/move" ? text(input.name, 60) || "Computer" : "");
+    }
+    if (path === "/v1/move") {
+      // The computer taking the licence is no longer "moved away", if it ever was; then it activates.
+      const list = (await movedList(config, license.id)).filter((entry) => entry.device !== device);
+      await putJson(config.store, `moved:${license.id}`, list);
+      const result = await activateDevice(config, keyText, device, text(input.name, 60) || "Computer");
+      return json(result.status, result.lease ? { ...result.body, lease: result.lease } : result.body);
     }
   }
   return json(200, { ok: true, seats: seatsFor, devices: masked(devices, device) });

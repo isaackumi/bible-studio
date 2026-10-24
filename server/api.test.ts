@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { licenseKeyPair, readLicense, signLicense, TEST_LICENSE_PUBLIC_KEY } from "../src/lib/domain/license";
 import { readLease, standing } from "../src/lib/domain/lease";
 import { PLANS } from "../src/lib/domain/plans";
-import { completeCheckout, EMAILS_PER_INBOX, handleApi, renewLicense, SEATS, type ApiConfig } from "./api";
+import { completeCheckout, EMAILS_PER_INBOX, handleApi, MOVES_PER_30_DAYS, renewLicense, SEATS, type ApiConfig } from "./api";
 import { mockProvider } from "./billing";
 import { PRICES } from "./pricing";
 import { memoryStore } from "./store";
@@ -21,7 +21,7 @@ function setup(asOwner = true) {
     provider: mockProvider,
     adminToken: "secret",
     admin: { users: { "owner@heitech.test": "owner" }, ...(asOwner ? { devEmail: "owner@heitech.test" } : {}) },
-    leaseDays: 30,
+    leaseDays: 14,
     trialDays: 14,
     graceDays: 7,
     mail: async (to, subject, text) => void mails.push({ to, subject, text }),
@@ -143,15 +143,69 @@ describe("server API", () => {
     expect((await call("/v1/activate", { key: paid!.key, device: "two", name: "Office" })).status).toBe(200);
   });
 
-  it("limits releases, so one key cannot hop between any number of computers", async () => {
+  it("limits moves per plan, so one key cannot hop between any number of computers", async () => {
+    const { call } = setup();
+    const premium = signLicense({ plan: "premium", until: "2027-06-01" }, pair.secretKey);
+    for (let n = 0; n < MOVES_PER_30_DAYS.premium; n++) {
+      expect((await call("/v1/activate", { key: premium, device: `pc-${n}` })).status).toBe(200);
+      expect((await call("/v1/release", { key: premium, device: `pc-${n}` })).status).toBe(200);
+    }
+    expect((await call("/v1/activate", { key: premium, device: "pc-9" })).status).toBe(200);
+    expect(await call("/v1/release", { key: premium, device: "pc-9" })).toMatchObject({ status: 429, data: { error: expect.stringContaining("2 times") } });
+    const church = signLicense({ plan: "church", until: "2027-06-01" }, pair.secretKey);
+    for (let n = 0; n < MOVES_PER_30_DAYS.church; n++) {
+      expect((await call("/v1/activate", { key: church, device: `c-${n}` })).status).toBe(200);
+      expect((await call("/v1/release", { key: church, device: `c-${n}` })).status).toBe(200);
+    }
+    expect((await call("/v1/activate", { key: church, device: "c-9" })).status).toBe(200);
+    expect((await call("/v1/release", { key: church, device: "c-9" })).status).toBe(429);
+  });
+
+  it("moves a license to another computer and refuses the one it left", async () => {
+    const { call } = setup();
+    const key = signLicense({ plan: "premium", until: "2027-06-01", holder: "Grace" }, pair.secretKey);
+    expect((await call("/v1/activate", { key, device: "one", name: "Pastor's Dell" })).status).toBe(200);
+    expect((await call("/v1/activate", { key, device: "two", name: "New laptop" })).status).toBe(409);
+    const moved = await call("/v1/move", { key, device: "two", name: "New laptop", from: "one" });
+    expect(moved.status).toBe(200);
+    expect(typeof moved.data.lease).toBe("string");
+    expect((moved.data.devices as Array<{ device: string }>).map((entry) => entry.device)).toEqual(["two"]);
+    // The old laptop, next time it is online: no lease, told where Premium went.
+    expect(await call("/v1/activate", { key, device: "one", name: "Pastor's Dell" })).toMatchObject({ status: 403, data: { moved: true, to: "New laptop", error: expect.stringContaining("Premium was moved to New laptop") } });
+    expect((await call("/v1/lease", { key, device: "one" })).status).toBe(403);
+  });
+
+  it("moves back the other way, and by the shortened id", async () => {
     const { call } = setup();
     const key = signLicense({ plan: "premium", until: "2027-06-01" }, pair.secretKey);
-    for (let n = 0; n < 3; n++) {
-      expect((await call("/v1/activate", { key, device: `pc-${n}` })).status).toBe(200);
-      expect((await call("/v1/release", { key, device: `pc-${n}` })).status).toBe(200);
-    }
-    expect((await call("/v1/activate", { key, device: "pc-3" })).status).toBe(200);
-    expect((await call("/v1/release", { key, device: "pc-3" })).status).toBe(429);
+    expect((await call("/v1/activate", { key, device: "laptop-aaaaaaaa", name: "Old" })).status).toBe(200);
+    // The list shows other computers by their first eight characters; that is what the app sends.
+    expect((await call("/v1/move", { key, device: "laptop-bbbbbbbb", name: "New", from: "laptop-a" })).status).toBe(200);
+    expect((await call("/v1/activate", { key, device: "laptop-aaaaaaaa", name: "Old" })).status).toBe(403);
+    // The new one died: the old one takes Premium back, which counts as a move.
+    expect((await call("/v1/move", { key, device: "laptop-aaaaaaaa", name: "Old", from: "laptop-bbbbbbbb" })).status).toBe(200);
+    expect((await call("/v1/activate", { key, device: "laptop-bbbbbbbb", name: "New" })).status).toBe(403);
+    expect((await call("/v1/activate", { key, device: "laptop-aaaaaaaa", name: "Old" })).status).toBe(200);
+    expect(await call("/v1/move", { key, device: "laptop-cccccccc", name: "Third", from: "nobody12" })).toMatchObject({ status: 404 });
+  });
+
+  it("blocks a released computer until the license is moved back to it", async () => {
+    const { call } = setup();
+    const key = signLicense({ plan: "premium", until: "2027-06-01" }, pair.secretKey);
+    expect((await call("/v1/activate", { key, device: "one", name: "Old" })).status).toBe(200);
+    expect((await call("/v1/release", { key, device: "one" })).status).toBe(200);
+    expect(await call("/v1/activate", { key, device: "one", name: "Old" })).toMatchObject({ status: 403, data: { moved: true } });
+    expect((await call("/v1/activate", { key, device: "two", name: "New" })).status).toBe(200);
+    expect((await call("/v1/move", { key, device: "one", name: "Old", from: "two" })).status).toBe(200);
+  });
+
+  it("leases last 14 days", async () => {
+    const { call, config, now } = setup();
+    const checkout = await call("/v1/checkout", { plan: "premium", interval: "monthly", email: "a@b.co" });
+    const paid = await completeCheckout(config, checkout.data.session as string, "sub_lease");
+    const answer = await call("/v1/activate", { key: paid!.key, device: "one", name: "Laptop" });
+    const lease = readLease(answer.data.lease as string, TEST_LICENSE_PUBLIC_KEY)!;
+    expect(lease.renewBy - now()).toBe(14 * DAY);
   });
 
   it("keeps a subscriber's plan through renewals, with the same key", async () => {

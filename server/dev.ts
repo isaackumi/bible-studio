@@ -62,7 +62,7 @@ const config = {
   provider: mockProvider,
   // The admin page as an owner without Cloudflare Access (this computer only).
   admin: { users: { "dev@localhost": "owner" as const }, devEmail: "dev@localhost", alertEmail: "dev@localhost" },
-  leaseDays: 30,
+  leaseDays: 14,
   trialDays: 14,
   graceDays: 7,
   mail,
