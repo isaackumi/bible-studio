@@ -68,6 +68,23 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   .timer { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; margin: 6px 0 14px; }
   .timer i { display: block; height: 100%; background: var(--accent); transform-origin: left; }
   .choices { display: grid; gap: 10px; }
+  .words { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+  .words.mine span { padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 22%, transparent); font-weight: 700; font-size: 14px; }
+  .words.cloud { justify-content: center; align-items: center; gap: 4px 12px; padding: 14px; border-radius: 14px; background: rgb(255 255 255 / 0.05); }
+  .words.cloud span { font-weight: 800; line-height: 1.15; }
+  .words.cloud .c0 { color: #ff8a5c; } .words.cloud .c1 { color: #7cc4ff; } .words.cloud .c2 { color: #ffd166; } .words.cloud .c3 { color: #8ee08a; } .words.cloud .c4 { color: #d6a6ff; } .words.cloud .c5 { color: #fff; }
+  .word-form { display: flex; gap: 8px; }
+  .word-form input { flex: 1; min-width: 0; height: 50px; padding: 0 14px; border: 1px solid rgb(255 255 255 / 0.18); border-radius: 12px; background: rgb(255 255 255 / 0.06); color: inherit; font: inherit; font-size: 17px; }
+  .word-form input:focus { outline: none; border-color: var(--accent); }
+  .word-form .send { flex: none; height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 800; }
+  .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .scale.ten { grid-template-columns: repeat(5, 1fr); }
+  .scale .num { position: relative; height: 58px; border: 0; border-radius: 14px; background: rgb(255 255 255 / 0.1); color: #fff; font: inherit; font-size: 22px; font-weight: 900; overflow: hidden; }
+  .scale .num.picked { background: var(--accent); }
+  .scale .num.dim { opacity: 0.45; }
+  .scale .num .fill { position: absolute; left: 0; right: 0; bottom: 0; background: rgb(255 255 255 / 0.18); }
+  .ends { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted, #aaa); font-size: 13px; }
+  .average { margin: 12px 0 0; font-size: 22px; font-weight: 900; text-align: center; }
   .choice { position: relative; display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 12px 14px; border: 0; border-radius: 14px; color: #fff; font-weight: 700; font-size: 16px; text-align: left; overflow: hidden; }
   .choice .mark { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: rgb(0 0 0 / 0.22); font-size: 14px; }
   .choice .fill { position: absolute; inset: 0 auto 0 0; background: rgb(255 255 255 / 0.18); }
@@ -192,6 +209,66 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     post("/answer", { pid: pid, choice: index }).then(refresh).catch(function (e) { note("ask-note", e.message, "bad"); });
   }
 
+  /** A word cloud: a few words each, sent one at a time, then the cloud once it is shown. */
+  function drawWords(a, box, reading, kept, focused) {
+    var mine = a.mine || [], each = a.each || 3;
+    if (mine.length) {
+      var chips = el("div", "words mine");
+      mine.forEach(function (word) { chips.appendChild(el("span", null, word)); });
+      box.appendChild(chips);
+    }
+    if (a.phase === "open" && !reading && mine.length < each) {
+      var form = el("form", "word-form");
+      var input = el("input"); input.id = "word-in"; input.maxLength = 40; input.autocomplete = "off"; input.placeholder = tr("Type a word or two"); input.value = kept;
+      var send = el("button", "send", tr("Send")); send.type = "submit";
+      form.appendChild(input); form.appendChild(send);
+      form.onsubmit = function (event) {
+        event.preventDefault();
+        var text = input.value.trim();
+        if (!text || busy) return;
+        busy = true; send.disabled = true;
+        post("/answer", { pid: pid, choice: 0, text: text }).then(function () { input.value = ""; if (navigator.vibrate) navigator.vibrate(20); last = null; refresh(); })
+          .catch(function (e) { note("ask-note", e.message, "bad"); }).then(function () { busy = false; send.disabled = false; });
+      };
+      box.appendChild(form);
+      if (focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      box.appendChild(el("p", "note", tr("{n} of {total} sent", { n: mine.length, total: each })));
+    } else if (a.phase === "open" && !reading) {
+      box.appendChild(el("p", "note", tr("Your words are in. Watch them on the screen.")));
+    } else if (a.phase === "closed") {
+      box.appendChild(el("p", "note", tr("Time is up!")));
+    }
+    if (a.phase === "reveal" && a.cloud && a.cloud.length) {
+      var most = a.cloud[0].count, cloud = el("div", "words cloud");
+      a.cloud.forEach(function (word, i) { var w = el("span", "c" + (i % 6), word.text); w.style.fontSize = (14 + Math.round((word.count / most) * 18)) + "px"; cloud.appendChild(w); });
+      box.appendChild(cloud);
+    }
+    if (a.anonymous) box.appendChild(el("p", "note anon", tr("Anonymous: nobody can see what you chose.")));
+  }
+
+  /** A rating: the numbers in a row, its two ends named, the average once it is shown. */
+  function drawScale(a, box, reading, total) {
+    var row = el("div", "scale" + (a.question.choices.length > 5 ? " ten" : ""));
+    a.question.choices.forEach(function (label, i) {
+      var b = el("button", "num" + (a.answered === i ? " picked" : "") + (a.answered !== null && a.answered !== i ? " dim" : ""), label);
+      if (a.phase === "reveal" && a.counts) { var f = el("i", "fill"); f.style.height = (total ? (a.counts[i] / total) * 100 : 0) + "%"; b.appendChild(f); }
+      b.disabled = a.phase !== "open" || a.answered !== null || reading;
+      b.onclick = function () { if (navigator.vibrate) navigator.vibrate(30); answer(i); };
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+    if (a.question.low || a.question.high) {
+      var ends = el("div", "ends"); ends.appendChild(el("span", null, a.question.low || "")); ends.appendChild(el("span", null, a.question.high || "")); box.appendChild(ends);
+    }
+    if (a.phase === "reveal" && total) {
+      var sum = a.counts.reduce(function (s, n, i) { return s + n * (i + 1); }, 0);
+      box.appendChild(el("p", "average", tr("Average {n}", { n: (Math.round((sum / total) * 10) / 10).toLocaleString() })));
+    }
+    var status = a.phase === "open" ? (reading ? tr("Get ready… the answers open in a moment.") : a.answered !== null ? tr("Answer in. Wait for the others…") : "") : a.phase === "closed" ? tr("Time is up!") : tr("Thanks for voting.");
+    if (status) box.appendChild(el("p", "note", status));
+    if (a.anonymous) box.appendChild(el("p", "note anon", tr("Anonymous: nobody can see what you chose.")));
+  }
+
   function count() { $("count").textContent = $("question").value.length + " / 280"; }
 
   var arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
@@ -223,6 +300,8 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   function drawActivity(d) {
     var a = d.activity, box = $("activity");
     if (!a || a.kind === "none") { show("activity", false); return; }
+    // The page redraws every few seconds: whatever is being typed into a word cloud stays put.
+    var typing = $("word-in"), kept = typing ? typing.value : "", focused = !!typing && document.activeElement === typing;
     show("activity", true); box.textContent = "";
     box.appendChild(el("div", "meta", (a.kind === "quiz" ? tr("Question {n} of {total}", { n: a.round, total: a.total }) : tr("Poll")) + (a.game ? " · " + a.game : "")));
     box.appendChild(el("h2", null, a.question.prompt));
@@ -242,7 +321,9 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       var tick = function () { var left = Math.max(0, Math.min(span, span - (Date.now() - start))), secs = Math.ceil(left / 1000); fill.style.transform = "scaleX(" + (span ? left / span : 0) + ")"; clock.textContent = String(secs); clock.classList.toggle("hurry", secs <= 5); if (left > 0 && document.body.contains(fill)) requestAnimationFrame(tick); };
       tick();
     }
+    if (a.question.type === "words") { drawWords(a, box, reading, kept, focused); return; }
     var total = (a.counts || []).reduce(function (s, n) { return s + n; }, 0);
+    if (a.question.type === "scale") { drawScale(a, box, reading, total); return; }
     var grid = el("div", "choices" + (a.question.choices.length <= 4 && a.question.choices.every(function (c) { return c.length <= 24; }) ? " big" : ""));
     a.question.choices.forEach(function (choice, i) {
       var reveal = a.phase === "reveal";

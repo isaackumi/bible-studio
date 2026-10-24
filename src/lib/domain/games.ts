@@ -12,7 +12,17 @@ export type GameQuestion = {
   correct: number | null;
   seconds: number;
   points: number;
+  /**
+   * A poll question that is not a choice of answers: `words`, where each phone types a few words
+   * and they grow into a word cloud; or `scale`, a rating from 1 to `scale.max`. Polls only.
+   */
+  type?: "words" | "scale";
+  /** A rating's top number and what each end means ("Not at all", "Completely"). */
+  scale?: { max: 5 | 10; low: string; high: string };
 };
+
+/** The numbers a rating offers: 1 to its top. */
+export const scaleChoices = (max: number) => Array.from({ length: max }, (_, index) => String(index + 1));
 
 export type Game = {
   id: string;
@@ -46,7 +56,11 @@ export function sanitizeGame(value: unknown): Game | null {
     .map((raw): GameQuestion | null => {
       if (!raw || typeof raw !== "object") return null;
       const q = raw as Record<string, unknown>;
-      const choices = (Array.isArray(q.choices) ? q.choices : []).map((choice) => text(choice, 120)).slice(0, MOST_CHOICES);
+      // Words and ratings are poll questions; in a quiz a question is always a choice.
+      const type = kind === "poll" && (q.type === "words" || q.type === "scale") ? q.type : undefined;
+      const rawScale = q.scale && typeof q.scale === "object" ? (q.scale as Record<string, unknown>) : {};
+      const scale = type === "scale" ? { max: (Number(rawScale.max) === 10 ? 10 : 5) as 5 | 10, low: text(rawScale.low, 40), high: text(rawScale.high, 40) } : undefined;
+      const choices = type === "words" ? [] : scale ? scaleChoices(scale.max) : (Array.isArray(q.choices) ? q.choices : []).map((choice) => text(choice, 120)).slice(0, MOST_CHOICES);
       const correct = Number.isInteger(q.correct) && Number(q.correct) >= 0 && Number(q.correct) < choices.length ? Number(q.correct) : null;
       return {
         id: text(q.id, 40) || uid("q"),
@@ -55,6 +69,8 @@ export function sanitizeGame(value: unknown): Game | null {
         correct: kind === "poll" ? null : correct,
         seconds: Math.min(120, Math.max(0, Math.round(Number(q.seconds) || 0))),
         points: Math.min(5000, Math.max(0, Math.round(Number(q.points ?? 1000)))),
+        ...(type ? { type } : {}),
+        ...(scale ? { scale } : {}),
       };
     })
     .filter((q): q is GameQuestion => q !== null);
@@ -88,6 +104,8 @@ export function seriesFinal(games: Game[], series: string, most = 15, random = M
 
 /** A question the room can run: words, two or more answers, and (in a quiz) the right one. */
 export function ready(question: GameQuestion, kind: Game["kind"]): boolean {
+  // Words and ratings need only the question: the phones bring the answers.
+  if (kind === "poll" && (question.type === "words" || question.type === "scale")) return question.prompt.trim().length > 0;
   const choices = question.choices.filter((choice) => choice.trim());
   return question.prompt.trim().length > 0 && choices.length >= 2 && (kind === "poll" || (question.correct !== null && !!question.choices[question.correct]?.trim()));
 }
@@ -134,6 +152,8 @@ export function drawQuestions(game: Game, settings: PlaySettings, asked: readonl
 }
 
 export function shuffled(question: GameQuestion, random = Math.random): GameQuestion {
+  // A rating keeps its order (1 to 5), and words have no answers to mix.
+  if (question.type) return question;
   const order = shuffle(question.choices.map((_, index) => index), random);
   return { ...question, choices: order.map((index) => question.choices[index]!), correct: question.correct === null ? null : order.indexOf(question.correct) };
 }
@@ -141,6 +161,8 @@ export function shuffled(question: GameQuestion, random = Math.random): GameQues
 const q = (prompt: string, choices: string[], correct: number | null = 0, seconds = 20, points = 1000): GameQuestion => ({ id: uid("q"), prompt, choices, correct, seconds, points });
 const game = (id: string, title: string, description: string, questions: GameQuestion[], kind: Game["kind"] = "quiz", anonymous = false): Game => ({ id: `builtin:${id}`, title, description, kind, questions, updatedAt: "2026-10-22T00:00:00.000Z", ...(anonymous ? { anonymous: true } : {}) });
 const poll = (prompt: string, choices: string[], seconds = 30) => q(prompt, choices, null, seconds, 0);
+const words = (prompt: string, seconds = 60): GameQuestion => ({ ...q(prompt, [], null, seconds, 0), type: "words" });
+const rating = (prompt: string, low: string, high: string, max: 5 | 10 = 5): GameQuestion => ({ ...q(prompt, scaleChoices(max), null, 30, 0), type: "scale", scale: { max, low, high } });
 
 /** Ready to play: each answer here checked against the Bible text (the right answer is listed first, and mixed when played). */
 export const BUILT_IN_GAMES: Game[] = [
@@ -195,11 +217,14 @@ export const BUILT_IN_GAMES: Game[] = [
   ]),
   game("worship-poll", "Pick the closing song", "A poll: let the congregation choose.", [q("Which song shall we close with?", ["Amazing Grace", "How Great Thou Art", "Great Is Thy Faithfulness", "Blessed Assurance"], null, 30, 0)], "poll"),
   game("poll-feedback", "How was today?", "Anonymous feedback after the service.", [
+    words("In one word, how did today's service speak to you?"),
+    rating("How clear was today's message?", "Lost me", "Crystal clear"),
     poll("How did today's service help you?", ["It encouraged me", "It challenged me", "I learned something new", "I'm still thinking about it"]),
     poll("How was the length of the service?", ["Too short", "Just right", "A little long", "Too long"]),
     poll("Would you invite a friend next Sunday?", ["Yes, already have one in mind", "Maybe", "Not yet"]),
   ], "poll", true),
   game("poll-icebreaker", "Get to know the room", "Light questions to warm everyone up.", [
+    words("Describe this week in one word", 45),
     poll("How did you get to church today?", ["Walked", "Car", "Bus or train", "Watching online"], 20),
     poll("How long have you been coming here?", ["First visit!", "Less than a year", "1 to 5 years", "Longer than that"], 20),
     poll("Which Bible character would you have coffee with?", ["Peter", "Mary", "David", "Paul"], 20),

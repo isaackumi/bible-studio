@@ -44,6 +44,13 @@ export type GameScreenData = {
   musicStyle?: string;
   /** An anonymous poll: no names on the screen. */
   anonymous?: boolean;
+  /** A poll of typed words (a cloud) or a rating, instead of answers to choose from. */
+  type?: "words" | "scale";
+  /** The word cloud: each word once, with how many sent it, the most first. */
+  cloud?: Array<{ text: string; count: number }>;
+  /** A rating's two ends, in words. */
+  low?: string;
+  high?: string;
   /** The random picker: everyone the reel flicks through, who it lands on, and which spin this is. */
   pick?: { names: string[]; winners: Array<{ n: number; name: string }>; spin: string };
   /** Random groups, each a list of people (their join number picks their colour). */
@@ -65,6 +72,8 @@ export type GameTeam = { team: number; name: string; color: string; players: num
  */
 export const GAME_WORDS = [
   msg("Join the game"),
+  msg("Words appear here as they come in…"),
+  msg("Average"),
   msg("Picked at random"),
   msg("And it's…"),
   msg("Random groups"),

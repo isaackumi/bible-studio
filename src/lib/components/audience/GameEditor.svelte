@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { blankQuestion, MOST_CHOICES, questionsFromText, ready, type Game } from "../../domain/games";
+  import { blankQuestion, MOST_CHOICES, questionsFromText, ready, scaleChoices, type Game, type GameQuestion } from "../../domain/games";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
   import ChoiceMark from "./ChoiceMark.svelte";
@@ -32,6 +32,24 @@
     game.questions = [...kept, ...preview];
     pasted = "";
     pasting = false;
+  }
+
+  /** A poll question as a choice of answers, typed words (a cloud) or a rating. */
+  function setType(item: GameQuestion, type: "choice" | "words" | "scale") {
+    if (type === "choice") {
+      delete item.type;
+      delete item.scale;
+      if (item.choices.length < 2 || item.choices.every((choice) => /^\d+$/.test(choice))) item.choices = ["", "", "", ""];
+    } else if (type === "words") {
+      item.type = "words";
+      delete item.scale;
+      item.choices = [];
+    } else {
+      item.type = "scale";
+      item.scale = item.scale ?? { max: 5, low: "", high: "" };
+      item.choices = scaleChoices(item.scale.max);
+    }
+    item.correct = null;
   }
 
   function move(index: number, by: number) {
@@ -124,6 +142,24 @@
             <textarea class="prompt" bind:value={item.prompt} maxlength="300" rows="2" placeholder={t("Type the question")} aria-label={t("Question {n}", { n: index + 1 })}></textarea>
           </div>
         </div>
+        {#if !quiz}
+          <div class="qtype" role="radiogroup" aria-label={t("Kind of question")}>
+            {#each [["choice", t("Choices")], ["words", t("Words")], ["scale", t("Rating")]] as [id, label] (id)}
+              <button type="button" role="radio" aria-checked={(item.type ?? "choice") === id} class:on={(item.type ?? "choice") === id} onclick={() => setType(item, id as "choice" | "words" | "scale")}>{label}</button>
+            {/each}
+          </div>
+        {/if}
+        {#if !quiz && item.type === "words"}
+          <p class="type-note">{t("Everyone types up to three words on their phone, and they grow into a word cloud on the screen as they come in. You can hide any word.")}</p>
+        {:else if !quiz && item.type === "scale" && item.scale}
+          <div class="scale-set">
+            <div class="fld"><span class="label">{t("From 1 to")}</span>
+              <select bind:value={item.scale.max} onchange={() => (item.choices = scaleChoices(item.scale!.max))}><option value={5}>5</option><option value={10}>10</option></select>
+            </div>
+            <div class="fld"><span class="label">{t("1 means")}</span><input bind:value={item.scale.low} maxlength="40" placeholder={t("Not at all")} /></div>
+            <div class="fld"><span class="label">{t("{n} means", { n: item.scale.max })}</span><input bind:value={item.scale.high} maxlength="40" placeholder={t("Completely")} /></div>
+          </div>
+        {:else}
         <div class="answers">
           <span class="label">{quiz ? t("Answers · mark the right one") : t("Answers")}</span>
           {#each item.choices as _choice, choiceIndex (choiceIndex)}
@@ -142,6 +178,7 @@
           {/each}
           {#if item.choices.length < MOST_CHOICES}<button type="button" class="add-answer" onclick={() => item.choices.push("")}><Icon name="plus" size={13} /> {t("Add an answer")}</button>{/if}
         </div>
+        {/if}
         <div class="card-foot">
           <label>{t("Time")}<select bind:value={item.seconds}>{#each TIMES as n (n)}<option value={n}>{n ? t("{n} seconds", { n }) : t("No clock")}</option>{/each}</select></label>
           {#if quiz}<label>{t("Points")}<select bind:value={item.points}>{#each [...new Set([...POINTS, item.points])].sort((a, b) => a - b) as n (n)}<option value={n}>{n === 2000 ? t("Double (2000)") : n}</option>{/each}</select></label>{/if}
@@ -186,6 +223,11 @@
   /* Dropdowns drawn alike on every computer: a quiet chevron on the right. */
   select { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; cursor: pointer; }
   .title { padding: 10px 12px; font-size: 17px; font-weight: 700; }
+  .qtype { display: inline-grid; grid-auto-flow: column; justify-self: start; gap: 2px; margin-left: 36px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, currentColor 7%, transparent); }
+  .qtype button { height: 26px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .qtype button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); }
+  .type-note { margin: 0 0 0 36px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .scale-set { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; margin-left: 36px; }
   .anon { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
   .anon span { display: grid; gap: 2px; color: var(--muted); font-size: 12px; line-height: 1.4; }
   .anon strong { color: var(--ink); font-size: 13px; }

@@ -34,7 +34,7 @@ export type RoomQuestion = {
   trending: number;
 };
 
-export type ActivityQuestion = { id: string; prompt: string; choices: string[]; correct?: number; seconds: number; points: number; image?: string };
+export type ActivityQuestion = { id: string; prompt: string; choices: string[]; correct?: number; seconds: number; points: number; image?: string; type?: "words" | "scale"; low?: string; high?: string };
 export type RoomActivity =
   | { kind: "none" }
   | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number };
@@ -46,6 +46,8 @@ export type HostView = {
   activity: RoomActivity;
   answers: number[];
   answered: number;
+  /** A word cloud's words, the most sent first; hidden ones stay off the screen. */
+  words?: Array<{ text: string; key: string; count: number; hidden: boolean }>;
   leaderboard: Array<{ name: string; score: number }>;
   /** Everyone's place, best first, with where they stood before the last question (the screen's climb). */
   ranking?: { players: number; top: GamePlayer[]; bottom: GamePlayer[] };
@@ -153,7 +155,9 @@ class AudienceRoom {
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
   settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
-  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams"; kind?: "quiz" | "poll"; anonymous?: boolean; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
+  /** Take a word off the word cloud on the screen, or put one back. */
+  setWordShown = (word: string, shown: boolean) => this.activity({ action: shown ? "show-word" : "hide-word", word }).then(() => this.poll());
+  activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams" | "hide-word" | "show-word"; word?: string; kind?: "quiz" | "poll"; anonymous?: boolean; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
 
   /** Ask the room what is new; while the panel is open, again every two seconds. */
   poll = async (): Promise<void> => {
@@ -320,7 +324,16 @@ class AudienceRoom {
       game: run.game.title,
       round: run.index + 1,
       total: run.game.questions.length,
-      question: { id: question.id, prompt: question.prompt, choices: question.choices.filter((choice) => choice.trim()), ...(question.correct !== null ? { correct: question.correct } : {}), seconds: question.seconds, points: question.points },
+      question: {
+        id: question.id,
+        prompt: question.prompt,
+        choices: question.choices.filter((choice) => choice.trim()),
+        ...(question.correct !== null ? { correct: question.correct } : {}),
+        seconds: question.seconds,
+        points: question.points,
+        ...(question.type ? { type: question.type } : {}),
+        ...(question.type === "scale" && question.scale ? { low: question.scale.low, high: question.scale.high } : {}),
+      },
     });
     if (opened && this.follow) await this.showGame("question", true);
   };
@@ -600,6 +613,10 @@ class AudienceRoom {
       sounds: this.sounds,
       music: this.sounds && this.playing !== null,
       musicStyle: this.musicStyle,
+      // A word cloud grows on the screen as the words come in; a rating names its two ends.
+      ...(question?.type ? { type: question.type } : {}),
+      ...(question?.type === "words" ? { cloud: (view?.words ?? []).filter((word) => !word.hidden).slice(0, 60).map(({ text, count }) => ({ text, count })) } : {}),
+      ...(question?.type === "scale" && question.scale ? { low: question.scale.low, high: question.scale.high } : {}),
       // An anonymous poll shows how many are in, never who.
       ...(run?.game.kind === "poll" && run.game.anonymous ? { anonymous: true } : {}),
       key: `${stage}:${stage === "pick" ? (this.pickShown?.spin ?? "") : stage === "groups" ? String(this.groupsShown?.length ?? 0) + (this.lastGroups?.flat().map((person) => person.n).join(",") ?? "") : (question?.id ?? "")}:${live?.phase === "open" ? "open" : ""}`,

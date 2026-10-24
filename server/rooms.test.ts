@@ -305,3 +305,57 @@ describe("rooms: anonymous polls", () => {
     expect(data<{ activity: { anonymous?: boolean } }>(await core.view(pid)).activity.anonymous).toBeUndefined();
   });
 });
+
+describe("rooms: word clouds and ratings", () => {
+  type Host = { words: Array<{ text: string; count: number; hidden: boolean }>; answered: number; answers: number[] };
+  const words = { prompt: "In one word, how was today?", choices: [], seconds: 0, points: 0, type: "words" };
+
+  it("gathers a few words from each phone, counted however they are typed", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("WORD23", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const kofi = data<{ pid: string }>(await core.join("Kofi", "")).pid;
+    data(await core.activity(hostKey, { action: "open", kind: "poll", question: words }));
+    data(await core.answer(ama, 0, "Joy"));
+    data(await core.answer(ama, 0, "peace "));
+    data(await core.answer(kofi, 0, "joy!"));
+    expect(await core.answer(ama, 0, "JOY")).toMatchObject({ ok: false, status: 409 });
+    data(await core.answer(ama, 0, "hope"));
+    expect(await core.answer(ama, 0, "love")).toMatchObject({ ok: false, status: 409 });
+    expect(await core.answer(kofi, 0, "   ")).toMatchObject({ ok: false, status: 400 });
+    const host = data<Host>(await core.hostView(hostKey));
+    expect(host.words.map((word) => [word.text, word.count])).toEqual([["Joy", 2], ["hope", 1], ["peace", 1]]);
+    expect(host.answered).toBe(2);
+    expect(data<{ activity: { mine: string[] } }>(await core.view(ama)).activity.mine).toEqual(["Joy", "peace", "hope"]);
+  });
+
+  it("keeps a hidden word off the cloud, and offensive words until the operator lets one through", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("WORD45", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    data(await core.activity(hostKey, { action: "open", kind: "poll", question: words }));
+    data(await core.answer(ama, 0, "grace"));
+    data(await core.answer(ama, 0, "stupid"));
+    data(await core.answer(ama, 0, "boring"));
+    data(await core.activity(hostKey, { action: "hide-word", word: "Boring" }));
+    let host = data<Host>(await core.hostView(hostKey));
+    expect(host.words.filter((word) => word.hidden).map((word) => word.text).sort()).toEqual(["boring", "stupid"]);
+    data(await core.activity(hostKey, { action: "show-word", word: "boring" }));
+    host = data<Host>(await core.hostView(hostKey));
+    expect(host.words.find((word) => word.text === "boring")!.hidden).toBe(false);
+    data(await core.activity(hostKey, { action: "reveal" }));
+    const cloud = data<{ activity: { cloud: Array<{ text: string }> } }>(await core.view(ama)).activity.cloud;
+    expect(cloud.map((word) => word.text).sort()).toEqual(["boring", "grace"]);
+  });
+
+  it("runs a rating as the numbers 1 to 5, with its two ends named", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("RATE23", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    data(await core.activity(hostKey, { action: "open", kind: "poll", question: { prompt: "How clear was the sermon?", choices: ["1", "2", "3", "4", "5"], seconds: 0, points: 0, type: "scale", low: "Lost me", high: "Crystal clear" } }));
+    const question = data<{ activity: { question: { type: string; choices: string[]; low: string; high: string } } }>(await core.view(ama)).activity.question;
+    expect(question).toMatchObject({ type: "scale", choices: ["1", "2", "3", "4", "5"], low: "Lost me", high: "Crystal clear" });
+    data(await core.answer(ama, 4));
+    expect(data<Host>(await core.hostView(hostKey)).answers).toEqual([0, 0, 0, 0, 1]);
+  });
+});

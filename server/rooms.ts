@@ -60,7 +60,48 @@ export type ActivityQuestion = {
   seconds: number;
   points: number;
   image?: string;
+  /** A poll of typed words (a word cloud) or a rating from 1 to the number of choices. */
+  type?: "words" | "scale";
+  /** A rating's two ends, in words. */
+  low?: string;
+  high?: string;
 };
+
+/** Each phone may send this many words to a word cloud, each this long at most. */
+export const WORDS = { each: 3, length: 40, shown: 100 };
+
+/** A word as the cloud counts it: the same however it is capitalised or spaced. */
+export const wordKey = (text: string) =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.,!?;:"'“”‘’()-]+|[\s.,!?;:"'“”‘’()-]+$/g, "")
+    .trim();
+
+/** Words kept off the screen until the operator says otherwise. Kept short: the operator decides the rest. */
+const HIDDEN_WORDS = new Set(["fuck", "fucking", "shit", "bitch", "bastard", "asshole", "dick", "cunt", "porn", "sex", "idiot", "stupid", "hate", "nigger", "faggot", "whore", "slut", "damn", "crap"]);
+const offends = (key: string) => key.split(/[\s-]+/).some((part) => HIDDEN_WORDS.has(part));
+
+/** The words sent to the current word cloud: each once with how many sent it, the most first. */
+export function wordCounts(state: RoomState): Array<{ text: string; key: string; count: number; hidden: boolean }> {
+  const counts = new Map<string, { text: string; key: string; count: number }>();
+  for (const entries of Object.values(state.words ?? {})) {
+    for (const text of entries) {
+      const key = wordKey(text);
+      if (!key) continue;
+      const seen = counts.get(key);
+      if (seen) seen.count += 1;
+      else counts.set(key, { text: text.trim(), key, count: 1 });
+    }
+  }
+  const shown = new Set(state.shownWords ?? []);
+  const hidden = new Set(state.hiddenWords ?? []);
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, WORDS.shown)
+    .map((word) => ({ ...word, hidden: hidden.has(word.key) || (offends(word.key) && !shown.has(word.key)) }));
+}
 
 /**
  * What the audience sees besides Q&A: nothing, a quiz question or a poll. `phase`: open (answering),
@@ -127,6 +168,11 @@ export type RoomState = {
   activity: Activity;
   /** Answers to the current activity question: participant → {choice, at}. */
   answers: Record<string, { choice: number; at: number }>;
+  /** A word cloud's words: participant → what they typed (a few each). */
+  words?: Record<string, string[]>;
+  /** Words the operator took off the screen, and flagged ones they let through (by wordKey). */
+  hiddenWords?: string[];
+  shownWords?: string[];
   /** Asks per participant, for the rate limit (times). */
   asked: Record<string, number[]>;
   /**
@@ -206,6 +252,8 @@ export function publicActivity(state: RoomState, pid: string | null, now: number
     endsAt: activity.question.seconds ? opensAt(activity) + activity.question.seconds * 1000 : null,
     now,
     answered: mine ? mine.choice : null,
+    ...(activity.question.type === "words" && pid ? { mine: state.words?.[pid] ?? [], each: WORDS.each } : {}),
+    ...(reveal && activity.question.type === "words" ? { cloud: wordCounts(state).filter((word) => !word.hidden).slice(0, 40).map(({ text, count }) => ({ text, count })) } : {}),
     // An anonymous poll: the phone says so (nothing ties a vote to a name anywhere).
     ...(activity.anonymous ? { anonymous: true } : {}),
     ...(reveal ? { correct: activity.kind === "quiz" ? correct : undefined, counts } : {}),
@@ -433,7 +481,7 @@ export class RoomCore {
     return { ok: true, data: { votes: question.votes } };
   }
 
-  async answer(pid: unknown, choice: unknown): Promise<Result<{ ok: true }>> {
+  async answer(pid: unknown, choice: unknown, text?: unknown): Promise<Result<{ ok: true }>> {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
@@ -442,6 +490,18 @@ export class RoomCore {
     if (activity.kind === "none" || activity.phase !== "open") return fail(409, "Answers are closed.");
     const now = this.now();
     if (activity.question.seconds && now > opensAt(activity) + activity.question.seconds * 1000 + 1500) return fail(409, "Time is up.");
+    // A word cloud: a few words each, sent one at a time.
+    if (activity.question.type === "words") {
+      const words = clean(text, WORDS.length);
+      if (!wordKey(words)) return fail(400, "Type a word or two.");
+      const mine = (state.words ??= {})[pid] ?? [];
+      if (mine.length >= WORDS.each) return fail(409, "You have sent your words.");
+      if (mine.some((entry) => wordKey(entry) === wordKey(words))) return fail(409, "You sent that already.");
+      state.words[pid] = [...mine, words];
+      if (!state.answers[pid]) state.answers[pid] = { choice: 0, at: now };
+      await this.save(state);
+      return { ok: true, data: { ok: true } };
+    }
     const index = Number(choice);
     if (!Number.isInteger(index) || index < 0 || index >= activity.question.choices.length) return fail(400, "Choose one of the answers.");
     if (state.answers[pid]) return fail(409, "You have answered already.");
@@ -464,6 +524,7 @@ export class RoomCore {
         questions: state.questions.map(({ recent, ...question }) => ({ ...question, trending: recent.filter((at) => this.now() - at < 15 * 60_000).length })),
         activity: state.activity,
         answers: state.activity.kind === "none" ? [] : state.activity.question.choices.map((_, index) => Object.values(state.answers).filter((answer) => answer.choice === index).length),
+        ...(state.activity.kind !== "none" && state.activity.question.type === "words" ? { words: wordCounts(state) } : {}),
         answered: Object.keys(state.answers).length,
         leaderboard: leaderboard(state, 10),
         ranking: ranking(state, 10),
@@ -537,7 +598,7 @@ export class RoomCore {
    * The desk runs quizzes and polls: it sends each question to open it, then closes it and reveals
    * the answer. Scores are given at reveal: points for a right answer, more for a quicker one.
    */
-  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown; teams?: unknown; anonymous?: unknown }): Promise<Result<{ ok: true }>> {
+  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown; teams?: unknown; anonymous?: unknown; word?: unknown }): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
@@ -551,6 +612,9 @@ export class RoomCore {
       const readMs = Math.min(10_000, Math.max(0, Math.round(Number(input.readMs) || 0)));
       state.activity = { kind, game: clean(input.game, 80), round: Math.max(1, Number(input.round) || 1), total: Math.max(1, Number(input.total) || 1), question, phase: "open", openedAt: now, ...(readMs ? { opensAt: now + readMs } : {}), ...(kind === "poll" && input.anonymous === true ? { anonymous: true } : {}) };
       state.answers = {};
+      state.words = {};
+      state.hiddenWords = [];
+      state.shownWords = [];
     } else if (input.action === "close") {
       if (state.activity.kind === "none") return fail(409, "Nothing is open.");
       state.activity = { ...state.activity, phase: "closed" };
@@ -590,6 +654,12 @@ export class RoomCore {
         delete state.teams;
         for (const person of Object.values(state.participants)) delete person.team;
       }
+    } else if (input.action === "hide-word" || input.action === "show-word") {
+      const key = wordKey(clean(input.word, WORDS.length));
+      if (!key) return fail(400, "Which word?");
+      const hide = input.action === "hide-word";
+      state.hiddenWords = (state.hiddenWords ?? []).filter((word) => word !== key).concat(hide ? [key] : []);
+      state.shownWords = (state.shownWords ?? []).filter((word) => word !== key).concat(hide ? [] : [key]);
     } else if (input.action === "reset-scores") {
       // A new game: people who have gone (not heard from for a while) are left out of it, so they
       // do not fill the leaderboard; anyone still here keeps their place and colour.
@@ -663,8 +733,10 @@ export function cleanQuestion(value: unknown): ActivityQuestion | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Record<string, unknown>;
   const prompt = clean(input.prompt, 300);
-  const choices = (Array.isArray(input.choices) ? input.choices : []).map((choice) => clean(choice, 120)).filter(Boolean).slice(0, 6);
-  if (!prompt || choices.length < 2) return null;
+  const type = input.type === "words" || input.type === "scale" ? input.type : undefined;
+  // A rating is the numbers 1 to 5 or 10; a word cloud has no choices at all.
+  const choices = type === "words" ? [] : type === "scale" ? Array.from({ length: Number(input.choices && Array.isArray(input.choices) ? input.choices.length : 5) === 10 ? 10 : 5 }, (_, n) => String(n + 1)) : (Array.isArray(input.choices) ? input.choices : []).map((choice) => clean(choice, 120)).filter(Boolean).slice(0, 6);
+  if (!prompt || (type !== "words" && choices.length < 2)) return null;
   const correct = Number.isInteger(input.correct) && Number(input.correct) >= 0 && Number(input.correct) < choices.length ? Number(input.correct) : undefined;
   const image = typeof input.image === "string" && /^https:\/\/[^\s"'<>]{1,500}$/.test(input.image) ? input.image : undefined;
   return {
@@ -675,6 +747,9 @@ export function cleanQuestion(value: unknown): ActivityQuestion | null {
     seconds: Math.min(120, Math.max(0, Math.round(Number(input.seconds) || 0))),
     points: Math.min(5000, Math.max(0, Math.round(Number(input.points) || 1000))),
     ...(image ? { image } : {}),
+    ...(type ? { type } : {}),
+    ...(type === "scale" && clean(input.low, 40) ? { low: clean(input.low, 40) } : {}),
+    ...(type === "scale" && clean(input.high, 40) ? { high: clean(input.high, 40) } : {}),
   };
 }
 
@@ -728,7 +803,7 @@ export class RoomObject {
       case "vote":
         return reply(await this.core.vote(input.pid, input.questionId, ip));
       case "answer":
-        return reply(await this.core.answer(input.pid, input.choice));
+        return reply(await this.core.answer(input.pid, input.choice, input.text));
       case "host":
         return reply(await this.core.hostView(input.hostKey));
       case "moderate":

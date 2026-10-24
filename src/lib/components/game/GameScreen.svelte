@@ -203,6 +203,22 @@
 
   const shape = (kind: (typeof CHOICE_STYLES)[number]["shape"]): string => CHOICE_PATHS[kind];
 
+  // --- A word cloud: sized by how many sent each word, the biggest in the middle ----------------
+  const CLOUD_COLORS = ["#ffd166", "#ff8a5c", "#7cc4ff", "#8ee08a", "#d6a6ff", "#ffffff", "#ff7aa8"];
+  const cloudWords = $derived.by(() => {
+    const words = data.cloud ?? [];
+    const most = Math.max(1, ...words.map((word) => word.count));
+    // Fewer words, bigger type; then each word by its share of the most sent.
+    const base = words.length > 40 ? 2.6 : words.length > 20 ? 3.2 : 4;
+    const sized = words.map((word) => ({ text: word.text, size: Math.round((base + (word.count / most) * (base * 2.4)) * 10) / 10 }));
+    // Big ones to the middle: alternate each next word to the left and the right.
+    const out: typeof sized = [];
+    sized.forEach((word, i) => (i % 2 ? out.push(word) : out.unshift(word)));
+    return out;
+  });
+  /** A rating's average (1 to its top). */
+  const scaleAverage = $derived(totalAnswers ? data.counts.reduce((sum, count, i) => sum + count * (i + 1), 0) / totalAnswers : 0);
+
   // --- The random picker: a reel of names that slows and lands on each one picked ---------------
   /** The name the reel shows now, and those it has landed on so far. */
   let reel = $state("");
@@ -298,6 +314,27 @@
       {#if reading}
         <div class="ready" aria-live="polite"><span>{say(data, "Get ready…")}</span>{#key readLeft}<b>{readLeft}</b>{/key}</div>
       {/if}
+      {#if data.type === "words"}
+        <!-- The word cloud: grows as words come in, the most sent biggest and in the middle. -->
+        <div class="cloud" class:hidden={reading}>
+          {#each cloudWords as word, i (word.text)}
+            <span style:font-size="{word.size}cqmin" style:color={CLOUD_COLORS[i % CLOUD_COLORS.length]}>{word.text}</span>
+          {:else}
+            <em>{say(data, "Words appear here as they come in…")}</em>
+          {/each}
+        </div>
+      {:else if data.type === "scale"}
+        <div class="scale-row" class:hidden={reading} style:--n={data.choices.length}>
+          {#each data.choices as label, i (i)}
+            <div class="scale-cell">
+              <div class="scale-bar">{#if data.stage === "results"}<b>{data.counts[i] ?? 0}</b><i style:height="{((data.counts[i] ?? 0) / most) * 80}%"></i>{/if}</div>
+              <span>{label}</span>
+            </div>
+          {/each}
+        </div>
+        {#if data.low || data.high}<div class="scale-ends" class:hidden={reading}><span>{data.low}</span><span>{data.high}</span></div>{/if}
+        {#if data.stage === "results" && totalAnswers}<p class="scale-average"><span>{say(data, "Average")}</span><b>{scaleAverage.toLocaleString(data.lang, { maximumFractionDigits: 1 })}</b></p>{/if}
+      {:else}
       {#if data.stage === "results"}
         <div class="bars">
           {#each data.choices as _choice, i (i)}
@@ -320,9 +357,11 @@
           </div>
         {/each}
       </div>
+      {/if}
       {#if data.stage === "results"}
         <p class="foot">
-          {#if data.correct === null}{sayCount(data, totalAnswers, "{n} vote", "{n} votes")}
+          {#if data.type === "words"}{sayCount(data, data.answered, "{n} vote", "{n} votes")}
+          {:else if data.correct === null}{sayCount(data, totalAnswers, "{n} vote", "{n} votes")}
           {:else}<span>{say(data, "{right} of {total} got it right.", { right: rightCount, total: totalAnswers })}</span> {#if verdict}<span>{verdict}</span>{/if}{/if}
           {#if data.fastest}<span class="fast">⚡ {say(data, "Fastest: {name} · {seconds}s", { name: data.fastest.name, seconds: (data.fastest.ms / 1000).toLocaleString(data.lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}</span>{/if}
         </p>
@@ -554,4 +593,20 @@
   .members { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 1cqmin; overflow: hidden; }
   .members span { padding: 0.9cqmin 2cqmin; border-radius: 99px; background: rgb(255 255 255 / 0.16); font-size: 3.2cqmin; font-weight: 750; animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   @container (aspect-ratio < 1) { .groups { grid-template-columns: repeat(min(var(--cols), 2), minmax(0, 1fr)); } }
+  /* Word cloud */
+  .cloud { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-content: center; align-items: center; justify-content: center; gap: 1cqmin 3cqmin; padding: 2cqmin 4cqw; overflow: hidden; }
+  .cloud span { font-weight: 900; line-height: 1.05; letter-spacing: -0.02em; text-shadow: 0 0.5cqmin 2cqmin rgb(0 0 0 / 0.3); animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; transition: font-size 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .cloud em { font-style: normal; font-size: 3.4cqmin; opacity: 0.6; }
+  .cloud.hidden, .scale-row.hidden, .scale-ends.hidden { visibility: hidden; }
+  /* Rating */
+  .scale-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); align-items: end; gap: 1.6cqmin; padding: 0 6cqw; }
+  /* The numbers stay on one line; each bar grows in the space above its number. */
+  .scale-cell { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 1cqmin; height: 100%; }
+  .scale-bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 0.8cqmin; min-height: 0; }
+  .scale-cell i { display: block; width: 100%; min-height: 1cqmin; border-radius: 1.2cqmin 1.2cqmin 0 0; background: linear-gradient(180deg, #ffd166, #ff8a5c); animation: grow 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: bottom; }
+  .scale-cell b { font-size: 3.4cqmin; font-weight: 900; }
+  .scale-cell span { display: grid; place-items: center; width: 100%; height: 9cqmin; border-radius: 1.6cqmin; background: rgb(255 255 255 / 0.14); font-size: 5cqmin; font-weight: 900; }
+  .scale-ends { display: flex; justify-content: space-between; padding: 1.4cqmin 6cqw 0; font-size: 3cqmin; font-weight: 700; opacity: 0.85; }
+  .scale-average { display: flex; align-items: baseline; justify-content: center; gap: 2cqmin; margin: 1cqmin 0 0; }
+  .scale-average span { font-size: 3.4cqmin; opacity: 0.8; } .scale-average b { font-size: 9cqmin; font-weight: 900; color: #ffd166; }
 </style>

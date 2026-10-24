@@ -134,6 +134,11 @@
           <p>{question.prompt || t("No question written yet")}</p>
           <span class="time" title={t("Seconds to answer")}>{question.seconds ? t("{n} s", { n: question.seconds }) : t("no clock")}{#if quiz}{` · ${t("{n} pts", { n: question.points })}`}{/if}</span>
         </div>
+        {#if question.type === "words"}
+          <p class="kind-note">☁ {t("Word cloud: everyone types up to three words")}</p>
+        {:else if question.type === "scale" && question.scale}
+          <p class="kind-note">{t("Rating from 1 to {n}", { n: question.scale.max })}{question.scale.low || question.scale.high ? ` · 1 = ${question.scale.low || "…"}, ${question.scale.max} = ${question.scale.high || "…"}` : ""}</p>
+        {:else}
         <ul class="choices">
           {#each question.choices as choice, choiceIndex (choiceIndex)}
             {#if choice.trim()}
@@ -146,6 +151,7 @@
             {/if}
           {/each}
         </ul>
+        {/if}
         {#if !done}<p class="todo">{quiz ? t("Needs a question, two answers and the right one marked.") : t("Needs a question and two answers.")}</p>{/if}
       </li>
     {/each}
@@ -165,6 +171,7 @@
   header { display: grid; gap: 4px; }
   .kind { justify-self: start; padding: 2px 9px; border-radius: 99px; background: color-mix(in srgb, #d89e00 22%, transparent); color: #e8b53a; font-size: 11.5px; font-weight: 750; }
   .tags { display: flex; gap: 6px; }
+  .kind-note { margin: 0 0 0 30px; color: var(--muted); font-size: 12.5px; }
   .kind.anon { background: color-mix(in srgb, #8e4ec6 22%, transparent); color: #b58be0; }
   .kind.sample { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--muted); }
   .kind.poll { background: color-mix(in srgb, #1368ce 22%, transparent); color: #6aa6f0; }

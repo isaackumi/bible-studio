@@ -249,6 +249,18 @@
       {/if}
     </div>
     <p class="prompt">{question.prompt}</p>
+    {#if question.type === "words"}
+      {@const words = audienceRoom.view?.words ?? []}
+      <!-- The words as they come in: the screen shows them all but the hidden ones. -->
+      <div class="word-list">
+        <div class="word-head"><strong>{tn(words.length, "{n} word", "{n} words")}</strong><span>{t("Click a word to hide it from the screen.")}</span></div>
+        {#each words as word (word.key)}
+          <button type="button" class="word" class:hidden={word.hidden} title={word.hidden ? t("Hidden: click to show it") : t("Click to hide it")} onclick={() => void audienceRoom.setWordShown(word.text, word.hidden)}>{word.text}<b>{word.count}</b>{#if word.hidden}<Icon name="eye-off" size={12} />{/if}</button>
+        {:else}
+          <p class="note">{live ? t("Waiting for the first words…") : t("Words people send will appear here.")}</p>
+        {/each}
+      </div>
+    {:else}
     <ol class="answers">
       {#each question.choices.filter((choice) => choice.trim()) as choice, index (index)}
         {@const count = live ? (answers[index] ?? 0) : 0}
@@ -263,6 +275,7 @@
         </li>
       {/each}
     </ol>
+    {/if}
     <details class="switches">
       <summary>{t("How the game runs")}</summary>
       <div class="screen">
@@ -508,6 +521,13 @@
   .cards { display: grid; gap: 6px; }
   @container (min-width: 640px) { .cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); } }
   .card { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border: 1px solid var(--line); border-radius: 12px; }
+  .word-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+  .word-head { flex-basis: 100%; display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11.5px; }
+  .word-head strong { color: var(--ink); font-size: 12.5px; }
+  .word { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .word b { color: var(--accent); font-size: 11.5px; }
+  .word.hidden { color: var(--muted); text-decoration: line-through; border-style: dashed; }
+  .word:hover { border-color: var(--danger, #e5484d); }
   .played { display: inline-flex; align-items: center; gap: 3px; color: var(--ok, #3fb950) !important; font-size: 11px !important; }
   .card .again { color: var(--accent); }
   .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
