@@ -221,7 +221,7 @@
           <div class="team-chips">{#each [...data.teams].sort((a, b) => a.team - b.team) as team (team.team)}<span style:--c={team.color}>{team.name} · {team.players}</span>{/each}</div>
         {/if}
       </div>
-      {#if data.join}<div class="qr"><QrView qr={{ data: data.join.url, style: "rounded", dark: "#111111", light: "#ffffff", caption: "" }} /></div>{/if}
+      {#if data.join}<div class="qr"><QrView qr={{ data: data.join.url, style: "square", dark: "#111111", light: "#ffffff", caption: "" }} /></div>{/if}
       <div class="names">
         {#each names as person (person.n)}
           <span class="bubble" style:--c={playerColor(person.n)}>{person.name}</span>
@@ -356,17 +356,29 @@
   .pill { padding: 0.9cqmin 2cqmin; border-radius: 99px; background: rgb(0 0 0 / 0.28); font-size: 2.2cqmin; font-weight: 700; }
 
   /* Lobby */
-  .lobby { position: absolute; inset: 12cqh 4cqw 4cqh; display: grid; grid-template-columns: 1.2fr 0.8fr; grid-template-rows: auto 1fr; gap: 3cqmin 4cqw; z-index: 1; }
-  .join { align-self: center; }
+  /* Two columns on a wide or 4:3 screen: how to join on the left, a big QR code on the right. */
+  .lobby { position: absolute; inset: 11cqh 5cqw 4cqh; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; align-items: center; gap: 3cqmin 5cqw; z-index: 1; }
+  .join { min-width: 0; }
   .kicker { margin: 0; font-size: 3cqmin; font-weight: 700; opacity: 0.8; letter-spacing: 0.08em; text-transform: uppercase; }
-  .at { margin: 1cqmin 0 2cqmin; font-size: 4cqmin; }
-  .at b { color: #ffd166; }
-  .code { display: flex; gap: 1.2cqmin; }
-  .code span { display: grid; place-items: center; width: 10cqmin; height: 13cqmin; border-radius: 1.6cqmin; background: #fff; color: #1a0b3d; font-size: 9cqmin; font-weight: 900; box-shadow: 0 1cqmin 0 rgb(0 0 0 / 0.25); animation: bounce 2.4s ease-in-out infinite; }
+  /* The address never breaks (it has a hyphen); it is sized to fit beside the QR code instead. */
+  .at { margin: 1.2cqmin 0 2.4cqmin; font-size: min(4.2cqmin, 2.7cqw); line-height: 1.35; }
+  .at b { display: block; color: #ffd166; white-space: nowrap; }
+  .code { display: flex; gap: min(1.2cqmin, 0.9cqw); }
+  .code span { display: grid; place-items: center; width: min(10cqmin, 7cqw); height: min(13cqmin, 9cqw); border-radius: 1.6cqmin; background: #fff; color: #1a0b3d; font-size: min(9cqmin, 6.2cqw); font-weight: 900; box-shadow: 0 1cqmin 0 rgb(0 0 0 / 0.25); animation: bounce 2.4s ease-in-out infinite; }
   .code span:nth-child(2) { animation-delay: 0.1s; } .code span:nth-child(3) { animation-delay: 0.2s; } .code span:nth-child(4) { animation-delay: 0.3s; } .code span:nth-child(5) { animation-delay: 0.4s; } .code span:nth-child(6) { animation-delay: 0.5s; }
   @keyframes bounce { 10% { transform: translateY(-1.4cqmin); } 20% { transform: none; } }
   .count { margin: 3cqmin 0 0; font-size: 3.4cqmin; } .count b { font-size: 6cqmin; font-weight: 900; color: #ffd166; }
-  .qr { align-self: center; justify-self: center; width: 34cqmin; height: 34cqmin; box-sizing: border-box; padding: 1.6cqmin; border-radius: 2cqmin; background: #fff; box-shadow: 0 2cqmin 6cqmin rgb(0 0 0 / 0.35); }
+  .qr { width: min(54cqh, 38cqw); aspect-ratio: 1; box-sizing: border-box; padding: 1.4cqmin; border-radius: 2cqmin; background: #fff; box-shadow: 0 2cqmin 6cqmin rgb(0 0 0 / 0.35); }
+  .qr :global(svg) { display: block; width: 100%; height: 100%; }
+  /* A portrait screen: one centred column, the QR code first. */
+  @container (aspect-ratio < 1) {
+    .lobby { inset: 9cqh 6cqw 4cqh; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); justify-items: center; align-items: start; text-align: center; gap: 3cqh; }
+    .qr { order: -1; width: min(70cqw, 38cqh); }
+    .at { font-size: min(4.4cqmin, 4.4cqw); }
+    .code { justify-content: center; gap: 1.6cqw; }
+    .code span { width: 12cqw; height: 15.5cqw; font-size: 10cqw; }
+    .names { justify-content: center; }
+  }
   .names { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 1.4cqmin; overflow: hidden; }
   .bubble { padding: 1.2cqmin 2.6cqmin; border-radius: 99px; background: var(--c); font-size: 3cqmin; font-weight: 800; box-shadow: 0 0.8cqmin 0 rgb(0 0 0 / 0.25); animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
