@@ -8,7 +8,6 @@
   import { pictures } from "../app/pictures.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
-  import NowRunning from "./NowRunning.svelte";
   import WhatsNew from "./WhatsNew.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
@@ -237,7 +236,8 @@
     <CommandPalette />
     <UpdateNotice />
     <StatusLine />
-    <NowRunning />
+    <!-- Loaded just after start-up: nothing is running yet when the desk opens. -->
+    {#await import("./NowRunning.svelte") then { default: NowRunning }}<NowRunning />{/await}
     <WhatsNew />
     {#if session.tourHubOpen}<TourHub />{/if}
     {#if session.tour}<TourGuide />{/if}
