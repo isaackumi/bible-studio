@@ -537,7 +537,7 @@ export class RoomCore {
    * The desk runs quizzes and polls: it sends each question to open it, then closes it and reveals
    * the answer. Scores are given at reveal: points for a right answer, more for a quicker one.
    */
-  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown; teams?: unknown }): Promise<Result<{ ok: true }>> {
+  async activity(hostKey: unknown, input: { action?: unknown; kind?: unknown; game?: unknown; round?: unknown; total?: unknown; question?: unknown; readMs?: unknown; teams?: unknown; anonymous?: unknown }): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
