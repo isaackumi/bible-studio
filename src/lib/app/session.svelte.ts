@@ -6739,7 +6739,16 @@ class Session {
     this.updateBusy = true;
     try {
       await this.flushSave();
-      await this.pendingUpdate.downloadAndInstall();
+      await this.pendingUpdate.downloadAndInstall().catch(async (error: unknown) => {
+        // A newer release came out since the check (its file is gone): ask again and take that one.
+        if (!/404/.test(error instanceof Error ? error.message : String(error))) throw error;
+        const { check } = await import("@tauri-apps/plugin-updater");
+        const fresh = await check();
+        if (!fresh) throw error;
+        this.pendingUpdate = fresh;
+        this.availableUpdate = { version: fresh.version, notes: fresh.body ?? "" };
+        await fresh.downloadAndInstall();
+      });
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
       return "";

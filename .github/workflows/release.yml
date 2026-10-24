@@ -145,4 +145,13 @@ jobs:
           for platform in darwin-aarch64 darwin-x86_64 windows-x86_64 linux-x86_64; do
             jq -e --arg p "$platform" '.platforms[$p]' latest.json > /dev/null || { echo "::error::latest.json has no $platform; left as a draft."; exit 1; }
           done
+          # Each file at its own version's address, not "the latest release": a copy that checked
+          # before a newer release came out would otherwise ask the newer release for an older
+          # file and get 404. The signatures cover the files, not the addresses.
+          tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" -q .tag_name)"
+          jq --arg base "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/" '.platforms |= map_values(.url |= sub("^https://github.com/[^/]+/[^/]+/releases/(latest/download|download/[^/]+)/"; $base))' latest.json > pinned.json
+          jq -e --arg tag "$tag" '[.platforms[].url | contains("/download/" + $tag + "/")] | all' pinned.json > /dev/null || { echo "::error::latest.json addresses could not be pinned; left as a draft."; exit 1; }
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$(gh api "repos/$GITHUB_REPOSITORY/releases/$id" -q '.assets[] | select(.name == "latest.json") | .id')"
+          cp pinned.json latest.json
+          gh release upload "$tag" latest.json --repo "$GITHUB_REPOSITORY"
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -f make_latest=true -q .html_url
