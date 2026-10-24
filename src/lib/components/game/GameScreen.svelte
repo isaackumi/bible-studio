@@ -418,11 +418,12 @@
       {/if}
     </section>
   {:else if data.stage === "podium"}
+    {@const played = Math.max(data.players, data.top.length)}
     <section class="podium">
       <canvas bind:this={confetti} aria-hidden="true"></canvas>
       <h1>{data.title}</h1>
       {#if winningTeam}<p class="team-win" style:--c={winningTeam.color}>{say(data, "Team {name} wins!", { name: winningTeam.name })}</p>{/if}
-      {#if data.players > 3}<p class="foot">{sayCount(data, data.players - 3, "and {n} more player. Well played, everyone!", "and {n} more players. Well played, everyone!")}</p>{/if}
+      {#if played > 3}<p class="foot">{sayCount(data, played - 3, "and {n} more player. Well played, everyone!", "and {n} more players. Well played, everyone!")}</p>{/if}
       <div class="steps">
         {#each podium as player, i (i)}
           {#if player}

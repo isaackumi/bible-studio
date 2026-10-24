@@ -601,7 +601,9 @@ export class RoomCore {
         ...(state.activity.kind !== "none" && state.activity.question.type === "words" ? { words: wordCounts(state) } : {}),
         answered: Object.keys(state.answers).length,
         leaderboard: leaderboard(state, 10),
-        ranking: ((all) => ({ players: all.length, top: all.slice(0, 10), bottom: all.length > 10 ? all.slice(-3) : [] }))(this.ranked(state).all),
+        // The table keeps everyone who scored, but "players in" is who is here now: the same number
+        // the desk shows, so the screen and the operator never disagree.
+        ranking: ((all) => ({ players: this.here(state).length, top: all.slice(0, 10), bottom: all.length > 10 ? all.slice(-3) : [] }))(this.ranked(state).all),
         fastest: fastest(state),
         teams: teamRanking(state),
         // Who is here, newest last (the lobby shows names popping in).

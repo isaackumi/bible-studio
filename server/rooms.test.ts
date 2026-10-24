@@ -274,6 +274,21 @@ describe("rooms: who is here", () => {
     expect(later.joined.map((person) => person.name)).toEqual(["Ama"]);
   });
 
+  it("tells the screen the same number as the desk: who is here now, though a scorer who left stays in the table", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("HERE34", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    data(await core.join("Kofi", ""));
+    for (let i = 0; i < 20; i++) {
+      advance(2_500);
+      data(await core.view(ama));
+    }
+    const view = data<Host & { ranking: { players: number; top: Array<{ name: string }> } }>(await core.hostView(hostKey));
+    expect(view.people).toBe(1);
+    expect(view.ranking.players).toBe(view.people);
+    expect(view.ranking.top.map((person) => person.name).sort()).toEqual(["Ama", "Kofi"]);
+  });
+
   it("leaves people who have gone out of a new game, and keeps those still here", async () => {
     const { core, advance, peek } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("HERE45", ""));
