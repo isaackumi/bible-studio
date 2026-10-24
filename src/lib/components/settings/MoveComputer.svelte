@@ -62,6 +62,7 @@
 {#if isDesktop()}
   {#if compact && !peek && !busy}
     <button type="button" class="move-link" onclick={() => void choose()}>{t("Moving from another computer? Bring everything across")}</button>
+    <p class="move-note quiet">{t("Or sign in on the last step: with Premium or Church, your cloud copy comes down by itself.")}</p>
     {#if note}<p class="move-note" class:bad={error} role="status">{note}</p>{/if}
   {:else}
     {#if !compact}<p class="section-label">{t("Move to a new computer")}</p>{/if}
@@ -107,6 +108,7 @@
   .move-link { margin-top: 14px; padding: 0; border: 0; background: none; color: inherit; opacity: 0.75; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .move-link:hover { opacity: 1; }
   .move-note { margin: 8px 0 0; font-size: 13px; }
+  .move-note.quiet { opacity: 0.6; font-size: 12px; }
   /* On the first-run screen, outside Settings: the same rows, drawn here. */
   .compact { margin-top: 14px; padding: 12px 14px; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 12px; }
   .compact .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

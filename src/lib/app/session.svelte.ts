@@ -1079,7 +1079,7 @@ class Session {
   };
 
   private writeNow = async () => {
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.workspace = { ...this.workspace, cursor: this.cursor, lastServiceId: this.service?.id ?? null };
     try {
       await this.saveWorkspaceDocument(this.workspace);
@@ -4136,7 +4136,7 @@ class Session {
   deleteService = async (id: string) => {
     const name = this.services.find((entry) => entry.id === id)?.name ?? "Service";
     await api.serviceDelete(id);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.services = await api.serviceList();
     if (this.service?.id === id) {
       const next = this.services[0];
@@ -5724,7 +5724,7 @@ class Session {
       return false;
     }
     await api.songSave(clean);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.songs = await api.songList();
     if (this.songFocus?.songId === clean.id) this.previewSongSection(clean, this.songFocus.sectionId);
     return true;
@@ -6858,59 +6858,32 @@ class Session {
   private cloudTouched = new Set<"songs" | "services" | "sermons" | "themes">();
   private cloudRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** A save just happened here: the cloud hears in a few seconds. */
+  private cloudSoon = () => void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+
   cloudEngine = (): Promise<CloudSync> => {
     if (this.cloud) return Promise.resolve(this.cloud);
     if (!this.cloudLoading) this.cloudLoading = this.makeCloud().then((engine) => (this.cloud = engine));
     return this.cloudLoading;
   };
 
-  private makeCloud = async (): Promise<CloudSync> => {
-    const [{ CloudSync }, { cloudProtocol }] = await Promise.all([import("./cloud.svelte"), import("../sync/protocol")]);
-    const identity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName() });
-    const touched = (what: "songs" | "services" | "sermons" | "themes") => {
-      this.cloudTouched.add(what);
-      clearTimeout(this.cloudRefreshTimer);
-      this.cloudRefreshTimer = setTimeout(() => void this.refreshAfterCloud(), 300);
-    };
-    return new CloudSync({
-      protocol: cloudProtocol(identity),
-      commands: {
-        hash: (id) => invoke("cloud_hash", { id }),
-        upload: (id, url) => invoke("cloud_upload", { id, url, ...identity() }),
-        download: (url, row) => invoke("cloud_download", { url, token: identity().token, device: identity().device, id: row.id, name: row.name, kind: row.kind, ext: row.ext, createdAt: row.createdAt }),
-        readState: () => invoke<string>("cloud_state_read"),
-        writeState: (text) => invoke("cloud_state_write", { text }),
-      },
-      library: {
-        collect: async () => ({ ...(await this.exportLibrary()), sermons: await api.sermonList(), workspace: this.workspace }),
-        apply: {
-          song: async (doc, id) => {
-            await (doc ? api.songSave(doc) : api.songDelete(id));
-            touched("songs");
-          },
-          service: async (doc, id) => {
-            await (doc ? api.serviceSave(doc) : api.serviceDelete(id));
-            touched("services");
-          },
-          sermon: async (doc, id) => {
-            await (doc ? api.sermonSave(doc) : api.sermonDelete(id));
-            touched("sermons");
-          },
-          theme: async (doc, id) => {
-            await (doc ? api.themeSave(doc) : api.themeDelete(id));
-            touched("themes");
-          },
-          workspace: (patch) => {
-            this.workspace = patch(this.workspace);
-            this.persistSoon();
-          },
-        },
-        mediaIds: async () => new Set(this.#allMedia.map((asset) => asset.id)),
-      },
-      gate: () => (!this.desktop() ? "off" : !this.signedIn ? "signedOut" : this.plan === "free" ? "free" : "ok"),
-      now: () => Date.now(),
-      name: () => this.deviceName(),
-    });
+  /** The sync engine with this session's parts, built in its own chunk (src/lib/app/cloud-wiring.ts). */
+  private makeCloud = async (): Promise<CloudSync> => (await import("./cloud-wiring")).wireCloud(this);
+
+  /** For the sync engine: who this computer is to the cloud. */
+  cloudIdentity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName() });
+
+  /** For the sync engine: a list the cloud wrote to is read back a moment later. */
+  cloudWrote = (what: "songs" | "services" | "sermons" | "themes") => {
+    this.cloudTouched.add(what);
+    clearTimeout(this.cloudRefreshTimer);
+    this.cloudRefreshTimer = setTimeout(() => void this.refreshAfterCloud(), 300);
+  };
+
+  /** For the sync engine: the workspace as the cloud changed it, saved. */
+  patchWorkspace = (patch: (workspace: Workspace) => Workspace) => {
+    this.workspace = patch(this.workspace);
+    this.persistSoon();
   };
 
   /** What the cloud wrote here is read back into the desk's lists (and Media, for files that came down). */
@@ -7056,7 +7029,7 @@ class Session {
     const clean = cleanFolder(folder);
     if (clean) this.createSongFolder(clean);
     await api.songSave(sanitizeSong({ ...song, folder: clean }));
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.songs = await api.songList();
     this.message = clean ? t("{title} moved to {folder}.", { title: song.title, folder: clean }) : t("{title} removed from its folder.", { title: song.title });
   };
@@ -7074,7 +7047,7 @@ class Session {
         continue;
       }
       await api.songSave(song);
-      void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+      this.cloudSoon();
       added += 1;
     }
     this.songs = await api.songList();
@@ -7092,7 +7065,7 @@ class Session {
       const ready = sanitizeSong({ ...song, folder: clean });
       if (songError(ready)) continue;
       await api.songSave(ready);
-      void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+      this.cloudSoon();
       added += 1;
     }
     this.songs = await api.songList();
@@ -7101,7 +7074,7 @@ class Session {
 
   deleteSong = async (id: string) => {
     await api.songDelete(id);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.songs = await api.songList();
     if (this.songFocus?.songId === id) {
       this.songFocus = null;
@@ -7159,7 +7132,7 @@ class Session {
       return false;
     }
     await api.sermonSave(clean);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.sermons = await api.sermonList();
     if (this.sermonFocus?.sermonId === clean.id) void this.previewSermonSection(clean, this.sermonFocus.sectionId);
     this.message = t("{title} saved. Notes stay on the desk.", { title: clean.title });
@@ -7170,13 +7143,13 @@ class Session {
   private saveSermonQuietly = async (sermon: Sermon) => {
     const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
     await api.sermonSave(clean);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.sermons = this.sermons.some((entry) => entry.id === clean.id) ? this.sermons.map((entry) => (entry.id === clean.id ? clean : entry)) : [clean, ...this.sermons];
   };
 
   deleteSermon = async (id: string) => {
     await api.sermonDelete(id);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.sermons = await api.sermonList();
     if (this.sermonFocus?.sermonId === id) {
       this.sermonFocus = null;
@@ -7364,7 +7337,7 @@ class Session {
     const transpose = Math.round(semitones) % 12;
     const clean = sanitizeSong({ ...song, transpose });
     await api.songSave(clean);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.songs = await api.songList();
     this.publishStage();
   };
@@ -7805,7 +7778,7 @@ class Session {
   deleteTheme = async (id: string) => {
     if (factoryThemes().some((theme) => theme.id === id)) return;
     await api.themeDelete(id);
-    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
+    this.cloudSoon();
     this.themes = this.themes.filter((theme) => theme.id !== id);
     if (this.workspace.themeId === id) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
     this.message = t("Theme deleted.");

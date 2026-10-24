@@ -5068,4 +5068,8 @@ export const fr: Readonly<Record<string, string>> = {
   "used in {n} place": "utilisé à {n} endroit",
   "used in {n} places": "utilisé à {n} endroits",
   "{used} of {limit}": "{used} sur {limit}",
+  "Your library is back from the cloud": "Votre bibliothèque est revenue du cloud",
+  "{n} song, service or sermon came down from your cloud copy. Pictures and videos follow in the background.": "{n} chant, culte ou prédication est descendu de votre copie cloud. Les images et vidéos suivent en arrière-plan.",
+  "{n} songs, services and sermons came down from your cloud copy. Pictures and videos follow in the background.": "{n} chants, cultes et prédications sont descendus de votre copie cloud. Les images et vidéos suivent en arrière-plan.",
+  "Or sign in on the last step: with Premium or Church, your cloud copy comes down by itself.": "Ou connectez-vous à la dernière étape : avec Premium ou Church, votre copie cloud descend toute seule.",
 };

@@ -4987,4 +4987,8 @@ export const es: Readonly<Record<string, string>> = {
   "used in {n} place": "usado en {n} lugar",
   "used in {n} places": "usado en {n} lugares",
   "{used} of {limit}": "{used} de {limit}",
+  "Your library is back from the cloud": "Tu biblioteca ha vuelto de la nube",
+  "{n} song, service or sermon came down from your cloud copy. Pictures and videos follow in the background.": "{n} canto, servicio o sermón bajó de tu copia en la nube. Las imágenes y vídeos siguen en segundo plano.",
+  "{n} songs, services and sermons came down from your cloud copy. Pictures and videos follow in the background.": "{n} cantos, servicios y sermones bajaron de tu copia en la nube. Las imágenes y vídeos siguen en segundo plano.",
+  "Or sign in on the last step: with Premium or Church, your cloud copy comes down by itself.": "O inicia sesión en el último paso: con Premium o Church, tu copia en la nube baja por sí sola.",
 };

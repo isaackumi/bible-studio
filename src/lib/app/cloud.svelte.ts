@@ -62,7 +62,7 @@ export class CloudSync {
   private everyTimer: ReturnType<typeof setInterval> | undefined;
   private stopped = false;
 
-  constructor(private deps: { protocol: CloudProtocol; commands: CloudCommands; library: CloudLibrary; gate: CloudGate; now: () => number; name: () => string }) {}
+  constructor(private deps: { protocol: CloudProtocol; commands: CloudCommands; library: CloudLibrary; gate: CloudGate; now: () => number; name: () => string; onRestored?: (records: number) => void }) {}
 
   /** Start syncing: now, and every few minutes while the app is open. */
   start = () => {
@@ -171,19 +171,25 @@ export class CloudSync {
     }
 
     // 2. What changed elsewhere comes down, in pages, and is written here.
+    const wasEmpty = library.songs.length === 0 && library.services.length === 0 && library.sermons.length === 0;
     let since = this.manifest.seq;
+    let arrived = 0;
     for (let guard = 0; guard < 1000; guard++) {
       const answer = await this.deps.protocol.pull(since);
       if (!answer.ok) {
         await this.save();
         return this.refused(answer);
       }
+      const before = this.manifest;
       this.manifest = await applyChanges(answer.data.changes, this.deps.library.apply, this.manifest);
+      arrived += answer.data.changes.filter((change) => change.doc !== null && (change.col === "song" || change.col === "service" || change.col === "sermon") && before.hashes[`${change.col}/${change.id}`]?.hash !== this.manifest.hashes[`${change.col}/${change.id}`]?.hash).length;
       this.manifest.seq = Math.max(this.manifest.seq, answer.data.seq);
       since = answer.data.seq;
       if (!answer.data.more) break;
     }
     await this.save();
+    // A fresh computer (nothing of its own) just got the licence's library: say so, this once.
+    if (wasEmpty && arrived > 0) this.deps.onRestored?.(arrived);
 
     // 3. The media those records use: up from here, down to here.
     const status = await this.deps.protocol.status();

@@ -189,6 +189,25 @@ describe("cloud sync on this computer", () => {
     expect(cloud.log).toEqual([]);
   });
 
+  it("says when an empty computer got its library back, once", async () => {
+    const cloud = fakeCloud();
+    cloud.seed({ col: "song", id: "s1", at: T0 - 1000, doc: song("s1", "Back") });
+    cloud.seed({ col: "song", id: "s2", at: T0 - 900, doc: song("s2", "Again") });
+    const computer = fakeComputer();
+    const said: number[] = [];
+    const sync = new CloudSync({ protocol: cloud.protocol, commands: computer.commands, library: computer.library, gate: () => "ok", now: () => T0, name: () => "New PC", onRestored: (count) => void said.push(count) });
+    await sync.syncNow();
+    expect(said).toEqual([2]);
+    cloud.seed({ col: "song", id: "s3", at: T0, doc: song("s3", "Later") });
+    await sync.syncNow();
+    expect(said).toEqual([2]);
+    // A computer with songs of its own is not "restored", it is joined.
+    const other = fakeComputer({ songs: [song("mine", "Mine")] });
+    const told: number[] = [];
+    await new CloudSync({ protocol: fakeCloud().protocol, commands: other.commands, library: other.library, gate: () => "ok", now: () => T0, name: () => "PC", onRestored: (count) => void told.push(count) }).syncNow();
+    expect(told).toEqual([]);
+  });
+
   it("remembers where it got to between runs", async () => {
     const cloud = fakeCloud();
     const computer = fakeComputer({ songs: [song("s", "Song")] });
