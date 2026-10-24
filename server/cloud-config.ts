@@ -61,7 +61,7 @@ export function memoryR2(): R2Like {
     async get(key) {
       const found = objects.get(key);
       if (!found) return null;
-      return { body: new Blob([found.bytes]).stream(), size: found.bytes.length, httpMetadata: found.contentType ? { contentType: found.contentType } : undefined };
+      return { body: new Blob([found.bytes as unknown as BlobPart]).stream(), size: found.bytes.length, httpMetadata: found.contentType ? { contentType: found.contentType } : undefined };
     },
     async delete(key) {
       for (const name of Array.isArray(key) ? key : [key]) objects.delete(name);
