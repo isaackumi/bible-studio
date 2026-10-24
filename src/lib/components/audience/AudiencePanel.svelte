@@ -11,7 +11,8 @@
   type Filter = "waiting" | "up" | "answered" | "put-away";
   type Sort = "top" | "trending" | "newest" | "oldest";
 
-  let tab = $state<"questions" | "games" | "pick">("questions");
+  // The tab lives with the room, so the desk's Now running bar can open the panel on the right one.
+  const tab = $derived(audienceRoom.tab);
   let filter = $state<Filter>("waiting");
   let sort = $state<Sort>("top");
   let query = $state("");
@@ -137,9 +138,9 @@
   {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
 
     <div class="tabs" role="tablist">
-      <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
-      <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} onclick={() => (tab = "games")}>{t("Quizzes and polls")}</button>
-      <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} onclick={() => (tab = "pick")}>{t("Pick someone")}</button>
+      <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (audienceRoom.tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
+      <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} onclick={() => (audienceRoom.tab = "games")}>{t("Quizzes and polls")}</button>
+      <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} onclick={() => (audienceRoom.tab = "pick")}>{t("Pick someone")}</button>
     </div>
 
     {#if tab === "pick" && !audienceRoom.current}

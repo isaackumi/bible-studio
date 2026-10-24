@@ -110,6 +110,15 @@ class AudienceRoom {
     void this.poll();
   };
 
+  /** Which tab the panel shows (kept here, so the desk can open it on the right one). */
+  tab = $state<"questions" | "games" | "pick">("questions");
+
+  /** The panel, on one tab. */
+  showTab = (tab: "questions" | "games" | "pick") => {
+    this.tab = tab;
+    this.show();
+  };
+
   hide = () => {
     this.open = false;
   };
@@ -311,6 +320,37 @@ class AudienceRoom {
 
   get question() {
     return this.playing ? (this.playing.game.questions[this.playing.index] ?? null) : null;
+  }
+
+  /** When the open question's clock runs out (this computer's time); null without a clock. */
+  get answersCloseAt(): number | null {
+    const live = this.liveActivity;
+    const seconds = this.question?.seconds ?? 0;
+    return live?.phase === "open" && seconds ? this.opensAt + seconds * 1000 : null;
+  }
+
+  /** The question that is open on the phones, when it is this game's current one. */
+  get liveActivity() {
+    const activity = this.view?.activity;
+    const question = this.question;
+    return activity && activity.kind !== "none" && question && activity.question.id === question.id ? activity : null;
+  }
+
+  /**
+   * What the game needs next, as one button: start the question, stop the answers, show the answer,
+   * the next question, or the podium. The panel and the desk's Now running bar both use it.
+   */
+  get nextStep(): { label: string; run: () => unknown; waiting?: boolean } | null {
+    const run = this.playing;
+    if (!run || !this.question) return null;
+    const live = this.liveActivity;
+    const quiz = run.game.kind === "quiz";
+    if (!live && run.index === 0 && (this.view?.people ?? 0) === 0) return { label: t("Waiting for players to join…"), run: () => this.ask(), waiting: true };
+    if (!live) return { label: t("Start question {n}", { n: run.index + 1 }), run: () => this.ask() };
+    if (live.phase === "open") return { label: t("Stop answers now"), run: () => this.stopAnswers() };
+    if (live.phase === "closed") return { label: quiz ? t("Show the answer") : t("Show the results"), run: () => this.reveal() };
+    if (run.index + 1 < run.game.questions.length) return { label: t("Next: question {n}", { n: run.index + 2 }), run: () => this.next() };
+    return { label: quiz ? t("Finish with the podium") : t("Finish game"), run: () => this.finish() };
   }
 
   /** Send the current question to the phones (and start its clock). */

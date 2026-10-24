@@ -8,6 +8,7 @@
   import { pictures } from "../app/pictures.svelte";
   import UpdateNotice from "./UpdateNotice.svelte";
   import StatusLine from "./StatusLine.svelte";
+  import NowRunning from "./NowRunning.svelte";
   import WhatsNew from "./WhatsNew.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
@@ -236,6 +237,7 @@
     <CommandPalette />
     <UpdateNotice />
     <StatusLine />
+    <NowRunning />
     <WhatsNew />
     {#if session.tourHubOpen}<TourHub />{/if}
     {#if session.tour}<TourGuide />{/if}
