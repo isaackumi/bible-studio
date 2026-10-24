@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handleRooms, LIMITS, memoryRooms, RoomCore, type RoomState } from "./rooms";
+import { ANSWER_FLUSH_MS, handleRooms, LIMITS, memoryRooms, RoomCore, type RoomState } from "./rooms";
 
 function room() {
   let saved: RoomState | null = null;
@@ -390,5 +390,50 @@ describe("rooms: join numbers and restarts", () => {
     expect(data<{ people: number }>(await after.hostView(hostKey)).people).toBe(1);
     data(await after.activity(hostKey, { action: "reset-scores" }));
     expect(Object.keys(saved!.participants)).toHaveLength(1);
+  });
+});
+
+describe("rooms: answers under load", () => {
+  it("counts each answer at once, and writes the room once for a burst of answers", async () => {
+    let saved: RoomState | null = null;
+    let writes = 0;
+    const store = { get: async () => (saved ? structuredClone(saved) : null), put: async (state: RoomState) => void ((saved = structuredClone(state)), (writes += 1)), drop: async () => void (saved = null) };
+    const core = new RoomCore(store);
+    const { hostKey } = data<{ hostKey: string }>(await core.create("BURST2", ""));
+    const pids: string[] = [];
+    for (let i = 0; i < 30; i++) pids.push(data<{ pid: string }>(await core.join(`P${i}`, "")).pid);
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", question: { prompt: "Who built the ark?", choices: ["Noah", "Moses"], correct: 0, seconds: 0, points: 1000 } }));
+    writes = 0;
+    for (const pid of pids) data(await core.answer(pid, 0));
+    // Seen straight away, by the desk and by the phones.
+    expect(data<{ answered: number; answers: number[] }>(await core.hostView(hostKey))).toMatchObject({ answered: 30, answers: [30, 0] });
+    expect(writes).toBe(0);
+    await new Promise((done) => setTimeout(done, ANSWER_FLUSH_MS + 100));
+    expect(writes).toBe(1);
+    expect(Object.keys(saved!.answers)).toHaveLength(30);
+    // A copy of the room that starts afresh reads them back.
+    const after = new RoomCore(store);
+    expect(data<{ answered: number }>(await after.hostView(hostKey)).answered).toBe(30);
+  });
+
+  it("ranks everyone once a reveal changes the scores, and tells each phone its own place", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("RANK23", ""));
+    const quick = data<{ pid: string }>(await core.join("Quick", "")).pid;
+    const wrong = data<{ pid: string }>(await core.join("Wrong", "")).pid;
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", question: { prompt: "Q?", choices: ["A", "B"], correct: 0, seconds: 20, points: 1000 } }));
+    data(await core.answer(quick, 0));
+    data(await core.answer(wrong, 1));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    expect(data<{ activity: { rank: number; players: number } }>(await core.view(quick)).activity).toMatchObject({ rank: 1, players: 2 });
+    expect(data<{ activity: { rank: number } }>(await core.view(wrong)).activity.rank).toBe(2);
+    // The next question changes the order: the cached ranking is worked out again.
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", question: { prompt: "Q2?", choices: ["A", "B"], correct: 1, seconds: 20, points: 1000 } }));
+    data(await core.answer(wrong, 1));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    data(await core.activity(hostKey, { action: "open", kind: "quiz", question: { prompt: "Q3?", choices: ["A", "B"], correct: 1, seconds: 20, points: 1000 } }));
+    data(await core.answer(wrong, 1));
+    data(await core.activity(hostKey, { action: "reveal" }));
+    expect(data<{ activity: { rank: number } }>(await core.view(wrong)).activity.rank).toBe(1);
   });
 });

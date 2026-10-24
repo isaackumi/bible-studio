@@ -236,12 +236,12 @@ export function publicQuestion(question: Question, pid: string | null, state: Ro
 }
 
 /** The audience's view of an activity: never the right answer before it is revealed. */
-export function publicActivity(state: RoomState, pid: string | null, now: number) {
+export function publicActivity(state: RoomState, pid: string | null, now: number, placeOf?: (n: number) => { rank: number | null; players: number }, counted?: number[]) {
   const activity = state.activity;
   if (activity.kind === "none") return { kind: "none" as const };
   const { correct, ...question } = activity.question;
   const mine = pid ? state.answers[pid] : undefined;
-  const counts = activity.question.choices.map((_, index) => Object.values(state.answers).filter((answer) => answer.choice === index).length);
+  const counts = counted ?? activity.question.choices.map((_, index) => Object.values(state.answers).filter((answer) => answer.choice === index).length);
   const reveal = activity.phase === "reveal";
   return {
     kind: activity.kind,
@@ -259,14 +259,16 @@ export function publicActivity(state: RoomState, pid: string | null, now: number
     // An anonymous poll: the phone says so (nothing ties a vote to a name anywhere).
     ...(activity.anonymous ? { anonymous: true } : {}),
     ...(reveal ? { correct: activity.kind === "quiz" ? correct : undefined, counts } : {}),
-    ...(reveal && activity.kind === "quiz" && pid ? { score: state.participants[pid]?.score ?? 0, ...standing(state, pid) } : {}),
+    ...(reveal && activity.kind === "quiz" && pid ? { score: state.participants[pid]?.score ?? 0, ...standing(state, pid, placeOf) } : {}),
   };
 }
 
 /** A player's own place after a reveal: what they gained, their streak and rank. */
-function standing(state: RoomState, pid: string) {
+function standing(state: RoomState, pid: string, placeOf?: (n: number) => { rank: number | null; players: number }) {
   const person = state.participants[pid];
   if (!person) return {};
+  // The room hands in its ranking, worked out once; without it, rank everyone here.
+  if (placeOf) return { gain: person.gain ?? 0, streak: person.streak ?? 0, ...placeOf(person.n ?? -1) };
   const all = ranking(state, Number.MAX_SAFE_INTEGER).top;
   const me = all.find((entry) => entry.n === (person.n ?? -1));
   return { gain: person.gain ?? 0, streak: person.streak ?? 0, rank: me?.rank ?? null, players: all.length };
@@ -321,6 +323,8 @@ export function leaderboard(state: RoomState, size = 10) {
 export const HERE_MS = 30_000;
 /** At a new game, people not heard from for this long have gone and are left out of it. */
 export const GONE_MS = 2 * 60_000;
+/** How long answers wait in memory before the room is written (at most). */
+export const ANSWER_FLUSH_MS = 400;
 
 export class RoomCore {
   /**
@@ -356,8 +360,22 @@ export class RoomCore {
     return Object.entries(state.participants).filter(([pid, person]) => now - this.lastSeen(pid, person) <= HERE_MS);
   }
 
+  /**
+   * The room as it is now, kept in memory between requests: a room is one object on one thread, so
+   * this copy is the truth, and a phone checking in no longer reads (and copies) the whole room from
+   * storage. Undefined until first read.
+   */
+  private live: RoomState | null | undefined;
+  /** Everyone ranked, worked out once after the scores change (not once per phone per check-in). */
+  private ranks: { all: Ranked[]; byN: Map<number, Ranked> } | null = null;
+  /** What every phone is shown alike (the vote counts, the top five), worked out once per change. */
+  private shared: { counts: number[]; top: Array<{ name: string; score: number }> } | null = null;
+  /** A save waiting to be written, while answers pour in. */
+  private flushTimer: ReturnType<typeof setTimeout> | undefined;
+
   private async load(): Promise<RoomState | null> {
-    const state = await this.store.get();
+    if (this.live === undefined) this.live = await this.store.get();
+    const state = this.live;
     if (!state) return null;
     if (state.closed || this.now() - state.touchedAt > LIMITS.idleMs) return null;
     return state;
@@ -365,7 +383,46 @@ export class RoomCore {
 
   private async save(state: RoomState) {
     state.touchedAt = this.now();
+    this.live = state;
+    this.ranks = null;
+    this.shared = null;
+    clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
     await this.store.put(state);
+  }
+
+  /**
+   * Answers arrive by the hundred in a few seconds: each is kept at once (in memory, so the next
+   * request sees it), and the room is written once for the lot a moment later, not once per answer.
+   */
+  private saveSoon(state: RoomState) {
+    state.touchedAt = this.now();
+    this.live = state;
+    this.ranks = null;
+    this.shared = null;
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = undefined;
+      if (this.live) void this.store.put(this.live);
+    }, ANSWER_FLUSH_MS);
+  }
+
+  private sharedFor(state: RoomState) {
+    if (!this.shared) {
+      const counts = new Array<number>(state.activity.kind === "none" ? 0 : state.activity.question.choices.length).fill(0);
+      for (const answer of Object.values(state.answers)) if (answer.choice < counts.length) counts[answer.choice]! += 1;
+      this.shared = { counts, top: leaderboard(state, 5) };
+    }
+    return this.shared;
+  }
+
+  /** Everyone's place, best first, from the scores as they are now. */
+  private ranked(state: RoomState) {
+    if (!this.ranks) {
+      const all = ranking(state, Number.MAX_SAFE_INTEGER).top;
+      this.ranks = { all, byN: new Map(all.map((entry) => [entry.n, entry])) };
+    }
+    return this.ranks;
   }
 
   private async host(hostKey: unknown): Promise<Result<RoomState>> {
@@ -379,6 +436,8 @@ export class RoomCore {
     if (await this.store.get().then((state) => state && !state.closed)) return fail(409, "taken");
     const hostKey = `rk_${randomId(24)}`;
     const now = this.now();
+    this.ranks = null;
+    this.live = undefined;
     await this.store.put({
       code,
       name: clean(name, 60) || "Church",
@@ -430,8 +489,8 @@ export class RoomCore {
         room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate },
         questions,
         waiting: mine,
-        activity: publicActivity(state, known, this.now()),
-        ...(state.activity.kind !== "none" && state.activity.phase === "reveal" && state.activity.kind === "quiz" ? { leaderboard: leaderboard(state, 5) } : {}),
+        activity: publicActivity(state, known, this.now(), (n) => ({ rank: this.ranked(state).byN.get(n)?.rank ?? null, players: this.ranked(state).all.length }), this.sharedFor(state).counts),
+        ...(state.activity.kind !== "none" && state.activity.phase === "reveal" && state.activity.kind === "quiz" ? { leaderboard: this.sharedFor(state).top } : {}),
         ...(known ? { me: { n: state.participants[known]!.n ?? 0, name: state.participants[known]!.name, ...(state.teams && state.teams >= 2 ? { team: state.participants[known]!.team ?? teamOf(state.participants[known]!.n ?? 0, state.teams) } : {}) } } : {}),
       },
     };
@@ -512,14 +571,14 @@ export class RoomCore {
       if (mine.some((entry) => wordKey(entry) === wordKey(words))) return fail(409, "You sent that already.");
       state.words[pid] = [...mine, words];
       if (!state.answers[pid]) state.answers[pid] = { choice: 0, at: now };
-      await this.save(state);
+      this.saveSoon(state);
       return { ok: true, data: { ok: true } };
     }
     const index = Number(choice);
     if (!Number.isInteger(index) || index < 0 || index >= activity.question.choices.length) return fail(400, "Choose one of the answers.");
     if (state.answers[pid]) return fail(409, "You have answered already.");
     state.answers[pid] = { choice: index, at: now };
-    await this.save(state);
+    this.saveSoon(state);
     return { ok: true, data: { ok: true } };
   }
 
@@ -540,7 +599,7 @@ export class RoomCore {
         ...(state.activity.kind !== "none" && state.activity.question.type === "words" ? { words: wordCounts(state) } : {}),
         answered: Object.keys(state.answers).length,
         leaderboard: leaderboard(state, 10),
-        ranking: ranking(state, 10),
+        ranking: ((all) => ({ players: all.length, top: all.slice(0, 10), bottom: all.length > 10 ? all.slice(-3) : [] }))(this.ranked(state).all),
         fastest: fastest(state),
         teams: teamRanking(state),
         // Who is here, newest last (the lobby shows names popping in).
@@ -737,6 +796,9 @@ export class RoomCore {
   async close(hostKey: unknown): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
+    clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
+    this.live = null;
     await this.store.drop();
     return { ok: true, data: { ok: true } };
   }

@@ -7205,8 +7205,11 @@ class Session {
    * source is on Program, its frame is replaced in place with no transition; on Preview, the same.
    */
   refreshSource = async (sourceId: string, model: PresentationModel) => {
-    if (this.live.preview.sourceId === sourceId) this.live = setPreview(this.live, frame(model, sourceId, "cut"));
-    if (this.live.program.sourceId !== sourceId || JSON.stringify(this.live.program.model) === JSON.stringify(model)) return;
+    // Only when the frame has changed: a game polls every second, and an unchanged frame repainted
+    // costs the desk a redraw (and restarted anything animating on it).
+    const next = JSON.stringify(model);
+    if (this.live.preview.sourceId === sourceId && JSON.stringify(this.live.preview.model) !== next) this.live = setPreview(this.live, frame(model, sourceId, "cut"));
+    if (this.live.program.sourceId !== sourceId || JSON.stringify(this.live.program.model) === next) return;
     this.live = replaceProgramModel(this.live, model, "cut");
     await this.pushProgram();
   };
