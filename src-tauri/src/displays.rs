@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -112,7 +113,8 @@ pub fn reconcile_blocking(app: &AppHandle) -> Result<(), String> {
         let _ = tx.send(reconcile(&app2));
     })
     .map_err(|error| error.to_string())?;
-    rx.recv_timeout(Duration::from_secs(3))
+    // A first audience window on Windows can take a few seconds (WebView2 starting up).
+    rx.recv_timeout(Duration::from_secs(10))
         .map_err(|_| "The display update did not finish.".to_string())?
 }
 
@@ -442,6 +444,9 @@ fn logical_points(x: i32, y: i32, width: u32, height: u32, scale: f64) -> (f64, 
     )
 }
 
+/// An audience window is being built (see the window creation below).
+static CREATING: AtomicBool = AtomicBool::new(false);
+
 fn audience_window(app: &AppHandle) -> WebviewWindowBuilder<'_, tauri::Wry, AppHandle> {
     let builder = WebviewWindowBuilder::new(app, "audience", WebviewUrl::default())
         .initialization_script("window.__CHURCH_STUDIO_SURFACE__='audience';")
@@ -466,6 +471,11 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
         return Ok(window);
     }
     // The builder takes top-left coordinates; place() then sets the exact AppKit frame.
+    // Windows runs other main-thread work while a webview starts (the once-a-second check
+    // included); that check must not start a second audience window inside the first.
+    if CREATING.swap(true, Ordering::SeqCst) {
+        return Err("The audience window is still opening.".into());
+    }
     let (x, y, width, height) = logical_frame(monitor);
     log::info!("Creating the audience window on {}", monitor_name(monitor));
     crate::diagnostics::doing("creating the audience window");
@@ -474,6 +484,7 @@ fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, St
         .inner_size(width, height)
         .build()
         .map_err(|e| e.to_string());
+    CREATING.store(false, Ordering::SeqCst);
     crate::diagnostics::doing("running");
     built
 }

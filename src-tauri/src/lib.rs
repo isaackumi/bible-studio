@@ -138,7 +138,7 @@ fn output_status(output: State<Output>) -> OutputStatus {
     status(&output)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn open_audience(app: AppHandle, output: State<Output>) -> Result<OutputStatus, String> {
     let mode = output
         .mode
@@ -150,14 +150,14 @@ fn open_audience(app: AppHandle, output: State<Output>) -> Result<OutputStatus, 
     Ok(status(&output))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn set_output(app: AppHandle, output: State<Output>, enabled: bool, mode: String) -> Result<OutputStatus, String> {
     set_preferences(&output, enabled, &mode);
     reconcile_blocking(&app)?;
     Ok(status(&output))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn refresh_displays(app: AppHandle, output: State<Output>) -> Result<OutputStatus, String> {
     *output
         .signature
@@ -173,7 +173,7 @@ fn test_output(app: AppHandle, output: State<Output>) -> Result<(), String> {
     app.emit("output-test", true).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn assign_audience(app: AppHandle, output: State<Output>, display_key: Option<String>) -> Result<OutputStatus, String> {
     let key = display_key.filter(|value| !value.is_empty());
     *output
@@ -188,7 +188,7 @@ fn assign_audience(app: AppHandle, output: State<Output>, display_key: Option<St
     Ok(status(&output))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn assign_operator(app: AppHandle, output: State<Output>, display_key: Option<String>) -> Result<OutputStatus, String> {
     let key = display_key.filter(|value| !value.is_empty());
     *output
@@ -201,7 +201,7 @@ fn assign_operator(app: AppHandle, output: State<Output>, display_key: Option<St
     Ok(status(&output))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn close_audience(app: AppHandle, output: State<Output>) -> Result<OutputStatus, String> {
     let mode = output
         .mode
