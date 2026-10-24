@@ -35,6 +35,19 @@
   const looseQuizzes = $derived(mine.filter((game) => !game.series && game.kind === "quiz"));
   const loosePolls = $derived(mine.filter((game) => !game.series && game.kind === "poll"));
   const reports = $derived(session.workspace.gameReports ?? []);
+  /** How often each game has been played here, and when last (from its reports). */
+  const played = $derived.by(() => {
+    const byGame = new Map<string, { times: number; last: string }>();
+    for (const report of reports) {
+      const seen = byGame.get(report.gameId);
+      byGame.set(report.gameId, { times: (seen?.times ?? 0) + 1, last: !seen || report.at > seen.last ? report.at : seen.last });
+    }
+    return byGame;
+  });
+  const whenPlayed = (iso: string) => {
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+    return days <= 0 ? t("today") : days === 1 ? t("yesterday") : days < 7 ? new Date(iso).toLocaleDateString(undefined, { weekday: "long" }) : new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  };
   let openReport = $state<string | null>(null);
   const shownReport = $derived(reports.find((report) => report.id === openReport) ?? null);
   const percent = (share: number | null) => (share === null ? "–" : `${Math.round(share * 100)}%`);
@@ -209,7 +222,10 @@
     </div>
     <div class="progress" aria-hidden="true">{#each run.game.questions as _q, index (index)}<i class:done={index < run.index} class:now={index === run.index}></i>{/each}</div>
     <div class="next-step">
-      {#if !live}
+      {#if !live && run.index === 0 && people === 0}
+        <button type="button" class="btn big step waiting" disabled>{t("Waiting for players to join…")}</button>
+        <p>{t("Question 1 can start once someone has joined with the code on the screen.")} <button type="button" class="inline-link" onclick={() => audienceRoom.ask()}>{t("Start anyway")}</button></p>
+      {:else if !live}
         <button type="button" class="btn accent big step" onclick={() => audienceRoom.ask()}>{t("Start question {n}", { n: run.index + 1 })}</button>
         <p>{audienceRoom.follow ? (question.seconds ? t("Shows it on the screen and on phones, and starts the {n}-second clock.", { n: question.seconds }) : t("Shows it on the screen and on phones.")) : t("Opens it on phones. The screen stays as it is; change it under How the game runs.")}{#if run.index === 0}{" "}<strong>{tn(people, "{n} person has joined.", "{n} people have joined.")}</strong>{/if}</p>
       {:else if live.phase === "open"}
@@ -288,6 +304,7 @@
   <GameView
     game={viewed}
     builtIn={isBuiltIn(viewed)}
+    played={played.get(viewed.id) ? { ...played.get(viewed.id)!, when: whenPlayed(played.get(viewed.id)!.last) } : null}
     onplay={() => void play(viewed)}
     onedit={() => (editing = structuredClone($state.snapshot(viewed)) as Game)}
     oncopy={() => (editing = copyOf(viewed, isBuiltIn(viewed) ? titleOf(viewed) : t("{title} (copy)", { title: viewed.title })))}
@@ -417,6 +434,7 @@
 
 {#snippet card(game: Game)}
   {@const quiz = game.kind === "quiz"}
+  {@const before = played.get(game.id)}
   <div class="card">
     <button type="button" class="open" onclick={() => (viewing = game.id)} title={t("See every question")}>
       {#if quiz}
@@ -427,9 +445,14 @@
       <span class="words">
         <strong>{titleOf(game)}</strong>
         <span>{quiz ? t("Quiz") : t("Poll")} · {tn(game.questions.length, "{n} question", "{n} questions")}{game.series ? ` · ${game.series}` : ""}</span>
+        {#if before}<span class="played"><Icon name="check" size={11} /> {tn(before.times, "Played once, {when}", "Played {n} times, last {when}", { when: whenPlayed(before.last) })}</span>{/if}
       </span>
     </button>
-    <button type="button" class="btn play" aria-label={t("Play {title}", { title: titleOf(game) })} title={t("Play")} onclick={() => void play(game)}><Icon name="play" size={13} /></button>
+    {#if before}
+      <button type="button" class="btn play again" aria-label={t("Play {title} again", { title: titleOf(game) })} title={t("Play again")} onclick={() => void play(game)}><Icon name="reset" size={13} /></button>
+    {:else}
+      <button type="button" class="btn play" aria-label={t("Play {title}", { title: titleOf(game) })} title={t("Play")} onclick={() => void play(game)}><Icon name="play" size={13} /></button>
+    {/if}
   </div>
 {/snippet}
 
@@ -476,6 +499,8 @@
   .cards { display: grid; gap: 6px; }
   @container (min-width: 640px) { .cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); } }
   .card { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border: 1px solid var(--line); border-radius: 12px; }
+  .played { display: inline-flex; align-items: center; gap: 3px; color: var(--ok, #3fb950) !important; font-size: 11px !important; }
+  .card .again { color: var(--accent); }
   .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .open:disabled { cursor: progress; }
@@ -533,6 +558,10 @@
   .next-step p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
   .next-step strong { color: var(--ink); }
   .step-row { display: flex; gap: 6px; }
+  .next-step .waiting { opacity: 1; cursor: default; color: var(--muted); border-style: dashed; animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.6; } }
+  @media (prefers-reduced-motion: reduce) { .next-step .waiting { animation: none; } }
+  .inline-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; }
   .step-row .step { flex: 1; }
   .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
   .switches summary { color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer; }

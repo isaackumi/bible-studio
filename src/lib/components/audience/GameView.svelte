@@ -1,5 +1,6 @@
 <script lang="ts">
   import { audienceRoom } from "../../app/rooms.svelte";
+  import { session } from "../../app/session.svelte";
   import { MOST_TEAMS, TEAMS } from "../../domain/game-colors";
   import { questionsAsText, ready, type Game } from "../../domain/games";
   import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/sounds";
@@ -12,12 +13,13 @@
   let {
     game,
     builtIn = false,
+    played = null,
     onplay,
     onedit,
     oncopy,
     ondelete,
     onback,
-  }: { game: Game; builtIn?: boolean; onplay: () => void; onedit: () => void; oncopy: () => void; ondelete?: () => void; onback: () => void } = $props();
+  }: { game: Game; builtIn?: boolean; played?: { times: number; when: string } | null; onplay: () => void; onedit: () => void; oncopy: () => void; ondelete?: () => void; onback: () => void } = $props();
 
   const title = $derived(builtIn ? t(game.title) : game.title);
   const description = $derived(builtIn && game.description ? t(game.description) : game.description);
@@ -41,10 +43,24 @@
       copied = false;
     }
   }
+
+  // Esc goes back to the list, unless someone is typing.
+  function onkeydown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    if (event.key !== "Escape" || session.findOpen || session.settingsOpen || (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable))) return;
+    event.preventDefault();
+    onback();
+  }
 </script>
 
-<article class="view">
-  <button type="button" class="back" onclick={onback}><Icon name="chevron-left" size={14} /> {t("All quizzes and polls")}</button>
+<svelte:window {onkeydown} />
+
+<!-- Opens at its top, whatever the list was scrolled to. -->
+<article class="view" {@attach (node) => node.scrollIntoView({ block: "start" })}>
+  <nav class="bar" aria-label={t("Where you are")}>
+    <button type="button" class="back" onclick={onback} title={t("Back to all quizzes and polls (Esc)")}><Icon name="chevron-left" size={15} /> {t("Back")}</button>
+    <span class="trail"><button type="button" class="crumb" onclick={onback}>{t("Quizzes and polls")}</button><Icon name="chevron-right" size={12} /><span class="here">{title}</span></span>
+  </nav>
 
   <header>
     <span class="kind" class:poll={!quiz}>{quiz ? t("Quiz") : t("Poll")}</span>
@@ -52,6 +68,7 @@
     {#if description}<p class="about">{description}</p>{/if}
     <p class="facts">
       {tn(game.questions.length, "{n} question", "{n} questions")}
+      {#if played}<span class="played-fact">{tn(played.times, "Played once, {when}", "Played {n} times, last {when}", { when: played.when })}</span>{/if}
       <span>{t("about {n} min", { n: Math.max(1, Math.round(seconds / 60)) })}</span>
       {#if game.series}<span>{game.series}</span>{/if}
       {#if notReady}<span class="warn">{tn(notReady, "{n} question is not finished and will be left out", "{n} questions are not finished and will be left out")}</span>{/if}
@@ -93,7 +110,7 @@
       </label>
     {/if}
     <div class="buttons">
-      <button type="button" class="btn accent big" onclick={onplay}><Icon name="play" size={14} /> {quiz ? t("Play this quiz") : t("Run this poll")}</button>
+      <button type="button" class="btn accent big" onclick={onplay}><Icon name={played ? "reset" : "play"} size={14} /> {played ? t("Play again") : quiz ? t("Play this quiz") : t("Run this poll")}</button>
       {#if builtIn}
         <button type="button" class="btn" onclick={oncopy}><Icon name="copy" size={14} /> {t("Make a copy to change")}</button>
       {:else}
@@ -137,14 +154,21 @@
 
 <style>
   .view { display: grid; gap: 14px; }
-  .back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-  .back:hover { color: var(--ink); }
+  /* Stays at the top while the questions scroll, so the way back is always in reach. */
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; margin: -2px -2px 2px; padding: 6px 2px 8px; background: var(--panel, var(--bg)); border-bottom: 1px solid var(--line); }
+  .back { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 30px; padding: 0 12px 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .back:hover { border-color: var(--accent); }
+  .trail { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font-size: 12px; }
+  .crumb { flex: none; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; }
+  .crumb:hover { color: var(--ink); text-decoration: underline; }
+  .here { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
   header { display: grid; gap: 4px; }
   .kind { justify-self: start; padding: 2px 9px; border-radius: 99px; background: color-mix(in srgb, #d89e00 22%, transparent); color: #e8b53a; font-size: 11.5px; font-weight: 750; }
   .kind.poll { background: color-mix(in srgb, #1368ce 22%, transparent); color: #6aa6f0; }
   h3 { margin: 2px 0 0; font-size: 19px; font-weight: 750; line-height: 1.25; }
   .about { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
   .facts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .facts .played-fact { color: var(--ok, #3fb950); }
   .facts .warn { color: var(--warn, #e8a33a); }
   .play { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field, transparent); }
   .teams { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

@@ -4711,4 +4711,13 @@ export const es: Readonly<Record<string, string>> = {
   "The room counts the phones that are with you, not everyone who ever joined, and a new game leaves out people who have gone.": "La sala cuenta los teléfonos que están contigo, no todos los que se unieron alguna vez, y un juego nuevo deja fuera a quienes se fueron.",
   "A join screen that reads well": "Una pantalla para unirse fácil de leer",
   "A bigger QR code that scans easily, and the address on one line, on wide, 4:3 and portrait screens alike.": "Un código QR más grande que se escanea fácil, y la dirección en una sola línea, en pantallas anchas, 4:3 y verticales.",
+  "Back to all quizzes and polls (Esc)": "Volver a todos los cuestionarios y encuestas (Esc)",
+  "Play {title} again": "Jugar otra vez {title}",
+  "Played once, {when}": "Jugado una vez, {when}",
+  "Played {n} times, last {when}": "Jugado {n} veces, la última {when}",
+  "Question 1 can start once someone has joined with the code on the screen.": "La pregunta 1 puede empezar cuando alguien se una con el código de la pantalla.",
+  "Start anyway": "Empezar de todos modos",
+  "Waiting for players to join…": "Esperando a que se unan jugadores…",
+  "Where you are": "Dónde estás",
+  "yesterday": "ayer",
 };
