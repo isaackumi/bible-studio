@@ -5689,8 +5689,11 @@ class Session {
    */
   switchPage = (from: PewPage, to: PewPage): boolean => {
     if (from === to) return true;
+    // A room's stage on Preview (a quiz, a poll, a question, the join code) belongs to no page:
+    // it stays up while the operator moves about, instead of a page's own verse taking its place.
+    const keep = this.live.preview.sourceId?.startsWith("room:") ?? false;
     this.pageStage[from] = {
-      preview: this.live.preview,
+      preview: keep ? (this.pageStage[from]?.preview ?? { transition: "cut", sourceId: null, model: emptyModel(this.theme()) }) : this.live.preview,
       songFocus: this.songFocus,
       sermonFocus: this.sermonFocus,
       previewBible: this.previewBible,
@@ -5699,13 +5702,13 @@ class Session {
     };
     this.deskPage = to;
     const saved = this.pageStage[to];
-    this.live = { ...this.live, preview: saved?.preview ?? { transition: "cut", sourceId: null, model: emptyModel(this.theme()) } };
+    if (!keep) this.live = { ...this.live, preview: saved?.preview ?? { transition: "cut", sourceId: null, model: emptyModel(this.theme()) } };
     this.songFocus = saved?.songFocus ?? null;
     this.sermonFocus = saved?.sermonFocus ?? null;
     this.previewBible = saved?.previewBible ?? null;
     this.lookOnPreview = saved?.lookOnPreview ?? null;
     this.previewFree = saved?.previewFree ?? false;
-    return !!saved;
+    return keep || !!saved;
   };
 
   // Running a part on the Presenter page: its Bible, songs and everything else, while the service's

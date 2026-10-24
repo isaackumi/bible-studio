@@ -159,8 +159,8 @@
       <!-- How questions come in, which to show, and finding one: together, above the list. -->
       <div class="q-tools">
       <div class="switches">
-        <label><input type="checkbox" class="switch" checked={view?.room.open ?? true} onchange={(event) => audienceRoom.settings({ open: event.currentTarget.checked })} /> {t("Taking questions")}</label>
-        <label><input type="checkbox" class="switch" checked={view?.room.moderate ?? true} onchange={(event) => audienceRoom.settings({ moderate: event.currentTarget.checked })} /> {t("Hold for approval")}</label>
+        <label><input type="checkbox" class="switch" checked={view?.room.open ?? false} onchange={(event) => audienceRoom.settings({ open: event.currentTarget.checked })} /> {t("Taking questions")}</label>
+        <label><input type="checkbox" class="switch" checked={view?.room.moderate ?? false} onchange={(event) => audienceRoom.settings({ moderate: event.currentTarget.checked })} /> {t("Hold for approval")}</label>
       </div>
       <div class="filters" role="radiogroup" aria-label={t("Show")}>
         {#each [["waiting", t("Waiting")], ["up", t("Up")], ["answered", t("Answered")], ["put-away", t("Put away")]] as [id, label] (id)}
@@ -265,7 +265,9 @@
   .share-head em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.4; }
   .tabs { display: grid; grid-template-columns: 1fr 1.25fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
   .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
-  .tabs button.on { background: var(--panel-2, #2a2a30); color: var(--ink); }
+  /* The chosen tab in ink on the panel, like the filters below: panel-2 was too close to the panel to see. */
+  .tabs button.on { background: var(--ink); color: var(--panel); }
+  .tabs button.on b { background: var(--accent); }
   .tabs b { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; }
   .q-tools { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
   .switches { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); }

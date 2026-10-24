@@ -444,8 +444,10 @@ export class RoomCore {
       createdAt: now,
       touchedAt: now,
       hostKeyHash: await sha256(hostKey),
-      moderate: true,
-      open: true,
+      // A new room starts with questions off and nothing held for approval: most rooms are opened
+      // for a quiz or a poll, and the desk turns questions on when it wants them.
+      moderate: false,
+      open: false,
       closed: false,
       questions: [],
       participants: {},

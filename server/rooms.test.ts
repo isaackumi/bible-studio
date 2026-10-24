@@ -19,6 +19,10 @@ describe("rooms: Q&A", () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace Chapel"));
     const { pid } = data<{ pid: string }>(await core.join("Ama", "ip1"));
+    // A new room is not taking questions and holds none for approval until the desk says so.
+    expect(await core.ask(pid, "Too soon?", "")).toMatchObject({ ok: false, status: 403 });
+    expect(data<{ room: { open: boolean; moderate: boolean } }>(await core.hostView(hostKey)).room).toMatchObject({ open: false, moderate: false });
+    data(await core.settings(hostKey, { open: true, moderate: true }));
     const asked = data<{ id: string; state: string }>(await core.ask(pid, "  What does grace mean?  ", ""));
     expect(asked.state).toBe("pending");
     expect(data<View>(await core.view(pid))).toMatchObject({ questions: [], waiting: 1 });
@@ -33,7 +37,7 @@ describe("rooms: Q&A", () => {
   it("asks without waiting when moderation is off, and limits how many one person asks", async () => {
     const { core, advance } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
-    data(await core.settings(hostKey, { moderate: false }));
+    data(await core.settings(hostKey, { open: true, moderate: false }));
     const { pid } = data<{ pid: string }>(await core.join("", "ip"));
     for (let i = 0; i < LIMITS.asksPer10Min; i++) expect(data<{ state: string }>(await core.ask(pid, `Question number ${i}`, "")).state).toBe("approved");
     expect(await core.ask(pid, "One too many", "")).toMatchObject({ ok: false, status: 429 });
@@ -48,7 +52,7 @@ describe("rooms: Q&A", () => {
   it("counts one vote per person, takes it back on a second press, and limits one network", async () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
-    data(await core.settings(hostKey, { moderate: false }));
+    data(await core.settings(hostKey, { open: true, moderate: false }));
     const a = data<{ pid: string }>(await core.join("A", "")).pid;
     const b = data<{ pid: string }>(await core.join("B", "")).pid;
     const { id } = data<{ id: string }>(await core.ask(a, "Why do we sing?", ""));
@@ -221,6 +225,9 @@ describe("rooms on Cloudflare", () => {
     expect(opened.joinUrl).toBe(`https://church.test/j/${opened.code}`);
     expect(await (await call(`/j/${opened.code}`))!.text()).toBe(`page ${opened.code}`);
     const joined = (await (await call(`/v1/rooms/${opened.code}/join`, { name: "Kofi" }))!.json()) as { pid: string };
+    // Questions start off; the desk turns them on, with approval.
+    expect((await call(`/v1/rooms/${opened.code}/ask`, { pid: joined.pid, text: "Too soon?" }))!.status).toBe(403);
+    expect((await call(`/v1/rooms/${opened.code}/settings`, { hostKey: opened.hostKey, open: true, moderate: true }))!.status).toBe(200);
     expect((await call(`/v1/rooms/${opened.code}/ask`, { pid: joined.pid, text: "Is there coffee after?" }))!.status).toBe(200);
     const host = (await (await call(`/v1/rooms/${opened.code}/host`, { hostKey: opened.hostKey }))!.json()) as { questions: Array<{ state: string }>; people: number };
     expect(host).toMatchObject({ people: 1, questions: [{ state: "pending" }] });
