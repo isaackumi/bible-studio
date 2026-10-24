@@ -27,15 +27,30 @@
     return null;
   }
 
-  /** Steps that can be shown right now: centered cards, and targets that are on screen. */
+  /**
+   * Steps that can be shown right now: centered cards, and targets that are on screen. Looked
+   * for again on every measure, since a panel the tour opened (the studio, Settings) may still be
+   * loading when the tour starts; a step that appears is slotted in without moving the card.
+   */
+  let tick = $state(0);
   const entries = $derived.by(() => {
     void session.tour;
+    void tick;
     return (tour?.steps ?? []).map((step, at) => ({ step, at })).filter(({ step }) => !step.target || find(step));
   });
   const steps = $derived(entries.map((entry) => entry.step));
   const step = $derived(steps[Math.min(index, steps.length - 1)] ?? null);
   /** This step's place in the tour's full list (what progress is saved against). */
   const at = $derived(entries[Math.min(index, entries.length - 1)]?.at ?? 0);
+  /** The full-list step the operator is on, set by moving; the list changing under us keeps it. */
+  let wantAt = 0;
+  $effect(() => {
+    const list = entries;
+    untrack(() => {
+      const same = list.findIndex((entry) => entry.at >= wantAt);
+      if (same >= 0 && same !== index) index = same;
+    });
+  });
 
   $effect(() => {
     const id = session.tour;
@@ -44,6 +59,7 @@
   });
 
   function measure() {
+    tick += 1;
     view = { width: window.innerWidth, height: window.innerHeight };
     const element = step ? find(step) : null;
     if (!element) {
@@ -64,6 +80,7 @@
     // Start at the chosen step, or the next one on screen after it.
     const from = entries.findIndex((entry) => entry.at >= session.tourFrom);
     index = from < 0 ? 0 : from;
+    wantAt = entries[index]?.at ?? 0;
     // Panels can move (resizing, a menu closing): keep the spotlight on its target.
     const timer = setInterval(measure, 400);
     window.addEventListener("resize", measure);
@@ -83,6 +100,7 @@
       return close();
     }
     index = next;
+    wantAt = entries[next]?.at ?? wantAt;
   }
 
   function close() {

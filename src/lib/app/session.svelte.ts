@@ -5895,6 +5895,8 @@ class Session {
       const { audienceRoom } = await import("./rooms.svelte");
       audienceRoom.show();
       audienceRoom.tab = "questions";
+      // The join code, the question switches and the game controls only exist with a room open.
+      if (!audienceRoom.current && !audienceRoom.busy) void audienceRoom.start();
     } else if (id === "design") {
       this.openStudio(undefined, "templates");
     } else if (id === "pictures") {
