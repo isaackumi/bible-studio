@@ -14,7 +14,7 @@ function input(over: Partial<LibraryInput> = {}): LibraryInput {
 /** The manifest after the cloud accepted everything in `library`. */
 function syncedFor(library: LibraryInput, at = T0) {
   const first = diffRecords(collectRecords(library), emptyManifest(), at);
-  return acceptChanges(first.manifest, first.changes, first.changes.length);
+  return acceptChanges(first.manifest, first.changes);
 }
 
 const quiet: Apply = { song: async () => {}, service: async () => {}, sermon: async () => {}, theme: async () => {}, workspace: () => {} };
@@ -49,8 +49,9 @@ describe("records in and out of the library", () => {
     expect(first.changes.map((change) => `${change.col}/${change.id}`)).toEqual(expect.arrayContaining(["song/s1", "settings/church"]));
     expect(first.changes.every((change) => change.at === T0)).toBe(true);
     // Accepted by the server: the manifest now holds them as synced.
-    const synced = acceptChanges(first.manifest, first.changes, first.changes.length);
-    expect(synced.seq).toBe(first.changes.length);
+    const synced = acceptChanges(first.manifest, first.changes);
+    // Accepting a push never moves the pull cursor: only a pull does.
+    expect(synced.seq).toBe(0);
     const same = diffRecords(collectRecords(input()), synced, T0 + 1);
     expect(same.changes).toEqual([]);
     const edited = diffRecords(collectRecords(input({ songs: [song("s1", "Amazing Grace (new)")] })), synced, T0 + 2);
@@ -97,6 +98,15 @@ describe("records in and out of the library", () => {
     // Pushing again now finds nothing to send for what came down.
     const after = diffRecords(collectRecords(input({ songs: [song("s2", "New here")], workspace })), manifest, T0 + 1);
     expect(after.changes.filter((change) => change.col !== "settings")).toEqual([]);
+  });
+
+  it("apply skips what this computer already has, so its own pushes do not come back as writes", async () => {
+    const written: string[] = [];
+    const apply: Apply = { ...quiet, song: async (doc, id) => void written.push(id) };
+    const synced = syncedFor(input());
+    const own = { col: "song", id: "s1", at: synced.hashes["song/s1"]!.at, doc: song("s1", "Amazing Grace") };
+    await applyChanges([own], apply, synced);
+    expect(written).toEqual([]);
   });
 
   it("a conflict keeps local work until the pull replaces it", async () => {

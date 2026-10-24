@@ -1,3 +1,4 @@
+import type { CloudSync } from "./cloud.svelte";
 import { noteSongUse } from "../domain/song-usage";
 import { guessUiLanguage, t, tn } from "../i18n/core";
 import { cuesBetween, sanitizeTimerSounds, type TimerCue, type TimerSounds } from "../domain/timer-cues";
@@ -1078,6 +1079,7 @@ class Session {
   };
 
   private writeNow = async () => {
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.workspace = { ...this.workspace, cursor: this.cursor, lastServiceId: this.service?.id ?? null };
     try {
       await this.saveWorkspaceDocument(this.workspace);
@@ -4134,6 +4136,7 @@ class Session {
   deleteService = async (id: string) => {
     const name = this.services.find((entry) => entry.id === id)?.name ?? "Service";
     await api.serviceDelete(id);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.services = await api.serviceList();
     if (this.service?.id === id) {
       const next = this.services[0];
@@ -5721,6 +5724,7 @@ class Session {
       return false;
     }
     await api.songSave(clean);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.songs = await api.songList();
     if (this.songFocus?.songId === clean.id) this.previewSongSection(clean, this.songFocus.sectionId);
     return true;
@@ -6205,6 +6209,8 @@ class Session {
     // Asked every start, not only when the lease is nearly due: a licence moved to another
     // computer leaves this one at the next start, as Settings says.
     await this.checkActivation(true);
+    // The cloud copy, once the plan and the seat are known.
+    void this.cloudEngine().then((cloud) => cloud.start());
     // Offline too long: a paid plan must check in before its lease runs out; say so a week ahead.
     const renewBy = this.ent.kind === "license" ? (this.ent.renewBy ?? 0) : 0;
     const daysLeft = renewBy ? Math.ceil((renewBy - Date.now()) / 86_400_000) : Infinity;
@@ -6298,6 +6304,7 @@ class Session {
     if (answer.ok) {
       await this.keepLease(answer.data.lease);
       this.activation = { status: "ok", seats: answer.data.seats, devices: answer.data.devices, message: "" };
+      void this.cloudEngine().then((cloud) => cloud.resume());
       return;
     }
     const data = answer.data as { seats?: number; devices?: ActivatedDevice[]; revoked?: boolean; ended?: boolean; moved?: boolean; to?: string };
@@ -6842,6 +6849,81 @@ class Session {
     }
   };
 
+  // --- Cloud sync: one library across the licence's computers (src/lib/app/cloud.svelte.ts) ---------
+
+  /** The engine, once loaded (its own chunk, fetched on first use so the desk starts light). */
+  cloud = $state<CloudSync | null>(null);
+  private cloudLoading: Promise<CloudSync> | null = null;
+  /** Pending refreshes after the cloud wrote records here, done once a moment later. */
+  private cloudTouched = new Set<"songs" | "services" | "sermons" | "themes">();
+  private cloudRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  cloudEngine = (): Promise<CloudSync> => {
+    if (this.cloud) return Promise.resolve(this.cloud);
+    if (!this.cloudLoading) this.cloudLoading = this.makeCloud().then((engine) => (this.cloud = engine));
+    return this.cloudLoading;
+  };
+
+  private makeCloud = async (): Promise<CloudSync> => {
+    const [{ CloudSync }, { cloudProtocol }] = await Promise.all([import("./cloud.svelte"), import("../sync/protocol")]);
+    const identity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName() });
+    const touched = (what: "songs" | "services" | "sermons" | "themes") => {
+      this.cloudTouched.add(what);
+      clearTimeout(this.cloudRefreshTimer);
+      this.cloudRefreshTimer = setTimeout(() => void this.refreshAfterCloud(), 300);
+    };
+    return new CloudSync({
+      protocol: cloudProtocol(identity),
+      commands: {
+        hash: (id) => invoke("cloud_hash", { id }),
+        upload: (id, url) => invoke("cloud_upload", { id, url, ...identity() }),
+        download: (url, row) => invoke("cloud_download", { url, token: identity().token, device: identity().device, id: row.id, name: row.name, kind: row.kind, ext: row.ext, createdAt: row.createdAt }),
+        readState: () => invoke<string>("cloud_state_read"),
+        writeState: (text) => invoke("cloud_state_write", { text }),
+      },
+      library: {
+        collect: async () => ({ ...(await this.exportLibrary()), sermons: await api.sermonList(), workspace: this.workspace }),
+        apply: {
+          song: async (doc, id) => {
+            await (doc ? api.songSave(doc) : api.songDelete(id));
+            touched("songs");
+          },
+          service: async (doc, id) => {
+            await (doc ? api.serviceSave(doc) : api.serviceDelete(id));
+            touched("services");
+          },
+          sermon: async (doc, id) => {
+            await (doc ? api.sermonSave(doc) : api.sermonDelete(id));
+            touched("sermons");
+          },
+          theme: async (doc, id) => {
+            await (doc ? api.themeSave(doc) : api.themeDelete(id));
+            touched("themes");
+          },
+          workspace: (patch) => {
+            this.workspace = patch(this.workspace);
+            this.persistSoon();
+          },
+        },
+        mediaIds: async () => new Set(this.#allMedia.map((asset) => asset.id)),
+      },
+      gate: () => (!this.desktop() ? "off" : !this.signedIn ? "signedOut" : this.plan === "free" ? "free" : "ok"),
+      now: () => Date.now(),
+      name: () => this.deviceName(),
+    });
+  };
+
+  /** What the cloud wrote here is read back into the desk's lists (and Media, for files that came down). */
+  private refreshAfterCloud = async () => {
+    const what = new Set(this.cloudTouched);
+    this.cloudTouched.clear();
+    if (what.has("songs")) this.songs = await api.songList();
+    if (what.has("services")) this.services = await api.serviceList();
+    if (what.has("sermons")) this.sermons = await api.sermonList();
+    if (what.has("themes")) this.themes = await api.themeList();
+    this.media = await api.mediaList();
+  };
+
   /** Install the waiting update and restart. Returns an error to show, or never returns (restart). */
   installUpdate = async (): Promise<string> => {
     if (!this.pendingUpdate) return "";
@@ -6974,6 +7056,7 @@ class Session {
     const clean = cleanFolder(folder);
     if (clean) this.createSongFolder(clean);
     await api.songSave(sanitizeSong({ ...song, folder: clean }));
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.songs = await api.songList();
     this.message = clean ? t("{title} moved to {folder}.", { title: song.title, folder: clean }) : t("{title} removed from its folder.", { title: song.title });
   };
@@ -6991,6 +7074,7 @@ class Session {
         continue;
       }
       await api.songSave(song);
+      void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
       added += 1;
     }
     this.songs = await api.songList();
@@ -7008,6 +7092,7 @@ class Session {
       const ready = sanitizeSong({ ...song, folder: clean });
       if (songError(ready)) continue;
       await api.songSave(ready);
+      void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
       added += 1;
     }
     this.songs = await api.songList();
@@ -7016,6 +7101,7 @@ class Session {
 
   deleteSong = async (id: string) => {
     await api.songDelete(id);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.songs = await api.songList();
     if (this.songFocus?.songId === id) {
       this.songFocus = null;
@@ -7073,6 +7159,7 @@ class Session {
       return false;
     }
     await api.sermonSave(clean);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.sermons = await api.sermonList();
     if (this.sermonFocus?.sermonId === clean.id) void this.previewSermonSection(clean, this.sermonFocus.sectionId);
     this.message = t("{title} saved. Notes stay on the desk.", { title: clean.title });
@@ -7083,11 +7170,13 @@ class Session {
   private saveSermonQuietly = async (sermon: Sermon) => {
     const clean = sanitizeSermon({ ...sermon, updatedAt: new Date().toISOString() });
     await api.sermonSave(clean);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.sermons = this.sermons.some((entry) => entry.id === clean.id) ? this.sermons.map((entry) => (entry.id === clean.id ? clean : entry)) : [clean, ...this.sermons];
   };
 
   deleteSermon = async (id: string) => {
     await api.sermonDelete(id);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.sermons = await api.sermonList();
     if (this.sermonFocus?.sermonId === id) {
       this.sermonFocus = null;
@@ -7275,6 +7364,7 @@ class Session {
     const transpose = Math.round(semitones) % 12;
     const clean = sanitizeSong({ ...song, transpose });
     await api.songSave(clean);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.songs = await api.songList();
     this.publishStage();
   };
@@ -7715,6 +7805,7 @@ class Session {
   deleteTheme = async (id: string) => {
     if (factoryThemes().some((theme) => theme.id === id)) return;
     await api.themeDelete(id);
+    void this.cloudEngine().then((cloud) => cloud.scheduleSoon());
     this.themes = this.themes.filter((theme) => theme.id !== id);
     if (this.workspace.themeId === id) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
     this.message = t("Theme deleted.");

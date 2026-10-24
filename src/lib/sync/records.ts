@@ -125,15 +125,19 @@ export function diffRecords(current: SyncRecord[], manifest: Manifest, now: numb
   return { changes, manifest: { ...manifest, hashes } };
 }
 
-/** The cloud accepted these changes: their pending versions are now what it holds. */
-export function acceptChanges(manifest: Manifest, changes: Change[], seq: number): Manifest {
+/**
+ * The cloud accepted these changes: their pending versions are now what it holds. The pull
+ * cursor (`seq`) is left alone: only a pull moves it, or changes made elsewhere just before this
+ * push would be skipped.
+ */
+export function acceptChanges(manifest: Manifest, changes: Change[]): Manifest {
   const hashes = { ...manifest.hashes };
   for (const change of changes) {
     const name = key(change.col, change.id);
     if (change.doc === null) delete hashes[name];
     else hashes[name] = { hash: hashDoc(change.doc), at: change.at };
   }
-  return { ...manifest, hashes, seq: Math.max(manifest.seq, seq) };
+  return { ...manifest, hashes };
 }
 
 export type Apply = {
@@ -170,9 +174,14 @@ export async function applyChanges(changes: Change[], apply: Apply, manifest: Ma
     const known = hashes[name];
     if (known?.pending && known.pending.at > change.at) continue;
     if (change.doc === null) {
+      // Deleted elsewhere: gone here too, even when this computer never synced it (the samples
+      // every install ships with share their ids).
       delete hashes[name];
     } else {
-      hashes[name] = { hash: hashDoc(change.doc), at: change.at };
+      const hash = hashDoc(change.doc);
+      // This computer's own change coming back round, or one it already has: nothing to write.
+      if (known && !known.pending && known.hash === hash && known.at === change.at) continue;
+      hashes[name] = { hash, at: change.at };
     }
     switch (change.col) {
       case "song":
