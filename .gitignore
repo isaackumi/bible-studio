@@ -32,3 +32,4 @@ server/web/
 google*.json
 client_secret*.json
 *-oauth-client.json
+.superpowers/
