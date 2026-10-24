@@ -12,6 +12,7 @@ import { recordingMinutes } from "../domain/readiness";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
+import { buildMoveLibrary, formatBytes, restoreMoveLibrary } from "./move";
 import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan } from "../integrations/pco";
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
@@ -1191,6 +1192,47 @@ class Session {
     this.persistSoon();
     return `Restored ${latest[0].replace(/\.json$/, "")}.`;
   };
+
+  /** A move file being saved or opened: how far it is, for the bar on screen. */
+  moveProgress = $state<{ done: number; total: number } | null>(null);
+
+  private withMoveProgress = async <T>(task: () => Promise<T>): Promise<T> => {
+    this.moveProgress = { done: 0, total: 1 };
+    const unlisten = await listen<{ done: number; total: number }>("move-progress", (event) => (this.moveProgress = event.payload));
+    try {
+      return await task();
+    } finally {
+      unlisten();
+      this.moveProgress = null;
+    }
+  };
+
+  /** Save everything to a .churchstudio file at `dest`. Returns what to show. */
+  saveMoveFile = (dest: string): Promise<string> =>
+    this.withMoveProgress(async () => {
+      await this.flushSave();
+      const library = buildMoveLibrary(await this.exportLibrary(), extrasFrom(this.workspace, await api.sermonList()));
+      const summary = await invoke<{ files: number; missing: number; bytes: number }>("move_export", { dest, library, computer: this.deviceName() });
+      const saved = t("Saved: {songs} songs, {services} services and {files} media files ({size}).", { songs: this.songs.length, services: this.services.length, files: summary.files, size: formatBytes(summary.bytes) });
+      return summary.missing ? `${saved} · ${tn(summary.missing, "{n} file could not be found", "{n} files could not be found")}` : saved;
+    });
+
+  /** What a .churchstudio file holds, before bringing it in. */
+  peekMoveFile = (path: string) => invoke<{ createdAt: string; computer: string; media: number; bytes: number }>("move_peek", { path });
+
+  /** Bring a .churchstudio file in. Nothing here is deleted; the same item from the file wins. */
+  openMoveFile = (path: string): Promise<string> =>
+    this.withMoveProgress(async () => {
+      const result = await invoke<{ library: string; mediaAdded: number }>("move_import", { path });
+      this.media = await api.mediaList();
+      const byId = new Map(this.#allMedia.map((asset) => [asset.id, asset]));
+      const extras = await restoreMoveLibrary(result.library, (id) => mediaUrl(byId.get(id) ?? null), (payload) => this.importLibrary(payload));
+      for (const sermon of Array.isArray(extras.sermons) ? extras.sermons : []) await api.sermonSave(sermon);
+      this.sermons = await api.sermonList();
+      this.workspace = applyExtras(this.workspace, extras);
+      this.persistSoon();
+      return t("Everything is here: {songs} songs, {services} services and {files} new media files.", { songs: this.songs.length, services: this.services.length, files: result.mediaAdded });
+    });
 
   importLibrary = async (payload: unknown) => {
     const snapshot = parseLibrarySnapshot(payload);
