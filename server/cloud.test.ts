@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { licenseKeyPair, signLicense } from "../src/lib/domain/license";
 import { type ApiConfig } from "./api";
 import { mockProvider } from "./billing";
-import { handleCloud } from "./cloud";
+import { handleCloud, runCloudCron } from "./cloud";
 import { memoryR2 } from "./cloud-config";
 import { memoryLibraries } from "./library";
 import { memoryStore, putJson } from "./store";
@@ -34,6 +34,7 @@ function setup() {
     mail: async (to, subject, text) => void mails.push({ to, subject, text }),
     now: () => clock,
   };
+  configs.set(libraries, config);
   const call = async (path: string, body: unknown, method = "POST") => {
     const response = (await handleCloud(new Request(`https://keys.test${path}`, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), config))!;
     return { status: response.status, data: ((await response.json().catch(() => ({}))) ?? {}) as Record<string, any> };
@@ -58,6 +59,10 @@ function setup() {
   };
   return { config, call, upload, download, person, mails, libraries, advance: (ms: number) => (clock += ms), now: () => clock };
 }
+
+/** The test's config is the one its libraries were made for (one per setup()). */
+const configs = new WeakMap<object, ApiConfig>();
+const config_of = (libraries: object) => configs.get(libraries)!;
 
 describe("cloud space", () => {
   it("pushes and pulls between two computers of one licence", async () => {
@@ -149,6 +154,30 @@ describe("cloud space", () => {
     expect(status.data).toMatchObject({ usedBytes: 9, limitBytes: 5, over: true });
     expect((await call("/v1/cloud/media/claim", { token, device: "laptop", hash: HASH2, bytes: 1, name: "g.png", kind: "image", mediaId: "m2" })).data).toMatchObject({ upload: false, full: true, usedBytes: 9 });
     expect((await call("/v1/cloud/media/list", { token, device: "laptop" })).data.items).toHaveLength(1);
+  });
+
+  it("emails the owner when a plan ends, at day 60 and at day 85, once each, then lets the copy go", async () => {
+    const { call, person, mails, advance, libraries, now } = setup();
+    const { token } = await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "premium", until: "2026-10-23" }, ["laptop"]);
+    expect((await call("/v1/cloud/status", { token, device: "laptop" })).data.readOnly).toBe(true);
+    expect((await call("/v1/cloud/status", { token, device: "laptop" })).data.readOnly).toBe(true);
+    expect(mails.map((mail) => [mail.to, mail.subject])).toEqual([["ama@grace.org", "Your cloud copy stays for 90 days"]]);
+    await runCloudCron(config_of(libraries));
+    expect(mails).toHaveLength(1);
+    advance(60 * DAY);
+    await runCloudCron(config_of(libraries));
+    await runCloudCron(config_of(libraries));
+    expect(mails.map((mail) => mail.subject)).toEqual(["Your cloud copy stays for 90 days", "Your cloud copy goes in 30 days"]);
+    advance(25 * DAY);
+    await runCloudCron(config_of(libraries));
+    expect(mails.map((mail) => mail.subject).at(-1)).toBe("Your cloud copy goes in 5 days");
+    advance(6 * DAY);
+    await libraries.core("0a0b0c0d").ageOut(now());
+    await runCloudCron(config_of(libraries));
+    expect(mails).toHaveLength(3);
+    // The seat itself went stale over those 91 days; back on it, the copy is gone and the library starts empty.
+    await putJson(config_of(libraries).store, "act:0a0b0c0d", [{ device: "laptop", name: "PC laptop", seenAt: new Date(now()).toISOString() }]);
+    expect((await call("/v1/cloud/pull", { token, device: "laptop", since: 0 })).data).toMatchObject({ seq: 0, changes: [] });
   });
 
   it("a lapsed licence is read-only, and still readable", async () => {

@@ -5,7 +5,7 @@
 // Stateless on purpose: the key id comes from the Paddle transaction id, so a retried webhook
 // makes the very same key instead of a second one.
 
-import { handleCloud } from "./cloud";
+import { handleCloud, runCloudCron } from "./cloud";
 import type { LibraryNamespace, R2Like } from "./cloud-config";
 import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { latestRelease } from "./downloads.ts";
@@ -168,6 +168,11 @@ type Fetch = typeof fetch;
 const MAX_AGE_SECONDS = 300;
 
 export default {
+  /** Once a day (wrangler.jsonc `triggers`): cloud-space reminders after a plan ends. */
+  scheduled: async (_event: unknown, env: Env) => {
+    const config = apiConfig(env);
+    if (config) await runCloudCron(config);
+  },
   fetch: async (request: Request, env: Env) => {
     const url = new URL(request.url);
     const path = url.pathname;

@@ -51,6 +51,8 @@
   },
   // Sign-in links, checkouts, test payments and promo checks: 10 a minute from one network address
   // (api.ts tooFast). namespace_id is any number unique to this account.
+  // Once a day at 06:00 UTC: cloud-space reminders after a plan ends (cloud.ts runCloudCron).
+  "triggers": { "crons": ["0 6 * * *"] },
   "ratelimits": [{ "name": "LIMITS", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   // Usage over time (usage.ts): one point per check-in, read by the admin page through the SQL API
   // with the ANALYTICS_TOKEN secret (a Cloudflare API token with Account Analytics Read).

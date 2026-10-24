@@ -67,10 +67,51 @@ async function library(config: ApiConfig, licence: string, method: string, body:
 
 const pass = (result: { status: number; data: Record<string, unknown> }) => json(result.status, result.data);
 
-/** A plan that ended: the cloud copy turns read-only now and is wiped 90 days after the end. */
+/** The email to write to about a licence's cloud copy: its owner's account, else the address it was bought with. */
+async function ownerEmail(config: ApiConfig, licence: string): Promise<string> {
+  const ownership = await ownershipOf(config, licence);
+  const account = ownership ? await getJson<Account>(config.store, `acct:${ownership.owner}`) : null;
+  if (account?.email) return account.email;
+  return (await getJson<{ email?: string }>(config.store, `license:${licence}`))?.email ?? "";
+}
+
+type Lapse = { endsAt: number; email: string; sent: number[] };
+
+/** A plan that ended: the cloud copy turns read-only now, the owner hears once, and it is wiped 90 days after the end. */
 async function lapseIfEnded(config: ApiConfig, who: Access): Promise<void> {
   if (!who.ended || who.endsAt === null) return;
   await library(config, who.licence, "lapse", { readOnly: true, wipeAt: who.endsAt + LAPSE_DAYS * DAY });
+  const key = `cloud:lapse:${who.licence}`;
+  if (await config.store.get(key)) return;
+  const email = await ownerEmail(config, who.licence);
+  await putJson(config.store, key, { endsAt: who.endsAt, email, sent: [0] } satisfies Lapse, { endsAt: who.endsAt });
+  if (email && config.mail) await config.mail(email, "Your cloud copy stays for 90 days", `${planName(who.plan)} has ended, so Church Studio has stopped syncing between your computers. Everything on each computer stays there. Your cloud copy can still be read for 90 days (until ${dayOf(who.endsAt + LAPSE_DAYS * DAY)}); after that it is removed. Renewing in Settings › Account at any time before then picks up where you left off.`);
+}
+
+const dayOf = (at: number) => new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+/**
+ * Once a day (the worker's cron): the reminders at day 60 and 85 after a plan ended, and the
+ * records of lapses whose copy is gone (the library object wipes itself at day 90).
+ */
+export async function runCloudCron(config: ApiConfig): Promise<void> {
+  const now = config.now();
+  for (const entry of await config.store.list("cloud:lapse:")) {
+    const licence = entry.key.slice("cloud:lapse:".length);
+    const lapse = await getJson<Lapse>(config.store, entry.key);
+    if (!lapse) continue;
+    const days = Math.floor((now - lapse.endsAt) / DAY);
+    if (days >= LAPSE_DAYS) {
+      await config.store.delete(entry.key);
+      await config.store.delete(`cloudused:${licence}`);
+      continue;
+    }
+    const due = days >= 85 ? 85 : days >= 60 ? 60 : null;
+    if (due === null || lapse.sent.includes(due)) continue;
+    await putJson(config.store, entry.key, { ...lapse, sent: [...lapse.sent, due] }, { endsAt: lapse.endsAt });
+    const left = LAPSE_DAYS - due;
+    if (lapse.email && config.mail) await config.mail(lapse.email, `Your cloud copy goes in ${left} days`, `Your plan ended on ${dayOf(lapse.endsAt)}. The cloud copy of your songs, services and media is removed on ${dayOf(lapse.endsAt + LAPSE_DAYS * DAY)}. Everything on your own computers stays. To keep the cloud copy, renew in Settings › Account before then.`);
+  }
 }
 
 /** Everyone's cloud use together, from the per-licence mirror (its summary rides on the key). */
