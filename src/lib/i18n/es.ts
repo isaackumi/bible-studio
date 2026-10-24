@@ -4599,4 +4599,9 @@ export const es: Readonly<Record<string, string>> = {
   "{name} is on Preview. Press LIVE to show it.": "{name} está en Vista previa. Presiona EN VIVO para mostrarlo.",
   "{n} page, round and round": "{n} página, en bucle",
   "{n} pages, round and round": "{n} páginas, en bucle",
+  "A proper design studio": "Un verdadero estudio de diseño",
+  "Templates, Text, Elements, Pictures and Background sit beside the canvas, with your pages along the bottom. About 400 templates in 16 kinds of page, each laid out for your screen, in any of 20 colour palettes and 6 font pairs.": "Plantillas, Texto, Elementos, Imágenes y Fondo están junto al lienzo, con tus páginas abajo. Unas 400 plantillas en 16 tipos de página, cada una diseñada para tu pantalla, en cualquiera de 20 paletas de colores y 6 combinaciones de fuentes.",
+  "Add packs for Advent and Christmas, Easter, youth and kids, outreach, weddings and funerals, and sermon series when you want them.": "Añade cuando quieras paquetes para Adviento y Navidad, Pascua, jóvenes y niños, evangelización, bodas y funerales, y series de sermones.",
+  "From the studio to the screen": "Del estudio a la pantalla",
+  "Show puts the page on Preview, shows it now, adds the deck to the service, or plays every page as a slideshow. My designs opens any deck, the newest first.": "Mostrar pone la página en Vista previa, la muestra ahora, añade la presentación al servicio o reproduce todas las páginas como presentación. Mis diseños abre cualquier presentación, la más reciente primero.",
 };

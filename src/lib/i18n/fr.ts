@@ -4680,4 +4680,9 @@ export const fr: Readonly<Record<string, string>> = {
   "{name} is on Preview. Press LIVE to show it.": "{name} est en Aperçu. Appuyez sur DIRECT pour l’afficher.",
   "{n} page, round and round": "{n} page, en boucle",
   "{n} pages, round and round": "{n} pages, en boucle",
+  "A proper design studio": "Un vrai studio de création",
+  "Templates, Text, Elements, Pictures and Background sit beside the canvas, with your pages along the bottom. About 400 templates in 16 kinds of page, each laid out for your screen, in any of 20 colour palettes and 6 font pairs.": "Modèles, Texte, Éléments, Images et Arrière-plan sont à côté de la zone de travail, avec vos pages en bas. Environ 400 modèles dans 16 types de pages, chacun mis en page pour votre écran, dans 20 palettes de couleurs et 6 associations de polices au choix.",
+  "Add packs for Advent and Christmas, Easter, youth and kids, outreach, weddings and funerals, and sermon series when you want them.": "Ajoutez quand vous voulez des lots pour l’Avent et Noël, Pâques, les jeunes et les enfants, l’évangélisation, les mariages et les obsèques, et les séries de prédications.",
+  "From the studio to the screen": "Du studio à l’écran",
+  "Show puts the page on Preview, shows it now, adds the deck to the service, or plays every page as a slideshow. My designs opens any deck, the newest first.": "Afficher met la page en Aperçu, l’affiche tout de suite, ajoute la présentation au culte ou lit toutes les pages en diaporama. Mes créations ouvre n’importe quelle présentation, la plus récente en premier.",
 };

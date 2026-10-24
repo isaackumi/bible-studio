@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.6",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "layout", title: msg("A proper design studio"), text: msg("Templates, Text, Elements, Pictures and Background sit beside the canvas, with your pages along the bottom. About 400 templates in 16 kinds of page, each laid out for your screen, in any of 20 colour palettes and 6 font pairs.") },
+      { icon: "download", title: msg("More templates to download"), text: msg("Add packs for Advent and Christmas, Easter, youth and kids, outreach, weddings and funerals, and sermon series when you want them.") },
+      { icon: "screens", title: msg("From the studio to the screen"), text: msg("Show puts the page on Preview, shows it now, adds the deck to the service, or plays every page as a slideshow. My designs opens any deck, the newest first.") },
+    ],
+  },
+  {
     version: "0.4.5",
     date: "2026-10-24",
     highlights: [
