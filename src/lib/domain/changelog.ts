@@ -10,6 +10,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.3",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "screens", title: msg("Choosing the audience screen on Windows"), text: msg("The audience window now opens on its own thread, so the desk keeps responding while it appears.") },
+    ],
+  },
+  {
     version: "0.5.2",
     date: "2026-10-24",
     highlights: [

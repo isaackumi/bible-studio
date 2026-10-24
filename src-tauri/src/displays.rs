@@ -243,7 +243,10 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
 
     let monitor = &monitors[index];
     let name = monitor_name(monitor);
-    let window = ensure_window(app, monitor)?;
+    // None: the window is still opening (Windows); the next check places it.
+    let Some(window) = ensure_window(app, monitor)? else {
+        return Ok(());
+    };
     let previous = lock(&output.signature).clone();
     let needs_place = previous != signature
         || !window.is_visible().unwrap_or(false)
@@ -466,27 +469,47 @@ fn audience_window(app: &AppHandle) -> WebviewWindowBuilder<'_, tauri::Wry, AppH
     builder
 }
 
-fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<WebviewWindow, String> {
+/// The audience window, made if there is none. None while it is still being made.
+fn ensure_window(app: &AppHandle, monitor: &Monitor) -> Result<Option<WebviewWindow>, String> {
     if let Some(window) = app.get_webview_window("audience") {
-        return Ok(window);
+        return Ok(Some(window));
+    }
+    // One at a time: Windows runs other main-thread work while a webview starts (the
+    // once-a-second check included), which must not start a second audience window.
+    if CREATING.swap(true, Ordering::SeqCst) {
+        return Ok(None);
     }
     // The builder takes top-left coordinates; place() then sets the exact AppKit frame.
-    // Windows runs other main-thread work while a webview starts (the once-a-second check
-    // included); that check must not start a second audience window inside the first.
-    if CREATING.swap(true, Ordering::SeqCst) {
-        return Err("The audience window is still opening.".into());
-    }
     let (x, y, width, height) = logical_frame(monitor);
     log::info!("Creating the audience window on {}", monitor_name(monitor));
-    crate::diagnostics::doing("creating the audience window");
-    let built = audience_window(app)
-        .position(x, y)
-        .inner_size(width, height)
-        .build()
-        .map_err(|e| e.to_string());
-    CREATING.store(false, Ordering::SeqCst);
-    crate::diagnostics::doing("running");
-    built
+    // On Windows a webview built on the main thread (where this check runs) waits on WebView2,
+    // which needs that same thread: the app stops responding. Built on its own thread instead,
+    // and placed by the check that follows.
+    #[cfg(target_os = "windows")]
+    {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = audience_window(&app).position(x, y).inner_size(width, height).build() {
+                log::error!("The audience window could not open: {error}");
+            }
+            CREATING.store(false, Ordering::SeqCst);
+            let tick = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Err(error) = reconcile(&tick) {
+                    log::error!("display reconcile: {error}");
+                }
+            });
+        });
+        Ok(None)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        crate::diagnostics::doing("creating the audience window");
+        let built = audience_window(app).position(x, y).inner_size(width, height).build().map_err(|e| e.to_string());
+        CREATING.store(false, Ordering::SeqCst);
+        crate::diagnostics::doing("running");
+        built.map(Some)
+    }
 }
 
 fn place(window: &WebviewWindow, monitor: &Monitor, fullscreen: bool) -> Result<(), String> {

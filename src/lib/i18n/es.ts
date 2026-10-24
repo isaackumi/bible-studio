@@ -4838,4 +4838,6 @@ export const es: Readonly<Record<string, string>> = {
   "Choosing the screen for the audience no longer makes the app stop responding.": "Elegir la pantalla del público ya no deja la aplicación sin responder.",
   "Design studio edits are kept": "Los cambios del estudio se conservan",
   "A change typed just before clicking elsewhere, like a QR code's text, is saved instead of lost.": "Un cambio escrito justo antes de hacer clic en otro lugar, como el texto de un código QR, se guarda en lugar de perderse.",
+  "Choosing the audience screen on Windows": "Elegir la pantalla del público en Windows",
+  "The audience window now opens on its own thread, so the desk keeps responding while it appears.": "La ventana del público se abre ahora por su cuenta, y el escritorio sigue respondiendo mientras aparece.",
 };
