@@ -98,7 +98,7 @@
     icon: "user",
     color: "#8e8e93",
     about: msg("Your plan, the Premium trial, and what each plan includes."),
-    keywords: "sign in user cloud plan premium free church trial upgrade billing license",
+    keywords: "sign in user cloud plan premium free church trial upgrade billing license cloud sync space backup copy computers videos",
   };
   /** Older links: these pages were folded into others. */
   const ALIASES: Partial<Record<string, SettingsSectionId>> = { license: "account", performance: "appearance" };
@@ -1771,6 +1771,8 @@
             {/if}
           </section>
         {/if}
+
+        {#await import("./CloudSpace.svelte") then { default: CloudSpace }}<CloudSpace />{/await}
 
         <button type="button" class="upsell" onclick={() => session.openPlans()}>
           <span class="upsell-copy">

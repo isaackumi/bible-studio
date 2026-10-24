@@ -13,7 +13,7 @@ describe("plans", () => {
     expect(planIncludes("premium", "scripture")).toBe(true);
     expect(planIncludes("church", "song-detection")).toBe(true);
     expect(planFor("phone-remote").id).toBe("premium");
-    expect(planFor("cloud-sync").id).toBe("church");
+    expect(planFor("cloud-sync").id).toBe("premium");
     expect(planFor("songs").id).toBe("premium");
     expect(planFor("scripture").id).toBe("free");
   });

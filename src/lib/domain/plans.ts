@@ -71,7 +71,7 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   screens: { label: msg("Extra screens with their own job: timer, scripture, lyrics or stage") },
   "song-packs": { label: msg("Song packs") },
   "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
-  "cloud-sync": { label: msg("Cloud sync across computers"), soon: true },
+  "cloud-sync": { label: msg("Cloud space: a copy of your library, and one library across a Church licence's computers") },
   ndi: { label: msg("NDI out with sound, and NDI cameras in") },
   streaming: { label: msg("Stream to YouTube and Facebook") },
   recording: { label: msg("Record the service") },
@@ -81,8 +81,8 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
 // Free is the Bible on the wall: the Presenter desk's Scriptures page and the audience screen.
 // Everything else is Premium (the 14-day trial gives it all first).
 const FREE: PlanFeature[] = ["presenter", "scripture", "audience-output"];
-const PREMIUM: PlanFeature[] = [...FREE, "songs", "sermon", "service", "slides", "media", "music", "audience", "captions", "production", "voice", "song-detection", "phone-remote", "stage-display", "screens", "song-packs", "theme-library"];
-const CHURCH: PlanFeature[] = [...PREMIUM, "ndi", "streaming", "recording", "priority-support", "cloud-sync"];
+const PREMIUM: PlanFeature[] = [...FREE, "songs", "sermon", "service", "slides", "media", "music", "audience", "captions", "production", "voice", "song-detection", "phone-remote", "stage-display", "screens", "song-packs", "theme-library", "cloud-sync"];
+const CHURCH: PlanFeature[] = [...PREMIUM, "ndi", "streaming", "recording", "priority-support"];
 
 export const PLANS: Plan[] = [
   { id: "free", name: msg("Free"), tagline: msg("The Bible on the wall: any verse, any translation, free for ever."), color: "#8e8e93", features: FREE, price: { monthly: 0, yearly: 0 }, computers: 1 },
