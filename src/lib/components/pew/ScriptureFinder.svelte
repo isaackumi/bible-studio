@@ -593,19 +593,22 @@
   .patterns { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; padding-left: 138px; font-size: 12px; color: var(--muted); }
   .patterns b { color: var(--ink); font-weight: 650; margin-right: 4px; font-variant-numeric: tabular-nums; }
 
-  .panes { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; }
+  .panes { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; }
   .browse { display: flex; flex-direction: column; gap: 8px; min-height: 0; padding-right: 12px; border-right: 1px solid var(--line); }
   .testaments { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; border-radius: 9px; background: var(--field); flex: none; }
   .testaments button { height: 28px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; }
   .testaments button[aria-selected="true"] { background: var(--panel); color: var(--ink); }
-  .book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 4px; overflow: auto; min-height: 0; align-content: start; padding-right: 2px; }
-  .book-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin: 8px 2px 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  /* Two columns of full names (the pane is wide enough for "1 Thessalonians"); each group's heading
+     stays put at the top while its books scroll under it. */
+  .book-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px 6px; overflow: auto; min-height: 0; align-content: start; padding-right: 4px; scrollbar-gutter: stable; }
+  .book-group { grid-column: 1 / -1; position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; padding: 4px 2px; background: var(--panel); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
   .book-group:first-child { margin-top: 0; }
   .book-group::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--tone); }
-  .book-grid button { position: relative; height: 28px; padding: 0 8px 0 12px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-grid button { position: relative; height: 28px; padding: 0 6px 0 13px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .book-grid button::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; border-radius: 1px; background: color-mix(in srgb, var(--tone) 55%, transparent); }
   .book-grid button:hover { background: color-mix(in srgb, var(--tone) 12%, var(--field)); }
-  .book-grid button.here { color: var(--accent); font-weight: 700; }
+  .book-grid button.here { color: var(--accent); font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .book-grid button.here::before { background: var(--accent); width: 3px; }
   .chapters-head { display: flex; align-items: center; gap: 8px; flex: none; }
   .tone-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--tone); flex: none; }
   .book-title { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
