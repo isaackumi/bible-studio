@@ -216,6 +216,12 @@
   /** Samples to try with (hymns, a whole sample service, quizzes): on unless unticked. */
   let samples = $state(true);
 
+  /** Everything came across from another computer: setup is done, and the desk says what arrived. */
+  function moved(message: string) {
+    session.finishOnboarding();
+    session.notify(message, { ms: 12_000 });
+  }
+
   /** Finish setup; with `tour`, start the tour of the desk they land on. */
   async function finish(tour = false) {
     if (step === "church") go(index);
@@ -297,6 +303,9 @@
                     <button type="button" role="radio" lang={language.id} aria-checked={(session.workspace.appearance.language ?? "en") === language.id} onclick={() => session.setAppearance({ language: language.id })}>{language.name}</button>
                   {/each}
                 </div>
+                {#await import("../settings/MoveComputer.svelte") then { default: MoveComputer }}
+                  <MoveComputer compact ondone={moved} />
+                {/await}
               {:else if step === "church"}
                 <h1 id="step-title">{t("Tell us about your church")}</h1>
                 <p class="lede">{t("The name becomes your logo slide. Tick what you show and the preview shows it.")}</p>

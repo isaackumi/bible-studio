@@ -634,6 +634,7 @@ dependencies = [
  "windows 0.62.2",
  "windows-core 0.62.2",
  "windows-registry",
+ "zip",
 ]
 
 [[package]]
@@ -6268,6 +6269,7 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
+ "flate2",
  "indexmap 2.14.2",
  "memchr",
 ]

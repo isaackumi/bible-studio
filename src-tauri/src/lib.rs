@@ -17,6 +17,7 @@ mod noise;
 mod broadcast;
 mod ndi;
 mod voice;
+mod bundle;
 mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
@@ -399,6 +400,69 @@ fn import_media(app: AppHandle, db: State<Db>, path: String) -> Result<Value, St
     let (id, dest) = db::media_dest(&app, &ext)?;
     storage::clone_or_copy(source, &dest)?;
     with_db(&db, |conn| db::record_media(conn, &id, &name, &dest, kind))
+}
+
+/// Progress of a move file being saved or opened, for the bar on screen (at most every 100 ms).
+fn move_progress(app: &AppHandle) -> impl FnMut(u64, u64) {
+    let app = app.clone();
+    let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+    move |done, total| {
+        if done == total || last.elapsed() >= std::time::Duration::from_millis(100) {
+            last = std::time::Instant::now();
+            let _ = app.emit("move-progress", serde_json::json!({ "done": done, "total": total }));
+        }
+    }
+}
+
+/// Media as the move file lists it: every file the library records, with its extension.
+fn media_rows(db: &State<Db>) -> Result<Vec<bundle::MediaRow>, String> {
+    let text = |value: &Value| value.as_str().unwrap_or_default().to_string();
+    Ok(with_db(db, db::media_list)?
+        .iter()
+        .map(|asset| {
+            let path = std::path::PathBuf::from(text(&asset["path"]));
+            let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase();
+            bundle::MediaRow { id: text(&asset["id"]), name: text(&asset["name"]), kind: text(&asset["kind"]), ext, path, bytes: 0, created_at: text(&asset["createdAt"]) }
+        })
+        .collect())
+}
+
+/// Save the .churchstudio file: the library the desk hands over, and every file in Media.
+#[tauri::command(async)]
+fn move_export(app: AppHandle, db: State<Db>, dest: String, library: String, computer: String) -> Result<bundle::WriteSummary, String> {
+    let media = media_rows(&db)?;
+    let version = app.package_info().version.to_string();
+    bundle::write_bundle(std::path::Path::new(&dest), &library, &media, &computer, &version, move_progress(&app))
+}
+
+/// What a .churchstudio file holds, for the screen that asks before bringing it in.
+#[tauri::command(async)]
+fn move_peek(path: String) -> Result<Value, String> {
+    let (manifest, _) = bundle::read_manifest(std::path::Path::new(&path))?;
+    Ok(serde_json::json!({
+        "createdAt": manifest.created_at,
+        "computer": manifest.computer,
+        "media": manifest.media.len(),
+        "bytes": manifest.media.iter().map(|row| row.bytes).sum::<u64>(),
+    }))
+}
+
+/// Bring a .churchstudio file's media into Media (keeping each file's id, so the library still
+/// points at it) and hand the library back to the desk to merge.
+#[tauri::command(async)]
+fn move_import(app: AppHandle, db: State<Db>, path: String) -> Result<Value, String> {
+    let file = std::path::Path::new(&path);
+    let (_, library) = bundle::read_manifest(file)?;
+    let known: std::collections::HashSet<String> = media_rows(&db)?.into_iter().map(|row| row.id).collect();
+    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let added = bundle::extract_media(file, &dir, &known, move_progress(&app))?;
+    let mut count = 0;
+    for row in &added {
+        if with_db(&db, |conn| db::record_media_at(conn, &row.id, &row.name, &row.path, &row.kind, &row.created_at)).is_ok() {
+            count += 1;
+        }
+    }
+    Ok(serde_json::json!({ "library": library, "mediaAdded": count }))
 }
 
 /// Raw image bytes in the request body; the name is URL-encoded in `x-media-name`.
@@ -1029,6 +1093,9 @@ pub fn run() {
             diagnostic_log,
             backup_write,
             backup_latest,
+            move_export,
+            move_peek,
+            move_import,
             output_status,
             open_audience,
             close_audience,

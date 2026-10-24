@@ -483,6 +483,17 @@ pub fn media_dest(app: &AppHandle, ext: &str) -> Result<(String, PathBuf), Strin
     Ok((id, dest))
 }
 
+/// A file brought from another computer: its row keeps that computer's id and date, so the
+/// library still points at it. Already here: left as it is.
+pub fn record_media_at(conn: &Connection, id: &str, name: &str, dest: &Path, kind: &str, created: &str) -> Result<(), String> {
+    conn.execute(
+        "INSERT OR IGNORE INTO media_assets (id, name, path, kind, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, name, dest.to_string_lossy().to_string(), kind, created],
+    )
+    .map(|_| ())
+    .map_err(|error| error.to_string())
+}
+
 /// The library's record of a file now in the media folder (the file goes if it cannot be recorded).
 pub fn record_media(conn: &Connection, id: &str, name: &str, dest: &Path, kind: &str) -> Result<Value, String> {
     let created = chrono_now();
@@ -593,7 +604,7 @@ fn write_library(conn: &Connection, snapshot: &Value, fail_at: Option<&str>) -> 
     Ok(())
 }
 
-fn chrono_now() -> String {
+pub(crate) fn chrono_now() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
