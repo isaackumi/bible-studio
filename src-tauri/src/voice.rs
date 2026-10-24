@@ -187,12 +187,19 @@ mod helper {
             let reader = std::io::BufReader::new(stdout);
             for line in std::io::BufRead::lines(reader) {
                 let Ok(line) = line else { break };
+                // Its status and error lines go to the log too (never the words heard), so a
+                // support file says why listening stopped on a computer far away.
+                if line.starts_with(r#"{"kind":"error""#) || line.starts_with(r#"{"kind":"status""#) {
+                    log::info!("speech helper: {}", line.chars().take(400).collect::<String>());
+                }
                 let _ = app.emit("listen-phrase", super::ListenLine { run, line });
             }
             // It ended by itself: pass on why, if it said.
             if !ended_by_stop.load(std::sync::atomic::Ordering::SeqCst) {
                 std::thread::sleep(Duration::from_millis(150));
-                if let Some(reason) = said.lock().unwrap_or_else(|poison| poison.into_inner()).take() {
+                let reason = said.lock().unwrap_or_else(|poison| poison.into_inner()).take();
+                log::warn!("speech helper ended by itself{}", reason.as_deref().map(|text| format!(": {text}")).unwrap_or_default());
+                if let Some(reason) = reason {
                     let line = serde_json::json!({ "kind": "error", "message": format!("The speech helper stopped: {reason}") }).to_string();
                     let _ = app.emit("listen-phrase", super::ListenLine { run, line });
                 }
@@ -295,7 +302,10 @@ mod windows {
             .ok()
             .filter(|path| path.exists())
             .ok_or("The Windows speech helper is missing from this install. Reinstall Church Studio.")?;
-        let mut command = std::process::Command::new("powershell.exe");
+        // Windows PowerShell by its full path: a PATH an installer broke must not stop listening.
+        let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let full = std::path::Path::new(&system_root).join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+        let mut command = std::process::Command::new(if full.exists() { full.as_os_str().to_owned() } else { "powershell.exe".into() });
         command.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]).arg(script);
         command.env("CHURCH_STUDIO_WORDS", words);
         // The helper watches for this process and ends if it is gone (a crash leaves no other trace).

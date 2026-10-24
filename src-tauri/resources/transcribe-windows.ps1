@@ -22,11 +22,15 @@ try {
   exit 1
 }
 
-$recognizers = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()
+$recognizers = @([System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers())
 $info = $recognizers | Where-Object { $_.Culture.Name -eq "en-US" } | Select-Object -First 1
 if (-not $info) { $info = $recognizers | Where-Object { $_.Culture.Name -like "en-*" } | Select-Object -First 1 }
 if (-not $info) {
-  Emit @{ kind = "error"; message = "No English speech recognizer is installed. Add English speech in Windows Settings > Time & language > Speech." }
+  # Say what Windows has, so a support file shows whether speech was never installed or is in
+  # another language only.
+  $found = ($recognizers | ForEach-Object { $_.Culture.Name }) -join ", "
+  if (-not $found) { $found = "none" }
+  Emit @{ kind = "error"; message = "Windows has no English speech recognizer on this PC (installed: $found). In Windows Settings > Time & language > Language & region, add English (United States), open its Language options and install Speech recognition. Or choose Accurate under Settings > Audio & voice." }
   exit 1
 }
 
@@ -51,7 +55,7 @@ $null = Register-ObjectEvent -InputObject $engine -EventName AudioLevelUpdated -
 # A cleaned stream ends when the app stops listening.
 $null = Register-ObjectEvent -InputObject $engine -EventName RecognizeCompleted -SourceIdentifier "done"
 $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
-Emit @{ kind = "status"; message = "Listening. Speak a reference or read a verse." }
+Emit @{ kind = "status"; message = "Listening. Speak a reference or read a verse."; recognizer = "$($info.Name) ($($info.Culture.Name))"; input = $(if ($Stdin) { "app" } else { "microphone" }) }
 
 $lastLevel = [DateTime]::MinValue
 # Church Studio's process: if it is gone (a crash, or quit without stopping), this ends too, so the

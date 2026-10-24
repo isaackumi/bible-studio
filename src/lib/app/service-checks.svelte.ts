@@ -27,6 +27,8 @@ export type ChecksHost = {
   readonly output: OutputStatus;
   readonly plan: PlanId;
   readonly ent: EntitlementStatus;
+  /** Listening as it stands: a support file says why it stopped (never the words heard). */
+  readonly voice: { status: string; error: string | null; message: string };
   aiModels(): Promise<string[]>;
 };
 
@@ -166,6 +168,7 @@ export class ServiceChecks {
       ["Memory", raw ? `computer ${mb(raw.memory.available)} free of ${mb(raw.memory.total)}; app core ${mb(raw.memory.app)}; up ${raw.uptimeSecs}s` : ""],
       ["Space", found ? `library drive free ${mb(raw?.libraryFree)}; library ${mb(found.usage?.library)}, media ${mb(found.usage?.media)}, speech model ${mb(found.usage?.models)}, cache ${mb(found.usage?.cache)}, unused media ${mb(found.unusedBytes)}` : ""],
       ["Smoothness", this.lastFrames ? `${this.lastFrames.fps} fps, ${this.lastFrames.hiccups} hiccups, worst ${this.lastFrames.worstMs} ms` : "not measured"],
+      ["Listening", `${this.host.voice.status}${this.host.voice.error ? ` (${this.host.voice.error})` : ""}${this.host.voice.message ? `: ${this.host.voice.message}` : ""}`],
       ["Settings (no keys)", [`language ${this.host.workspace.appearance.language ?? "en"}`, `listening ${this.host.workspace.voice.engine ?? "system"}`, `AI ${aiReady(this.host.workspace.ai) ? this.host.workspace.ai.provider : "off"}${this.host.workspace.ai.features ? ` ${JSON.stringify(this.host.workspace.ai.features)}` : ""}`, `recording ${this.host.workspace.broadcast.quality}`, `backup ${this.host.workspace.backup.folder ? `on, last ${this.host.workspace.backup.lastAt || "never"}` : "off"}`].join("; ")],
       ["Log (last lines)", logTail],
     ];
