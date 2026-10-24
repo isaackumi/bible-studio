@@ -402,7 +402,7 @@ function promos() {
 const ACTS = {
   "extend-license": { label: "Extend", role: "support", fields: [["days", "Days", "number"], ["reason", "Reason", "text"]], hint: () => "Up to " + ME.limits.licenseDays[ME.role === "owner" ? "owner" : "support"] + " days at once; more waits for an owner’s approval." },
   "resend-key": { label: "Resend key email", role: "support", fields: [], hint: () => "Sent only to the email that bought it." },
-  "reset-seats": { label: "Free all seats", role: "support", fields: [["reason", "Reason", "text"]], hint: () => "Freed computers keep working until their next check-in, then must activate again." },
+  "reset-seats": { label: "Free all seats", role: "support", fields: [["reason", "Reason", "text"]], hint: () => "Every computer is freed and may activate again, first come first served; moves start counting from zero." },
   suspend: { label: "Suspend", role: "owner", danger: true, fields: [["reason", "Reason (required)", "text"]], hint: () => "Its computers drop to Free at their next check-in. It can be restored." },
   resume: { label: "Restore", role: "owner", fields: [["reason", "Reason", "text"]], hint: () => "Restoring always waits for an owner’s approval by email." },
   refund: { label: "Revoke for refund", role: "owner", danger: true, fields: [["reason", "Reason", "text"]], hint: () => "Refund the money in Paddle; this stops the license." },
@@ -502,7 +502,7 @@ document.addEventListener("click", (event) => {
   if (t.dataset.tab) { tab = t.dataset.tab; tabs(); return draw(); }
   if (t.dataset.open) { event.preventDefault(); const i = t.dataset.open.indexOf(":"); form = null; return show(t.dataset.open.slice(0, i), t.dataset.open.slice(i + 1)); }
   if (t.dataset.act) { form = { action: t.dataset.act, target: JSON.parse(t.dataset.target) }; if (!ACTS[form.action].fields.length) { const f = form; return confirm(ACTS[f.action].label + "?") && run(Object.assign({ action: f.action }, f.target), ACTS[f.action].label); } return show(open.kind, open.id, true); }
-  if (t.dataset.free) { if (confirm("Free this computer’s seat? It keeps working until its next check-in.")) run({ action: "release-device", license: t.dataset.license, device: t.dataset.free }, "Seat freed"); return; }
+  if (t.dataset.free) { if (confirm("Free this computer’s seat? It goes back to Free at its next check-in, until the license is moved back to it.")) run({ action: "release-device", license: t.dataset.license, device: t.dataset.free }, "Seat freed"); return; }
   if (t.dataset.team) return run({ action: "mark-team", device: t.dataset.team, team: t.dataset.on === "1" }, t.dataset.on === "1" ? "Marked as ours" : "Counted again");
   if (t.dataset.end) { if (confirm("End code " + t.dataset.end + " now? It stops working at once.")) run({ action: "end-promo", code: t.dataset.end }, "Code ended"); }
 });

@@ -18,7 +18,7 @@
 //   POST /admin/api/approve  {id, token, decline?}
 
 import { ownershipOf } from "./ownership.ts";
-import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial } from "./api.ts";
+import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial, markMoved } from "./api.ts";
 import type { Account, LinkedLicense } from "./accounts.ts";
 import { licenseKeyEmail } from "./email.ts";
 import { adminPage } from "./admin-page.ts";
@@ -376,7 +376,15 @@ async function perform(config: ApiConfig, admin: Admin, action: AdminAction, inp
       const left = action === "reset-seats" ? [] : seats.filter((entry) => entry.device !== device && !(device.length === 8 && entry.device.startsWith(device)));
       if (left.length === seats.length) return { ok: false, error: action === "reset-seats" ? "No computers are using this license." : "That computer is not on this license." };
       await putJson(store, `act:${id}`, left);
-      return { ok: true, detail: `${seats.length - left.length} seat(s) freed; a freed computer keeps working until its next check-in` };
+      if (action === "reset-seats") {
+        // A fresh start: every computer may activate again, and moves count from zero.
+        await store.delete(`moved:${id}`);
+        await store.delete(`rel:${id}`);
+        return { ok: true, detail: `${seats.length} seat(s) freed; every computer may activate again, first come first served` };
+      }
+      // A freed computer drops to Free at its next check-in, until the licence is moved back to it.
+      for (const entry of seats.filter((candidate) => !left.includes(candidate))) await markMoved(config, id, entry.device, entry.name, "");
+      return { ok: true, detail: `${seats.length - left.length} seat(s) freed; that computer goes back to Free at its next check-in` };
     }
     case "resend-key": {
       if (!license) return { ok: false, error: "This license has no email on file." };

@@ -60,6 +60,30 @@ async function setup(users = "owner@heitech.test:owner,help@heitech.test:support
   return { config, as, mails, access, tokenFor, license, advance: (ms: number) => (clock += ms), now: () => clock };
 }
 
+describe("admin: seats and moves", () => {
+  it("release-device blocks that computer until the license is moved back", async () => {
+    const { as, license } = await setup();
+    const key = await license("0a0b0c0d", "pastor@grace.org");
+    expect((await as(null, "/v1/activate", { key, device: "one", name: "Old" })).status).toBe(200);
+    expect((await as("help@heitech.test", "/admin/api/action", { action: "release-device", license: "0a0b0c0d", device: "one" })).status).toBe(200);
+    expect(await as(null, "/v1/activate", { key, device: "one", name: "Old" })).toMatchObject({ status: 403, data: { moved: true } });
+  });
+
+  it("reset-seats clears the moved list and the move log, so everyone starts again", async () => {
+    const { as, config, license } = await setup();
+    const key = await license("0a0b0c0d", "pastor@grace.org");
+    expect((await as(null, "/v1/activate", { key, device: "one", name: "Old" })).status).toBe(200);
+    expect((await as(null, "/v1/release", { key, device: "one" })).status).toBe(200);
+    expect((await as(null, "/v1/activate", { key, device: "two", name: "New" })).status).toBe(200);
+    expect(((await getJson<unknown[]>(config.store, "moved:0a0b0c0d")) ?? []).length).toBe(1);
+    expect(((await getJson<unknown[]>(config.store, "rel:0a0b0c0d")) ?? []).length).toBe(1);
+    expect((await as("help@heitech.test", "/admin/api/action", { action: "reset-seats", license: "0a0b0c0d", reason: "new laptops" })).status).toBe(200);
+    expect((await getJson<unknown[]>(config.store, "moved:0a0b0c0d")) ?? []).toEqual([]);
+    expect((await getJson<unknown[]>(config.store, "rel:0a0b0c0d")) ?? []).toEqual([]);
+    expect((await as(null, "/v1/activate", { key, device: "one", name: "Old" })).status).toBe(200);
+  });
+});
+
 describe("admin: who gets in", () => {
   it("takes the email only from a valid Cloudflare Access token, and the role only from ADMIN_USERS", async () => {
     const { as, config, access, tokenFor, now } = await setup();
