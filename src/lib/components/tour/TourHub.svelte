@@ -3,7 +3,7 @@
   import { session } from "../../app/session.svelte";
   import { TOUR_GROUPS, TOURS, tourStatus, type TourId } from "../../tour/steps";
   import Icon from "../Icon.svelte";
-  import { t } from "../../i18n/core";
+  import { t, tn } from "../../i18n/core";
 
   // Guided tours, grouped by desk: what is done, what is left, and a way back into any step.
   let open = $state<TourId | null>(null);
@@ -12,6 +12,17 @@
   const progress = $derived(session.workspace.tours);
   const all = $derived(TOUR_GROUPS.flatMap((group) => group.tours));
   const doneCount = $derived(all.filter((id) => progress[id].done).length);
+  // Groups fold up: the first with a tour still to do starts open, the rest closed, so the list
+  // stays short as tours are added.
+  const firstToDo = TOUR_GROUPS.find((group) => group.tours.some((id) => !session.workspace.tours[id].done))?.name ?? TOUR_GROUPS[0]!.name;
+  let openGroups = $state<Set<string>>(new Set([firstToDo]));
+  const toggleGroup = (name: string) => {
+    const next = new Set(openGroups);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    openGroups = next;
+  };
+  const doneIn = (tours: TourId[]) => tours.filter((id) => progress[id].done).length;
 
   function close() {
     session.tourHubOpen = false;
@@ -40,8 +51,13 @@
 
   <div class="groups">
     {#each TOUR_GROUPS as group (group.name)}
-      <section>
-        <p class="group">{group.name}</p>
+      <section class:closed={!openGroups.has(group.name)}>
+        <button type="button" class="group" aria-expanded={openGroups.has(group.name)} onclick={() => toggleGroup(group.name)}>
+          <span>{t(group.name)}</span>
+          <em>{doneIn(group.tours) === group.tours.length ? t("Done") : tn(group.tours.length, "{n} tour", "{n} tours") + (doneIn(group.tours) ? ` · ${t("{n} done", { n: doneIn(group.tours) })}` : "")}</em>
+          <Icon name={openGroups.has(group.name) ? "chevron-up" : "chevron-down"} size={13} />
+        </button>
+        {#if openGroups.has(group.name)}
         {#each group.tours as id (id)}
           {@const tour = TOURS[id]}
           {@const status = tourStatus(progress, id)}
@@ -77,6 +93,7 @@
             {/if}
           </div>
         {/each}
+        {/if}
       </section>
     {/each}
   </div>
@@ -101,7 +118,7 @@
     z-index: 79;
     display: flex;
     flex-direction: column;
-    width: min(400px, calc(100vw - 32px));
+    width: min(440px, calc(100vw - 32px));
     max-height: calc(100vh - 80px);
     border: 1px solid color-mix(in srgb, var(--ink) 14%, var(--line));
     border-radius: 14px;
@@ -120,7 +137,11 @@
   .meter { height: 4px; margin: 0 16px 6px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 10%, transparent); overflow: hidden; }
   .meter i { display: block; height: 100%; border-radius: 4px; background: var(--presence, #3fb950); transition: width 240ms ease; }
   .groups { overflow: auto; padding: 4px 10px 8px; }
-  .group { margin: 10px 6px 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .group { display: flex; align-items: center; gap: 8px; width: 100%; margin: 6px 0 4px; padding: 6px 6px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; text-align: left; text-transform: none; letter-spacing: normal; cursor: pointer; }
+  .group:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .group span { flex: 1; }
+  .group em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); }
+  section.closed .group { color: var(--muted); }
   .tour { border: 1px solid var(--line); border-radius: 10px; background: var(--field); margin-bottom: 6px; overflow: hidden; }
   .tour.expanded { border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
   .tour-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; }

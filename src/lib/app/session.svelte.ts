@@ -233,7 +233,7 @@ import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { countUse, usageCounts, usageSent } from "./usage-counts";
 import type { MessageTone } from "./status-line";
-import { whatsNewFor, type Release } from "../domain/changelog";
+import { CHANGELOG, whatsNewFor, type Release } from "../domain/changelog";
 import { internetRemote } from "./remote-relay.svelte";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
@@ -5884,20 +5884,32 @@ class Session {
   };
 
   /** Start a tour, on its own page or desk, from any step. */
-  startTour = (id: TourId, from = 0) => {
+  startTour = async (id: TourId, from = 0) => {
     this.settingsOpen = false;
     this.tourHubOpen = false;
+    // Each tour opens the part of the app it walks through.
     if (id === "production") {
       if (!this.requireFeature("production")) return;
       if (this.workspace.appearance.desk !== "obs") this.setAppearance({ desk: "obs" });
+    } else if (id === "audience") {
+      const { audienceRoom } = await import("./rooms.svelte");
+      audienceRoom.show();
+      audienceRoom.tab = "questions";
+    } else if (id === "design") {
+      this.openStudio(undefined, "templates");
+    } else if (id === "pictures") {
+      const { pictures } = await import("./pictures.svelte");
+      pictures.show();
+    } else if (id === "sound") {
+      this.openSettings("audio");
     } else {
       if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
       this.pageRequest = id;
     }
     this.tour = null;
     this.tourFrom = Math.max(0, from);
-    // Let the page or desk switch paint before the spotlight looks for its targets.
-    setTimeout(() => (this.tour = id), 180);
+    // Let the page, desk or panel paint before the spotlight looks for its targets.
+    setTimeout(() => (this.tour = id), 260);
   };
 
   endTour = () => {
@@ -6789,6 +6801,11 @@ class Session {
 
   dismissWhatsNew = () => {
     this.whatsNew = null;
+  };
+
+  /** The What's new card for this version, asked for (Go to anything › What's new). */
+  showWhatsNew = () => {
+    this.whatsNew = CHANGELOG[0] ?? null;
   };
 
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */

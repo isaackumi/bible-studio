@@ -109,7 +109,7 @@
 
   {#if audienceRoom.current}
     {@const room = audienceRoom.current}
-    <section class="join">
+    <section class="join" data-tour="aud-join">
       <div class="qr"><QrView qr={{ data: room.joinUrl, style: "rounded", dark: "#111111", light: "#ffffff", caption: "" }} /></div>
       <div class="join-copy">
         <span class="code" aria-label={t("Room code {code}", { code: room.code })}>{room.code}</span>
@@ -137,10 +137,10 @@
   {/if}
   {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
 
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" data-tour="aud-tabs">
       <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (audienceRoom.tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
-      <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} onclick={() => (audienceRoom.tab = "games")}>{t("Quizzes and polls")}</button>
-      <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} onclick={() => (audienceRoom.tab = "pick")}>{t("Pick someone")}</button>
+      <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} data-tour="aud-tab-games" onclick={() => (audienceRoom.tab = "games")}>{t("Quizzes and polls")}</button>
+      <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} data-tour="aud-tab-pick" onclick={() => (audienceRoom.tab = "pick")}>{t("Pick someone")}</button>
     </div>
 
     {#if tab === "pick" && !audienceRoom.current}
@@ -158,7 +158,7 @@
     {:else if tab === "questions"}
       <!-- How questions come in, which to show, and finding one: together, above the list. -->
       <div class="q-tools">
-      <div class="switches">
+      <div class="switches" data-tour="aud-questions">
         <label><input type="checkbox" class="switch" checked={view?.room.open ?? false} onchange={(event) => audienceRoom.settings({ open: event.currentTarget.checked })} /> {t("Taking questions")}</label>
         <label><input type="checkbox" class="switch" checked={view?.room.moderate ?? false} onchange={(event) => audienceRoom.settings({ moderate: event.currentTarget.checked })} /> {t("Hold for approval")}</label>
       </div>

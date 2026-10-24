@@ -2,7 +2,6 @@
   import RemoteApproval from "./RemoteApproval.svelte";
   import Paywall from "./Paywall.svelte";
   import Toast from "./Toast.svelte";
-  import CommandPalette from "./CommandPalette.svelte";
   import DeckEditor from "./decks/DeckEditor.svelte";
   import { audienceRoom } from "../app/rooms.svelte";
   import { pictures } from "../app/pictures.svelte";
@@ -233,7 +232,8 @@
         {#key studioDeck.id}<DeckEditor deck={studioDeck} startWith={session.studio.start} onclose={() => session.closeStudio()} />{/key}
       {/if}
     {/if}
-    <CommandPalette />
+    <!-- Its own chunk, loaded just after the desk starts (⌘K works a moment later). -->
+    {#await import("./CommandPalette.svelte") then { default: CommandPalette }}<CommandPalette />{/await}
     <UpdateNotice />
     <StatusLine />
     <!-- Loaded just after start-up: nothing is running yet when the desk opens. -->

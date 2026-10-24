@@ -105,7 +105,7 @@
 </script>
 
 {#if lead}
-  <div class="island" class:expanded role="region" aria-label={t("Now running")} transition:fly={{ y: -16, duration: 220 }}>
+  <div class="island" class:expanded role="region" data-tour="now-running" aria-label={t("Now running")} transition:fly={{ y: -16, duration: 220 }}>
     <div class="pill tone-{lead.tone}">
       <span class="pulse" aria-hidden="true"></span>
       <Icon name={lead.icon} size={14} />

@@ -228,7 +228,7 @@
       <button type="button" class="end-game" class:armed={endArmed} title={t("Stops the game now and takes it off the screen. The room stays open.")} onclick={() => { if (endArmed) { endArmed = false; void audienceRoom.endGame(); } else { endArmed = true; setTimeout(() => (endArmed = false), 4000); } }}>{endArmed ? t("Press again to end the game") : t("End game")}</button>
     </div>
     <div class="progress" aria-hidden="true">{#each run.game.questions as _q, index (index)}<i class:done={index < run.index} class:now={index === run.index}></i>{/each}</div>
-    <div class="next-step">
+    <div class="next-step" data-tour="game-step">
       {#if !live && run.index === 0 && people === 0}
         <button type="button" class="btn big step waiting" disabled>{t("Waiting for players to join…")}</button>
         <p>{t("Question 1 can start once someone has joined with the code on the screen.")} <button type="button" class="inline-link" onclick={() => audienceRoom.ask()}>{t("Start anyway")}</button></p>
@@ -281,7 +281,7 @@
       {/each}
     </ol>
     {/if}
-    <details class="switches">
+    <details class="switches" data-tour="game-switches">
       <summary>{t("How the game runs")}</summary>
       <div class="screen">
         <span>{audienceRoom.follow ? t("Put on the screen yourself:") : t("Put on Preview:")}</span>

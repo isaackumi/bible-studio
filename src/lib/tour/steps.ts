@@ -4,7 +4,7 @@
 
 import { msg } from "../i18n/core";
 
-export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production";
+export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production" | "audience" | "design" | "pictures" | "sound";
 
 export type TourStep = {
   /** CSS selectors, tried in order. None: a centered card with no spotlight. */
@@ -232,6 +232,156 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       TOUR_BUTTON,
     ],
   },
+  audience: {
+    name: msg("Audience & phones"),
+    steps: [
+      {
+        title: msg("Phones in the room"),
+        body: msg("Open Audience and a room starts: people scan a code to ask questions, play quizzes, answer polls or be picked. Nothing reaches the screen until you put it there."),
+      },
+      {
+        target: ['[data-tour="aud-join"]'],
+        title: msg("Scan to join"),
+        body: msg("The QR code and the six-letter code go on the screen with Show join. Anyone with a phone is in: no app, no sign-in."),
+      },
+      {
+        target: ['[data-tour="aud-tabs"]'],
+        title: msg("Three things to do"),
+        body: msg("Questions from the room, quizzes and polls, and picking someone at random. Each tab is its own panel."),
+      },
+      {
+        target: ['[data-tour="aud-questions"]'],
+        title: msg("Questions, on your terms"),
+        body: msg("Taking questions is off until you turn it on. Hold for approval keeps each one here until you put it through to the screen."),
+      },
+      {
+        target: ['[data-tour="aud-tab-games"]'],
+        title: msg("Quizzes and polls"),
+        body: msg("Ready-made quizzes and polls to try, or your own. Questions come in a new order each time; a poll can be anonymous, a word cloud or a rating."),
+      },
+      {
+        target: ['[data-tour="game-step"]'],
+        title: msg("One button runs the game"),
+        body: msg("It always says what happens next: start the question, stop answers, show the answer, the leaderboard, the next question. By default it moves on by itself."),
+      },
+      {
+        target: ['[data-tour="game-switches"]'],
+        title: msg("How the game runs"),
+        body: msg("Sounds and music styles, a countdown to read each question, and whether the game moves on by itself or waits for you to press Next."),
+      },
+      {
+        target: ['[data-tour="aud-tab-pick"]'],
+        title: msg("Pick someone"),
+        body: msg("Spin through the names of everyone here and land on one, or split the room into random groups."),
+      },
+      {
+        target: ['[data-tour="now-running"]'],
+        title: msg("Now running"),
+        body: msg("Leave this panel and a small bar under the top keeps the game's next step within reach, with a way back to it."),
+      },
+      TOUR_BUTTON,
+    ],
+  },
+  design: {
+    name: msg("Design studio"),
+    steps: [
+      {
+        title: msg("The design studio"),
+        body: msg("Slides, lower thirds, announcements and logos, designed here and used anywhere: on Preview, on the screen, or in the service."),
+      },
+      {
+        target: ['.deck-editor .rail'],
+        title: msg("Tools down the side"),
+        body: msg("Templates, text, pictures, shapes, icons, gradients and your media, each a panel."),
+      },
+      {
+        target: ['.deck-editor .side'],
+        title: msg("Start from a template"),
+        body: msg("Welcome, event, verse, sermon and giving pages in many styles. Add one as a new page or replace this one, then change anything."),
+      },
+      {
+        target: ['.deck-editor .toolbar'],
+        title: msg("Add to the page"),
+        body: msg("Text, a picture, a shape, an icon or a QR code. Drag to place it, resize from the corners."),
+      },
+      {
+        target: ['.deck-editor .canvas-area'],
+        title: msg("The page"),
+        body: msg("Click an element to edit it; double-click text to type. The inspector on the right changes fonts, colours, fit and animation."),
+      },
+      {
+        target: ['.deck-editor .pages'],
+        title: msg("Pages"),
+        body: msg("A deck can hold many pages. Drag to reorder; each page can go on the screen on its own."),
+      },
+      {
+        target: ['.deck-editor .save'],
+        title: msg("Save, then use it"),
+        body: msg("A saved deck shows up in Slides on the desk, in Add to service, and as a source in the Production Desk."),
+      },
+      TOUR_BUTTON,
+    ],
+  },
+  pictures: {
+    name: msg("Pictures & slideshows"),
+    steps: [
+      {
+        title: msg("Pictures from any folder"),
+        body: msg("Show photos straight from a folder on this computer or a USB stick: no importing, no library."),
+      },
+      {
+        target: ['[data-tour="pic-folder"]'],
+        title: msg("Choose a folder"),
+        body: msg("Pick a folder once; its pictures appear here, and the folders inside it too."),
+      },
+      {
+        target: ['.folders'],
+        title: msg("Folders inside"),
+        body: msg("Open any folder inside with a click. Back takes you up a level."),
+      },
+      {
+        target: ['.grid[role="listbox"]'],
+        title: msg("Pictures"),
+        body: msg("Click one to put it on Preview; LIVE sends it to the screen. The arrow keys move through them."),
+      },
+      {
+        target: ['.start-btn'],
+        title: msg("Slideshow"),
+        body: msg("Start from the first picture or the one you chose. It changes by itself at the pace you set, and loops."),
+      },
+      {
+        target: ['.slideshow'],
+        title: msg("Slideshow settings"),
+        body: msg("Seconds per picture, how one changes to the next, and whether to shuffle."),
+      },
+      TOUR_BUTTON,
+    ],
+  },
+  sound: {
+    name: msg("Sound & voice"),
+    steps: [
+      {
+        title: msg("Sound and voice"),
+        body: msg("Where the room hears Church Studio, and how Church Studio listens to you."),
+      },
+      {
+        target: ['.settings-body .picker'],
+        title: msg("Where sound goes"),
+        body: msg("Music, the sound pad and videos on the audience screen play through the output chosen here. Automatic follows the church's sound system when it is plugged in."),
+      },
+      {
+        target: ['[data-tour="audio-mic"]'],
+        title: msg("The microphone"),
+        body: msg("Listening needs the microphone. If the computer refused it, this row says where to allow it."),
+      },
+      {
+        target: ['.settings-body .choices'],
+        title: msg("Which recognizer listens"),
+        body: msg("System is built in and light. Accurate runs Whisper on this computer. ElevenLabs and Deepgram use your own key and hear accents best."),
+      },
+      TOUR_BUTTON,
+    ],
+  },
 };
 
 export type Rect = { left: number; top: number; width: number; height: number };
@@ -262,6 +412,9 @@ export function placeCard(target: Rect | null, card: { width: number; height: nu
 export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
   { name: msg("Presenter Desk"), tours: ["scriptures", "songs", "sermon", "service"] },
   { name: msg("Production Desk"), tours: ["production"] },
+  { name: msg("Audience & phones"), tours: ["audience"] },
+  { name: msg("Design & pictures"), tours: ["design", "pictures"] },
+  { name: msg("Sound & voice"), tours: ["sound"] },
 ];
 
 /** How far someone got in each tour: the furthest step seen (index into the full list), and done. */

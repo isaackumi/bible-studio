@@ -29,7 +29,7 @@
       {#each [1, 2, 3, 5] as n (n)}<button type="button" class="chip" class:on={count === n} onclick={() => (count = n)}>{n}</button>{/each}
     </div>
     <label class="check"><input type="checkbox" bind:checked={again} /> {t("Someone can be picked more than once")}</label>
-    <button type="button" class="btn accent big" disabled={!people.length} onclick={() => void audienceRoom.pick(count, again)}><Icon name="sparkles" size={15} /> {count > 1 ? t("Pick {n} people", { n: count }) : t("Pick someone")}</button>
+    <button type="button" class="btn accent big" data-tour="pick-go" disabled={!people.length} onclick={() => void audienceRoom.pick(count, again)}><Icon name="sparkles" size={15} /> {count > 1 ? t("Pick {n} people", { n: count }) : t("Pick someone")}</button>
     <p class="hint">{audienceRoom.follow ? t("The screen spins through everyone's names and lands on who is picked.") : t("The spin goes to Preview; press LIVE to show it.")}</p>
     {#if audienceRoom.pickHistory.length}
       <div class="history">

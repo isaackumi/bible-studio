@@ -158,7 +158,7 @@
       <div class="start">
         <span class="start-icon"><Icon name="media" size={22} /></span>
         <div><strong>{t("Show pictures from any folder")}</strong><span>{t("Announcements, a photo album, a picture loop for the walk-in. Nothing is copied.")}</span></div>
-        <button type="button" class="btn accent" onclick={() => pictures.choose()}>{t("Choose folder…")}</button>
+        <button type="button" class="btn accent" data-tour="pic-folder" onclick={() => pictures.choose()}>{t("Choose folder…")}</button>
       </div>
     {/if}
     <!-- Go to: the usual places (synced cloud drives included) and pinned folders, on one line. -->
