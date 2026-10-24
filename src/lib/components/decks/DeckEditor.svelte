@@ -95,6 +95,13 @@
 
   const page = $derived(draft.pages[pageIndex] ?? draft.pages[0]!);
   const selected = $derived(page.layers.find((layer) => layer.id === selectedId) ?? null);
+  // A field's change arrives on blur, after the click elsewhere has already cleared the selection:
+  // the inspector still commits to the element it was editing, not to nothing.
+  let lastSelectedId = $state<string | null>(null);
+  $effect.pre(() => {
+    if (selectedId) lastSelectedId = selectedId;
+  });
+  const inspected = $derived(selected ?? page.layers.find((layer) => layer.id === lastSelectedId) ?? null);
   const dirty = $derived(JSON.stringify(draft) !== savedJson);
   const images = $derived(session.media.filter((asset) => asset.kind === "image"));
 
@@ -556,8 +563,8 @@
           <button type="button" class="btn danger" onclick={() => { commitPage(pickedIds.reduce((next, id) => removeLayer(next, id), page)); selectedId = null; }}>{t("Delete")}</button>
         </div>
         <p class="note">{keys(t("Drag any of them to move them together. Shift-click to add or take one away. ⌘G groups them, ⌘⇧G ungroups."))}</p>
-      {:else if selected}
-        <ElementInspector {page} layer={selected} oncommit={commitPage} />
+      {:else if selected && inspected}
+        <ElementInspector {page} layer={inspected} oncommit={commitPage} />
       {:else}
         <h3>{page.name}</h3>
         <label class="field-row">
