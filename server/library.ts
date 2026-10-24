@@ -84,7 +84,7 @@ export class LibraryCore {
   }
 
   /** Apply changes from one computer: the newest wins, the replaced version goes to history. */
-  async push(input: { device: string; name?: string; now: number; changes: Change[] }): Promise<Result<{ seq: number; applied: number; conflicts: Array<{ col: string; id: string; keptAt: number }> }>> {
+  async push(input: { device: string; name?: string; now: number; changes: Change[] }): Promise<Result<{ seq: number; applied: number; conflicts: Array<{ col: string; id: string; keptAt: number; doc: unknown | null }> }>> {
     if (await this.readOnly()) return fail(403, "This plan has ended: the cloud copy can be read but not changed.");
     const changes = Array.isArray(input.changes) ? input.changes : [];
     if (changes.length > PUSH_CHANGES) return fail(413, `At most ${PUSH_CHANGES} changes in one push.`);
@@ -101,11 +101,13 @@ export class LibraryCore {
     let seq = await this.seq();
     const records: RecordRow[] = [];
     const history: HistoryRow[] = [];
-    const conflicts: Array<{ col: string; id: string; keptAt: number }> = [];
+    const conflicts: Array<{ col: string; id: string; keptAt: number; doc: unknown | null }> = [];
     for (const change of changes) {
       const existing = records.find((row) => row.col === change.col && row.id === change.id) ?? (await this.store.getRecord(change.col, change.id));
       if (existing && existing.at >= change.at) {
-        conflicts.push({ col: change.col, id: change.id, keptAt: existing.at });
+        // The version that stays goes back to the sender (null: it is deleted), so that computer
+        // can show it at once instead of keeping its own.
+        conflicts.push({ col: change.col, id: change.id, keptAt: existing.at, doc: existing.deletedAt !== null ? null : existing.doc });
         // The losing version is kept too: the church can get it back from the record's history.
         if (change.doc !== null && change.doc !== undefined) history.push({ col: change.col, id: change.id, at: change.at, device: input.device, doc: change.doc, until: input.now + HISTORY_DAYS * DAY });
         continue;

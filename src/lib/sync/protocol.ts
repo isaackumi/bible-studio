@@ -11,7 +11,7 @@ export type CloudBinItem = { col: string; id: string; deletedAt: number; name: s
 export type CloudVersion = { at: number; device: string; doc: unknown };
 
 export type CloudProtocol = {
-  push(changes: Change[]): Promise<ServerAnswer<{ seq: number; applied: number; conflicts: Array<{ col: string; id: string; keptAt: number }> }>>;
+  push(changes: Change[]): Promise<ServerAnswer<{ seq: number; applied: number; conflicts: Array<{ col: string; id: string; keptAt: number; doc: unknown | null }> }>>;
   pull(since: number): Promise<ServerAnswer<{ seq: number; changes: Change[]; more: boolean }>>;
   status(): Promise<ServerAnswer<CloudStatus>>;
   settings(syncVideos: boolean): Promise<ServerAnswer<{ syncVideos: boolean }>>;

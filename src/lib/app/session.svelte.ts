@@ -1078,8 +1078,14 @@ class Session {
     await run;
   };
 
+  /** The workspace as last handed to the cloud: a cursor move is not a change worth a sync. */
+  private cloudShape: unknown[] = [];
+
   private writeNow = async () => {
-    this.cloudSoon();
+    const synced = this.workspace;
+    const shape = [synced.decks, synced.compositions, synced.games, synced.playlists, synced.serviceTemplates, synced.macros, synced.overlays, synced.customLayouts, synced.sources, synced.songFolders, synced.favorites, synced.churchName, synced.logoAssetId, synced.logoText, synced.logoPicture, synced.ccliLicense, synced.voice.words];
+    if (this.service !== this.savedService || shape.some((part, index) => part !== this.cloudShape[index])) this.cloudSoon();
+    this.cloudShape = shape;
     this.workspace = { ...this.workspace, cursor: this.cursor, lastServiceId: this.service?.id ?? null };
     try {
       await this.saveWorkspaceDocument(this.workspace);
@@ -6891,7 +6897,15 @@ class Session {
     const what = new Set(this.cloudTouched);
     this.cloudTouched.clear();
     if (what.has("songs")) this.songs = await api.songList();
-    if (what.has("services")) this.services = await api.serviceList();
+    if (what.has("services")) {
+      this.services = await api.serviceList();
+      // The open service, as the cloud changed it; gone if it was deleted elsewhere.
+      if (this.service) {
+        const fresh = await api.serviceGet(this.service.id);
+        this.service = fresh;
+        this.savedService = fresh;
+      }
+    }
     if (what.has("sermons")) this.sermons = await api.sermonList();
     if (what.has("themes")) this.themes = await api.themeList();
     this.media = await api.mediaList();

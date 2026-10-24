@@ -24,9 +24,17 @@ function fakeCloud(over: Partial<{ status: Partial<CloudStatus>; refuse: ServerA
     push: async (changes) => {
       log.push(`push ${changes.length}`);
       if (over.refuse) return over.refuse;
-      for (const change of changes) records.push({ ...change });
-      seq += changes.length;
-      return ok({ seq, applied: changes.length, conflicts: [] });
+      const conflicts: Array<{ col: string; id: string; keptAt: number; doc: unknown | null }> = [];
+      for (const change of changes) {
+        const held = [...records].reverse().find((row) => row.col === change.col && row.id === change.id);
+        if (held && held.at >= change.at) {
+          conflicts.push({ col: change.col, id: change.id, keptAt: held.at, doc: held.doc });
+          continue;
+        }
+        records.push({ ...change });
+        seq += 1;
+      }
+      return ok({ seq, applied: changes.length - conflicts.length, conflicts });
     },
     pull: async (since) => {
       log.push(`pull ${since}`);
@@ -75,8 +83,12 @@ function fakeComputer(start: { songs?: Song[]; workspace?: Workspace; media?: Ar
       sermon: async () => {},
       theme: async (doc, id) => void (themes = doc ? [...themes.filter((entry) => entry.id !== id), doc] : themes.filter((entry) => entry.id !== id)),
       workspace: (patch) => void (workspace = patch(workspace)),
+      copy: async (col, doc, suffix) => {
+        if (col === "song") songs = [...songs, { ...(doc as Song), id: `copy-${(doc as Song).id}`, title: `${(doc as Song).title} ${suffix}` }];
+        did.push(`copy ${col} ${suffix}`);
+      },
     },
-    mediaIds: async () => new Set(media.keys()),
+    media: async () => new Map([...media.values()].map((item) => [item.id, item.kind])),
   };
   const commands: CloudCommands = {
     hash: async (id) => {
@@ -85,9 +97,9 @@ function fakeComputer(start: { songs?: Song[]; workspace?: Workspace; media?: Ar
       return { hash: `hash-${id}`, bytes: 100, name: `${id}.${item.kind === "video" ? "mp4" : "png"}`, kind: item.kind, ext: item.kind === "video" ? "mp4" : "png" };
     },
     upload: async (id, url) => void did.push(`upload ${id} ${url}`),
-    download: async (url, row) => {
+    download: async (url, row, hash) => {
       media.set(row.id, { id: row.id, kind: row.kind });
-      did.push(`download ${row.id} ${url}`);
+      did.push(`download ${row.id} ${url} ${hash}`);
     },
     readState: async () => state,
     writeState: async (text) => void (state = text),
@@ -131,7 +143,7 @@ describe("cloud sync on this computer", () => {
     const computer = fakeComputer({ workspace, media: [{ id: logo, kind: "image" }] });
     const sync = make(cloud, computer);
     await sync.syncNow();
-    expect(computer.did).toContain(`download ${PIC} cloud://hash-pic`);
+    expect(computer.did).toContain(`download ${PIC} cloud://hash-pic hash-pic`);
     expect(computer.did).toContain(`upload ${logo} cloud://hash-${logo}`);
     expect(computer.media.has(PIC)).toBe(true);
     // Next time: the picture is here and the logo is in the cloud, so neither moves again.
@@ -206,6 +218,34 @@ describe("cloud sync on this computer", () => {
     const told: number[] = [];
     await new CloudSync({ protocol: fakeCloud().protocol, commands: other.commands, library: other.library, gate: () => "ok", now: () => T0, name: () => "PC", onRestored: (count) => void told.push(count) }).syncNow();
     expect(told).toEqual([]);
+  });
+
+  it("on first contact the cloud's version wins and the joining copy is kept, renamed", async () => {
+    const cloud = fakeCloud();
+    cloud.seed({ col: "song", id: "grace", at: T0 - 5000, doc: song("grace", "Amazing Grace, as we sing it") });
+    cloud.seed({ col: "song", id: "same", at: T0 - 5000, doc: song("same", "Untouched sample") });
+    const computer = fakeComputer({ songs: [song("grace", "Amazing Grace"), song("same", "Untouched sample")] });
+    const sync = make(cloud, computer);
+    await sync.syncNow();
+    const titles = computer.songs().map((entry) => entry.title).sort();
+    expect(titles).toEqual(["Amazing Grace (from Test PC)", "Amazing Grace, as we sing it", "Untouched sample"]);
+    // The renamed copy went up too, and the cloud's version stayed as it was.
+    expect(cloud.records.find((row) => row.id === "grace")!.doc).toMatchObject({ title: "Amazing Grace, as we sing it" });
+    expect(cloud.records.some((row) => row.id === "copy-grace")).toBe(true);
+    expect(computer.did.filter((line) => line.startsWith("copy"))).toEqual(["copy song (from Test PC)"]);
+  });
+
+  it("an edit here wins over what this computer last saw, even with its clock behind", async () => {
+    const cloud = fakeCloud();
+    cloud.seed({ col: "song", id: "s", at: T0 + 3_600_000, doc: song("s", "From a fast clock") });
+    const computer = fakeComputer();
+    const sync = make(cloud, computer, () => "ok", () => T0);
+    await sync.syncNow();
+    expect(computer.songs()[0]!.title).toBe("From a fast clock");
+    await computer.library.apply.song(song("s", "Edited here"), "s");
+    await sync.syncNow();
+    expect(cloud.records.at(-1)!.doc).toMatchObject({ title: "Edited here" });
+    expect(cloud.records.at(-1)!.at).toBe(T0 + 3_600_001);
   });
 
   it("remembers where it got to between runs", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultWorkspace } from "../domain/theme";
 import type { Service, Sermon, Song, Theme, Workspace } from "../domain/types";
-import { acceptChanges, applyChanges, collectRecords, diffRecords, emptyManifest, hashDoc, mediaIdsIn, type Apply, type LibraryInput } from "./records";
+import { acceptChanges, applyChanges, applyConflicts, collectRecords, diffRecords, emptyManifest, hashDoc, mediaIdsIn, type Apply, type LibraryInput } from "./records";
 
 const T0 = Date.UTC(2026, 9, 24, 10);
 const UUID = "0b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b";
@@ -17,7 +17,7 @@ function syncedFor(library: LibraryInput, at = T0) {
   return acceptChanges(first.manifest, first.changes);
 }
 
-const quiet: Apply = { song: async () => {}, service: async () => {}, sermon: async () => {}, theme: async () => {}, workspace: () => {} };
+const quiet: Apply = { song: async () => {}, service: async () => {}, sermon: async () => {}, theme: async () => {}, workspace: () => {}, copy: async () => {} };
 
 describe("records in and out of the library", () => {
   it("collects every synced collection and the settings record, never a secret", () => {
@@ -47,7 +47,9 @@ describe("records in and out of the library", () => {
   it("diff finds new, changed, unchanged and deleted", () => {
     const first = diffRecords(collectRecords(input()), emptyManifest(), T0);
     expect(first.changes.map((change) => `${change.col}/${change.id}`)).toEqual(expect.arrayContaining(["song/s1", "settings/church"]));
-    expect(first.changes.every((change) => change.at === T0)).toBe(true);
+    // First contact goes up at time 0: whatever the cloud already holds wins over a copy that
+    // never saw it (the samples every install ships with, a library brought over by file).
+    expect(first.changes.every((change) => change.at === 0)).toBe(true);
     // Accepted by the server: the manifest now holds them as synced.
     const synced = acceptChanges(first.manifest, first.changes);
     // Accepting a push never moves the pull cursor: only a pull does.
@@ -58,6 +60,60 @@ describe("records in and out of the library", () => {
     expect(edited.changes).toEqual([{ col: "song", id: "s1", at: T0 + 2, doc: expect.objectContaining({ title: "Amazing Grace (new)" }) }]);
     const gone = diffRecords(collectRecords(input({ songs: [] })), synced, T0 + 3);
     expect(gone.changes).toEqual([{ col: "song", id: "s1", at: T0 + 3, doc: null }]);
+  });
+
+  it("an edit is always newer than what this computer last saw, whatever its clock says", () => {
+    const seen = diffRecords(collectRecords(input()), emptyManifest(), T0);
+    // The cloud's version, as pulled, is from a computer whose clock was well ahead.
+    const synced = { ...acceptChanges(seen.manifest, seen.changes), hashes: { ...acceptChanges(seen.manifest, seen.changes).hashes, "song/s1": { hash: hashDoc(song("s1", "Amazing Grace")), at: T0 + 3_600_000 } } };
+    const edited = diffRecords(collectRecords(input({ songs: [song("s1", "edited here")] })), synced, T0 + 500);
+    expect(edited.changes[0]!.at).toBe(T0 + 3_600_001);
+  });
+
+  it("a conflict on first contact keeps the cloud's version and renames the joining copy", async () => {
+    const written: string[] = [];
+    const copies: string[] = [];
+    const apply: Apply = { ...quiet, song: async (doc, id) => void written.push(`${id} ${doc ? (doc as Song).title : "deleted"}`), copy: async (col, doc, suffix) => void copies.push(`${col} ${(doc as Song).title} ${suffix}`) };
+    const local = new Map<string, unknown>([["song/s1", song("s1", "Amazing Grace")], ["song/s2", song("s2", "Same everywhere")]]);
+    const manifest = await applyConflicts(
+      [
+        { col: "song", id: "s1", keptAt: T0, doc: song("s1", "Amazing Grace, as we sing it") },
+        { col: "song", id: "s2", keptAt: T0, doc: song("s2", "Same everywhere") },
+        { col: "song", id: "s3", keptAt: T0, doc: null },
+      ],
+      local,
+      apply,
+      emptyManifest(),
+      "(from Office)",
+    );
+    expect(copies).toEqual(["song Amazing Grace (from Office)"]);
+    expect(written).toEqual(["s1 Amazing Grace, as we sing it", "s3 deleted"]);
+    expect(manifest.hashes["song/s1"]).toEqual({ hash: hashDoc(song("s1", "Amazing Grace, as we sing it")), at: T0 });
+    expect(manifest.hashes["song/s2"]).toEqual({ hash: hashDoc(song("s2", "Same everywhere")), at: T0 });
+    expect(manifest.hashes["song/s3"]).toBeUndefined();
+  });
+
+  it("a conflict on a known record takes the newer version without a copy (the lost edit is in history)", async () => {
+    const copies: string[] = [];
+    const written: string[] = [];
+    const apply: Apply = { ...quiet, song: async (doc) => void written.push((doc as Song).title), copy: async () => void copies.push("copy") };
+    const synced = syncedFor(input());
+    const pending = diffRecords(collectRecords(input({ songs: [song("s1", "mine")] })), synced, T0 + 5).manifest;
+    const manifest = await applyConflicts([{ col: "song", id: "s1", keptAt: T0 + 9, doc: song("s1", "theirs") }], new Map([["song/s1", song("s1", "mine")]]), apply, pending, "(from here)");
+    expect(copies).toEqual([]);
+    expect(written).toEqual(["theirs"]);
+    expect(manifest.hashes["song/s1"]).toEqual({ hash: hashDoc(song("s1", "theirs")), at: T0 + 9 });
+  });
+
+  it("an edit made during a sync is kept", async () => {
+    const written: string[] = [];
+    const apply: Apply = { ...quiet, song: async (doc, id) => void written.push(id) };
+    const synced = syncedFor(input());
+    // The cloud sends a newer s1, but s1 was edited here after this run began (its live hash differs).
+    const live = new Map([["song/s1", hashDoc(song("s1", "typed just now"))]]);
+    const manifest = await applyChanges([{ col: "song", id: "s1", at: T0 + 9, doc: song("s1", "theirs") }], apply, synced, live);
+    expect(written).toEqual([]);
+    expect(manifest.hashes["song/s1"]).toEqual(synced.hashes["song/s1"]);
   });
 
   it("a pending change keeps its first time across pushes", () => {
@@ -125,6 +181,14 @@ describe("records in and out of the library", () => {
     const after = await applyChanges([{ col: "song", id: "s1", at: T0 + 1, doc: null }], apply, local);
     expect(deleted).toEqual([]);
     expect(after.hashes["song/s1"]!.pending).toBeTruthy();
+  });
+
+  it("mediaIdsIn finds backing tracks and playlists too", () => {
+    const track = "3b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b";
+    const other = "4b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b";
+    const workspace = { ...defaultWorkspace(), playlists: [{ id: "p", name: "Walk-in", trackIds: [other], loop: true }] };
+    const records = collectRecords(input({ songs: [{ ...song("s1", "A"), trackId: track } as Song], workspace }));
+    expect([...mediaIdsIn(records)].sort()).toEqual([track, other].sort());
   });
 
   it("mediaIdsIn finds assetId, the logo and media paths", () => {

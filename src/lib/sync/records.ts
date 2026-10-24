@@ -100,27 +100,35 @@ export function diffRecords(current: SyncRecord[], manifest: Manifest, now: numb
   const changes: Change[] = [];
   const hashes: Manifest["hashes"] = { ...manifest.hashes };
   const seen = new Set<string>();
+  /**
+   * When a change is from: first contact goes up at 0, so whatever the cloud holds wins over a copy
+   * that never saw it; an edit to a record this computer has seen is always later than that
+   * version, whatever this clock says, so it wins over what was seen and loses only to an edit
+   * made elsewhere since.
+   */
+  const timeFor = (known: Manifest["hashes"][string] | undefined) => (!known || known.hash === "" ? 0 : Math.max(now, known.at + 1));
   for (const record of current) {
     const name = key(record.col, record.id);
     seen.add(name);
     const hash = hashDoc(record.doc);
     const known = hashes[name];
     if (known && known.hash === hash && !known.pending) continue;
-    const at = known?.pending?.hash === hash ? known.pending.at : now;
+    const at = known?.pending?.hash === hash ? known.pending.at : timeFor(known);
     changes.push({ col: record.col, id: record.id, at, doc: record.doc });
     hashes[name] = { hash: known?.hash ?? "", at: known?.at ?? 0, pending: { hash, at } };
   }
   for (const name of Object.keys(hashes)) {
     if (seen.has(name)) continue;
     const known = hashes[name]!;
-    if (known.pending?.hash === "") {
-      changes.push({ col: name.slice(0, name.indexOf("/")), id: name.slice(name.indexOf("/") + 1), at: known.pending.at, doc: null });
-      continue;
-    }
     const col = name.slice(0, name.indexOf("/"));
     const id = name.slice(name.indexOf("/") + 1);
-    changes.push({ col, id, at: now, doc: null });
-    hashes[name] = { ...known, pending: { hash: "", at: now } };
+    if (known.pending?.hash === "") {
+      changes.push({ col, id, at: known.pending.at, doc: null });
+      continue;
+    }
+    const at = timeFor(known);
+    changes.push({ col, id, at, doc: null });
+    hashes[name] = { ...known, pending: { hash: "", at } };
   }
   return { changes, manifest: { ...manifest, hashes } };
 }
@@ -146,7 +154,36 @@ export type Apply = {
   sermon(doc: Sermon | null, id: string): Promise<void>;
   theme(doc: Theme | null, id: string): Promise<void>;
   workspace(patch: (workspace: Workspace) => Workspace): void;
+  /** Keep this computer's own version of a record under a new id, its name marked with `suffix`. */
+  copy(col: string, doc: unknown, suffix: string): Promise<void>;
 };
+
+/** Write one pulled (or kept) version here: the library's own tables, or the workspace's lists. */
+async function write(change: Change, apply: Apply): Promise<void> {
+  switch (change.col) {
+    case "song":
+      return apply.song(change.doc as Song | null, change.id);
+    case "service":
+      return apply.service(change.doc as Service | null, change.id);
+    case "sermon":
+      return apply.sermon(change.doc as Sermon | null, change.id);
+    case "theme":
+      return apply.theme(change.doc as Theme | null, change.id);
+    case "settings":
+      if (change.doc && typeof change.doc === "object") apply.workspace((workspace) => applySettings(workspace, change.doc as Record<string, unknown>));
+      return;
+    default: {
+      const list = LISTS.find(([, col]) => col === change.col);
+      if (!list) return;
+      const [field] = list;
+      apply.workspace((workspace) => {
+        const current = (workspace[field] as Array<{ id: string }>) ?? [];
+        const next = change.doc === null ? current.filter((item) => item.id !== change.id) : mergeById(current, [change.doc as { id: string }]);
+        return { ...workspace, [field]: next };
+      });
+    }
+  }
+}
 
 /** A pulled settings record onto this computer's: the newest wins, field by field as sent. */
 function applySettings(workspace: Workspace, doc: Record<string, unknown>): Workspace {
@@ -167,12 +204,15 @@ function applySettings(workspace: Workspace, doc: Record<string, unknown>): Work
  * later than the cloud's version, keeps the local version (its push wins next); otherwise the
  * cloud's version lands and is marked as agreed, so it is not pushed back.
  */
-export async function applyChanges(changes: Change[], apply: Apply, manifest: Manifest): Promise<Manifest> {
+export async function applyChanges(changes: Change[], apply: Apply, manifest: Manifest, live?: Map<string, string>): Promise<Manifest> {
   const hashes = { ...manifest.hashes };
   for (const change of changes) {
     const name = key(change.col, change.id);
     const known = hashes[name];
     if (known?.pending && known.pending.at > change.at) continue;
+    // Edited here since this run began (its live hash is not what the cloud last agreed to): left
+    // alone, so that edit goes up next and wins.
+    if (known && live && live.has(name) && live.get(name) !== known.hash) continue;
     if (change.doc === null) {
       // Deleted elsewhere: gone here too, even when this computer never synced it (the samples
       // every install ships with share their ids).
@@ -183,33 +223,34 @@ export async function applyChanges(changes: Change[], apply: Apply, manifest: Ma
       if (known && !known.pending && known.hash === hash && known.at === change.at) continue;
       hashes[name] = { hash, at: change.at };
     }
-    switch (change.col) {
-      case "song":
-        await apply.song(change.doc as Song | null, change.id);
-        break;
-      case "service":
-        await apply.service(change.doc as Service | null, change.id);
-        break;
-      case "sermon":
-        await apply.sermon(change.doc as Sermon | null, change.id);
-        break;
-      case "theme":
-        await apply.theme(change.doc as Theme | null, change.id);
-        break;
-      case "settings":
-        if (change.doc && typeof change.doc === "object") apply.workspace((workspace) => applySettings(workspace, change.doc as Record<string, unknown>));
-        break;
-      default: {
-        const list = LISTS.find(([, col]) => col === change.col);
-        if (!list) break;
-        const [field] = list;
-        apply.workspace((workspace) => {
-          const current = (workspace[field] as Array<{ id: string }>) ?? [];
-          const next = change.doc === null ? current.filter((item) => item.id !== change.id) : mergeById(current, [change.doc as { id: string }]);
-          return { ...workspace, [field]: next };
-        });
+    await write(change, apply);
+  }
+  return { ...manifest, hashes };
+}
+
+/**
+ * What the cloud kept over this computer's push: the cloud's version lands here. On first
+ * contact (a record this computer had never synced) this computer's own version is kept too,
+ * under a new id and marked `suffix`, so nothing anyone made is lost.
+ */
+export async function applyConflicts(conflicts: Array<{ col: string; id: string; keptAt: number; doc: unknown | null }>, local: Map<string, unknown>, apply: Apply, manifest: Manifest, suffix: string): Promise<Manifest> {
+  const hashes = { ...manifest.hashes };
+  for (const kept of conflicts) {
+    const name = key(kept.col, kept.id);
+    const known = hashes[name];
+    const mine = local.get(name);
+    const firstContact = !known || known.hash === "";
+    if (kept.doc !== null) {
+      const theirs = hashDoc(kept.doc);
+      // The same thing on both sides (the untouched samples): agreed, nothing to write.
+      if (mine !== undefined && hashDoc(mine) === theirs) {
+        hashes[name] = { hash: theirs, at: kept.keptAt };
+        continue;
       }
-    }
+      if (firstContact && mine !== undefined && kept.col !== "settings") await apply.copy(kept.col, mine, suffix);
+      hashes[name] = { hash: theirs, at: kept.keptAt };
+    } else delete hashes[name];
+    await write({ col: kept.col, id: kept.id, at: kept.keptAt, doc: kept.doc }, apply);
   }
   return { ...manifest, hashes };
 }
@@ -227,7 +268,8 @@ export function mediaIdsIn(records: SyncRecord[]): Set<string> {
     if (Array.isArray(value)) return value.forEach(walk);
     if (!value || typeof value !== "object") return;
     for (const [name, entry] of Object.entries(value)) {
-      if ((name === "assetId" || name === "logoAssetId" || name === "imageId") && typeof entry === "string" && uuid.test(entry)) ids.add(entry.toLowerCase());
+      if ((name === "assetId" || name === "logoAssetId" || name === "imageId" || name === "trackId") && typeof entry === "string" && uuid.test(entry)) ids.add(entry.toLowerCase());
+      if (name === "trackIds" && Array.isArray(entry)) for (const id of entry) if (typeof id === "string" && uuid.test(id)) ids.add(id.toLowerCase());
       walk(entry);
     }
   };

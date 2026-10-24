@@ -29,7 +29,7 @@
     if (!cloud) return;
     loading = true;
     await cloud.refreshStatus();
-    if (cloud.status === "idle" || cloud.status === "syncing" || cloud.status === "readOnly" || cloud.status === "off") {
+    if (cloud.status === "idle" || cloud.status === "syncing" || cloud.status === "readOnly") {
       const [media, deleted] = await Promise.all([cloud.media(), cloud.bin()]);
       if (media.ok) items = media.data.items;
       if (deleted.ok) bin = deleted.data.items;

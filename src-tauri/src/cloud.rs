@@ -105,7 +105,7 @@ fn refusal(status: u16, mut response: ureq::http::Response<ureq::Body>) -> Strin
 /// Fetch a media file from the cloud into Media, keeping the id it had on the computer that sent it.
 #[tauri::command(async)]
 #[allow(clippy::too_many_arguments)]
-pub fn cloud_download(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>, url: String, token: String, device: String, id: String, name: String, kind: String, ext: String, created_at: String) -> Result<serde_json::Value, String> {
+pub fn cloud_download(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>, url: String, token: String, device: String, id: String, name: String, kind: String, ext: String, created_at: String, hash: String) -> Result<serde_json::Value, String> {
     let ext = ext.to_ascii_lowercase();
     if id.len() != 36 || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
         return Err("That file has no proper id.".into());
@@ -139,6 +139,16 @@ pub fn cloud_download(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>
         std::io::copy(&mut reader, &mut out).map_err(|error| format!("The download could not finish. ({error})"))?;
         Ok(())
     })();
+    // The bytes must be the file that was promised: a download cut short or a wrong file is not kept.
+    if copied.is_ok() && !hash.is_empty() {
+        match hash_file(&part) {
+            Ok((got, _)) if got == hash => {}
+            _ => {
+                let _ = std::fs::remove_file(&part);
+                return Err("The download did not come through whole. It will be tried again.".into());
+            }
+        }
+    }
     if let Err(error) = copied {
         let _ = std::fs::remove_file(&part);
         return Err(error);

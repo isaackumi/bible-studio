@@ -17,7 +17,7 @@ export function wireCloud(session: typeof Session): CloudSync {
     commands: {
       hash: (id) => invoke("cloud_hash", { id }),
       upload: (id, url) => invoke("cloud_upload", { id, url, ...identity() }),
-      download: (url, row) => invoke("cloud_download", { url, token: identity().token, device: identity().device, id: row.id, name: row.name, kind: row.kind, ext: row.ext, createdAt: row.createdAt }),
+      download: (url, row, hash) => invoke("cloud_download", { url, token: identity().token, device: identity().device, id: row.id, name: row.name, kind: row.kind, ext: row.ext, createdAt: row.createdAt, hash }),
       readState: () => invoke<string>("cloud_state_read"),
       writeState: (text) => invoke("cloud_state_write", { text }),
     },
@@ -41,8 +41,28 @@ export function wireCloud(session: typeof Session): CloudSync {
           session.cloudWrote("themes");
         },
         workspace: session.patchWorkspace,
+        // This computer's own version of a record the cloud already had: kept under a new id, marked.
+        copy: async (col, doc, suffix) => {
+          const record = doc as Record<string, unknown>;
+          const id = crypto.randomUUID();
+          const named = (field: "title" | "name") => ({ ...record, id, [field]: `${String(record[field] ?? "")} ${suffix}`.trim(), updatedAt: new Date().toISOString() });
+          if (col === "song") await api.songSave(named("title") as never);
+          else if (col === "service") await api.serviceSave(named("name") as never);
+          else if (col === "sermon") await api.sermonSave(named("title") as never);
+          else if (col === "theme") await api.themeSave(named("name") as never);
+          else {
+            const field = "title" in record ? "title" : "name";
+            session.patchWorkspace((workspace) => {
+              const lists: Record<string, keyof typeof workspace> = { deck: "decks", composition: "compositions", game: "games", playlist: "playlists", template: "serviceTemplates", macro: "macros", overlay: "overlays", layout: "customLayouts", source: "sources" };
+              const key = lists[col];
+              if (!key) return workspace;
+              return { ...workspace, [key]: [...(workspace[key] as unknown[]), named(field)] };
+            });
+          }
+          session.cloudWrote(col === "song" ? "songs" : col === "service" ? "services" : col === "sermon" ? "sermons" : "themes");
+        },
       },
-      mediaIds: async () => new Set([...session.media, ...session.audioTracks].map((asset) => asset.id)),
+      media: async () => new Map([...session.media, ...session.audioTracks].map((asset) => [asset.id, asset.kind])),
     },
     gate: () => (!isDesktop() ? "off" : !session.signedIn ? "signedOut" : session.plan === "free" ? "free" : "ok"),
     now: () => Date.now(),

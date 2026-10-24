@@ -3,21 +3,21 @@
 // every few minutes while the app is open, and a few seconds after a save. The protocol, the
 // library and the file commands come in from outside, so the whole engine runs in a test on fakes.
 
-import { acceptChanges, applyChanges, collectRecords, diffRecords, emptyManifest, mediaIdsIn, type Apply, type Change, type LibraryInput, type Manifest } from "../sync/records";
+import { acceptChanges, applyChanges, applyConflicts, collectRecords, diffRecords, emptyManifest, hashDoc, mediaIdsIn, type Apply, type LibraryInput, type Manifest } from "../sync/records";
 import type { CloudBinItem, CloudMediaItem, CloudProtocol, CloudStatus, CloudVersion } from "../sync/protocol";
 import type { ServerAnswer } from "../domain/billing";
 
 export type CloudLibrary = {
   collect(): Promise<LibraryInput>;
   apply: Apply;
-  /** Ids of the pictures, videos and audio this computer has in Media. */
-  mediaIds(): Promise<Set<string>>;
+  /** The pictures, videos and audio this computer has in Media: each id and its kind. */
+  media(): Promise<Map<string, string>>;
 };
 
 export type CloudCommands = {
   hash(id: string): Promise<{ hash: string; bytes: number; name: string; kind: string; ext: string }>;
   upload(id: string, url: string): Promise<void>;
-  download(url: string, row: { id: string; name: string; kind: string; ext: string; createdAt: string }): Promise<void>;
+  download(url: string, row: { id: string; name: string; kind: string; ext: string; createdAt: string }, hash: string): Promise<void>;
   readState(): Promise<string>;
   writeState(text: string): Promise<void>;
 };
@@ -30,6 +30,11 @@ export type CloudSyncStatus = "off" | "free" | "signedOut" | "idle" | "syncing" 
 const EVERY_MS = 3 * 60_000;
 const SOON_MS = 5000;
 const PAGE = 500;
+/** A file the cloud refused (full, too large, paused) is asked about again after this long. */
+const REFUSED_AGAIN_MS = 60 * 60_000;
+
+/** The manifest, with what this computer remembers about its own files. */
+type Kept = Manifest & { licence?: string; fileHashes?: Record<string, { hash: string; bytes: number; name: string; kind: string }>; refused?: Record<string, number> };
 
 /** The extension a cloud file is saved with here: from its name, else from its kind. */
 function extensionFor(item: { name: string; kind: string }): string {
@@ -55,9 +60,12 @@ export class CloudSync {
   /** How many media files are still to go up or come down. */
   pendingMedia = $state(0);
 
-  private manifest: Manifest = emptyManifest();
+  private manifest: Kept = emptyManifest();
   private loaded = false;
   private running: Promise<void> | null = null;
+  /** A save landed while a run was under way: that run leaves edited records alone, and another run follows. */
+  private dirty = false;
+  private again = false;
   private soonTimer: ReturnType<typeof setTimeout> | undefined;
   private everyTimer: ReturnType<typeof setInterval> | undefined;
   private stopped = false;
@@ -81,6 +89,10 @@ export class CloudSync {
   /** A save just happened: sync in a few seconds, once, however many saves follow. */
   scheduleSoon = () => {
     if (this.stopped) return;
+    if (this.running) {
+      this.dirty = true;
+      this.again = true;
+    }
     clearTimeout(this.soonTimer);
     this.soonTimer = setTimeout(() => void this.syncNow(), SOON_MS);
   };
@@ -99,7 +111,17 @@ export class CloudSync {
 
   syncNow = (): Promise<void> => {
     if (this.running) return this.running;
-    this.running = this.run().finally(() => (this.running = null));
+    this.running = this.run()
+      .catch(() => {
+        this.status = "error";
+      })
+      .finally(() => {
+        this.running = null;
+        if (this.again) {
+          this.again = false;
+          void this.syncNow();
+        }
+      });
     return this.running;
   };
 
@@ -108,8 +130,8 @@ export class CloudSync {
     this.loaded = true;
     try {
       const text = await this.deps.commands.readState();
-      const saved = text ? (JSON.parse(text) as Partial<Manifest>) : null;
-      if (saved && typeof saved === "object" && saved.hashes && typeof saved.hashes === "object") this.manifest = { seq: Number(saved.seq) || 0, hashes: saved.hashes, media: saved.media ?? {} };
+      const saved = text ? (JSON.parse(text) as Partial<Kept>) : null;
+      if (saved && typeof saved === "object" && saved.hashes && typeof saved.hashes === "object") this.manifest = { seq: Number(saved.seq) || 0, hashes: saved.hashes, media: saved.media ?? {}, licence: saved.licence, fileHashes: saved.fileHashes ?? {}, refused: saved.refused ?? {} };
     } catch {
       this.manifest = emptyManifest();
     }
@@ -152,26 +174,51 @@ export class CloudSync {
     }
     if (this.stopped) return;
     await this.load();
+    this.dirty = false;
     this.status = "syncing";
     const now = this.deps.now();
 
-    // 1. What changed here goes up, in pages.
+    // 0. Which library, and how far it goes: another licence, or one wiped and begun again,
+    //    means this computer's record of what was agreed no longer holds.
+    const first = await this.deps.protocol.status();
+    if (!first.ok) return this.refused(first);
+    this.takeStatus(first.data);
+    if ((this.manifest.licence && this.manifest.licence !== first.data.licence) || first.data.seq < this.manifest.seq) {
+      this.manifest = { ...emptyManifest(), licence: first.data.licence, fileHashes: this.manifest.fileHashes ?? {}, refused: {} };
+    }
+    this.manifest.licence = first.data.licence;
+    const fresh = Object.keys(this.manifest.hashes).length === 0;
+
+    // 1. What changed here goes up, in pages. What the cloud kept instead comes straight back,
+    //    and a copy kept here under a new name goes up in a second round.
     let library = await this.deps.library.collect();
     let records = collectRecords(library);
-    const diff = diffRecords(records, this.manifest, now);
-    this.manifest = diff.manifest;
-    for (let at = 0; at < diff.changes.length; at += PAGE) {
-      const page = diff.changes.slice(at, at + PAGE);
-      const answer = await this.deps.protocol.push(page);
-      if (!answer.ok) {
-        await this.save();
-        return this.refused(answer);
+    const local = new Map(records.map((record) => [`${record.col}/${record.id}`, record.doc]));
+    const suffix = `(from ${this.deps.name()})`;
+    for (let round = 0; round < 2; round++) {
+      const diff = diffRecords(records, this.manifest, now);
+      this.manifest = diff.manifest;
+      let copied = false;
+      for (let at = 0; at < diff.changes.length; at += PAGE) {
+        const page = diff.changes.slice(at, at + PAGE);
+        const answer = await this.deps.protocol.push(page);
+        if (!answer.ok) {
+          await this.save();
+          return this.refused(answer);
+        }
+        const lost = new Set(answer.data.conflicts.map((conflict) => `${conflict.col}/${conflict.id}`));
+        this.manifest = acceptChanges(this.manifest, page.filter((change) => !lost.has(`${change.col}/${change.id}`)));
+        if (answer.data.conflicts.length) {
+          this.manifest = await applyConflicts(answer.data.conflicts, local, this.deps.library.apply, this.manifest, suffix);
+          copied = true;
+        }
       }
-      this.manifest = acceptChanges(this.manifest, page);
+      if (!copied) break;
+      records = collectRecords(await this.deps.library.collect());
     }
 
-    // 2. What changed elsewhere comes down, in pages, and is written here.
-    const wasEmpty = library.songs.length === 0 && library.services.length === 0 && library.sermons.length === 0;
+    // 2. What changed elsewhere comes down, in pages, and is written here. A record edited here
+    //    while this ran is left alone: it goes up next time and wins.
     let since = this.manifest.seq;
     let arrived = 0;
     for (let guard = 0; guard < 1000; guard++) {
@@ -180,21 +227,18 @@ export class CloudSync {
         await this.save();
         return this.refused(answer);
       }
-      const before = this.manifest;
-      this.manifest = await applyChanges(answer.data.changes, this.deps.library.apply, this.manifest);
-      arrived += answer.data.changes.filter((change) => change.doc !== null && (change.col === "song" || change.col === "service" || change.col === "sermon") && before.hashes[`${change.col}/${change.id}`]?.hash !== this.manifest.hashes[`${change.col}/${change.id}`]?.hash).length;
+      const live = this.dirty ? new Map(collectRecords(await this.deps.library.collect()).map((record) => [`${record.col}/${record.id}`, hashDoc(record.doc)])) : undefined;
+      this.manifest = await applyChanges(answer.data.changes, this.deps.library.apply, this.manifest, live);
+      arrived += answer.data.changes.filter((change) => change.doc !== null && (change.col === "song" || change.col === "service" || change.col === "sermon") && !local.has(`${change.col}/${change.id}`)).length;
       this.manifest.seq = Math.max(this.manifest.seq, answer.data.seq);
       since = answer.data.seq;
       if (!answer.data.more) break;
     }
     await this.save();
-    // A fresh computer (nothing of its own) just got the licence's library: say so, this once.
-    if (wasEmpty && arrived > 0) this.deps.onRestored?.(arrived);
+    // This computer's first sync brought records it did not have: say so, once.
+    if (fresh && arrived > 0) this.deps.onRestored?.(arrived);
 
     // 3. The media those records use: up from here, down to here.
-    const status = await this.deps.protocol.status();
-    if (!status.ok) return this.refused(status);
-    this.takeStatus(status.data);
     library = await this.deps.library.collect();
     records = collectRecords(library);
     await this.moveMedia(mediaIdsIn(records));
@@ -218,25 +262,34 @@ export class CloudSync {
 
   /** Files the records use: send what is here and not in the cloud; fetch what the cloud has and this computer lacks. */
   private async moveMedia(needed: Set<string>): Promise<void> {
-    const here = await this.deps.library.mediaIds();
+    const here = await this.deps.library.media();
     const sent = this.manifest.media ?? (this.manifest.media = {});
+    const hashes = this.manifest.fileHashes ?? (this.manifest.fileHashes = {});
+    const refused = this.manifest.refused ?? (this.manifest.refused = {});
+    const now = this.deps.now();
     const stillHere = new Set<string>();
     let full = false;
     let paused = false;
-    const toSend = [...needed].filter((id) => here.has(id) && !sent[id]);
+    // Videos stay put when the switch is off; a file refused lately is not asked about again yet.
+    const toSend = [...needed].filter((id) => here.has(id) && !sent[id] && (here.get(id) !== "video" || this.syncVideos));
     const toFetch = [...needed].filter((id) => !here.has(id));
     this.pendingMedia = toSend.length + toFetch.length;
     for (const id of toSend) {
-      let hashed;
-      try {
-        hashed = await this.deps.commands.hash(id);
-      } catch {
+      if (refused[id] && now - refused[id] < REFUSED_AGAIN_MS) {
+        stillHere.add(id);
         this.pendingMedia -= 1;
         continue;
       }
-      if (hashed.kind === "video" && !this.syncVideos) {
-        this.pendingMedia -= 1;
-        continue;
+      // Hashed once: a file in Media never changes its bytes.
+      let hashed = hashes[id];
+      if (!hashed) {
+        try {
+          const found = await this.deps.commands.hash(id);
+          hashed = hashes[id] = { hash: found.hash, bytes: found.bytes, name: found.name, kind: found.kind };
+        } catch {
+          this.pendingMedia -= 1;
+          continue;
+        }
       }
       const claim = await this.deps.protocol.claim({ hash: hashed.hash, bytes: hashed.bytes, name: hashed.name, kind: hashed.kind, mediaId: id });
       if (!claim.ok) {
@@ -254,6 +307,7 @@ export class CloudSync {
         }
       } else {
         stillHere.add(id);
+        refused[id] = now;
         if (claim.data.full || claim.data.tooLarge) full = true;
         if (claim.data.paused) paused = true;
       }
@@ -266,8 +320,9 @@ export class CloudSync {
           const item = list.data.items.find((entry) => entry.mediaId === id || entry.aliases?.includes(id));
           if (item && (item.kind !== "video" || this.syncVideos)) {
             try {
-              await this.deps.commands.download(this.deps.protocol.mediaUrl(item.hash), { id, name: item.name, kind: item.kind, ext: extensionFor(item), createdAt: new Date(item.storedAt).toISOString() });
+              await this.deps.commands.download(this.deps.protocol.mediaUrl(item.hash), { id, name: item.name, kind: item.kind, ext: extensionFor(item), createdAt: new Date(item.storedAt).toISOString() }, item.hash);
               sent[id] = item.hash;
+              hashes[id] = { hash: item.hash, bytes: item.bytes, name: item.name, kind: item.kind };
             } catch {
               // Tried again next time.
             }

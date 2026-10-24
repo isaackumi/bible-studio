@@ -31,8 +31,9 @@ describe("the library object", () => {
   it("keeps the newest and files the other in history", async () => {
     const lib = library();
     data(await lib.push({ device: "a", now: T0, changes: [song("s1", "Older edit", T0 + 1000)] }));
-    const second = data<{ applied: number; conflicts: Array<{ id: string; keptAt: number }> }>(await lib.push({ device: "b", now: T0 + 5000, changes: [song("s1", "Even older", T0)] }));
-    expect(second).toMatchObject({ applied: 0, conflicts: [{ id: "s1", keptAt: T0 + 1000 }] });
+    const second = data<{ applied: number; conflicts: Array<{ id: string; keptAt: number; doc: unknown }> }>(await lib.push({ device: "b", now: T0 + 5000, changes: [song("s1", "Even older", T0)] }));
+    // The computer that lost hears what won, so it can show that version at once.
+    expect(second).toMatchObject({ applied: 0, conflicts: [{ id: "s1", keptAt: T0 + 1000, doc: { title: "Older edit" } }] });
     data(await lib.push({ device: "b", now: T0 + 6000, changes: [song("s1", "Newest", T0 + 2000)] }));
     const pulled = data<{ changes: Change[] }>(await lib.pull({ since: 0 }));
     expect(pulled.changes).toHaveLength(1);
@@ -41,6 +42,10 @@ describe("the library object", () => {
     // Both the replaced version and the edit that lost are there to get back, newest first.
     expect(history.versions.map((version) => version.doc.title)).toEqual(["Older edit", "Even older"]);
     expect(history.versions.map((version) => version.device)).toEqual(["a", "b"]);
+    // A deletion that won comes back as null.
+    data(await lib.push({ device: "a", now: T0 + 7000, changes: [{ col: "song", id: "s1", at: T0 + 3000, doc: null }] }));
+    const third = data<{ conflicts: Array<{ doc: unknown }> }>(await lib.push({ device: "b", now: T0 + 8000, changes: [song("s1", "Late", T0 + 2500)] }));
+    expect(third.conflicts).toEqual([{ col: "song", id: "s1", keptAt: T0 + 3000, doc: null }]);
     // History ages out after 30 days.
     await lib.ageOut(T0 + 31 * DAY);
     expect(data<{ versions: unknown[] }>(await lib.history({ col: "song", id: "s1" })).versions).toEqual([]);
