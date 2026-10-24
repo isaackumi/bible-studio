@@ -223,6 +223,14 @@ pub fn service_delete(conn: &Connection, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// One Media row: its name, path and kind, if the id is known.
+pub fn media_get(conn: &Connection, id: &str) -> Result<Option<(String, String, String)>, String> {
+    use rusqlite::OptionalExtension;
+    conn.query_row("SELECT name, path, kind FROM media_assets WHERE id = ?1", params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .optional()
+        .map_err(|error| error.to_string())
+}
+
 /// Remove a picture, video or audio file from the library, and its copy in the app's folder.
 pub fn media_delete(conn: &Connection, id: &str) -> Result<(), String> {
     let path: Option<String> = conn

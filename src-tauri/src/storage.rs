@@ -205,7 +205,7 @@ pub fn same_bytes(bytes: &[u8], kept: &[PathBuf]) -> Option<usize> {
     kept.iter().position(|path| std::fs::metadata(path).map(|meta| meta.len()).ok() == Some(bytes.len() as u64) && fingerprint(path) == Some(digest))
 }
 
-fn fingerprint(path: &Path) -> Option<[u8; 32]> {
+pub(crate) fn fingerprint(path: &Path) -> Option<[u8; 32]> {
     use sha2::{Digest, Sha256};
     use std::io::Read;
     let mut file = std::fs::File::open(path).ok()?;

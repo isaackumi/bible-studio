@@ -18,6 +18,7 @@ mod broadcast;
 mod ndi;
 mod voice;
 mod bundle;
+mod cloud;
 mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
@@ -1096,6 +1097,11 @@ pub fn run() {
             move_export,
             move_peek,
             move_import,
+            cloud::cloud_hash,
+            cloud::cloud_upload,
+            cloud::cloud_download,
+            cloud::cloud_state_read,
+            cloud::cloud_state_write,
             output_status,
             open_audience,
             close_audience,
