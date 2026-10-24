@@ -1584,13 +1584,26 @@ class Session {
     return true;
   };
 
-  checkRoomOutputs = async () => {
+  /**
+   * One output check or change at a time: a check landing while Church Studio is switching the
+   * output would take that switch for a change made by hand.
+   */
+  private outputQueue: Promise<void> = Promise.resolve();
+  private oneAtATime = (task: () => Promise<void>) => (this.outputQueue = this.outputQueue.then(task, task));
+
+  checkRoomOutputs = () => this.oneAtATime(this.checkRoomOutputsNow);
+
+  private checkRoomOutputsNow = async () => {
     const before = this.roomOutputsKey ? this.roomOutputs : null;
     if (!(await this.readRoomOutputs())) return;
     // Changed in the computer's own settings (Control Center): that is the church's choice now.
     const byHand = changedByHand(this.roomDefaultId, this.roomOutputs);
     this.roomDefaultId = this.roomOutputs.find((output) => output.isDefault)?.id ?? null;
-    if (byHand) this.adoptRoomOutput(byHand);
+    if (byHand) {
+      this.adoptRoomOutput(byHand);
+      // Where the computer is not told (Windows), the music follows the choice itself.
+      if (!this.canSetRoomOutput) await this.routeMusicTo(byHand.name);
+    }
     // A different audience screen can mean a different output too (its own speakers).
     const key = `${outputsKey(this.roomOutputs)}#${this.audienceScreenNames().join("|")}`;
     if (key === this.roomOutputsKey) return;
@@ -1612,7 +1625,9 @@ class Session {
   };
 
   /** "auto", or one output by its id: kept with the workspace, used straight away. */
-  setRoomOutput = async (choice: string) => {
+  setRoomOutput = (choice: string) => this.oneAtATime(() => this.setRoomOutputNow(choice));
+
+  private setRoomOutputNow = async (choice: string) => {
     const output = this.roomOutputs.find((entry) => entry.id === choice);
     // Choosing an output by hand takes it off the never-again list.
     this.setAudio({ audience: output ? output.id : "auto", audienceName: output?.name ?? "", audienceSkip: this.workspace.audio.audienceSkip.filter((id) => id !== output?.id) });

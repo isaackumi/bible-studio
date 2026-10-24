@@ -182,6 +182,8 @@ export type RoomState = {
   screen?: { on: boolean; revision: number; frame: string; at: number };
   /** Team mode: how many teams (2 to 4); absent or 0, everyone plays for themselves. */
   teams?: number;
+  /** The next joiner's number (join order); it only goes up. */
+  nextN?: number;
 };
 
 export type RoomStorage = { get(): Promise<RoomState | null>; put(state: RoomState): Promise<void>; drop(): Promise<void> };
@@ -326,11 +328,19 @@ export class RoomCore {
    * seconds, and writing each poll to storage would cost more than knowing who is here is worth.
    */
   private seen = new Map<string, number>();
+  /**
+   * When this copy of the room started. The check-ins live in memory, so after a restart (a deploy,
+   * or the room waking up) everyone counts as heard from at that moment, until their phones say
+   * otherwise: nobody is dropped from a game because the server forgot them.
+   */
+  private readonly startedAt: number;
 
   constructor(
     private store: RoomStorage,
     private now: () => number = () => Date.now(),
-  ) {}
+  ) {
+    this.startedAt = now();
+  }
 
   private touch(pid: unknown) {
     if (typeof pid === "string" && pid) this.seen.set(pid, this.now());
@@ -338,7 +348,7 @@ export class RoomCore {
 
   /** Last heard from: a check-in, or joining when there has been none since. */
   private lastSeen(pid: string, person: Participant) {
-    return Math.max(this.seen.get(pid) ?? 0, person.joinedAt);
+    return Math.max(this.seen.get(pid) ?? 0, person.joinedAt, this.startedAt);
   }
 
   private here(state: RoomState) {
@@ -396,7 +406,10 @@ export class RoomCore {
     if (Object.keys(state.participants).length >= LIMITS.participants) return fail(429, "This room is full.");
     const pid = randomId(12);
     // Each joiner a number of their own, which picks their colour on the screen and their phone.
-    const n = Object.keys(state.participants).length;
+    // Never reused, even after people who left are taken out of a new game: the number keys their
+    // name on the screen and picks their colour, so two people must never share one.
+    const n = state.nextN ?? Object.values(state.participants).reduce((most, person) => Math.max(most, (person.n ?? 0) + 1), Object.keys(state.participants).length);
+    state.nextN = n + 1;
     state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0, ...(state.teams && state.teams >= 2 ? { team: teamOf(n, state.teams) } : {}) };
     await this.save(state);
     this.touch(pid);

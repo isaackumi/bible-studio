@@ -251,12 +251,14 @@ class AudienceRoom {
   plays = $state<Record<string, PlaySettings>>(readPlays().settings);
   /** The questions each game asked lately (by their words), so a replay asks others first. */
   private asked: Record<string, string[]> = readPlays().asked;
+  /** How often each game (quiz or poll) was played on this computer, and when last. */
+  played = $state<Record<string, { times: number; last: string }>>(readPlays().played);
 
   playSettings = (game: Game): PlaySettings => this.plays[game.id] ?? defaultPlay(game);
 
   setPlaySettings = (game: Game, settings: PlaySettings) => {
     this.plays = { ...this.plays, [game.id]: { count: Math.max(0, Math.round(settings.count)), mix: settings.mix } };
-    writePlays(this.plays, this.asked);
+    writePlays(this.plays, this.asked, this.played);
   };
 
   /**
@@ -271,10 +273,12 @@ class AudienceRoom {
       this.error = t("This game has no questions ready to play yet.");
       return;
     }
-    // Asked lately: added to until every question has had its turn, then it starts again.
-    const lately = [...new Set([...(this.asked[game.id] ?? []), ...drawn.map((question) => question.prompt)])];
+    // Asked lately: added to until every question has had its turn, then it starts again. Questions
+    // since changed or removed no longer count.
+    const inPool = new Set(pool.map((question) => question.prompt));
+    const lately = [...new Set([...(this.asked[game.id] ?? []).filter((prompt) => inPool.has(prompt)), ...drawn.map((question) => question.prompt)])];
     this.asked = { ...this.asked, [game.id]: lately.length >= pool.length ? drawn.map((question) => question.prompt) : lately };
-    writePlays(this.plays, this.asked);
+    writePlays(this.plays, this.asked, this.played);
     this.playing = { game: { ...game, questions }, index: 0 };
     this.lastGame = null;
     this.recentGames = [game.id, ...this.recentGames.filter((id) => id !== game.id)].slice(0, MOST_RECENT);
@@ -316,6 +320,12 @@ class AudienceRoom {
     if (!run || !question) return;
     this.askedAt = Date.now();
     this.opensAt = this.askedAt + (this.ready ? READ_MS : 0);
+    // A game counts as played once its first question is asked.
+    if (run.index === 0) {
+      const seen = this.played[run.game.id];
+      this.played = { ...this.played, [run.game.id]: { times: (seen?.times ?? 0) + 1, last: new Date().toISOString() } };
+      writePlays(this.plays, this.asked, this.played);
+    }
     const opened = await this.activity({
       action: "open",
       readMs: this.ready ? READ_MS : 0,
@@ -550,7 +560,6 @@ class AudienceRoom {
     this.sampler = new GameSound();
     this.sampler.setStyle(style);
     this.sampler.play("question");
-    this.hearing = style;
     this.samplerTimer = setTimeout(() => {
       this.sampler?.close();
       this.sampler = null;
@@ -729,7 +738,7 @@ function writePrefs(prefs: GamePrefs) {
 
 const GAME_PLAYS = "church-studio:game-plays";
 
-function readPlays(): { settings: Record<string, PlaySettings>; asked: Record<string, string[]> } {
+function readPlays(): { settings: Record<string, PlaySettings>; asked: Record<string, string[]>; played: Record<string, { times: number; last: string }> } {
   try {
     const saved = JSON.parse(localStorage.getItem(GAME_PLAYS) ?? "null") as { settings?: unknown; asked?: unknown } | null;
     const settings: Record<string, PlaySettings> = {};
@@ -741,15 +750,20 @@ function readPlays(): { settings: Record<string, PlaySettings>; asked: Record<st
     for (const [id, value] of Object.entries(saved?.asked && typeof saved.asked === "object" ? saved.asked : {})) {
       if (Array.isArray(value)) asked[id] = value.filter((entry): entry is string => typeof entry === "string").slice(0, 200);
     }
-    return { settings, asked };
+    const played: Record<string, { times: number; last: string }> = {};
+    for (const [id, value] of Object.entries(saved && typeof (saved as { played?: unknown }).played === "object" && (saved as { played?: unknown }).played ? ((saved as { played: object }).played) : {})) {
+      const entry = value as { times?: unknown; last?: unknown } | null;
+      if (entry && typeof entry.last === "string" && Number(entry.times) > 0) played[id] = { times: Math.round(Number(entry.times)), last: entry.last };
+    }
+    return { settings, asked, played };
   } catch {
-    return { settings: {}, asked: {} };
+    return { settings: {}, asked: {}, played: {} };
   }
 }
 
-function writePlays(settings: Record<string, PlaySettings>, asked: Record<string, string[]>) {
+function writePlays(settings: Record<string, PlaySettings>, asked: Record<string, string[]>, played: Record<string, { times: number; last: string }>) {
   try {
-    localStorage.setItem(GAME_PLAYS, JSON.stringify({ settings, asked }));
+    localStorage.setItem(GAME_PLAYS, JSON.stringify({ settings, asked, played }));
   } catch {
     // Storage refused: the choices last until this window closes.
   }

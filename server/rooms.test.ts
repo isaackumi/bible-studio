@@ -359,3 +359,36 @@ describe("rooms: word clouds and ratings", () => {
     expect(data<Host>(await core.hostView(hostKey)).answers).toEqual([0, 0, 0, 0, 1]);
   });
 });
+
+describe("rooms: join numbers and restarts", () => {
+  it("never gives a newcomer the number of someone still here, after people who left are dropped", async () => {
+    const { core, advance, peek } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("NUMS23", ""));
+    const pids: string[] = [];
+    for (const name of ["A", "B", "C", "D", "E"]) pids.push(data<{ pid: string }>(await core.join(name, "")).pid);
+    for (let i = 0; i < 60; i++) {
+      advance(2_500);
+      for (const pid of [pids[0]!, pids[3]!, pids[4]!]) data(await core.view(pid));
+    }
+    data(await core.activity(hostKey, { action: "reset-scores" }));
+    data(await core.join("F", ""));
+    const numbers = Object.values(peek()!.participants).map((person) => person.n);
+    expect(new Set(numbers).size).toBe(numbers.length);
+    expect(numbers).toContain(5);
+  });
+
+  it("drops nobody straight after the room restarts and has forgotten who checked in", async () => {
+    let saved: RoomState | null = null;
+    let clock = Date.UTC(2026, 9, 25, 10);
+    const store = { get: async () => (saved ? structuredClone(saved) : null), put: async (state: RoomState) => void (saved = structuredClone(state)), drop: async () => void (saved = null) };
+    const before = new RoomCore(store, () => clock);
+    const { hostKey } = data<{ hostKey: string }>(await before.create("BOOT23", ""));
+    data(await before.join("Ama", ""));
+    clock += 10 * 60_000;
+    // A deploy: a new copy of the room, with no memory of check-ins.
+    const after = new RoomCore(store, () => clock);
+    expect(data<{ people: number }>(await after.hostView(hostKey)).people).toBe(1);
+    data(await after.activity(hostKey, { action: "reset-scores" }));
+    expect(Object.keys(saved!.participants)).toHaveLength(1);
+  });
+});

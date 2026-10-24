@@ -44,6 +44,11 @@
       const seen = byGame.get(report.gameId);
       byGame.set(report.gameId, { times: (seen?.times ?? 0) + 1, last: !seen || report.at > seen.last ? report.at : seen.last });
     }
+    // Every play is counted here, polls too (reports are kept for quizzes only); the larger count wins.
+    for (const [id, play] of Object.entries(audienceRoom.played)) {
+      const seen = byGame.get(id);
+      byGame.set(id, { times: Math.max(seen?.times ?? 0, play.times), last: !seen || play.last > seen.last ? play.last : seen.last });
+    }
     return byGame;
   });
   const whenPlayed = (iso: string) => {

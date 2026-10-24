@@ -118,7 +118,6 @@ export function newGame(title = "New game"): Game {
   return { id: uid("game"), title, description: "", kind: "quiz", questions: [blankQuestion()], updatedAt: new Date().toISOString() };
 }
 
-/** Mix the answers (the right one keeps being right). */
 /** A fair shuffle (Fisher–Yates): every order equally likely. */
 export function shuffle<T>(items: readonly T[], random = Math.random): T[] {
   const out = [...items];
@@ -151,6 +150,7 @@ export function drawQuestions(game: Game, settings: PlaySettings, asked: readonl
   return [...fresh, ...again].slice(0, count);
 }
 
+/** Mix the answers (the right one keeps being right). */
 export function shuffled(question: GameQuestion, random = Math.random): GameQuestion {
   // A rating keeps its order (1 to 5), and words have no answers to mix.
   if (question.type) return question;

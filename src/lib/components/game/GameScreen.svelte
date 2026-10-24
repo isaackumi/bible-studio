@@ -224,13 +224,13 @@
   let reel = $state("");
   let landed = $state<Array<{ n: number; name: string }>>([]);
   let spinning = $state(false);
+  /** Which spin this is: the reel starts once for it, however often the frame is sent again. */
+  const spinKey = $derived(data.stage === "pick" ? (data.pick?.spin ?? null) : null);
   $effect(() => {
-    const pick = data.stage === "pick" ? data.pick : undefined;
-    if (!pick) return;
-    const spin = pick.spin;
-    return untrack(() => runReel(pick, spin));
+    if (!spinKey) return;
+    return untrack(() => (data.pick ? runReel(data.pick) : undefined));
   });
-  function runReel(pick: NonNullable<GameScreenData["pick"]>, spin: string) {
+  function runReel(pick: NonNullable<GameScreenData["pick"]>) {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const later = (ms: number, run: () => void) => timers.push(setTimeout(run, ms));
     landed = [];
@@ -261,7 +261,6 @@
       });
       at += 1400;
     });
-    void spin;
     return () => timers.forEach(clearTimeout);
   }
 </script>

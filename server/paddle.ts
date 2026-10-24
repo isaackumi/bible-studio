@@ -170,11 +170,12 @@ export default {
       const file = await env.ASSETS.fetch(request);
       // Template packs: the desktop app downloads them from here, so a new pack reaches every church
       // without a release.
-      if (path.startsWith("/app/template-packs/") && file.ok) {
+      // A 304 (the copy the app has is current) passes through too.
+      if (path.startsWith("/app/template-packs/") && (file.ok || file.status === 304)) {
         const headers = new Headers(file.headers);
         headers.set("access-control-allow-origin", "*");
         headers.set("cache-control", "public, max-age=3600");
-        return new Response(file.body, { status: file.status, headers });
+        return new Response(file.status === 304 ? null : file.body, { status: file.status, headers });
       }
       if (path.startsWith("/app/template-packs/")) return new Response("Not found", { status: 404, headers: { "access-control-allow-origin": "*" } });
       return file.status === 404 ? env.ASSETS.fetch(new Request(`${url.origin}/app/`, request)) : file;

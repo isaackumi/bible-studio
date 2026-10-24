@@ -78,7 +78,6 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   .word-form input:focus { outline: none; border-color: var(--accent); }
   .word-form .send { flex: none; height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 800; }
   .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-  .scale.ten { grid-template-columns: repeat(5, 1fr); }
   .scale .num { position: relative; height: 58px; border: 0; border-radius: 14px; background: rgb(255 255 255 / 0.1); color: #fff; font: inherit; font-size: 22px; font-weight: 900; overflow: hidden; }
   .scale .num.picked { background: var(--accent); }
   .scale .num.dim { opacity: 0.45; }
@@ -248,7 +247,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
 
   /** A rating: the numbers in a row, its two ends named, the average once it is shown. */
   function drawScale(a, box, reading, total) {
-    var row = el("div", "scale" + (a.question.choices.length > 5 ? " ten" : ""));
+    var row = el("div", "scale");
     a.question.choices.forEach(function (label, i) {
       var b = el("button", "num" + (a.answered === i ? " picked" : "") + (a.answered !== null && a.answered !== i ? " dim" : ""), label);
       if (a.phase === "reveal" && a.counts) { var f = el("i", "fill"); f.style.height = (total ? (a.counts[i] / total) * 100 : 0) + "%"; b.appendChild(f); }
@@ -397,7 +396,9 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       document.title = d.room.name + " · Church Studio";
       if (!pid) { show("join", true); return; }
       show("live", true);
-      var key = JSON.stringify(d);
+      // The server's clock changes on every poll: leave it out, so the page redraws only when
+      // something it shows has changed (and a word being typed keeps its keyboard).
+      var key = JSON.stringify(d, function (name, value) { return name === "now" ? undefined : value; });
       if (key !== last) { last = key; lastData = d; drawMe(d); drawQuestions(d); drawActivity(d); }
       timer = setTimeout(refresh, d.activity && d.activity.kind !== "none" && d.activity.phase === "open" ? 1500 : 2500);
     }).catch(function () { timer = setTimeout(refresh, 4000); });
