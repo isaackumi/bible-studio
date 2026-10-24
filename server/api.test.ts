@@ -213,6 +213,13 @@ describe("server API", () => {
     expect(features).toContain("Everything your church does on a screen");
     expect(features).toContain("Grace Software Ltd");
     expect(String((await call("/whats-new")).data.html)).toContain("Version 0.4.1");
+    // The story: a brief to present and print, linked from every footer.
+    const story = String((await call("/story")).data.html);
+    expect(story).toContain("Have you ever watched a congregation wait for a verse?");
+    expect(story).toContain("@media print");
+    expect(story).toContain("window.print()");
+    expect(story).toContain("Grace Software Ltd");
+    expect(home).toContain('href="/story"');
     expect(home).toContain('"@type":"SoftwareApplication"');
     expect(home).toContain('href="/features"');
     expect(await (await handleApi(new Request("https://keys.test/robots.txt"), config)).text()).toContain("Sitemap: https://keys.test/sitemap.xml");

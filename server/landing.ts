@@ -341,7 +341,7 @@ export function siteFooter(site: Site): string {
   const mail = escape(site.contact);
   return `<footer><div class="wrap">
   <span>© ${new Date().getFullYear()} ${escape(site.company)} · Church Studio is made by ${escape(site.company)} · <a href="mailto:${mail}">${mail}</a></span>
-  <nav aria-label="Legal"><a href="/features">Features</a><a href="/whats-new">What's new</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a><a href="/licenses">Open-source licenses</a><a href="/security">Security</a></nav>
+  <nav aria-label="Legal"><a href="/features">Features</a><a href="/story">The story</a><a href="/whats-new">What's new</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds &amp; cancellation</a><a href="/licenses">Open-source licenses</a><a href="/security">Security</a></nav>
 </div></footer>`;
 }
 

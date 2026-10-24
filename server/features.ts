@@ -377,7 +377,7 @@ ${chapter("screens", 5, `Any screen, <span class="serif">any shape.</span>`, "Pr
 ${chapter("pictures", 6, `Slides and pictures, <span class="serif">beautifully.</span>`, "A design studio for slides, 33 themes, and picture slideshows straight from a folder, with music and real transitions.", `
   <div class="duo flip">
     <ul class="list reveal">
-      ${item("Design studio", "Layered pages with text, shapes, icons, pictures and QR codes, 13 templates laid out for every screen shape.", "free")}
+      ${item("Design studio", "Layered pages with text, shapes, icons, pictures and QR codes; about 400 templates laid out for every screen shape, in 20 palettes, with more packs to download.", "free")}
       ${item("Themes", "33 to choose from: animated scenes, photos, video and full editing.", "free", '<span class="tag tag-premium">22 Premium</span>')}
       ${item("PowerPoint and PDF", "PowerPoint as editable slides with notes; PDF pages as pictures.", "free")}
       ${item("Pictures from a folder", "Any folder, Google Drive, iCloud, Dropbox or OneDrive, with videos played to the end.", "free")}

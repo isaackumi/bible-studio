@@ -20,6 +20,7 @@ import { claimLicense } from "./ownership.ts";
 import { RELEASES_PAGE, type Platform, type Release } from "./downloads.ts";
 import { landingPage } from "./landing.ts";
 import { featuresPage } from "./features.ts";
+import { storyPage } from "./story.ts";
 import { lostPage, newsPage } from "./news.ts";
 import { llmsFullTxt, llmsTxt } from "./llms.ts";
 import { INSTRUMENT_SERIF_ITALIC_WOFF2, INTER_WOFF2, SHARE_IMAGE_JPEG } from "./site-assets.ts";
@@ -238,7 +239,7 @@ async function serveDownload(config: ApiConfig, platform: Platform, request: Req
 }
 
 /** The public pages, for search engines. */
-const PUBLIC_PAGES = ["/", "/features", "/whats-new", "/terms", "/privacy", "/refunds", "/licenses", "/security"];
+const PUBLIC_PAGES = ["/", "/features", "/story", "/whats-new", "/terms", "/privacy", "/refunds", "/licenses", "/security"];
 
 function sitemap(origin: string): string {
   // The product pages change with each release; the policies with their own dates.
@@ -307,6 +308,7 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
     if (path === "/features") return page(featuresPage(site, origin));
+    if (path === "/story") return page(storyPage(site, origin));
     if (path === "/whats-new") return page(newsPage(site, origin, await releasedVersion(config)));
     if (path === "/robots.txt") return text200(robots(origin), "text/plain; charset=utf-8");
     if (path === "/llms.txt") return text200(llmsTxt(origin, await releasedVersion(config)), "text/markdown; charset=utf-8");

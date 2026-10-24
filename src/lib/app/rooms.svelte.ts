@@ -6,7 +6,8 @@
 
 import { serverCall } from "../domain/billing";
 import { defaultPlay, drawQuestions, finishTheVerseGame, ready, shuffled, whichBookGame, WELL_KNOWN, type Game, type PlaySettings } from "../domain/games";
-import { GameSound, sanitizeMusicStyle, type MusicStyle } from "../game/sounds";
+import { sanitizeMusicStyle, type MusicStyle } from "../game/music-styles";
+import type { GameSound } from "../game/sounds";
 import { makeGroups, pickPeople, type RoomPerson } from "../domain/picker";
 import { api } from "../db/api";
 import { presentQr } from "../domain/overlays";
@@ -522,7 +523,7 @@ class AudienceRoom {
   private sampler: GameSound | null = null;
   private samplerTimer: ReturnType<typeof setTimeout> | undefined;
   hearing = $state<MusicStyle | null>(null);
-  hearMusic = (style: MusicStyle) => {
+  hearMusic = async (style: MusicStyle) => {
     clearTimeout(this.samplerTimer);
     this.sampler?.close();
     if (this.hearing === style) {
@@ -530,6 +531,9 @@ class AudienceRoom {
       this.hearing = null;
       return;
     }
+    this.hearing = style;
+    const { GameSound } = await import("../game/sounds");
+    if (this.hearing !== style) return;
     this.sampler = new GameSound();
     this.sampler.setStyle(style);
     this.sampler.play("question");

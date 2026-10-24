@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/sounds";
+  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/music-styles";
   import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
   import { quizPacks } from "../../app/starter.svelte";

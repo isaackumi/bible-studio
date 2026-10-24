@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { blankQuestion, MOST_CHOICES, questionsFromText, ready, type Game } from "../../domain/games";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
@@ -21,8 +20,8 @@
   const TIMES = [0, 10, 20, 30, 45, 60, 90];
   const POINTS = [0, 500, 1000, 2000];
 
-  // A new, empty game opens with the paste box: the quickest way to put in questions written elsewhere.
-  let pasting = $state(untrack(() => game.questions.length === 1 && !game.questions[0]!.prompt.trim() && !fromAi));
+  // A new game opens on its first question card; pasting many at once is one click away.
+  let pasting = $state(false);
   let pasted = $state("");
   const preview = $derived(questionsFromText(pasted, game.kind));
 
@@ -59,14 +58,19 @@
 </script>
 
 <section class="game-editor">
-  <div class="ed-top">
-    <button type="button" class="back" onclick={oncancel}><Icon name="chevron-left" size={14} /> {t("Back without saving")}</button>
+  <nav class="ed-top" aria-label={t("Where you are")}>
+    <button type="button" class="back" onclick={oncancel} title={t("Back without saving")}><Icon name="chevron-left" size={15} /> {t("Back")}</button>
+    <strong class="what">{game.title.trim() || (quiz ? t("New quiz") : t("New poll"))}</strong>
     <span class="count">{tn(readyCount, "{n} question ready", "{n} questions ready")}{readyCount < game.questions.length ? ` · ${t("{n} to finish", { n: game.questions.length - readyCount })}` : ""}</span>
-  </div>
+  </nav>
 
   {#if fromAi}<p class="ai-check"><Icon name="sparkles" size={14} /> {t("Written by the AI. Read each question and check the right answer before you save: the AI can be wrong.")}</p>{/if}
 
-  <input class="title" bind:value={game.title} maxlength="80" placeholder={t("Name of the quiz or poll")} aria-label={t("Title")} />
+  <div class="fld">
+    <span class="label" id="game-name">{t("Name")}</span>
+    <input class="title" bind:value={game.title} maxlength="80" placeholder={t("Name of the quiz or poll")} aria-labelledby="game-name" />
+  </div>
+  <span class="label">{t("Kind")}</span>
 
   <div class="kind" role="radiogroup" aria-label={t("Kind")}>
     <button type="button" role="radio" aria-checked={quiz} class:on={quiz} onclick={() => (game.kind = "quiz")}>
@@ -115,9 +119,13 @@
       <li class="card" class:unfinished={!done}>
         <div class="card-head">
           <span class="num">{index + 1}</span>
-          <textarea class="prompt" bind:value={item.prompt} maxlength="300" rows="2" placeholder={t("Type the question")}></textarea>
+          <div class="fld grow">
+            <span class="label">{t("Question")}</span>
+            <textarea class="prompt" bind:value={item.prompt} maxlength="300" rows="2" placeholder={t("Type the question")} aria-label={t("Question {n}", { n: index + 1 })}></textarea>
+          </div>
         </div>
         <div class="answers">
+          <span class="label">{quiz ? t("Answers · mark the right one") : t("Answers")}</span>
           {#each item.choices as _choice, choiceIndex (choiceIndex)}
             {@const right = quiz && item.correct === choiceIndex}
             <div class="answer" class:right>
@@ -128,9 +136,8 @@
                   <Icon name="check" size={13} /><span>{right ? t("Right") : t("Mark right")}</span>
                 </button>
               {/if}
-              {#if item.choices.length > 2}
-                <button type="button" class="x" aria-label={t("Remove answer")} onclick={() => { item.choices.splice(choiceIndex, 1); if (item.correct !== null && item.correct >= item.choices.length) item.correct = 0; else if (item.correct !== null && item.correct > choiceIndex) item.correct -= 1; }}><Icon name="close" size={13} /></button>
-              {/if}
+              <!-- The remove button keeps its place even when hidden, so every answer box lines up. -->
+              <button type="button" class="x" style:visibility={item.choices.length > 2 ? "visible" : "hidden"} aria-label={t("Remove answer")} title={t("Remove answer")} onclick={() => { item.choices.splice(choiceIndex, 1); if (item.correct !== null && item.correct >= item.choices.length) item.correct = 0; else if (item.correct !== null && item.correct > choiceIndex) item.correct -= 1; }}><Icon name="close" size={13} /></button>
             </div>
           {/each}
           {#if item.choices.length < MOST_CHOICES}<button type="button" class="add-answer" onclick={() => item.choices.push("")}><Icon name="plus" size={13} /> {t("Add an answer")}</button>{/if}
@@ -155,21 +162,29 @@
   </div>
 
   <div class="save">
-    <button type="button" class="btn accent" disabled={!game.title.trim()} onclick={onsave}>{quiz ? t("Save quiz") : t("Save poll")}</button>
+    <span class="hint">{!game.title.trim() ? t("Give it a name to save it.") : readyCount < game.questions.length ? t("Unfinished questions are kept but left out when you play.") : tn(readyCount, "{n} question, ready to play.", "{n} questions, ready to play.")}</span>
     <button type="button" class="btn" onclick={oncancel}>{t("Cancel")}</button>
-    {#if readyCount < game.questions.length}<span class="hint">{t("Unfinished questions are kept but left out when you play.")}</span>{/if}
+    <button type="button" class="btn accent" disabled={!game.title.trim()} onclick={onsave}><Icon name="check" size={14} /> {quiz ? t("Save quiz") : t("Save poll")}</button>
   </div>
 </section>
 
 <style>
   .game-editor { display: grid; gap: 12px; container-type: inline-size; }
-  .ed-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .back { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-  .back:hover { color: var(--ink); }
-  .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ed-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; margin: -2px -2px 0; padding: 6px 2px 8px; background: var(--panel, var(--bg)); border-bottom: 1px solid var(--line); }
+  .back { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 30px; padding: 0 12px 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .back:hover { border-color: var(--accent); }
+  .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .count { flex: none; margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .label { display: block; color: var(--muted); font-size: 11.5px; font-weight: 650; letter-spacing: 0.02em; }
+  .fld { display: grid; gap: 5px; min-width: 0; }
+  .fld.grow { flex: 1; }
   .ai-check { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: 12px; line-height: 1.4; }
-  input, textarea, select { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 13px; }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  input, textarea, select { min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 13px; transition: border-color 0.15s, box-shadow 0.15s; }
+  input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 75%, transparent); }
+  input:hover, textarea:hover, select:hover { border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  /* Dropdowns drawn alike on every computer: a quiet chevron on the right. */
+  select { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; cursor: pointer; }
   .title { padding: 10px 12px; font-size: 17px; font-weight: 700; }
   .anon { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
   .anon span { display: grid; gap: 2px; color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -198,10 +213,11 @@
   .num { flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 4px; border-radius: 50%; background: var(--ink); color: var(--panel); font-size: 12px; font-weight: 800; }
   .prompt { flex: 1; min-width: 0; min-height: 44px; resize: vertical; font-size: 14px; font-weight: 600; line-height: 1.4; }
   .answers { display: grid; gap: 6px; padding-left: 36px; }
-  .answer { display: flex; align-items: center; gap: 8px; padding: 3px; border-radius: 10px; }
+  /* Mark, words, right-answer button, remove: the same columns on every row. */
+  .answer { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 26px; align-items: center; gap: 8px; padding: 3px; border-radius: 10px; }
   .answer.right { background: color-mix(in srgb, var(--good, #3ccf7a) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good, #3ccf7a) 55%, transparent); }
-  .answer input { flex: 1; min-width: 0; }
-  .right-btn { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+  .answer input { min-width: 0; }
+  .right-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 98px; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
   .right-btn:hover { color: var(--ink); }
   .right-btn.on { border-color: transparent; background: var(--good, #3ccf7a); color: #06210f; }
   .x { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -210,7 +226,7 @@
   .add-answer:hover { color: var(--ink); background: color-mix(in srgb, currentColor 8%, transparent); }
   .card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
   .card-foot label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-  .card-foot select { width: auto; padding: 4px 6px; font-size: 12px; }
+  .card-foot select { width: auto; min-height: 30px; padding: 4px 26px 4px 8px; font-size: 12px; background-position: right 7px center; }
   .tools { display: inline-flex; gap: 2px; margin-left: auto; }
   .icon { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
   .icon:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--ink); }
@@ -218,8 +234,9 @@
   .adds { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
   .add { display: flex; align-items: center; justify-content: center; gap: 6px; height: 42px; border: 1px dashed var(--line); border-radius: 12px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
   .add:hover { border-color: var(--accent); color: var(--ink); }
-  .save { position: sticky; bottom: -16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; background: var(--panel); border-top: 1px solid var(--line); }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .save { position: sticky; bottom: -16px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 0; background: var(--panel); border-top: 1px solid var(--line); }
+  .save .hint { margin-right: auto; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.accent { border-color: transparent; background: var(--accent); color: var(--on-accent, #fff); }
   .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

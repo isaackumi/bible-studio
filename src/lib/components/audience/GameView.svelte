@@ -3,7 +3,7 @@
   import { session } from "../../app/session.svelte";
   import { MOST_TEAMS, TEAMS } from "../../domain/game-colors";
   import { questionsAsText, ready, type Game } from "../../domain/games";
-  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/sounds";
+  import { MUSIC_STYLE_INFO, type MusicStyle } from "../../game/music-styles";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
   import ChoiceMark from "./ChoiceMark.svelte";

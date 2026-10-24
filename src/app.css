@@ -414,9 +414,18 @@ button { cursor: pointer; }
   width: 100%;
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 8px;
   padding: 8px 10px;
 }
+/* Typing in a field, or choosing from a list: a clear ring says where you are. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
 .item-row {
   display: grid;
   grid-template-columns: 10px 1fr auto;

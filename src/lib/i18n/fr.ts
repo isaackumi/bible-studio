@@ -4849,4 +4849,10 @@ export const fr: Readonly<Record<string, string>> = {
   "Let the church pick what the preaching covers next.": "L’église choisit le prochain sujet des prédications.",
   "Plan the church picnic": "Organiser le pique-nique de l’église",
   "Decide the details together.": "Décidez ensemble des détails.",
+  "Answers · mark the right one": "Réponses · marquez la bonne",
+  "Give it a name to save it.": "Donnez-lui un nom pour l’enregistrer.",
+  "Question {n}": "Question {n}",
+  "{n} question, ready to play.": "{n} question, prête à jouer.",
+  "{n} questions, ready to play.": "{n} questions, prêtes à jouer.",
+  "Answers": "Réponses",
 };
