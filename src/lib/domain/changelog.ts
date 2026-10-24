@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.4.7",
+    date: "2026-10-24",
+    highlights: [
+      { icon: "audio", title: msg("Sound for the room, not the laptop"), text: msg("Church Studio finds the church's sound system (a USB audio interface, or the audience screen's own speakers) and plays music, videos and YouTube there, with this computer's speakers as the fallback. Choose another output in Settings › Sound & voice.") },
+      { icon: "refresh", title: msg("Plug in, pull out"), text: msg("An interface plugged in during the service takes over; if the one in use is unplugged, the sound moves and the desk says where. On a Mac the old sound output comes back when Church Studio quits.") },
+    ],
+  },
+  {
     version: "0.4.6",
     date: "2026-10-24",
     highlights: [

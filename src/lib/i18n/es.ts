@@ -4639,4 +4639,8 @@ export const es: Readonly<Record<string, string>> = {
   "AirPlay": "AirPlay",
   "Virtual": "Virtual",
   "Combined": "Combinada",
+  "Sound for the room, not the laptop": "Sonido para la sala, no para la portátil",
+  "Church Studio finds the church's sound system (a USB audio interface, or the audience screen's own speakers) and plays music, videos and YouTube there, with this computer's speakers as the fallback. Choose another output in Settings › Sound & voice.": "Church Studio encuentra el sistema de sonido de la iglesia (una interfaz de audio USB o los altavoces de la pantalla de la congregación) y reproduce ahí la música, los videos y YouTube, con los altavoces de esta computadora como respaldo. Elige otra salida en Ajustes › Sonido y voz.",
+  "Plug in, pull out": "Conectar, desconectar",
+  "An interface plugged in during the service takes over; if the one in use is unplugged, the sound moves and the desk says where. On a Mac the old sound output comes back when Church Studio quits.": "Una interfaz conectada durante el servicio toma el relevo; si se desconecta la que está en uso, el sonido se mueve y el escritorio indica adónde. En Mac, la salida de sonido anterior vuelve cuando Church Studio se cierra.",
 };
