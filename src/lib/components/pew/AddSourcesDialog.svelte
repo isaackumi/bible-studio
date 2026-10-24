@@ -18,6 +18,7 @@
   import DeskDialog from "../sources/DeskDialog.svelte";
   import AiSlidesDialog from "../decks/AiSlidesDialog.svelte";
   import DeckEditor from "../decks/DeckEditor.svelte";
+  import DeckThumb from "../decks/DeckThumb.svelte";
   import { createDeck } from "../../domain/decks";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
   import { isDesktop } from "../../platform/runtime";
@@ -409,8 +410,9 @@
           <input bind:this={deckInput} type="file" hidden accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label={t("Import PowerPoint or PDF")} onchange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; input.value = ""; if (file) void importDeckFile(file); }} />
         </div>
         <div class="grid">
-          {#each session.decks as deck (deck.id)}
-            <button type="button" class="card" class:done={wasAdded(`deck:${deck.id}`)} onclick={() => { void session.addDeckToService(deck.id, target ?? undefined); note(`deck:${deck.id}`, deck.name); }}>
+          {#each session.recentDecks as deck (deck.id)}
+            <button type="button" class="card deck-card" class:done={wasAdded(`deck:${deck.id}`)} onclick={() => { void session.addDeckToService(deck.id, target ?? undefined); note(`deck:${deck.id}`, deck.name); }}>
+              {#if deck.pages[0]}<span class="deck-thumb"><DeckThumb page={deck.pages[0]} /></span>{/if}
               <strong>{deck.name}</strong><span>{tn(deck.pages.length, "{n} page", "{n} pages")}</span><em>{wasAdded(`deck:${deck.id}`) ? t("Added") : ""}</em>
               <Icon name={wasAdded(`deck:${deck.id}`) ? "check" : "plus"} size={15} />
             </button>
@@ -528,6 +530,7 @@
   .grow { flex: 1; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; align-content: start; }
   .card { position: relative; display: grid; gap: 3px; padding: 10px 34px 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 55%, transparent); color: var(--ink); font: inherit; text-align: left; }
+  .deck-thumb { display: block; margin-bottom: 4px; border-radius: 6px; overflow: hidden; background: #000; }
   .card strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card em { font-size: 11px; font-style: normal; color: var(--muted); }

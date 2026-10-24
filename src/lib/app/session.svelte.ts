@@ -4427,6 +4427,26 @@ class Session {
     return (this.workspace.decks ?? []).map(sanitizeDeck).filter((deck): deck is SlideDeck => deck !== null);
   }
 
+  /** Decks, the one changed last first: what a church just made is what it looks for. */
+  get recentDecks(): SlideDeck[] {
+    return [...this.decks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  /**
+   * A deck from the studio onto the screens: one page on Preview, or straight to Program, every page
+   * as a slideshow, or into the service to run in order.
+   */
+  showDeck = async (deckId: string, how: "preview" | "live" | "slideshow" | "service", options: { page?: number; seconds?: number } = {}) => {
+    const deck = this.decks.find((entry) => entry.id === deckId);
+    if (!deck) return;
+    const page = Math.min(Math.max(0, options.page ?? 0), deck.pages.length - 1);
+    if (how === "service") return this.addDeckToService(deckId);
+    if (how === "slideshow") return this.startDeckLoop(deckId, options.seconds ?? 8);
+    this.previewDeckPage(deckId, page);
+    if (how === "live") await this.take();
+    else this.message = t("{name} is on Preview. Press LIVE to show it.", { name: deck.name });
+  };
+
   /**
    * The design studio (the slide editor) open over any page: on a deck, the newest one, or a new one.
    * `start`: open the template gallery straight away.

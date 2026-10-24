@@ -18,7 +18,7 @@
   let armTimer: ReturnType<typeof setTimeout> | undefined;
 
   const decks = $derived(
-    session.decks.filter((deck) => {
+    session.recentDecks.filter((deck) => {
       const needle = query.trim().toLowerCase();
       if (!needle) return true;
       return (

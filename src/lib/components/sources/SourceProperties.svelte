@@ -363,7 +363,7 @@
         <span>{t("Deck")}</span>
         <select class="field" aria-label={t("Deck")} value={deckId} onchange={(event) => fields.type === "slide" && (fields = { ...fields, deckId: event.currentTarget.value, page: 0 })}>
           <option value="" disabled>{t("Choose a deck")}</option>
-          {#each session.decks as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
+          {#each session.recentDecks as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
         </select>
       </label>
       {#if deck}

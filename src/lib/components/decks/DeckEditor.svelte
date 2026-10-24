@@ -8,11 +8,13 @@
     addIconElement,
     addImageElement,
     addPage,
+    createDeck,
     addQrElement,
     addShapeElement,
     addTextElement,
     duplicatePage,
     insertPage,
+    isUntouchedPage,
     movePage,
     removePage,
     replacePage,
@@ -27,7 +29,7 @@
   import { assignLayerSource } from "../../domain/composition";
   import { encodeFill, sanitizeFill, type Fill } from "../../domain/fill";
   import type { IconNode } from "../../domain/icon";
-  import { t } from "../../i18n/core";
+  import { t, tn } from "../../i18n/core";
   import { keys } from "../../platform/os";
 
   // Full-screen deck editor. Edits stay in a draft until "Save changes"; Program never changes here.
@@ -167,6 +169,29 @@
     selectedId = next.layers.at(-1)?.id ?? null;
     imageMenu = false;
   }
+  let showMenu = $state(false);
+  let designsMenu = $state(false);
+  let loopSeconds = $state(8);
+  /** Saves, leaves the studio, and puts the deck on the screens the way chosen. */
+  function present(how: "preview" | "live" | "slideshow" | "service") {
+    showMenu = false;
+    save();
+    onclose();
+    void session.showDeck(draft.id, how, { page: pageIndex, seconds: loopSeconds });
+  }
+  /** Another design (or a new one) in the studio; this one is saved first. */
+  function openDesign(id: string | null) {
+    designsMenu = false;
+    if (id === draft.id) return;
+    if (dirty) save();
+    onclose();
+    if (id) session.openStudio(id);
+    else {
+      const deck = createDeck(t("New design"));
+      session.saveDeck(deck);
+      session.openStudio(deck.id, "templates");
+    }
+  }
   /** The full-size template gallery, over the studio. */
   let templates = $state(false);
   /** The panel open beside the canvas; Templates first, so a church sees them straight away. */
@@ -190,7 +215,8 @@
   function addTemplatePage(next: Composition) {
     templates = false;
     selectedId = null;
-    if (placeTemplate === "replace") {
+    // A new deck's first page, still as it came, gives way to the template.
+    if (placeTemplate === "replace" || isUntouchedPage(page)) {
       commitPage({ ...next, id: page.id });
       return;
     }
@@ -333,6 +359,10 @@
       selectedId = null;
     } else if (event.key === "Escape") {
       event.preventDefault();
+      if (showMenu || designsMenu) {
+        showMenu = designsMenu = false;
+        return;
+      }
       // A window over the studio closes first; the studio only on the next Escape.
       if (templates) templates = false;
       else if (panel && !selectedId && !editingText && !iconPicker) panel = null;
@@ -350,12 +380,46 @@
 
 <div class="deck-editor" role="dialog" aria-modal="true" aria-label={t("Edit {name}", { name: draft.name })}>
   <header>
+    <span class="menu-wrap">
+      <button type="button" class="designs-btn" aria-haspopup="menu" aria-expanded={designsMenu} onclick={() => { designsMenu = !designsMenu; showMenu = false; }}>{t("My designs")} <span aria-hidden="true">▾</span></button>
+      {#if designsMenu}
+        <div class="menu designs-menu" role="menu">
+          <button type="button" role="menuitem" class="new-design" onclick={() => openDesign(null)}>+ {t("New design")}</button>
+          {#each session.recentDecks.slice(0, 40) as entry (entry.id)}
+            <button type="button" role="menuitem" class="design" class:on={entry.id === draft.id} onclick={() => openDesign(entry.id)}>
+              <span class="mini" style:--aspect={screenAspect}>{#if entry.pages[0]}<DeckThumb page={entry.pages[0]} />{/if}</span>
+              <span class="design-name">{entry.name}<small>{tn(entry.pages.length, "{n} page", "{n} pages")}{entry.id === draft.id ? ` · ${t("Open now")}` : ""}</small></span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </span>
     <input class="deck-name" aria-label={t("Deck name")} value={draft.name} onchange={(event) => commitDeck({ ...draft, name: event.currentTarget.value.trim() || draft.name })} />
     <div class="history">
       <button type="button" aria-label={t("Undo")} title={keys(t("Undo (⌘Z)"))} disabled={!undoStack.length} onclick={undo}>↶</button>
       <button type="button" aria-label={t("Redo")} title={keys(t("Redo (⇧⌘Z)"))} disabled={!redoStack.length} onclick={redo}>↷</button>
     </div>
     <span class="status">{dirty ? t("Unsaved changes") : t("Saved")}</span>
+    <span class="menu-wrap">
+      <button type="button" class="show-btn" aria-haspopup="menu" aria-expanded={showMenu} onclick={() => { showMenu = !showMenu; designsMenu = false; }}>{t("Show")} <span aria-hidden="true">▾</span></button>
+      {#if showMenu}
+        <div class="menu show-menu" role="menu">
+          <button type="button" role="menuitem" onclick={() => present("preview")}><strong>{t("Put this page on Preview")}</strong><small>{t("Then press LIVE when you are ready.")}</small></button>
+          <button type="button" role="menuitem" onclick={() => present("live")}><strong>{t("Show this page now")}</strong><small>{t("Straight to the screens.")}</small></button>
+          <button type="button" role="menuitem" onclick={() => present("service")}><strong>{t("Add to the service")}</strong><small>{t("Its pages run in order with Next.")}</small></button>
+          {#if draft.pages.length > 1}
+            <button type="button" role="menuitem" onclick={() => present("slideshow")}><strong>{t("Play as a slideshow")}</strong><small>{tn(draft.pages.length, "{n} page, round and round", "{n} pages, round and round")}</small></button>
+            <label class="loop-row">
+              <span>{t("Seconds per page")}</span>
+              <select bind:value={loopSeconds}>
+                {#each [5, 8, 12, 20, 30] as seconds (seconds)}<option value={seconds}>{seconds}</option>{/each}
+              </select>
+            </label>
+          {/if}
+          <p class="menu-note">{t("Saves your changes first.")}</p>
+        </div>
+      {/if}
+    </span>
     <button type="button" class="save" disabled={!dirty} onclick={save}>{t("Save changes")}</button>
     <button type="button" class="close" class:warn={confirmClose} onclick={close}>{confirmClose ? t("Discard changes?") : t("Close")}</button>
   </header>
@@ -567,13 +631,29 @@
 
 <style>
   .deck-editor { position: fixed; inset: 0; z-index: 35; background: var(--desk, #111); color: var(--ink); display: flex; flex-direction: column; font-family: var(--font-ui); font-size: 13px; }
-  header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header { position: relative; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   .deck-name { flex: 0 1 360px; height: 36px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); font: 600 18px/1 var(--font-ui); padding: 0 8px; }
   .deck-name:hover, .deck-name:focus { border-color: var(--line); background: var(--field); }
   .history { display: flex; gap: 4px; }
   .history button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: 16px; cursor: pointer; }
   .history button:disabled { opacity: 0.4; cursor: default; }
   .status { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
+  .menu-wrap > .designs-btn, .menu-wrap > .show-btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .menu-wrap > .show-btn { border-color: var(--accent); color: var(--accent); }
+  .menu-wrap > .show-btn:hover, .menu-wrap > .designs-btn:hover { background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
+  .menu.designs-menu { width: 320px; max-height: 70vh; }
+  .new-design { font-weight: 700; color: var(--accent) !important; }
+  .menu .design { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+  .menu .design.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .mini { flex: none; width: 72px; aspect-ratio: var(--aspect, 16 / 9); max-height: 48px; border-radius: 5px; overflow: hidden; background: #000; }
+  .design-name { display: grid; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .design-name small, .show-menu small { color: var(--muted); font-size: 11px; font-weight: 400; }
+  .menu.show-menu { left: auto; right: 0; width: 290px; max-height: none; }
+  .menu.show-menu button { display: grid; gap: 2px; padding: 8px 10px; min-height: 0; }
+  .loop-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px 4px; font-size: 11.5px; color: var(--muted); }
+  .loop-row span { white-space: nowrap; }
+  .loop-row select { flex: none; width: 64px; height: 28px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
+  .menu-note { margin: 4px 10px 2px; font-size: 11px; color: var(--muted); }
   .save { height: 36px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
   .save:disabled { opacity: 0.45; cursor: default; }
   .close { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }

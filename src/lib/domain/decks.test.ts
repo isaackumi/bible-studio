@@ -80,3 +80,13 @@ describe("slide words and sources", () => {
     expect(deckSource("song:x:1")).toBeNull();
   });
 });
+
+describe("untouched pages", () => {
+  it("knows a new deck's first page until something changes on it", async () => {
+    const { createDeck, isUntouchedPage, addTextElement } = await import("./decks");
+    const page = createDeck("D").pages[0]!;
+    expect(isUntouchedPage(page)).toBe(true);
+    expect(isUntouchedPage(addTextElement(page, "Hi", { x: 1, y: 1, w: 10, h: 10 }))).toBe(false);
+    expect(isUntouchedPage({ ...page, layers: page.layers.map((layer) => ({ ...layer, source: { ...layer.source, payload: { ...layer.source.payload, body: "Sunday" } } })) })).toBe(false);
+  });
+});

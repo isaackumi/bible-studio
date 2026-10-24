@@ -106,6 +106,13 @@ export function newPage(name = "Page"): Composition {
   return { ...page, transition: { type: "fade", ms: 300 } };
 }
 
+/** A page as newPage made it: nothing typed, moved or added yet. */
+export function isUntouchedPage(page: Composition): boolean {
+  const fresh = newPage(page.name);
+  const shape = (entry: Composition) => JSON.stringify([entry.background, entry.layers.map((layer) => [layer.name, layer.bounds, layer.source.payload])]);
+  return shape(page) === shape(fresh);
+}
+
 export function createDeck(name: string, now = new Date()): SlideDeck {
   return { id: uid("deck"), name: name.trim() || "Untitled deck", updatedAt: now.toISOString(), pages: [newPage("Page 1")] };
 }
