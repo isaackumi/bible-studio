@@ -462,6 +462,8 @@ const SPOKEN_FORM: Record<string, string> = {
   to: "to", unto: "to", shall: "shall", shalt: "shall", will: "shall", hast: "has",
   // Old spellings a speaker says the modern way ("rejoice in the Lord always").
   alway: "always", spake: "spoke",
+  // The World English Bible writes "Yahweh" where a preacher says "the Lord"; "which" for "that".
+  yahweh: "lord", which: "that",
 };
 const spokenForm = (word: string) => SPOKEN_FORM[word] ?? word;
 /** A word that tells verses apart (not "in", "the", "be", "you"). */
@@ -496,12 +498,13 @@ export function matchPhrase(heard: string, source: QuoteVerse[] | QuoteIndex, tr
   if (index.catalog.length === 0) return null;
   const { tokens, pairs } = phraseIndex(index);
   const said = wordsOf(heard).map(spokenForm).slice(-40);
-  let best: { length: number; start: number; verses: Set<number> } | null = null;
+  // Each verse the longest run is in, with where in it the run starts.
+  let best: { length: number; start: number; verses: Map<number, number> } | null = null;
   for (let start = 0; start + 1 < said.length; start += 1) {
     const hits = pairs.get(`${said[start]} ${said[start + 1]}`);
     if (!hits || hits.length > 4000) continue;
     let longest = 0;
-    const verses = new Set<number>();
+    const verses = new Map<number, number>();
     for (const hit of hits) {
       const verse = Math.floor(hit / 256);
       const at = hit % 256;
@@ -512,7 +515,7 @@ export function matchPhrase(heard: string, source: QuoteVerse[] | QuoteIndex, tr
         longest = length;
         verses.clear();
       }
-      if (length === longest) verses.add(verse);
+      if (length === longest && !verses.has(verse)) verses.set(verse, at);
     }
     if (!best || longest > best.length) best = { length: longest, start, verses };
   }
@@ -522,15 +525,21 @@ export function matchPhrase(heard: string, source: QuoteVerse[] | QuoteIndex, tr
   const characters = run.join(" ").length;
   const enough =
     (best.length >= 4 && tellingWords >= 1) || (best.length === 3 && tellingWords >= 2) || (best.length === 2 && tellingWords === 2 && run.every((word) => word.length >= 4));
+  // Counted by verse, not by version: one verse matched in King James and World English is one.
+  const place = (verse: number) => `${index.catalog[verse]!.bookOrd}:${index.catalog[verse]!.chapter}:${index.catalog[verse]!.verse}`;
+  const places = new Set([...best.verses.keys()].map(place));
   // In one chapter only ("God is love", twice in 1 John 4): its first place is the one to show.
-  const chapters = new Set([...best.verses].map((verse) => `${index.catalog[verse]!.bookOrd}:${index.catalog[verse]!.chapter}`));
-  const clear = best.verses.size === 1 || chapters.size === 1 || (best.length >= 8 && best.verses.size <= 3);
+  const chapters = new Set([...places].map((key) => key.split(":").slice(0, 2).join(":")));
+  const clear = places.size === 1 || chapters.size === 1 || (best.length >= 8 && places.size <= 3);
   if (!enough || !clear || characters < 9) return null;
-  const first = Math.min(...best.verses);
-  // A quote is a real part of its verse ("the lord is my shepherd": 5 of 8 words), not four words
-  // lost in a long one ("unto thy neighbour, and" heard in "turn to your neighbour and say").
+  const first = Math.min(...best.verses.keys());
+  // A quote is a real part of its verse ("the lord is my shepherd": 5 of 8 words), or how it opens
+  // ("Love is patient…"; a verse's last words are not enough: "…will close your eyes"), not four words lost in a long one ("unto thy neighbour, and" heard
+  // in "turn to your neighbour and say").
+  const at = best.verses.get(first)!;
+  const edge = at === 0;
   const share = best.length / tokens[first]!.length;
-  if ((best.length < 6 && share < 0.25) || (best.length < 8 && share < 0.15)) return null;
+  if (!edge && ((best.length < 6 && share < 0.25) || (best.length < 8 && share < 0.15))) return null;
   const verse = index.catalog[first]!;
   return { item: passageFor(verse, translationId), text: verse.text, hits: best.length };
 }
@@ -542,9 +551,12 @@ export function matchSpoken(heard: string, source: QuoteVerse[] | QuoteIndex, tr
   // A run of the verse's own words, small words included: what a preacher quotes most.
   const phrase = matchPhrase(heard, source, translationId);
   if (phrase && !citation) return phrase;
-  const quote = matchQuote(heard, source, translationId);
-  if (quote && (!citation || quote.hits >= 4)) return quote;
-  return citation ?? quote;
+  // Telling words in order, scattered: four at least now that short quotes are matched as phrases
+  // ("close… eyes… heads" is in Isaiah 29:10, but "close your eyes and bow your heads" is not it).
+  const scattered = matchQuote(heard, source, translationId);
+  const quote = scattered && scattered.hits >= 4 ? scattered : null;
+  if (quote) return quote;
+  return citation;
 }
 
 /** Try each recognizer alternative and keep the one that lands on scripture. */

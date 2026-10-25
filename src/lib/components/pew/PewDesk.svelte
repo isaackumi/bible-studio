@@ -119,20 +119,25 @@
   let seededChapterPreview = false;
   let takeAfterPreview = false;
   let quoteIndex: QuoteIndex | null = null;
+  /**
+   * What listening matches quotes against: the desk's version with the King James and the World
+   * English Bible, so a verse quoted in old or modern words is found and shown in the desk's version.
+   */
+  let listenIndex: QuoteIndex | null = null;
   let lastSpokenRef = "";
 
   // The open service's passages are looked at first, by listening and by word search.
   const passagesInService = $derived(servicePassages(session.service));
-  let serviceQuotes: { from: QuoteIndex; key: string; index: QuoteIndex } | null = null;
-  function serviceQuoteIndex(): QuoteIndex | null {
+  const serviceQuotes = new WeakMap<QuoteIndex, { key: string; index: QuoteIndex }>();
+  function serviceQuoteIndex(from: QuoteIndex | null = quoteIndex): QuoteIndex | null {
     const passages = passagesInService;
-    if (!quoteIndex || passages.length === 0) return null;
+    if (!from || passages.length === 0) return null;
     const key = passages.map((p) => `${p.bookOrd}:${p.chapter}:${p.startVerse}-${p.endVerse}`).join(",");
-    if (serviceQuotes?.from !== quoteIndex || serviceQuotes.key !== key) {
-      const rows = quoteIndex.catalog.filter((row) => inPassages(passages, row.bookOrd, row.chapter, row.verse));
-      serviceQuotes = { from: quoteIndex, key, index: buildQuoteIndex(rows) };
-    }
-    return serviceQuotes.index;
+    const kept = serviceQuotes.get(from);
+    if (kept?.key === key) return kept.index;
+    const index = buildQuoteIndex(from.catalog.filter((row) => inPassages(passages, row.bookOrd, row.chapter, row.verse)));
+    serviceQuotes.set(from, { key, index });
+    return index;
   }
 
   const book = $derived(session.books.find((entry) => entry.ord === bookOrd) ?? session.books[0]);
@@ -309,8 +314,13 @@
   $effect(() => {
     const id = translationId;
     // Online translations are not stored, so matching reads a bundled translation's words.
-    void bundledQuoteCatalog(isOnlineTranslation(id) ? WORDS_TRANSLATION : id).then((rows) => {
+    const own = isOnlineTranslation(id) ? WORDS_TRANSLATION : id;
+    void bundledQuoteCatalog(own).then((rows) => {
       if (id === translationId) quoteIndex = buildQuoteIndex(rows);
+    });
+    // Listening also reads the King James and the World English Bible (every library has both).
+    void Promise.all([...new Set([own, "kjv", "web"])].map((source) => bundledQuoteCatalog(source).catch(() => []))).then((lists) => {
+      if (id === translationId) listenIndex = buildQuoteIndex(lists.flat());
     });
   });
 
@@ -643,13 +653,14 @@
     // While songs are up, lyrics that quote scripture must not pull a verse onto Preview.
     if (!text || mode === "songs") return;
     const phrases = alternatives.length ? alternatives : [text];
-    const inService = serviceQuoteIndex();
+    const words = listenIndex ?? quoteIndex;
+    const inService = serviceQuoteIndex(words);
     const own = inService && inService.catalog.length ? chooseHeard(phrases, inService, translationId) : null;
-    const quoted = quoteIndex ? preferService(own, chooseHeard(phrases, quoteIndex, translationId)) : null;
+    const quoted = words ? preferService(own, chooseHeard(phrases, words, translationId)) : null;
     const openChapter = !quoted && book ? detectVerse(text, verses, book, chapter, translationId) : null;
     const match = quoted ?? (openChapter ? { item: openChapter, text } : null);
     if (!match) {
-      if (!lastSpokenRef) session.voice.message = quoteIndex ? t("Hearing you. Keep reading the verse.") : t("Loading the Bible so a verse can be found…");
+      if (!lastSpokenRef) session.voice.message = words ? t("Hearing you. Keep reading the verse.") : t("Loading the Bible so a verse can be found…");
       if (final) askAiForVerse(text);
       return;
     }

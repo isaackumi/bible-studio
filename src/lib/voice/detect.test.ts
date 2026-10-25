@@ -183,5 +183,21 @@ describe("finding a verse from part of it (KJV)", async () => {
       expect(found(said), said).toBeNull();
     }
   });
+
+  it("finds a verse quoted in modern words by matching King James and the World English Bible together", async () => {
+    const index = buildQuoteIndex([...(await bundledQuoteCatalog("kjv")), ...(await bundledQuoteCatalog("web"))]);
+    const found = (said: string) => matchSpoken(said, index, "kjv")?.item.reference ?? null;
+    // Modern wording the King James does not have, at the start of a long verse.
+    expect(found("love is patient")).toBe("1 Corinthians 13:4");
+    expect(found("for God so loved the world that he gave his only born son")).toBe("John 3:16");
+    // The same verse in two versions is one verse, not two choices.
+    expect(found("the lord is my shepherd")).toBe("Psalms 23:1");
+    expect(found("jesus wept")).toBe("John 11:35");
+    // The World English Bible says "Yahweh" where people say "the Lord".
+    expect(found("this is the day that the lord has made")).toBe("Psalms 118:24");
+    // Shown in the desk's own version, whichever version the words matched.
+    expect(matchSpoken("love is patient", index, "kjv")?.item.translationId).toBe("kjv");
+    for (const said of ["good morning church", "turn to your neighbour and say", "God is good all the time", "please be seated", "close your eyes and bow your heads"]) expect(found(said), said).toBeNull();
+  });
 });
 
