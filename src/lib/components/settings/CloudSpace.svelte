@@ -6,6 +6,7 @@
   import type { CloudBinItem, CloudMediaItem } from "../../sync/protocol";
   import { t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
+  import { isDesktop } from "../../platform/runtime";
 
   // Cloud space, in Settings › Account: how much of the plan's space is used and by what, the
   // files largest first with a way to take each out, the bin, and the computers syncing.
@@ -138,6 +139,19 @@
       {#if nearby.size}
         <div class="row"><div class="row-copy"><span>{t("Pictures and videos come from the computers on this network first: faster, and they do not need the cloud space.")}</span></div></div>
       {/if}
+      {#if isDesktop()}
+        <!-- Nearby needs the computers to see each other: the usual reasons they cannot, in plain words. -->
+        <details class="row help">
+          <summary>{t("Another computer not on this network?")}</summary>
+          <ul>
+            <li>{t("Both computers need Church Studio 0.5.6 or newer, on the same plan.")}</li>
+            <li>{t("Both need the same network: the same Wi-Fi, or a cable. Guest Wi-Fi often hides computers from each other; use the main network, an Ethernet cable, or a cable straight between the two computers.")}</li>
+            <li>{t("Windows: if it asks whether Church Studio may use networks, choose Allow. If the network is set to Public, set it to Private (Settings › Network & internet › your network).")}</li>
+            <li>{t("Mac: System Settings › Privacy & Security › Local Network, and turn on Church Studio.")}</li>
+            <li>{t("Until then, pictures and videos still come through the cloud.")}</li>
+          </ul>
+        </details>
+      {/if}
       {#each cloud.devices as device (device.device)}
         <div class="row"><div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}</strong><span>{t("Last synced {when}", { when: new Date(device.lastSyncAt).toLocaleString() })}{#if nearby.has(device.device)} · {t("On this network")}{/if}</span></div></div></div>
       {/each}
@@ -146,6 +160,9 @@
 </section>
 
 <style>
+  .help { display: block; }
+  .help summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .help ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .meter { display: block; height: 8px; margin: 6px 0; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); overflow: hidden; }
   .meter i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.3s ease; }
   .meter i.over { background: var(--live, #ff3b3b); }

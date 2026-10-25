@@ -420,7 +420,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 **Not covered yet (backlog, 2026-10-25):**
 
 - [ ] **Records over the local network.** Only pictures, videos and audio go device to device; songs, services and slides still need the cloud, so with the internet out an edit reaches the other computer only when it comes back. Needs per-device clocks (hybrid logical clocks or version vectors), delete markers that outlive a month-long absence, and care with mixed app versions dropping unknown fields.
-- [ ] **"Why isn't my other computer showing?"** Settings says nothing when no computer is found. Explain the usual causes in plain words: guest Wi-Fi that hides devices from each other, Windows treating the network as Public, the Mac's local-network permission refused, a computer on another licence or on Free.
+- [x] **"Why isn't my other computer showing?"** (done: a help note in Settings › Cloud space.) Settings says nothing when no computer is found. Explain the usual causes in plain words: guest Wi-Fi that hides devices from each other, Windows treating the network as Public, the Mac's local-network permission refused, a computer on another licence or on Free.
 - [ ] **Windows network marked Public.** The firewall blocks incoming copies unless someone clicks Allow. Detect it and say how to set the network to Private, or ask once with a clear reason.
 - [ ] **Mac local-network permission refused.** It quietly falls back to the cloud. Detect it and point to System Settings › Privacy & Security › Local Network.
 - [ ] **Guest Wi-Fi client isolation.** Cannot be got through; say so (see the help line above) and suggest Ethernet or a direct cable.
