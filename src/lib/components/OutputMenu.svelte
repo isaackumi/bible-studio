@@ -73,6 +73,7 @@
         {#if wifi.on}
           <p class="menu-note">{wifi.link ? t("Bookmark on the TV, once: {url}", { url: wifi.link.replace(/^https?:\/\//, "") }) : t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>
           {#if wifi.link}<p class="menu-note">{t("Without internet: {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>{/if}
+          {#if wifi.network?.name}<p class="menu-note">{t("On the Wi-Fi “{name}”: the TV must join it too.", { name: wifi.network.name })}</p>{/if}
           <button type="button" role="menuitem" onclick={() => { wifi.qrOnPreview(); close(); }}>{t("Its address as a QR code on Preview")}</button>
         {/if}
         {#if wifi.error}<p class="menu-note">{wifi.error}</p>{/if}

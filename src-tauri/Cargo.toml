@@ -45,6 +45,9 @@ objc2-app-kit = "0.3.2"
 objc2-foundation = { version = "0.3.2", features = ["NSDate", "NSRunLoop"] }
 objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
 objc2-speech = { version = "0.3.2", features = ["SFSpeechRecognizer", "block2"] }
+# The Wi-Fi network's name for Settings › Screens (CoreWLAN; macOS shares it once Location is allowed).
+objc2-core-wlan = { version = "0.3.2", features = ["CWWiFiClient", "CWInterface"] }
+objc2-core-location = { version = "0.3.2", features = ["CLLocationManager"] }
 # Sound outputs (audio_out.rs): already built for cpal, with the same features.
 coreaudio-sys = { version = "0.2", default-features = false, features = ["audio_unit", "core_audio"] }
 # Whisper on the Mac's graphics (Metal).

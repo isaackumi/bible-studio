@@ -120,6 +120,22 @@
         <button type="button" class="btn" onclick={() => wifi?.qrOnPreview()}>{t("Its address as a QR code on Preview")}</button>
       </div>
     {/if}
+    {#if wifi?.on && wifi.network}
+      {@const net = wifi.network}
+      <!-- Which network the TV must join: the Wi-Fi's own name, once the system shares it. -->
+      <div class="row">
+        <div class="row-copy">
+          <strong>{t("Network")}</strong>
+          <span class:warn={!!net.name && !!wifi.tvNetwork && wifi.tvNetwork !== net.name}>
+            {#if net.name}{t("This computer is on the Wi-Fi “{name}”. The TV must join it too.", { name: net.name })}{#if wifi.tvNetwork && wifi.tvNetwork !== net.name}{" "}{t("Last time the TV showed the screen on “{name}”.", { name: wifi.tvNetwork })}{/if}
+            {:else if net.hidden}{t("This computer is on Wi-Fi. The system shares the network's name only with apps allowed to use Location; your location is never used.")}
+            {:else if net.kind === "wired"}{t("This computer is on a cable (Ethernet). The TV must be on the same network: the Wi-Fi from the same router.")}
+            {:else}{t("The TV must be on the same network as this computer.")}{/if}
+          </span>
+        </div>
+        {#if net.hidden}<button type="button" class="btn" onclick={() => void wifi?.allowNetworkName()}>{t("Show the network's name")}</button>{/if}
+      </div>
+    {/if}
     {#if wifi?.error}<div class="row"><div class="row-copy"><span class="warn">{wifi.error}</span></div></div>{/if}
   </section>
 {/if}

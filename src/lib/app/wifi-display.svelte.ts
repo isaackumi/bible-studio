@@ -15,6 +15,10 @@ import { session } from "./session.svelte";
 const KEY = "cs-wifi-display";
 /** This computer's TV link (church-studio…/tv/CODE) and the key that moves it. */
 const LINK_KEY = "cs-tv-link";
+/** The network a TV last showed the screen on: said when this computer is on another one. */
+const TV_NETWORK_KEY = "cs-tv-network";
+
+export type NetworkInfo = { kind: "wifi" | "wired" | "unknown"; name: string | null; hidden: boolean };
 
 class WifiDisplay {
   /** Program is going to TV browsers on this Wi-Fi. */
@@ -26,6 +30,36 @@ class WifiDisplay {
   error = $state("");
   /** The address to bookmark on the TV once: it follows this computer when its Wi-Fi address changes. */
   link = $state("");
+  /** The network this computer is on now (its Wi-Fi name, once the system shares it). */
+  network = $state<NetworkInfo | null>(null);
+  /** The Wi-Fi a TV last showed the screen on. */
+  tvNetwork = $state(this.remembered());
+
+  private remembered(): string {
+    try {
+      return localStorage.getItem(TV_NETWORK_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  /** Read the network's name again (after Location is allowed, or the computer changed network). */
+  readNetwork = async () => {
+    this.network = await invoke<NetworkInfo>("network_name").catch(() => null);
+  };
+
+  /** Let the system share the Wi-Fi name: macOS asks to allow Location; Windows opens its Location settings. */
+  allowNetworkName = async () => {
+    if (/Windows/i.test(navigator.userAgent)) {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl("ms-settings:privacy-location").catch(() => {});
+    } else await invoke("network_allow_location").catch(() => {});
+    // The answer comes from a system dialog: look again for a little while.
+    for (let i = 0; i < 10 && this.network?.hidden !== false; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await this.readNetwork();
+    }
+  };
   private stopWatching: (() => void) | null = null;
   private sendTimer: ReturnType<typeof setTimeout> | undefined;
   private countTimer: ReturnType<typeof setInterval> | undefined;
@@ -58,6 +92,7 @@ class WifiDisplay {
     this.url = `${new URL(status.url).origin}/?lan=1`;
     this.on = true;
     void this.refreshLink();
+    void this.readNetwork();
     try {
       localStorage.setItem(KEY, "1");
     } catch {
@@ -74,7 +109,23 @@ class WifiDisplay {
         this.sendTimer = setTimeout(() => void this.send(frame), 120);
       });
     });
-    this.countTimer = setInterval(() => void invoke<number>("lan_screen_watching").then((n) => (this.watching = n)).catch(() => {}), 3000);
+    this.countTimer = setInterval(() => {
+      void invoke<number>("lan_screen_watching")
+        .then((n) => {
+          this.watching = n;
+          // A TV is showing it: remember the Wi-Fi it is on, to say so if this computer is elsewhere next time.
+          const name = this.network?.name;
+          if (n > 0 && name && name !== this.tvNetwork) {
+            this.tvNetwork = name;
+            try {
+              localStorage.setItem(TV_NETWORK_KEY, name);
+            } catch {
+              // Not remembered.
+            }
+          }
+        })
+        .catch(() => {});
+    }, 3000);
   };
 
   stop = async () => {
