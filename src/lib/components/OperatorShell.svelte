@@ -24,7 +24,6 @@
   import PartPickerDialog from "./pew/PartPickerDialog.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
   import PewDesk from "./pew/PewDesk.svelte";
-  import SettingsDialog from "./settings/SettingsDialog.svelte";
 
   // The desk's language: its lines are loaded first and the desk switches once they are here, so it
   // never shows half one language. The last one is remembered on this computer, so a French desk
@@ -210,7 +209,8 @@
     {/if}
     <FindOverlay />
     {#if session.settingsOpen}
-      <SettingsDialog />
+      <!-- Its own chunk, fetched when first opened: Settings is large and the desk starts without it. -->
+      {#await import("./settings/SettingsDialog.svelte") then { default: SettingsDialog }}<SettingsDialog />{/await}
     {/if}
     <RemoteApproval />
     <Paywall />
