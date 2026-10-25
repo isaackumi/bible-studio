@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.5",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "users", title: msg("Invite your team by email"), text: msg("On a Church plan, add someone in Settings › Plan & account and they get an email from you naming the church. They download Church Studio, sign in with that address, and the church's library comes to their computer. No license key to pass around. You see who has joined, and can send the invitation again.") },
+      { icon: "screens", title: msg("Mac: the audience screen's status tells the truth"), text: msg("A Mac no longer warns that the audience window misses the screen when it covers it, and a rare crash on start is gone.") },
+    ],
+  },
+  {
     version: "0.5.4",
     date: "2026-10-24",
     highlights: [
