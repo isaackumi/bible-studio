@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.1",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "screens", title: msg("Every screen shows what you choose"), text: msg("Name your monitors (\u201cMain auditorium (HISENSE)\u201d). Give a screen one job and let it take others between: a scripture screen can show songs, and a verse takes over the moment it goes live. Preview says which screens LIVE will reach, and Settings \u203a More screens shows where everything goes.") },
+      { icon: "cast", title: msg("TVs over Wi-Fi, set up once"), text: msg("A TV over Wi-Fi can be one of your screens, with its own job. Bookmark its link on the TV once: it keeps working when the computer's address changes, and Settings shows which Wi-Fi network the TV must join.") },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-10-25",
     highlights: [
