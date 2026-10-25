@@ -9,7 +9,8 @@
   // A phone, tablet or TV browser used as a display (/d/CODE): it shows what the church's screen
   // shows, as the church's Church Studio shares it over the internet. Only the picture: no controls,
   // nothing that changes anything. A tap goes full screen; the device stays awake while it shows.
-  let { code }: { code: string } = $props();
+  // `lan`: opened from the church computer itself over the church Wi-Fi (/?lan=1), no internet needed.
+  let { code, lan = false }: { code: string; lan?: boolean } = $props();
 
   let model = $state<PresentationModel>(emptyModel(defaultTheme()));
   let aspect = $state(16 / 9);
@@ -42,7 +43,7 @@
     const ask = async () => {
       if (stopped) return;
       try {
-        const response = await fetch(`${SERVER_URL}/v1/rooms/${code}/screen?after=${revision}`, { cache: "no-store" });
+        const response = await fetch(lan ? `/display/screen?after=${revision}` : `${SERVER_URL}/v1/rooms/${code}/screen?after=${revision}`, { cache: "no-store" });
         if (response.status === 404) {
           status = "ended";
           return;
@@ -117,7 +118,10 @@
         <p>The church is no longer sharing it.</p>
       {:else if status === "offline"}
         <h1>Reconnecting…</h1>
-        <p>Check this device's internet connection.</p>
+        <p>{lan ? "Check that this device is on the church Wi-Fi and Church Studio is open." : "Check this device's internet connection."}</p>
+      {:else if lan}
+        <h1>Connected to Church Studio</h1>
+        <p>The screen appears here when the church computer shows it on Wi-Fi.</p>
       {:else}
         <h1>{church ? `Waiting for ${church}` : "Connecting…"}</h1>
         <p>The screen appears here when the church shares it. Code <b>{code}</b></p>

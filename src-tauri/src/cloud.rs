@@ -41,7 +41,7 @@ fn extension_of(path: &Path) -> String {
     path.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase()
 }
 
-fn content_type(ext: &str) -> &'static str {
+pub(crate) fn content_type(ext: &str) -> &'static str {
     match ext {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",

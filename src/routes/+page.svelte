@@ -39,7 +39,7 @@
     if (typeof window === "undefined") return "operator";
     const params = new URLSearchParams(window.location.search);
     if (params.get("remote") === "1") return "remote";
-    if (/^[A-Za-z0-9]{6}$/.test(params.get("receiver") ?? "")) return "receiver";
+    if (/^[A-Za-z0-9]{6}$/.test(params.get("receiver") ?? "") || params.get("lan") === "1") return "receiver";
     if (params.get("stage") === "1" || tauriWindowLabel() === "stage") return "stage";
     if (params.get("second") === "1" || tauriWindowLabel() === "second") return "second";
     // Extra screens (Settings › Screens): ?screen=<id>, or a window labelled screen-<id>.
@@ -59,7 +59,7 @@
 
 {#await SURFACES[surface]() then { default: View }}
   {#if surface === "receiver"}
-    <View code={(new URLSearchParams(window.location.search).get("receiver") ?? "").toUpperCase()} />
+    <View code={(new URLSearchParams(window.location.search).get("receiver") ?? "").toUpperCase()} lan={new URLSearchParams(window.location.search).get("lan") === "1"} />
   {:else if surface === "screen"}
     <View id={new URLSearchParams(window.location.search).get("screen") || (tauriWindowLabel() ?? "").replace(/^screen-/, "")} />
   {:else}

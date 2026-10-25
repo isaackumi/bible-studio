@@ -682,6 +682,8 @@ class Session {
       // On a service day, the readiness check runs by itself once the screens have settled.
       setTimeout(() => void this.serviceDayCheck(), 10_000);
       if (this.desktop()) {
+        // A TV showing the screen over Wi-Fi before the restart picks it back up.
+        void import("./wifi-display.svelte").then(({ wifiDisplay }) => wifiDisplay.resume());
         void this.ensureBackupFolder();
         this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
       }

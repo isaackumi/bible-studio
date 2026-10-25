@@ -31,7 +31,24 @@ pub struct LanRemote {
     stopping: AtomicBool,
     connections: AtomicUsize,
     pending: Mutex<HashMap<String, mpsc::Sender<Value>>>,
+    /// The audience screen for TV browsers on this Wi-Fi (/?lan=1): Program as the desk last sent it.
+    screen: Mutex<LanScreen>,
+    /// Browsers that asked for the screen lately, by address: how many TVs are watching.
+    watchers: Mutex<HashMap<String, std::time::Instant>>,
 }
+
+#[derive(Default)]
+struct LanScreen {
+    revision: u64,
+    frame: Option<String>,
+}
+
+/// A browser that has not asked for this long has stopped watching.
+const WATCHING: Duration = Duration::from_secs(10);
+/// A screen is a model (words, theme, layout), never pictures themselves: this is generous.
+const SCREEN_BYTES: usize = 512 * 1024;
+/// Pictures only (a video needs streaming): larger files are not sent.
+const MEDIA_BYTES: u64 = 40 * 1024 * 1024;
 
 impl Default for LanRemote {
     fn default() -> Self {
@@ -43,6 +60,8 @@ impl Default for LanRemote {
             stopping: AtomicBool::new(false),
             connections: AtomicUsize::new(0),
             pending: Mutex::new(HashMap::new()),
+            screen: Mutex::new(LanScreen::default()),
+            watchers: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -198,6 +217,36 @@ pub fn stop(lan: &LanRemote) {
     lock(&lan.pending).clear();
 }
 
+/// The desk's newest Program for TV browsers (None: not shown on Wi-Fi any more).
+pub fn set_screen(lan: &LanRemote, frame: Option<String>) -> Result<(), String> {
+    if frame.as_ref().is_some_and(|frame| frame.len() > SCREEN_BYTES) {
+        return Err("That screen is too large to send.".into());
+    }
+    let mut screen = lock(&lan.screen);
+    screen.revision += 1;
+    screen.frame = frame;
+    Ok(())
+}
+
+/// How many browsers are showing the screen now.
+pub fn watching(lan: &LanRemote) -> usize {
+    let mut watchers = lock(&lan.watchers);
+    watchers.retain(|_, at| at.elapsed() < WATCHING);
+    watchers.len()
+}
+
+/// What a TV browser gets for "anything newer than `after`?": nothing (204), or the screen.
+fn screen_reply(screen: &LanScreen, after: u64) -> Option<Value> {
+    (after != screen.revision).then(|| json!({ "on": screen.frame.is_some(), "revision": screen.revision, "frame": screen.frame, "name": "" }))
+}
+
+/// A picture's path from its /media/<token> (base64url of the path).
+fn media_path(token: &str) -> Option<String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(token).ok()?;
+    String::from_utf8(bytes).ok().filter(|path| !path.is_empty())
+}
+
 pub fn reply(lan: &LanRemote, id: String, envelope: Value) {
     if let Some(tx) = lock(&lan.pending).remove(&id) {
         let _ = tx.send(envelope);
@@ -288,6 +337,31 @@ fn parse_http(buf: &[u8]) -> Parsed {
 }
 
 fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRequest) {
+    // A TV browser on this Wi-Fi as the audience screen: the app itself, drawing what the desk sends.
+    if req.method == "GET" && req.path == "/" && query_value(&req.query, "lan").as_deref() == Some("1") {
+        serve_app_file(stream, app, "index.html");
+        return;
+    }
+    if req.method == "GET" && req.path == "/display/screen" {
+        let who = stream.peer_addr().map(|addr| addr.ip().to_string()).unwrap_or_default();
+        lock(&lan.watchers).insert(who, std::time::Instant::now());
+        let after = query_value(&req.query, "after").and_then(|value| value.parse().ok()).unwrap_or(0);
+        match screen_reply(&lock(&lan.screen), after) {
+            Some(body) => write_json(stream, body),
+            None => write_http(stream, 204, "text/plain", b""),
+        }
+        return;
+    }
+    if req.method == "GET" {
+        if let Some(token) = req.path.strip_prefix("/media/") {
+            serve_media(stream, app, token);
+            return;
+        }
+        if req.path.starts_with("/_app/") {
+            serve_app_file(stream, app, req.path.trim_start_matches('/'));
+            return;
+        }
+    }
     if req.method == "GET" && (req.path == "/" || req.path == "/remote.html" || req.path == "/index.html") {
         write_http(stream, 200, "text/html; charset=utf-8", PAD.as_bytes());
         return;
@@ -322,6 +396,40 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
         return;
     }
     write_http(stream, 404, "text/plain", b"Not found");
+}
+
+/// One of the app's own files (built into Church Studio), for the TV browser's page.
+fn serve_app_file(stream: &mut TcpStream, app: &AppHandle, path: &str) {
+    match app.asset_resolver().get(path.to_string()) {
+        Some(asset) => write_http(stream, 200, &asset.mime_type, &asset.bytes),
+        None => write_http(stream, 404, "text/plain", b"Not found"),
+    }
+}
+
+/// A picture on the screen, for the TV browser: only a file that is in Media, never any other path.
+fn serve_media(stream: &mut TcpStream, app: &AppHandle, token: &str) {
+    use tauri::Manager;
+    let Some(path) = media_path(token) else {
+        write_http(stream, 404, "text/plain", b"Not found");
+        return;
+    };
+    let known = {
+        let db = app.state::<crate::db::Db>();
+        let Ok(conn) = db.0.lock() else {
+            write_http(stream, 503, "text/plain", b"Busy");
+            return;
+        };
+        conn.query_row("SELECT 1 FROM media_assets WHERE path = ?1", [&path], |_| Ok(())).is_ok()
+    };
+    let file = std::path::Path::new(&path);
+    let small = std::fs::metadata(file).map(|meta| meta.len() <= MEDIA_BYTES).unwrap_or(false);
+    match (known && small).then(|| std::fs::read(file).ok()).flatten() {
+        Some(bytes) => {
+            let ext = file.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase();
+            write_http(stream, 200, crate::cloud::content_type(&ext), &bytes);
+        }
+        None => write_http(stream, 404, "text/plain", b"Not found"),
+    }
 }
 
 /// One query value, percent-decoded ("token=ab%2Bc" → "ab+c").
@@ -382,6 +490,7 @@ fn write_json(stream: &mut TcpStream, value: Value) {
 fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u8]) {
     let reason = match status {
         200 => "OK",
+        204 => "No Content",
         400 => "Bad Request",
         404 => "Not Found",
         413 => "Payload Too Large",
@@ -400,6 +509,30 @@ fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_tv_browser_gets_the_newest_screen_once_and_then_nothing_until_it_changes() {
+        let lan = LanRemote::default();
+        assert_eq!(screen_reply(&lock(&lan.screen), 0), None);
+        set_screen(&lan, Some("{\"model\":1}".into())).unwrap();
+        let first = screen_reply(&lock(&lan.screen), 0).unwrap();
+        assert_eq!(first["on"], true);
+        assert_eq!(first["frame"], "{\"model\":1}");
+        assert_eq!(screen_reply(&lock(&lan.screen), first["revision"].as_u64().unwrap()), None);
+        set_screen(&lan, None).unwrap();
+        assert_eq!(screen_reply(&lock(&lan.screen), first["revision"].as_u64().unwrap()).unwrap()["on"], false);
+        assert!(set_screen(&lan, Some("x".repeat(SCREEN_BYTES + 1))).is_err());
+    }
+
+    #[test]
+    fn reads_a_pictures_path_back_from_its_address() {
+        // The desk's lanMediaToken("/Users/me/Média/a b.png"): base64url of the UTF-8 path.
+        use base64::Engine;
+        let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode("/Users/me/Média/a b.png");
+        assert_eq!(media_path(&token).as_deref(), Some("/Users/me/Média/a b.png"));
+        assert_eq!(media_path("!!"), None);
+        assert_eq!(media_path(""), None);
+    }
 
     fn complete(raw: &[u8]) -> HttpRequest {
         match parse_http(raw) {

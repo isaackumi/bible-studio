@@ -1,5 +1,6 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
+  import { wifiDisplay } from "../app/wifi-display.svelte";
   import { audienceChip, audienceDeskLine } from "../display/status";
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
@@ -56,6 +57,15 @@
       <button type="button" role="menuitemcheckbox" aria-checked={ndiOn} onclick={() => { void (ndiOn ? session.stopNdi() : session.startNdi()); close(); }}>
         {t("Send over NDI")}{#if ndiOn}<span class="menu-note-inline">{tn(session.ndi.connections, "{n} watching", "{n} watching")}{session.ndi.audio ? ` · ${t("with sound")}` : ""}</span>{/if}
       </button>
+      <!-- No HDMI cable (or one that drops): a TV's own browser on the church Wi-Fi shows the screen. -->
+      <button type="button" role="menuitemcheckbox" aria-checked={wifiDisplay.on} onclick={() => { void wifiDisplay.toggle(); close(); }}>
+        {t("Show on a TV over Wi-Fi")}{#if wifiDisplay.on}<span class="menu-note-inline">{tn(wifiDisplay.watching, "{n} watching", "{n} watching")}</span>{/if}
+      </button>
+      {#if wifiDisplay.on}
+        <p class="menu-note">{t("On the TV's browser, open {url}", { url: wifiDisplay.url.replace(/^https?:\/\//, "") })}</p>
+        <button type="button" role="menuitem" onclick={() => { wifiDisplay.qrOnPreview(); close(); }}>{t("Its address as a QR code on Preview")}</button>
+      {/if}
+      {#if wifiDisplay.error}<p class="menu-note">{wifiDisplay.error}</p>{/if}
     {/if}
     <div class="menu-sep"></div>
     <button type="button" role="menuitem" onclick={() => { session.testOutput(); close(); }}>{t("Test output")}</button>

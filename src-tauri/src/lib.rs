@@ -786,6 +786,18 @@ fn remote_reply(lan: State<Arc<remote::LanRemote>>, id: String, envelope: Value)
     remote::reply(&lan, id, envelope);
 }
 
+/// The audience screen for TV browsers on this Wi-Fi: Program as a model, or None to stop.
+#[tauri::command]
+fn lan_screen(lan: State<Arc<remote::LanRemote>>, frame: Option<String>) -> Result<(), String> {
+    remote::set_screen(&lan, frame)
+}
+
+/// How many TV browsers on this Wi-Fi are showing the screen now.
+#[tauri::command]
+fn lan_screen_watching(lan: State<Arc<remote::LanRemote>>) -> usize {
+    remote::watching(&lan)
+}
+
 fn backup_file_name(name: &str) -> Result<&str, String> {
     if name.starts_with("Church Studio backup ") && name.ends_with(".json") && !name.contains(['/', '\\']) && !name.contains("..") {
         Ok(name)
@@ -1187,6 +1199,8 @@ pub fn run() {
             remote_lan_status,
             stop_remote_lan,
             remote_reply,
+            lan_screen,
+            lan_screen_watching,
             audio_out::audio_outputs,
             audio_out::set_audio_output
         ]);
