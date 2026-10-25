@@ -199,5 +199,14 @@ describe("finding a verse from part of it (KJV)", async () => {
     expect(matchSpoken("love is patient", index, "kjv")?.item.translationId).toBe("kjv");
     for (const said of ["good morning church", "turn to your neighbour and say", "God is good all the time", "please be seated", "close your eyes and bow your heads"]) expect(found(said), said).toBeNull();
   });
+
+  it("with the Berean Standard Bible too, finds what people quote from modern Bibles", async () => {
+    const index = buildQuoteIndex([...(await bundledQuoteCatalog("kjv")), ...(await bundledQuoteCatalog("web")), ...(await bundledQuoteCatalog("bsb"))]);
+    const found = (said: string) => matchSpoken(said, index, "kjv")?.item.reference ?? null;
+    expect(found("for I know the plans I have for you")).toBe("Jeremiah 29:11");
+    expect(found("love is patient love is kind")).toBe("1 Corinthians 13:4");
+    expect(found("in him is life")).toBe("John 1:4");
+    for (const said of ["good morning church", "turn to your neighbour and say", "God is good all the time", "close your eyes and bow your heads", "please be seated"]) expect(found(said), said).toBeNull();
+  });
 });
 

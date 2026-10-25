@@ -120,8 +120,9 @@
   let takeAfterPreview = false;
   let quoteIndex: QuoteIndex | null = null;
   /**
-   * What listening matches quotes against: the desk's version with the King James and the World
-   * English Bible, so a verse quoted in old or modern words is found and shown in the desk's version.
+   * What listening matches quotes against: the desk's version with the King James, the World English
+   * and the Berean Standard Bible, so a verse quoted in old or modern words is found and shown in the
+   * desk's version.
    */
   let listenIndex: QuoteIndex | null = null;
   let lastSpokenRef = "";
@@ -318,8 +319,9 @@
     void bundledQuoteCatalog(own).then((rows) => {
       if (id === translationId) quoteIndex = buildQuoteIndex(rows);
     });
-    // Listening also reads the King James and the World English Bible (every library has both).
-    void Promise.all([...new Set([own, "kjv", "web"])].map((source) => bundledQuoteCatalog(source).catch(() => []))).then((lists) => {
+    // Listening also reads the King James, the World English and the Berean Standard Bible (every
+    // library has them): a verse is found in old or modern words, and shown in the desk's version.
+    void Promise.all([...new Set([own, "kjv", "web", "bsb"])].map((source) => bundledQuoteCatalog(source).catch(() => []))).then((lists) => {
       if (id === translationId) listenIndex = buildQuoteIndex(lists.flat());
     });
   });

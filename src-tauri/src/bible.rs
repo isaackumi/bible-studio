@@ -30,6 +30,8 @@ const BUNDLED: &[BundledTranslation] = &[
     BundledTranslation { id: "asv", name: "American Standard Version", abbreviation: "ASV", file: "asv.json", license: "Public domain" },
     BundledTranslation { id: "web", name: "World English Bible", abbreviation: "WEB", file: "web.json", license: "Public domain" },
     BundledTranslation { id: "bbe", name: "Bible in Basic English", abbreviation: "BBE", file: "bbe.json", license: "Public domain" },
+    // Modern English, dedicated to the public domain in 2023 (berean.bible): what people quote today.
+    BundledTranslation { id: "bsb", name: "Berean Standard Bible", abbreviation: "BSB", file: "bsb.json", license: "Public domain" },
     BundledTranslation {
         id: "twi",
         name: "Akuapem Twi (Nkwa Asɛm)",
@@ -60,7 +62,7 @@ const DOWNLOADS: &[DownloadTranslation] = &[
 ];
 
 /// Installed on first launch. The rest are installed on request (Settings → Bible).
-const DEFAULT_IDS: &[&str] = &["kjv", "web"];
+const DEFAULT_IDS: &[&str] = &["kjv", "web", "bsb"];
 
 pub fn seed_bundled_translations(conn: &Connection, resource_dir: &Path) -> Result<(), String> {
     for translation in BUNDLED.iter().filter(|t| DEFAULT_IDS.contains(&t.id)) {
@@ -506,6 +508,11 @@ mod tests {
         let books: Vec<SourceBook> = serde_json::from_reader(BufReader::new(File::open(path).expect("twi"))).expect("json");
         assert_eq!(books.len(), 66);
         assert!(!john_3_16("twi.json").trim().is_empty());
+    }
+
+    #[test]
+    fn bundled_bsb_is_modern_english_with_every_book() {
+        assert!(john_3_16("bsb.json").starts_with("For God so loved the world that He gave His one and only Son"));
     }
 
     #[test]

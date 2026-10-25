@@ -20,6 +20,7 @@ const LOADERS: Record<string, () => Promise<{ default?: SourceBook[] } | SourceB
         web: () => import("../../../src-tauri/resources/web.json"),
         bbe: () => import("../../../src-tauri/resources/bbe.json"),
         twi: () => import("../../../src-tauri/resources/twi.json"),
+        bsb: () => import("../../../src-tauri/resources/bsb.json"),
       }
     : {}),
   // Downloaded only when chosen (the desktop app checks each against its SHA-256 in src-tauri/src/bible.rs).
@@ -48,6 +49,8 @@ export const BUNDLED_TRANSLATIONS: TranslationInfo[] = [
   { id: "ibo", name: "Igbo (Biblica Open)", abbreviation: "IGB", licenseNote: "© 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
   { id: "hausa", name: "Hausa (Biblica Open)", abbreviation: "HAU", licenseNote: "© 2009, 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
   { id: "twiasante", name: "Asante Twi (Biblica Open)", abbreviation: "TWA", licenseNote: "© 1996, 2020 Biblica, Inc. CC BY-SA 4.0", source: "download" },
+  // Modern English, public domain since 2023 (berean.bible): installed with the King James and World English.
+  { id: "bsb", name: "Berean Standard Bible", abbreviation: "BSB", licenseNote: "Public domain", source: "bundled" },
 ];
 
 /** Every translation the app can install. `default` ones are installed on first launch. Sizes are the download. */
@@ -56,6 +59,7 @@ export type CatalogEntry = TranslationInfo & { default: boolean; sizeMb: number;
 export const BIBLE_CATALOG: CatalogEntry[] = [
   { ...BUNDLED_TRANSLATIONS[0]!, default: true, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[2]!, default: true, sizeMb: 4.2, language: "English" },
+  { ...BUNDLED_TRANSLATIONS.find((entry) => entry.id === "bsb")!, default: true, sizeMb: 3.9, language: "English" },
   { ...BUNDLED_TRANSLATIONS[1]!, default: false, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[3]!, default: false, sizeMb: 4.2, language: "English" },
   { ...BUNDLED_TRANSLATIONS[4]!, default: false, sizeMb: 3.8, language: "Twi (Akuapem)" },
