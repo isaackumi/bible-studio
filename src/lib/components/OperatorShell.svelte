@@ -237,6 +237,8 @@
     <!-- Its own chunk, loaded just after the desk starts (⌘K works a moment later). -->
     {#await import("./CommandPalette.svelte") then { default: CommandPalette }}<CommandPalette />{/await}
     <UpdateNotice />
+    <!-- The audience screen dropped out: its own chunk, loaded only when that happens. -->
+    {#if session.screenLost}{#await import("./ScreenLost.svelte") then { default: ScreenLost }}<ScreenLost name={session.screenLost} />{/await}{/if}
     <StatusLine />
     <!-- Loaded just after start-up: nothing is running yet when the desk opens. -->
     {#await import("./NowRunning.svelte") then { default: NowRunning }}<NowRunning />{/await}

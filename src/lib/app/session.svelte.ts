@@ -10,6 +10,7 @@ import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type Chec
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { recordingMinutes } from "../domain/readiness";
+import { screenLoss } from "./screen-loss";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
 import { applyExtras, backupName, extrasFrom, type BackupExtras } from "../platform/backup";
@@ -707,10 +708,34 @@ class Session {
     if (translationId) this.books = withChapterCounts(await api.books(translationId));
   };
 
+  /** The audience screen that dropped out mid-service (its name), once it has been gone a few seconds. */
+  screenLost = $state<string | null>(null);
+  private lostScreen: string | null = null;
+  private lostTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** A TV that blinks for a second says nothing; one gone for longer gets a banner, and a word when it is back. */
+  private followScreenLoss = (before: OutputStatus | null, now: OutputStatus) => {
+    const next = screenLoss(this.lostScreen, before, now);
+    this.lostScreen = next.lost;
+    if (next.lost) {
+      this.lostTimer ??= setTimeout(() => {
+        this.lostTimer = undefined;
+        this.screenLost = this.lostScreen;
+      }, 3000);
+      return;
+    }
+    clearTimeout(this.lostTimer);
+    this.lostTimer = undefined;
+    if (next.back && this.screenLost) this.notify(t("{name} is back", { name: next.back }), { detail: t("The audience screen is showing Program again.") });
+    this.screenLost = null;
+  };
+
   private loadLibraries = async () => {
     this.output = await api.outputStatus();
     this.unlisten = await listen<OutputStatus>("output-status", (event) => {
+      const before = this.output;
       this.output = event.payload;
+      this.followScreenLoss(before, event.payload);
       // A monitor came or went: screens follow their own monitors.
       void this.placeScreenWindows();
     });
