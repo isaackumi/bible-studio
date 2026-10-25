@@ -15,7 +15,16 @@ export function readProblems(store: Pick<Storage, "getItem"> = localStorage): Pr
   }
 }
 
+/** Errors from a development build (the Vite dev server): never a church's problem. */
+const fromDevServer = (problem: Pick<Problem, "message" | "where">) => /localhost:1420|\/@vite\/|node_modules\/\.vite\//.test(`${problem.where} ${problem.message}`);
+
+/** The same problem with other numbers in it (a key, a line, an index) is one problem. */
+const problemShape = (problem: Problem) => `${problem.kind} ${problem.message.replace(/`[^`]*`/g, "`…`").replace(/\d+/g, "#")}`;
+
+const REPORT_DAYS = 7;
+
 export function recordProblem(problem: Omit<Problem, "at">, store: Pick<Storage, "getItem" | "setItem"> = localStorage, now = new Date()) {
+  if (fromDevServer(problem)) return;
   try {
     const entry: Problem = { ...problem, message: problem.message.slice(0, 600), where: problem.where.slice(0, 300), at: now.toISOString() };
     // The same problem repeating in a loop is kept once.
@@ -50,6 +59,24 @@ export function watchProblems(target: Window = window) {
   };
 }
 
+/** Log lines that say the same thing one after another (beside their time), shown once with a count. */
+function collapseRepeats(text: string): string {
+  const said = (line: string) => line.replace(/^\[\d+\] \+\d+ms /, "");
+  const out: string[] = [];
+  let repeats = 0;
+  const lines = text.split("\n");
+  lines.forEach((line, index) => {
+    if (index > 0 && said(line) === said(lines[index - 1]!)) repeats += 1;
+    else {
+      if (repeats) out.push(`  … the same line ${repeats} more ${repeats === 1 ? "time" : "times"}`);
+      repeats = 0;
+      out.push(line);
+    }
+  });
+  if (repeats) out.push(`  … the same line ${repeats} more ${repeats === 1 ? "time" : "times"}`);
+  return out.join("\n");
+}
+
 /** A plain-text report: version, computer, a few counts (no church content), and the problems. */
 export function problemReport(input: {
   version: string;
@@ -62,6 +89,19 @@ export function problemReport(input: {
   sections?: Array<[string, string]>;
   now?: Date;
 }): string {
+  // The last week's problems, development ones left out, each shape once with how often it came.
+  const since = (input.now ?? new Date()).getTime() - REPORT_DAYS * 86_400_000;
+  const groups = new Map<string, { problem: Problem; count: number; first: string }>();
+  for (const problem of input.problems) {
+    if (fromDevServer(problem) || !(Date.parse(problem.at) >= since)) continue;
+    const shape = problemShape(problem);
+    const group = groups.get(shape);
+    if (group) {
+      group.count += 1;
+      group.first = problem.at;
+    } else groups.set(shape, { problem, count: 1, first: problem.at });
+  }
+  const problems = [...groups.values()].map(({ problem, count, first }) => `- ${problem.at} [${problem.kind}] ${problem.message}${problem.where ? ` (${problem.where})` : ""}${count > 1 ? ` (${count} times since ${new Date(first).toISOString()})` : ""}`);
   const lines = [
     "Church Studio support file",
     `Made: ${(input.now ?? new Date()).toISOString()}`,
@@ -70,10 +110,10 @@ export function problemReport(input: {
     `Browser engine: ${input.userAgent}`,
     `Library: ${Object.entries(input.counts).map(([name, count]) => `${count} ${name}`).join(", ")}`,
     "",
-    `Problems (${input.problems.length}):`,
-    ...(input.problems.length ? input.problems.map((problem) => `- ${problem.at} [${problem.kind}] ${problem.message}${problem.where ? ` (${problem.where})` : ""}`) : ["- none"]),
+    `Problems (${problems.length}, last ${REPORT_DAYS} days):`,
+    ...(problems.length ? problems : ["- none"]),
   ];
-  for (const [title, text] of input.sections ?? []) if (text.trim()) lines.push("", `${title}:`, text.trim());
+  for (const [title, text] of input.sections ?? []) if (text.trim()) lines.push("", `${title}:`, collapseRepeats(text.trim()));
   if (input.crashLog.trim()) lines.push("", "Desktop crash log:", input.crashLog.trim().slice(-8000));
   return lines.join("\n") + "\n";
 }
