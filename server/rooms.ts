@@ -9,7 +9,8 @@
 // without Cloudflare.
 //
 //   POST /v1/rooms                       {name?}                 → {code, hostKey, joinUrl}
-//   POST /v1/rooms/:code/join            {name?}                 → {pid, room}
+//   POST /v1/rooms/:code/join            {name?}                 → {pid, room}   (409 + suggestion: name taken)
+//   POST /v1/rooms/:code/rename          {pid, name}             → {name}        (409 + suggestion: name taken)
 //   GET  /v1/rooms/:code/state?pid=      (audience view)          → {room, questions, activity}
 //   POST /v1/rooms/:code/ask             {pid, text, name?}      → {question}
 //   POST /v1/rooms/:code/vote            {pid, questionId}       → {votes}
@@ -217,8 +218,22 @@ const clean = (value: unknown, max: number) =>
     : "";
 export const isCode = (value: string) => /^[A-HJ-NP-Z2-9]{6}$/.test(value);
 
-export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string; suggestion?: string };
 const fail = (status: number, error: string): Result<never> => ({ ok: false, status, error });
+
+/** A name as the screen tells names apart: case, spacing and look-alike forms set aside. */
+const nameKey = (name: string) => name.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Two people in a room never share a name (the screen and the leaderboard show it). No name never clashes. */
+function nameTaken(state: RoomState, name: string, self?: string): Result<never> | null {
+  const key = nameKey(name);
+  if (!key) return null;
+  const taken = new Set(Object.entries(state.participants).filter(([pid]) => pid !== self).map(([, person]) => nameKey(person.name)));
+  if (!taken.has(key)) return null;
+  let n = 2;
+  while (taken.has(nameKey(`${name} ${n}`))) n++;
+  return { ok: false, status: 409, error: `Someone here is already called ${name}. Choose another name.`, suggestion: `${name} ${n}`.slice(0, LIMITS.nameLength) };
+}
 
 /** What the audience may see of a question (no other people's ids or addresses). */
 export function publicQuestion(question: Question, pid: string | null, state: RoomState) {
@@ -465,16 +480,34 @@ export class RoomCore {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     if (Object.keys(state.participants).length >= LIMITS.participants) return fail(429, "This room is full.");
+    const wanted = clean(name, LIMITS.nameLength).replace(/\s+/g, " ");
+    const clash = nameTaken(state, wanted);
+    if (clash) return clash;
     const pid = randomId(12);
     // Each joiner a number of their own, which picks their colour on the screen and their phone.
     // Never reused, even after people who left are taken out of a new game: the number keys their
     // name on the screen and picks their colour, so two people must never share one.
     const n = state.nextN ?? Object.values(state.participants).reduce((most, person) => Math.max(most, (person.n ?? 0) + 1), Object.keys(state.participants).length);
     state.nextN = n + 1;
-    state.participants[pid] = { name: clean(name, LIMITS.nameLength), joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0, ...(state.teams && state.teams >= 2 ? { team: teamOf(n, state.teams) } : {}) };
+    state.participants[pid] = { name: wanted, joinedAt: this.now(), score: 0, ip, n, gain: 0, before: 0, streak: 0, ...(state.teams && state.teams >= 2 ? { team: teamOf(n, state.teams) } : {}) };
     await this.save(state);
     this.touch(pid);
     return { ok: true, data: { pid, room: { name: state.name, code: state.code }, n } };
+  }
+
+  /** A player changes their name, to one nobody else in the room has. */
+  async rename(pid: unknown, name: unknown): Promise<Result<{ name: string }>> {
+    const state = await this.load();
+    if (!state) return fail(404, "This room has ended.");
+    if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
+    const wanted = clean(name, LIMITS.nameLength).replace(/\s+/g, " ");
+    if (!wanted) return fail(400, "Type a name.");
+    const clash = nameTaken(state, wanted, pid);
+    if (clash) return clash;
+    state.participants[pid]!.name = wanted;
+    await this.save(state);
+    return { ok: true, data: { name: wanted } };
   }
 
   /** What a phone sees: the room, the questions the operator lets through, and the activity. */
@@ -869,12 +902,14 @@ export class RoomObject {
     if (body.length > limit) return json(413, { error: "Too large." });
     const input = body ? ((() => { try { return JSON.parse(body); } catch { return {}; } })() as Record<string, unknown>) : {};
     const ip = request.headers.get("x-room-ip") ?? "";
-    const reply = (result: Result<unknown>) => (result.ok ? json(200, result.data) : json(result.status, { error: result.error }));
+    const reply = (result: Result<unknown>) => (result.ok ? json(200, result.data) : json(result.status, { error: result.error, ...(result.suggestion ? { suggestion: result.suggestion } : {}) }));
     switch (action) {
       case "create":
         return reply(await this.core.create(String(input.code ?? ""), String(input.name ?? "")));
       case "join":
         return reply(await this.core.join(input.name, ip));
+      case "rename":
+        return reply(await this.core.rename(input.pid, input.name));
       case "state":
         return reply(await this.core.view(url.searchParams.get("pid")));
       case "ask":
@@ -965,12 +1000,12 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
     }
     return json(503, { error: "Could not open a room. Try again." });
   }
-  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
+  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|rename|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
   if (!match) return json(404, { error: "Not found" });
   const code = match[1]!.toUpperCase();
   const action = match[2]!;
   if (!isCode(code)) return json(404, { error: "No such room." });
-  if ((action === "ask" || action === "join") && (await slow(action))) return json(429, { error: "Too many at once from this network. Wait a minute." });
+  if ((action === "ask" || action === "join" || action === "rename") && (await slow(action))) return json(429, { error: "Too many at once from this network. Wait a minute." });
   const stub = rooms.get(rooms.idFromName(code));
   const headers = { "content-type": "application/json", "x-room-ip": await sha256(`${address}:${code}`) };
   const target = `https://room/${action}${url.search}`;

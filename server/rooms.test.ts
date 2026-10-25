@@ -77,6 +77,36 @@ describe("rooms: Q&A", () => {
   });
 });
 
+describe("rooms: players' names", () => {
+  it("keeps names unique in a room: a taken name is refused with a free one to use instead", async () => {
+    const { core } = room();
+    data(await core.create("ABC234", ""));
+    data(await core.join("Ama", ""));
+    // The same name in another case or with extra spaces is the same name on the screen.
+    expect(await core.join("  ama ", "")).toMatchObject({ ok: false, status: 409, suggestion: "ama 2" });
+    data(await core.join("Ama 2", ""));
+    expect(await core.join("AMA", "")).toMatchObject({ ok: false, status: 409, suggestion: "AMA 3" });
+    // No name is "Guest" for everyone, never a clash.
+    data(await core.join("", ""));
+    data(await core.join("", ""));
+  });
+
+  it("lets a player change their name, to one nobody else in the room has", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const kofi = data<{ pid: string }>(await core.join("Kofi", "")).pid;
+    expect(data<{ name: string }>(await core.rename(ama, "  Ama   Mensah ")).name).toBe("Ama Mensah");
+    expect(data<{ me: { name: string } }>(await core.view(ama)).me.name).toBe("Ama Mensah");
+    expect(data<{ joined: Array<{ name: string }> }>(await core.hostView(hostKey)).joined.map((person) => person.name)).toEqual(["Ama Mensah", "Kofi"]);
+    expect(await core.rename(kofi, "ama mensah")).toMatchObject({ ok: false, status: 409, suggestion: "ama mensah 2" });
+    // Their own name in another case is theirs to keep.
+    expect(data<{ name: string }>(await core.rename(kofi, "KOFI")).name).toBe("KOFI");
+    expect(await core.rename(kofi, "   ")).toMatchObject({ ok: false, status: 400 });
+    expect(await core.rename("nobody", "Esi")).toMatchObject({ ok: false, status: 401 });
+  });
+});
+
 describe("rooms: quizzes and polls", () => {
   it("runs a quiz question: answers once, never shows the right answer early, scores quicker answers higher", async () => {
     const { core, advance } = room();
@@ -225,6 +255,11 @@ describe("rooms on Cloudflare", () => {
     expect(opened.joinUrl).toBe(`https://church.test/j/${opened.code}`);
     expect(await (await call(`/j/${opened.code}`))!.text()).toBe(`page ${opened.code}`);
     const joined = (await (await call(`/v1/rooms/${opened.code}/join`, { name: "Kofi" }))!.json()) as { pid: string };
+    // A taken name comes back with one free to use; a rename goes through to the room.
+    const clash = (await call(`/v1/rooms/${opened.code}/join`, { name: "kofi" }))!;
+    expect(clash.status).toBe(409);
+    expect(await clash.json()).toMatchObject({ suggestion: "kofi 2" });
+    expect(await (await call(`/v1/rooms/${opened.code}/rename`, { pid: joined.pid, name: "Kofi A." }))!.json()).toEqual({ name: "Kofi A." });
     // Questions start off; the desk turns them on, with approval.
     expect((await call(`/v1/rooms/${opened.code}/ask`, { pid: joined.pid, text: "Too soon?" }))!.status).toBe(403);
     expect((await call(`/v1/rooms/${opened.code}/settings`, { hostKey: opened.hostKey, open: true, moderate: true }))!.status).toBe(200);

@@ -98,6 +98,9 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   .me { display: inline-flex; align-items: center; gap: 7px; max-width: 50%; padding: 4px 10px 4px 4px; border-radius: 999px; background: color-mix(in srgb, var(--me, var(--accent)) 22%, transparent); font-size: 13px; font-weight: 750; }
   .me i { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--me, var(--accent)); color: #fff; font-style: normal; font-size: 12px; }
   .me span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.me { border: 0; color: inherit; font-family: inherit; text-align: left; }
+  .rename-row { display: flex; gap: 8px; margin-top: 10px; }
+  .rename-row button { flex: 1; }
   .team { padding: 4px 10px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
   .activity { border-color: color-mix(in srgb, var(--me, var(--accent)) 45%, var(--line)); }
   .clock { float: right; min-width: 44px; height: 44px; margin: -4px 0 6px 10px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 3px solid var(--accent); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -128,13 +131,20 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
 </head>
 <body>
 <main>
-  <header><h1 id="room">${w("Joining…")}</h1><span class="me hidden" id="me"><i id="me-n"></i><span id="me-name"></span></span><span class="team hidden" id="team"></span><span class="code" id="code">${safe}</span></header>
+  <header><h1 id="room">${w("Joining…")}</h1><button type="button" class="me hidden" id="me" aria-label="${w("Change your name")}" title="${w("Change your name")}"><i id="me-n"></i><span id="me-name"></span></button><span class="team hidden" id="team"></span><span class="code" id="code">${safe}</span></header>
 
   <section id="join" class="card hidden">
     <label for="name">${w("Your name (optional)")}</label>
     <input id="name" maxlength="40" autocomplete="given-name" placeholder="${w("Shown with your questions")}">
     <button class="primary" id="join-btn">${w("Join")}</button>
     <p class="note" id="join-note"></p>
+  </section>
+
+  <section id="rename" class="card hidden">
+    <label for="new-name">${w("Change your name")}</label>
+    <input id="new-name" maxlength="40" autocomplete="given-name">
+    <div class="rename-row"><button id="rename-cancel">${w("Cancel")}</button><button class="primary" id="rename-save">${w("Save")}</button></div>
+    <p class="note" id="rename-note"></p>
   </section>
 
   <section id="live" class="hidden">
@@ -174,16 +184,39 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   function show(id, on) { $(id).classList.toggle("hidden", !on); }
   function post(path, body) {
     return fetch(API + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || tr("Something went wrong.")); return d; }); });
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) { var e = new Error(d.error || tr("Something went wrong.")); e.suggestion = d.suggestion; throw e; } return d; }); });
   }
   function note(id, text, kind) { var n = $(id); n.textContent = text || ""; n.className = "note" + (kind ? " " + kind : ""); }
+
+  /** A name someone in the room already has: say so in the phone's language, with a free one filled in. */
+  function taken(e, input, noteId) {
+    if (!e.suggestion) return false;
+    note(noteId, tr("Someone here is already called {name}. Try {suggestion}, or another name.", { name: input.value.trim(), suggestion: e.suggestion }), "bad");
+    input.value = e.suggestion; input.focus(); input.select();
+    return true;
+  }
 
   function join() {
     $("join-btn").disabled = true;
     post("/join", { name: $("name").value }).then(function (d) {
       pid = d.pid; try { localStorage.setItem(KEY, pid); } catch (e) {}
       show("join", false); show("live", true); refresh();
-    }).catch(function (e) { note("join-note", e.message, "bad"); $("join-btn").disabled = false; });
+    }).catch(function (e) { if (!taken(e, $("name"), "join-note")) note("join-note", e.message, "bad"); $("join-btn").disabled = false; });
+  }
+
+  // Tapping your own name changes it.
+  function openRename() {
+    $("new-name").value = lastData && lastData.me ? lastData.me.name : "";
+    note("rename-note", "");
+    show("rename", true); $("new-name").focus();
+  }
+  function rename() {
+    var name = $("new-name").value.trim();
+    if (!name) { note("rename-note", tr("Type a name."), "bad"); return; }
+    $("rename-save").disabled = true;
+    post("/rename", { pid: pid, name: name }).then(function () {
+      show("rename", false); last = null; refresh();
+    }).catch(function (e) { if (!taken(e, $("new-name"), "rename-note")) note("rename-note", e.message, "bad"); }).then(function () { $("rename-save").disabled = false; });
   }
 
   function ask() {
@@ -405,6 +438,10 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   }
 
   $("join-btn").onclick = join;
+  $("me").onclick = openRename;
+  $("rename-save").onclick = rename;
+  $("rename-cancel").onclick = function () { show("rename", false); };
+  $("new-name").onkeydown = function (e) { if (e.key === "Enter") rename(); };
   $("ask-btn").onclick = ask;
   $("question").oninput = count;
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
