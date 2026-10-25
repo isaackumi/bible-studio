@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { CONTENT_KINDS, MAX_SCREENS, SCREEN_ROLES, WIFI_SCREEN, screenLetter, type ContentKind, type ScreenOutput, type ScreenRole } from "../../display/screens";
   import { isDesktop } from "../../platform/runtime";
-  import { msg, t } from "../../i18n/core";
+  import { msg, t, tn } from "../../i18n/core";
   import Icon from "../Icon.svelte";
 
   // Extra screens: each monitor beyond the desk and the audience screen gets a job, and a lock.
@@ -99,6 +99,28 @@
         <input class="field" value={session.workspace.monitorNames?.[display.key] ?? ""} placeholder={t("Call it… (Main auditorium)")} maxlength="40" aria-label={t("Name for {name}", { name: display.name })} onchange={(event) => session.setMonitorName(display.key, event.currentTarget.value)} />
       </div>
     {/each}
+  </section>
+{/if}
+
+{#if isDesktop()}
+  <!-- A TV's own browser on the church Wi-Fi as a screen: no HDMI cable, no internet. Also in the
+       audience output menu at the top of the desk. -->
+  <p class="section-label">{t("TV over Wi-Fi")}</p>
+  <section class="rows">
+    <div class="row">
+      <div class="row-copy">
+        <strong>{t("Show on a TV over Wi-Fi")}</strong>
+        <span>{wifi?.on ? t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") }) : t("For a TV with a web browser, or when the HDMI cable is not reliable. The TV and this computer must be on the same Wi-Fi.")}</span>
+      </div>
+      <input type="checkbox" class="switch" role="switch" aria-label={t("Show on a TV over Wi-Fi")} checked={!!wifi?.on} disabled={!wifi} onchange={() => void wifi?.toggle()} />
+    </div>
+    {#if wifi?.on}
+      <div class="row">
+        <div class="row-copy"><span>{tn(wifi.watching, "{n} TV is showing the screen now.", "{n} TVs are showing the screen now.")}</span></div>
+        <button type="button" class="btn" onclick={() => wifi?.qrOnPreview()}>{t("Its address as a QR code on Preview")}</button>
+      </div>
+    {/if}
+    {#if wifi?.error}<div class="row"><div class="row-copy"><span class="warn">{wifi.error}</span></div></div>{/if}
   </section>
 {/if}
 
