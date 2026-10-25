@@ -126,12 +126,15 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   .board { margin-top: 14px; }
   .board li { display: flex; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
   .hidden { display: none !important; }
+  .offline { position: sticky; top: 0; z-index: 5; margin: -4px 0 14px; padding: 10px 14px; border-radius: 12px; background: #5a3a12; color: #ffd9a3; font-size: 14px; font-weight: 650; text-align: center; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <main>
   <header><h1 id="room">${w("Joining…")}</h1><button type="button" class="me hidden" id="me" aria-label="${w("Change your name")}" title="${w("Change your name")}"><i id="me-n"></i><span id="me-name"></span></button><span class="team hidden" id="team"></span><span class="code" id="code">${safe}</span></header>
+
+  <p id="offline" class="offline hidden" role="status" aria-live="polite">${w("Reconnecting… check your Wi-Fi or mobile data.")}</p>
 
   <section id="join" class="card hidden">
     <label for="name">${w("Your name (optional)")}</label>
@@ -180,7 +183,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   // The name this phone last played under, in any room: next week's join box is already filled in.
   var NAME_KEY = "cs-room-name";
   function rememberName(name) { try { if (name) localStorage.setItem(NAME_KEY, name); } catch (e) {} }
-  var pid = null, sort = "top", last = null, timer = null, busy = false;
+  var pid = null, sort = "top", last = null, timer = null, busy = false, misses = 0;
   try { pid = localStorage.getItem(KEY); } catch (e) {}
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -427,6 +430,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       if (r.status === 404) { show("live", false); show("join", false); show("ended", true); $("room").textContent = tr("Room ended"); return null; }
       return r.json();
     }).then(function (d) {
+      misses = 0; show("offline", false);
       if (!d) return;
       // Left out of a new game after being away: join again with a name.
       if (pid && !d.me) { try { localStorage.removeItem(KEY); } catch (x) {} pid = null; show("live", false); show("join", true); }
@@ -439,7 +443,11 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       var key = JSON.stringify(d, function (name, value) { return name === "now" ? undefined : value; });
       if (key !== last) { last = key; lastData = d; drawMe(d); drawQuestions(d); drawActivity(d); }
       timer = setTimeout(refresh, d.activity && d.activity.kind !== "none" && d.activity.phase === "open" ? 1500 : 2500);
-    }).catch(function () { timer = setTimeout(refresh, 4000); });
+    }).catch(function () {
+      // The connection dropped: said after two misses (one is often just a blip), and gone once it is back.
+      misses += 1; if (misses >= 2) show("offline", true);
+      timer = setTimeout(refresh, 4000);
+    });
   }
 
   try { if (!$("name").value) $("name").value = localStorage.getItem(NAME_KEY) || ""; } catch (e) {}
