@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bundledQuoteCatalog } from "../bible/texts";
-import { chooseHeard, detectVerse, matchSpoken, spokenReference, type QuoteVerse } from "./detect";
+import { buildQuoteIndex, chooseHeard, detectVerse, matchSpoken, spokenReference, type QuoteVerse } from "./detect";
 
 const genesis = { ord: 1, name: "Genesis", chapters: 50 };
 
@@ -165,6 +165,23 @@ describe("finding a verse from part of it (KJV)", async () => {
     expect(spokenReference("John 5 of you stood up")).toBeNull();
     // A verse word too far away, with other numbers between, is not this chapter's verse.
     expect(spokenReference("Luke 15 was 20 years ago verse 11")?.startVerse ?? null).not.toBe(11);
+  });
+
+  it("finds a famous verse from a short phrase of it, said the way people say it (KJV)", async () => {
+    const index = buildQuoteIndex(await bundledQuoteCatalog("kjv"));
+    const found = (said: string) => matchSpoken(said, index, "kjv")?.item.reference ?? null;
+    expect(found("in him is life")).toBe("John 1:4");
+    expect(found("in him was life")).toBe("John 1:4");
+    expect(found("the lord is my shepherd")).toBe("Psalms 23:1");
+    expect(found("jesus wept")).toBe("John 11:35");
+    expect(found("be still and know that I am God")).toBe("Psalms 46:10");
+    expect(found("rejoice in the Lord always")).toBe("Philippians 4:4");
+    // Inside what a preacher says around it.
+    expect(found("church John tells us that in him was life and that is good news")).toBe("John 1:4");
+    // Everyday church words are not verses.
+    for (const said of ["good morning church", "please be seated", "turn to your neighbour and say", "God is good all the time", "thank you very much", "let us pray", "lift your hands"]) {
+      expect(found(said), said).toBeNull();
+    }
   });
 });
 

@@ -247,6 +247,8 @@ export type QuoteIndex = {
   postings: Map<string, number[]>;
   /** Every distinct word, built on first typed search that needs spelling help. */
   vocabulary?: string[];
+  /** Every verse word for word, small words too, and where each pair of words starts: built on first phrase match. */
+  phrases?: { tokens: string[][]; pairs: Map<string, number[]> };
 };
 
 export function buildQuoteIndex(catalog: QuoteVerse[]): QuoteIndex {
@@ -446,10 +448,100 @@ function citationMatch(
 }
 
 /** A citation or a quoted phrase. A later quote beats an older reference in the same phrase. */
+// --- Phrases: a verse found from a run of its words, small words included ("in him was life") ---
+
+/**
+ * How people say what the King James writes: "in him is life" for "in him was life", "you" for
+ * "thee", "has" for "hath". Both the verse and what was heard are read this way before comparing.
+ */
+const SPOKEN_FORM: Record<string, string> = {
+  is: "be", was: "be", are: "be", were: "be", art: "be", am: "be", be: "be",
+  you: "you", thee: "you", thou: "you", ye: "you",
+  your: "your", thy: "your", thine: "your", yours: "your",
+  has: "has", hath: "has", have: "has", does: "does", doth: "does", says: "says", saith: "says",
+  to: "to", unto: "to", shall: "shall", shalt: "shall", will: "shall", hast: "has",
+  // Old spellings a speaker says the modern way ("rejoice in the Lord always").
+  alway: "always", spake: "spoke",
+};
+const spokenForm = (word: string) => SPOKEN_FORM[word] ?? word;
+/** A word that tells verses apart (not "in", "the", "be", "you"). */
+const telling = (word: string) => word.length > 2 && !STOP.has(word) && !(word in SPOKEN_FORM) && !Object.values(SPOKEN_FORM).includes(word);
+
+/** Each verse word for word in its spoken form, and where every pair of words starts (verse × 256 + position). */
+function phraseIndex(index: QuoteIndex): NonNullable<QuoteIndex["phrases"]> {
+  if (index.phrases) return index.phrases;
+  const tokens = index.catalog.map((verse) => verse.normalized.split(" ").filter(Boolean).map(spokenForm).slice(0, 255));
+  const pairs = new Map<string, number[]>();
+  tokens.forEach((words, verse) => {
+    for (let at = 0; at + 1 < words.length; at += 1) {
+      const key = `${words[at]} ${words[at + 1]}`;
+      const list = pairs.get(key);
+      if (list) list.push(verse * 256 + at);
+      else pairs.set(key, [verse * 256 + at]);
+    }
+  });
+  index.phrases = { tokens, pairs };
+  return index.phrases;
+}
+
+/**
+ * The verse a run of heard words comes from, word for word ("the lord is my shepherd", "jesus
+ * wept"), anywhere in what was said. Kept only when the run points to one verse, says enough
+ * (four words or more with a telling word, three with two, or two telling words found in one verse
+ * only) and is a real part of that verse (a quarter of it under six words). A run of eight words
+ * or more may be in a few verses; the first is taken.
+ */
+export function matchPhrase(heard: string, source: QuoteVerse[] | QuoteIndex, translationId: string): SpokenMatch | null {
+  const index = asIndex(source);
+  if (index.catalog.length === 0) return null;
+  const { tokens, pairs } = phraseIndex(index);
+  const said = wordsOf(heard).map(spokenForm).slice(-40);
+  let best: { length: number; start: number; verses: Set<number> } | null = null;
+  for (let start = 0; start + 1 < said.length; start += 1) {
+    const hits = pairs.get(`${said[start]} ${said[start + 1]}`);
+    if (!hits || hits.length > 4000) continue;
+    let longest = 0;
+    const verses = new Set<number>();
+    for (const hit of hits) {
+      const verse = Math.floor(hit / 256);
+      const at = hit % 256;
+      const words = tokens[verse]!;
+      let length = 2;
+      while (start + length < said.length && at + length < words.length && words[at + length] === said[start + length]) length += 1;
+      if (length > longest) {
+        longest = length;
+        verses.clear();
+      }
+      if (length === longest) verses.add(verse);
+    }
+    if (!best || longest > best.length) best = { length: longest, start, verses };
+  }
+  if (!best) return null;
+  const run = said.slice(best.start, best.start + best.length);
+  const tellingWords = run.filter(telling).length;
+  const characters = run.join(" ").length;
+  const enough =
+    (best.length >= 4 && tellingWords >= 1) || (best.length === 3 && tellingWords >= 2) || (best.length === 2 && tellingWords === 2 && run.every((word) => word.length >= 4));
+  // In one chapter only ("God is love", twice in 1 John 4): its first place is the one to show.
+  const chapters = new Set([...best.verses].map((verse) => `${index.catalog[verse]!.bookOrd}:${index.catalog[verse]!.chapter}`));
+  const clear = best.verses.size === 1 || chapters.size === 1 || (best.length >= 8 && best.verses.size <= 3);
+  if (!enough || !clear || characters < 9) return null;
+  const first = Math.min(...best.verses);
+  // A quote is a real part of its verse ("the lord is my shepherd": 5 of 8 words), not four words
+  // lost in a long one ("unto thy neighbour, and" heard in "turn to your neighbour and say").
+  const share = best.length / tokens[first]!.length;
+  if ((best.length < 6 && share < 0.25) || (best.length < 8 && share < 0.15)) return null;
+  const verse = index.catalog[first]!;
+  return { item: passageFor(verse, translationId), text: verse.text, hits: best.length };
+}
+
 export function matchSpoken(heard: string, source: QuoteVerse[] | QuoteIndex, translationId: string): SpokenMatch | null {
   const spoken = spokenReference(heard);
   const citation = hasStartVerse(spoken) ? citationMatch(heard, spoken, translationId) : null;
   if (citation && citation.hits >= 12) return citation;
+  // A run of the verse's own words, small words included: what a preacher quotes most.
+  const phrase = matchPhrase(heard, source, translationId);
+  if (phrase && !citation) return phrase;
   const quote = matchQuote(heard, source, translationId);
   if (quote && (!citation || quote.hits >= 4)) return quote;
   return citation ?? quote;
