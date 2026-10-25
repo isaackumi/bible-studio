@@ -677,8 +677,12 @@ class Session {
       if (this.desktop()) void this.attachLanRemote();
       // Phones paired over the internet reach the desk again after a restart.
       if (this.remoteVia === "internet" && internetRemote.room && this.remoteDevices.length) this.startInternetRemote();
-      // Automatic backups to the chosen folder, every half hour while the app is open.
-      if (this.desktop()) this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
+      // Automatic backups to the chosen folder, every half hour while the app is open; on a computer
+      // where nobody chose one, Documents › Church Studio Backups.
+      if (this.desktop()) {
+        void this.ensureBackupFolder();
+        this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
+      }
       if (this.message === "Opening workspace") {
         this.message = this.desktop()
           ? this.outputWaiting
@@ -1201,6 +1205,19 @@ class Session {
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
+    }
+  };
+
+  /** No backup folder chosen on this computer: Documents › Church Studio Backups, made and said once. */
+  private ensureBackupFolder = async () => {
+    if (this.workspace.backup.folder) return;
+    try {
+      this.setBackupFolder(await invoke<string>("backup_default_folder"));
+      if (!(await this.backupNow())) {
+        this.notify(t("Backups are on"), { detail: t("Songs and services are backed up every half hour to Documents › Church Studio Backups. Choose another folder in Settings › Storage & backup."), ms: 15_000 });
+      }
+    } catch (error) {
+      console.warn("No backup folder", error);
     }
   };
 

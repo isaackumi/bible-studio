@@ -818,6 +818,14 @@ fn backup_write(dir: String, name: String, contents: String) -> Result<(), Strin
     Ok(())
 }
 
+/// The backup folder used when nobody chose one: Documents › Church Studio Backups, made if missing.
+#[tauri::command(async)]
+fn backup_default_folder(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = app.path().document_dir().map_err(|error| error.to_string())?.join("Church Studio Backups");
+    std::fs::create_dir_all(&dir).map_err(|error| format!("The backup folder could not be made. {error}"))?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// The newest backup in a folder: its name and contents, or nothing.
 #[tauri::command(async)]
 fn backup_latest(dir: String) -> Result<Option<(String, String)>, String> {
@@ -1096,6 +1104,7 @@ pub fn run() {
             diagnostic_log,
             backup_write,
             backup_latest,
+            backup_default_folder,
             move_export,
             move_peek,
             move_import,

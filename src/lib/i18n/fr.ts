@@ -5100,6 +5100,8 @@ export const fr: Readonly<Record<string, string>> = {
   "Windows: if it asks whether Church Studio may use networks, choose Allow. If the network is set to Public, set it to Private (Settings › Network & internet › your network).": "Windows : s’il demande si Church Studio peut utiliser les réseaux, choisissez Autoriser. Si le réseau est Public, passez-le en Privé (Paramètres › Réseau et Internet › votre réseau).",
   "Mac: System Settings › Privacy & Security › Local Network, and turn on Church Studio.": "Mac : Réglages Système › Confidentialité et sécurité › Réseau local, et activez Church Studio.",
   "Until then, pictures and videos still come through the cloud.": "En attendant, les images et les vidéos arrivent toujours par le cloud.",
+  "Backups are on": "Les sauvegardes sont activées",
+  "Songs and services are backed up every half hour to Documents › Church Studio Backups. Choose another folder in Settings › Storage & backup.": "Les chants et les cultes sont sauvegardés toutes les demi-heures dans Documents › Church Studio Backups. Choisissez un autre dossier dans Réglages › Espace et sauvegarde.",
   "{name} disconnected": "{name} déconnecté",
   "Program is held and comes back by itself when the screen returns. Check the cable and the TV's input.": "Le direct est gardé et revient tout seul quand l’écran revient. Vérifiez le câble et l’entrée de la télé.",
   "{name} is back": "{name} est de retour",
