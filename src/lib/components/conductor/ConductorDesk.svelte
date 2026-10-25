@@ -12,6 +12,7 @@
   import OutputMenu from "../OutputMenu.svelte";
   import Screen from "../Screen.svelte";
   import Icon from "../Icon.svelte";
+  import LookBar from "./LookBar.svelte";
 
   // The Conductor Desk: the Presenter Desk's work as one gesture. Two decks face each other, NEXT
   // (Preview) and LIVE (Program), with a lever between them: push it up and NEXT goes live. The
@@ -34,9 +35,9 @@
   let crateEl = $state<HTMLInputElement | null>(null);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function passageFor(bookOrd: number, chapter: number, start: number, end: number): BibleItem {
+  function passageFor(bookOrd: number, chapter: number, start: number, end: number, version = translationId): BibleItem {
     const book = CANON.find((entry) => entry.ord === bookOrd)!;
-    return { translationId, bookOrd, chapter, startVerse: start, endVerse: end, reference: formatReference(book.name, chapter, start, end, book.chapters) };
+    return { translationId: version, bookOrd, chapter, startVerse: start, endVerse: end, reference: formatReference(book.name, chapter, start, end, book.chapters) };
   }
 
   async function search(text: string) {
@@ -196,6 +197,15 @@
     };
   });
 
+  /** Another Bible version: the verse on Next is read again in it, and the screen's too with "Live too". */
+  async function useVersion(id: string, liveToo: boolean) {
+    session.setDeskTranslation(id);
+    const next = session.live.preview.model;
+    const parsed = next.layout === "scripture" && next.reference ? parseReference(next.reference) : null;
+    if (parsed?.startVerse) await session.previewPassage(passageFor(parsed.bookOrd, parsed.chapter, parsed.startVerse, parsed.endVerse ?? parsed.startVerse, id));
+    if (liveToo) await session.refreshProgramTranslation(id);
+  }
+
   /** What a deck shows, in a few words: the reference, a caption, or its first line. */
   const titleOf = (model: PresentationModel) => model.reference || model.caption || model.lines[0]?.text || "";
 
@@ -264,6 +274,8 @@
       <div class="pads">
         <button type="button" class="pad black" onclick={() => session.black()}>{t("Black")}</button>
         <button type="button" class="pad" onclick={() => session.clear()}>{t("Clear")}</button>
+        <button type="button" class="pad" title={t("Take the words off; the background stays")} onclick={() => void session.clearWords()}>{t("Clear words")}</button>
+        <button type="button" class="pad" onclick={() => session.logo()}>{t("Logo")}</button>
         {#if session.canUndoProgram}<button type="button" class="pad" onclick={() => void session.undoProgram()}>{t("Undo")}</button>{/if}
       </div>
     </div>
@@ -278,6 +290,8 @@
       </div>
     </section>
   </main>
+
+  <div class="look-row"><LookBar onversion={(id, liveToo) => void useVersion(id, liveToo)} /></div>
 
   <footer class="crate">
     <div class="listen">
@@ -317,7 +331,7 @@
     min-height: 0;
     container: desk / inline-size;
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     gap: 10px;
     padding: 10px 14px 12px;
     background: var(--desk);
@@ -365,6 +379,8 @@
   .pad { height: 34px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
   .pad.black { background: #000; color: #fff; border-color: #000; }
 
+  .look-row { display: grid; gap: 8px; min-width: 0; }
+
   /* The crate: listening on one line, then the box that loads anything onto Next. */
   .crate { display: grid; gap: 8px; }
   .listen { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 13px; color: var(--muted); }
@@ -389,7 +405,10 @@
   }
   /* A narrow window: Live on top, the lever lies down, Next below. */
   @media (max-width: 900px) {
-    .cd-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
+    /* The desk scrolls instead, so each screen keeps the church's screen shape. */
+    .conductor { grid-template-rows: none; grid-auto-rows: auto; overflow-y: auto; }
+    .cd-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+    .deck { grid-template-rows: auto auto auto; }
     .live { order: 1; }
     .lever-col { order: 2; grid-template-rows: none; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
     .next { order: 3; }

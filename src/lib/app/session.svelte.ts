@@ -3570,6 +3570,17 @@ class Session {
     this.remember(passage);
   };
 
+  /** The theme changed while words are on the screen: they take the new look now (size, font, colour). */
+  restyleProgram = async () => {
+    const current = this.live.program.model;
+    const words = current.layout === "scripture" || current.layout === "lyrics" || current.layout === "title" || current.layout === "lower-third";
+    if (!words || this.programHeld) return;
+    const next = this.theme();
+    const photo = next.background.type === "image" ? this.mediaSrc(next.background.assetId) : null;
+    this.live = replaceProgramModel(this.live, this.withBackdrop({ ...current, theme: next, backgroundImageUrl: photo }), "cut");
+    await this.pushProgram();
+  };
+
   /** Keep Program on the same verse, in the newly chosen translation. Preview is updated separately. */
   refreshProgramTranslation = async (translationId: string) => {
     const current = this.live.program.model;
