@@ -632,6 +632,18 @@ function lease(config: ApiConfig, fields: { kind: LeaseKind; plan: LicensePlan; 
   return signLease({ ...fields, issuedAt: now, renewBy: fields.endsAt === null ? reach : Math.min(reach, fields.endsAt) }, signer.secret);
 }
 
+/**
+ * Whether a new trial or key needs a signed-in account here. Apps before 0.3 never send their
+ * sign-in with these (0.2.5 does for trials, 0.3.0 for keys), so they go on as before; a computer
+ * that never checked in is asked like a new app. The rule tightens by itself as churches update.
+ */
+async function mustSignIn(config: ApiConfig, device: string): Promise<boolean> {
+  if (!config.requireAccount) return false;
+  const version = (await getJson<DeviceMeta>(config.store, `device:${device}`))?.version ?? "";
+  const [major = 0, minor = 0] = version.split(".").map(Number);
+  return !version || major > 0 || minor >= 3;
+}
+
 // --- Trials --------------------------------------------------------------------------------
 
 async function trial(config: ApiConfig, input: Record<string, unknown>, address: string | null = null): Promise<Response> {
@@ -645,7 +657,7 @@ async function trial(config: ApiConfig, input: Record<string, unknown>, address:
   const saved = await getJson<Trial>(config.store, key);
   const account = input.token ? await accountOf(config, text(input.token, 80)) : null;
   // A new trial is one per person: signing in is what makes that hold (computer ids can be made up).
-  if (!saved && !account && config.requireAccount) return json(401, { signin: true, error: "Sign in to start your free trial. It stays with you on any computer." });
+  if (!saved && !account && (await mustSignIn(config, device))) return json(401, { signin: true, error: "Sign in to start your free trial. It stays with you on any computer." });
   if (saved) {
     if (account) await noteAccountTrial(config, account.id, saved);
     // The same running trial again (a reinstall, a second request); never a second trial.
@@ -917,7 +929,7 @@ async function seats(config: ApiConfig, path: string, input: Record<string, unkn
         const claimed = await claimLicense(config, account, { id: read.license.id, key: keyText });
         if (!claimed.ok) return json(409, { owned: true, error: claimed.error });
         await noteDevice(config, device, { account: account.id });
-      } else if (read && config.requireAccount) return json(401, { signin: true, error: "Sign in to add this key. Your plan then follows you to any computer." });
+      } else if (read && (await mustSignIn(config, device))) return json(401, { signin: true, error: "Sign in to add this key. Your plan then follows you to any computer." });
     }
     const result = await activateDevice(config, keyText, device, text(input.name, 60) || "Computer");
     return json(result.status, result.lease ? { ...result.body, lease: result.lease } : result.body);

@@ -337,6 +337,21 @@ describe("signing in safely, and who a license belongs to", () => {
     expect((await call("/v1/trial", { device: "new-mac", token })).status).toBe(200);
   });
 
+  it("with sign-in required, apps too old to send a sign-in (before 0.3) still start trials and add keys", async () => {
+    const { identity } = fakeIdentity();
+    const { call, buy, config } = setup(identity);
+    const key = (await buy("a@b.co")).key!;
+    config.requireAccount = true;
+    await call("/v1/hello", { device: "old-mac", version: "0.2.4", os: "macos", plan: "free" });
+    await call("/v1/hello", { device: "new-mac", version: "0.6.3", os: "macos", plan: "free" });
+    expect((await call("/v1/trial", { device: "old-mac" })).status).toBe(200);
+    expect((await call("/v1/activate", { key, device: "old-mac" })).status).toBe(200);
+    expect((await call("/v1/trial", { device: "new-mac" })).data).toMatchObject({ signin: true });
+    expect((await call("/v1/activate", { key, device: "new-mac" })).data).toMatchObject({ signin: true });
+    // A computer that never checked in is asked to sign in.
+    expect((await call("/v1/trial", { device: "quiet-mac" })).data).toMatchObject({ signin: true });
+  });
+
   it("lists where an account is signed in, signs out another computer, and lets unused tokens lapse", async () => {
     const { identity, signInAs } = fakeIdentity();
     const { call, page, config } = setup(identity);

@@ -33,6 +33,9 @@
     // Free trial length, and how long a computer may stay offline before it must check in.
     "TRIAL_DAYS": "14",
     "LEASE_DAYS": "14",
+    // "1": a new trial or key needs a signed-in account (one trial per person). Apps before 0.3,
+    // which cannot send their sign-in, go on as before (api.ts › mustSignIn).
+    "REQUIRE_ACCOUNT": "1",
     // The public pages (home, terms, privacy, refunds): who sells, and an inbox someone reads.
     "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",
