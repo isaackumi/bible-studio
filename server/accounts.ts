@@ -31,6 +31,7 @@
 import { readLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { activateDevice, noteAccountTrial, noteDevice, readAnyLicense, type ApiConfig } from "./api.ts";
 import { changeMembers, claimLicense, mayUse, noteJoined, ownershipOf, peopleOf } from "./ownership.ts";
+import { seatsFullEmail } from "./email.ts";
 import { signinPage } from "./pages.ts";
 import { getJson, putJson } from "./store.ts";
 
@@ -298,6 +299,18 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
   }
 }
 
+/** Someone the owner added could not join (every computer in use): the owner hears, once a day per person. */
+async function tellOwnerFull(config: ApiConfig, ownerId: string, account: Account, what: { license: string; plan: LicensePlan; computer: string; seats: number }): Promise<void> {
+  if (!config.mail) return;
+  const key = `fullnote:${what.license}:${normalEmail(account.email)}:${new Date(config.now()).toISOString().slice(0, 10)}`;
+  if (await config.store.get(key)) return;
+  await config.store.put(key, "1", undefined, 2 * 86_400).catch(() => {});
+  const holder = await getJson<Account>(config.store, `acct:${ownerId}`);
+  if (!holder) return;
+  const email = seatsFullEmail({ who: account.name || account.email, email: account.email, computer: what.computer, seats: what.seats, plan: what.plan === "premium" ? "premium" : "church" }, config.publicUrl ?? "https://church-studio.heitechinc.com");
+  await config.mail(holder.email, email.subject, email.text, email.html).catch(() => {});
+}
+
 /** The account, its licenses, and (with a device) a lease for the best plan it has a seat on. */
 async function accountStatus(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const account = await accountOf(config, text(input.token, 80));
@@ -330,11 +343,15 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
     }
     summary.push({ license: license.id, plan: license.plan, revoked, owner, ...(owner && ownership ? { members: ownership.members, people: peopleOf(ownership) } : {}), ...(by ? { by } : {}), ...(allowed ? {} : { removed: true }) });
     if (!device || lease || revoked || !allowed) continue;
-    const result = await activateDevice(config, entry.key, device, text(input.name, 60) || "Computer");
+    const computer = text(input.name, 60) || "Computer";
+    const result = await activateDevice(config, entry.key, device, computer);
     if (result.lease) {
       lease = result.lease;
       activation = { ...result.body, key: entry.key };
-    } else activation ??= { ...result.body, status: result.status };
+    } else {
+      activation ??= { ...result.body, status: result.status };
+      if (result.status === 409 && !owner && ownership) await tellOwnerFull(config, ownership.owner, account, { license: license.id, plan: license.plan, computer, seats: Number(result.body.seats) || 0 });
+    }
   }
   return json(200, { account: { email: account.email, name: account.name }, licenses: summary, ...(lease ? { lease } : {}), ...(activation ? { activation } : {}) });
 }

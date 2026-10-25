@@ -280,6 +280,27 @@ describe("signing in safely, and who a license belongs to", () => {
     expect(removed).toEqual({ members: [], people: [] });
   });
 
+  it("tells the owner, once a day, when someone they added cannot join because every computer is in use", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy, mails, advance } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const { license } = await buy("", { token: aliceToken });
+    await call("/v1/license/members", { token: aliceToken, license, add: bob.email });
+    // Church covers three computers: all three in use.
+    for (const device of ["mac-1", "pc-2", "pc-3"]) await call("/v1/account", { token: aliceToken, device, name: device });
+    const bobToken = await signedIn(call, page, signInAs, bob, "bobs-laptop");
+    const toAlice = () => mails.filter((mail) => mail.to === alice.email && /all \d computers/.test(mail.subject));
+    expect((await call("/v1/account", { token: bobToken, device: "bobs-laptop", name: "Bob's laptop" })).data.activation).toMatchObject({ status: 409 });
+    expect(toAlice()).toHaveLength(1);
+    expect(toAlice()[0]!.subject).toBe("Bob could not join: all 3 computers are in use");
+    expect(toAlice()[0]!.text).toContain("Bob's laptop");
+    await call("/v1/account", { token: bobToken, device: "bobs-laptop", name: "Bob's laptop" });
+    expect(toAlice()).toHaveLength(1);
+    advance(86_400_000);
+    await call("/v1/account", { token: bobToken, device: "bobs-laptop", name: "Bob's laptop" });
+    expect(toAlice()).toHaveLength(2);
+  });
+
   it("an invitation without a church name says the inviter's church, and one inbox gets only a few a day", async () => {
     const { identity, signInAs } = fakeIdentity();
     const { call, page, buy, mails } = setup(identity);

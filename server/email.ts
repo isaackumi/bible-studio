@@ -113,6 +113,26 @@ export function inviteEmail(input: { inviter: string; inviterEmail: string; chur
   };
 }
 
+/** Someone the owner added could not join: every computer on the plan is in use. */
+export function seatsFullEmail(input: { who: string; email: string; computer: string; seats: number; plan: "premium" | "church" }, base: string): Email {
+  const plan = input.plan === "church" ? "Church" : "Premium";
+  const said = `${input.who} (${input.email}) tried to use Church Studio on ${input.computer}, but all ${input.seats} computers on your ${plan} plan are in use.`;
+  const how = "To let them in, open Church Studio, go to Settings › Plan & account, and release a computer that is no longer used. They are let in the next time they open Church Studio.";
+  return {
+    subject: `${input.who} could not join: all ${input.seats} computers are in use`,
+    text: [said, "", how, "", "Church Studio by HeiTech · support@heitechinc.com"].join("\n"),
+    html: layout(base, {
+      preheader: said,
+      heading: `${input.who} could not join`,
+      blocks: [
+        { kind: "text", text: said },
+        { kind: "text", text: how },
+      ],
+      footer: "You got this because you own this Church Studio plan and added this person to it.",
+    }),
+  };
+}
+
 /** A license key, after a purchase. `added`: Church Studio already put it on the computer that bought it. */
 export function licenseKeyEmail(input: { key: string; plan: "premium" | "church"; until?: string | null; added?: boolean }, base: string): Email {
   const plan = input.plan === "church" ? "Church" : "Premium";
