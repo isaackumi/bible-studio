@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.8",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "alerts", title: msg("Sunday morning, looked after"), text: msg("When the TV drops out, a banner says so and Program waits for it. On a service day the desk checks the screens, the service and the backup by itself and says what needs a look. Backups now happen on their own, to Documents \u203a Church Studio Backups.") },
+      { icon: "cloud", title: msg("Sync at a glance"), text: msg("A cloud in the top bar shows whether your library is synced, syncing or offline. Cloud space explains why another computer may not be found on the network.") },
+      { icon: "users", title: msg("Names in games"), text: msg("Players keep one name each, and their phone remembers it for next time. The desk can rename or remove a player whose name is not for the screen (Audience \u203a Pick someone \u203a Names).") },
+    ],
+  },
+  {
     version: "0.5.7",
     date: "2026-10-25",
     highlights: [
