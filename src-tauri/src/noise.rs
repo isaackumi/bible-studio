@@ -41,6 +41,20 @@ impl Filter {
             Filter::Strong => 1.0,
         }
     }
+
+    /**
+     * How much of the cleaned signal a speech recognizer hears. Never all of it: noise filters strip
+     * the detail recognizers lean on (Whisper learned from noisy audio and copes with a room), and
+     * a fully cleaned sermon in a live room came out as "give me" for "Luke". At least half is the
+     * voice as the microphone heard it.
+     */
+    pub fn for_recognizer(self) -> f32 {
+        match self {
+            Filter::Off => 0.0,
+            Filter::Light => 0.3,
+            Filter::Strong => 0.5,
+        }
+    }
 }
 
 /// Linear resampler, any rate to any rate, carried across buffers.
@@ -337,6 +351,14 @@ pub fn stop_test() {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_recognizer_always_hears_at_least_half_the_real_voice() {
+        assert_eq!(Filter::Off.for_recognizer(), 0.0);
+        assert!(Filter::Light.for_recognizer() > 0.0 && Filter::Light.for_recognizer() < Filter::Light.mix());
+        assert!(Filter::Strong.for_recognizer() <= 0.5);
+    }
+
     use super::*;
 
     fn rms(samples: &[f32]) -> f32 {

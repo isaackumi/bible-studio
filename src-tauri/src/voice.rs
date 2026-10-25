@@ -69,7 +69,7 @@ pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str, words: &[
     stop_transcribe();
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     if accurate {
-        return crate::whisper::start(app, run, crate::noise::Filter::parse(filter).mix(), &expected(words));
+        return crate::whisper::start(app, run, crate::noise::Filter::parse(filter).for_recognizer(), &expected(words));
     }
     #[cfg(target_os = "macos")]
     {
@@ -318,7 +318,7 @@ mod windows {
             // No console window flashing up behind the desk.
             command.creation_flags(0x0800_0000);
         }
-        let feed = (filter != crate::noise::Filter::Off).then(|| filter.mix());
+        let feed = (filter != crate::noise::Filter::Off).then(|| filter.for_recognizer());
         super::helper::start(app, run, command, feed)
     }
 }
@@ -511,7 +511,7 @@ mod macos {
             .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
         let mut command = std::process::Command::new(&path);
         command.env("CHURCH_STUDIO_WORDS", words);
-        let feed = (filter != crate::noise::Filter::Off).then(|| filter.mix());
+        let feed = (filter != crate::noise::Filter::Off).then(|| filter.for_recognizer());
         if feed.is_some() {
             command.env("CHURCH_STUDIO_AUDIO", "stdin");
         }
