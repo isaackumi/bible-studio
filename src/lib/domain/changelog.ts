@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.3",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "bible", title: msg("The Berean Standard Bible, built in"), text: msg("A modern English Bible, free for every church, installed with the King James and the World English Bible. Choose it like any other version.") },
+      { icon: "mic", title: msg("Listening knows old and modern wording"), text: msg("A verse quoted in modern words (\u201cFor I know the plans I have for you\u201d, \u201cLove is patient\u201d) or in the King James is found either way, and shown in the version your desk uses.") },
+    ],
+  },
+  {
     version: "0.6.2",
     date: "2026-10-25",
     highlights: [
