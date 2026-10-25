@@ -200,6 +200,23 @@ describe("cloud sync on this computer", () => {
     expect(computer.did.filter((line) => line.startsWith("download") && line.includes(VID))).toEqual([]);
   });
 
+  it("with the internet out, or not signed in, the files this library uses still come from nearby", async () => {
+    const deck = { id: "d", name: "Deck", updatedAt: "x", pages: [{ background: { assetId: VID } }] } as never;
+    for (const way of ["offline", "signedOut"] as const) {
+      const cloud = fakeCloud();
+      cloud.protocol.status = async () => ({ ok: false, status: 0, data: {}, offline: true, error: "No internet." });
+      const computer = fakeComputer({ workspace: { ...defaultWorkspace(), decks: [deck] } });
+      computer.commands.nearby = async (id) => {
+        computer.media.set(id, { id, kind: "video" });
+        return true;
+      };
+      const sync = make(cloud, computer, way === "signedOut" ? () => "signedOut" : () => "ok");
+      await sync.syncNow();
+      expect(sync.status).toBe(way);
+      expect(computer.media.has(VID)).toBe(true);
+    }
+  });
+
   it("skips videos when the switch is off", async () => {
     const cloud = fakeCloud({ status: { syncVideos: false } });
     const workspace = { ...defaultWorkspace(), decks: [{ id: "d", name: "Deck", updatedAt: "x", pages: [{ background: { assetId: VID } }, { background: { assetId: PIC } }] } as never] };

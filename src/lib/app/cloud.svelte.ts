@@ -172,6 +172,8 @@ export class CloudSync {
     if (gate !== "ok") {
       this.status = gate;
       this.message = "";
+      // A computer on a licence key but not signed in still gets its files from the ones nearby.
+      if (gate === "signedOut") await this.nearbyOnly();
       return;
     }
     if (this.stopped) return;
@@ -183,7 +185,12 @@ export class CloudSync {
     // 0. Which library, and how far it goes: another licence, or one wiped and begun again,
     //    means this computer's record of what was agreed no longer holds.
     const first = await this.deps.protocol.status();
-    if (!first.ok) return this.refused(first);
+    if (!first.ok) {
+      this.refused(first);
+      // The internet out (Sunday morning's Wi-Fi): the computers nearby still lend what is missing.
+      if (first.offline) await this.nearbyOnly();
+      return;
+    }
     this.takeStatus(first.data);
     if ((this.manifest.licence && this.manifest.licence !== first.data.licence) || first.data.seq < this.manifest.seq) {
       this.manifest = { ...emptyManifest(), licence: first.data.licence, fileHashes: this.manifest.fileHashes ?? {}, refused: {} };
@@ -344,6 +351,15 @@ export class CloudSync {
     this.full = full;
     this.paused = paused;
     this.pendingMedia = 0;
+  }
+
+  /** No cloud to ask: the files this library's records use, from the computers nearby. */
+  private async nearbyOnly(): Promise<void> {
+    if (!this.deps.commands.nearby) return;
+    const here = await this.deps.library.media();
+    for (const id of mediaIdsIn(collectRecords(await this.deps.library.collect()))) {
+      if (!here.has(id)) await this.fromNearby(id);
+    }
   }
 
   private async fromNearby(id: string): Promise<boolean> {
