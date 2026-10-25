@@ -143,12 +143,12 @@
 <style>
   .preach { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
   .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-  .mode { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; }
+  .mode { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; }
   .mode i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .name { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
   .clock { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; font-weight: 750; font-size: 15px; color: var(--ink); }
   .clock em { font-style: normal; font-weight: 600; font-size: 12px; color: var(--muted); }
-  .clock.near { color: #f5a524; }
+  .clock.near { color: var(--warn-text); }
   .clock.over { color: var(--live, #e5484d); }
   .tool { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
   .tool:hover { background: var(--field); }
@@ -156,7 +156,7 @@
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 260px); gap: 16px; }
   .now { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--field); }
   .now-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-  .where { padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.05em; }
+  .where { padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.05em; }
   .where.live { background: var(--live, #e5484d); color: #fff; }
   .count { font-size: 12px; color: var(--muted); }
   .now-head .clock { margin-left: auto; }

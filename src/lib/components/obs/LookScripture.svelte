@@ -55,7 +55,7 @@
   .title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 650; color: var(--muted); }
   .row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px; padding: 4px 4px 4px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
   .row.on-air { border-color: color-mix(in srgb, var(--live) 60%, var(--line)); }
-  .tag { padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); font-size: 10px; font-weight: 750; line-height: 16px; }
+  .tag { padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 750; line-height: 16px; }
   .on-air .tag { background: var(--live); color: #fff; }
   .row strong { min-width: 0; font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); cursor: pointer; }

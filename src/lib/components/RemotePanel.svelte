@@ -224,10 +224,10 @@
   .life i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 1s linear; }
   .life i.low { background: var(--live); }
   .expires { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .expires.low { color: var(--live); }
+  .expires.low { color: var(--live-text); }
   .pair-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; min-width: 0; }
   .pair-steps li { display: flex; gap: 12px; min-width: 0; }
-  .pair-steps li > b { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; font-weight: 800; }
+  .pair-steps li > b { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 12px; font-weight: 800; }
   .pair-steps li > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
   .pair-steps strong { font-size: 13.5px; }
   .pair-steps span { font-size: 12.5px; color: var(--muted); }

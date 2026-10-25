@@ -95,7 +95,7 @@
   .tip { color: var(--ink); font-size: 13px; line-height: 1.45; }
   .state { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; }
   .state.ok { background: color-mix(in srgb, var(--presence, #3fb950) 20%, transparent); color: var(--presence, #3fb950); }
-  .state.warn { background: color-mix(in srgb, #f5a524 22%, transparent); color: #f5a524; }
+  .state.warn { background: color-mix(in srgb, #f5a524 22%, transparent); color: var(--warn-text); }
   .state.fail { background: color-mix(in srgb, var(--live, #e5484d) 22%, transparent); color: var(--live, #e5484d); }
   .state.unknown { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); }
 </style>

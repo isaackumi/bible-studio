@@ -142,7 +142,7 @@
     border-radius: 8px;
     border: 1px solid var(--accent);
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-text);
     padding: 0 12px;
   }
 </style>

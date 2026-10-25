@@ -219,7 +219,7 @@
   .key-row { display: flex; gap: 8px; }
   .key-row input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; }
   .key-row .btn { height: 36px; }
-  .row-copy a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .row-copy a { color: var(--accent-text); font-weight: 600; text-decoration: none; }
   .row-copy a:hover { text-decoration: underline; }
   .key-error { margin: 0; color: var(--danger, #ff6b6b); font-size: 12.5px; }
   .ok { margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--good, #3ccf7a) 18%, transparent); color: var(--good, #3ccf7a); font-size: 11px; font-style: normal; font-weight: 700; }
@@ -241,5 +241,5 @@
   .field-label .field { width: 100%; max-width: none; }
   .arrow { padding-bottom: 8px; color: var(--muted); }
   .built-in { margin: 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
-  .link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+  .link { border: 0; background: none; padding: 0; color: var(--accent-text); font: inherit; text-decoration: underline; cursor: pointer; }
 </style>

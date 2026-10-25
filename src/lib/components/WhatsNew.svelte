@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fade, scale } from "svelte/transition";
+  import { fade, scale } from "../ui/motion";
   import { session } from "../app/session.svelte";
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
@@ -47,11 +47,11 @@
     color: var(--ink);
     box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
   }
-  .eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-text); }
   h2 { margin: 0 0 18px; font-size: 22px; letter-spacing: -0.01em; }
   ul { display: grid; gap: 14px; margin: 0 0 22px; padding: 0; list-style: none; }
   li { display: flex; gap: 12px; align-items: flex-start; }
-  .icon { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .icon { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); }
   li div { display: grid; gap: 2px; }
   li strong { font-size: 14px; }
   li span { font-size: 13px; line-height: 1.45; color: var(--muted); }

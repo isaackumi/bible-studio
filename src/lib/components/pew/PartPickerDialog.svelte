@@ -129,7 +129,7 @@
 
 <style>
   .picker { display: grid; gap: 12px; min-width: min(420px, 100%); }
-  .what { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--field)); color: var(--accent); }
+  .what { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--field)); color: var(--accent-text); }
   .what strong { color: var(--ink); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lbl { font-size: 11px; font-weight: 700; color: var(--muted); }
   .svc { display: grid; gap: 6px; }
@@ -138,7 +138,7 @@
   select { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; }
   .open { height: 32px; }
   .warn { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #f5a524 14%, var(--field)); color: var(--ink); font-size: 12px; }
-  .warn :global(svg) { color: #f5a524; flex: none; }
+  .warn :global(svg) { color: var(--warn-text); flex: none; }
   .parts { display: grid; gap: 4px; max-height: min(46vh, 380px); overflow: auto; }
   .part { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .part i { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; background: var(--panel); font-style: normal; font-size: 11px; font-weight: 750; }
@@ -147,9 +147,9 @@
   .part-copy span { font-size: 11px; color: var(--muted); }
   .part :global(svg) { flex: none; color: var(--muted); }
   .part:hover, .part:focus-visible { border-color: var(--accent); outline: none; background: color-mix(in srgb, var(--accent) 8%, var(--field)); }
-  .part:hover :global(svg), .part:focus-visible :global(svg) { color: var(--accent); }
+  .part:hover :global(svg), .part:focus-visible :global(svg) { color: var(--accent-text); }
   .part.here { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-  .tag { flex: none; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, #f5a524 18%, transparent); color: #f5a524; font-size: 10px; font-style: normal; font-weight: 750; }
+  .tag { flex: none; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, #f5a524 18%, transparent); color: var(--warn-text); font-size: 10px; font-style: normal; font-weight: 750; }
   .newpart { display: flex; gap: 6px; }
   .newpart input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; }
   .go { flex: none; height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }

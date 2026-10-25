@@ -70,6 +70,7 @@
   .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
   .who { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 6px; border: 1px solid transparent; border-radius: 7px; color: var(--muted); }
   .who:hover, .who:focus-within { border-color: var(--line); background: var(--field); }
+  .who:focus-within { border-color: var(--accent); }
   .who input { width: 140px; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
   .who input::placeholder { color: var(--muted); }
   .show { height: 22px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; white-space: nowrap; }
@@ -85,7 +86,7 @@
   .over .used, .over .left { color: var(--danger, #e5484d); }
   .over .left { background: color-mix(in srgb, var(--danger, #e5484d) 16%, transparent); }
   .left { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
-  .left.soon { background: color-mix(in srgb, #f5a524 26%, transparent); color: #f5a524; }
+  .left.soon { background: color-mix(in srgb, #f5a524 26%, transparent); color: var(--warn-text); }
   .left.late { background: color-mix(in srgb, var(--danger, #e5484d) 18%, transparent); color: var(--danger, #e5484d); animation: nudge 1.6s ease-in-out infinite; }
   .soon .bar i { background: #f5a524; }
   .beacon { width: 7px; height: 7px; border-radius: 50%; background: #f5a524; box-shadow: 0 0 0 0 rgb(245 165 36 / 0.7); animation: beacon 1.2s ease-out infinite; }

@@ -277,7 +277,7 @@
   .letter { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-weight: 800; }
   .locked .letter { background: var(--muted); }
   .name { flex: 1; min-width: 0; max-width: none; }
-  .lock.on { border-color: var(--accent); color: var(--accent); }
+  .lock.on { border-color: var(--accent); color: var(--accent-text); }
   .stack { flex-direction: column; align-items: stretch !important; gap: 10px; }
   .roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .role { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }

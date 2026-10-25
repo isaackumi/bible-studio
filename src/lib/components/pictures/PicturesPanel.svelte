@@ -410,11 +410,11 @@
   .loc-path button { flex: 0 1 auto; min-width: 0; max-width: 140px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
   .loc-path button:hover { color: var(--ink); text-decoration: underline; }
   .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 9%, transparent); color: var(--ink); }
-  .pin.on { color: #f5a524; }
+  .pin.on { color: var(--warn-text); }
   .pin.on :global(svg) { fill: currentColor; }
   .btn.open { flex: none; display: inline-flex; align-items: center; gap: 6px; }
   .start { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
-  .start-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .start-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); }
   .start div { display: grid; gap: 2px; }
   .start strong { font-size: 13.5px; }
   .start span { color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -427,7 +427,7 @@
   .place i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #fff; }
   .place:hover, .place.on { border-color: var(--accent); }
   .place.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-  .link-btn { justify-self: start; align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .link-btn { justify-self: start; align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   /* Folders inside: big coloured icons first, so they read as places to go, not pictures. */
   .folders { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .folders button { width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, currentColor 3%, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
@@ -462,7 +462,7 @@
   .options { margin-top: 6px; border-top: 1px solid var(--line); }
   .options summary { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; list-style: none; font-size: 13px; font-weight: 700; }
   .options summary::-webkit-details-marker { display: none; }
-  .options summary small { flex: 1; min-width: 0; color: var(--accent); font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .options summary small { flex: 1; min-width: 0; color: var(--accent-text); font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .options summary :global(svg) { margin-left: auto; color: var(--muted); transition: transform 150ms; }
   .options[open] summary :global(svg) { transform: rotate(180deg); }
   /* A <details> does not lay out its contents as a grid, so the spacing is margins on each row. */
@@ -486,7 +486,7 @@
   .tracks { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .music-volume input { flex: 0 1 150px; accent-color: var(--accent); }
   .music-now { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .music-now.warn { color: #f5a524; white-space: normal; }
+  .music-now.warn { color: var(--warn-text); white-space: normal; }
   h3 { margin: 0; font-size: 13px; font-weight: 700; }
   /* The player: the picture, start or stop, and the two other things to do with it. */
   .player { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }

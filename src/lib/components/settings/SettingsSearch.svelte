@@ -178,6 +178,8 @@
   @media (prefers-reduced-motion: reduce) { .palette { animation: none; } }
   .find { flex: none; display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--muted); }
   .find input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 16px; outline: none; }
+  /* Keyboard users see where they are. */
+  .find:focus-within { border-color: var(--accent); }
   .clear { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--field); color: var(--muted); cursor: pointer; }
   .clear:hover { color: var(--ink); }
   kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 10.5px; font-weight: 700; color: var(--muted); }
@@ -196,10 +198,10 @@
   .icon, .tile { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 7px; }
   .icon { background: var(--field); color: var(--muted); }
   .tile { color: #fff; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.25); }
-  .entry[aria-selected="true"] .icon { color: var(--accent); }
+  .entry[aria-selected="true"] .icon { color: var(--accent-text); }
   .copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
   .label { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .label mark { background: none; color: var(--accent); font-weight: 750; }
+  .label mark { background: none; color: var(--accent-text); font-weight: 750; }
   .detail { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .enter { flex: none; }
   .none { display: grid; justify-items: center; gap: 6px; padding: 28px 16px 32px; text-align: center; color: var(--muted); }

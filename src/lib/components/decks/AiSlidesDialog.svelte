@@ -114,7 +114,7 @@
 <style>
   .make, .done, .setup { display: grid; gap: 14px; }
   .setup, .done { justify-items: start; }
-  .setup :global(svg), .done :global(svg) { color: var(--accent); }
+  .setup :global(svg), .done :global(svg) { color: var(--accent-text); }
   .setup p, .done p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 520px; }
   .done strong { font-size: 18px; }
   .seg { display: inline-flex; gap: 2px; width: fit-content; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }

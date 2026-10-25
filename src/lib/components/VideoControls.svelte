@@ -87,9 +87,9 @@
   .vc { display: grid; place-items: center; flex: none; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .vc.text { padding: 0 8px; }
   .vc:disabled { opacity: 0.5; cursor: default; }
-  .vc.on { border-color: var(--accent); color: var(--accent); }
+  .vc.on { border-color: var(--accent); color: var(--accent-text); }
   .time { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
   .scrub { flex: 1; min-width: 60px; accent-color: var(--live); }
   .volume { width: 64px; flex: none; accent-color: var(--accent); }
-  .then { flex: none; font-size: 11px; font-weight: 650; color: var(--accent); white-space: nowrap; }
+  .then { flex: none; font-size: 11px; font-weight: 650; color: var(--accent-text); white-space: nowrap; }
 </style>

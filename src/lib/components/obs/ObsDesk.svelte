@@ -1042,7 +1042,7 @@
   }
   .kicker.program { color: var(--pigment-live-ink); display: inline-flex; align-items: center; gap: 6px; }
   .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .unseen { margin-right: auto; margin-left: 10px; font-size: 12px; font-weight: 650; color: #f5a524; white-space: nowrap; }
+  .unseen { margin-right: auto; margin-left: 10px; font-size: 12px; font-weight: 650; color: var(--warn-text); white-space: nowrap; }
   .pip {
     width: 7px;
     height: 7px;
@@ -1131,7 +1131,7 @@
   .prod :global([data-pane-resizer][data-active]::after) { background: var(--accent); }
   .dock header { justify-content: flex-start; gap: 6px; font-weight: 600; letter-spacing: 0; font-size: 12px; }
   .dock header .count { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--field); color: var(--muted); font-weight: 600; letter-spacing: 0; text-transform: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dock-add { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; }
+  .dock-add { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent-text); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; }
   .dock-add:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
   .dock-add:disabled { opacity: 0.4; cursor: default; }
   .list .empty-cta { display: flex !important; flex-direction: row !important; align-items: center; gap: 12px; margin: 6px; padding: 14px !important; border: 1px dashed var(--line) !important; border-radius: 12px; background: none; color: var(--muted); text-align: left; }
@@ -1145,7 +1145,7 @@
   .scene-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
   .scene-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
+  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
   .badge.live { background: var(--live); color: #fff; }
   .scene-rename { height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-weight: 600; min-width: 0; }
   /* Row tools appear on hover, focus or selection; what is switched on always shows. */
@@ -1158,7 +1158,7 @@
   .source-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--tint) 18%, transparent); color: var(--tint); }
   .source-text { display: grid; gap: 1px; min-width: 0; }
   .source-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 14%, transparent) !important; }
+  .armed { color: var(--live-text) !important; background: color-mix(in srgb, var(--live) 14%, transparent) !important; }
   .list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding: 4px; gap: 2px; }
   .list button {
     text-align: left;
@@ -1184,7 +1184,7 @@
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-row .toggle { color: var(--muted); }
   .scene-row .toggle:hover { color: var(--ink); }
-  .scene-row .toggle.on { color: var(--accent); }
+  .scene-row .toggle.on { color: var(--accent-text); }
   .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent); }
   .swatch.none { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%) !important; }
   .swatches { position: absolute; right: 4px; top: calc(100% + 2px); z-index: 4; display: grid; grid-template-columns: repeat(5, 26px); gap: 6px; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); }
@@ -1194,7 +1194,7 @@
   .source-row .hidden-layer > span:first-child { opacity: 0.5; }
   .source-row .toggle { color: var(--muted); }
   .source-row .toggle:hover { color: var(--ink); }
-  .source-row .toggle.on { color: var(--accent); }
+  .source-row .toggle.on { color: var(--accent-text); }
   .source-row .toggle.off { color: color-mix(in srgb, var(--muted) 60%, transparent); }
   .desk-btn.armed { background: var(--live, #d92d20); border-color: var(--live, #d92d20); color: #fff; }
   .source-row.dragging { opacity: 0.45; }

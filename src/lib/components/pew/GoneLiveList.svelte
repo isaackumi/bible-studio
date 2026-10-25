@@ -204,6 +204,8 @@
   .gl-search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); }
   .wide .gl-search { height: 36px; }
   .gl-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
+  /* Keyboard users see where they are. */
+  .gl-search:focus-within { border-color: var(--accent); }
   .gl-scope { display: flex; flex: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .gl-scope button { height: 28px; padding: 0 9px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; }
   .gl-scope button[aria-checked="true"] { background: var(--field); color: var(--ink); }

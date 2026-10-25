@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly } from "../ui/motion";
   import { session } from "../app/session.svelte";
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";

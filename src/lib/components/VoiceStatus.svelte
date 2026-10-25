@@ -80,7 +80,7 @@
   .meter { flex: 0 0 64px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
   .meter span { display: block; height: 100%; background: #3ccf6e; }
   .live { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--muted); }
-  .heard { margin: 0; color: var(--accent); font-style: italic; overflow-wrap: anywhere; }
+  .heard { margin: 0; color: var(--accent-text); font-style: italic; overflow-wrap: anywhere; }
   .heard.interim { opacity: 0.7; }
   .command { margin: 0; font-weight: 600; }
   .command[data-outcome="executed"] { color: #3ccf6e; }

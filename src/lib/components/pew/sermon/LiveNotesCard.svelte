@@ -179,7 +179,7 @@
   .notes-view .li::before { content: "•"; position: absolute; left: 2px; color: var(--muted); }
   .auto { display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; }
   .edit { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field, transparent); color: var(--ink); font: 13px/1.5 var(--font-ui, inherit); resize: vertical; }
-  .link { justify-self: start; border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
+  .link { justify-self: start; border: 0; background: none; padding: 0; color: var(--accent-text); font: inherit; font-size: 12px; cursor: pointer; }
   .transcript { margin: 0; max-height: 260px; overflow: auto; padding: 10px; border-radius: 10px; background: color-mix(in srgb, currentColor 5%, transparent); font: 12px/1.5 var(--font-ui, inherit); white-space: pre-wrap; color: var(--muted); }
   @media (prefers-reduced-motion: reduce) { .badge.on i { animation: none; } }
 </style>

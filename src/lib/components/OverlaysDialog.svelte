@@ -198,7 +198,7 @@
   .ov-row { display: flex; align-items: center; gap: 8px; padding-right: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
   .ov-row.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .ov-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .ov-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent); }
+  .ov-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent-text); }
   .ov-copy { display: grid; min-width: 0; }
   .ov-copy strong { font-size: 13px; }
   .ov-copy em { font-style: normal; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -207,7 +207,7 @@
   .ov-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .ov-kind { display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border: 1px dashed var(--line); border-radius: 10px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .ov-kind:hover { border-style: solid; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-  .ov-kind :global(svg) { flex: none; margin-top: 1px; color: var(--accent); }
+  .ov-kind :global(svg) { flex: none; margin-top: 1px; color: var(--accent-text); }
   .ov-kind span { display: grid; gap: 1px; }
   .ov-kind strong { font-size: 12px; }
   .ov-kind em { font-style: normal; font-size: 11px; color: var(--muted); }

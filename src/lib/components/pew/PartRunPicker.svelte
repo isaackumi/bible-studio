@@ -142,7 +142,7 @@
   .tick { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--line); border-radius: 5px; color: transparent; }
   .desk[aria-checked="true"] .tick { border-color: var(--accent); background: var(--accent); color: #fff; }
   .desk-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--field); color: var(--muted); }
-  .desk[aria-checked="true"] .desk-icon { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .desk[aria-checked="true"] .desk-icon { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
   .desk strong { font-size: 13.5px; font-weight: 750; }
   .desk em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--muted); }
   .row { display: flex; align-items: center; gap: 12px; }

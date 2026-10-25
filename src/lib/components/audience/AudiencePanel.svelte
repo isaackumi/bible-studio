@@ -296,15 +296,15 @@
   .tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font-weight: 700; }
   .tag.gold { color: #f2c46b; }
   .tag.good { color: var(--good, #3ccf7a); }
-  .tag.accent { color: var(--accent); }
+  .tag.accent { color: var(--accent-text); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
   .actions .btn { display: inline-flex; align-items: center; gap: 5px; }
   .actions .btn.on { color: var(--good, #3ccf7a); border-color: color-mix(in srgb, var(--good, #3ccf7a) 50%, var(--line)); }
   .more-actions { display: inline-flex; gap: 2px; margin-left: auto; }
   .icon-btn.sm { width: 28px; height: 28px; }
-  .icon-btn.on { color: var(--accent); }
+  .icon-btn.on { color: var(--accent-text); }
   .next-up { display: grid; gap: 4px; width: 100%; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .next-up span { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 12px; font-weight: 750; }
+  .next-up span { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); font-size: 12px; font-weight: 750; }
   .next-up em { font-style: normal; font-size: 13.5px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .next-up:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .empty { color: var(--muted); text-align: center; padding: 20px 8px; }

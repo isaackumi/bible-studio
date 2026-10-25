@@ -660,10 +660,10 @@
   .history button:disabled { opacity: 0.4; cursor: default; }
   .status { flex: 1; color: var(--muted); font-size: 12px; text-align: right; }
   .menu-wrap > .designs-btn, .menu-wrap > .show-btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .menu-wrap > .show-btn { border-color: var(--accent); color: var(--accent); }
+  .menu-wrap > .show-btn { border-color: var(--accent); color: var(--accent-text); }
   .menu-wrap > .show-btn:hover, .menu-wrap > .designs-btn:hover { background: color-mix(in srgb, var(--accent) 12%, var(--field)); }
   .menu.designs-menu { width: 320px; max-height: 70vh; }
-  .new-design { font-weight: 700; color: var(--accent) !important; }
+  .new-design { font-weight: 700; color: var(--accent-text) !important; }
   .menu .design { display: flex; align-items: center; gap: 10px; min-height: 52px; }
   .menu .design.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .mini { flex: none; width: 72px; aspect-ratio: var(--aspect, 16 / 9); max-height: 48px; border-radius: 5px; overflow: hidden; background: #000; }
@@ -685,7 +685,7 @@
   .rail button { display: grid; justify-items: center; gap: 4px; padding: 9px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
   .rail button svg { width: 22px; height: 22px; }
   .rail button:hover { color: var(--ink); background: var(--field); }
-  .rail button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .rail button.on { color: var(--accent-text); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--panel); }
   .side-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; }
   .side-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
@@ -701,7 +701,7 @@
   .page { display: block; width: 128px; aspect-ratio: var(--aspect, 16 / 9); max-height: 110px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; cursor: pointer; }
   .pages li.on .page { border-color: var(--accent); }
   .pages .page.is-live { box-shadow: 0 0 0 2px #ff1414, 0 0 18px rgb(255 20 20 / 0.35); }
-  .badge { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1; padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 800; font-style: normal; letter-spacing: 0.08em; color: #fff; pointer-events: none; }
+  .badge { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.08em; color: #fff; pointer-events: none; }
   .badge.live { background: #ff1414; }
   .badge.preview { background: var(--accent); }
   .num { font-size: 11px; color: var(--muted); }
@@ -713,7 +713,7 @@
   .page-actions button { font-size: 11.5px; min-height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--field); color: var(--muted); cursor: pointer; }
   .page-actions button:disabled { opacity: 0.45; cursor: default; }
   .divider { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--line); }
-  .toolbar > button.tpl { color: var(--accent); }
+  .toolbar > button.tpl { color: var(--accent-text); }
   .work { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 12px 18px 10px; gap: 10px; background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 0) 0 0 / 22px 22px; }
   .toolbar { align-self: center; display: flex; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
   .toolbar > button, .menu-wrap > button { min-height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); cursor: pointer; font-weight: 600; }

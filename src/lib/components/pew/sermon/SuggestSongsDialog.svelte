@@ -100,7 +100,7 @@
 
 <style>
   .setup { display: grid; gap: 14px; justify-items: start; }
-  .setup :global(svg), .wait :global(svg) { color: var(--accent); }
+  .setup :global(svg), .wait :global(svg) { color: var(--accent-text); }
   .setup p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 520px; }
   .wait { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--muted); }
   h3 { margin: 4px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }

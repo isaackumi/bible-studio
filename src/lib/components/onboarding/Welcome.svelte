@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fade } from "svelte/transition";
+  import { fade } from "../../ui/motion";
   import { session } from "../../app/session.svelte";
   import { BIBLE_CATALOG } from "../../bible/texts";
   import { api } from "../../db/api";
@@ -563,7 +563,7 @@
   .lede { margin: 0; font-size: 15px; line-height: 1.55; color: var(--muted); max-width: 42ch; }
   .promises { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 12px; }
   .promises li { display: flex; align-items: center; gap: 12px; font-size: 14px; }
-  .pi { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .pi { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); }
 
   .field-wrap { display: grid; gap: 6px; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
   .field-wrap input { height: 50px; padding: 0 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font: inherit; font-size: 18px; outline: none; }
@@ -603,7 +603,7 @@
   .bible.on .abbr { background: var(--accent); color: var(--on-accent); }
   .bname { flex: 1; font-size: 13px; font-weight: 600; }
   .state { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 650; color: var(--muted); }
-  .bible.on .state { color: var(--accent); }
+  .bible.on .state { color: var(--accent-text); }
   .bible:disabled { opacity: 0.7; cursor: progress; }
 
   .walls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
@@ -622,12 +622,12 @@
   .use span { flex: 1; }
   .use :global(svg:first-child) { color: var(--muted); }
   .use.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .use.on :global(svg) { color: var(--accent); }
+  .use.on :global(svg) { color: var(--accent-text); }
   .screen-steps { display: grid; gap: 8px; margin-top: 4px; }
   .screen-row { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .screen-row.done { border-color: color-mix(in srgb, var(--presence, #3fb950) 55%, var(--line)); }
   .screen-row.off { opacity: 0.6; }
-  .num { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; font-weight: 800; }
+  .num { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 12px; font-weight: 800; }
   .screen-row.done .num { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
   .screen-copy { flex: 1; display: grid; gap: 2px; min-width: 0; }
   .screen-copy strong { font-size: 13px; }
@@ -640,17 +640,17 @@
   .summary li.pending :global(svg) { color: var(--muted); }
   .desk-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
   .desk-pick button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-  .desk-pick button :global(svg) { flex: none; color: var(--accent); }
+  .desk-pick button :global(svg) { flex: none; color: var(--accent-text); }
   .desk-pick span { display: grid; gap: 1px; }
   .desk-pick strong { font-size: 13px; }
   .desk-pick em { font-style: normal; font-size: 11.5px; color: var(--muted); }
   .desk-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .ready-buttons { display: flex; gap: 8px; }
-  .tour-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .tour-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .tour-link:hover { text-decoration: underline; }
   .screen-note { margin: 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, #f5a524 55%, transparent); border-radius: 8px; background: color-mix(in srgb, #f5a524 10%, transparent); font-size: 13px; line-height: 1.4; }
   .trial-note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
-  .trial-note :global(svg) { color: var(--accent); flex: none; }
+  .trial-note :global(svg) { color: var(--accent-text); flex: none; }
   .account-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--field) 60%, transparent); }
   .account-card > :global(svg) { flex: none; color: var(--muted); }
   .account-card > span:not(.account-actions) { flex: 1; min-width: 0; display: grid; gap: 2px; }

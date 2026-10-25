@@ -299,6 +299,8 @@
   @media (prefers-reduced-motion: reduce) { .palette { animation: none; } }
   .find { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; color: var(--muted); }
   .find input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 16px; outline: none; }
+  /* Keyboard users see where they are. */
+  .find:focus-within { box-shadow: inset 0 -2px 0 var(--accent); color: var(--ink); }
   kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
   .kinds { display: flex; gap: 4px; padding: 0 12px 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
   .kinds button { flex: none; height: 26px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
@@ -309,7 +311,7 @@
   .entry { width: 100%; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: var(--ink); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
   .entry[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--field)); }
   .icon { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--field); color: var(--muted); }
-  .entry[aria-selected="true"] .icon { color: var(--accent); }
+  .entry[aria-selected="true"] .icon { color: var(--accent-text); }
   .label { flex: none; max-width: 52%; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .detail { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .keys { margin-left: auto; }

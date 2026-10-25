@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly } from "../ui/motion";
   import { session } from "../app/session.svelte";
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
@@ -38,7 +38,7 @@
     color: var(--ink);
     box-shadow: 0 14px 40px rgb(0 0 0 / 0.35);
   }
-  .badge { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .badge { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
   .copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
   .copy strong { font-size: 13px; font-weight: 700; }
   .copy span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

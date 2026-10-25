@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { fade, scale } from "svelte/transition";
+  import { fade, scale } from "../../ui/motion";
   import { session } from "../../app/session.svelte";
   import { cleanFolder, sectionShort, sectionTone, songFolders } from "../../domain/song";
   import { searchSongHits } from "../../domain/song-search";
@@ -255,6 +255,8 @@
   /* Search and tabs stay put; only the results and the parts scroll. */
   .finder-search { flex: none; display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--muted); }
   .finder-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 18px; font-weight: 500; outline: none; }
+  /* Keyboard users see where they are. */
+  .finder-search:focus-within { box-shadow: inset 0 -2px 0 var(--accent); color: var(--ink); }
   .finder-search input::placeholder { color: color-mix(in srgb, var(--muted) 75%, transparent); }
   .clear { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
   .clear:hover { background: var(--field); color: var(--ink); }
@@ -264,7 +266,7 @@
   .scopes button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .scopes button:hover { background: var(--field); color: var(--ink); }
   .scopes button.on { background: var(--field); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, var(--line)); }
-  .scopes button.on :global(svg) { color: var(--accent); }
+  .scopes button.on :global(svg) { color: var(--accent-text); }
   .scopes small { font-size: 11px; font-weight: 500; opacity: 0.6; }
 
   .finder-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -274,12 +276,12 @@
   .row.on { background: var(--field); }
   .row-main { flex: 1; min-width: 0; display: grid; gap: 1px; padding: 8px 10px 8px 12px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .row-main strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row.on .row-main strong { color: var(--accent); }
+  .row.on .row-main strong { color: var(--accent-text); }
   .row-main span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-end { padding-right: 6px; opacity: 0; }
   .row:hover .row-end, .row.on .row-end, .row-end.starred, .row-end:focus-within { opacity: 1; }
   .none { padding: 32px 16px; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }
-  .link { margin-left: 4px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+  .link { margin-left: 4px; padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-weight: 600; cursor: pointer; }
 
   .detail { display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 10px; overflow: auto; }
   .detail h3 { margin: 0; font-size: 17px; }

@@ -536,7 +536,7 @@
   .card em { font-size: 11px; font-style: normal; color: var(--muted); }
   .card :global(svg) { position: absolute; top: 10px; right: 10px; color: var(--muted); }
   .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
-  .card:hover :global(svg) { color: var(--accent); }
+  .card:hover :global(svg) { color: var(--accent-text); }
   .card.done { border-color: color-mix(in srgb, #30a46c 55%, var(--line)); }
   .card.done em, .card.done :global(svg) { color: #3dd68c; }
   .ref { display: flex; gap: 8px; align-items: center; }

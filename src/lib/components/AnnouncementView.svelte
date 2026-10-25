@@ -67,7 +67,7 @@
   .ann * { margin: 0; }
   .ann-label {
     display: inline-block;
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: calc(4.4cqmin * var(--k));
     font-weight: 650;
     letter-spacing: 0.06em;

@@ -102,7 +102,7 @@
   }
   .menu :global([role="menuitem"]:hover),
   .menu :global([role="menuitemcheckbox"]:hover) { background: var(--field); }
-  .menu :global([role="menuitemcheckbox"][aria-checked="true"]) { color: var(--accent); }
+  .menu :global([role="menuitemcheckbox"][aria-checked="true"]) { color: var(--accent-text); }
   .menu :global([role="menuitemcheckbox"][aria-checked="true"])::after { content: "✓"; margin-left: auto; padding-left: 12px; }
   .menu :global(.menu-sep) { height: 1px; margin: 4px 2px; background: var(--line); }
   .menu :global(.menu-label) { margin: 4px 10px 2px; font-size: 11px; font-weight: 650; color: var(--muted); }

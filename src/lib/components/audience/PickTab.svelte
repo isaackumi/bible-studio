@@ -125,7 +125,7 @@
   .history, .groups { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
   .history-head { display: flex; justify-content: space-between; align-items: baseline; }
   .history-head strong { font-size: 12.5px; }
-  .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .link { padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
   li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
   time { flex: none; color: var(--muted); font-size: 11.5px; }

@@ -42,6 +42,12 @@
   --desk: #1a1a1a;
   --field: #1b1b1b;
   --accent: var(--brass);
+  /* The accent as text: the same in the dark themes, darker on Day so it reads (4.5:1 for every accent). */
+  --accent-text: var(--accent);
+  /* Signal colours as text: the same on the dark desks, deeper on Day so they read on white. */
+  --live-text: var(--live);
+  --presence-text: var(--presence);
+  --warn-text: #f5a524;
   /* On-air red: a true broadcast red, not pink. */
   --live: #f21b1b;
   /* Text on accent fills; OperatorShell switches it to black for light accents. */
@@ -756,7 +762,8 @@ select:focus-visible {
  *   ghost  quiet: Cancel, CLEAR and other low-key actions.
  *   danger black: BLACK, the screen-off button.
  */
-.desk-btn.live { background: var(--live); border-color: var(--live); color: #fff; }
+/* White on red is 4.2:1: bold keeps it readable (3:1 is enough for bold text). */
+.desk-btn.live { background: var(--live); border-color: var(--live); color: #fff; font-weight: 750; }
 .desk-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .desk-btn.primary-soft { background: color-mix(in srgb, var(--accent) 14%, var(--field)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--ink); }
 .desk-btn.primary-soft:hover:not(:disabled) { border-color: var(--accent); }
@@ -768,7 +775,7 @@ select:focus-visible {
   min-width: var(--tool-size);
   padding: 0;
 }
-.desk-btn.on { color: var(--accent); border-color: var(--accent); }
+.desk-btn.on { color: var(--accent-text); border-color: var(--accent); }
 /* A top bar that runs out of room tightens in steps (ui/fit-bar.ts), so the tools on the right and
    Settings never leave the screen: names beside icons go first, then the screen status keeps only
    its light, then the page tabs pack closer. Every button keeps its name on hover. */
@@ -924,8 +931,17 @@ input.switch:focus-visible { outline: 2px solid var(--focus, var(--accent)); out
 .frame .web-card span { font-size: 40px; opacity: 0.7; }
 .frame .web-card strong { font-size: 64px; }
 
+/* Day: the accent darkened for text, so orange, mustard, ember and crimson all read on white. */
+:root[data-theme="light"] { --accent-text: color-mix(in srgb, var(--accent) 50%, #000); --live-text: #b42318; --presence-text: #0f7a35; --warn-text: #8a5200; }
 /* Settings › Appearance › Stronger borders: lines at least 3:1 against the panels, in every desk theme. */
 :root[data-contrast] { --line: #6b665f; }
 :root[data-contrast][data-theme="vespers"] { --line: #75695c; }
 :root[data-contrast][data-theme="nave"] { --line: #5c7194; }
 :root[data-contrast][data-theme="light"] { --line: #858079; }
+/* The computer's Increase Contrast setting does the same as the desk's own switch. */
+@media (prefers-contrast: more) {
+  :root { --line: #6b665f; }
+  :root[data-theme="vespers"] { --line: #75695c; }
+  :root[data-theme="nave"] { --line: #5c7194; }
+  :root[data-theme="light"] { --line: #858079; }
+}

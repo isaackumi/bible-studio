@@ -85,7 +85,7 @@
   .bad .verdict > :global(svg) { color: var(--live, #e5484d); }
   .state { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; }
   .state.ok { background: color-mix(in srgb, var(--presence, #3fb950) 20%, transparent); color: var(--presence, #3fb950); }
-  .state.warn { background: color-mix(in srgb, #f5a524 22%, transparent); color: #f5a524; }
+  .state.warn { background: color-mix(in srgb, #f5a524 22%, transparent); color: var(--warn-text); }
   .state.fail { background: color-mix(in srgb, var(--live, #e5484d) 22%, transparent); color: var(--live, #e5484d); }
   /* Settings' own rows spread their parts apart; here the mark, words and button sit in a line. */
   :global(.settings-body) .ready-rows .row { justify-content: flex-start; gap: 14px; }

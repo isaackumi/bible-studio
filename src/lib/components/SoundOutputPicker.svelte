@@ -86,11 +86,11 @@
   .list { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 2px; }
   .list li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px; border-radius: 8px; font-size: 13px; color: var(--muted); }
   .list li.on { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); font-weight: 600; }
-  .tick { color: var(--accent); }
+  .tick { color: var(--accent-text); }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tags { display: flex; gap: 4px; }
   .tag { padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; font-weight: 600; }
-  .tag.room { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+  .tag.room { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent-text); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .btn { justify-self: start; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer; }
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { slide } from "svelte/transition";
+  import { slide } from "../../ui/motion";
   import { cubicOut } from "svelte/easing";
   import { session } from "../../app/session.svelte";
   import { sectionShort, sectionTone } from "../../domain/song";
@@ -874,10 +874,10 @@
   .row.live::before { background: #30a46c; }
   /* A small calendar leaf: the day it last ran (or was edited). */
   .svc-date { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 38px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); line-height: 1; }
-  .svc-date small { font-size: 9px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .svc-date small { font-size: 10px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .svc-date b { margin-top: 3px; font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
   .row.on .svc-date { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-  .row.on .svc-date small { color: var(--accent); }
+  .row.on .svc-date small { color: var(--accent-text); }
   .row.live .svc-date small { color: #30a46c; }
   .svc-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .svc-copy strong { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -891,7 +891,7 @@
   .name { flex: 0 1 auto; width: 100%; min-width: 120px; height: 38px; font-size: 17px; font-weight: 700; border-color: transparent; background: none; text-overflow: ellipsis; }
   .head :global(.more), .panel-toggle { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; }
   .panel-toggle { color: var(--muted); }
-  .panel-toggle[aria-pressed="false"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .panel-toggle[aria-pressed="false"] { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
   /* A narrow middle pane: the header keeps one row, buttons keep their icon and tooltip. */
   .sheet { container-type: inline-size; }
   @container (max-width: 820px) {
@@ -970,15 +970,15 @@
   .mini-map { display: flex; gap: 2px; overflow: hidden; }
   .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 10px; font-weight: 700; line-height: 15px; }
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 10px; font-weight: 750; }
+  .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 750; }
   .live-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--live); color: #fff; letter-spacing: 0.04em; }
   .live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: live-dot 1.4s ease-in-out infinite; }
   @keyframes live-dot { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .live-badge i { animation: none; } }
-  .preview-badge { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .preview-badge { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
   .loop { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; margin-right: 4px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .loop:hover { color: var(--ink); border-color: var(--accent); }
-  .loop.on { border-color: var(--live); color: var(--live); background: color-mix(in srgb, var(--live) 10%, transparent); }
+  .loop.on { border-color: var(--live); color: var(--live-text); background: color-mix(in srgb, var(--live) 10%, transparent); }
   .start-guide { display: grid; justify-items: center; gap: 8px; max-width: 460px; margin: 48px auto 24px; text-align: center; color: var(--muted); }
   .start-guide strong { color: var(--ink); font-size: 16px; }
   .start-guide p { margin: 0; font-size: 13px; line-height: 1.5; }
@@ -998,7 +998,7 @@
   .tile span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile :global(svg) { color: var(--muted); }
   .tile:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
-  .tile:hover:not(:disabled) :global(svg) { color: var(--accent); }
+  .tile:hover:not(:disabled) :global(svg) { color: var(--accent-text); }
   .tile:disabled { opacity: 0.45; cursor: default; }
   /* A part left out this time: still in the order (to bring back), but quiet and dashed. */
   .block.skipped { border-style: dashed; background: transparent; }
@@ -1014,7 +1014,7 @@
   .desk-tag.production { border-color: color-mix(in srgb, #a855f7 50%, var(--line)); background: color-mix(in srgb, #a855f7 12%, transparent); }
   .head-main :global(.menu .menu-note) { margin: 6px 10px 2px; font-size: 10.5px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-  .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+  .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent-text); }
   .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }
   .stage { position: relative; }
   .stage-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 40px; padding: 8px 0; border: 1px solid var(--line); border-radius: var(--radius-panel, 12px); background: var(--panel); }
@@ -1106,6 +1106,8 @@
   .svc-group { margin: 8px 6px 2px; font-size: 11px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
   .svc-find { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); }
   .svc-find input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; outline: none; }
+  /* Keyboard users see where they are. */
+  .svc-find:focus-within { border-color: var(--accent); }
   .svc .row { padding-right: 10px; }
   .svc:hover .row, .svc:focus-within .row { padding-right: 64px; }
   .svc-tools { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: none; gap: 2px; }
@@ -1118,6 +1120,6 @@
   .block.drop-before { box-shadow: 0 -3px 0 var(--accent); }
   .item.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
   .item.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
-  .drop-hint.drop-on { border-color: var(--accent); color: var(--accent); }
+  .drop-hint.drop-on { border-color: var(--accent); color: var(--accent-text); }
   .row-tool.del:hover { color: var(--danger, #e5484d); }
 </style>

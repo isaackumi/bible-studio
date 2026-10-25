@@ -127,7 +127,7 @@
   .bar { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 650; white-space: nowrap; }
   .desk-btn { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--muted); }
   .desk-btn.on { border-color: var(--accent); color: var(--ink); }
-  .desk-btn.on :global(svg) { color: var(--accent); }
+  .desk-btn.on :global(svg) { color: var(--accent-text); }
   .pages { display: flex; gap: 2px; margin-left: 8px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); }
   .pages span { padding: 7px 14px; border-radius: 6px; color: var(--muted); font-size: 15px; }
   .pages span.on { background: var(--accent); color: var(--on-accent); }
@@ -165,14 +165,14 @@
   .verses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .verses li { display: flex; gap: 14px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; white-space: nowrap; overflow: hidden; }
   .verses li span { overflow: hidden; text-overflow: ellipsis; }
-  .verses b { min-width: 20px; color: var(--accent); }
+  .verses b { min-width: 20px; color: var(--accent-text); }
   .verses li.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
   .read { margin: 0; font-size: 15px; line-height: 1.55; }
-  .read sup { margin-right: 4px; color: var(--accent); }
+  .read sup { margin-right: 4px; color: var(--accent-text); }
   .mon { padding: 0; gap: 0; }
   .cap { height: 34px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
   .cap span { margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
-  .cap.preview { color: var(--accent); }
+  .cap.preview { color: var(--accent-text); }
   .cap.program { color: var(--live); }
   .program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
   .program.on-air { border-color: var(--live); }

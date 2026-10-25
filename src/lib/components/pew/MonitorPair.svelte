@@ -61,15 +61,15 @@
   .kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
   .place { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .preview { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-  .preview .kicker { color: var(--accent); }
+  .preview .kicker { color: var(--accent-text); }
   .program { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); }
-  .program .kicker { color: var(--live); }
+  .program .kicker { color: var(--live-text); }
   .program.on-air { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 18px color-mix(in srgb, var(--live) 25%, transparent); }
-  .place.warn { color: #f5a524; font-weight: 600; }
+  .place.warn { color: var(--warn-text); font-weight: 600; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); box-shadow: 0 0 6px var(--live); }
   .steps { display: flex; gap: 2px; }
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
   .row-tool:hover { background: var(--panel); color: var(--ink); }
   .monitor { position: relative; container-type: inline-size; background: #000; }
-  .loop-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 24px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--live) 50%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--live) 12%, transparent); color: var(--live); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .loop-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 24px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--live) 50%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--live) 12%, transparent); color: var(--live-text); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 </style>

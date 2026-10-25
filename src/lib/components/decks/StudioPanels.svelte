@@ -178,7 +178,7 @@
   .panel-body { padding: 12px 14px 18px; display: grid; gap: 10px; align-content: start; }
   h3 { margin: 6px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .row { display: flex; align-items: baseline; justify-content: space-between; }
-  .link { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
+  .link { border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
   .list { display: grid; gap: 6px; }
   .text-btn { display: grid; gap: 2px; justify-items: start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; text-align: left; font: inherit; }
   .text-btn:hover, .combo:hover, .shape:hover, .icon:hover { border-color: var(--accent); }

@@ -133,7 +133,7 @@
 
 <style>
   .setup { display: grid; gap: 14px; justify-items: start; }
-  .setup :global(svg) { color: var(--accent); }
+  .setup :global(svg) { color: var(--accent-text); }
   .setup p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 520px; }
   .ask { display: flex; gap: 8px; }
   .ask input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; }
@@ -146,7 +146,7 @@
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
   .tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
   .tag.free { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }
-  .tag.have { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .tag.have { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
   .acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex: none; }
   .hint { margin: 12px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
   .error { margin: 10px 0 0; font-size: 13px; color: #e5484d; }

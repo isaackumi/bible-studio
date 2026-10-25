@@ -128,7 +128,7 @@
   .find input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; outline: none; }
   .find kbd { padding: 1px 7px; border: 1px solid var(--line); border-radius: 5px; font: inherit; font-size: 11px; color: var(--muted); }
   .go { height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-  .problem { margin: 0; font-size: 12px; color: #f5a524; }
+  .problem { margin: 0; font-size: 12px; color: var(--warn-text); }
   .free-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border: 1px dashed color-mix(in srgb, #3b82f6 60%, var(--line)); border-radius: 10px; background: color-mix(in srgb, #3b82f6 10%, transparent); }
   .free-copy { flex: 1 1 140px; display: grid; gap: 1px; min-width: 0; }
   .free-copy strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly } from "../ui/motion";
   import { session } from "../app/session.svelte";
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
@@ -39,7 +39,7 @@
     box-shadow: 0 14px 40px rgb(0 0 0 / 0.35);
   }
   .tick { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, #30a46c 22%, transparent); color: #3dd68c; }
-  .warn .tick { background: color-mix(in srgb, #f5a524 22%, transparent); color: #f5a524; }
+  .warn .tick { background: color-mix(in srgb, #f5a524 22%, transparent); color: var(--warn-text); }
   .warn { border-color: color-mix(in srgb, #f5a524 45%, var(--line)); }
   .copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
   .copy strong { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

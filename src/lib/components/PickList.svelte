@@ -323,7 +323,7 @@
   /* Row buttons come from the caller; they look like the list's own. */
   .row-end :global(button) { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .row-end :global(button:hover:not(:disabled)) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-  .row-end :global(button:disabled) { border-color: transparent; color: var(--accent); cursor: default; }
+  .row-end :global(button:disabled) { border-color: transparent; color: var(--accent-text); cursor: default; }
 
   .none { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 32px; color: var(--muted); text-align: center; }
   .none p { margin: 0; max-width: 40ch; line-height: 1.5; }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly } from "../../ui/motion";
   import { session } from "../../app/session.svelte";
   import { TOUR_FEATURES, TOUR_GROUPS, TOURS, tourStatus, type TourId } from "../../tour/steps";
   import Icon from "../Icon.svelte";
@@ -165,12 +165,12 @@
   .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--ink) 30%, transparent); }
   .seen .dot { border-color: var(--presence, #3fb950); background: var(--presence, #3fb950); }
   .step-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .here { flex: none; font-size: 11px; font-weight: 650; color: var(--accent); opacity: 0; }
+  .here { flex: none; font-size: 11px; font-weight: 650; color: var(--accent-text); opacity: 0; }
   .steps button:hover .here, .steps button:focus-visible .here { opacity: 1; }
   footer { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
   footer span { margin-right: auto; }
   .link { padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
   .link:hover { color: var(--ink); }
-  .link.danger { color: var(--live); }
+  .link.danger { color: var(--live-text); }
   :is(.expand, .go, .steps button, .link, .icon-btn):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>

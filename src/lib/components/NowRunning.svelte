@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly, slide } from "svelte/transition";
+  import { fly, slide } from "../ui/motion";
   import { audienceRoom } from "../app/rooms.svelte";
   import { pictures } from "../app/pictures.svelte";
   import { session } from "../app/session.svelte";

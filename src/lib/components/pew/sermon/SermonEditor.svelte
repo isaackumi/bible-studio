@@ -504,7 +504,7 @@
   .head-copy { display: grid; gap: 2px; }
   .sub { font-size: 12px; color: var(--muted); }
   .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .armed { color: var(--live) !important; border-color: var(--live) !important; }
+  .armed { color: var(--live-text) !important; border-color: var(--live) !important; }
   input, select, textarea { border: 1px solid var(--line); border-radius: var(--radius-control, 8px); background: var(--field); color: var(--ink); font: inherit; min-width: 0; }
   input, select { height: 32px; padding: 0 10px; }
   textarea { padding: 10px; resize: vertical; line-height: 1.45; }
@@ -554,7 +554,7 @@
   .seg button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .seg button.on { background: var(--accent); color: var(--on-accent); }
   .verse-text { margin: 0; padding: 8px 10px; border-left: 3px solid #d4a017; border-radius: 0 6px 6px 0; background: color-mix(in srgb, #d4a017 8%, var(--panel)); font-size: 12px; line-height: 1.5; max-height: 96px; overflow: auto; }
-  .verse-bad { margin: 0; font-size: 12px; color: #f5a524; }
+  .verse-bad { margin: 0; font-size: 12px; color: var(--warn-text); }
   .refs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
   .ref { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 8px; border: 1px solid color-mix(in srgb, #d4a017 50%, var(--line)); border-radius: 11px; background: color-mix(in srgb, #d4a017 10%, transparent); color: var(--ink); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
   .ref:hover { background: color-mix(in srgb, #d4a017 22%, transparent); }
@@ -578,7 +578,7 @@
   .ai-summary { margin: 0; font-size: 14px; line-height: 1.5; }
   .ai-points { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
   .ai-points li strong { font-weight: 650; }
-  .ai-points li em { margin-left: 8px; font-style: normal; font-size: 12px; color: var(--accent); }
+  .ai-points li em { margin-left: 8px; font-style: normal; font-size: 12px; color: var(--accent-text); }
   .ai-points li span { display: block; color: var(--muted); }
   .ai-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .ai-foot { margin: 0; font-size: 11px; color: var(--muted); }

@@ -205,7 +205,7 @@
   .choice:hover { background: var(--field); }
   .choice[aria-checked="true"] { border-color: color-mix(in srgb, var(--accent) 65%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, transparent); }
   .choice-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--field); color: var(--muted); }
-  .choice[aria-checked="true"] .choice-icon { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .choice[aria-checked="true"] .choice-icon { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
   .choice-copy { flex: 1; display: grid; gap: 2px; min-width: 0; }
   .choice-copy strong { font-size: 13px; font-weight: 700; }
   .choice-copy em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--muted); }

@@ -82,7 +82,7 @@
   .scroll { overflow: auto; padding: 12px 14px 16px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 4px; margin-bottom: 14px; }
   .grid button { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; }
-  .grid button:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .grid button:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); }
   .grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .grid svg { width: 24px; height: 24px; }
   .note { margin: 4px 2px; font-size: 12.5px; color: var(--muted); }

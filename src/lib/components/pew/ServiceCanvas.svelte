@@ -488,6 +488,7 @@
   .step { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 7px; background: color-mix(in srgb, var(--tone) 24%, transparent); color: var(--ink); font-size: 11px; font-weight: 800; }
   .node-name { flex: 1; min-width: 0; height: 30px; padding: 0 6px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 750; cursor: text; }
   .node-name:hover, .node-name:focus { border-color: var(--line); background: var(--field); outline: none; }
+  .node-name:focus-visible { border-color: var(--accent); }
   .now { padding: 2px 8px; border-radius: 9px; background: #30a46c; color: #fff; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
   .tool { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 11px; }
   .tool:hover { background: var(--field); color: var(--ink); }

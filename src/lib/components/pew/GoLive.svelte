@@ -39,6 +39,6 @@
   }
   .go-live:not(.on):hover { border-color: var(--live); filter: brightness(1.08); }
   .go-live i { width: 7px; height: 7px; border-radius: 50%; background: #fff; flex: none; }
-  .go-live kbd { padding: 0 5px; border: 1px solid rgb(255 255 255 / 0.45); border-radius: 4px; font: inherit; font-size: 10px; font-weight: 650; letter-spacing: 0; line-height: 16px; }
+  .go-live kbd { padding: 0 5px; border: 1px solid rgb(255 255 255 / 0.45); border-radius: 4px; font: inherit; font-size: 10px; font-weight: 750; letter-spacing: 0; line-height: 16px; }
   .go-live.on { padding: 0 10px; letter-spacing: 0.04em; background: rgb(0 0 0 / 0.62); border-color: transparent; color: #8fe3b4; cursor: default; box-shadow: none; }
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../../ui/motion";
   import { session } from "../../app/session.svelte";
   import { placeCard, TOURS, type Rect, type TourStep } from "../../tour/steps";
   import Icon from "../Icon.svelte";
@@ -192,7 +192,7 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
     transition: left 280ms cubic-bezier(0.2, 0.8, 0.2, 1), top 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .count { display: flex; align-items: center; margin: 0 0 6px; font-size: 11px; font-weight: 650; color: var(--accent); }
+  .count { display: flex; align-items: center; margin: 0 0 6px; font-size: 11px; font-weight: 650; color: var(--accent-text); }
   .all-tours { margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 650; text-transform: none; letter-spacing: normal; cursor: pointer; }
   .all-tours:hover { color: var(--ink); }
   h2 { margin: 0 0 6px; font-size: 17px; font-weight: 750; letter-spacing: -0.01em; }

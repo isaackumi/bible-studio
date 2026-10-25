@@ -515,7 +515,7 @@
   .theme-name:disabled { opacity: 1; border-color: transparent; background: none; padding: 0; }
   .hero-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .unlock { display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px dashed color-mix(in srgb, var(--accent) 60%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
-  .unlock :global(svg) { color: var(--accent); flex: none; }
+  .unlock :global(svg) { color: var(--accent-text); flex: none; }
 
   .editor { display: flex; flex-direction: column; gap: 8px; }
   .editor.locked :global(.rows) { opacity: 0.6; }

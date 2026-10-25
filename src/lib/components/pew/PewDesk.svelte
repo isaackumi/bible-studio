@@ -1364,8 +1364,9 @@
     flex: none;
   }
   .pb-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
-  .pb-modes button.on { background: var(--accent); color: white; }
-  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 9.5px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+  /* White on the accent is 3.4:1 for the default orange: bold keeps it readable. */
+  .pb-modes button.on { background: var(--accent); color: var(--on-accent, #fff); font-weight: 750; }
+  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
   .pb-modes button.on .lock { background: rgb(255 255 255 / 0.22); color: white; }
   .pb-actions {
     margin-left: auto;
@@ -1480,7 +1481,7 @@
   .recent span { font-size: 12px; font-weight: 700; letter-spacing: 0; color: var(--muted); flex: none; }
   .recent button { flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap; }
   .recent button:hover { background: var(--field); }
-  .recent button.on { border-color: var(--accent); color: var(--accent); }
+  .recent button.on { border-color: var(--accent); color: var(--accent-text); }
   .recent.favorites span { display: inline-flex; align-items: center; gap: 4px; color: #f5b301; }
   .recent.favorites button { border-color: color-mix(in srgb, #f5b301 40%, var(--line)); }
   .fill { height: 100%; min-width: 0; min-height: 0; }
@@ -1569,8 +1570,8 @@
     font-size: 12px;
   }
   .quiet { display: inline-flex; align-items: center; gap: 4px; }
-  .go { color: var(--presence); display: inline-flex; align-items: center; gap: 6px; font-weight: 560; }
-  .go.on { color: var(--accent); }
+  .go { color: var(--presence-text); display: inline-flex; align-items: center; gap: 6px; font-weight: 560; }
+  .go.on { color: var(--accent-text); }
   .pb-foot { justify-content: space-between; border-top: 1px solid var(--line); }
   .mini {
     width: 28px;
@@ -1584,7 +1585,7 @@
     flex: none;
   }
   .mini:hover, .lex:hover, .steppers button:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
-  .mini.on { color: var(--accent); border-color: var(--accent); }
+  .mini.on { color: var(--accent-text); border-color: var(--accent); }
   .script-bar { padding: 8px; flex-wrap: wrap; flex: none; }
   select, .script-bar input {
     height: 32px;
@@ -1597,7 +1598,7 @@
   select { width: 88px; }
   .script-bar input { flex: 1; min-width: 0; }
   .script-bar .parallel-pick { width: 74px; flex: none; color: var(--muted); }
-  .script-bar .parallel-pick.on { border-color: var(--accent); color: var(--accent); }
+  .script-bar .parallel-pick.on { border-color: var(--accent); color: var(--accent-text); }
   .verse-list, .queue { overflow: auto; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
   .verse, .queue button {
     border: 1px solid var(--line);
@@ -1612,7 +1613,7 @@
     gap: 8px;
     padding: 8px 10px;
   }
-  .verse span:first-child { color: var(--accent); font-weight: 650; }
+  .verse span:first-child { color: var(--accent-text); font-weight: 650; }
   .verse span:last-child {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1628,7 +1629,7 @@
   .script-note { margin: 0; padding: 0 12px 4px; color: var(--muted); font-size: 12px; }
   .transcript, .reading, .detections { overflow: auto; padding: var(--panel-pad); }
   .transcript p, .reading p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .reading sup { color: var(--accent); font-size: 0.75em; margin-right: 4px; }
+  .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
   .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
@@ -1674,7 +1675,7 @@
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
   .kicker.plain { font-size: 12px; letter-spacing: 0; text-transform: none; }
-  .kicker.program { color: var(--live); }
+  .kicker.program { color: var(--live-text); }
   .pb-panel.preview { border-style: dashed; }
   .pb-panel.output { border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
   .pb-panel.output.on-air { border-color: var(--live); animation: program-beam 1.8s ease-in-out infinite; }
@@ -1723,10 +1724,10 @@
   .version:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .version.on { border-color: var(--live, #e5484d); box-shadow: 0 0 0 1px var(--live, #e5484d); }
   .version-head { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--muted); }
-  .version-head b { color: var(--accent); font-size: 12px; letter-spacing: 0.04em; }
+  .version-head b { color: var(--accent-text); font-size: 12px; letter-spacing: 0.04em; }
   .version-head em { margin-left: auto; font-style: normal; font-weight: 700; color: var(--live, #e5484d); }
   .version-text { font-size: 14px; line-height: 1.45; }
-  .unseen { flex: none; font-size: 11px; font-weight: 650; color: #f5a524; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .unseen { flex: none; font-size: 11px; font-weight: 650; color: var(--warn-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* A narrow Program column keeps the warning and drops the look's name (it comes back once the screen shows). */
   .pb-panel.output { container-type: inline-size; }
   @container (max-width: 380px) { .unseen ~ .style-name { display: none; } }
@@ -1752,7 +1753,7 @@
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   }
   .sheet header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .sheet header button { border: 0; background: transparent; color: var(--accent); }
+  .sheet header button { border: 0; background: transparent; color: var(--accent-text); }
   .sheet p { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
   /* The bar fits the desk's own width (a docked drawer narrows the desk, not the window). */
   .pb { position: relative; container: desk / inline-size; }
@@ -1764,7 +1765,7 @@
   .pb-tools :global(.tool-menu > button) { position: relative; }
   .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
   .menu-state { margin-left: auto; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--field); color: var(--muted); }
-  .menu-state.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .menu-state.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }
   .now-audio-btn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
   /* Narrower desks: shorter labels so the tools on the right stay in reach. */

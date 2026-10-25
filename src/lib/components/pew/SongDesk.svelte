@@ -1309,7 +1309,7 @@
   }
   .folder:hover { background: var(--field); }
   .folder.on, .folder-row.on .folder:hover { background: none; }
-  .folder.on :global(svg) { color: var(--accent); }
+  .folder.on :global(svg) { color: var(--accent-text); }
   .folder.on small { background: color-mix(in srgb, var(--accent) 30%, var(--panel)); color: var(--ink); }
   .folder.add { color: var(--muted); border: 1px dashed var(--line); margin-top: 4px; }
   .folder.add:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
@@ -1327,7 +1327,7 @@
   }
   .row-tool:hover { background: var(--field); color: var(--ink); }
   .folder-row .row-tool:last-child { margin-right: 4px; }
-  .armed { color: var(--live) !important; background: color-mix(in srgb, var(--live) 15%, transparent) !important; }
+  .armed { color: var(--live-text) !important; background: color-mix(in srgb, var(--live) 15%, transparent) !important; }
   .packs { display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 12px 10px; border-top: 1px solid var(--line); flex: none; }
   .packs .group { padding: 0 6px 2px; }
   .pack { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: var(--radius-control, 8px); }
@@ -1341,7 +1341,7 @@
   .export-list:hover:not(:disabled) { color: var(--ink); background: var(--field); }
   .export-list:disabled { opacity: 0.4; cursor: default; }
   .packs-close { margin-left: 6px; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; vertical-align: middle; }
-  :global(.menu .danger-item) { color: var(--live) !important; }
+  :global(.menu .danger-item) { color: var(--live-text) !important; }
   .import {
     flex: 1 1 auto;
     height: 30px;
@@ -1362,8 +1362,8 @@
   .letter { position: sticky; top: -4px; z-index: 2; margin-top: 6px; padding: 4px 6px; font-size: 11px; font-weight: 800; color: var(--muted); background: var(--panel); }
   .more { padding: 10px; font-size: 12px; color: var(--muted); text-align: center; }
   .letters { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 0; padding: 4px 4px 14px 0; overflow: auto; }
-  .letters button { width: 18px; height: 17px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1; }
-  .letters button:hover { color: var(--accent); background: var(--field); }
+  .letters button { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1; }
+  .letters button:hover { color: var(--accent-text); background: var(--field); }
   .list-tools { display: flex; gap: 6px; padding: 0 10px 6px; flex: none; }
   .list-filter { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--muted); }
   .list-filter:focus-within { border-color: var(--accent); }
@@ -1405,14 +1405,14 @@
     padding: 1px 6px;
     border-radius: 4px;
     background: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: 10px;
     font-style: normal;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
-  .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live); }
+  .badge.live { background: color-mix(in srgb, var(--live) 22%, transparent); color: var(--live-text); }
   .badge.heard { background: color-mix(in srgb, var(--presence, #3fb950) 22%, transparent); color: var(--presence, #3fb950); }
 
   /* Song sheet */
@@ -1431,7 +1431,7 @@
   .keys-hint { display: block; margin-top: 2px; font-size: 11px; opacity: 0.8; }
   .transpose .key { padding: 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .hint.on-screen { color: var(--ink); }
-  .hint.on-screen b { color: var(--live); }
+  .hint.on-screen b { color: var(--live-text); }
   .hint .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--live); vertical-align: 1px; }
   kbd { padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: inherit; font-size: 11px; }
   .sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }

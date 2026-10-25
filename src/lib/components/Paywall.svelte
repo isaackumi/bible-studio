@@ -1,6 +1,6 @@
 <script lang="ts">
   import { modalFocus } from "../ui/modal-focus";
-  import { fade, fly, scale } from "svelte/transition";
+  import { fade, fly, scale } from "../ui/motion";
   import { cubicOut, backOut } from "svelte/easing";
   import { session } from "../app/session.svelte";
   import { discounted, PROMO_REASONS, type Interval, type PromoResult } from "../domain/billing";
@@ -367,7 +367,7 @@
 
   .scroll { position: relative; z-index: 1; flex: 1; overflow: auto; padding: 8px 24px 120px; }
   .hero { max-width: 760px; margin: 2vh auto 26px; text-align: center; }
-  .eyebrow { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: 0.02em; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); font-size: 12px; font-weight: 800; letter-spacing: 0.02em; }
   h1 { margin: 14px 0 10px; font-size: clamp(30px, 4.4vw, 52px); line-height: 1.05; letter-spacing: -0.035em; font-weight: 850; }
   .lede { margin: 0 auto; max-width: 620px; font-size: 16px; line-height: 1.55; color: var(--muted); }
   .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 13px; font-weight: 650; }
@@ -377,6 +377,8 @@
 
   .key-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 560px; margin: 0 auto 22px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
   .key-form input { flex: 1; min-width: 200px; height: 36px; border: 0; background: none; color: var(--ink); font: inherit; font-family: ui-monospace, monospace; outline: none; }
+  /* Keyboard users see where they are. */
+  .key-form:focus-within { border-color: var(--accent); }
   .key-form .error { flex-basis: 100%; }
 
   .billing { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: 300px; margin: 0 auto 26px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }

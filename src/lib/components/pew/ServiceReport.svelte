@@ -186,7 +186,7 @@
 
 <style>
   .empty { display: grid; justify-items: center; gap: 10px; padding: 56px 24px; text-align: center; color: var(--muted); }
-  .empty-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .empty-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); }
   .empty strong { color: var(--ink); font-size: 16px; }
   .empty p { margin: 0; max-width: 440px; font-size: 13px; line-height: 1.5; }
   .report { display: grid; gap: 18px; }

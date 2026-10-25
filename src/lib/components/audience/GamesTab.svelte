@@ -488,7 +488,7 @@
   h3 { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
   .row, .screen { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .screen span { color: var(--muted); font-size: 12px; margin-right: 2px; }
-  .screen .btn.on { border-color: var(--accent); color: var(--accent); }
+  .screen .btn.on { border-color: var(--accent); color: var(--accent-text); }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .btn:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
   .btn:disabled { opacity: 0.45; cursor: default; }
@@ -507,7 +507,7 @@
   .tile.ai .glyph { grid-row: span 2; }
   .tile.ai strong { margin-top: 0; }
   .tile.ai { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 6%, transparent); }
-  .tile.ai .glyph { color: var(--accent); }
+  .tile.ai .glyph { color: var(--accent-text); }
 
   .glyph { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: color-mix(in srgb, currentColor 8%, transparent); }
   .glyph.quiz { grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: transparent; }
@@ -530,11 +530,11 @@
   .word-head { flex-basis: 100%; display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11.5px; }
   .word-head strong { color: var(--ink); font-size: 12.5px; }
   .word { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--field, transparent); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
-  .word b { color: var(--accent); font-size: 11.5px; }
+  .word b { color: var(--accent-text); font-size: 11.5px; }
   .word.hidden { color: var(--muted); text-decoration: line-through; border-style: dashed; }
   .word:hover { border-color: var(--danger, #e5484d); }
   .played { display: inline-flex; align-items: center; gap: 3px; color: var(--ok, #3fb950) !important; font-size: 11px !important; }
-  .card .again { color: var(--accent); }
+  .card .again { color: var(--accent-text); }
   .card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .open:disabled { cursor: progress; }
@@ -595,7 +595,7 @@
   .next-step .waiting { opacity: 1; cursor: default; color: var(--muted); border-style: dashed; animation: breathe 2.4s ease-in-out infinite; }
   @keyframes breathe { 50% { opacity: 0.6; } }
   @media (prefers-reduced-motion: reduce) { .next-step .waiting { animation: none; } }
-  .inline-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; }
+  .inline-link { padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; }
   .step-row .step { flex: 1; }
   .switches { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
   .switches summary { color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer; }
@@ -613,5 +613,5 @@
   .style.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   .style > button:first-child { flex: 1; display: grid; gap: 1px; padding: 6px 10px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
   .style small { color: var(--muted); font-size: 11px; }
-  .hear { width: 36px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
+  .hear { width: 36px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--accent-text); font-size: 12px; cursor: pointer; }
 </style>

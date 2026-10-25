@@ -567,7 +567,7 @@
   .box:focus-within { border-color: var(--accent); }
   .box input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 21px; font-weight: 650; outline: none; }
   .busy { font-size: 12px; }
-  .understood { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .understood { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 15px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); font-size: 14px; font-weight: 700; white-space: nowrap; }
   .understood span { opacity: 0.7; }
   .translations { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); max-width: 46%; overflow-x: auto; scrollbar-width: none; }
   .translations button { flex: none; height: 44px; min-width: 50px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
@@ -581,10 +581,10 @@
   .chip-scroll { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
   .chip { flex: none; height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 14px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; }
   .chip:hover { background: var(--field); }
-  .chip.on { border-color: var(--accent); color: var(--accent); }
+  .chip.on { border-color: var(--accent); color: var(--accent-text); }
   .chip-pair { flex: none; display: inline-flex; align-items: center; height: 28px; border: 1px solid var(--line); border-radius: 14px; }
   .chip-pair.on { border-color: var(--accent); }
-  .chip-pair.on .chip { color: var(--accent); }
+  .chip-pair.on .chip { color: var(--accent-text); }
   .chip.in-pair { border: 0; height: 26px; padding-right: 4px; border-radius: 14px 0 0 14px; }
   .chip-x { width: 24px; height: 26px; border: 0; border-radius: 0 14px 14px 0; background: none; color: var(--muted); display: grid; place-items: center; }
   .chip-x:hover { color: var(--ink); background: var(--field); }
@@ -607,7 +607,7 @@
   .book-grid button { position: relative; height: 28px; padding: 0 6px 0 13px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .book-grid button::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; border-radius: 1px; background: color-mix(in srgb, var(--tone) 55%, transparent); }
   .book-grid button:hover { background: color-mix(in srgb, var(--tone) 12%, var(--field)); }
-  .book-grid button.here { color: var(--accent); font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .book-grid button.here { color: var(--accent-text); font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .book-grid button.here::before { background: var(--accent); width: 3px; }
   .chapters-head { display: flex; align-items: center; gap: 8px; flex: none; }
   .tone-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--tone); flex: none; }
@@ -650,7 +650,7 @@
   .words { flex: 1; min-height: 0; overflow: auto; }
   .words p { margin: 0 0 10px; font-size: 16px; line-height: 1.55; }
   .words p.context { color: var(--muted); font-size: 14px; }
-  .words sup { color: var(--accent); margin-right: 4px; font-size: 0.72em; }
+  .words sup { color: var(--accent-text); margin-right: 4px; font-size: 0.72em; }
   .hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
   .note { margin: 0; font-size: 12px; color: var(--muted); }
   .go { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }

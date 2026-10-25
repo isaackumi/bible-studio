@@ -62,7 +62,7 @@
 <style>
   .onair { display: inline-flex; align-items: center; gap: 6px; padding: 0 2px; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; color: #e5484d; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .onair i { width: 8px; height: 8px; border-radius: 50%; background: #e5484d; box-shadow: 0 0 8px #e5484d; animation: pulse 1.6s ease-in-out infinite; }
-  .onair.connecting { color: #f5a524; }
+  .onair.connecting { color: var(--warn-text); }
   .onair.connecting i { background: #f5a524; box-shadow: 0 0 8px #f5a524; }
   @keyframes pulse { 50% { opacity: 0.4; } }
   @media (prefers-reduced-motion: reduce) { .onair i { animation: none; } }

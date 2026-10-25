@@ -149,5 +149,5 @@
   .lang { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 15px; font-size: 13px; cursor: pointer; }
   .lang.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .lang input { margin: 0; }
-  .link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+  .link { border: 0; background: none; padding: 0; color: var(--accent-text); font: inherit; text-decoration: underline; cursor: pointer; }
 </style>

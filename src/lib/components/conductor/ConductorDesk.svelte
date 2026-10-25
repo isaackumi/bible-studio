@@ -358,7 +358,7 @@
   /* Each deck names itself in words, so neither leans on colour alone. */
   .deck-name { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 750; }
   .next .deck-name { color: var(--next); }
-  .live .deck-name { color: var(--live); }
+  .live .deck-name { color: var(--live-text); }
   .screen { position: relative; min-height: 0; display: grid; place-items: center; border-radius: 10px; overflow: hidden; }
   .deck-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .deck-title { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -374,7 +374,7 @@
   .groove { position: absolute; left: 50%; top: 14px; bottom: 14px; width: 4px; transform: translateX(-50%); border-radius: 2px; background: linear-gradient(to top, var(--next), var(--live)); opacity: 0.55; }
   .knob { position: absolute; left: 50%; bottom: calc(6px + (100% - 56px) * var(--lever)); width: 44px; height: 44px; transform: translateX(-50%); display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--live) calc(var(--lever) * 100%), var(--next)); color: var(--desk); box-shadow: 0 6px 18px rgb(0 0 0 / 0.35); transition: bottom 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2), background 220ms; }
   .track.dragging .knob { transition: none; }
-  .lever-word { font-size: 13px; font-weight: 800; color: var(--live); }
+  .lever-word { font-size: 13px; font-weight: 800; color: var(--live-text); }
   .pads { display: grid; gap: 6px; width: 100%; }
   .pad { height: 34px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
   .pad.black { background: #000; color: #fff; border-color: #000; }

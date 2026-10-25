@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { fade } from "svelte/transition";
+  import { fade } from "../ui/motion";
   import { session } from "../app/session.svelte";
   import { messageTone } from "../app/status-line";
 

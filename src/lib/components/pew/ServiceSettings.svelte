@@ -217,7 +217,7 @@
   .sample { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
   .sample-bar { position: relative; width: 90px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
   .sample-bar i { position: absolute; inset: 0 auto 0 0; width: 85%; background: #f5a524; }
-  .sample-pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 8px; background: color-mix(in srgb, #f5a524 26%, transparent); color: #f5a524; font-size: 12px; font-weight: 650; }
+  .sample-pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 8px; background: color-mix(in srgb, #f5a524 26%, transparent); color: var(--warn-text); font-size: 12px; font-weight: 650; }
   .sample-pill i { width: 7px; height: 7px; border-radius: 50%; background: #f5a524; }
 
 

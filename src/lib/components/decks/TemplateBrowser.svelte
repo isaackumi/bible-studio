@@ -183,7 +183,7 @@
   section { margin-top: 12px; }
   section header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   h3 { margin: 0; font-size: 13px; font-weight: 700; }
-  .more { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
+  .more { border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .wide .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
   .card { display: grid; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0; }

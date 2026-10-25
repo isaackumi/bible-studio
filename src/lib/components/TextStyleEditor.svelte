@@ -125,7 +125,7 @@
   .grid button i { width: 8px; height: 4px; border-radius: 2px; background: color-mix(in srgb, #fff 35%, transparent); }
   .grid button[aria-checked="true"] { background: var(--accent); }
   .grid button[aria-checked="true"] i { background: #fff; }
-  .link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; padding: 2px; }
+  .link { background: none; border: 0; color: var(--accent-text); cursor: pointer; font: inherit; font-size: 12px; padding: 2px; }
   fieldset:disabled { opacity: 0.55; }
   .toggle:focus-visible, .grid button:focus-visible, .link:focus-visible, select:focus-visible, .size:focus-visible, .color input:focus-visible {
     outline: 2px solid var(--focus, var(--accent));

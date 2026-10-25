@@ -106,6 +106,8 @@
   .stepper > button { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); display: grid; place-items: center; }
   .stepper label { flex: 1; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); font-size: 12px; color: var(--muted); }
   .stepper input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; outline: none; }
+  /* Keyboard users see where they are. */
+  .stepper label:focus-within { border-color: var(--accent); }
   .until { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
   .until input { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; }
   .note { margin: 0; font-size: 12px; color: var(--muted); }
