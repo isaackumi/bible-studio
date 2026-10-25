@@ -5030,6 +5030,7 @@ export const es: Readonly<Record<string, string>> = {
   "Its address as a QR code on Preview": "Su dirección como código QR en la vista previa",
   "Open on the TV's browser": "Abrir en el navegador del televisor",
   "This computer is not on a network a TV can reach.": "Este ordenador no está en una red que el televisor pueda alcanzar.",
+  "Slides, pictures and videos; dark between them": "Diapositivas, imágenes y vídeos; oscuro entre ellas",
   "{name} disconnected": "{name} desconectado",
   "Program is held and comes back by itself when the screen returns. Check the cable and the TV's input.": "Programa se mantiene y vuelve solo cuando regresa la pantalla. Revisa el cable y la entrada del televisor.",
   "{name} is back": "{name} ha vuelto",

@@ -18,7 +18,7 @@
   const sameForAll = $derived(!!run && !!learned && learned.desk === run.desk && learned.page === run.page && (learned.also ?? []).join() === (run.also ?? []).join());
   const chosen = $derived(run ? partDesks(run) : []);
   const screens = $derived(session.workspace.screens ?? []);
-  const JOBS: Record<ScreenRole, string> = { program: msg("Program"), scripture: msg("Scripture"), lyrics: msg("Lyrics"), timer: msg("Timer"), stage: msg("Stage"), blank: msg("Dark") };
+  const JOBS: Record<ScreenRole, string> = { program: msg("Program"), scripture: msg("Scripture"), lyrics: msg("Lyrics"), slides: msg("Slides"), timer: msg("Timer"), stage: msg("Stage"), blank: msg("Dark") };
 
   const DESKS: Array<{ desk: PartDesk; name: string; hint: string; icon: string }> = [
     { desk: "service", name: msg("Running order"), hint: msg("Its items, one after another, from the Service page."), icon: "list" },

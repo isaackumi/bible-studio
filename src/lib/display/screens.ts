@@ -8,12 +8,17 @@
 
 import type { PresentationModel } from "../domain/types";
 
-export type ScreenRole = "program" | "scripture" | "lyrics" | "timer" | "stage" | "blank";
+export type ScreenRole = "program" | "scripture" | "lyrics" | "slides" | "timer" | "stage" | "blank";
+
+/** What goes live, as screens tell it apart: a verse, song words, or slides and pictures. */
+export type ContentKind = "scripture" | "lyrics" | "slides";
+export const CONTENT_KINDS: readonly ContentKind[] = ["scripture", "lyrics", "slides"];
 
 export const SCREEN_ROLES: ReadonlyArray<{ id: ScreenRole; label: string; about: string }> = [
   { id: "program", label: "Program", about: "Everything the audience sees, except cameras" },
   { id: "scripture", label: "Scripture", about: "Only verses; dark between them" },
   { id: "lyrics", label: "Lyrics", about: "Only song words; dark between them" },
+  { id: "slides", label: "Slides", about: "Slides, pictures and videos; dark between them" },
   { id: "timer", label: "Timer", about: "The countdown, the part's time left, or the clock" },
   { id: "stage", label: "Stage", about: "Now and next, notes, clock and messages" },
   { id: "blank", label: "Dark", about: "Nothing, until it is given a job" },
@@ -28,7 +33,17 @@ export type ScreenOutput = {
   role: ScreenRole;
   /** A locked screen keeps its job: nothing switches it until it is unlocked. */
   locked: boolean;
+  /**
+   * A screen with one kind of job (scripture, lyrics or slides) can take other kinds too: these
+   * show when its own kind is not up ("also"), or its last one stays up ("keep"). Absent: dark.
+   * Its own kind always takes over the moment it goes live.
+   */
+  also?: ContentKind[];
+  between?: "also" | "keep";
 };
+
+/** Names the church gave its monitors ("Main auditorium"), by display key (name|WxH|scale). */
+export type MonitorNames = Record<string, string>;
 
 export type ScreenDisplay = { key: string; name: string; x: number; y: number; width: number; height: number; primary: boolean; audience: boolean };
 
@@ -57,9 +72,26 @@ export function sanitizeScreens(value: unknown): ScreenOutput[] {
       displayKey: typeof item.displayKey === "string" && item.displayKey ? item.displayKey.slice(0, 200) : null,
       role: ROLES.has(item.role as ScreenRole) ? (item.role as ScreenRole) : "blank",
       locked: item.locked === true,
+      ...(() => {
+        const also = Array.isArray(item.also) ? [...new Set(item.also.filter((kind): kind is ContentKind => CONTENT_KINDS.includes(kind as ContentKind)))] : [];
+        return {
+          ...(also.length ? { also } : {}),
+          ...(item.between === "also" || item.between === "keep" ? { between: item.between } : {}),
+        };
+      })(),
     });
   }
   return out.slice(0, MAX_SCREENS);
+}
+
+/** Saved monitor names, cleaned: short names, at most a few dozen monitors. */
+export function sanitizeMonitorNames(value: unknown): MonitorNames {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: MonitorNames = {};
+  for (const [key, name] of Object.entries(value).slice(0, 40)) {
+    if (typeof name === "string" && name.trim() && key.length <= 200) out[key] = name.trim().slice(0, 40);
+  }
+  return out;
 }
 
 /** Give a screen a new job, unless it is locked. */
@@ -83,9 +115,39 @@ export function screensNow(screens: ScreenOutput[], partJobs: Record<string, unk
 export function programFor(role: ScreenRole, model: PresentationModel | null): PresentationModel | null {
   if (!model) return null;
   if (role === "program") return model;
-  if (role === "scripture") return model.layout === "scripture" ? model : null;
-  if (role === "lyrics") return model.layout === "lyrics" ? model : null;
+  if (role === "scripture" || role === "lyrics" || role === "slides") return contentKind(model) === role ? model : null;
   return null;
+}
+
+/** What went live, as screens tell it apart. BLACK and CLEAR are "clear": every screen goes dark. */
+export function contentKind(model: PresentationModel | null): ContentKind | "clear" | "other" {
+  if (!model || model.layout === "black" || model.layout === "empty") return "clear";
+  if (model.layout === "scripture") return "scripture";
+  if (model.layout === "lyrics") return "lyrics";
+  if (["image", "video", "document", "title", "composition"].includes(model.layout)) return "slides";
+  return "other";
+}
+
+/**
+ * What a screen shows now, and the last of its own kind it showed (for "keep"). Its own kind
+ * always takes over the moment it goes live; between them it shows the other kinds it takes, keeps
+ * the last one up, or goes dark. BLACK and CLEAR empty it whatever it was keeping.
+ */
+export function screenShows(screen: Pick<ScreenOutput, "role" | "also" | "between">, model: PresentationModel | null, last: PresentationModel | null): { show: PresentationModel | null; last: PresentationModel | null } {
+  if (screen.role === "program") return { show: model, last: null };
+  if (screen.role !== "scripture" && screen.role !== "lyrics" && screen.role !== "slides") return { show: null, last: null };
+  const kind = contentKind(model);
+  if (kind === "clear") return { show: null, last: null };
+  if (kind === screen.role) return { show: model, last: model };
+  if (screen.between === "keep") return { show: last, last };
+  if (screen.between === "also" && kind !== "other" && screen.also?.includes(kind)) return { show: model, last };
+  return { show: null, last };
+}
+
+/** A monitor as people know it: the church's name for it, with its own name beside ("Main auditorium (HISENSE)"). */
+export function monitorLabel(display: { key: string; name: string }, names: MonitorNames): string {
+  const own = names[display.key] ?? Object.entries(names).find(([key]) => key.split("|")[0] === display.name)?.[1];
+  return own?.trim() ? `${own.trim()} (${display.name})` : display.name;
 }
 
 export type ScreenPlace =

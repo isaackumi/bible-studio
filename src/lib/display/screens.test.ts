@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
+import { contentKind, monitorLabel, newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, screenShows, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
 import type { PresentationModel } from "../domain/types";
 
 const display = (key: string, extra: Partial<ScreenDisplay> = {}): ScreenDisplay => ({ key, name: key, x: 0, y: 0, width: 1920, height: 1080, primary: false, audience: false, ...extra });
@@ -55,4 +55,65 @@ describe("screens", () => {
     expect(first).toMatchObject({ displayKey: "tv", role: "timer" });
     expect(newScreen([first], displays, "desk", "bbbb2222")).toMatchObject({ displayKey: null, role: "blank" });
   });
+
+  it("sorts what goes live into scripture, songs, and slides and pictures; BLACK and CLEAR empty every screen", () => {
+    expect(contentKind(model("scripture"))).toBe("scripture");
+    expect(contentKind(model("lyrics"))).toBe("lyrics");
+    for (const layout of ["image", "video", "document", "title", "composition"]) expect(contentKind(model(layout))).toBe("slides");
+    expect(contentKind(model("black"))).toBe("clear");
+    expect(contentKind(model("empty"))).toBe("clear");
+    expect(contentKind(model("timer"))).toBe("other");
+    expect(contentKind(null)).toBe("clear");
+  });
+
+  it("a scripture screen that also takes songs: songs while singing, the verse the moment it goes live, songs again after", () => {
+    const bible = screen("aaaa1111", "DELL", { role: "scripture", also: ["lyrics"], between: "also" });
+    let last = null as ReturnType<typeof screenShows>["last"];
+    const step = (layout: string) => {
+      const next = screenShows(bible, model(layout), last);
+      last = next.last;
+      return next.show?.layout ?? null;
+    };
+    expect(step("lyrics")).toBe("lyrics");
+    expect(step("scripture")).toBe("scripture");
+    expect(step("lyrics")).toBe("lyrics");
+    expect(step("image")).toBeNull();
+    expect(step("black")).toBeNull();
+  });
+
+  it("can keep the last verse up until the next one, or go dark between, and CLEAR always empties it", () => {
+    const keep = screen("aaaa1111", "DELL", { role: "scripture", also: ["lyrics"], between: "keep" });
+    let last = null as ReturnType<typeof screenShows>["last"];
+    const step = (s: ScreenOutput, layout: string) => {
+      const next = screenShows(s, model(layout), last);
+      last = next.last;
+      return next.show?.layout ?? null;
+    };
+    expect(step(keep, "lyrics")).toBeNull();
+    expect(step(keep, "scripture")).toBe("scripture");
+    expect(step(keep, "lyrics")).toBe("scripture");
+    expect(step(keep, "empty")).toBeNull();
+    expect(step(keep, "lyrics")).toBeNull();
+    last = null;
+    const dark = screen("bbbb2222", "LG", { role: "lyrics" });
+    expect(step(dark, "lyrics")).toBe("lyrics");
+    expect(step(dark, "scripture")).toBeNull();
+    // Everything: whatever goes live, BLACK included.
+    expect(screenShows(screen("cccc3333", "X", { role: "program" }), model("black"), null).show?.layout).toBe("black");
+    expect(screenShows(screen("dddd4444", "X", { role: "slides" }), model("video"), null).show?.layout).toBe("video");
+  });
+
+  it("calls a monitor by the name the church gave it, with its own name beside it", () => {
+    const hisense = display("HISENSE|1920x1080|1.00", { name: "HISENSE" });
+    expect(monitorLabel(hisense, { "HISENSE|1920x1080|1.00": "Main auditorium" })).toBe("Main auditorium (HISENSE)");
+    expect(monitorLabel(hisense, {})).toBe("HISENSE");
+    // A new resolution changes the monitor's key, not what people call it.
+    expect(monitorLabel(display("HISENSE|3840x2160|2.00", { name: "HISENSE" }), { "HISENSE|1920x1080|1.00": "Main auditorium" })).toBe("Main auditorium (HISENSE)");
+  });
+
+  it("keeps a screen's other jobs and what it does between, when saved", () => {
+    expect(sanitizeScreens([{ id: "abcd1234", role: "scripture", also: ["lyrics", "junk", "lyrics"], between: "keep" }])[0]).toMatchObject({ role: "scripture", also: ["lyrics"], between: "keep" });
+    expect(sanitizeScreens([{ id: "abcd1234", role: "slides", between: "nonsense" }])[0]).toEqual({ id: "abcd1234", name: "", displayKey: null, role: "slides", locked: false });
+  });
 });
+

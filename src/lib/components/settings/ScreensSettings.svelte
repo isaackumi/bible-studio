@@ -17,6 +17,7 @@
     program: { label: msg("Program"), about: msg("Everything the audience sees, except cameras") },
     scripture: { label: msg("Scripture"), about: msg("Only verses; dark between them") },
     lyrics: { label: msg("Lyrics"), about: msg("Only song words; dark between them") },
+    slides: { label: msg("Slides"), about: msg("Slides, pictures and videos; dark between them") },
     timer: { label: msg("Timer"), about: msg("The countdown, the part's time left, or the clock") },
     stage: { label: msg("Stage"), about: msg("Now and next, notes, clock and messages") },
     blank: { label: msg("Dark"), about: msg("Nothing, until it is given a job") },

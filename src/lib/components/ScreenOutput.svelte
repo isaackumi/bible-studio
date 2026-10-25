@@ -1,9 +1,9 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { api } from "../db/api";
   import { parseStage, readLocal, readStageLocal, subscribeLocal, subscribeStageLocal, type StageSnapshot } from "../display/channel";
-  import { programFor, readScreensLocal, screenLetter, type ScreenOutput } from "../display/screens";
+  import { readScreensLocal, screenLetter, screenShows, type ScreenOutput } from "../display/screens";
   import { frameBackground } from "../domain/backgrounds";
   import { formatClock, formatCountdown, timerDisplay, timerFromPaint, timersIn } from "../domain/timer";
   import type { PresentationModel, ProgramPacket } from "../domain/types";
@@ -27,7 +27,14 @@
   const index = $derived(screens.findIndex((screen) => screen.id === id));
   const screen = $derived(index >= 0 ? screens[index]! : null);
   const role = $derived(screen?.role ?? "blank");
-  const shown = $derived(programFor(role, program));
+  /** What it shows: its own kind the moment it goes live; between, the other kinds it takes, the last one kept, or dark. */
+  let shown = $state<PresentationModel | null>(null);
+  let kept: PresentationModel | null = null;
+  $effect(() => {
+    const next = screenShows(screen ?? { role }, program, untrack(() => kept));
+    kept = next.last;
+    shown = next.show;
+  });
   const label = $derived(screen ? screen.name || t("Screen {letter}", { letter: screenLetter(index) }) : "");
 
   /** The timer screen: a timer on Program, else the part's time left, else the clock. */

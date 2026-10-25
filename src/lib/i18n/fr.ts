@@ -5111,6 +5111,7 @@ export const fr: Readonly<Record<string, string>> = {
   "Its address as a QR code on Preview": "Son adresse en QR code dans l’aperçu",
   "Open on the TV's browser": "À ouvrir dans le navigateur de la télé",
   "This computer is not on a network a TV can reach.": "Cet ordinateur n’est pas sur un réseau que la télé peut joindre.",
+  "Slides, pictures and videos; dark between them": "Diapositives, images et vidéos ; noir entre elles",
   "{name} disconnected": "{name} déconnecté",
   "Program is held and comes back by itself when the screen returns. Check the cable and the TV's input.": "Le direct est gardé et revient tout seul quand l’écran revient. Vérifiez le câble et l’entrée de la télé.",
   "{name} is back": "{name} est de retour",

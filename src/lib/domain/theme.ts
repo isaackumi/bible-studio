@@ -301,6 +301,7 @@ export function defaultWorkspace(): Workspace {
     parallelTranslationId: null,
     stageLayout: { next: true, clock: true, notes: true, chords: true, size: "m" },
     screens: [],
+    monitorNames: {},
     pco: { appId: "", secret: "" },
     ai: emptyAiSettings(),
     backup: { folder: "", lastAt: "" },

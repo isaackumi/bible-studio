@@ -584,6 +584,8 @@ export type Workspace = {
   stageLayout: import("../display/channel").StageLayout;
   /** Extra screens, each on its own monitor with a job (Settings › Screens). */
   screens: import("../display/screens").ScreenOutput[];
+  /** Names the church gave this computer's monitors ("Main auditorium"), by display key. */
+  monitorNames: import("../display/screens").MonitorNames;
   /** A second translation shown beside the first on scripture slides, or null. */
   parallelTranslationId: string | null;
   /** Songs shown live, once per day, for CCLI copy reporting. */
