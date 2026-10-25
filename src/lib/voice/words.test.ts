@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spokenReference } from "./detect";
-import { BUILT_IN_FIXES, bookNamed, expectedWords, fixHeard, learnFix, nearMisses, type WordFix } from "./words";
+import { BUILT_IN_FIXES, bookNamed, expectedWords, fixHeard, learnFix, soundsLikeBook, nearMisses, type WordFix } from "./words";
 
 describe("misheard words", () => {
   it("puts book names right where a book makes sense, and nowhere else", () => {
@@ -75,4 +75,18 @@ describe("misheard words", () => {
     }
     expect(expectedWords([{ heard: "pastor kway", means: "Pastor Quaye", source: "yours" }, { heard: "efficient", means: "Ephesians", source: "learned" }])).toEqual(["Pastor Quaye"]);
   });
+
+  it("learns a correction only when what was heard sounds like the book (not \"yeah\" for John)", () => {
+    // Real ones from a service: nothing like the book, so nothing to learn.
+    for (const [heard, chapter, bookOrd] of [["give me", 4, 42], ["yeah", 3, 43], ["those", 1, 43], ["rows", 1, 34], ["it until", 21, 66]] as const) {
+      expect(learnFix([{ words: heard, chapter }], { bookOrd, chapter }, [])).toBeNull();
+    }
+    // A real mishearing of the name is still learned.
+    expect(learnFix([{ words: "fill a peons", chapter: 4 }], { bookOrd: 50, chapter: 4 }, [])).toMatchObject({ heard: "fill a peons", means: "Philippians" });
+    expect(soundsLikeBook("roman's", "Romans")).toBe(true);
+    expect(soundsLikeBook("give me", "Luke")).toBe(false);
+    // Not a book (a pastor's name): the church's own word, kept as it is.
+    expect(soundsLikeBook("pastor quaye", "Pastor Kwei")).toBe(true);
+  });
 });
+

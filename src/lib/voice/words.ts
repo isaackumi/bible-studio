@@ -10,6 +10,7 @@
 // operator puts up the passage that was misheard), then the built-in list of common mishearings
 // across accents (Ghana, Nigeria and elsewhere).
 
+import { nameScore } from "../bible/books";
 import { CANON } from "../bible/reference";
 
 export type WordFix = {
@@ -206,6 +207,22 @@ export function nearMisses(text: string): NearMiss[] {
   return misses;
 }
 
+/**
+ * Whether misheard words sound like the book they were taken for ("fill a peons" for Philippians):
+ * only those are learned. A correction that merely came first ("yeah" for John, "give me" for
+ * Luke, both learned in one real service) would turn everyday words into books. Words that are not
+ * a book (a pastor's name) always pass.
+ */
+export function soundsLikeBook(heard: string, means: string): boolean {
+  const book = bookNamed(means);
+  if (!book) return true;
+  const entry = CANON.find((item) => item.name === book || item.name.replace(/^\d\s+/, "") === book);
+  const names = [book.replace(/^\d\s+/, ""), ...(entry?.aliases ?? []).filter((alias) => alias.length >= 4 && !/^\d|^i+ /.test(alias))];
+  // Real mishearings score 0.38 and up ("a feesh" for Ephesians); the ones learned by mistake in a
+  // service scored 0.2 at most ("those" for John, "it until" for Revelation).
+  return Math.max(...names.map((name) => nameScore(clean(heard), name))) >= 0.3;
+}
+
 /** A misheard phrase and the passage the operator put up: the fix to learn, or null. */
 export function learnFix(misses: NearMiss[], shown: { bookOrd: number; chapter: number }, fixes: readonly WordFix[]): WordFix | null {
   const book = CANON.find((entry) => entry.ord === shown.bookOrd);
@@ -214,6 +231,7 @@ export function learnFix(misses: NearMiss[], shown: { bookOrd: number; chapter: 
   if (!miss || fixes.some((fix) => clean(fix.heard) === miss.words)) return null;
   // The numbered books keep their number in the words that were said ("first efficient"), so learn the name only.
   const means = book.name.replace(/^\d\s+/, "");
+  if (!soundsLikeBook(miss.words, means)) return null;
   return { heard: miss.words, means, source: "learned", uses: 0, at: Date.now() };
 }
 

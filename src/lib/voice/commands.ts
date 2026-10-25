@@ -1,6 +1,6 @@
 import { msg } from "../i18n/core";
 import { COMMANDS, type CommandId } from "../commands/registry";
-import type { WordFix } from "./words";
+import { soundsLikeBook, type WordFix } from "./words";
 
 /**
  * Spoken operator commands in plain words: "next verse", "go back", "give me King James".
@@ -225,6 +225,8 @@ export function sanitizeVoiceSettings(value: unknown): {
     const heard = typeof item.heard === "string" ? normalize(item.heard).slice(0, 40) : "";
     const means = typeof item.means === "string" ? item.means.trim().slice(0, 60) : "";
     if (!heard || !means || heardSeen.has(heard)) continue;
+    // Learned by mistake (an everyday word taken for a book, before learning checked the sound): dropped.
+    if (item.source === "learned" && !soundsLikeBook(heard, means)) continue;
     heardSeen.add(heard);
     words.push({ heard, means, source: item.source === "learned" ? "learned" : "yours", uses: Number.isFinite(item.uses) ? Math.max(0, Math.round(item.uses!)) : 0, ...(Number.isFinite(item.at) ? { at: item.at } : {}) });
   }
