@@ -10,6 +10,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.0",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "screens", title: msg("A TV over Wi-Fi, no cable needed"), text: msg("Audience output \u203a Show on a TV over Wi-Fi: open the address it shows on the TV's own browser, and the screen appears there over the church Wi-Fi, without an HDMI cable or the internet. Words and pictures show; videos stay on this computer for now.") },
+    ],
+  },
+  {
     version: "0.5.9",
     date: "2026-10-25",
     highlights: [
