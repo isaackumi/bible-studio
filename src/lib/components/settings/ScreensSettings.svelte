@@ -1,6 +1,6 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { MAX_SCREENS, SCREEN_ROLES, screenLetter, type ScreenRole } from "../../display/screens";
+  import { CONTENT_KINDS, MAX_SCREENS, SCREEN_ROLES, screenLetter, type ContentKind, type ScreenOutput, type ScreenRole } from "../../display/screens";
   import { isDesktop } from "../../platform/runtime";
   import { msg, t } from "../../i18n/core";
   import Icon from "../Icon.svelte";
@@ -33,11 +33,31 @@
         ok: false,
       };
     }
-    return { text: t("Showing on {name}", { name: place.display.name }), ok: true };
+    return { text: t("Showing on {name}", { name: session.monitorName(place.display) }), ok: true };
   }
 
   const monitorLabel = (display: (typeof displays)[number]) =>
-    `${display.name} · ${display.width}×${display.height}${display.primary ? ` · ${t("main")}` : ""}${display.audience ? ` · ${t("audience")}` : ""}`;
+    `${session.monitorName(display)} · ${display.width}×${display.height}${display.primary ? ` · ${t("main")}` : ""}${display.audience ? ` · ${t("audience")}` : ""}`;
+
+  /** The main screen's monitor (the audience window's), if it is open. */
+  const mainDisplay = $derived(displays.find((display) => display.audience) ?? null);
+  /** What a monitor is used for now: the desk, the main screen, a screen, or nothing yet. */
+  function usedFor(display: (typeof displays)[number]): string {
+    if (display.key === session.output.operatorKey) return t("The desk");
+    if (display.audience) return t("The main screen");
+    const index = screens.findIndex((screen) => screen.displayKey === display.key);
+    if (index >= 0) return t("Screen {name}", { name: screens[index]!.name || screenLetter(index) });
+    return t("Not used yet");
+  }
+  const KIND_TEXT: Record<ContentKind, string> = { scripture: msg("Scripture"), lyrics: msg("Songs"), slides: msg("Slides and pictures") };
+  const WHEN_NONE: Record<ContentKind, string> = { scripture: msg("When no verse is up"), lyrics: msg("When no song is up"), slides: msg("When no slide is up") };
+  const isKind = (role: ScreenRole): role is ContentKind => (CONTENT_KINDS as readonly string[]).includes(role);
+  function toggleAlso(screen: ScreenOutput, kind: ContentKind, on: boolean) {
+    const also = new Set(screen.also ?? []);
+    if (on) also.add(kind);
+    else also.delete(kind);
+    session.setScreenBetween(screen.id, "also", [...also]);
+  }
 </script>
 
 <section class="rows">
@@ -53,6 +73,32 @@
   {:else if displays.length < 3}
     <div class="row"><div class="row-copy"><span>{t("This computer shows {count} monitor(s). Connect another monitor for a screen; the desk and the audience screen use the first two.", { count: displays.length })}</span></div></div>
   {/if}
+</section>
+
+{#if isDesktop() && displays.length}
+  <!-- Each monitor by the name people use for it ("Main auditorium"), with its own name kept beside. -->
+  <p class="section-label">{t("Your monitors")}</p>
+  <section class="rows">
+    {#each displays as display (display.key)}
+      <div class="row">
+        <div class="row-copy"><strong>{display.name}</strong><span>{display.width}×{display.height} · {usedFor(display)}</span></div>
+        <input class="field" value={session.workspace.monitorNames?.[display.key] ?? ""} placeholder={t("Call it… (Main auditorium)")} maxlength="40" aria-label={t("Name for {name}", { name: display.name })} onchange={(event) => session.setMonitorName(display.key, event.currentTarget.value)} />
+      </div>
+    {/each}
+  </section>
+{/if}
+
+<p class="section-label">{t("Screens")}</p>
+<!-- The main screen: everything that goes LIVE. It is what LIVE, BLACK and CLEAR are about. -->
+<section class="rows screen main">
+  <div class="row head">
+    <span class="letter" aria-hidden="true"><Icon name="screens" size={15} /></span>
+    <strong class="name">{t("Main screen")}</strong>
+  </div>
+  <div class="row">
+    <div class="row-copy"><strong>{t("Monitor")}</strong><span class:ok={!!mainDisplay} class:warn={!mainDisplay}>{mainDisplay ? t("Showing on {name}", { name: session.monitorName(mainDisplay) }) : t("Not open. Open it from the audience output menu at the top of the desk.")}</span></div>
+  </div>
+  <div class="row"><div class="row-copy"><strong>{t("Job")}</strong><span>{t("Everything that goes LIVE, cameras included.")}</span></div></div>
 </section>
 
 {#each screens as screen, index (screen.id)}
@@ -93,6 +139,23 @@
         {/each}
       </div>
     </div>
+    {#if isKind(screen.role)}
+      {@const own = screen.role}
+      <!-- A screen with one job can take others between: its own kind always takes over the moment it goes LIVE. -->
+      <div class="row stack">
+        <div class="row-copy"><strong>{t(WHEN_NONE[own])}</strong><span>{t("{job} always takes over the moment it goes LIVE. BLACK and CLEAR empty it.", { job: t(KIND_TEXT[own]) })}</span></div>
+        <div class="between" role="radiogroup" aria-label={t(WHEN_NONE[own])}>
+          <label><input type="radio" name={`between-${screen.id}`} checked={!screen.between} disabled={screen.locked} onchange={() => session.setScreenBetween(screen.id, "dark")} /> {t("Go dark")}</label>
+          <label><input type="radio" name={`between-${screen.id}`} checked={screen.between === "keep"} disabled={screen.locked} onchange={() => session.setScreenBetween(screen.id, "keep")} /> {t("Keep the last one up")}</label>
+          <label><input type="radio" name={`between-${screen.id}`} checked={screen.between === "also"} disabled={screen.locked} onchange={() => session.setScreenBetween(screen.id, "also", screen.also?.length ? screen.also : CONTENT_KINDS.filter((kind) => kind !== own))} /> {t("Show these instead")}</label>
+          <span class="also">
+            {#each CONTENT_KINDS.filter((kind) => kind !== own) as kind (kind)}
+              <label><input type="checkbox" checked={screen.between === "also" && !!screen.also?.includes(kind)} disabled={screen.locked || screen.between !== "also"} onchange={(event) => toggleAlso(screen, kind, event.currentTarget.checked)} /> {t(KIND_TEXT[kind])}</label>
+            {/each}
+          </span>
+        </div>
+      </div>
+    {/if}
   </section>
 {/each}
 
@@ -120,6 +183,11 @@
   .role span { font-size: 12px; color: var(--muted); }
   .role.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   .role:disabled { opacity: 0.45; cursor: default; }
+  .main { border-left-color: var(--presence, var(--accent)); }
+  .main .letter { background: var(--presence, var(--accent)); }
+  .between { display: grid; gap: 6px; font-size: 13px; }
+  .between label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .between .also { display: flex; flex-wrap: wrap; gap: 14px; padding-left: 26px; color: var(--muted); }
   .ok { color: var(--ok, #2f9e6a) !important; }
   .warn { color: var(--warning, #c98a14) !important; }
 </style>

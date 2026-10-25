@@ -228,7 +228,7 @@ import {
   type AccurateModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
-import { MAX_SCREENS, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ScreenOutput, type ScreenRole } from "../display/screens";
+import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
 import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
@@ -7724,6 +7724,32 @@ class Session {
     this.saveScreens(switchRole(screens, id, role));
     return true;
   };
+
+  /**
+   * What a screen with one job (scripture, songs, slides) does when its own kind is not up: go dark,
+   * keep its last one up, or show the other kinds ticked. Its own kind always takes over.
+   */
+  setScreenBetween = (id: string, between: "dark" | "keep" | "also", also?: ContentKind[]) =>
+    this.saveScreens(
+      (this.workspace.screens ?? []).map((screen) => {
+        if (screen.id !== id) return screen;
+        const { between: _between, also: _also, ...rest } = screen;
+        const kinds = also ?? screen.also ?? [];
+        return { ...rest, ...(between === "dark" ? {} : { between }), ...(kinds.length ? { also: kinds } : {}) };
+      }),
+    );
+
+  /** The church's own name for a monitor ("Main auditorium"); empty takes it away. Kept on this computer. */
+  setMonitorName = (key: string, name: string) => {
+    const names = { ...(this.workspace.monitorNames ?? {}) };
+    if (name.trim()) names[key] = name.trim().slice(0, 40);
+    else delete names[key];
+    this.workspace = { ...this.workspace, monitorNames: names };
+    this.persistSoon();
+  };
+
+  /** A monitor as people know it: "Main auditorium (HISENSE)", or its own name until it is given one. */
+  monitorName = (display: { key: string; name: string }) => monitorLabel(display, this.workspace.monitorNames ?? {});
 
   lockScreen = (id: string, locked: boolean) => this.saveScreens((this.workspace.screens ?? []).map((screen) => (screen.id === id ? { ...screen, locked } : screen)));
 
