@@ -144,4 +144,27 @@ describe("finding a verse from part of it (KJV)", async () => {
     expect(first("shepard want")).toBe("Psalms 23:1");
     expect(searchQuotes("the and of", index)).toEqual([]);
   });
+
+  it("hears references the way preachers say them (found missing in a real service)", () => {
+    // "and verse" between the chapter and the verse.
+    expect(spokenReference("Open your Bibles to Philippians 4 and verse 13.")).toMatchObject({ bookName: "Philippians", chapter: 4, startVerse: 13 });
+    // The verse said a few words after the chapter.
+    expect(spokenReference("Luke 15, the parable of the prodigal son, verse 11.")).toMatchObject({ bookName: "Luke", chapter: 15, startVerse: 11 });
+    expect(spokenReference("Romans 8, and look at verse 28")).toMatchObject({ chapter: 8, startVerse: 28 });
+    // A chapter on its own, after "turn to", "go with me to"…, and any Psalm: from its first verse.
+    expect(spokenReference("Go with me to Psalm 23.")).toMatchObject({ bookName: "Psalms", chapter: 23, startVerse: 1 });
+    expect(spokenReference("Turn with me to Isaiah 53")).toMatchObject({ bookName: "Isaiah", chapter: 53, startVerse: 1 });
+    expect(spokenReference("open to the book of Ruth chapter 1")).toMatchObject({ bookName: "Ruth", chapter: 1, startVerse: 1 });
+    // Ranges said with "to" after "verse".
+    expect(spokenReference("First Corinthians thirteen verse four to seven")).toMatchObject({ chapter: 13, startVerse: 4, endVerse: 7 });
+  });
+
+  it("does not take every number after a book's name for a reference", () => {
+    // A name with a number that is not a reference: no cue, not a Psalm, no verse.
+    expect(spokenReference("Mark 2 people came in late")).toBeNull();
+    expect(spokenReference("John 5 of you stood up")).toBeNull();
+    // A verse word too far away, with other numbers between, is not this chapter's verse.
+    expect(spokenReference("Luke 15 was 20 years ago verse 11")?.startVerse ?? null).not.toBe(11);
+  });
 });
+

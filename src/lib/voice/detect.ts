@@ -80,20 +80,37 @@ function splitGlued(chapters: number, digits: string): { chapter: number; verse:
   return options.length === 1 ? options[0] : null;
 }
 
-/** The chapter and verse spoken right after a book name: "3 16", "316", or "chapter 8" alone. */
-function numbersAfter(tail: string, chapters: number): { chapter: number; verse: number; end?: number; exact: boolean } | null {
-  const pair = tail.match(/^\s+(?:ch\s+)?(\d+)\s+(\d+)\b(?:\s+(?:to|through|thru|till|until|and)\s+(\d+)\b)?/);
-  if (pair) {
-    const end = pair[3] ? Number(pair[3]) : undefined;
-    return { chapter: Number(pair[1]), verse: Number(pair[2]), end: end && end > Number(pair[2]) && end - Number(pair[2]) <= 40 ? end : undefined, exact: true };
-  }
+/** A range's end after "to", "through", "and" ("verses 4 to 7"), kept only when it reads as one. */
+const RANGE = String.raw`(?:\s+(?:to|through|thru|till|until|and)\s+(?:v\s+)?(\d+)\b)?`;
+const rangeEnd = (start: number, end: string | undefined) => (end && Number(end) > start && Number(end) - start <= 40 ? Number(end) : undefined);
+
+/**
+ * The chapter and verse spoken after a book name: "3 16", "316", "4 and verse 13", "15, the
+ * parable of the prodigal son, verse 11", or the chapter alone ("chapter 8", or "Psalm 23" and
+ * "turn to Isaiah 53" when `cued`). "v" marks where the word "verse" was said.
+ */
+function numbersAfter(tail: string, chapters: number, cued = false): { chapter: number; verse: number; end?: number; exact: boolean } | null {
+  const pair = tail.match(new RegExp(String.raw`^\s+(?:ch\s+)?(\d+)\s+(?:and\s+)?(?:v\s+)?(\d+)\b` + RANGE));
+  if (pair) return { chapter: Number(pair[1]), verse: Number(pair[2]), end: rangeEnd(Number(pair[2]), pair[3]), exact: true };
   const glued = tail.match(/^\s+(\d{3,4})\b/);
   const split = glued ? splitGlued(chapters, glued[1]!) : null;
   if (split) return { ...split, exact: true };
-  // "Romans chapter eight": the chapter, from its first verse.
-  const chapterOnly = tail.match(/^\s+ch\s+(\d+)\b(?!\s+\d)/);
+  // The verse said a few words later: up to eight words between, none of them a number.
+  const later = tail.match(new RegExp(String.raw`^\s+(?:ch\s+)?(\d+)\b((?:\s+(?!v\b)[a-z]+){1,8})\s+v\s+(\d+)\b` + RANGE));
+  if (later) return { chapter: Number(later[1]), verse: Number(later[3]), end: rangeEnd(Number(later[3]), later[4]), exact: true };
+  // "Romans chapter eight", "Psalm 23", "turn to Isaiah 53": the chapter, from its first verse.
+  const chapterOnly = tail.match(/^\s+ch\s+(\d+)\b(?!\s+(?:\d|v\s))/) ?? (cued ? tail.match(/^\s+(\d+)\b(?!\s+(?:\d|v\s))/) : null);
   if (chapterOnly) return { chapter: Number(chapterOnly[1]), verse: 1, exact: false };
   return null;
+}
+
+/** Words that say a reference is coming ("turn to", "go with me to", "open to", "the book of"). */
+const CUES = new Set(["turn", "open", "go", "read", "look", "text", "book", "reading", "passage"]);
+
+/** A chapter said alone counts as a reference after a cue, and always for a Psalm. */
+function cuedAt(prepared: string, at: number, book: CanonBook): boolean {
+  if (book.name === "Psalms") return true;
+  return prepared.slice(0, at).trim().split(" ").slice(-5).some((word) => CUES.has(word));
 }
 
 /**
@@ -109,14 +126,14 @@ export function spokenReference(raw: string): ParsedReference | null {
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, " ")
         .replace(/\bchapters?\b/g, " ch ")
-        .replace(/\bverses?\b/g, " ")
+        .replace(/\bverses?\b/g, " v ")
         .replace(/\s+/g, " ")
         .trim(),
     ),
   );
   const found: Array<{ at: number; size: number; hit: ParsedReference }> = [];
   const accept = (book: CanonBook, at: number, size: number, tail: string) => {
-    const numbers = numbersAfter(tail, book.chapters);
+    const numbers = numbersAfter(tail, book.chapters, cuedAt(prepared, at, book));
     if (!numbers) return false;
     const hit = parseReference(`${book.name} ${numbers.chapter}:${numbers.verse}${numbers.end ? `-${numbers.end}` : ""}`);
     if (!hit?.startVerse) return false;
@@ -152,7 +169,7 @@ function spokenAliases() {
   return spokenAliasList;
 }
 
-const FILLER = new Set(["to", "the", "in", "at", "of", "and", "turn", "open", "read", "go", "let", "us", "me", "with", "from", "our", "book", "ch"]);
+const FILLER = new Set(["v", "to", "the", "in", "at", "of", "and", "turn", "open", "read", "go", "let", "us", "me", "with", "from", "our", "book", "ch"]);
 
 /** For each spoken chapter number, try the one to three words before it as a misheard book name. */
 function fuzzyReferences(prepared: string, accept: (book: CanonBook, at: number, size: number, tail: string) => boolean) {
