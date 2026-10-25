@@ -64,7 +64,8 @@ impl log::Log for Logger {
         }
         // Milliseconds since launch beside the time, so a slow step shows how slow.
         let line = format!("[{}] +{}ms {} {}: {}\n", unix_secs(), since_start_ms(), record.level(), record.target(), record.args());
-        eprint!("{line}");
+        // Not eprint!: it panics when stderr is a closed pipe (the terminal that started us went away).
+        let _ = std::io::stderr().write_all(line.as_bytes());
         let mut sink = lock(&self.sink);
         if let Some(file) = sink.file.as_mut() {
             let _ = file.write_all(line.as_bytes());

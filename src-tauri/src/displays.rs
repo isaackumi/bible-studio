@@ -715,11 +715,14 @@ fn coverage(window: &WebviewWindow, monitor: &Monitor) -> Option<Coverage> {
     let ns_window = unsafe { &*(pointer as *const objc2_app_kit::NSWindow) };
     let frame = ns_window.frame();
     let actual = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
-    // The screen AppKit says the window is on, by name, so the status never names the wrong one.
-    let on = ns_window.screen().map(|screen| screen.localizedName().to_string());
-    let wanted = raw_monitor_name(monitor);
-    if let Some(on) = on.filter(|on| *on != wanted) {
-        return Some(Coverage { covers: false, detail: format!("the window is on {on}, not {wanted}") });
+    // The screen AppKit says the window is on, compared by frame: tao's name ("Monitor #41146")
+    // never equals AppKit's ("DELL U2415"), so comparing names flagged every correct placement.
+    if let Some(screen) = ns_window.screen() {
+        let on = screen.frame();
+        if !frames_close((on.origin.x, on.origin.y, on.size.width, on.size.height), target) {
+            let detail = format!("the window is on {}, not {}", screen.localizedName(), monitor_name(monitor));
+            return Some(Coverage { covers: false, detail });
+        }
     }
     Some(Coverage {
         covers: frames_close(actual, target),
