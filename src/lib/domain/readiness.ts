@@ -59,6 +59,15 @@ export function spaceCheck(facts: { free: number | null; kbps: number }): ReadyC
   return { id: "space", state: "ok", title: msg("Room for about {hours} hours of recording"), detail: msg("Plenty of space on this computer."), values: { hours } };
 }
 
+/**
+ * A service day, when the desk checks readiness by itself on opening: a Sunday, or a day the open
+ * service is named for (the desk names a new service with its date, "Bible study, 28 Oct").
+ */
+export function isServiceDay(now: Date, serviceName: string | null): boolean {
+  if (now.getDay() === 0) return true;
+  return !!serviceName && serviceName.includes(now.toLocaleDateString(undefined, { day: "numeric", month: "short" }));
+}
+
 export function backupCheck(facts: { folder: string; lastAt: string | null; now: number; desktop: boolean }): ReadyCheck {
   if (!facts.desktop) return { id: "backup", state: "warn", title: msg("Back up from the desktop app"), detail: msg("In a browser, use Export in Storage & backup now and then."), fix: { label: msg("Storage & backup"), action: "backup" } };
   if (!facts.folder) return { id: "backup", state: "warn", title: msg("Not backed up yet"), detail: msg("Choose a backup folder so songs and services are kept safe."), fix: { label: msg("Set up backups"), action: "backup" } };

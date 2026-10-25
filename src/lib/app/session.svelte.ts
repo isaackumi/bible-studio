@@ -9,7 +9,7 @@ import { activationFrom, idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice,
 import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type LicenseMember, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
-import { recordingMinutes } from "../domain/readiness";
+import { isServiceDay, recordingMinutes, type ReadyFix } from "../domain/readiness";
 import { screenLoss } from "./screen-loss";
 import { idleSwitcher, ObsSwitcher, sanitizeSwitcher, VmixSwitcher, type Switcher, type SwitcherSettings, type SwitcherState } from "../integrations/switcher";
 import { invoke } from "@tauri-apps/api/core";
@@ -679,6 +679,8 @@ class Session {
       if (this.remoteVia === "internet" && internetRemote.room && this.remoteDevices.length) this.startInternetRemote();
       // Automatic backups to the chosen folder, every half hour while the app is open; on a computer
       // where nobody chose one, Documents › Church Studio Backups.
+      // On a service day, the readiness check runs by itself once the screens have settled.
+      setTimeout(() => void this.serviceDayCheck(), 10_000);
       if (this.desktop()) {
         void this.ensureBackupFolder();
         this.every(30 * 60 * 1000, () => void (this.workspace.backup.folder && this.backupNow()));
@@ -5442,6 +5444,42 @@ class Session {
   private checks = new ServiceChecks(this, () => this.desktop());
 
   checkReady = () => this.checks.ready();
+
+  /**
+   * On a service day (a Sunday, or the day the open service is named for), the readiness check runs
+   * once by itself and says what needs a look, with the first fix a click away. Quiet when all is set.
+   */
+  private serviceDayCheck = async () => {
+    const day = new Date().toDateString();
+    try {
+      if (!isServiceDay(new Date(), this.service?.name ?? null) || localStorage.getItem("cs-ready-day") === day) return;
+      localStorage.setItem("cs-ready-day", day);
+    } catch {
+      return;
+    }
+    const open = (await this.checkReady()).filter((check) => check.state !== "ok");
+    if (!open.length) return;
+    const failing = open.filter((check) => check.state === "fail").length;
+    const first = open.find((check) => check.fix);
+    const fix = first?.fix?.action;
+    this.notify(failing ? tn(failing, "{n} thing needs fixing before the service", "{n} things need fixing before the service") : tn(open.length, "Ready, with {n} thing to look at", "Ready, with {n} things to look at"), {
+      detail: open.map((check) => t(check.title, check.values)).join(" · "),
+      actions: [
+        ...(first?.fix && fix ? [{ label: t(first.fix.label), run: () => void this.runReadyFix(fix) }] : []),
+        { label: t("See all"), run: () => this.openSettings("ready") },
+      ],
+      ms: 30_000,
+    });
+  };
+
+  /** A readiness fix from outside Settings: open the screen, the service, the plans, or the right page. */
+  private runReadyFix = async (action: ReadyFix) => {
+    this.dismissToast();
+    if (action === "open-audience") await this.openAudience();
+    else if (action === "service") this.goToDesk("service");
+    else if (action === "plans") this.openPlans();
+    else this.openSettings({ displays: "displays", backup: "storage", storage: "storage", ai: "ai", recording: "broadcast" }[action]);
+  };
   checkHealth = () => this.checks.health();
   measureSmoothness = () => this.checks.measureSmoothness();
   supportFile = () => this.checks.supportFile();

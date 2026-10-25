@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backupCheck, internetCheck, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck } from "./readiness";
+import { backupCheck, internetCheck, isServiceDay, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck } from "./readiness";
 
 const now = Date.parse("2026-10-25T08:30:00Z");
 const DAY = 86_400_000;
@@ -46,3 +46,16 @@ describe("Readiness check", () => {
     expect(sortChecks([libraryCheck(true), libraryCheck(false), spaceCheck({ free: 4e9, kbps: 6000 })]).map((check) => check.state)).toEqual(["fail", "warn", "ok"]);
   });
 });
+
+describe("the service-day check on the desk", () => {
+  it("runs on Sundays, and on a day the open service is named for", () => {
+    const sunday = new Date(2026, 9, 25, 9);
+    const wednesday = new Date(2026, 9, 28, 18);
+    const today = (date: Date) => date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    expect(isServiceDay(sunday, null)).toBe(true);
+    expect(isServiceDay(wednesday, null)).toBe(false);
+    expect(isServiceDay(wednesday, `Bible study, ${today(wednesday)}`)).toBe(true);
+    expect(isServiceDay(wednesday, `Sunday service, ${today(sunday)}`)).toBe(false);
+  });
+});
+

@@ -5102,6 +5102,7 @@ export const fr: Readonly<Record<string, string>> = {
   "Until then, pictures and videos still come through the cloud.": "En attendant, les images et les vidéos arrivent toujours par le cloud.",
   "Backups are on": "Les sauvegardes sont activées",
   "Songs and services are backed up every half hour to Documents › Church Studio Backups. Choose another folder in Settings › Storage & backup.": "Les chants et les cultes sont sauvegardés toutes les demi-heures dans Documents › Church Studio Backups. Choisissez un autre dossier dans Réglages › Espace et sauvegarde.",
+  "See all": "Tout voir",
   "{name} disconnected": "{name} déconnecté",
   "Program is held and comes back by itself when the screen returns. Check the cable and the TV's input.": "Le direct est gardé et revient tout seul quand l’écran revient. Vérifiez le câble et l’entrée de la télé.",
   "{name} is back": "{name} est de retour",
