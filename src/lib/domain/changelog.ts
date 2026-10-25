@@ -10,6 +10,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.6",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "laptop", title: msg("Pictures and videos from the computer next door"), text: msg("On Premium and Church, your computers on the same network find each other and hand over the pictures, videos and audio a service needs: in seconds, without the cloud space, and even with the internet out. Works over Wi-Fi, Ethernet, or a cable straight between two computers. Settings › Cloud space shows which computers are on this network.") },
+    ],
+  },
+  {
     version: "0.5.5",
     date: "2026-10-25",
     highlights: [

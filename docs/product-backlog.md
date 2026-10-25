@@ -53,6 +53,7 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 | CS-P1-016 | Saved compositions | P1 | Partial | A |
 | CS-P1-017 | Composition templates | P1 | Partial | A |
 | CS-P1-018 | Basic composition editor | P1 | Shipped | A |
+| CS-P1-019 | Nearby: computers on one licence share files over the local network | P1 | Partial | D |
 | CS-P2-001 | Community plugin ecosystem | P2 | Planned | G |
 | CS-P2-002 | Extension registry | P2 | Planned | G |
 | CS-P2-003 | External song providers | P2 | Planned | G |
@@ -409,6 +410,28 @@ Phases: **A** architecture, **B** content, **C** browser, **D** production media
 **Status.** Partial. Looks pane on Presenter Desk; Production Desk Scenes/Sources docks edit the same looks (Photoshop front-on-top layer list). Add/rename/remove/duplicate layers. Duplicate saved look. Scene lock freezes all edits. Production Desk Add source → Create new / Add existing → Properties (camera device + mirror, scripture lookup, song section, text, timer, lower third, image); double-click or ⚙ reopens Properties. Look transition cut/fade; TAKE of a look uses that transition. Text heading/body fields. Scripture/lyrics have editable copy fields and can refill from the desk. Image layers can pick from the media library. Numeric opacity. Entrance/exit + shared duration and easing. Preview drag handles. Fit and lock (lock blocks drag and numeric bounds). Program has no handles. Exit is persisted; leave animation on hide is later.
 
 **Phase.** A.
+
+### CS-P1-019 Nearby: computers on one licence share files over the local network
+
+**Description.** Computers on the same paid licence and network find each other over Bonjour (mDNS) and lend each other Media files before the cloud is asked. A video comes from the laptop next door in seconds, uses no cloud space, and still comes with the internet out. See `src-tauri/src/nearby.rs`.
+
+**Status.** Partial (0.5.6). Shipped: discovery by licence tag, HMAC-signed requests, Media by id only, every announced address tried (church network, then a direct cable on 169.254, then the rest), sleeping computers rested for a minute, a day of clock skew allowed, offline and signed-out computers still fetch, and "On this network" in Settings › Cloud space. Not yet tested between two real computers (Mac and Windows) on a church network.
+
+**Not covered yet (backlog, 2026-10-25):**
+
+- [ ] **Records over the local network.** Only pictures, videos and audio go device to device; songs, services and slides still need the cloud, so with the internet out an edit reaches the other computer only when it comes back. Needs per-device clocks (hybrid logical clocks or version vectors), delete markers that outlive a month-long absence, and care with mixed app versions dropping unknown fields.
+- [ ] **"Why isn't my other computer showing?"** Settings says nothing when no computer is found. Explain the usual causes in plain words: guest Wi-Fi that hides devices from each other, Windows treating the network as Public, the Mac's local-network permission refused, a computer on another licence or on Free.
+- [ ] **Windows network marked Public.** The firewall blocks incoming copies unless someone clicks Allow. Detect it and say how to set the network to Private, or ask once with a clear reason.
+- [ ] **Mac local-network permission refused.** It quietly falls back to the cloud. Detect it and point to System Settings › Privacy & Security › Local Network.
+- [ ] **Guest Wi-Fi client isolation.** Cannot be got through; say so (see the help line above) and suggest Ethernet or a direct cable.
+- [ ] **A removed person keeps lending for up to three hours**, until their app next checks the plan. Stop Nearby as soon as the account says removed, or rotate the tag when members change.
+- [ ] **Integrity beyond length.** A nearby copy is checked by its length only; check it against the cloud's hash when the cloud knows it.
+- [ ] **Same file under two ids** (the cloud's aliases) is not matched nearby.
+- [ ] **Tested for real:** Mac and Windows on one Wi-Fi; Ethernet through a switch; a cable straight between two computers; Thunderbolt Bridge between two Macs; one computer asleep; the internet unplugged.
+
+**Not possible by design.** HDMI carries picture and sound one way to a screen, not data. USB A-to-A transfer cables need their own drivers and are not a network. A USB stick or drive carries the whole library as a `.churchstudio` file (Settings › Storage), by hand.
+
+**Phase.** D.
 
 ---
 
