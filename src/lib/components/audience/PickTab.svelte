@@ -12,11 +12,52 @@
   let again = $state(false);
 
   const people = $derived(audienceRoom.roomPeople);
+  /** Looking after names: the player being renamed (and the name typed), or the one Remove was pressed for once. */
+  let renaming = $state<number | null>(null);
+  let newName = $state("");
+  let removing = $state<number | null>(null);
+
+  async function saveName(n: number) {
+    if (newName.trim() && (await audienceRoom.player(n, { name: newName }))) renaming = null;
+  }
+  function remove(n: number) {
+    if (removing !== n) {
+      removing = n;
+      setTimeout(() => (removing = removing === n ? null : removing), 4000);
+      return;
+    }
+    removing = null;
+    void audienceRoom.player(n, { remove: true });
+  }
   const left = $derived(people.filter((person) => !audienceRoom.picked.includes(person.n)).length);
 </script>
 
 <section class="pick">
   <p class="here"><strong>{tn(people.length, "{n} person here", "{n} people here")}</strong>{#if mode === "pick" && audienceRoom.picked.length && !again} · {tn(left, "{n} not picked yet", "{n} not picked yet")}{/if}</p>
+
+  {#if people.length}
+    <!-- A name not for the screen: the desk renames the player, or takes them out of the room. -->
+    <details class="names">
+      <summary>{t("Names")}</summary>
+      <ul>
+        {#each people as person (person.n)}
+          <li>
+            {#if renaming === person.n}
+              <form onsubmit={(event) => { event.preventDefault(); void saveName(person.n); }}>
+                <input bind:value={newName} maxlength="40" aria-label={t("New name for {name}", { name: person.name })} />
+                <button type="submit" class="link">{t("Save")}</button>
+                <button type="button" class="link" onclick={() => (renaming = null)}>{t("Cancel")}</button>
+              </form>
+            {:else}
+              <span>{person.name}</span>
+              <button type="button" class="link" onclick={() => { renaming = person.n; newName = person.name; }}>{t("Rename")}</button>
+              <button type="button" class="link danger" onclick={() => remove(person.n)}>{removing === person.n ? t("Click again to remove") : t("Remove")}</button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </details>
+  {/if}
 
   <div class="modes" role="radiogroup" aria-label={t("What to do")}>
     <button type="button" role="radio" aria-checked={mode === "pick"} class:on={mode === "pick"} onclick={() => (mode = "pick")}><strong>{t("Pick at random")}</strong><span>{t("A winner, a volunteer, who reads next")}</span></button>
@@ -62,6 +103,12 @@
 <style>
   .pick { display: grid; gap: 10px; }
   .here { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .names summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 650; }
+  .names ul { display: grid; gap: 2px; max-height: 220px; overflow: auto; margin: 6px 0 0; padding: 0; list-style: none; }
+  .names li, .names form { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 12.5px; }
+  .names li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .names input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; }
+  .link.danger { color: #ff6b4a; }
   .here strong { color: var(--ink); }
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .modes button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--muted); font: inherit; text-align: left; cursor: pointer; }

@@ -107,6 +107,25 @@ describe("rooms: players' names", () => {
   });
 });
 
+describe("rooms: the desk looks after names", () => {
+  it("renames a player (still unique) or takes them out; their phone goes back to joining", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const rude = data<{ pid: string; n: number }>(await core.join("Rude word", ""));
+    data(await core.join("Kofi", ""));
+    const names = async () => data<{ joined: Array<{ name: string }> }>(await core.hostView(hostKey)).joined.map((person) => person.name);
+    expect(data<{ name: string }>(await core.player(hostKey, { n: rude.n, name: "Guest 1" })).name).toBe("Guest 1");
+    expect(await names()).toEqual(["Guest 1", "Kofi"]);
+    expect(await core.player(hostKey, { n: rude.n, name: "kofi" })).toMatchObject({ ok: false, status: 409 });
+    data(await core.player(hostKey, { n: rude.n, remove: true }));
+    expect(await names()).toEqual(["Kofi"]);
+    expect(data<{ me?: unknown }>(await core.view(rude.pid)).me).toBeUndefined();
+    // Phones cannot do it, and a player who is not there is said so.
+    expect(await core.player("wrong", { n: 1, remove: true })).toMatchObject({ ok: false, status: 403 });
+    expect(await core.player(hostKey, { n: 99, remove: true })).toMatchObject({ ok: false, status: 404 });
+  });
+});
+
 describe("rooms: quizzes and polls", () => {
   it("runs a quiz question: answers once, never shows the right answer early, scores quicker answers higher", async () => {
     const { core, advance } = room();

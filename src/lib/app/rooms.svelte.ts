@@ -166,6 +166,8 @@ class AudienceRoom {
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
   settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
+  /** Rename a player (still a name nobody else here has), or take them out: their phone goes back to joining. */
+  player = (n: number, change: { name?: string; remove?: boolean }) => this.call("player", { n, ...change });
   /** Take a word off the word cloud on the screen, or put one back. */
   setWordShown = (word: string, shown: boolean) => this.activity({ action: shown ? "show-word" : "hide-word", word }).then(() => this.poll());
   activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams" | "hide-word" | "show-word"; word?: string; kind?: "quiz" | "poll"; anonymous?: boolean; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);

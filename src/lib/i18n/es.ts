@@ -5012,6 +5012,7 @@ export const es: Readonly<Record<string, string>> = {
   "Sync needs a look: {reason}": "La sincronización necesita revisión: {reason}",
   "open Cloud space for details.": "abre Espacio en la nube para ver los detalles.",
   "Cloud sync": "Sincronización en la nube",
+  "New name for {name}": "Nuevo nombre para {name}",
   "{name} disconnected": "{name} desconectado",
   "Program is held and comes back by itself when the screen returns. Check the cable and the TV's input.": "Programa se mantiene y vuelve solo cuando regresa la pantalla. Revisa el cable y la entrada del televisor.",
   "{name} is back": "{name} ha vuelto",

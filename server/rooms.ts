@@ -11,6 +11,7 @@
 //   POST /v1/rooms                       {name?}                 → {code, hostKey, joinUrl}
 //   POST /v1/rooms/:code/join            {name?}                 → {pid, room}   (409 + suggestion: name taken)
 //   POST /v1/rooms/:code/rename          {pid, name}             → {name}        (409 + suggestion: name taken)
+//   POST /v1/rooms/:code/player          {hostKey, n, name?|remove?}             (the desk renames or takes out a player)
 //   GET  /v1/rooms/:code/state?pid=      (audience view)          → {room, questions, activity}
 //   POST /v1/rooms/:code/ask             {pid, text, name?}      → {question}
 //   POST /v1/rooms/:code/vote            {pid, questionId}       → {votes}
@@ -618,6 +619,28 @@ export class RoomCore {
   }
 
   /** Everything, for the desk. */
+  /** The desk renames a player (a name not for the screen) or takes them out; their phone goes back to joining. */
+  async player(hostKey: unknown, input: { n?: unknown; name?: unknown; remove?: unknown }): Promise<Result<{ name?: string; removed?: boolean }>> {
+    const found = await this.host(hostKey);
+    if (!found.ok) return found;
+    const state = found.data;
+    const pid = Object.keys(state.participants).find((key) => state.participants[key]!.n === input.n);
+    if (!pid) return fail(404, "That person is not in the room any more.");
+    if (input.remove === true) {
+      delete state.participants[pid];
+      this.seen.delete(pid);
+      await this.save(state);
+      return { ok: true, data: { removed: true } };
+    }
+    const wanted = clean(input.name, LIMITS.nameLength).replace(/\s+/g, " ");
+    if (!wanted) return fail(400, "Type a name.");
+    const clash = nameTaken(state, wanted, pid);
+    if (clash) return clash;
+    state.participants[pid]!.name = wanted;
+    await this.save(state);
+    return { ok: true, data: { name: wanted } };
+  }
+
   async hostView(hostKey: unknown): Promise<Result<unknown>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
@@ -910,6 +933,8 @@ export class RoomObject {
         return reply(await this.core.join(input.name, ip));
       case "rename":
         return reply(await this.core.rename(input.pid, input.name));
+      case "player":
+        return reply(await this.core.player(input.hostKey, input));
       case "state":
         return reply(await this.core.view(url.searchParams.get("pid")));
       case "ask":
@@ -1000,7 +1025,7 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
     }
     return json(503, { error: "Could not open a room. Try again." });
   }
-  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|rename|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
+  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|rename|player|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
   if (!match) return json(404, { error: "Not found" });
   const code = match[1]!.toUpperCase();
   const action = match[2]!;
