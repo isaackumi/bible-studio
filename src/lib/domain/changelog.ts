@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.2",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "mic", title: msg("Listening hears more of what preachers say"), text: msg("References said the way preachers say them (\u201cPhilippians 4 and verse 13\u201d, \u201cLuke 15\u2026 verse 11\u201d, \u201cGo with me to Psalm 23\u201d), and verses from a short phrase of them (\u201cin him is life\u201d, \u201cthe Lord is my shepherd\u201d). The noise filter no longer muffles the voice listening hears, and everyday words are no longer learned as books.") },
+      { icon: "download", title: msg("Keep a recording of listening"), text: msg("Settings \u203a Sound & voice \u203a Listening recording keeps the sound listening heard and a timed list of what it understood, in Documents \u203a Church Studio Listening. Send it to us to make listening better for your church.") },
+    ],
+  },
+  {
     version: "0.6.1",
     date: "2026-10-25",
     highlights: [
