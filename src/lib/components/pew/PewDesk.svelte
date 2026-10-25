@@ -154,7 +154,9 @@
     const names = session.output.online ? [main ? session.monitorName(main) : t("Main screen")] : [];
     now.forEach((screen, index) => {
       const place = places.get(screen.id);
-      if (reach.has(screen.id) && place?.state === "showing") names.push(screen.name || session.monitorName(place.display) || t("Screen {name}", { name: screenLetter(index) }));
+      if (!reach.has(screen.id)) return;
+      if (place?.state === "showing") names.push(screen.name || session.monitorName(place.display) || t("Screen {name}", { name: screenLetter(index) }));
+      else if (place?.state === "wifi") names.push(screen.name || t("TV over Wi-Fi"));
     });
     return names.join(", ");
   });

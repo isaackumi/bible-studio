@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentKind, showsOn, monitorLabel, newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, screenShows, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
+import { WIFI_SCREEN, contentKind, showsOn, monitorLabel, newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, screenShows, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
 import type { PresentationModel } from "../domain/types";
 
 const display = (key: string, extra: Partial<ScreenDisplay> = {}): ScreenDisplay => ({ key, name: key, x: 0, y: 0, width: 1920, height: 1080, primary: false, audience: false, ...extra });
@@ -126,6 +126,12 @@ describe("screens", () => {
     expect(showsOn(screens, model("scripture"))).toEqual(["aaaa1111", "dddd4444"]);
     expect(showsOn(screens, model("lyrics"))).toEqual(["aaaa1111", "bbbb2222", "dddd4444"]);
     expect(showsOn(screens, model("image"))).toEqual(["dddd4444"]);
+  });
+
+  it("a screen can be a TV's browser on the Wi-Fi instead of a monitor: no window, never in a monitor's way", () => {
+    const places = placeScreens([screen("aaaa1111", WIFI_SCREEN), screen("bbbb2222", "B")], [display("B")], null);
+    expect(places.get("aaaa1111")).toEqual({ state: "wifi" });
+    expect(places.get("bbbb2222")?.state).toBe("showing");
   });
 });
 

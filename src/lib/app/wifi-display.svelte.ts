@@ -6,6 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { api } from "../db/api";
 import { lanSafe } from "../display/lan-safe";
+import { WIFI_SCREEN } from "../display/screens";
 import { presentQr } from "../domain/overlays";
 import { t } from "../i18n/core";
 import { session } from "./session.svelte";
@@ -28,7 +29,8 @@ class WifiDisplay {
   /** Turned on before: on again after a restart, so a TV left on picks the screen back up. */
   resume = () => {
     try {
-      if (localStorage.getItem(KEY) === "1") void this.start();
+      // On before, or a screen is a TV on the Wi-Fi (Settings › Screens): it needs the screen sent.
+      if (localStorage.getItem(KEY) === "1" || (session.workspace.screens ?? []).some((screen) => screen.displayKey === WIFI_SCREEN)) void this.start();
     } catch {
       // Storage blocked: stays off.
     }
@@ -59,7 +61,9 @@ class WifiDisplay {
     this.stopWatching = $effect.root(() => {
       $effect(() => {
         const canvas = session.outputCanvas();
-        const frame = JSON.stringify({ model: lanSafe(session.live.program.model), aspect: canvas.width / canvas.height });
+        // Screens that are TVs on the Wi-Fi get their job too: each TV shows what its job lets through.
+        const screens = session.screensForNow().filter((screen) => screen.displayKey === WIFI_SCREEN).map(({ id, role, also, between }) => ({ id, role, also, between }));
+        const frame = JSON.stringify({ model: lanSafe(session.live.program.model), aspect: canvas.width / canvas.height, screens });
         clearTimeout(this.sendTimer);
         this.sendTimer = setTimeout(() => void this.send(frame), 120);
       });
@@ -93,10 +97,14 @@ class WifiDisplay {
     }
   };
 
+  /** The address a TV opens: the whole screen, or one screen's (Settings › Screens) with its job. */
+  urlFor = (screenId?: string) => (this.url && screenId ? `${this.url}&screen=${screenId}` : this.url);
+
   /** The address as a QR code on Preview, to scan with a TV or tablet (or type in). */
-  qrOnPreview = () => {
-    if (!this.url) return;
-    session.previewModel(presentQr({ theme: session.theme(), data: this.url, style: "rounded", dark: "#000000", light: "#ffffff", caption: `${t("Open on the TV's browser")} · ${this.url.replace(/^https?:\/\//, "")}` }), "wifi-display:qr");
+  qrOnPreview = (screenId?: string) => {
+    const url = this.urlFor(screenId);
+    if (!url) return;
+    session.previewModel(presentQr({ theme: session.theme(), data: url, style: "rounded", dark: "#000000", light: "#ffffff", caption: `${t("Open on the TV's browser")} · ${url.replace(/^https?:\/\//, "")}` }), `wifi-display:qr:${screenId ?? "all"}`);
   };
 }
 

@@ -5,12 +5,16 @@
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel } from "../domain/types";
   import Screen from "./Screen.svelte";
+  import { screenShows, type ScreenOutput } from "../display/screens";
 
   // A phone, tablet or TV browser used as a display (/d/CODE): it shows what the church's screen
   // shows, as the church's Church Studio shares it over the internet. Only the picture: no controls,
   // nothing that changes anything. A tap goes full screen; the device stays awake while it shows.
   // `lan`: opened from the church computer itself over the church Wi-Fi (/?lan=1), no internet needed.
-  let { code, lan = false }: { code: string; lan?: boolean } = $props();
+  // `screen`: one of the church's screens (Settings › Screens) that is this TV: it shows what that
+  // screen's job lets through (only verses, songs between, …) instead of everything.
+  let { code, lan = false, screen = "" }: { code: string; lan?: boolean; screen?: string } = $props();
+  let kept: PresentationModel | null = null;
 
   let model = $state<PresentationModel>(emptyModel(defaultTheme()));
   let aspect = $state(16 / 9);
@@ -53,8 +57,13 @@
           revision = data.revision;
           church = data.name;
           if (data.on && data.frame) {
-            const frame = JSON.parse(data.frame) as { model: PresentationModel; aspect: number };
-            model = frame.model;
+            const frame = JSON.parse(data.frame) as { model: PresentationModel; aspect: number; screens?: Array<Pick<ScreenOutput, "id" | "role" | "also" | "between">> };
+            const job = screen ? frame.screens?.find((entry) => entry.id === screen) : undefined;
+            if (job) {
+              const next = screenShows(job, frame.model, kept);
+              kept = next.last;
+              model = next.show ?? emptyModel(frame.model.theme);
+            } else model = frame.model;
             aspect = cleanAspect(frame.aspect);
             if (status !== "showing") void keepAwake();
             status = "showing";

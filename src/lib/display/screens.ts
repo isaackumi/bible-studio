@@ -155,8 +155,12 @@ export function monitorLabel(display: { key: string; name: string }, names: Moni
   return own?.trim() ? `${own.trim()} (${display.name})` : display.name;
 }
 
+/** A screen that is a TV's browser on the church Wi-Fi (Show on a TV over Wi-Fi), not a monitor. */
+export const WIFI_SCREEN = "wifi";
+
 export type ScreenPlace =
   | { state: "showing"; display: ScreenDisplay }
+  | { state: "wifi" }
   | { state: "no-monitor" }
   | { state: "missing"; displayKey: string }
   | { state: "taken"; display: ScreenDisplay; by: "desk" | "audience" | "screen" };
@@ -171,6 +175,10 @@ export function placeScreens(screens: ScreenOutput[], displays: ScreenDisplay[],
   for (const screen of screens) {
     if (!screen.displayKey) {
       places.set(screen.id, { state: "no-monitor" });
+      continue;
+    }
+    if (screen.displayKey === WIFI_SCREEN) {
+      places.set(screen.id, { state: "wifi" });
       continue;
     }
     const display = displays.find((item) => item.key === screen.displayKey);

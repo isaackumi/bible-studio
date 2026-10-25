@@ -59,7 +59,7 @@
 
 {#await SURFACES[surface]() then { default: View }}
   {#if surface === "receiver"}
-    <View code={(new URLSearchParams(window.location.search).get("receiver") ?? "").toUpperCase()} lan={new URLSearchParams(window.location.search).get("lan") === "1"} />
+    <View code={(new URLSearchParams(window.location.search).get("receiver") ?? "").toUpperCase()} lan={new URLSearchParams(window.location.search).get("lan") === "1"} screen={new URLSearchParams(window.location.search).get("screen") ?? ""} />
   {:else if surface === "screen"}
     <View id={new URLSearchParams(window.location.search).get("screen") || (tauriWindowLabel() ?? "").replace(/^screen-/, "")} />
   {:else}

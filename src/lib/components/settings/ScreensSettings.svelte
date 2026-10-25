@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from "../../app/session.svelte";
-  import { CONTENT_KINDS, MAX_SCREENS, SCREEN_ROLES, screenLetter, type ContentKind, type ScreenOutput, type ScreenRole } from "../../display/screens";
+  import { onMount } from "svelte";
+  import { CONTENT_KINDS, MAX_SCREENS, SCREEN_ROLES, WIFI_SCREEN, screenLetter, type ContentKind, type ScreenOutput, type ScreenRole } from "../../display/screens";
   import { isDesktop } from "../../platform/runtime";
   import { msg, t } from "../../i18n/core";
   import Icon from "../Icon.svelte";
@@ -23,8 +24,21 @@
     blank: { label: msg("Dark"), about: msg("Nothing, until it is given a job") },
   };
 
+  // A screen can be a TV's browser on the Wi-Fi: its own address, from the Wi-Fi display.
+  let wifi = $state<(typeof import("../../app/wifi-display.svelte"))["wifiDisplay"] | null>(null);
+  onMount(() => {
+    if (isDesktop()) void import("../../app/wifi-display.svelte").then((module) => (wifi = module.wifiDisplay));
+  });
+  async function chooseMonitor(id: string, value: string) {
+    session.setScreenDisplay(id, value || null);
+    if (value === WIFI_SCREEN && wifi && !wifi.on) await wifi.start();
+  }
+
   function where(id: string): { text: string; ok: boolean } {
     const place = places.get(id);
+    if (place?.state === "wifi") {
+      return wifi?.on ? { text: t("On the TV's browser, open {url}", { url: wifi.urlFor(id).replace(/^https?:\/\//, "") }), ok: true } : { text: t("Starting the Wi-Fi screen…"), ok: false };
+    }
     if (!place || place.state === "no-monitor") return { text: t("Choose its monitor"), ok: false };
     if (place.state === "missing") return { text: t("Its monitor is not connected. It comes back when the monitor does."), ok: false };
     if (place.state === "taken") {
@@ -114,16 +128,20 @@
     </div>
     <div class="row">
       <div class="row-copy"><strong>{t("Monitor")}</strong><span class:ok={status.ok} class:warn={!status.ok}>{status.text}</span></div>
-      <select class="field" aria-label={t("Monitor")} value={screen.displayKey ?? ""} onchange={(event) => session.setScreenDisplay(screen.id, event.currentTarget.value || null)}>
+      <select class="field" aria-label={t("Monitor")} value={screen.displayKey ?? ""} onchange={(event) => void chooseMonitor(screen.id, event.currentTarget.value)}>
         <option value="">{t("Choose…")}</option>
         {#each displays as display (display.key)}
           <option value={display.key}>{monitorLabel(display)}</option>
         {/each}
-        {#if screen.displayKey && !displays.some((display) => display.key === screen.displayKey)}
+        <option value={WIFI_SCREEN}>{t("Wi-Fi: a TV's browser (no cable)")}</option>
+        {#if screen.displayKey && screen.displayKey !== WIFI_SCREEN && !displays.some((display) => display.key === screen.displayKey)}
           <option value={screen.displayKey}>{screen.displayKey.split("|")[0]} · {t("not connected")}</option>
         {/if}
       </select>
     </div>
+    {#if screen.displayKey === WIFI_SCREEN && wifi?.on}
+      <div class="row"><div class="row-copy"><span>{t("The TV shows this screen's job by itself. Scan the address from the TV or a tablet, or type it in.")}</span></div><button type="button" class="btn" onclick={() => wifi?.qrOnPreview(screen.id)}>{t("Its address as a QR code on Preview")}</button></div>
+    {/if}
     <div class="row stack">
       <div class="row-copy">
         <strong>{t("Job")}</strong>
@@ -133,7 +151,7 @@
       </div>
       <div class="roles" role="radiogroup" aria-label={t("Job")}>
         {#each SCREEN_ROLES as role (role.id)}
-          <button type="button" role="radio" class="role" class:on={screen.role === role.id} aria-checked={screen.role === role.id} disabled={screen.locked && screen.role !== role.id} onclick={() => session.setScreenRole(screen.id, role.id)}>
+          <button type="button" role="radio" class="role" class:on={screen.role === role.id} aria-checked={screen.role === role.id} disabled={(screen.locked && screen.role !== role.id) || (screen.displayKey === WIFI_SCREEN && (role.id === "timer" || role.id === "stage"))} title={screen.displayKey === WIFI_SCREEN && (role.id === "timer" || role.id === "stage") ? t("Not on a TV over Wi-Fi yet: give this job to a monitor.") : undefined} onclick={() => session.setScreenRole(screen.id, role.id)}>
             <b>{t(ROLE_TEXT[role.id].label)}</b><span>{t(ROLE_TEXT[role.id].about)}</span>
           </button>
         {/each}

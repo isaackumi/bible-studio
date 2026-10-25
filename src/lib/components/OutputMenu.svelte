@@ -82,7 +82,7 @@
       <div class="menu-sep"></div>
       {#each session.screensForNow() as screen, index (screen.id)}
         {@const place = session.screenPlaces().get(screen.id)}
-        <p class="menu-note">{screen.name || (place?.state === "showing" ? session.monitorName(place.display) : t("Screen {name}", { name: screenLetter(index) }))} · {t(JOB[screen.role])}{place?.state !== "showing" ? ` · ${t("not showing")}` : ""}</p>
+        <p class="menu-note">{screen.name || (place?.state === "showing" ? session.monitorName(place.display) : place?.state === "wifi" ? t("TV over Wi-Fi") : t("Screen {name}", { name: screenLetter(index) }))} · {t(JOB[screen.role])}{place?.state !== "showing" && place?.state !== "wifi" ? ` · ${t("not showing")}` : ""}</p>
       {/each}
     {/if}
     <button type="button" role="menuitem" onclick={() => { session.openSettings("screens"); close(); }}>{t("Screens and monitors…")}</button>
