@@ -10,6 +10,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.7",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "screens", title: msg("Mac: a TV that blinks stays off your desk"), text: msg("When the TV or projector drops out for a moment, the audience window waits for it to come back instead of covering the laptop's own screen.") },
+    ],
+  },
+  {
     version: "0.5.6",
     date: "2026-10-25",
     highlights: [

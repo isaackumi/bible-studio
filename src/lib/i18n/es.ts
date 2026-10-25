@@ -5006,6 +5006,8 @@ export const es: Readonly<Record<string, string>> = {
   "Holding": "En espera",
   "Live: page {n}": "En directo: página {n}",
   "Live: page {n} of {total}": "En directo: página {n} de {total}",
+  "Mac: a TV that blinks stays off your desk": "Mac: un televisor que parpadea no tapa tu pantalla",
+  "When the TV or projector drops out for a moment, the audience window waits for it to come back instead of covering the laptop's own screen.": "Cuando el televisor o el proyector se corta un momento, la ventana del público espera a que vuelva en lugar de tapar la pantalla del portátil.",
   "Pictures and videos from the computer next door": "Imágenes y vídeos desde el ordenador de al lado",
   "On Premium and Church, your computers on the same network find each other and hand over the pictures, videos and audio a service needs: in seconds, without the cloud space, and even with the internet out. Works over Wi-Fi, Ethernet, or a cable straight between two computers. Settings › Cloud space shows which computers are on this network.": "Con Premium y Church, tus ordenadores en la misma red se encuentran y se pasan las imágenes, vídeos y audio que necesita un culto: en segundos, sin el espacio en la nube, e incluso sin internet. Funciona por Wi-Fi, Ethernet o con un cable directo entre dos ordenadores. Ajustes › Espacio en la nube muestra qué ordenadores están en esta red.",
   "Invite your team by email": "Invita a tu equipo por correo",
