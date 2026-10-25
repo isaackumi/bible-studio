@@ -709,6 +709,7 @@
     if (hit.reference === lastSpokenRef) return;
     lastSpokenRef = hit.reference;
     takenCount++;
+    session.noteListening(`found by listening${ai ? " (AI)" : ""}: ${hit.reference}`);
     // What was said before this verse is about something else now.
     heardLately = [];
     if (hit.bookOrd !== bookOrd || hit.chapter !== chapter) {

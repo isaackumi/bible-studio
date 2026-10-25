@@ -686,6 +686,8 @@ export type VoiceSettings = {
   speechKeys?: { elevenlabs?: string; deepgram?: string };
   /** Words the recognizer mishears here, put right before anything reads them (voice/words.ts). */
   words?: Array<{ heard: string; means: string; source: "yours" | "learned"; uses?: number; at?: number }>;
+  /** Keep a recording of listening (the sound the recognizer hears, and what it understood), on this computer. */
+  keepRecording?: boolean;
 };
 
 export type NoiseFilter = "off" | "light" | "strong";

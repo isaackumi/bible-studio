@@ -21,6 +21,7 @@ mod bundle;
 mod cloud;
 mod nearby;
 mod network;
+mod listen_record;
 mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
@@ -1203,6 +1204,9 @@ pub fn run() {
             lan_screen,
             lan_screen_watching,
             network::network_name,
+            listen_record::listen_record_start,
+            listen_record::listen_record_stop,
+            listen_record::listen_record_note,
             network::network_allow_location,
             audio_out::audio_outputs,
             audio_out::set_audio_output

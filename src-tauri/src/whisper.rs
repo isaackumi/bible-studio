@@ -245,6 +245,7 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
     let feed = crate::noise::start(
         mix,
         move |bytes| {
+            crate::listen_record::sound(bytes);
             let mut buffer = sink_audio.lock().unwrap_or_else(|poison| poison.into_inner());
             buffer.extend(bytes.as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32_768.0));
             true

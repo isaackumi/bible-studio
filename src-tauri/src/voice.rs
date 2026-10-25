@@ -157,7 +157,10 @@ mod helper {
                 let lost_app = app.clone();
                 let started = crate::noise::start(
                     mix,
-                    move |bytes| std::io::Write::write_all(&mut stdin, bytes).is_ok(),
+                    move |bytes| {
+                        crate::listen_record::sound(bytes);
+                        std::io::Write::write_all(&mut stdin, bytes).is_ok()
+                    },
                     move |_room, clean| {
                         use tauri::Emitter;
                         let line = format!(r#"{{"kind":"level","value":{:.3}}}"#, (clean * 4.0).min(1.0));
@@ -318,7 +321,8 @@ mod windows {
             // No console window flashing up behind the desk.
             command.creation_flags(0x0800_0000);
         }
-        let feed = (filter != crate::noise::Filter::Off).then(|| filter.for_recognizer());
+        // Recording listening: the sound comes through the app (filtered or not) so it can be kept.
+        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active()).then(|| filter.for_recognizer());
         super::helper::start(app, run, command, feed)
     }
 }
@@ -511,7 +515,8 @@ mod macos {
             .ok_or("The on-device transcriber was not built. Quit Church Studio and run npm run tauri dev again.")?;
         let mut command = std::process::Command::new(&path);
         command.env("CHURCH_STUDIO_WORDS", words);
-        let feed = (filter != crate::noise::Filter::Off).then(|| filter.for_recognizer());
+        // Recording listening: the sound comes through the app (filtered or not) so it can be kept.
+        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active()).then(|| filter.for_recognizer());
         if feed.is_some() {
             command.env("CHURCH_STUDIO_AUDIO", "stdin");
         }

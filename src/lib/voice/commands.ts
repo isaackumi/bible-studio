@@ -234,5 +234,5 @@ export function sanitizeVoiceSettings(value: unknown): {
   const rawKeys = record.speechKeys && typeof record.speechKeys === "object" ? (record.speechKeys as Record<string, unknown>) : {};
   const key = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : undefined);
   const speechKeys = { ...(key(rawKeys.elevenlabs) ? { elevenlabs: key(rawKeys.elevenlabs) } : {}), ...(key(rawKeys.deepgram) ? { deepgram: key(rawKeys.deepgram) } : {}) };
-  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, engine, speechKeys, words: words.slice(0, 300) };
+  return { commands: record.commands !== false, wake: wakeChosen && record.wake === true, wakeChosen, custom: custom.slice(0, 50), noiseFilter, engine, speechKeys, words: words.slice(0, 300), ...(record.keepRecording === true ? { keepRecording: true } : {}) };
 }

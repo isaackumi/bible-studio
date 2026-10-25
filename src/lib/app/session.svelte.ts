@@ -3062,6 +3062,7 @@ class Session {
       },
       onEnd: () => {
         this.stopVoiceEngine = null;
+        void this.finishListeningRecording();
         if (this.voice.status === "error") return;
         this.voice = { ...this.voice, status: "stopped", level: 0, hearing: false, message: this.voice.message || t("Listening stopped.") };
       },
@@ -3085,6 +3086,8 @@ class Session {
       return;
     }
     const local = engine === "accurate" ? "accurate" : "system";
+    // Keep a recording of what the recognizer hears, and what it understood (Settings › Audio & voice).
+    if (isDesktop() && this.workspace.voice.keepRecording) await this.startListeningRecording(local);
     this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, words, local) : startListening(handlers, filter);
     this.watchForSilence(this.stopVoiceEngine, () => soundReached);
   };
@@ -3104,12 +3107,51 @@ class Session {
     this.stopVoiceEngine = null;
     this.voice = { ...this.voice, status: "stopped", error: null, level: 0, hearing: false, message };
     stop?.();
+    void this.finishListeningRecording();
+  };
+
+  // A listening recording: the sound the recognizer hears and a timed list of what it understood,
+  // in Documents › Church Studio Listening (src-tauri/src/listen_record.rs). For checking and tuning
+  // listening against a real sermon.
+
+  /** Listening is being recorded now. */
+  listeningRecorded = $state(false);
+
+  private startListeningRecording = async (engine: string) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}`;
+    try {
+      await invoke("listen_record_start", { stamp });
+      this.listeningRecorded = true;
+      this.noteListening(`engine: ${engine}, noise filter: ${this.workspace.voice.noiseFilter ?? "off"}, version ${APP_VERSION}`);
+    } catch (error) {
+      this.warn(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  /** A line in the listening recording's notes, when one is being kept. */
+  noteListening = (line: string) => {
+    if (this.listeningRecorded) void invoke("listen_record_note", { line }).catch(() => {});
+  };
+
+  private finishListeningRecording = async () => {
+    if (!this.listeningRecorded) return;
+    this.listeningRecorded = false;
+    const path = await invoke<string | null>("listen_record_stop").catch(() => null);
+    if (!path) return;
+    this.notify(t("Listening recording saved"), {
+      detail: t("Its sound and what was understood are in Documents › Church Studio Listening."),
+      actions: [{ label: t(revealLabel()), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(path)).catch(() => {}) }],
+      ms: 15_000,
+    });
   };
 
   openVoicePrivacy = () => void openPrivacySettings();
 
   private handleVoiceHeard = (rawText: string, final: boolean, rawAlternatives: string[], rawLatest: string) => {
     if (this.voice.status !== "listening") return;
+    if (final && rawLatest.trim()) this.noteListening(`heard: ${rawLatest.trim()}`);
     // Misheard words put right first (voice/words.ts), so the transcript, captions, commands and
     // verse finding all read "Ephesians 4", not "efficient 4".
     const words = this.workspace.voice?.words ?? [];
@@ -3507,6 +3549,7 @@ class Session {
   };
 
   previewPassage = async (passage: BibleItem) => {
+    if (this.voice.status === "listening") this.noteListening(`Preview: ${passage.reference}`);
     this.learnWord(passage);
     this.songFocus = null;
     this.sermonFocus = null;

@@ -17,7 +17,7 @@
   const FILTERS: Array<{ id: NoiseFilter; label: string; detail: string }> = [
     { id: "off", label: msg("Off"), detail: msg("Listening hears the microphone as it is.") },
     { id: "light", label: msg("Light"), detail: msg("Turns down fans, hum and hiss, and keeps some of the room so quiet words are never lost.") },
-    { id: "strong", label: msg("Strong"), detail: msg("Removes as much background noise as it can. Best for noisy rooms; very soft speech can drop out.") },
+    { id: "strong", label: msg("Strong"), detail: msg("Removes as much background noise as it can for the meters; listening still hears half the real voice, which it recognizes best.") },
   ];
   const filter = $derived(session.workspace.voice.noiseFilter ?? "off");
   const desktop = isDesktop();
@@ -162,6 +162,20 @@
   ]);
   const actionLabel = (id: string) => VOICE_ACTIONS.find((entry) => entry.id === id)?.label ?? id;
 </script>
+
+{#if desktop}
+  <!-- For checking listening against a real sermon: the sound it heard and what it made of it. -->
+  <p class="section-label">{t("Listening recording")}</p>
+  <section class="rows">
+    <div class="row">
+      <div class="row-copy">
+        <strong>{t("Keep a recording of listening")}</strong>
+        <span>{t("While listening runs, the sound the recognizer hears and a timed list of what it understood and which verses it found are saved in Documents › Church Studio Listening, on this computer only. Use it to check and improve listening, or keep the sermon's sound. Not with ElevenLabs or Deepgram.")}</span>
+      </div>
+      <input type="checkbox" class="switch" role="switch" aria-label={t("Keep a recording of listening")} checked={!!session.workspace.voice.keepRecording} onchange={(event) => session.saveVoiceSettings({ keepRecording: event.currentTarget.checked })} />
+    </div>
+  </section>
+{/if}
 
 <p class="section-label">{t("Noise filter")}</p>
 <section class="rows">
