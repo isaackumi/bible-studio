@@ -688,7 +688,7 @@
         <section class="card">
           <h3>{t("Desk")}</h3>
           <div class="choice-row" role="group" aria-label={t("Desk")}>
-            {#each [{ id: "pewbeam", name: msg("Presenter Desk"), icon: "pew", note: msg("Scripture, songs and service presentation.") }, { id: "obs", name: msg("Production Desk"), icon: "obs", note: msg("Live production, cameras, compositions and output control.") }] as style (style.id)}
+            {#each [{ id: "pewbeam", name: msg("Presenter Desk"), icon: "pew", note: msg("Scripture, songs and service presentation.") }, { id: "conductor", name: msg("Conductor Desk"), icon: "transition", note: msg("Next and Live side by side, with a lever to go live.") }, { id: "obs", name: msg("Production Desk"), icon: "obs", note: msg("Live production, cameras, compositions and output control.") }] as style (style.id)}
               <button type="button" class="choice" class:active={session.workspace.appearance.desk === style.id} onclick={() => session.setAppearance({ desk: style.id as DeskStyle })}>
                 <Icon name={style.icon} size={18} />
                 <strong>{t(style.name)}</strong>

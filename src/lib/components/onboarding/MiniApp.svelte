@@ -26,7 +26,7 @@
     onAir?: boolean;
     mode?: string;
     reference?: string;
-    desk?: "pewbeam" | "obs";
+    desk?: import("../../domain/types").DeskStyle;
     /** The parts this step is about; empty shows the whole desk evenly. */
     focus?: Zone[];
     /** The verse list in the Bible pane: [verse, text]. */

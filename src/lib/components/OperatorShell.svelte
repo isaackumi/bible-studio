@@ -204,6 +204,11 @@
     <!-- The Production Desk is a Premium feature: on Free (or after a trial) the Presenter Desk shows. -->
     {#if session.workspace.appearance.desk === "obs" && session.entitled("production")}
       <ObsDesk />
+    {:else if session.workspace.appearance.desk === "conductor"}
+      <!-- Its own chunk: only churches that choose the Conductor Desk load it. -->
+      {#await import("./conductor/ConductorDesk.svelte") then { default: ConductorDesk }}
+        <ConductorDesk />
+      {/await}
     {:else}
       <PewDesk />
     {/if}

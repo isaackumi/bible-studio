@@ -59,7 +59,7 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
     density: value?.density === "compact" ? "compact" : value?.density === "comfortable" ? "comfortable" : base.density,
     scale: value?.scale === undefined ? base.scale : clampScale(value.scale),
     accent: sanitizeAccent(value?.accent?.toLowerCase() === "#c6a15b" ? undefined : (value?.accent ?? base.accent)),
-    desk: value?.desk === "obs" ? "obs" : value?.desk === "pewbeam" ? "pewbeam" : base.desk,
+    desk: value?.desk === "obs" || value?.desk === "pewbeam" || value?.desk === "conductor" ? value.desk : base.desk,
     calm: value?.calm === true,
     contrast: value?.contrast === true,
     screenShape: sanitizeScreenShape(value?.screenShape),

@@ -5939,7 +5939,9 @@ class Session {
 
   /** The desk the operator is on now, in the same words as a part's desks. */
   get currentDesk(): PartDesk {
-    return this.workspace.appearance.desk !== "pewbeam" ? "production" : this.deskPage === "service" ? "service" : "presenter";
+    const desk = this.workspace.appearance.desk;
+    // The Conductor Desk does the Presenter Desk's work, so a part counts it as the Presenter's.
+    return desk === "obs" ? "production" : desk === "conductor" || this.deskPage !== "service" ? "presenter" : "service";
   }
 
   /** Go to one of the desks a part uses (the service strip's switches). The part keeps counting. */

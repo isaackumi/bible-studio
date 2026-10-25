@@ -498,7 +498,7 @@ export type DisplayProfile = {
   outputMode: OutputMode;
 };
 
-export type DeskStyle = "pewbeam" | "obs";
+export type DeskStyle = "pewbeam" | "obs" | "conductor";
 
 /** Operator chrome. Scripture themes are a separate record. */
 export type OperatorTheme = "dark" | "vespers" | "nave" | "light";

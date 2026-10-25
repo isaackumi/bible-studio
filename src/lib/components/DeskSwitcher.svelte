@@ -7,12 +7,13 @@
   import { t } from "../i18n/core";
   import { keys } from "../platform/os";
 
-  // Two small groups, so the bar stays short: which desk (Presenter or Production), and what opens
+  // Two small groups, so the bar stays short: which desk (Presenter, Conductor or Production), and what opens
   // beside it (the design studio, Audience, Pictures). Only the desk in use and an open drawer say
   // their name; the rest are icons with their name on hover, and every name shows on a very wide bar.
   let { compact = false }: { compact?: boolean } = $props();
 
   const production = $derived(session.workspace.appearance.desk === "obs" && session.entitled("production"));
+  const conductor = $derived(session.workspace.appearance.desk === "conductor");
   // The cloud copy at a glance, on computers that sync: synced, syncing, offline, or needing a look.
   const cloud = $derived(session.cloud && !["off", "free", "signedOut"].includes(session.cloud.status) ? session.cloud : null);
   const cloudTip = $derived(
@@ -33,9 +34,13 @@
 
 <nav class="desk-switch" class:compact aria-label={t("Desk")}>
   <div class="group" role="group" aria-label={t("Desk")}>
-    <button type="button" class:on={!production} aria-label={t("Presenter Desk")} aria-pressed={!production} data-tip={t("Presenter Desk: scripture, songs and sermons")} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
+    <button type="button" class:on={!production && !conductor} aria-label={t("Presenter Desk")} aria-pressed={!production && !conductor} data-tip={t("Presenter Desk: scripture, songs and sermons")} onclick={() => session.setAppearance({ desk: "pewbeam" })}>
       <Icon name="pew" size={16} />
       <span class="name">{t("Presenter")}</span>
+    </button>
+    <button type="button" class:on={conductor} aria-label={t("Conductor Desk")} aria-pressed={conductor} data-tip={t("Conductor Desk: Next and Live side by side, a lever to go live")} onclick={() => session.setAppearance({ desk: "conductor" })}>
+      <Icon name="transition" size={16} />
+      <span class="name">{t("Conductor")}</span>
     </button>
     <button type="button" class:on={production} aria-label={t("Production Desk")} aria-pressed={production} data-tip={t("Production Desk: scenes, cameras and video")} onclick={() => session.requireFeature("production") && session.setAppearance({ desk: "obs" })}>
       <Icon name="obs" size={16} />
