@@ -177,6 +177,9 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   function tr(text, values) { var line = W[text] || text; for (var key in values || {}) line = line.split("{" + key + "}").join(String(values[key])); return line; }
   var API = ${JSON.stringify(origin)} + "/v1/rooms/" + CODE;
   var KEY = "cs-room-" + CODE;
+  // The name this phone last played under, in any room: next week's join box is already filled in.
+  var NAME_KEY = "cs-room-name";
+  function rememberName(name) { try { if (name) localStorage.setItem(NAME_KEY, name); } catch (e) {} }
   var pid = null, sort = "top", last = null, timer = null, busy = false;
   try { pid = localStorage.getItem(KEY); } catch (e) {}
   var $ = function (id) { return document.getElementById(id); };
@@ -200,6 +203,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     $("join-btn").disabled = true;
     post("/join", { name: $("name").value }).then(function (d) {
       pid = d.pid; try { localStorage.setItem(KEY, pid); } catch (e) {}
+      rememberName($("name").value.trim());
       show("join", false); show("live", true); refresh();
     }).catch(function (e) { if (!taken(e, $("name"), "join-note")) note("join-note", e.message, "bad"); $("join-btn").disabled = false; });
   }
@@ -214,7 +218,8 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     var name = $("new-name").value.trim();
     if (!name) { note("rename-note", tr("Type a name."), "bad"); return; }
     $("rename-save").disabled = true;
-    post("/rename", { pid: pid, name: name }).then(function () {
+    post("/rename", { pid: pid, name: name }).then(function (d) {
+      rememberName(d.name);
       show("rename", false); last = null; refresh();
     }).catch(function (e) { if (!taken(e, $("new-name"), "rename-note")) note("rename-note", e.message, "bad"); }).then(function () { $("rename-save").disabled = false; });
   }
@@ -437,6 +442,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     }).catch(function () { timer = setTimeout(refresh, 4000); });
   }
 
+  try { if (!$("name").value) $("name").value = localStorage.getItem(NAME_KEY) || ""; } catch (e) {}
   $("join-btn").onclick = join;
   $("me").onclick = openRename;
   $("rename-save").onclick = rename;
