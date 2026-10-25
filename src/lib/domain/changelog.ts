@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.5.9",
+    date: "2026-10-25",
+    highlights: [
+      { icon: "screens", title: msg("Safer when you are live"), text: msg("BLACK is always in sight, and Undo sits beside CLEAR after any change on the screen. When Auto LIVE is on it says so beside LIVE, with one click back to Preview first. Backspace just after typing no longer clears the screen.") },
+      { icon: "alerts", title: msg("Notes you can read"), text: msg("The desk's notes stack instead of covering each other, and problems show in amber. Phones say when they are reconnecting.") },
+    ],
+  },
+  {
     version: "0.5.8",
     date: "2026-10-25",
     highlights: [
