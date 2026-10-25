@@ -1776,7 +1776,7 @@ class Session {
     const notice = plan.notice;
     const change = t("Change it in Settings › Sound & voice.");
     if (notice?.kind === "unplugged") {
-      this.notify(t("{name} was unplugged", { name: notice.name }), { detail: t("Sound now goes to {output}. It goes back when {name} is plugged in again.", { output: notice.output, name: notice.name }), ms: 12_000 });
+      this.notify(t("{name} was unplugged", { name: notice.name }), { detail: t("Sound now goes to {output}. It goes back when {name} is plugged in again.", { output: notice.output, name: notice.name }), ms: 12_000, tone: "warn" });
     } else if (notice?.kind === "moved") {
       const why = { "plugged-in": t("It was just plugged in."), unplugged: t("The output it used was unplugged."), screen: t("It is the audience screen's own sound."), other: "" }[notice.cause];
       this.notify(t("Sound now goes to {output}", { output: notice.output }), { detail: `${why} ${change}`.trim(), ms: 10_000 });
@@ -5167,6 +5167,7 @@ class Session {
       actions.push({ label: t("Free up space"), run: () => { this.openSettings("storage"); this.dismissToast(); } });
     }
     this.notify(t("Streaming and recording did not start"), {
+      tone: "warn",
       detail: fix === "permission" ? t("Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.") : message,
       ms: 30_000,
       actions,
@@ -5469,6 +5470,7 @@ class Session {
         { label: t("See all"), run: () => this.openSettings("ready") },
       ],
       ms: 30_000,
+      tone: "warn",
     });
   };
 
@@ -6023,13 +6025,14 @@ class Session {
   pageRequest = $state<PewPage | null>(null);
 
   /** A short note in the corner after an action ("Added to Sunday Service › Worship"), with an optional button. */
-  toast = $state<{ id: number; text: string; detail?: string; actions: Array<{ label: string; run: () => void }> } | null>(null);
+  /** `tone: "warn"`: something went wrong or needs a look (amber, not the tick). */
+  toast = $state<{ id: number; text: string; detail?: string; actions: Array<{ label: string; run: () => void }>; tone?: "warn" } | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  notify = (text: string, options: { detail?: string; actions?: Array<{ label: string; run: () => void }>; ms?: number } = {}) => {
+  notify = (text: string, options: { detail?: string; actions?: Array<{ label: string; run: () => void }>; ms?: number; tone?: "warn" } = {}) => {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     const id = Date.now();
-    this.toast = { id, text, detail: options.detail, actions: options.actions ?? [] };
+    this.toast = { id, text, detail: options.detail, actions: options.actions ?? [], ...(options.tone ? { tone: options.tone } : {}) };
     this.toastTimer = setTimeout(() => {
       if (this.toast?.id === id) this.toast = null;
     }, options.ms ?? 6000);
@@ -6318,6 +6321,7 @@ class Session {
       this.notify(tn(daysLeft, "Connect to the internet within {n} day", "Connect to the internet within {n} days"), {
         detail: t("Church Studio checks your plan online now and then. Without it, this computer goes back to Free until it can check."),
         ms: 20_000,
+        tone: "warn",
       });
     }
     // Signed in, but not on a license yet (a plan bought on another computer): pick it up.
@@ -7990,7 +7994,7 @@ class Session {
   /** After a change that empties or blacks out the screen: a note with Undo. */
   private offerProgramUndo(label: string) {
     const key = shortcutLabelForUndo();
-    this.notify(label, { detail: t("Undo puts back what was showing ({key}).", { key }), actions: [{ label: t("Undo"), run: () => { void this.undoProgram(); this.dismissToast(); } }] });
+    this.notify(label, { detail: t("Undo puts back what was showing ({key}).", { key }), actions: [{ label: t("Undo"), run: () => { void this.undoProgram(); this.dismissToast(); } }], ms: 12_000 });
   }
 
   /** `transition`: this take's own (a slideshow's chosen one), instead of the theme's. */

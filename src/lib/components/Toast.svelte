@@ -10,8 +10,8 @@
 
 {#if toast}
   {#key toast.id}
-    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: 10, duration: 180 }}>
-      <span class="tick"><Icon name="check" size={14} /></span>
+    <div class="toast" class:warn={toast.tone === "warn"} role={toast.tone === "warn" ? "alert" : "status"} aria-live={toast.tone === "warn" ? "assertive" : "polite"} transition:fly={{ y: 10, duration: 180 }}>
+      <span class="tick"><Icon name={toast.tone === "warn" ? "alerts" : "check"} size={14} /></span>
       <div class="copy">
         <strong>{toast.text}</strong>
         {#if toast.detail}<span>{toast.detail}</span>{/if}
@@ -26,10 +26,7 @@
 
 <style>
   .toast {
-    position: fixed;
-    left: 20px;
-    bottom: 20px;
-    z-index: 900;
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -42,6 +39,8 @@
     box-shadow: 0 14px 40px rgb(0 0 0 / 0.35);
   }
   .tick { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, #30a46c 22%, transparent); color: #3dd68c; }
+  .warn .tick { background: color-mix(in srgb, #f5a524 22%, transparent); color: #f5a524; }
+  .warn { border-color: color-mix(in srgb, #f5a524 45%, var(--line)); }
   .copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
   .copy strong { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .copy span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

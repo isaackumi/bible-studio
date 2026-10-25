@@ -47,13 +47,25 @@ function ownsArrows(target: KeyInput["target"]): boolean {
   return target?.role === "separator" || target?.role === "slider";
 }
 
-export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record<ShortcutAction, () => void>>) {
+/**
+ * Backspace this soon after typing in a box is a typo being fixed after a click moved the focus
+ * away, not a wish to clear the screen in front of everyone.
+ */
+const TYPING_GRACE_MS = 2000;
+
+export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record<ShortcutAction, () => void>>, now: () => number = () => Date.now()) {
+  let typedAt = -Infinity;
   return {
     onKeyDown(event: KeyInput) {
       if (event.defaultPrevented) return;
+      if (isTypingTarget(event.target)) typedAt = now();
       const action = shortcutFor(map, event.code);
       if (!action) return;
       if (DESK_ACTIONS.has(action) && event.modified) return;
+      if (event.code === "Backspace" && !isTypingTarget(event.target) && now() - typedAt < TYPING_GRACE_MS) {
+        event.preventDefault();
+        return;
+      }
       if (isTypingTarget(event.target)) {
         if (action !== "escape") return;
         handlers.escape?.();

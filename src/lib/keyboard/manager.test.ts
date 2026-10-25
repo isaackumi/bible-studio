@@ -119,4 +119,20 @@ describe("changing shortcuts", () => {
     expect(shortcutLabels(defaultShortcuts, "previous")).toBe("← / ↑");
     expect(shortcutLabels(map, "logo")).toBe("—");
   });
+
+  it("does not clear the screen with Backspace just after typing in a box (fixing a typo after clicking away)", () => {
+    let clock = 1_000_000;
+    const seen: string[] = [];
+    const manager = createKeyboardManager(defaultShortcuts, { clear: () => seen.push("clear") }, () => clock);
+    manager.onKeyDown(press("KeyJ", "INPUT").event);
+    clock += 800;
+    const early = press("Backspace");
+    manager.onKeyDown(early.event);
+    expect(seen).toEqual([]);
+    expect(early.prevented()).toBe(true);
+    clock += 2500;
+    manager.onKeyDown(press("Backspace").event);
+    expect(seen).toEqual(["clear"]);
+  });
 });
+

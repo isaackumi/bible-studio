@@ -61,7 +61,7 @@
   let detections = $state<SearchHit[]>([]);
   const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
-  const keyOf = (action: "take" | "black" | "clear") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
+  const keyOf = (action: "take" | "black" | "clear" | "clear-words") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   /** The queue's Clear all was pressed once. */
   let clearArmed = $state(false);
   // The transcript follows the newest words as they are heard.
@@ -771,6 +771,11 @@
         <button type="button" class="desk-btn" data-tip={t("Send to the audience from this window")} onclick={() => session.claimAudience()}>{t("Take control")}</button>
       {/if}
       <OutputMenu />
+      {#if session.liveOnClick}
+        <!-- Auto LIVE: while the service runs a click or an arrow goes straight to the audience. Said
+             beside LIVE, and one click puts Preview first again. -->
+        <button type="button" class="desk-btn auto-live" data-tip={t("Auto LIVE is on: a click or an arrow goes straight to the audience. Click for Preview first.")} onclick={() => session.setLiveOnClick(false)}>{t("Auto LIVE")}</button>
+      {/if}
       <button
         type="button"
         class="desk-btn live"
@@ -778,18 +783,22 @@
         aria-label={displayLive ? t("On air. Send Preview to Program") : t("Go live: send Preview to Program")}
         data-tip={`${displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")} (${keyOf("take")})`}
         onclick={() => session.take()}
-      ><span class="pip"></span>{displayLive ? t("ON AIR") : t("LIVE")}</button>
-      <!-- CLEAR shows; hovering (or tabbing to) it slides out CLEAR WORDS and BLACK, and they fold
-           away again after. Their keys (W, B) work whether or not they show. -->
-      <span class="clears" role="group" aria-label={t("Clear and black")}>
+      ><span class="pip"></span>{t("LIVE")}</button>
+      <!-- BLACK always shows: it is the button for when the wrong thing is up. CLEAR shows too;
+           hovering (or tabbing to) it slides out CLEAR WORDS. Every key works whether or not it shows. -->
+      <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
+      <span class="clears" role="group" aria-label={t("Clear")}>
         <span class="clears-more">
           <span class="clears-row">
-            <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
-            <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (W)`} aria-label={t("Clear words")} onclick={() => void session.clearWords()}>{t("CLEAR WORDS")}</button>
+            <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (${keyOf("clear-words")})`} aria-label={t("Clear words")} onclick={() => void session.clearWords()}>{t("CLEAR WORDS")}</button>
           </span>
         </span>
         <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
+      {#if session.canUndoProgram}
+        <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. -->
+        <button type="button" class="desk-btn ghost" data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
+      {/if}
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
       <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={keys(t("Go to a page, song, verse, part or setting (⌘K)"))} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
@@ -956,7 +965,7 @@
       {#if sheet === "help"}
         <p>{t("Click a verse to put it on Preview. Shift-click a second verse to select a range.")}</p>
         <p>{t("LIVE copies Preview onto Program. BLACK and CLEAR change Program only.")}</p>
-        <p>{t("The arrow keys and the arrows on Preview step Preview. The Live arrows under Program change the screen at once.")}</p>
+        <p>{t("The arrow keys and the arrows on Preview step Preview. The Live arrows under Program change the screen at once.")}{#if session.liveOnClick}{" "}{t("Auto LIVE is on, so for now a click or an arrow goes straight to the screen.")}{/if}</p>
         <p>{t("{key} undoes the last change to Program: LIVE, CLEAR, BLACK or LOGO.", { key: undoKey })}</p>
         <p>{t("Search a reference such as John 3:16, or a phrase such as “in the beginning”.")}</p>
         <p>{t("Listen matches spoken scripture on Preview. It never takes Program by itself.")}</p>
@@ -1269,6 +1278,8 @@
 
 
 <style>
+  /* Auto LIVE is on: said beside LIVE, in its colour. */
+  .auto-live { border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: #ff6b6b; font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
   .pb {
     height: 100%;
     min-height: 0;

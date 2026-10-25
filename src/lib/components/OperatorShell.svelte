@@ -215,7 +215,6 @@
     <RemoteApproval />
     <Paywall />
     <PartPickerDialog />
-    <Toast />
     {#if !isDesktop() && !import.meta.env.DEV}
       <!-- The browser version is a demo: Premium and the trial are in the installed app. -->
       <a class="demo-badge" href="https://church-studio.heitechinc.com/#download" target="_blank" rel="noopener" title={t("This is the browser demo. Download the app for the Premium trial, the audience screen on a projector, voice, streaming and more.")}>
@@ -236,10 +235,15 @@
     {/if}
     <!-- Its own chunk, loaded just after the desk starts (⌘K works a moment later). -->
     {#await import("./CommandPalette.svelte") then { default: CommandPalette }}<CommandPalette />{/await}
-    <UpdateNotice />
+    <!-- The desk's notes share the bottom-left corner, stacked so none covers another: the latest
+         action's note at the bottom, then the status line, then an update waiting. -->
+    <div class="corner-notes">
+      <Toast />
+      <StatusLine />
+      <UpdateNotice />
+    </div>
     <!-- The audience screen dropped out: its own chunk, loaded only when that happens. -->
     {#if session.screenLost}{#await import("./ScreenLost.svelte") then { default: ScreenLost }}<ScreenLost name={session.screenLost} />{/await}{/if}
-    <StatusLine />
     <!-- Loaded just after start-up: nothing is running yet when the desk opens. -->
     {#await import("./NowRunning.svelte") then { default: NowRunning }}<NowRunning />{/await}
     <WhatsNew />
@@ -250,3 +254,8 @@
 {#if !session.booted || !session.workspace.onboarded}
   <Welcome booting={!session.booted} />
 {/if}
+
+<style>
+  .corner-notes { position: fixed; left: 20px; bottom: 20px; z-index: 900; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
+  .corner-notes > :global(*) { pointer-events: auto; }
+</style>

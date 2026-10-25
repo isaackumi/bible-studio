@@ -26,10 +26,7 @@
 
 <style>
   .update {
-    position: fixed;
-    left: 20px;
-    bottom: 20px;
-    z-index: 880;
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
