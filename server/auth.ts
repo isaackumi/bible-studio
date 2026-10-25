@@ -51,7 +51,8 @@ export function authOptions(settings: AuthSettings): BetterAuthOptions {
     plugins: mail
       ? [
           magicLink({
-            expiresIn: 15 * 60,
+            // As long as the sign-in it finishes (SIGNIN_MINUTES in accounts.ts), so the email's time holds.
+            expiresIn: 10 * 60,
             sendMagicLink: async ({ email, url }) =>
               (({ subject, text, html }) => mail(email, subject, text, html))(signInEmail(url, new URL(url).origin)),
           }),

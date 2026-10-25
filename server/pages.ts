@@ -155,7 +155,7 @@ export function signinPage({ state, id, mode = "number", device, place, email, m
           <div class="envelope" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
           <div>
             <h2>Check your email</h2>
-            <p class="sent-copy">We sent a sign-in link to <b id="sent-to"></b>. Open it on this device; it works once, for 15 minutes.</p>
+            <p class="sent-copy">We sent a sign-in link to <b id="sent-to"></b>. Open it on this device; it works once, for 10 minutes.</p>
           </div>
         </div>
         <div class="sent-actions">

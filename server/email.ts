@@ -56,14 +56,14 @@ function layout(base: string, input: { preheader: string; heading: string; block
 export function signInEmail(url: string, base: string): Email {
   return {
     subject: "Sign in to Church Studio",
-    text: `Sign in to Church Studio\n\nOpen this link to sign in:\n${url}\n\nIt works once, for 15 minutes. Then go back to Church Studio and tap the number it shows.\n\nIf you did not ask to sign in, you can ignore this email.\n\nChurch Studio by HeiTech · support@heitechinc.com`,
+    text: `Sign in to Church Studio\n\nOpen this link on the computer where Church Studio is open:\n${url}\n\nIt works once, for 10 minutes. Then follow the steps on the page, and Church Studio signs in by itself.\n\nIf you did not ask to sign in, you can ignore this email.\n\nChurch Studio by HeiTech · support@heitechinc.com`,
     html: layout(base, {
-      preheader: "Your sign-in link for Church Studio. It works once, for 15 minutes.",
+      preheader: "Your sign-in link for Church Studio. Open it on the computer where Church Studio is open.",
       heading: "Sign in to Church Studio",
       blocks: [
-        { kind: "text", text: "Use the button below to sign in. Then go back to Church Studio and tap the number it shows." },
+        { kind: "text", text: "Open this on the computer where Church Studio is open, then follow the steps on the page. Church Studio signs in by itself." },
         { kind: "button", label: "Sign in to Church Studio", url },
-        { kind: "note", text: "The link works once, for 15 minutes." },
+        { kind: "note", text: "The link works once, for 10 minutes." },
         { kind: "note", text: `Button not working? Copy this into your browser: ${url}` },
       ],
       footer: "You got this because someone asked to sign in to Church Studio with this address. If it was not you, ignore it: nothing changes.",

@@ -202,7 +202,7 @@ export function privacyPage(site: Site): string {
     <tr><td>Check-ins and computer records</td><td>Up to 24 months after the computer was last seen</td></tr>
     <tr><td>Trial records</td><td>As long as needed to keep one trial per computer</td></tr>
     <tr><td>Trial counts per network address</td><td>2 days</td></tr>
-    <tr><td>Sign-in links</td><td>15 minutes, or until used</td></tr>
+    <tr><td>Sign-in links</td><td>10 minutes, or until used</td></tr>
     <tr><td>Error reports</td><td>90 days</td></tr>
     <tr><td>Record of staff changes</td><td>24 months</td></tr>
     <tr><td>Support emails</td><td>As long as needed to help you, up to 3 years</td></tr>
