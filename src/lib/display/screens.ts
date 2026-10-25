@@ -144,6 +144,11 @@ export function screenShows(screen: Pick<ScreenOutput, "role" | "also" | "betwee
   return { show: null, last };
 }
 
+/** The screens an item would show on if it went LIVE now (a screen keeping its last one shows only its own kind). */
+export function showsOn(screens: ScreenOutput[], model: PresentationModel | null): string[] {
+  return screens.filter((screen) => screenShows({ ...screen, between: screen.between === "keep" ? undefined : screen.between }, model, null).show !== null).map((screen) => screen.id);
+}
+
 /** A monitor as people know it: the church's name for it, with its own name beside ("Main auditorium (HISENSE)"). */
 export function monitorLabel(display: { key: string; name: string }, names: MonitorNames): string {
   const own = names[display.key] ?? Object.entries(names).find(([key]) => key.split("|")[0] === display.name)?.[1];

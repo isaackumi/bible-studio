@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentKind, monitorLabel, newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, screenShows, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
+import { contentKind, showsOn, monitorLabel, newScreen, placeScreens, screensNow, programFor, sanitizeScreens, screenLetter, screenShows, switchRole, type ScreenDisplay, type ScreenOutput } from "./screens";
 import type { PresentationModel } from "../domain/types";
 
 const display = (key: string, extra: Partial<ScreenDisplay> = {}): ScreenDisplay => ({ key, name: key, x: 0, y: 0, width: 1920, height: 1080, primary: false, audience: false, ...extra });
@@ -114,6 +114,18 @@ describe("screens", () => {
   it("keeps a screen's other jobs and what it does between, when saved", () => {
     expect(sanitizeScreens([{ id: "abcd1234", role: "scripture", also: ["lyrics", "junk", "lyrics"], between: "keep" }])[0]).toMatchObject({ role: "scripture", also: ["lyrics"], between: "keep" });
     expect(sanitizeScreens([{ id: "abcd1234", role: "slides", between: "nonsense" }])[0]).toEqual({ id: "abcd1234", name: "", displayKey: null, role: "slides", locked: false });
+  });
+
+  it("says which screens an item will show on when it goes LIVE", () => {
+    const screens = [
+      screen("aaaa1111", "DELL", { role: "scripture", also: ["lyrics"], between: "also" }),
+      screen("bbbb2222", "LG", { role: "lyrics" }),
+      screen("cccc3333", "TV", { role: "timer" }),
+      screen("dddd4444", "SONY", { role: "program" }),
+    ];
+    expect(showsOn(screens, model("scripture"))).toEqual(["aaaa1111", "dddd4444"]);
+    expect(showsOn(screens, model("lyrics"))).toEqual(["aaaa1111", "bbbb2222", "dddd4444"]);
+    expect(showsOn(screens, model("image"))).toEqual(["dddd4444"]);
   });
 });
 

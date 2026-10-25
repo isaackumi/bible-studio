@@ -723,7 +723,10 @@ class Session {
 
   /** A TV that blinks for a second says nothing; one gone for longer gets a banner, and a word when it is back. */
   private followScreenLoss = (before: OutputStatus | null, now: OutputStatus) => {
-    const next = screenLoss(this.lostScreen, before, now);
+    // The screen by the church's name for it ("Main auditorium (HISENSE)").
+    const main = before?.displays.find((display) => display.audience);
+    const named = before && main ? { ...before, displayName: this.monitorName(main) } : before;
+    const next = screenLoss(this.lostScreen, named, now);
     this.lostScreen = next.lost;
     if (next.lost) {
       this.lostTimer ??= setTimeout(() => {

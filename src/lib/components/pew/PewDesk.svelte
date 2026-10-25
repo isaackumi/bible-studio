@@ -17,6 +17,7 @@
   import TextStyleEditor from "../TextStyleEditor.svelte";
   import VoiceStatus from "../VoiceStatus.svelte";
   import { session } from "../../app/session.svelte";
+  import { screenLetter, showsOn } from "../../display/screens";
   import type { PlanFeature } from "../../domain/plans";
   import { defaultShortcuts, shortcutLabel } from "../../keyboard/manager";
   import { stepVerse } from "../../bible/passage";
@@ -140,6 +141,23 @@
   /** Program has something on it. */
   const programSet = $derived(session.live.program.model.layout !== "black" && session.live.program.model.layout !== "empty");
   /** On air only when the audience can actually see Program. */
+  /**
+   * With extra screens: where LIVE will show what is on Preview ("Main auditorium (HISENSE), Scripture
+   * Monitor"), so no one has to guess which screen a verse or a song reaches.
+   */
+  const liveShowsOn = $derived.by(() => {
+    if (!(session.workspace.screens ?? []).length || session.live.preview.model.layout === "empty") return "";
+    const now = session.screensForNow();
+    const places = session.screenPlaces();
+    const reach = new Set(showsOn(now, session.live.preview.model));
+    const main = session.output.displays.find((display) => display.audience);
+    const names = session.output.online ? [main ? session.monitorName(main) : t("Main screen")] : [];
+    now.forEach((screen, index) => {
+      const place = places.get(screen.id);
+      if (reach.has(screen.id) && place?.state === "showing") names.push(screen.name || session.monitorName(place.display) || t("Screen {name}", { name: screenLetter(index) }));
+    });
+    return names.join(", ");
+  });
   const displayLive = $derived(programSet && !session.programHeld && session.output.online);
   const activeLayout = $derived(
     session.workspace.layouts.find((item) => item.id === session.workspace.activeLayoutId) ?? session.workspace.layouts[0],
@@ -1171,7 +1189,7 @@
 
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span></header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › Screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
@@ -1278,6 +1296,9 @@
 
 
 <style>
+  /* Where LIVE will show Preview, with extra screens: quiet, one line, a way to Settings › Screens. */
+  .shows-on { min-width: 0; margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .shows-on:hover { color: var(--ink); }
   /* Auto LIVE is on: said beside LIVE, in its colour. */
   .auto-live { border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: #ff6b6b; font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
   .pb {

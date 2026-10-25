@@ -1,13 +1,20 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
-  import { wifiDisplay } from "../app/wifi-display.svelte";
+  import { onMount } from "svelte";
+  import { screenLetter, type ScreenRole } from "../display/screens";
   import { audienceChip, audienceDeskLine } from "../display/status";
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
   import ToolMenu from "./ToolMenu.svelte";
-  import { t, tn } from "../i18n/core";
+  import { msg, t, tn } from "../i18n/core";
 
   // One toolbar control for the audience output: its status on the button, the output actions in the menu.
+  // The TV over Wi-Fi: its own chunk, loaded just after the desk starts (it keeps the desk's start-up small).
+  let wifiDisplay = $state<(typeof import("../app/wifi-display.svelte"))["wifiDisplay"] | null>(null);
+  onMount(() => {
+    if (isDesktop()) void import("../app/wifi-display.svelte").then((module) => (wifiDisplay = module.wifiDisplay));
+  });
+  const JOB: Record<ScreenRole, string> = { program: msg("Program"), scripture: msg("Scripture"), lyrics: msg("Lyrics"), slides: msg("Slides"), timer: msg("Timer"), stage: msg("Stage"), blank: msg("Dark") };
   const profile = $derived(
     session.workspace.displayProfiles.find((item) => item.id === session.workspace.activeDisplayProfileId) ??
       session.workspace.displayProfiles[0],
@@ -45,7 +52,7 @@
       {/if}
     {:else}
       <button type="button" role="menuitem" onclick={() => { session.openAudience(); close(); }}>
-        {external ? t("Show on {name}", { name: external.name }) : t("Open output")}
+        {external ? t("Show on {name}", { name: session.monitorName(external) }) : t("Open output")}
       </button>
     {/if}
     <button type="button" role="menuitemcheckbox" aria-checked={fullscreen} onclick={() => { session.setOutputMode(fullscreen ? "window" : "fullscreen"); close(); }}>
@@ -57,16 +64,28 @@
       <button type="button" role="menuitemcheckbox" aria-checked={ndiOn} onclick={() => { void (ndiOn ? session.stopNdi() : session.startNdi()); close(); }}>
         {t("Send over NDI")}{#if ndiOn}<span class="menu-note-inline">{tn(session.ndi.connections, "{n} watching", "{n} watching")}{session.ndi.audio ? ` · ${t("with sound")}` : ""}</span>{/if}
       </button>
-      <!-- No HDMI cable (or one that drops): a TV's own browser on the church Wi-Fi shows the screen. -->
-      <button type="button" role="menuitemcheckbox" aria-checked={wifiDisplay.on} onclick={() => { void wifiDisplay.toggle(); close(); }}>
-        {t("Show on a TV over Wi-Fi")}{#if wifiDisplay.on}<span class="menu-note-inline">{tn(wifiDisplay.watching, "{n} watching", "{n} watching")}</span>{/if}
-      </button>
-      {#if wifiDisplay.on}
-        <p class="menu-note">{t("On the TV's browser, open {url}", { url: wifiDisplay.url.replace(/^https?:\/\//, "") })}</p>
-        <button type="button" role="menuitem" onclick={() => { wifiDisplay.qrOnPreview(); close(); }}>{t("Its address as a QR code on Preview")}</button>
+      {#if wifiDisplay}
+        {@const wifi = wifiDisplay}
+        <!-- No HDMI cable (or one that drops): a TV's own browser on the church Wi-Fi shows the screen. -->
+        <button type="button" role="menuitemcheckbox" aria-checked={wifi.on} onclick={() => { void wifi.toggle(); close(); }}>
+          {t("Show on a TV over Wi-Fi")}{#if wifi.on}<span class="menu-note-inline">{tn(wifi.watching, "{n} watching", "{n} watching")}</span>{/if}
+        </button>
+        {#if wifi.on}
+          <p class="menu-note">{t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>
+          <button type="button" role="menuitem" onclick={() => { wifi.qrOnPreview(); close(); }}>{t("Its address as a QR code on Preview")}</button>
+        {/if}
+        {#if wifi.error}<p class="menu-note">{wifi.error}</p>{/if}
       {/if}
-      {#if wifiDisplay.error}<p class="menu-note">{wifiDisplay.error}</p>{/if}
     {/if}
+    {#if isDesktop() && (session.workspace.screens ?? []).length}
+      <!-- The extra screens, by name and job, so nobody has to dig into Settings to know what goes where. -->
+      <div class="menu-sep"></div>
+      {#each session.screensForNow() as screen, index (screen.id)}
+        {@const place = session.screenPlaces().get(screen.id)}
+        <p class="menu-note">{screen.name || (place?.state === "showing" ? session.monitorName(place.display) : t("Screen {name}", { name: screenLetter(index) }))} · {t(JOB[screen.role])}{place?.state !== "showing" ? ` · ${t("not showing")}` : ""}</p>
+      {/each}
+    {/if}
+    <button type="button" role="menuitem" onclick={() => { session.openSettings("screens"); close(); }}>{t("Screens and monitors…")}</button>
     <div class="menu-sep"></div>
     <button type="button" role="menuitem" onclick={() => { session.testOutput(); close(); }}>{t("Test output")}</button>
     <button type="button" role="menuitem" onclick={() => { session.openSettings("audience"); close(); }}>{t("Output settings…")}</button>
