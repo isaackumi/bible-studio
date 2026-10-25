@@ -587,29 +587,31 @@ fn screen_frame(monitor: &Monitor) -> (f64, f64, f64, f64) {
     logical_frame(monitor)
 }
 
+/// The first screen that is not the menu-bar one, from AppKit's screen frames (menu-bar screen
+/// first). Not NSScreen.mainScreen: that is the screen with the focused window, and with focus on
+/// the TV side it made the laptop's own screen look external, so the audience covered the desk.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn external_frame(frames: &[(f64, f64, f64, f64)]) -> Option<(i32, i32, u32, u32)> {
+    let (menu_bar, rest) = frames.split_first()?;
+    rest.iter()
+        .find(|frame| (frame.0 - menu_bar.0).abs() >= 1.0 || (frame.1 - menu_bar.1).abs() >= 1.0)
+        .map(|frame| (frame.0.round() as i32, frame.1.round() as i32, frame.2.round() as u32, frame.3.round() as u32))
+}
+
 #[cfg(target_os = "macos")]
 fn first_external_ns_frame() -> Option<(i32, i32, u32, u32)> {
     use objc2::MainThreadMarker;
     use objc2_app_kit::NSScreen;
 
     let marker = MainThreadMarker::new()?;
-    let main = NSScreen::mainScreen(marker)?;
-    let main_frame = main.frame();
-    for screen in NSScreen::screens(marker) {
-        let frame = screen.frame();
-        let same_origin = (frame.origin.x - main_frame.origin.x).abs() < 1.0
-            && (frame.origin.y - main_frame.origin.y).abs() < 1.0;
-        if same_origin {
-            continue;
-        }
-        return Some((
-            frame.origin.x.round() as i32,
-            frame.origin.y.round() as i32,
-            frame.size.width.round() as u32,
-            frame.size.height.round() as u32,
-        ));
-    }
-    None
+    let frames = NSScreen::screens(marker)
+        .iter()
+        .map(|screen| {
+            let frame = screen.frame();
+            (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height)
+        })
+        .collect::<Vec<_>>();
+    external_frame(&frames)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -1043,6 +1045,17 @@ fn display_info(monitor: &Monitor, all: &[Monitor], primary_key: Option<&str>, a
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_fallback_never_takes_the_laptops_own_screen_for_the_external_one() {
+        let laptop = (0.0, 0.0, 1440.0, 900.0);
+        let tv = (1440.0, -312.0, 1920.0, 1080.0);
+        // AppKit lists the menu-bar screen first, whichever screen has the focused window.
+        assert_eq!(external_frame(&[laptop, tv]), Some((1440, -312, 1920, 1080)));
+        // The TV dropped for a moment: nothing external, so nothing is covered.
+        assert_eq!(external_frame(&[laptop]), None);
+        assert_eq!(external_frame(&[]), None);
+    }
 
     fn candidate(key: &str, primary: bool) -> DisplayCandidate {
         DisplayCandidate {
