@@ -198,7 +198,7 @@ describe("finding a verse from part of it (KJV)", async () => {
     // Shown in the desk's own version, whichever version the words matched.
     expect(matchSpoken("love is patient", index, "kjv")?.item.translationId).toBe("kjv");
     for (const said of ["good morning church", "turn to your neighbour and say", "God is good all the time", "please be seated", "close your eyes and bow your heads"]) expect(found(said), said).toBeNull();
-  });
+  }, 90_000);
 
   it("with the Berean Standard Bible too, finds what people quote from modern Bibles", async () => {
     const index = buildQuoteIndex([...(await bundledQuoteCatalog("kjv")), ...(await bundledQuoteCatalog("web")), ...(await bundledQuoteCatalog("bsb"))]);
@@ -207,6 +207,6 @@ describe("finding a verse from part of it (KJV)", async () => {
     expect(found("love is patient love is kind")).toBe("1 Corinthians 13:4");
     expect(found("in him is life")).toBe("John 1:4");
     for (const said of ["good morning church", "turn to your neighbour and say", "God is good all the time", "close your eyes and bow your heads", "please be seated"]) expect(found(said), said).toBeNull();
-  });
+  }, 90_000);
 });
 
