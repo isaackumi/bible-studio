@@ -19,6 +19,7 @@ mod ndi;
 mod voice;
 mod bundle;
 mod cloud;
+mod nearby;
 mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
@@ -1063,6 +1064,7 @@ pub fn run() {
             }
             displays::start(app.handle().clone());
             app.manage(Arc::new(remote::LanRemote::default()));
+            app.manage(Arc::new(nearby::Nearby::default()));
             diagnostics::doing("starting NDI");
             ndi::start_hub();
             diagnostics::doing("running");
@@ -1102,6 +1104,10 @@ pub fn run() {
             cloud::cloud_download,
             cloud::cloud_state_read,
             cloud::cloud_state_write,
+            nearby::nearby_start,
+            nearby::nearby_stop,
+            nearby::nearby_peers,
+            nearby::nearby_fetch,
             output_status,
             open_audience,
             close_audience,

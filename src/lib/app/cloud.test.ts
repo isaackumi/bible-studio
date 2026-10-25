@@ -181,6 +181,25 @@ describe("cloud sync on this computer", () => {
     expect(other.status).toBe("readOnly");
   });
 
+  it("takes a missing file from a computer nearby first, even a video the cloud does not keep", async () => {
+    const cloud = fakeCloud({ status: { syncVideos: false } });
+    cloud.seed({ col: "deck", id: "d", at: T0 - 1000, doc: { id: "d", name: "Deck", updatedAt: "x", pages: [{ background: { assetId: VID } }, { background: { assetId: PIC } }] } });
+    cloud.seedMedia({ hash: "hash-pic", mediaId: PIC, name: "welcome.png", kind: "image", bytes: 100, usedIn: 1, lastUsedAt: null, storedAt: T0 - 1000 });
+    const computer = fakeComputer();
+    // The laptop next door has the video, not the picture.
+    computer.commands.nearby = async (id) => {
+      computer.did.push(`nearby ${id}`);
+      if (id !== VID) return false;
+      computer.media.set(id, { id, kind: "video" });
+      return true;
+    };
+    await make(cloud, computer).syncNow();
+    expect(computer.did).toContain(`nearby ${VID}`);
+    expect(computer.media.has(VID)).toBe(true);
+    expect(computer.did).toContain(`download ${PIC} cloud://hash-pic hash-pic`);
+    expect(computer.did.filter((line) => line.startsWith("download") && line.includes(VID))).toEqual([]);
+  });
+
   it("skips videos when the switch is off", async () => {
     const cloud = fakeCloud({ status: { syncVideos: false } });
     const workspace = { ...defaultWorkspace(), decks: [{ id: "d", name: "Deck", updatedAt: "x", pages: [{ background: { assetId: VID } }, { background: { assetId: PIC } }] } as never] };

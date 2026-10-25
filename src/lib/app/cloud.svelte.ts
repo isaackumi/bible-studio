@@ -18,6 +18,8 @@ export type CloudCommands = {
   hash(id: string): Promise<{ hash: string; bytes: number; name: string; kind: string; ext: string }>;
   upload(id: string, url: string): Promise<void>;
   download(url: string, row: { id: string; name: string; kind: string; ext: string; createdAt: string }, hash: string): Promise<void>;
+  /** Fetch a file from a computer nearby on the same licence: true when one had it and it is here now. */
+  nearby?(id: string): Promise<boolean>;
   readState(): Promise<string>;
   writeState(text: string): Promise<void>;
 };
@@ -313,10 +315,17 @@ export class CloudSync {
       }
       this.pendingMedia -= 1;
     }
-    if (toFetch.length) {
+    // A computer nearby lends what it has first: seconds over the church network, no cloud space,
+    // and even a video the cloud does not keep. What none of them has comes from the cloud.
+    const missing: string[] = [];
+    for (const id of toFetch) {
+      if (await this.fromNearby(id)) this.pendingMedia -= 1;
+      else missing.push(id);
+    }
+    if (missing.length) {
       const list = await this.deps.protocol.mediaList();
       if (list.ok) {
-        for (const id of toFetch) {
+        for (const id of missing) {
           const item = list.data.items.find((entry) => entry.mediaId === id || entry.aliases?.includes(id));
           if (item && (item.kind !== "video" || this.syncVideos)) {
             try {
@@ -335,6 +344,14 @@ export class CloudSync {
     this.full = full;
     this.paused = paused;
     this.pendingMedia = 0;
+  }
+
+  private async fromNearby(id: string): Promise<boolean> {
+    try {
+      return (await this.deps.commands.nearby?.(id)) ?? false;
+    } catch {
+      return false;
+    }
   }
 
   // --- For the Cloud space screen ------------------------------------------------------------

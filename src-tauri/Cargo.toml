@@ -31,6 +31,8 @@ zip = { version = "4", default-features = false, features = ["deflate-flate2-zli
 base64 = "0.22"
 reflink-copy = "0.1"
 fs4 = "1"
+# Nearby (nearby.rs): finding the other computers on this network and licence, over Bonjour (mDNS).
+mdns-sd = "0.21"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
 [target.'cfg(unix)'.dependencies]

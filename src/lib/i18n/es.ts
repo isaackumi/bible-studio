@@ -3741,6 +3741,8 @@ export const es: Readonly<Record<string, string>> = {
   "A computer nobody opens for six months signs itself out.": "Un ordenador que nadie abre durante seis meses cierra la sesión solo.",
   "Add person": "Añadir persona",
   "Add someone by email and they get an invitation from you. Once they sign in with that address, their computers use this license, up to its seats.": "Añade a alguien por correo y recibirá una invitación tuya. Cuando inicie sesión con esa dirección, sus ordenadores usarán esta licencia, hasta sus puestos.",
+  "On this network": "En esta red",
+  "Pictures and videos come from the computers on this network first: faster, and they do not need the cloud space.": "Las imágenes y los vídeos llegan primero de los ordenadores de esta red: más rápido, y no ocupan espacio en la nube.",
   "Joined {date}": "Se unió el {date}",
   "Invited {date} · not joined yet": "Invitado el {date} · aún no se ha unido",
   "Not joined yet": "Aún no se ha unido",

@@ -18,6 +18,12 @@
   <string>Church Studio listens so it can suggest the verse being read. The suggestion stays on Preview until you press LIVE.</string>
   <key>NSCameraUsageDescription</key>
   <string>Church Studio shows your cameras, including phone cameras like Iriun, on Preview and on Program when you take them.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Church Studio finds your church's other computers on this network, so pictures and videos come from the computer next door instead of the internet.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_churchstudio._tcp</string>
+  </array>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Church Studio uses on-device speech recognition to detect scripture. It does not send Program by itself.</string>
 </dict>

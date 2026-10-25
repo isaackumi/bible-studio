@@ -6223,13 +6223,14 @@ class Session {
     // While the app stays open (a Saturday rehearsal into Sunday morning), every few hours too.
     this.every(3 * 60 * 60_000, () => {
       void this.checkIn();
-      void this.checkActivation(true);
+      void this.checkActivation(true).then(() => this.checkNearby());
     });
     // Asked every start, not only when the lease is nearly due: a licence moved to another
     // computer leaves this one at the next start, as Settings says.
     await this.checkActivation(true);
-    // The cloud copy, once the plan and the seat are known.
+    // The cloud copy, once the plan and the seat are known; and the computers nearby on the licence.
     void this.cloudEngine().then((cloud) => cloud.start());
+    void this.checkNearby();
     // Offline too long: a paid plan must check in before its lease runs out; say so a week ahead.
     const renewBy = this.ent.kind === "license" ? (this.ent.renewBy ?? 0) : 0;
     const daysLeft = renewBy ? Math.ceil((renewBy - Date.now()) / 86_400_000) : Infinity;
@@ -6658,6 +6659,7 @@ class Session {
       this.persistSoon();
       await this.keepLease(lease);
       await this.checkActivation(true);
+      void this.checkNearby();
       this.message = t("Your account's {plan} plan is on this computer.", { plan: this.plan === "church" ? "Church" : "Premium" });
       return null;
     }
@@ -6897,6 +6899,32 @@ class Session {
 
   /** The sync engine with this session's parts, built in its own chunk (src/lib/app/cloud-wiring.ts). */
   private makeCloud = async (): Promise<CloudSync> => (await import("./cloud-wiring")).wireCloud(this);
+
+  // Nearby (src-tauri/src/nearby.rs): on a paid licence, the computers on the same network find
+  // each other and lend each other Media files before the cloud is asked.
+
+  private nearbyOn = false;
+
+  /** Start Nearby while this computer is on a licence key with a paid plan; stop it otherwise. */
+  checkNearby = async () => {
+    if (!isDesktop()) return;
+    const entitlement = this.workspace.entitlement;
+    const key = entitlement.source === "license" && this.plan !== "free" ? entitlement.license : null;
+    try {
+      if (key) {
+        await invoke("nearby_start", { key, device: this.deviceId, name: this.deviceName() });
+        this.nearbyOn = true;
+      } else if (this.nearbyOn) {
+        await invoke("nearby_stop");
+        this.nearbyOn = false;
+      }
+    } catch (error) {
+      console.warn("Nearby could not start", error);
+    }
+  };
+
+  /** The computers on this licence found on this network, by device id. */
+  nearbyComputers = async (): Promise<Array<{ device: string; name: string }>> => (this.nearbyOn ? invoke<Array<{ device: string; name: string }>>("nearby_peers").catch(() => []) : []);
 
   /** For the sync engine: who this computer is to the cloud. */
   cloudIdentity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName() });

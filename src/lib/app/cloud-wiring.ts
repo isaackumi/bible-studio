@@ -18,6 +18,12 @@ export function wireCloud(session: typeof Session): CloudSync {
       hash: (id) => invoke("cloud_hash", { id }),
       upload: (id, url) => invoke("cloud_upload", { id, url, ...identity() }),
       download: (url, row, hash) => invoke("cloud_download", { url, token: identity().token, device: identity().device, id: row.id, name: row.name, kind: row.kind, ext: row.ext, createdAt: row.createdAt, hash }),
+      // A computer nearby on the licence, first; the desk's Media list picks the file up.
+      nearby: async (id) => {
+        const from = await invoke<string | null>("nearby_fetch", { id });
+        if (from) void session.reloadMedia();
+        return !!from;
+      },
       readState: () => invoke<string>("cloud_state_read"),
       writeState: (text) => invoke("cloud_state_write", { text }),
     },

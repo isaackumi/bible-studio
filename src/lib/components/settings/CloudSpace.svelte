@@ -17,8 +17,11 @@
   let note = $state("");
   /** The file (or "bin") whose dangerous button was pressed once; a second press does it. */
   let armed = $state<string | null>(null);
+  /** Computers on this licence found on this network: they lend each other files first. */
+  let nearby = $state<Set<string>>(new Set());
 
   onMount(() => {
+    void session.nearbyComputers().then((found) => (nearby = new Set(found.map((computer) => computer.device))));
     void session.cloudEngine().then(async (engine) => {
       cloud = engine;
       await refresh();
@@ -132,8 +135,11 @@
     {/if}
     {#if cloud.devices.length}
       <p class="list-label">{t("Computers syncing")}</p>
+      {#if nearby.size}
+        <div class="row"><div class="row-copy"><span>{t("Pictures and videos come from the computers on this network first: faster, and they do not need the cloud space.")}</span></div></div>
+      {/if}
       {#each cloud.devices as device (device.device)}
-        <div class="row"><div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}</strong><span>{t("Last synced {when}", { when: new Date(device.lastSyncAt).toLocaleString() })}</span></div></div></div>
+        <div class="row"><div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}</strong><span>{t("Last synced {when}", { when: new Date(device.lastSyncAt).toLocaleString() })}{#if nearby.has(device.device)} · {t("On this network")}{/if}</span></div></div></div>
       {/each}
     {/if}
   {/if}
