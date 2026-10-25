@@ -71,7 +71,8 @@
           {t("Show on a TV over Wi-Fi")}{#if wifi.on}<span class="menu-note-inline">{tn(wifi.watching, "{n} watching", "{n} watching")}</span>{/if}
         </button>
         {#if wifi.on}
-          <p class="menu-note">{t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>
+          <p class="menu-note">{wifi.link ? t("Bookmark on the TV, once: {url}", { url: wifi.link.replace(/^https?:\/\//, "") }) : t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>
+          {#if wifi.link}<p class="menu-note">{t("Without internet: {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}</p>{/if}
           <button type="button" role="menuitem" onclick={() => { wifi.qrOnPreview(); close(); }}>{t("Its address as a QR code on Preview")}</button>
         {/if}
         {#if wifi.error}<p class="menu-note">{wifi.error}</p>{/if}

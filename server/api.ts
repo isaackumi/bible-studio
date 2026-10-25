@@ -28,6 +28,7 @@ import { INSTRUMENT_SERIF_ITALIC_WOFF2, INTER_WOFF2, SHARE_IMAGE_JPEG } from "./
 import { CHANGELOG } from "../src/lib/domain/changelog.ts";
 import { EMAIL_LOGO_PNG } from "./brand-logo.ts";
 import { licenseKeyEmail } from "./email.ts";
+import { tvPage, tvRegister } from "./tv.ts";
 import type { Provider } from "./billing.ts";
 import { checkoutPage, payPage } from "./pages.ts";
 import { adminRoute, type AdminSettings } from "./admin.ts";
@@ -332,6 +333,8 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     const bible = path.match(/^\/bibles\/([a-z]+)\.json$/);
     if (bible) return serveBible(config, bible[1]!);
     if (path === "/features") return page(featuresPage(site, origin));
+    const tv = path.match(/^\/tv\/([A-Za-z0-9]{6})$/);
+    if (tv) return tvPage(config, tv[1]!, url.searchParams.get("screen"));
     if (path === "/story") return page(storyPage(site, origin));
     if (path === "/whats-new") return page(newsPage(site, origin, await releasedVersion(config)));
     if (path === "/robots.txt") return text200(robots(origin), "text/plain; charset=utf-8");
@@ -375,11 +378,13 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (!input) return json(400, { error: "Send JSON." });
   // The routes that send email, make records or could be guessed at: a few a minute from one address.
   // Check-ins too: each new computer id is a stored record, so one address cannot make thousands.
-  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start" || path === "/v1/hello") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
+  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start" || path === "/v1/hello" || path === "/v1/tv") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
 
   switch (path) {
     case "/v1/hello":
       return hello(config, input);
+    case "/v1/tv":
+      return tvRegister(config, input);
     case "/v1/trial":
       return trial(config, input, request.headers.get("cf-connecting-ip"));
     case "/v1/promo": {

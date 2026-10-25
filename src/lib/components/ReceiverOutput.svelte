@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { SERVER_URL } from "../domain/billing";
+  import { SERVER_URL, SITE_URL } from "../domain/billing";
   import { cleanAspect } from "../display/shape";
   import { emptyModel, defaultTheme } from "../domain/theme";
   import type { PresentationModel } from "../domain/types";
@@ -15,6 +15,9 @@
   // screen's job lets through (only verses, songs between, …) instead of everything.
   let { code, lan = false, screen = "" }: { code: string; lan?: boolean; screen?: string } = $props();
   let kept: PresentationModel | null = null;
+  /** The church's TV link this page came by (?via=CODE), and when the computer last answered. */
+  const via = typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("via") ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
+  let lastSeen = Date.now();
 
   let model = $state<PresentationModel>(emptyModel(defaultTheme()));
   let aspect = $state(16 / 9);
@@ -52,6 +55,7 @@
           status = "ended";
           return;
         }
+        if (response.ok) lastSeen = Date.now();
         if (response.status === 200) {
           const data = (await response.json()) as { on: boolean; revision: number; frame?: string; name: string };
           revision = data.revision;
@@ -71,6 +75,12 @@
         } else if (status === "offline") status = revision ? "showing" : "waiting";
       } catch {
         status = "offline";
+        // Came by the church's TV link and the computer has gone quiet a while (its Wi-Fi address
+        // changed): back through the link, which knows where it is now.
+        if (lan && via && Date.now() - lastSeen > 20_000) {
+          window.location.href = `${SITE_URL}/tv/${via}${screen ? `?screen=${screen}` : ""}`;
+          return;
+        }
       }
       // Once a second while the page is in view; slower when it is not.
       timer = setTimeout(ask, document.hidden ? 5000 : 1000);

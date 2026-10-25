@@ -37,7 +37,7 @@
   function where(id: string): { text: string; ok: boolean } {
     const place = places.get(id);
     if (place?.state === "wifi") {
-      return wifi?.on ? { text: t("On the TV's browser, open {url}", { url: wifi.urlFor(id).replace(/^https?:\/\//, "") }), ok: true } : { text: t("Starting the Wi-Fi screen…"), ok: false };
+      return wifi?.on ? { text: t("On the TV's browser, open {url}", { url: wifi.linkFor(id).replace(/^https?:\/\//, "") }), ok: true } : { text: t("Starting the Wi-Fi screen…"), ok: false };
     }
     if (!place || place.state === "no-monitor") return { text: t("Choose its monitor"), ok: false };
     if (place.state === "missing") return { text: t("Its monitor is not connected. It comes back when the monitor does."), ok: false };
@@ -110,13 +110,13 @@
     <div class="row">
       <div class="row-copy">
         <strong>{t("Show on a TV over Wi-Fi")}</strong>
-        <span>{wifi?.on ? t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") }) : t("For a TV with a web browser, or when the HDMI cable is not reliable. The TV and this computer must be on the same Wi-Fi.")}</span>
+        <span>{wifi?.on ? (wifi.link ? t("Bookmark on the TV, once: {url}", { url: wifi.link.replace(/^https?:\/\//, "") }) : t("On the TV's browser, open {url}", { url: wifi.url.replace(/^https?:\/\//, "") })) : t("For a TV with a web browser, or when the HDMI cable is not reliable. The TV and this computer must be on the same Wi-Fi.")}</span>
       </div>
       <input type="checkbox" class="switch" role="switch" aria-label={t("Show on a TV over Wi-Fi")} checked={!!wifi?.on} disabled={!wifi} onchange={() => void wifi?.toggle()} />
     </div>
     {#if wifi?.on}
       <div class="row">
-        <div class="row-copy"><span>{tn(wifi.watching, "{n} TV is showing the screen now.", "{n} TVs are showing the screen now.")}</span></div>
+        <div class="row-copy"><span>{tn(wifi.watching, "{n} TV is showing the screen now.", "{n} TVs are showing the screen now.")}{#if wifi.link}{" "}{t("The bookmark keeps working when this computer's Wi-Fi address changes; it needs the internet only to open. Without internet: {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}{/if}</span></div>
         <button type="button" class="btn" onclick={() => wifi?.qrOnPreview()}>{t("Its address as a QR code on Preview")}</button>
       </div>
     {/if}
