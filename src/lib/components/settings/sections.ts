@@ -48,11 +48,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     label: msg("Screens"),
     items: [
-      { id: "audience", title: msg("Audience output"), icon: "cast", color: "#e5484d", about: msg("What the congregation sees, and on which screen."), keywords: "projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
-      { id: "displays", title: msg("Displays"), icon: "screens", color: "#0a84ff", about: msg("Which screen is the desk, and which is the audience."), keywords: "monitor screen profile second assign" },
-      { id: "themes", title: msg("Themes"), icon: "themes", color: "#c2410c", about: msg("How verses, songs and slides look on the screen."), keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
+      // One page per question: what the congregation sees, which monitor is which, what the other
+      // screens show, and what the people on stage see.
+      { id: "audience", title: msg("Main screen"), icon: "cast", color: "#e5484d", about: msg("The congregation's screen: open it, full screen or in a window, its shape, and a test."), keywords: "audience output projector window fullscreen program open test shape aspect 16:9 4:3 16:10 portrait led size resolution" },
+      { id: "displays", title: msg("Monitors"), icon: "screens", color: "#0a84ff", about: msg("Which monitor is the desk, and which is the main screen."), keywords: "displays monitor screen profile second assign" },
+      { id: "screens", title: msg("More screens"), icon: "screens", color: "#0ea5e9", about: msg("Other monitors and TVs over Wi-Fi, each showing only what you choose: scripture, songs, slides or a timer. And where everything goes."), keywords: "screens monitors multiple outputs timer scripture lyrics songs lock assign wifi wi-fi tv television browser network names" },
       { id: "stage", title: msg("Stage display"), icon: "stage", color: "#ff9f0a", about: msg("A private confidence screen for the people on stage."), keywords: "confidence platform next clock" },
-      { id: "screens", title: msg("Screens"), icon: "screens", color: "#0ea5e9", about: msg("Extra monitors, each with its own job: timer, scripture, lyrics or stage."), keywords: "monitors multiple screens outputs timer scripture lyrics lock assign" },
+      { id: "themes", title: msg("Themes"), icon: "themes", color: "#c2410c", about: msg("How verses, songs and slides look on the screen."), keywords: "theme background color font animation motion video photo image wash gradient premium library look" },
       { id: "captions", title: msg("Captions"), icon: "captions", color: "#0f9d8a", about: msg("Live captions on the screen and on phones, translated."), keywords: "captions subtitles deaf hard of hearing translate translation language phone qr live words transcript" },
     ],
   },

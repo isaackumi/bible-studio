@@ -43,7 +43,7 @@
     if (place.state === "missing") return { text: t("Its monitor is not connected. It comes back when the monitor does."), ok: false };
     if (place.state === "taken") {
       return {
-        text: place.by === "desk" ? t("That monitor has the desk. Choose another.") : place.by === "audience" ? t("That monitor has the audience screen. Choose another.") : t("Another screen already uses that monitor."),
+        text: place.by === "desk" ? t("That monitor has the desk. Choose another.") : place.by === "audience" ? t("That monitor is the main screen, which already shows everything. Choose another monitor, or Wi-Fi for a TV.") : t("Another screen already uses that monitor."),
         ok: false,
       };
     }
@@ -63,6 +63,35 @@
     if (index >= 0) return t("Screen {name}", { name: screens[index]!.name || screenLetter(index) });
     return t("Not used yet");
   }
+  /** What a screen shows, in a few words: its job, what it takes between, and whether it is locked. */
+  function shows(screen: ScreenOutput): string {
+    const job = t(ROLE_TEXT[screen.role].label);
+    const between =
+      isKind(screen.role) && screen.between === "keep"
+        ? t("{job}, the last one kept up", { job })
+        : isKind(screen.role) && screen.between === "also" && screen.also?.length
+          ? t("{job}, and {others} between", { job, others: screen.also.map((kind) => t(KIND_TEXT[kind]).toLowerCase()).join(", ") })
+          : screen.role === "program"
+            ? t("Everything that goes LIVE")
+            : job;
+    return screen.locked ? `${between} · ${t("locked")}` : between;
+  }
+
+  /** Where everything goes, one line each: the desk, the main screen, every other screen, the Wi-Fi link. */
+  const summary = $derived.by(() => {
+    const rows: Array<{ who: string; where: string; what: string; ok: boolean }> = [];
+    const desk = displays.find((display) => display.key === session.output.operatorKey);
+    rows.push({ who: t("Desk"), where: desk ? session.monitorName(desk) : t("This computer"), what: t("Your controls; the congregation never sees it"), ok: true });
+    rows.push({ who: t("Main screen"), where: mainDisplay ? session.monitorName(mainDisplay) : t("Not open"), what: t("Everything that goes LIVE"), ok: !!mainDisplay });
+    if (wifi?.on) rows.push({ who: t("TV over Wi-Fi"), where: t("The Wi-Fi address"), what: t("The same as the main screen"), ok: true });
+    now.forEach((screen, index) => {
+      const place = places.get(screen.id);
+      const where = place?.state === "showing" ? session.monitorName(place.display) : place?.state === "wifi" ? t("Wi-Fi: its own address") : place?.state === "missing" ? t("Its monitor is not connected") : place?.state === "taken" ? t("Its monitor is in use") : t("No monitor chosen");
+      rows.push({ who: screen.name || t("Screen {name}", { name: screenLetter(index) }), where, what: shows(screen), ok: place?.state === "showing" || place?.state === "wifi" });
+    });
+    return rows;
+  });
+
   const KIND_TEXT: Record<ContentKind, string> = { scripture: msg("Scripture"), lyrics: msg("Songs"), slides: msg("Slides and pictures") };
   const WHEN_NONE: Record<ContentKind, string> = { scripture: msg("When no verse is up"), lyrics: msg("When no song is up"), slides: msg("When no slide is up") };
   const isKind = (role: ScreenRole): role is ContentKind => (CONTENT_KINDS as readonly string[]).includes(role);
@@ -89,6 +118,19 @@
   {/if}
 </section>
 
+{#if isDesktop()}
+  <!-- Where everything goes, at a glance: every screen, where it is, and what it shows. -->
+  <p class="section-label">{t("Where everything goes")}</p>
+  <section class="rows">
+    {#each summary as row (row.who + row.where)}
+      <div class="row where">
+        <div class="row-copy"><strong>{row.who}</strong><span class:warn={!row.ok}>{row.where}</span></div>
+        <span class="what">{row.what}</span>
+      </div>
+    {/each}
+  </section>
+{/if}
+
 {#if isDesktop() && displays.length}
   <!-- Each monitor by the name people use for it ("Main auditorium"), with its own name kept beside. -->
   <p class="section-label">{t("Your monitors")}</p>
@@ -114,6 +156,9 @@
       </div>
       <input type="checkbox" class="switch" role="switch" aria-label={t("Show on a TV over Wi-Fi")} checked={!!wifi?.on} disabled={!wifi} onchange={() => void wifi?.toggle()} />
     </div>
+    {#if wifi?.on}
+      <div class="row"><div class="row-copy"><span>{t("This address shows the same as the main screen. For a TV that shows only songs or only scripture, add a screen below, choose Wi-Fi as its monitor, and open that screen's own address on the TV.")}</span></div></div>
+    {/if}
     {#if wifi?.on}
       <div class="row">
         <div class="row-copy"><span>{tn(wifi.watching, "{n} TV is showing the screen now.", "{n} TVs are showing the screen now.")}{#if wifi.link}{" "}{t("The bookmark keeps working when this computer's Wi-Fi address changes; it needs the internet only to open. Without internet: {url}", { url: wifi.url.replace(/^https?:\/\//, "") })}{/if}</span></div>
@@ -240,6 +285,7 @@
   .role.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   .role:disabled { opacity: 0.45; cursor: default; }
   .main { border-left-color: var(--presence, var(--accent)); }
+  .where .what { flex: none; max-width: 55%; color: var(--ink); font-size: 13px; text-align: right; }
   .main .letter { background: var(--presence, var(--accent)); }
   .between { display: grid; gap: 6px; font-size: 13px; }
   .between label { display: flex; align-items: center; gap: 8px; cursor: pointer; }

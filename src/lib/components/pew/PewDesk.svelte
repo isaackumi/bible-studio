@@ -1191,7 +1191,7 @@
 
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › Screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
