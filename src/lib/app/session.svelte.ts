@@ -6,7 +6,7 @@ import { playCue } from "../audio/beeper";
 import { cleanTrim, endPoint, videoEnd, type VideoEnd } from "../domain/video-play";
 import { buildSlideIndex, matchSlide, type SlideIndex, type SlideMatch, type SlideText } from "../voice/slide-follow";
 import { activationFrom, idleActivation, RENEW_EARLY_DAYS, type ActivatedDevice, type ActivationState } from "../domain/activation";
-import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
+import { CHECKOUT_WAIT_MS, freeStatus, serverCall, type AccountStatus, type CheckoutPoll, type CheckoutStart, type EntitlementStatus, type Interval, type LicenseMember, type PromoResult, type SignedInComputer, type SigninPoll, type SigninStart, type SigninToken, pkcePair } from "../domain/billing";
 import { readLicense } from "../domain/license";
 import { QUALITIES, recordingStamp, sanitizeBroadcast, streamTarget, type BroadcastSettings } from "../domain/broadcast";
 import { recordingMinutes } from "../domain/readiness";
@@ -6595,12 +6595,17 @@ class Session {
   };
 
   /** The owner adds or removes a person (by email) on one of their licenses. */
-  changeLicenseMembers = async (license: string, change: { add?: string; remove?: string }): Promise<string | null> => {
+  /** Add, remove or invite again: adding someone (or resend) emails them an invitation naming the church. */
+  changeLicenseMembers = async (license: string, change: { add?: string; remove?: string; resend?: string }): Promise<string | null> => {
     const token = this.workspace.profile?.token;
     if (!token) return null;
-    const answer = await serverCall<{ members: string[] }>("/v1/license/members", { token, license, ...change });
+    const answer = await serverCall<{ members: string[]; people?: LicenseMember[] }>("/v1/license/members", { token, license, church: this.workspace.churchName.trim(), ...change });
     if (!answer.ok) return answer.offline ? t("Connect to the internet to change who uses this license.") : answer.error;
-    this.accountLicenses = this.accountLicenses.map((entry) => (entry.license === license ? { ...entry, members: answer.data.members } : entry));
+    this.accountLicenses = this.accountLicenses.map((entry) => (entry.license === license ? { ...entry, members: answer.data.members, people: answer.data.people } : entry));
+    const invited = change.add?.trim().toLowerCase() || change.resend;
+    if (invited && answer.data.people?.find((person) => person.email === invited)?.invitedAt) {
+      this.notify(t("Invitation sent to {email}", { email: invited }), { detail: t("They download Church Studio and sign in with that address. No license key needed.") });
+    }
     return null;
   };
 
@@ -6656,7 +6661,11 @@ class Session {
       this.message = t("Your account's {plan} plan is on this computer.", { plan: this.plan === "church" ? "Church" : "Premium" });
       return null;
     }
-    if (activation?.status === 409) return t("Your account's plan is in use on all the computers it covers. Release one, then sign in again.");
+    if (activation?.status === 409) {
+      // Someone else's license this account was added to: say whom to ask.
+      const by = answer.data.licenses.find((entry) => !entry.owner && !entry.removed && !entry.revoked && entry.by)?.by;
+      return by ? t("{name}'s plan is in use on all the computers it covers. Ask {name} to free one, then sign in again.", { name: by }) : t("Your account's plan is in use on all the computers it covers. Release one, then sign in again.");
+    }
     if (answer.data.licenses.length) return null;
     // No plan on the account: say what this computer has instead of a bare "no plan".
     if (this.ent.kind === "trial" && this.ent.endsAt) {

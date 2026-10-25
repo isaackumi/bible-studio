@@ -78,10 +78,16 @@ export const CHECKOUT_WAIT_MS = 45 * 60_000;
 export type SigninStart = { id: string; secret: string; number?: number; code?: string; url: string; expiresAt: number; methods: string[] };
 export type SigninToken = { token: string; account: { email: string; name: string } };
 export type SigninPoll = { status: "pending" | "done" | "cancelled" | "expired" | "collected"; token?: string; account?: { email: string; name: string } };
+/** A person an owner added to their license. */
+export type LicenseMember = { email: string; invitedAt?: number; joinedAt?: number };
 export type AccountStatus = {
   account: { email: string; name: string };
-  /** owner: this account owns it (members: who it added); removed: the owner took this account off it. */
-  licenses: Array<{ license: string; plan: LicensePlan; revoked: boolean; owner?: boolean; members?: string[]; removed?: boolean }>;
+  /**
+   * owner: this account owns it (members: who it added; people: each with when they were invited and
+   * joined); by: the owner's name, on a license someone added this account to; removed: the owner
+   * took this account off it.
+   */
+  licenses: Array<{ license: string; plan: LicensePlan; revoked: boolean; owner?: boolean; members?: string[]; people?: LicenseMember[]; by?: string; removed?: boolean }>;
   lease?: string;
   activation?: { key?: string; seats?: number; devices?: unknown[]; status?: number; error?: string };
 };

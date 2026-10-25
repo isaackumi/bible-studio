@@ -8,7 +8,7 @@
   import ScreensSettings from "./ScreensSettings.svelte";
   import StorageSpace from "./StorageSpace.svelte";
   import PlatformMark, { platformOf } from "../PlatformMark.svelte";
-  import type { SignedInComputer } from "../../domain/billing";
+  import type { LicenseMember, SignedInComputer } from "../../domain/billing";
   import SettingsSearch from "./SettingsSearch.svelte";
   import type { SettingEntry } from "../../settings/search";
   import { tick } from "svelte";
@@ -358,6 +358,14 @@
   let signInError = $state("");
 
   /** "Mac app, used today" / "Edge on Windows, used 3 days ago": what it is, and when it was last used. */
+  /** Where an added person is: invited (and when), or joined. */
+  function memberLine(person: LicenseMember | undefined): string {
+    const day = (at: number) => new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    if (person?.joinedAt) return t("Joined {date}", { date: day(person.joinedAt) });
+    if (person?.invitedAt) return t("Invited {date} · not joined yet", { date: day(person.invitedAt) });
+    return t("Not joined yet");
+  }
+
   function computerLine(computer: SignedInComputer): string {
     const { platform, browser } = platformOf(computer.os, computer.browser);
     const system = { mac: "Mac", windows: "Windows", linux: "Linux", other: "" }[platform];
@@ -1636,9 +1644,16 @@
             {#if profile.token}
               {#each session.accountLicenses.filter((entry) => entry.owner && !entry.revoked) as owned (owned.license)}
                 <div class="row stack">
-                  <div class="row-copy"><strong>{t("People on your {plan} license", { plan: owned.plan === "church" ? "Church" : "Premium" })}</strong><span>{t("Add someone by the email they sign in with. Their computers then use this license, up to its seats.")}</span></div>
+                  <div class="row-copy"><strong>{t("People on your {plan} license", { plan: owned.plan === "church" ? "Church" : "Premium" })}</strong><span>{t("Add someone by email and they get an invitation from you. Once they sign in with that address, their computers use this license, up to its seats.")}</span></div>
                   {#each owned.members ?? [] as email (email)}
-                    <div class="member"><span class="one-line">{email}</span><button type="button" class="btn small" onclick={async () => { signInError = (await session.changeLicenseMembers(owned.license, { remove: email })) ?? ""; }}>{t("Remove")}</button></div>
+                    {@const person = owned.people?.find((entry) => entry.email === email)}
+                    <div class="member">
+                      <span class="member-copy"><span class="one-line">{email}</span><small class="one-line">{memberLine(person)}</small></span>
+                      <span class="member-actions">
+                        {#if !person?.joinedAt}<button type="button" class="btn small" onclick={async () => { signInError = (await session.changeLicenseMembers(owned.license, { resend: email })) ?? ""; }}>{person?.invitedAt ? t("Resend invite") : t("Send invite")}</button>{/if}
+                        <button type="button" class="btn small" onclick={async () => { signInError = (await session.changeLicenseMembers(owned.license, { remove: email })) ?? ""; }}>{t("Remove")}</button>
+                      </span>
+                    </div>
                   {/each}
                   <form class="sign-in" onsubmit={async (event) => { event.preventDefault(); const input = event.currentTarget.elements.namedItem("email") as HTMLInputElement; signInError = (await session.changeLicenseMembers(owned.license, { add: input.value })) ?? ""; if (!signInError) input.value = ""; }}>
                     <input name="email" type="email" required placeholder="volunteer@church.org" aria-label={t("Email to add")} />
@@ -2149,6 +2164,9 @@
   .quiet-action { flex: none; padding: 5px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
   .quiet-action:hover, .quiet-action:focus-visible { color: var(--danger, #ff6b5e); background: color-mix(in srgb, var(--danger, #ff6b5e) 10%, transparent); }
   .member span { font-size: 13px; }
+  .member-copy { display: flex; flex-direction: column; min-width: 0; }
+  .member-copy small { font-size: 12px; color: var(--muted); }
+  .member-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .member { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
   .sign-in input { flex: 1 1 200px; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 9px; background: transparent; color: inherit; font: inherit; }
   .signin-number { align-self: flex-start; padding: 6px 22px; border: 1px solid var(--line, rgb(255 255 255 / 0.12)); border-radius: 14px; font-size: 40px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--accent); }

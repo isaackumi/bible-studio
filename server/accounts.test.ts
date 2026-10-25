@@ -126,7 +126,7 @@ describe("accounts", () => {
     const { token } = (await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data;
     const status = (await call("/v1/account", { token, device: "mac-2", name: "Office PC" })).data;
     // The buyer's verified email claims it: they own it, with nobody added yet.
-    expect(status.licenses).toEqual([{ license: paid.license, plan: "church", revoked: false, owner: true, members: [] }]);
+    expect(status.licenses).toEqual([{ license: paid.license, plan: "church", revoked: false, owner: true, members: [], people: [] }]);
     // Mock checkouts are test sales, signed with the test key.
     expect(readLease(status.lease, TEST_LICENSE_PUBLIC_KEY)).toMatchObject({ plan: "church", device: "mac-2" });
     expect(status.activation.key).toBe(paid.key);
@@ -228,7 +228,7 @@ describe("signing in safely, and who a license belongs to", () => {
     expect((await call("/v1/activate", { key, device: "pc-2", token: bobToken })).data).toMatchObject({ owned: true });
     const license = (await call("/v1/account", { token: aliceToken })).data.licenses[0].license;
     expect((await call("/v1/license/members", { token: bobToken, license, add: "x@y.z" })).status).toBe(404);
-    expect((await call("/v1/license/members", { token: aliceToken, license, add: "Bob@Grace.org" })).data).toEqual({ members: ["bob@grace.org"] });
+    expect((await call("/v1/license/members", { token: aliceToken, license, add: "Bob@Grace.org" })).data).toMatchObject({ members: ["bob@grace.org"] });
     expect((await call("/v1/activate", { key, device: "pc-2", token: bobToken })).status).toBe(200);
     // Removed again: still listed on Bob's account, never used.
     await call("/v1/license/members", { token: aliceToken, license, remove: "bob@grace.org" });
@@ -245,6 +245,52 @@ describe("signing in safely, and who a license belongs to", () => {
     await call("/v1/license/members", { token: aliceToken, license: bought.license, add: bob.email });
     const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
     expect((await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" })).data).toMatchObject({ licenses: [{ license: bought.license, owner: false }], lease: expect.any(String) });
+  });
+
+  it("an added person is emailed an invitation naming who and which church; the owner sees invited, then joined", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy, mails } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const { license } = await buy("", { token: aliceToken });
+    const invites = () => mails.filter((mail) => mail.to === "bob@grace.org");
+
+    const added = (await call("/v1/license/members", { token: aliceToken, license, add: "Bob@Grace.org", church: " Grace\nChapel " })).data;
+    expect(added.members).toEqual(["bob@grace.org"]);
+    expect(added.people).toEqual([{ email: "bob@grace.org", invitedAt: expect.any(Number) }]);
+    expect(invites()).toHaveLength(1);
+    expect(invites()[0]!.subject).toBe("Alice invited you to Grace Chapel on Church Studio");
+    expect(invites()[0]!.text).toContain("Sign in with this email address: bob@grace.org");
+    expect(invites()[0]!.text).toContain("/download/windows");
+
+    // Adding the same person again sends nothing; Resend does.
+    await call("/v1/license/members", { token: aliceToken, license, add: "bob@grace.org" });
+    expect(invites()).toHaveLength(1);
+    await call("/v1/license/members", { token: aliceToken, license, resend: "bob@grace.org" });
+    expect(invites()).toHaveLength(2);
+    // Only people already on the license can be sent one again.
+    expect((await call("/v1/license/members", { token: aliceToken, license, resend: "eve@x.org" })).status).toBe(404);
+
+    const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
+    const bobs = (await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" })).data;
+    expect(bobs.licenses[0]).toMatchObject({ owner: false, by: "Alice" });
+    const alices = (await call("/v1/account", { token: aliceToken })).data;
+    expect(alices.licenses[0].people).toEqual([{ email: "bob@grace.org", invitedAt: expect.any(Number), joinedAt: expect.any(Number) }]);
+
+    const removed = (await call("/v1/license/members", { token: aliceToken, license, remove: "bob@grace.org" })).data;
+    expect(removed).toEqual({ members: [], people: [] });
+  });
+
+  it("an invitation without a church name says the inviter's church, and one inbox gets only a few a day", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy, mails } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const { license } = await buy("", { token: aliceToken });
+    await call("/v1/license/members", { token: aliceToken, license, add: "carol@grace.org" });
+    expect(mails.find((mail) => mail.to === "carol@grace.org")!.subject).toBe("Alice invited you to their church on Church Studio");
+    let refused = 0;
+    for (let i = 0; i < 6; i++) if ((await call("/v1/license/members", { token: aliceToken, license, resend: "carol@grace.org" })).status === 429) refused++;
+    expect(refused).toBeGreaterThan(0);
+    expect(mails.filter((mail) => mail.to === "carol@grace.org").length).toBeLessThanOrEqual(5);
   });
 
   it("the browser version signs in as whoever is signed in to the browser, with no code", async () => {

@@ -22,14 +22,15 @@
 //   POST /v1/account/link   {token, key}              → {ok}   (a key bought before signing in)
 //   POST /v1/account/devices {token}                  → {devices}  (where this account is signed in)
 //   POST /v1/account/signout {token, device?|everywhere?} → {ok}
-//   POST /v1/license/members {token, license, add?, remove?} → {members}  (the owner's team)
+//   POST /v1/license/members {token, license, add?|remove?|resend?, church?} → {members, people}  (the owner's team;
+//     adding someone, or resend, emails them an invitation from the owner, naming the church)
 //   GET  /signin/:id   POST /signin/:id/confirm|cancel   (the browser pages)
 //
 // Tokens last 180 days from their last use, so a computer nobody opens any more signs itself out.
 
 import { readLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { activateDevice, noteAccountTrial, noteDevice, readAnyLicense, type ApiConfig } from "./api.ts";
-import { changeMembers, claimLicense, mayUse, ownershipOf } from "./ownership.ts";
+import { changeMembers, claimLicense, mayUse, noteJoined, ownershipOf, peopleOf } from "./ownership.ts";
 import { signinPage } from "./pages.ts";
 import { getJson, putJson } from "./store.ts";
 
@@ -288,8 +289,9 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       if (!account) return json(401, { signedOut: true, error: "Sign in again." });
       const linked = account.licenses.find((entry) => entry.id === text(input.license, 40));
       if (!linked) return json(404, { error: "That license is not on your account." });
-      const result = await changeMembers(config, account, linked, { add: text(input.add, 120), remove: text(input.remove, 120) });
-      return result.ok ? json(200, { members: result.members }) : json(result.status, { error: result.error });
+      const plan = (readAnyLicense(config, linked.key)?.license ?? readLicense(linked.key))?.plan;
+      const result = await changeMembers(config, account, linked, { add: text(input.add, 120), remove: text(input.remove, 120), resend: text(input.resend, 120), church: text(input.church, 120), plan: plan === "premium" ? "premium" : "church" });
+      return result.ok ? json(200, { members: result.members, people: result.people }) : json(result.status, { error: result.error });
     }
     default:
       return null;
@@ -319,7 +321,14 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
     const owner = !ownership || ownership.owner === account.id;
     // Removed from a license by its owner: still listed, but no longer used.
     const allowed = mayUse(ownership, account);
-    summary.push({ license: license.id, plan: license.plan, revoked, owner, ...(owner && ownership ? { members: ownership.members } : {}), ...(allowed ? {} : { removed: true }) });
+    // The person who added this account, by name, so a full license can say whom to ask.
+    let by: string | undefined;
+    if (!owner && allowed && ownership) {
+      await noteJoined(config, license.id, ownership, account.email);
+      const holder = await getJson<Account>(config.store, `acct:${ownership.owner}`);
+      by = holder ? holder.name || holder.email : undefined;
+    }
+    summary.push({ license: license.id, plan: license.plan, revoked, owner, ...(owner && ownership ? { members: ownership.members, people: peopleOf(ownership) } : {}), ...(by ? { by } : {}), ...(allowed ? {} : { removed: true }) });
     if (!device || lease || revoked || !allowed) continue;
     const result = await activateDevice(config, entry.key, device, text(input.name, 60) || "Computer");
     if (result.lease) {

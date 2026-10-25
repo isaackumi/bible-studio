@@ -71,6 +71,48 @@ export function signInEmail(url: string, base: string): Email {
   };
 }
 
+/** An owner added someone to their license: who invited them, to which church, and how to join. */
+export function inviteEmail(input: { inviter: string; inviterEmail: string; church: string; to: string; plan: "premium" | "church" }, base: string): Email {
+  const root = base.replace(/\/+$/, "");
+  const where = input.church ? input.church : "their church";
+  const whose = input.church ? `${input.church}'s` : "their";
+  const plan = input.plan === "church" ? "Church" : "Premium";
+  const about = `${input.inviter} (${input.inviterEmail}) added you to ${whose} ${plan} plan on Church Studio, the app for putting songs, Bible verses and slides on the screens at church. Once you join, the church's songs, services, slides and pictures come to your computer and stay in step with everyone else's.`;
+  const steps = ["1. Download Church Studio for your computer (Windows or Mac).", "2. Open it, go to Settings › Plan & account and choose Sign in.", `3. Sign in with this email address: ${input.to}`];
+  const keyless = "No license key to type: signing in is all it takes.";
+  return {
+    subject: `${input.inviter} invited you to ${where} on Church Studio`,
+    text: [
+      `${input.inviter} invited you to ${where} on Church Studio`,
+      "",
+      about,
+      "",
+      ...steps,
+      "",
+      keyless,
+      "",
+      `Windows: ${root}/download/windows`,
+      `Mac: ${root}/download/mac`,
+      "",
+      "Not expecting this? Ignore it: nothing happens unless you sign in.",
+      "",
+      "Church Studio by HeiTech · support@heitechinc.com",
+    ].join("\n"),
+    html: layout(base, {
+      preheader: `${input.inviter} invited you to ${where}. Download Church Studio and sign in with ${input.to}.`,
+      heading: `Join ${where} on Church Studio`,
+      blocks: [
+        { kind: "text", text: about },
+        ...steps.map((step) => ({ kind: "text" as const, text: step })),
+        { kind: "button", label: "Download Church Studio", url: `${root}/#download` },
+        { kind: "note", text: keyless },
+        { kind: "note", text: `Direct downloads: Windows ${root}/download/windows · Mac ${root}/download/mac` },
+      ],
+      footer: `You got this because ${input.inviter} added this address to their Church Studio plan. Not expecting it? Ignore it: nothing happens unless you sign in.`,
+    }),
+  };
+}
+
 /** A license key, after a purchase. `added`: Church Studio already put it on the computer that bought it. */
 export function licenseKeyEmail(input: { key: string; plan: "premium" | "church"; until?: string | null; added?: boolean }, base: string): Email {
   const plan = input.plan === "church" ? "Church" : "Premium";

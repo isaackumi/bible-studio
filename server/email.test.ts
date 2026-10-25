@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { licenseKeyEmail, signInEmail } from "./email";
+import { inviteEmail, licenseKeyEmail, signInEmail } from "./email";
 
 describe("emails", () => {
   it("sends the sign-in link as a branded page with a button, and as plain text", () => {
@@ -18,5 +18,16 @@ describe("emails", () => {
     expect(email.html).toContain("CS1-ABCD");
     expect(email.html).toContain("https://keys.test/email/logo.png");
     expect(email.text).toContain("already added it");
+  });
+
+  it("invites someone by name and church, with the steps and the address to sign in with", () => {
+    const email = inviteEmail({ inviter: "Pastor <James>", inviterEmail: "james@grace.org", church: "Grace Chapel", to: "bob@grace.org", plan: "church" }, "https://keys.test");
+    expect(email.subject).toBe("Pastor <James> invited you to Grace Chapel on Church Studio");
+    expect(email.html).toContain("Pastor &lt;James&gt;");
+    expect(email.html).not.toContain("<James>");
+    expect(email.html).toContain('href="https://keys.test/#download"');
+    expect(email.text).toContain("Sign in with this email address: bob@grace.org");
+    expect(email.text).toContain("james@grace.org");
+    expect(email.text).toContain("No license key");
   });
 });
