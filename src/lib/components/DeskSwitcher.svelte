@@ -13,6 +13,21 @@
   let { compact = false }: { compact?: boolean } = $props();
 
   const production = $derived(session.workspace.appearance.desk === "obs" && session.entitled("production"));
+  // The cloud copy at a glance, on computers that sync: synced, syncing, offline, or needing a look.
+  const cloud = $derived(session.cloud && !["off", "free", "signedOut"].includes(session.cloud.status) ? session.cloud : null);
+  const cloudTip = $derived(
+    !cloud
+      ? ""
+      : cloud.status === "syncing"
+        ? t("Syncing…")
+        : cloud.status === "idle"
+          ? cloud.lastSyncAt
+            ? t("Library synced, last at {time}", { time: new Date(cloud.lastSyncAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) })
+            : t("Library synced")
+          : cloud.status === "offline"
+            ? t("Offline: changes stay on this computer and sync when the internet is back.")
+            : t("Sync needs a look: {reason}", { reason: cloud.message || t("open Cloud space for details.") }),
+  );
   const waiting = $derived((audienceRoom.view?.questions.filter((question) => question.state === "pending").length ?? 0) > 0);
 </script>
 
@@ -48,6 +63,14 @@
       </button>
     {/if}
   </div>
+  {#if cloud}
+    <div class="group" role="group" aria-label={t("Cloud sync")}>
+      <button type="button" class="cloud" aria-label={cloudTip} data-tip={cloudTip} onclick={() => session.openSettings("account")}>
+        <Icon name="cloud" size={16} />
+        {#if cloud.status !== "idle"}<span class="dot" class:busy={cloud.status === "syncing"} class:paused={cloud.status === "offline"} class:bad={cloud.status !== "syncing" && cloud.status !== "offline"} aria-hidden="true"></span>{/if}
+      </button>
+    </div>
+  {/if}
 </nav>
 
 <style>
@@ -63,6 +86,11 @@
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
   /* A slideshow is on the screen (amber while paused). */
   .dot.paused { background: #f5a524; }
+  /* Sync: under way (pulsing), or needing a look (red). */
+  .dot.busy { animation: pulse 1.2s ease-in-out infinite; }
+  .dot.bad { background: #ff6b4a; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .dot.busy { animation: none; } }
   /* Plenty of room: every name. */
   @container desk (min-width: 1720px) {
     .name { display: inline; }
