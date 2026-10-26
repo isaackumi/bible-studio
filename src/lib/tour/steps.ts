@@ -4,7 +4,7 @@
 
 import { msg } from "../i18n/core";
 
-export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production" | "audience" | "design" | "pictures" | "sound";
+export type TourId = "scriptures" | "songs" | "sermon" | "service" | "production" | "conductor" | "audience" | "design" | "pictures" | "sound";
 
 export type TourStep = {
   /** CSS selectors, tried in order. None: a centered card with no spotlight. */
@@ -357,6 +357,51 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       TOUR_BUTTON,
     ],
   },
+  conductor: {
+    name: msg("Conductor Desk"),
+    steps: [
+      {
+        title: msg("The Conductor Desk"),
+        body: msg("Next and Live face each other, with a lever between them. Everything else is one button away, in Tools."),
+      },
+      {
+        target: [".conductor .rail"],
+        title: msg("The service"),
+        body: msg("What comes and what is up now. Click a stop to put it on Next."),
+      },
+      {
+        target: [".conductor .deck.next"],
+        title: msg("Next is only for you"),
+        body: msg("Fill it from the service, from the box at the bottom, or let listening put the verses it hears here."),
+      },
+      {
+        target: [".conductor .lever-col"],
+        title: msg("Push the lever"),
+        body: msg("Push it up, or press Space, and Next goes live. Undo puts back what was showing."),
+      },
+      {
+        target: [".conductor .deck.live"],
+        title: msg("Live is what they see"),
+        body: msg("The congregation sees this. Black, Clear and Logo are beside the lever."),
+      },
+      {
+        target: [".conductor .look-row"],
+        title: msg("The screen's look"),
+        body: msg("Text size, font, lining up, the theme and the Bible version. With Live too on, a change shows at once."),
+      },
+      {
+        target: [".conductor .crate .find"],
+        title: msg("Find anything"),
+        body: msg("Type a verse, a song or a line from one. Enter puts it on Next; Shift+Enter shows it live."),
+      },
+      {
+        target: [".conductor .tools-button"],
+        title: msg("Tools"),
+        body: msg("Autopilot, captions, the countdown, a message to the platform and more. Pin the ones you use to the desk."),
+      },
+      TOUR_BUTTON,
+    ],
+  },
   sound: {
     name: msg("Sound & voice"),
     steps: [
@@ -415,6 +460,7 @@ export const TOUR_FEATURES: Partial<Record<TourId, import("../domain/plans").Pla
 export const TOUR_GROUPS: { name: string; tours: TourId[] }[] = [
   { name: msg("Presenter Desk"), tours: ["scriptures", "songs", "sermon", "service"] },
   { name: msg("Production Desk"), tours: ["production"] },
+  { name: msg("Conductor Desk"), tours: ["conductor"] },
   { name: msg("Audience & phones"), tours: ["audience"] },
   { name: msg("Design & pictures"), tours: ["design", "pictures"] },
   { name: msg("Sound & voice"), tours: ["sound"] },
