@@ -5204,4 +5204,11 @@ export const es: Readonly<Record<string, string>> = {
   "Type a verse, a song, or a line from one": "Escriba un versículo, un canto o una línea de uno",
   "Type in the crate, pick from the rail, or let listening find the verse.": "Escriba en la caja, elija del orden, o deje que la escucha encuentre el versículo.",
   "{reference} is on Next. Push the lever to show it.": "{reference} está en Siguiente. Empuje la palanca para mostrarlo.",
+  // 0.6.4
+  "A third desk: the Conductor Desk": "Una tercera mesa: la mesa del director",
+  "Next and Live side by side with a lever between them: push it up and Next goes live. The service runs along the top, one box finds verses, songs and service items, and listening drops the verses it hears onto Next. Choose it in the desk switcher.": "Siguiente y En vivo lado a lado con una palanca entre ellos: empújela y Siguiente sale en vivo. El culto aparece arriba, una sola caja encuentra versículos, cantos y elementos del culto, y la escucha deja en Siguiente los versículos que oye. Elíjala en el selector de mesa.",
+  "The screen's look, changed while it shows": "El aspecto de la pantalla, cambiado mientras se muestra",
+  "On the Conductor Desk, text size, font, lining up, where the words sit, the theme and the Bible version are on one line under the screens. Changes show on the screen at once, or wait on Next for the lever.": "En la mesa del director, el tamaño del texto, la fuente, la alineación, la posición del texto, el tema y la versión de la Biblia están en una línea bajo las pantallas. Los cambios se ven al instante, o esperan en Siguiente a la palanca.",
+  "Easier to read and use": "Más fácil de leer y usar",
+  "Clearer colours on the Day desk, a visible outline on every search box, larger small text, and the computer's Increase contrast and Reduce motion settings followed.": "Colores más legibles en la mesa Día, un contorno visible en cada caja de búsqueda, textos pequeños más grandes, y los ajustes Aumentar contraste y Reducir movimiento del ordenador respetados.",
 };

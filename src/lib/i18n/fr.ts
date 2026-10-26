@@ -5285,4 +5285,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Type a verse, a song, or a line from one": "Tapez un verset, un chant, ou une ligne de l’un d’eux",
   "Type in the crate, pick from the rail, or let listening find the verse.": "Tapez dans la case, choisissez dans le déroulé, ou laissez l’écoute trouver le verset.",
   "{reference} is on Next. Push the lever to show it.": "{reference} est dans Suivant. Poussez le levier pour l’afficher.",
+  // 0.6.4
+  "A third desk: the Conductor Desk": "Un troisième bureau : le bureau chef d’orchestre",
+  "Next and Live side by side with a lever between them: push it up and Next goes live. The service runs along the top, one box finds verses, songs and service items, and listening drops the verses it hears onto Next. Choose it in the desk switcher.": "Suivant et Direct côte à côte avec un levier entre eux : poussez-le et Suivant passe en direct. Le culte défile en haut, une seule case trouve versets, chants et éléments du culte, et l’écoute dépose dans Suivant les versets entendus. Choisissez-le dans le sélecteur de bureau.",
+  "The screen's look, changed while it shows": "L’aspect de l’écran, modifié pendant l’affichage",
+  "On the Conductor Desk, text size, font, lining up, where the words sit, the theme and the Bible version are on one line under the screens. Changes show on the screen at once, or wait on Next for the lever.": "Sur le bureau chef d’orchestre, la taille du texte, la police, l’alignement, la position du texte, le thème et la version de la Bible sont sur une ligne sous les écrans. Les changements s’affichent tout de suite, ou attendent dans Suivant le levier.",
+  "Easier to read and use": "Plus facile à lire et à utiliser",
+  "Clearer colours on the Day desk, a visible outline on every search box, larger small text, and the computer's Increase contrast and Reduce motion settings followed.": "Des couleurs plus lisibles sur le bureau Jour, un contour visible sur chaque champ de recherche, de petits textes agrandis, et les réglages Augmenter le contraste et Réduire les animations de l’ordinateur respectés.",
 };

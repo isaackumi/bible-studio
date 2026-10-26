@@ -10,6 +10,15 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.4",
+    date: "2026-10-26",
+    highlights: [
+      { icon: "transition", title: msg("A third desk: the Conductor Desk"), text: msg("Next and Live side by side with a lever between them: push it up and Next goes live. The service runs along the top, one box finds verses, songs and service items, and listening drops the verses it hears onto Next. Choose it in the desk switcher.") },
+      { icon: "type", title: msg("The screen's look, changed while it shows"), text: msg("On the Conductor Desk, text size, font, lining up, where the words sit, the theme and the Bible version are on one line under the screens. Changes show on the screen at once, or wait on Next for the lever.") },
+      { icon: "eye", title: msg("Easier to read and use"), text: msg("Clearer colours on the Day desk, a visible outline on every search box, larger small text, and the computer's Increase contrast and Reduce motion settings followed.") },
+    ],
+  },
+  {
     version: "0.6.3",
     date: "2026-10-25",
     highlights: [
