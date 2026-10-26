@@ -65,6 +65,14 @@ cpal = "0.15"
 nnnoiseless = { version = "0.5", default-features = false }
 whisper-rs = { version = "0.16", features = ["log_backend"] }
 
+# Parakeet listening (NVIDIA Parakeet TDT on ONNX Runtime): offline and fast; its model downloads only
+# when chosen. ONNX Runtime ships for Windows and Apple Silicon Macs only (not Intel Macs).
+[target.'cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
+transcribe-rs = { version = "0.3.12", default-features = false, features = ["onnx"] }
+# transcribe-rs is built against this release of the ONNX Runtime bindings; later ones changed their API.
+ort = "=2.0.0-rc.12"
+ort-sys = "=2.0.0-rc.12"
+
 # The computer's id (license binding) read straight from the registry: already part of Tauri's build.
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-registry = "0.6"
@@ -79,3 +87,7 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# transcribe-rs with a thread limit for its sessions (vendor/transcribe-rs/CHURCH-STUDIO.md).
+[patch.crates-io]
+transcribe-rs = { path = "vendor/transcribe-rs" }

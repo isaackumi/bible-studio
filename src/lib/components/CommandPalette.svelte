@@ -9,6 +9,7 @@
   import { pictures } from "../app/pictures.svelte";
   import { defaultShortcuts, shortcutLabel } from "../keyboard/manager";
   import { SETTINGS_GROUPS } from "./settings/sections";
+  import { findPlaces } from "../tour/where";
 
   // Go to anything (⌘K / Ctrl+K), from any page: an action (LIVE, Clear, Listen, Captions…), a
   // page, a part or item of the service, a song, a verse ("John 3:16" goes on Preview), any
@@ -51,6 +52,7 @@
     { id: "Media", label: msg("Media") },
     { id: "Settings", label: msg("Settings") },
     { id: "Help", label: msg("Help") },
+    { id: "Where", label: msg("Where is") },
   ];
 
   const go = (page: PewPage) => () => {
@@ -170,6 +172,12 @@
       for (const deck of session.decks) add({ id: `deck-${deck.id}`, group: "Design", label: t("Edit slides: {name}", { name: deck.name }), detail: tn(deck.pages.length, "{n} page", "{n} pages"), icon: "stage", run: () => session.openStudio(deck.id) });
       if (!kind) for (const song of session.songs) add({ id: `song-${song.id}`, group: "Songs", label: song.title || t("Untitled song"), detail: song.author || undefined, icon: "lyrics", run: () => { go("songs")(); session.previewSongSection(song, song.sections[0]?.id ?? null); } });
     }
+    // "Where is…?": the parts of the screen the question names, pointed at on their page.
+    if (q && (!kind || kind === "Where")) {
+      findPlaces(q, 4).forEach((place, at) => {
+        found.push({ id: `where-${place.tour}-${place.at}`, group: "Where", label: t("Show me: {title}", { title: t(place.step.title) }), detail: t(place.step.body), icon: "help", run: () => session.showWhere(place.tour, place.at), rank: 3 - at * 0.1 });
+      });
+    }
     // Empty box: what was chosen lately first, then the rest.
     if (!q && !kind) {
       for (const id of recentIds) {
@@ -251,7 +259,7 @@
     }
   }
 
-  const GROUP_LABELS: Record<string, string> = { Recent: msg("Recent"), Actions: msg("Actions"), Pages: msg("Pages"), Audience: msg("Audience"), Design: msg("Design"), Media: msg("Media"), Settings: msg("Settings"), Help: msg("Help"), Scripture: msg("Scripture"), Service: msg("Service"), Songs: msg("Songs") };
+  const GROUP_LABELS: Record<string, string> = { Recent: msg("Recent"), Actions: msg("Actions"), Pages: msg("Pages"), Audience: msg("Audience"), Design: msg("Design"), Media: msg("Media"), Settings: msg("Settings"), Help: msg("Help"), Where: msg("Where is"), Scripture: msg("Scripture"), Service: msg("Service"), Songs: msg("Songs") };
   const groupLabel = (group: string) => t(GROUP_LABELS[group] ?? group);
 </script>
 

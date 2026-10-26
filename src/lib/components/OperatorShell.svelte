@@ -9,6 +9,7 @@
   import WhatsNew from "./WhatsNew.svelte";
   import Welcome from "./onboarding/Welcome.svelte";
   import TourGuide from "./tour/TourGuide.svelte";
+  import WherePointer from "./tour/WherePointer.svelte";
   import TourHub from "./tour/TourHub.svelte";
   import { onMount, untrack } from "svelte";
   import { listen } from "@tauri-apps/api/event";
@@ -254,6 +255,7 @@
     <WhatsNew />
     {#if session.tourHubOpen}<TourHub />{/if}
     {#if session.tour}<TourGuide />{/if}
+    {#if session.where}{#key session.where}<WherePointer />{/key}{/if}
   </div>
 {/if}
 {#if !session.booted || !session.workspace.onboarded}

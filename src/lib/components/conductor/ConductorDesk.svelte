@@ -17,11 +17,13 @@
   // The Conductor Desk: the Presenter Desk's work as one gesture. Two decks face each other, NEXT
   // (Preview) and LIVE (Program), with a lever between them: push it up and NEXT goes live. The
   // service runs along the top; anything typed in the crate below lands on NEXT. Listening drops
-  // the verses it hears onto NEXT too, with the same matching as the Presenter Desk.
+  // the verses it hears onto NEXT too, with the same matching as the Presenter Desk. Autopilot
+  // goes further: songs follow the singing onto LIVE and slides follow the sermon by themselves.
 
   const translationId = $derived(session.workspace.deskTranslationId ?? "kjv");
   const displayLive = $derived(session.output.online && session.live.program.model.layout !== "empty" && !session.programHeld);
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
+  const pilot = session.autopilot;
 
   // ---- The service rail
   const serviceItems = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
@@ -169,15 +171,23 @@
     });
   });
 
-  function heard(text: string, final: boolean, alternatives: string[]) {
+  async function heard(text: string, final: boolean, alternatives: string[]) {
     if (!text) return;
     if (final) lastHeard = text;
     if (!listenIndex) return;
     const match = chooseHeard(alternatives.length ? alternatives : [text], listenIndex, translationId);
-    if (!match || match.item.reference === lastFound) return;
+    if (!match) return;
+    const passage = { ...match.item, translationId };
+    // The finished phrase may let Autopilot show a verse found while it was still being said. It
+    // puts the verse on Next itself, so the desk does not load it again (the later load would win).
+    if (final && pilot.on && pilot.verses && (await pilot.verse(passage, text, final))) {
+      lastFound = match.item.reference;
+      return;
+    }
+    if (match.item.reference === lastFound) return;
     lastFound = match.item.reference;
     session.noteListening(`found by listening: ${match.item.reference}`);
-    void session.previewPassage({ ...match.item, translationId });
+    void session.previewPassage(passage);
     session.voice.message = t("{reference} is on Next. Push the lever to show it.", { reference: match.item.reference });
   }
 
@@ -193,6 +203,8 @@
     window.addEventListener("keydown", slash);
     return () => {
       stop();
+      // Autopilot belongs to this desk: it never keeps changing the screen out of sight.
+      pilot.stop();
       window.removeEventListener("keydown", slash);
     };
   });
@@ -300,7 +312,25 @@
       </button>
       <span class="meter" aria-hidden="true"><span style:width="{Math.round((listening ? session.voice.level : 0) * 100)}%"></span></span>
       <span class="said">{listening ? lastHeard || session.voice.message : t("Listen, and the verses the preacher mentions land on Next.")}</span>
+      <button
+        type="button"
+        class="autopilot"
+        class:on={pilot.on}
+        aria-pressed={pilot.on}
+        title={t("Songs follow the singing onto the screen and slides follow the sermon. Verses still wait on Next.")}
+        onclick={() => (pilot.on ? pilot.stop() : void pilot.start())}
+      >{t("Autopilot")}</button>
     </div>
+    {#if pilot.on}
+      <div class="pilot" role="status" class:paused={pilot.paused}>
+        <span class="pilot-said">{pilot.status}</span>
+        <label class="pilot-verses" title={t("A verse goes live by itself when the preacher says its whole reference, such as John 3:16. Otherwise verses wait on Next.")}>
+          <input type="checkbox" class="switch" role="switch" checked={pilot.verses} onchange={(event) => pilot.setVerses(event.currentTarget.checked)} />
+          {t("Verses go live")}
+        </label>
+        {#if pilot.last?.live && session.canUndoProgram && !pilot.paused}<button type="button" class="pad" onclick={() => void pilot.undo()}>{t("Undo")}</button>{/if}
+      </div>
+    {/if}
     <label class="find">
       <Icon name="search" size={16} />
       <input bind:this={crateEl} bind:value={query} onkeydown={crateKey} placeholder={t("Type a verse, a song, or a line from one")} aria-label={t("Find something to load on Next")} />
@@ -388,7 +418,15 @@
   .mic.on { background: var(--live); border-color: var(--live); color: #fff; }
   .meter { flex: none; width: 70px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
   .meter span { display: block; height: 100%; background: var(--live); transition: width 120ms linear; }
-  .said { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Autopilot: calm when off; on, it takes Next's colour (Live's red stays for what is on the screen). */
+  .autopilot { flex: none; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); color: var(--muted); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+  .autopilot.on { border-color: var(--next); color: var(--ink); background: color-mix(in srgb, var(--next) 18%, var(--field)); }
+  .pilot { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 6px 6px 12px; border: 1px solid color-mix(in srgb, var(--next) 45%, var(--line)); border-radius: 10px; font-size: 13px; color: var(--ink); }
+  .pilot.paused { color: var(--muted); border-color: var(--line); }
+  .pilot .pad { flex: none; height: 30px; padding: 0 12px; }
+  .pilot-verses { flex: none; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .pilot-said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .find { display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 48px; border: 1px solid var(--line); border-radius: 14px; background: var(--field); color: var(--muted); }
   .find:focus-within { border-color: var(--next); box-shadow: 0 0 0 1px var(--next); }
   .find input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 17px; outline: none; }

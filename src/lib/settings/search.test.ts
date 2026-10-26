@@ -45,7 +45,7 @@ describe("settings search", () => {
     const entries = settingsIndex();
     expect(searchSettings(entries, pages, "church name")[0]!.id).toBe("general:Church name");
     expect(searchSettings(entries, pages, "noise").slice(0, 3).map((hit) => hit.id)).toContain("audio:Clean the microphone before listening");
-    expect(searchSettings(entries, pages, "whisper").map((hit) => hit.id)).toContain("audio:Which recognizer listens");
+    expect(searchSettings(entries, pages, "offline").map((hit) => hit.id)).toContain("audio:Which recognizer listens");
     expect(searchSettings(entries, pages, "keyboard")[0]!.id).toBe("keyboard:");
     // Every word must be found.
     expect(searchSettings(entries, pages, "church zebra")).toEqual([]);

@@ -13,7 +13,8 @@ export type VoiceCommand =
   | { kind: "library"; tab: "bible" | "songs"; live: false; phrase: string }
   | { kind: "search"; scope: "scripture" | "songs"; query: string; live: false; phrase: string }
   | { kind: "reference"; query: string; live: false; phrase: string }
-  | { kind: "translation"; id: string; live: false; phrase: string };
+  | { kind: "translation"; id: string; live: false; phrase: string }
+  | { kind: "where"; query: string; live: false; phrase: string };
 
 /** What a custom phrase can do: any desk command, or open a library. */
 export type VoiceAction = CommandId | "open-scripture" | "open-songs";
@@ -167,6 +168,10 @@ export function parseVoiceCommand(text: string, options: VoiceParseOptions = {})
   // Other open-ended phrases need the wake word: without it, sermon speech ("show me 3 things") could match.
   if (!wake) return null;
 
+  // "Studio, where is the projector?": that part of the screen, pointed at (tour/where.ts).
+  const where = /^(?:where(?:'s| is| are| do i| can i)(?: find)?|how do i find|show me where)\s+(.+)$/.exec(phrase);
+  if (where) return { kind: "where", query: where[1]!.trim(), live: false, phrase };
+
   const search = /^(?:search|find|look up)\s+(?:for\s+)?(?:the\s+)?(scripture|scriptures|bible|verse|verses|songs?|lyrics)\s+(?:for\s+)?(.+)$/.exec(phrase);
   if (search) {
     const query = search[2]!.trim();
@@ -186,6 +191,7 @@ export function voiceCommandLabel(command: VoiceCommand): string {
   if (command.kind === "library") return command.tab === "songs" ? "Open songs" : "Open scripture";
   if (command.kind === "search") return `Search ${command.scope === "songs" ? "songs" : "scripture"} “${command.query}”`;
   if (command.kind === "translation") return `Translation ${command.id.toUpperCase()}`;
+  if (command.kind === "where") return `Where is ${command.query}`;
   return `Show ${command.query}`;
 }
 
@@ -196,7 +202,7 @@ export function sanitizeVoiceSettings(value: unknown): {
   wakeChosen: boolean;
   custom: CustomVoiceCommand[];
   noiseFilter: "off" | "light" | "strong";
-  engine: "system" | "accurate" | "elevenlabs" | "deepgram";
+  engine: "system" | "accurate" | "parakeet" | "elevenlabs" | "deepgram";
   speechKeys: { elevenlabs?: string; deepgram?: string };
   words: WordFix[];
 } {
@@ -230,7 +236,7 @@ export function sanitizeVoiceSettings(value: unknown): {
     heardSeen.add(heard);
     words.push({ heard, means, source: item.source === "learned" ? "learned" : "yours", uses: Number.isFinite(item.uses) ? Math.max(0, Math.round(item.uses!)) : 0, ...(Number.isFinite(item.at) ? { at: item.at } : {}) });
   }
-  const engine = record.engine === "accurate" || record.engine === "elevenlabs" || record.engine === "deepgram" ? record.engine : "system";
+  const engine = record.engine === "accurate" || record.engine === "parakeet" || record.engine === "elevenlabs" || record.engine === "deepgram" ? record.engine : "system";
   const rawKeys = record.speechKeys && typeof record.speechKeys === "object" ? (record.speechKeys as Record<string, unknown>) : {};
   const key = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : undefined);
   const speechKeys = { ...(key(rawKeys.elevenlabs) ? { elevenlabs: key(rawKeys.elevenlabs) } : {}), ...(key(rawKeys.deepgram) ? { deepgram: key(rawKeys.deepgram) } : {}) };

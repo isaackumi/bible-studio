@@ -25,6 +25,8 @@ mod listen_record;
 mod storage;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod whisper;
+#[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+mod parakeet;
 
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -585,7 +587,7 @@ fn open_privacy_settings(pane: Option<String>) -> Result<(), String> {
 
 #[tauri::command(async)]
 fn start_sermon_listen(app: tauri::AppHandle, run: u64, filter: Option<String>, words: Option<Vec<String>>, engine: Option<String>) -> Result<(), String> {
-    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default(), engine.as_deref() == Some("accurate"))
+    voice::start_transcribe(app, run, filter.as_deref().unwrap_or("off"), &words.unwrap_or_default(), engine.as_deref().unwrap_or("system"))
 }
 
 /// Space on this computer: what the app keeps, and the safe ways to make it smaller.
@@ -676,6 +678,55 @@ fn whisper_delete(app: tauri::AppHandle) -> Result<(), String> {
         whisper::delete(&app)
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+/// Parakeet listening's model: whether this computer can carry it, whether it is here, and getting
+/// or removing it. Windows and Apple Silicon only (ONNX Runtime ships for nothing else).
+#[tauri::command(async)]
+fn parakeet_status(app: tauri::AppHandle) -> serde_json::Value {
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    {
+        serde_json::to_value(parakeet::status(&app)).unwrap_or_default()
+    }
+    #[cfg(not(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64"))))]
+    {
+        let _ = app;
+        serde_json::json!({ "installed": false, "downloading": false, "bytes": 0, "supported": false, "reason": "Most accurate listening runs on Windows and on Macs with Apple silicon." })
+    }
+}
+
+#[tauri::command]
+fn parakeet_download(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    {
+        parakeet::download(app)
+    }
+    #[cfg(not(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64"))))]
+    {
+        let _ = app;
+        Err("Most accurate listening runs on Windows and on Macs with Apple silicon.".into())
+    }
+}
+
+#[tauri::command]
+fn parakeet_cancel(app: tauri::AppHandle) {
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    parakeet::cancel_download(&app);
+    #[cfg(not(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64"))))]
+    let _ = app;
+}
+
+#[tauri::command(async)]
+fn parakeet_delete(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    {
+        parakeet::delete(&app)
+    }
+    #[cfg(not(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64"))))]
     {
         let _ = app;
         Ok(())
@@ -1184,6 +1235,10 @@ pub fn run() {
             whisper_download,
             whisper_cancel,
             whisper_delete,
+            parakeet_status,
+            parakeet_download,
+            parakeet_cancel,
+            parakeet_delete,
             stop_sermon_listen,
             start_noise_test,
             start_ndi,

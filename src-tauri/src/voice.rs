@@ -63,13 +63,23 @@ pub struct ListenLine {
 
 /// `filter` is the Noise filter setting: "off", "light" or "strong". `words` are the church's own
 /// words (names, places) for the recognizer to expect, beside the book names it always expects.
-pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str, words: &[String], accurate: bool) -> Result<(), String> {
-    // Accurate listening: Whisper in this app instead of the system recognizer's helper.
+/// `engine`: "accurate" (Whisper), "parakeet", or the system recognizer's helper for anything else.
+pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str, words: &[String], engine: &str) -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     stop_transcribe();
+    // Accurate listening: Whisper in this app instead of the system recognizer's helper.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    if accurate {
+    if engine == "accurate" {
         return crate::whisper::start(app, run, crate::noise::Filter::parse(filter).for_recognizer(), &expected(words));
+    }
+    // Parakeet: in this app too. It takes no hints, so the church's words are not passed.
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    if engine == "parakeet" {
+        return crate::parakeet::start(app, run, crate::noise::Filter::parse(filter).for_recognizer());
+    }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    if engine == "parakeet" {
+        return Err("Most accurate listening runs on Macs with Apple silicon. Choose System or Accurate listening in Settings › Sound & voice.".into());
     }
     #[cfg(target_os = "macos")]
     {
@@ -81,7 +91,7 @@ pub fn start_transcribe(app: tauri::AppHandle, run: u64, filter: &str, words: &[
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (app, run, filter, words, accurate);
+        let _ = (app, run, filter, words, engine);
         Err("Listening runs on macOS and Windows.".into())
     }
 }
@@ -104,6 +114,8 @@ pub fn stop_transcribe() {
         helper::stop();
         crate::whisper::stop();
     }
+    #[cfg(any(target_os = "windows", all(target_os = "macos", target_arch = "aarch64")))]
+    crate::parakeet::stop();
 }
 
 /// The speech helper process, shared by macOS (Swift) and Windows (PowerShell): it prints one

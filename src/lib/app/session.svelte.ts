@@ -18,6 +18,7 @@ import { importPlan, listPlans, listServiceTypes, pcoAuthorization, type PcoPlan
 import { videoPosition, type VideoControl } from "../domain/types";
 import { attributionFor, configureOnlineBibles, type OnlineBibleChoice } from "../bible/online-bibles";
 import { emptyTourProgress, TOUR_FEATURES, type TourId } from "../tour/steps";
+import { findPlaces } from "../tour/where";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { screenful, screenStarts, shiftPassage, stepScreenful, stepVerse, versesPerScreen } from "../bible/passage";
 import { CANON, formatReference, parseReference, withChapterCounts, type CanonBook } from "../bible/reference";
@@ -156,6 +157,7 @@ import { ServiceChecks } from "./service-checks.svelte";
 import { webTarget } from "../domain/web";
 import { documentAssets, pageAt, pageStart, scrollLength, stepScroll } from "../domain/document-scroll";
 import { LiveNotes } from "./live-notes.svelte";
+import { Autopilot } from "./autopilot.svelte";
 import { CLOUD_SPEECH, KeyRefused, startCloudListening, testSpeechKey, type CloudSpeech } from "../voice/cloud-listen";
 import { recentSongHits, rememberSongRecent, searchSongHits, type SongHit, type SongRecent } from "../domain/song-search";
 import { serviceFirst, serviceSongIds } from "../domain/service-first";
@@ -226,6 +228,11 @@ import {
   deleteAccurateModel,
   downloadAccurateModel,
   type AccurateModel,
+  parakeetModel,
+  cancelParakeetModel,
+  deleteParakeetModel,
+  downloadParakeetModel,
+  type ParakeetModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
@@ -3085,7 +3092,7 @@ class Session {
       this.watchForSilence(this.stopVoiceEngine, () => soundReached);
       return;
     }
-    const local = engine === "accurate" ? "accurate" : "system";
+    const local = engine === "accurate" || engine === "parakeet" ? engine : "system";
     // Keep a recording of what the recognizer hears, and what it understood (Settings › Audio & voice).
     if (isDesktop() && this.workspace.voice.keepRecording) await this.startListeningRecording(local);
     this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, words, local) : startListening(handlers, filter);
@@ -3124,7 +3131,7 @@ class Session {
     try {
       await invoke("listen_record_start", { stamp });
       this.listeningRecorded = true;
-      this.noteListening(`engine: ${engine}, noise filter: ${this.workspace.voice.noiseFilter ?? "off"}, version ${APP_VERSION}`);
+      this.noteListening(`engine: ${engine === "parakeet" ? "most accurate" : engine}, noise filter: ${this.workspace.voice.noiseFilter ?? "off"}, version ${APP_VERSION}`);
     } catch (error) {
       this.warn(error instanceof Error ? error.message : String(error));
     }
@@ -3221,7 +3228,10 @@ class Session {
     if (!target) return;
     this.previewDeckPage(target.deckId, target.index);
     // Auto-advance changes the screen only while a slide of that same deck is up there.
-    if (this.sermonFollow.mode === "auto" && deckSource(program)?.deckId === target.deckId) void this.take();
+    if (this.sermonFollow.mode === "auto" && deckSource(program)?.deckId === target.deckId) {
+      this.autopilot.claim(match.key, match.label);
+      void this.take();
+    }
   }
 
   /** The slide on Program, one page on or back (voice "next slide" with live commands on). */
@@ -3280,6 +3290,16 @@ class Session {
         this.voiceTranslationId = command.id;
         await this.voiceDesk?.({ kind: "translation", id: command.id });
         record("executed", `${label}. Scripture now reads from it.`);
+        return;
+      }
+      if (command.kind === "where") {
+        const place = findPlaces(command.query, 1)[0];
+        if (!place) {
+          record("failed", t("Nothing on the screen is called “{query}”.", { query: command.query }));
+          return;
+        }
+        await this.showWhere(place.tour, place.at);
+        record("executed", `${label}.`);
         return;
       }
       if (command.kind === "search" && command.scope === "songs") {
@@ -3440,11 +3460,54 @@ class Session {
     await this.refreshAccurate();
   };
 
+  // --- Parakeet listening (NVIDIA Parakeet on this computer) -------------------------------------
+
+  /** As `accurate`: the model's state, and a download's progress (0..1). */
+  parakeet = $state<{ model: ParakeetModel | null; progress: number | null; error: string | null }>({ model: null, progress: null, error: null });
+
+  refreshParakeet = async () => {
+    try {
+      const model = await parakeetModel();
+      this.parakeet = { ...this.parakeet, model };
+    } catch {
+      this.parakeet = { ...this.parakeet, model: { installed: false, downloading: false, bytes: 0, unsupported: true } };
+    }
+  };
+
+  downloadParakeet = async () => {
+    this.parakeet = { ...this.parakeet, progress: 0, error: null };
+    let stop: (() => void) | null = null;
+    try {
+      stop = await downloadParakeetModel((progress) => {
+        if (!progress.done) {
+          this.parakeet = { ...this.parakeet, progress: progress.total ? progress.received / progress.total : 0 };
+          return;
+        }
+        stop?.();
+        this.parakeet = { ...this.parakeet, progress: null, error: progress.error };
+        void this.refreshParakeet().then(() => {
+          if (!progress.error) void this.setVoiceEngine("parakeet");
+        });
+      });
+    } catch (error) {
+      stop?.();
+      this.parakeet = { ...this.parakeet, progress: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  cancelParakeet = () => void cancelParakeetModel();
+
+  deleteParakeet = async () => {
+    if (this.workspace.voice.engine === "parakeet") await this.setVoiceEngine("system");
+    await deleteParakeetModel().catch(() => {});
+    await this.refreshParakeet();
+  };
+
   /** Which recognizer listens. While listening, restarts it so the change is heard at once. */
   setVoiceEngine = async (engine: VoiceEngine) => {
     this.saveVoiceSettings({ engine });
     if (this.voice.status !== "listening") return;
-    this.stopVoice(engine === "accurate" ? t("Accurate listening on. Listening again…") : engine === "elevenlabs" || engine === "deepgram" ? t("{service} listening on. Listening again…", { service: CLOUD_SPEECH[engine].name }) : t("System listening on. Listening again…"));
+    this.stopVoice(engine === "accurate" ? t("Accurate listening on. Listening again…") : engine === "parakeet" ? t("Most accurate listening on. Listening again…") : engine === "elevenlabs" || engine === "deepgram" ? t("{service} listening on. Listening again…", { service: CLOUD_SPEECH[engine].name }) : t("System listening on. Listening again…"));
     await this.startVoice();
   };
 
@@ -5488,6 +5551,48 @@ class Session {
     tidy: (input) => this.assistant.tidyNotes(input),
   });
 
+  /** Autopilot (autopilot.svelte.ts): songs follow the singing onto the screen, slides the sermon. */
+  autopilot = new Autopilot({
+    songs: () => this.songs,
+    service: () => this.service,
+    program: () => {
+      const { sourceId, model } = this.live.program;
+      // A verse or a plain screen has no source of its own: name it, so every change shows.
+      const source = sourceId ?? (model.layout === "scripture" && model.reference ? `verse:${model.reference}` : `screen:${model.layout}`);
+      return { source, layout: model.layout, held: this.programHeld };
+    },
+    nextSource: () => this.live.preview.sourceId ?? null,
+    songScreens: (section) => this.songScreens(section),
+    songLive: (song, sectionId, screen) => this.songToProgram(song, sectionId, screen),
+    songNext: (song, sectionId, screen) => this.previewSongSection(song, sectionId, undefined, screen),
+    verseLive: async (passage) => {
+      await this.previewPassage(passage);
+      await this.take();
+    },
+    undo: () => this.undoProgram(),
+    onHeard: (listener) => this.onVoiceHeard(listener),
+    listening: () => this.voice.status === "listening" || this.voice.status === "starting",
+    startListening: () => this.startVoice(),
+    allowed: () => this.requireFeature("song-detection"),
+    sermonMode: () => this.sermonFollow.mode,
+    setSermonMode: (mode) => this.setSermonFollow(mode),
+    log: (line) => this.noteListening(line),
+  });
+
+  /** A song part straight to Program. Whatever else the operator staged on Preview stays there. */
+  private async songToProgram(song: Song, sectionId: string, screen: number) {
+    const staged = this.live.preview;
+    const focus = this.songFocus;
+    this.previewSongSection(song, sectionId, undefined, screen);
+    await this.take();
+    // Put back what was staged, unless something newer (a verse heard meanwhile) has taken Preview.
+    const stillOurs = this.live.preview.sourceId?.startsWith(`song:${song.id}:`) ?? false;
+    if (stillOurs && staged.model.layout !== "empty" && !staged.sourceId?.startsWith("song:")) {
+      this.live = setPreview(this.live, staged);
+      this.songFocus = focus;
+    }
+  }
+
   /**
    * Look up a song with AI, asked for elsewhere (Settings, a sermon's suggestions): what to look up
    * ("" to let the operator type), waiting until the Songs page opens it. null: nothing asked.
@@ -6106,11 +6211,34 @@ class Session {
 
   /** Start a tour, on its own page or desk, from any step. */
   startTour = async (id: TourId, from = 0) => {
+    if (!(await this.openTourPage(id))) return;
+    this.where = null;
+    this.tour = null;
+    this.tourFrom = Math.max(0, from);
+    // Let the page, desk or panel paint before the spotlight looks for its targets.
+    setTimeout(() => (this.tour = id), 260);
+  };
+
+  /** "Where is…?" (tour/where.ts): the place asked for, pointed at on its own page. */
+  where = $state<{ tour: TourId; at: number } | null>(null);
+
+  showWhere = async (tour: TourId, at: number) => {
+    if (!(await this.openTourPage(tour))) return;
+    this.tour = null;
+    this.where = null;
+    setTimeout(() => (this.where = { tour, at }), 260);
+  };
+
+  endWhere = () => {
+    this.where = null;
+  };
+
+  /** Open the part of the app a tour walks through. False when the plan does not include it. */
+  private async openTourPage(id: TourId): Promise<boolean> {
     this.settingsOpen = false;
     this.tourHubOpen = false;
-    // Each tour opens the part of the app it walks through.
     const needs = TOUR_FEATURES[id];
-    if (needs && !this.requireFeature(needs)) return;
+    if (needs && !this.requireFeature(needs)) return false;
     if (id === "production") {
       if (this.workspace.appearance.desk !== "obs") this.setAppearance({ desk: "obs" });
     } else if (id === "audience") {
@@ -6130,11 +6258,8 @@ class Session {
       if (this.workspace.appearance.desk !== "pewbeam") this.setAppearance({ desk: "pewbeam" });
       this.pageRequest = id;
     }
-    this.tour = null;
-    this.tourFrom = Math.max(0, from);
-    // Let the page, desk or panel paint before the spotlight looks for its targets.
-    setTimeout(() => (this.tour = id), 260);
-  };
+    return true;
+  }
 
   endTour = () => {
     this.tour = null;

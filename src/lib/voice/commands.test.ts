@@ -159,4 +159,10 @@ describe("plain-language commands (no wake word)", () => {
       expect(say(text), text).toBeNull();
     }
   });
+
+  it("points at a part of the screen only after the wake word", () => {
+    expect(parseVoiceCommand("Studio, where is the projector?")).toMatchObject({ kind: "where", query: "the projector" });
+    expect(parseVoiceCommand("studio where do I find the songs")).toMatchObject({ kind: "where", query: "the songs" });
+    expect(parseVoiceCommand("where is God when we suffer")).toBeNull();
+  });
 });

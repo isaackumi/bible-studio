@@ -75,7 +75,7 @@ ${plans()}
 
 ### Scripture
 - Finds Bible verses by listening: references and close quotes go to Preview; LIVE shows them. About 250 common mishearings of book names are corrected, and it learns a church's own words.
-- Accurate listening (Whisper) runs on the computer itself (Mac and Windows); audio does not leave the building.
+- Accurate and Most accurate listening run on the computer itself (Mac and Windows); audio does not leave the building.
 - Quick find with shorthand (jn316, 1co13), phrase search, two translations side by side.
 - Bibles included offline: KJV, ASV, WEB, BBE, Akuapem Twi; free downloads: Asante Twi, Ewe, Yorùbá, Igbo, Hausa. Import Zefania, OSIS or OpenSong files; NIV, ESV and others online with the church's own API.Bible key.
 
