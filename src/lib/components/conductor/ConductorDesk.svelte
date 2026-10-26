@@ -13,6 +13,8 @@
   import Screen from "../Screen.svelte";
   import Icon from "../Icon.svelte";
   import LookBar from "./LookBar.svelte";
+  import ToolsPanel from "./ToolsPanel.svelte";
+  import { conductorTools, pins } from "./tools.svelte";
 
   // The Conductor Desk: the Presenter Desk's work as one gesture. Two decks face each other, NEXT
   // (Preview) and LIVE (Program), with a lever between them: push it up and NEXT goes live. The
@@ -24,6 +26,13 @@
   const displayLive = $derived(session.output.online && session.live.program.model.layout !== "empty" && !session.programHeld);
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const pilot = session.autopilot;
+
+  // Tools: everything beyond Next, the lever and Live, one button away; pinned ones sit on the strip.
+  let toolsOpen = $state(false);
+  const pinned = $derived.by(() => {
+    const tools = conductorTools();
+    return pins.ids.map((id) => tools.find((tool) => tool.id === id)).filter((tool) => tool !== undefined);
+  });
 
   // ---- The service rail
   const serviceItems = $derived(session.service?.sections.flatMap((section) => section.items) ?? []);
@@ -228,6 +237,12 @@
   <header class="bar">
     <DeskSwitcher compact />
     <div class="bar-end">
+      <div class="tools-anchor">
+        <button type="button" class="tool tools-button" data-tour="tours" class:on={toolsOpen} aria-expanded={toolsOpen} aria-haspopup="dialog" onclick={() => (toolsOpen = !toolsOpen)}>
+          <Icon name="grid" size={15} /><span>{t("Tools")}</span>
+        </button>
+        {#if toolsOpen}<ToolsPanel onclose={() => (toolsOpen = false)} />{/if}
+      </div>
       <OutputMenu />
       <button type="button" class="tool" aria-label={t("Settings")} title={t("Settings")} onclick={() => session.openSettings()}><Icon name="settings" size={16} /></button>
     </div>
@@ -312,14 +327,11 @@
       </button>
       <span class="meter" aria-hidden="true"><span style:width="{Math.round((listening ? session.voice.level : 0) * 100)}%"></span></span>
       <span class="said">{listening ? lastHeard || session.voice.message : t("Listen, and the verses the preacher mentions land on Next.")}</span>
-      <button
-        type="button"
-        class="autopilot"
-        class:on={pilot.on}
-        aria-pressed={pilot.on}
-        title={t("Songs follow the singing onto the screen and slides follow the sermon. Verses still wait on Next.")}
-        onclick={() => (pilot.on ? pilot.stop() : void pilot.start())}
-      >{t("Autopilot")}</button>
+      {#each pinned as tool (tool.id)}
+        <button type="button" class="pinned" class:on={tool.on} aria-pressed={tool.on} title={t(tool.label)} onclick={() => void tool.run()}>
+          <Icon name={tool.icon} size={14} /><span>{t(tool.label)}</span>
+        </button>
+      {/each}
     </div>
     {#if pilot.on}
       <div class="pilot" role="status" class:paused={pilot.paused}>
@@ -419,9 +431,12 @@
   .meter { flex: none; width: 70px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
   .meter span { display: block; height: 100%; background: var(--live); transition: width 120ms linear; }
   .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* Autopilot: calm when off; on, it takes Next's colour (Live's red stays for what is on the screen). */
-  .autopilot { flex: none; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); color: var(--muted); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
-  .autopilot.on { border-color: var(--next); color: var(--ink); background: color-mix(in srgb, var(--next) 18%, var(--field)); }
+  /* Pinned tools: calm when off; on, they take Next's colour (Live's red stays for what is on the screen). */
+  .pinned { flex: none; height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .pinned.on { border-color: var(--next); color: var(--ink); background: color-mix(in srgb, var(--next) 18%, var(--field)); }
+  .tools-anchor { position: relative; }
+  .tools-button { width: auto; display: inline-flex; gap: 6px; padding: 0 11px; font: inherit; font-size: 13px; font-weight: 650; }
+  .tools-button.on { border-color: var(--next); }
   .pilot { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 6px 6px 12px; border: 1px solid color-mix(in srgb, var(--next) 45%, var(--line)); border-radius: 10px; font-size: 13px; color: var(--ink); }
   .pilot.paused { color: var(--muted); border-color: var(--line); }
   .pilot .pad { flex: none; height: 30px; padding: 0 12px; }

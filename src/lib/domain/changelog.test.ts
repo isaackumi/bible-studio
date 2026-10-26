@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CHANGELOG, compareVersions, releaseNotes, whatsNewFor, published } from "./changelog";
+import { CHANGELOG, compareVersions, releaseNotes, releasesSince, updateStops, whatsNewFor, published } from "./changelog";
+import { TOURS } from "../tour/steps";
 import { readFileSync } from "node:fs";
 
 const sample = [
@@ -38,5 +39,30 @@ describe("what's new", () => {
     const version = JSON.parse(readFileSync("package.json", "utf8")).version as string;
     expect(CHANGELOG[0]?.version).toBe(version);
     for (let i = 1; i < CHANGELOG.length; i++) expect(compareVersions(CHANGELOG[i - 1]!.version, CHANGELOG[i]!.version)).toBe(1);
+  });
+
+  it("walks through every version an update brought, newest first, briefly", () => {
+    const log = [
+      { version: "0.4.0", date: "", highlights: [{ icon: "x", title: "Four", text: "" }] },
+      { version: "0.3.0", date: "", highlights: [{ icon: "x", title: "Three", text: "" }, { icon: "x", title: "Three b", text: "" }] },
+      { version: "0.2.0", date: "", highlights: [{ icon: "x", title: "Two", text: "" }] },
+    ];
+    expect(releasesSince("0.4.0", "0.2.0", log).map((r) => r.version)).toEqual(["0.4.0", "0.3.0"]);
+    expect(updateStops(releasesSince("0.4.0", "0.2.0", log)).map((stop) => stop.highlight.title)).toEqual(["Four", "Three", "Three b"]);
+    expect(updateStops(releasesSince("0.4.0", "0.2.0", log), 2)).toHaveLength(2);
+  });
+
+  it("says where each of the newest version's highlights lives, at a target its tour knows", () => {
+    for (const highlight of CHANGELOG[0]!.highlights) {
+      expect(highlight.show, highlight.title).not.toBeUndefined();
+      if (!highlight.show) continue;
+      const targets = TOURS[highlight.show.tour].steps.flatMap((step) => step.target ?? []);
+      expect(targets, highlight.title).toContain(highlight.show.target);
+    }
+  });
+
+  it("never names the engines behind a feature in what churches read", () => {
+    const words = CHANGELOG.flatMap((release) => release.highlights.flatMap((highlight) => [highlight.title, highlight.text])).join(" ");
+    expect(words).not.toMatch(/whisper|parakeet|nvidia|onnx|hugging ?face|rnnoise/i);
   });
 });

@@ -1,14 +1,31 @@
 // What changed in each version, written once for people, not developers. It feeds the What's new
 // card (shown once after an update), the update note on the desk, and the GitHub release notes
 // (scripts/release-notes.ts). Add the new version at the top before tagging a release: three to five
-// highlights, each one line a volunteer would understand.
+// highlights, each one line a volunteer would understand. Name features as the church sees them,
+// never the engines or libraries behind them.
+//
+// `show` is where a highlight lives on screen, for the walk through what changed ("Show me" on the
+// card): a tour (which opens its desk or page) and one of that tour's targets. null: nothing to
+// point at, shown as a card. A test asks the newest version to say this for every highlight.
 
 import { msg } from "../i18n/core";
+import type { TourId } from "../tour/steps";
 
-export type Highlight = { icon: string; title: string; text: string };
+export type Highlight = { icon: string; title: string; text: string; show?: { tour: TourId; target: string } | null };
 export type Release = { version: string; date: string; highlights: Highlight[] };
 
 export const CHANGELOG: Release[] = [
+  {
+    version: "0.6.5",
+    date: "2026-10-27",
+    highlights: [
+      { icon: "sparkles", title: msg("Autopilot on the Conductor Desk"), text: msg("Turn it on in Tools. Songs follow the singing onto the screen and slides follow the sermon; with Verses go live, a verse goes up when its whole reference is said. It stands back the moment you take over, and Undo puts back what was showing."), show: { tour: "conductor", target: ".conductor .tools-button" } },
+      { icon: "grid", title: msg("Tools, one button away"), text: msg("The Conductor Desk keeps to Next, the lever and Live. Captions, the countdown, messages, Autopilot and help are in Tools; pin the ones you use to the desk."), show: { tour: "conductor", target: ".conductor .tools-button" } },
+      { icon: "mic", title: msg("Most accurate listening"), text: msg("A new choice that listens on this computer and hears more exactly, for computers with 8 GB of memory or more. Settings › Sound & voice."), show: { tour: "sound", target: ".settings-body .choices" } },
+      { icon: "help", title: msg("Ask where anything is"), text: msg("Press ⌘K (Ctrl+K) and type “where is the projector”, or say “Studio, where is the projector?”, and a pointer lands on it."), show: null },
+      { icon: "eye", title: msg("Updates show you what changed"), text: msg("After an update, Show me walks you to each new thing, like this."), show: null },
+    ],
+  },
   {
     version: "0.6.4",
     date: "2026-10-26",
@@ -377,6 +394,19 @@ export function releaseFor(version: string, changelog = CHANGELOG): Release | nu
 export function whatsNewFor(current: string, lastSeen: string | null, changelog = CHANGELOG): Release | null {
   if (!lastSeen || compareVersions(current, lastSeen) <= 0) return null;
   return releaseFor(current, changelog);
+}
+
+/** Every version newer than `lastSeen` up to `current`, newest first (what an update brought). */
+export function releasesSince(current: string, lastSeen: string, changelog = CHANGELOG): Release[] {
+  return changelog.filter((release) => compareVersions(release.version, lastSeen) > 0 && compareVersions(release.version, current) <= 0);
+}
+
+/** One stop in the walk through what changed. */
+export type UpdateStop = { version: string; highlight: Highlight };
+
+/** The walk: each release's highlights, newest release first, at most `most` stops. */
+export function updateStops(releases: Release[], most = 8): UpdateStop[] {
+  return releases.flatMap((release) => release.highlights.map((highlight) => ({ version: release.version, highlight }))).slice(0, most);
 }
 
 /** Markdown for a GitHub release. */

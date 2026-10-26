@@ -25,7 +25,10 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="ok" bind:this={close} onclick={() => session.dismissWhatsNew()}>{t("Got it")}</button>
+    <div class="actions">
+      <button type="button" class="later" onclick={() => session.dismissWhatsNew()}>{t("Later")}</button>
+      <button type="button" class="ok" bind:this={close} onclick={() => void session.startUpdateTour()}>{t("Show me")}</button>
+    </div>
   </div>
 {/if}
 
@@ -55,6 +58,8 @@
   li div { display: grid; gap: 2px; }
   li strong { font-size: 14px; }
   li span { font-size: 13px; line-height: 1.45; color: var(--muted); }
-  .ok { width: 100%; height: 42px; border: 0; border-radius: 11px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 14px; font-weight: 750; }
+  .actions { display: flex; gap: 8px; }
+  .later { flex: none; height: 42px; padding: 0 18px; border: 1px solid var(--line); border-radius: 11px; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+  .ok { flex: 1; height: 42px; border: 0; border-radius: 11px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 14px; font-weight: 750; }
   .ok:hover { filter: brightness(1.06); }
 </style>

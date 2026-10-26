@@ -207,7 +207,8 @@
   // Opened from the key or a button: start empty, with the cursor in the field.
   $effect(() => {
     if (!session.commandOpen) return;
-    query = "";
+    query = session.commandSeed;
+    session.commandSeed = "";
     kind = null;
     recentIds = readRecent();
     requestAnimationFrame(() => input?.focus());

@@ -242,7 +242,7 @@ import { APP_VERSION, isDesktop, openExternal } from "../platform/runtime";
 import { reportCrashLog, setReportsAllowed, startReports } from "./telemetry";
 import { countUse, usageCounts, usageSent } from "./usage-counts";
 import type { MessageTone } from "./status-line";
-import type { Release } from "../domain/changelog";
+import type { Release, UpdateStop } from "../domain/changelog";
 import { internetRemote } from "./remote-relay.svelte";
 import { normalizeWorkspace, sanitizeAccent } from "../workspace/document";
 import { DEFAULT_LOGO_URL } from "../brand/logo";
@@ -955,6 +955,13 @@ class Session {
   macrosOpen = $state(false);
   /** Go to anything (⌘K): pages, the service, songs, verses, settings and actions. */
   commandOpen = $state(false);
+  /** Words already typed when Go to anything opens (Tools › Where is…? opens it on "where is "). */
+  commandSeed = "";
+
+  openCommand = (seed = "") => {
+    this.commandSeed = seed;
+    this.commandOpen = true;
+  };
   /** The macro running now and the step it is on (for the button's progress). */
   runningMacro = $state<{ id: string; step: number } | null>(null);
 
@@ -6241,6 +6248,8 @@ class Session {
     if (needs && !this.requireFeature(needs)) return false;
     if (id === "production") {
       if (this.workspace.appearance.desk !== "obs") this.setAppearance({ desk: "obs" });
+    } else if (id === "conductor") {
+      if (this.workspace.appearance.desk !== "conductor") this.setAppearance({ desk: "conductor" });
     } else if (id === "audience") {
       const { audienceRoom } = await import("./rooms.svelte");
       audienceRoom.show();
@@ -7273,6 +7282,10 @@ class Session {
   // changelog (every version's words) is its own chunk, fetched only when a card is due or asked for.
 
   whatsNew = $state<Release | null>(null);
+  /** The version this computer had before the update, for the walk through everything since. */
+  private whatsNewSince: string | null = null;
+  /** The walk through what changed ("Show me" on the card), stop by stop. */
+  updateTour = $state<UpdateStop[] | null>(null);
 
   private noteVersion() {
     if (typeof localStorage === "undefined") return;
@@ -7282,6 +7295,7 @@ class Session {
       // Setup introduces a first install; an update shows its highlights once.
       if (!this.workspace.onboarded || seen === APP_VERSION) return;
       void import("../domain/changelog").then(({ whatsNewFor }) => {
+        this.whatsNewSince = seen;
         this.whatsNew = whatsNewFor(APP_VERSION, seen);
       });
     } catch {
@@ -7296,9 +7310,29 @@ class Session {
   /** The What's new card for this version, asked for (Go to anything › What's new). */
   showWhatsNew = () => {
     void import("../domain/changelog").then(({ CHANGELOG }) => {
+      this.whatsNewSince = null;
       this.whatsNew = CHANGELOG[0] ?? null;
     });
   };
+
+  /** "Show me": walk to each new thing, from every version since the one this computer had. */
+  startUpdateTour = async () => {
+    const shown = this.whatsNew;
+    const { releasesSince, updateStops } = await import("../domain/changelog");
+    const releases = this.whatsNewSince ? releasesSince(APP_VERSION, this.whatsNewSince) : shown ? [shown] : [];
+    const stops = updateStops(releases.length ? releases : shown ? [shown] : []);
+    this.whatsNew = null;
+    this.tour = null;
+    this.where = null;
+    this.updateTour = stops.length ? stops : null;
+  };
+
+  endUpdateTour = () => {
+    this.updateTour = null;
+  };
+
+  /** Open the desk or page a tour walks through (for a stop of the walk through what changed). */
+  openPlace = (tour: TourId) => this.openTourPage(tour);
 
   /** Packs shipped with the app (static/song-packs/index.json). Missing or broken index: none. */
   loadSongPacks = async () => {
