@@ -388,7 +388,7 @@
     <div class="list">
       {#if session.services.length === 0}<p class="empty">{t("No services yet. Start one to plan the order.")}</p>{/if}
       {#if session.services.length > 5}
-        <label class="svc-find"><Icon name="search" size={13} /><input type="search" aria-label={t("Find a service")} placeholder={t("Find a service")} bind:value={serviceQuery} /></label>
+        <label class="svc-find focus-box"><Icon name="search" size={13} /><input type="search" aria-label={t("Find a service")} placeholder={t("Find a service")} bind:value={serviceQuery} /></label>
       {/if}
       {#each serviceGroups as group (group.id)}
       <p class="svc-group">{t(group.label)}</p>

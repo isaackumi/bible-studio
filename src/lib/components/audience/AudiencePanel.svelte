@@ -168,7 +168,7 @@
         {/each}
       </div>
       <div class="find">
-        <label class="search">
+        <label class="search focus-box">
           <Icon name="search" size={15} />
           <input type="text" placeholder={t("Search questions or names")} aria-label={t("Search questions")} bind:value={query} />
           {#if query}<button type="button" class="clear" aria-label={t("Clear search")} onclick={() => (query = "")}><Icon name="close" size={13} /></button>{/if}

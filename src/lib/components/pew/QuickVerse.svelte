@@ -88,7 +88,7 @@
 <svelte:window onkeydowncapture={onKey} />
 
 <div class="quick" class:free={!!free}>
-  <form class="find" onsubmit={show}>
+  <form class="find focus-box" onsubmit={show}>
     <Icon name="search" size={14} />
     <input bind:this={input} bind:value={text} aria-label={t("Show a verse not in the service")} placeholder={t("Any verse: John 3:16")} title={t("A verse not in the running order goes on Preview. Press / to type here.")} oninput={() => (problem = "")} />
     {#if text.trim()}<button type="submit" class="go" disabled={busy}>{t("Preview")}</button>{:else}<kbd>/</kbd>{/if}

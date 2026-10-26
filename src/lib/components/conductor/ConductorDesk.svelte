@@ -343,7 +343,7 @@
         {#if pilot.last?.live && session.canUndoProgram && !pilot.paused}<button type="button" class="pad" onclick={() => void pilot.undo()}>{t("Undo")}</button>{/if}
       </div>
     {/if}
-    <label class="find">
+    <label class="find focus-box">
       <Icon name="search" size={16} />
       <input bind:this={crateEl} bind:value={query} onkeydown={crateKey} placeholder={t("Type a verse, a song, or a line from one")} aria-label={t("Find something to load on Next")} />
     </label>

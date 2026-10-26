@@ -54,7 +54,7 @@
 
 <DeskDialog title={t("Find a verse")} {onclose}>
   <form class="finder" onsubmit={(event) => { event.preventDefault(); void look(); }}>
-    <label class="field">
+    <label class="field focus-box">
       <Icon name="search" size={15} />
       <!-- svelte-ignore a11y_autofocus -->
       <input aria-label={t("Verse")} placeholder={t("John 3:16, 1 Cor 13:4-7, Psalm 23")} bind:value={query} autofocus />

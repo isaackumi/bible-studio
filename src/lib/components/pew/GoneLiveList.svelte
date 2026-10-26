@@ -140,7 +140,7 @@
   {#if showSearch || hasOlder}
     <div class="gl-tools">
       {#if showSearch}
-        <label class="gl-search">
+        <label class="gl-search focus-box">
           <Icon name="search" size={13} />
           <input
             bind:this={searchInput}

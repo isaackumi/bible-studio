@@ -270,7 +270,7 @@
   <div class="layer">
     <button type="button" class="backdrop" aria-label={t("Close")} tabindex="-1" onclick={close}></button>
     <div class="palette" role="dialog" aria-modal="true" aria-label={t("Go to anything")}>
-      <label class="find">
+      <label class="find focus-box">
         <Icon name="search" size={16} />
         <input bind:this={input} bind:value={query} role="combobox" aria-expanded="true" aria-controls="palette-list" aria-activedescendant={results[active] ? `palette-${results[active]!.id}` : undefined} placeholder={kind ? t("Search {kind}…", { kind: groupLabel(kind) }) : t("Go to a page, song, verse, setting or action…")} />
         <kbd>esc</kbd>

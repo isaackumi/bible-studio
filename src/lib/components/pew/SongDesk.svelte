@@ -825,7 +825,7 @@
 
     {#if visible.length > 8}
       <div class="list-tools">
-        <label class="list-filter">
+        <label class="list-filter focus-box">
           <Icon name="search" size={13} />
           <input type="search" aria-label={t("Filter this list")} placeholder={t("Filter")} bind:value={listQuery} />
         </label>

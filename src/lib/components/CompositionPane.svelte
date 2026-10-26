@@ -1072,7 +1072,7 @@
           <p class="box-title">{t("Content")}</p>
           {#if selected.source.type === "scripture"}
             <form class="verse-find" onsubmit={(event) => { event.preventDefault(); void findVerse(verseQuery); }}>
-              <label class="find-field">
+              <label class="find-field focus-box">
                 <Icon name="search" size={14} />
                 <input aria-label={t("Find a verse")} placeholder={t("John 3:16, 1 Cor 13:4-7, Psalm 23")} bind:value={verseQuery} />
               </label>

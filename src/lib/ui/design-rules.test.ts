@@ -41,4 +41,18 @@ describe("design rules", () => {
     const direct = files.filter(({ source }) => /import\s*\{[^}]*\b(fade|fly|slide|scale|blur)\b[^}]*\}\s*from\s*"svelte\/transition"/.test(source)).map(({ path }) => path);
     expect(direct).toEqual([]);
   });
+
+  it("draws one focus outline on a search box, not a ring inside a ring", () => {
+    // A box that lights up while its borderless field is in use must say so (focus-box), so the
+    // field's own ring (app.css) stays off.
+    const missing = files.flatMap(({ path, source }) => {
+      const style = styleOf(source);
+      const boxes = [...style.matchAll(/\.([\w-]+):focus-within\s*\{[^}]*(?:border-color|box-shadow)/g)].map((match) => match[1]!);
+      return boxes
+        .filter((box) => new RegExp(`\\.${box}\\s+(?:input|textarea)[^{]*\\{[^}]*border:\\s*0`).test(style))
+        .filter((box) => !new RegExp(`class="[^"]*(?<![\\w-])${box}(?![\\w-])[^"]*\\bfocus-box\\b|class="[^"]*\\bfocus-box\\b[^"]*(?<![\\w-])${box}(?![\\w-])`).test(source.replace(style, "")))
+        .map((box) => `${path}: .${box} needs focus-box`);
+    });
+    expect(missing).toEqual([]);
+  });
 });

@@ -394,7 +394,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -- keyboard control for the list inside -->
   <div class="finder" onkeydown={keys}>
     <div class="top">
-      <label class="box">
+      <label class="box focus-box">
         <Icon name="search" size={20} />
         <input
           bind:this={input}

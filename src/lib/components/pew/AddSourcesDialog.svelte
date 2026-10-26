@@ -303,7 +303,7 @@
       {#if !target}
         <p class="empty">{t("Add a part first, then fill it.")}</p>
       {:else if tab === "song"}
-        <label class="search">
+        <label class="search focus-box">
           <Icon name="search" size={15} />
           <!-- svelte-ignore a11y_autofocus -->
           <input type="search" autofocus aria-label={t("Find a song")} placeholder={t("Title, author or first line")} bind:value={songQuery} onkeydown={(event) => { if (event.key === "Enter" && songs[0]) addSong(songs[0].id); }} />
@@ -322,7 +322,7 @@
         </div>
       {:else if tab === "scripture"}
         <form class="ref" onsubmit={addReference}>
-          <label class="search grow">
+          <label class="search grow focus-box">
             <Icon name="bible" size={15} />
             <!-- svelte-ignore a11y_autofocus -->
             <input autofocus aria-label={t("Scripture reference")} placeholder={t("John 3:16-18, Psalm 23")} bind:value={reference} />
