@@ -6,6 +6,8 @@
 //!
 //! The WAV is written as the sound comes, with its sizes put right every few seconds and at the
 //! end, so a crash mid-sermon still leaves a file that plays up to that moment.
+// The sound comes from the Mac and Windows listening helpers; elsewhere only the commands are built.
+#![cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
