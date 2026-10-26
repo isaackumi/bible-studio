@@ -14,6 +14,7 @@ pub struct Network {
 }
 
 /// `ipconfig getsummary <interface>` on a Mac: the kind of link, and the SSID unless it is redacted.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn read_mac_summary(text: &str) -> Network {
     let field = |key: &str| text.lines().find_map(|line| line.trim().strip_prefix(key).and_then(|rest| rest.trim_start().strip_prefix(':')).map(|value| value.trim().to_string()));
     match field("InterfaceType").as_deref() {
