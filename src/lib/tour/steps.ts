@@ -377,7 +377,7 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       {
         target: ['.settings-body .choices'],
         title: msg("Which recognizer listens"),
-        body: msg("System is built in and light. Accurate runs Whisper on this computer. ElevenLabs and Deepgram use your own key and hear accents best."),
+        body: msg("System is built in and light. Accurate and Most accurate listen on this computer. ElevenLabs and Deepgram use your own key and hear accents best."),
       },
       TOUR_BUTTON,
     ],

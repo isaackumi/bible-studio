@@ -692,7 +692,7 @@ export type VoiceSettings = {
 
 export type NoiseFilter = "off" | "light" | "strong";
 
-export type VoiceEngine = "system" | "accurate" | "elevenlabs" | "deepgram";
+export type VoiceEngine = "system" | "accurate" | "parakeet" | "elevenlabs" | "deepgram";
 
 export type SlideDeckDocument = {
   id: string;

@@ -45,9 +45,22 @@
   const model = $derived(session.accurate.model);
   const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`;
 
+  const parakeet = $derived(session.parakeet.model);
+
   $effect(() => {
-    if (isDesktop()) untrack(() => void session.refreshAccurate());
+    if (isDesktop()) untrack(() => void Promise.all([session.refreshAccurate(), session.refreshParakeet()]));
   });
+
+  /** Where the sound goes with the recognizer chosen, in one plain line. */
+  const whereSoundGoes = $derived(
+    engine === "accurate" || engine === "parakeet"
+      ? t("Your sound stays on this computer.")
+      : engine === "elevenlabs" || engine === "deepgram"
+        ? t("Your sound goes to {service} while listening.", { service: CLOUD_SPEECH[engine].name })
+        : desktop
+          ? t("The computer's own recognizer. A Mac may send the sound to Apple when it cannot recognise it on the computer.")
+          : t("The browser sends the sound to Google or Microsoft to recognise it."),
+  );
 
   let heard = $state("");
   let means = $state("");
@@ -79,7 +92,7 @@
   <div class="row stack">
     <div class="row-copy">
       <strong>{t("Which recognizer listens")}</strong>
-      <span>{desktop ? t("The system recognizer is built into the computer. Accurate uses Whisper on this computer and never sends audio away. ElevenLabs and Deepgram are speech services with your own key: they hear accents and Bible names best, and send the sound to that service while listening.") : t("This browser's own recognizer works in Chrome and Edge. ElevenLabs and Deepgram are speech services with your own key: they work in any browser, hear accents and Bible names best, and send the sound to that service while listening.")}</span>
+      <span>{desktop ? t("The system recognizer is built into the computer. Accurate and Most accurate listen on this computer and never send audio away; Most accurate hears more exactly but needs 8 GB of memory. ElevenLabs and Deepgram are speech services with your own key: they hear accents and Bible names best, and send the sound to that service while listening.") : t("This browser's own recognizer works in Chrome and Edge. ElevenLabs and Deepgram are speech services with your own key: they work in any browser, hear accents and Bible names best, and send the sound to that service while listening.")}</span>
     </div>
     <div class="choices" role="radiogroup" aria-label={t("Recognizer")}>
       <button type="button" role="radio" class="choice" class:on={engine === "system"} aria-checked={engine === "system"} onclick={() => void session.setVoiceEngine("system")}>
@@ -87,7 +100,12 @@
       </button>
       {#if desktop && !model?.unsupported}
         <button type="button" role="radio" class="choice" class:on={engine === "accurate"} aria-checked={engine === "accurate"} disabled={!model?.installed} onclick={() => void session.setVoiceEngine("accurate")}>
-          <b>{t("Accurate")}</b><span>{model?.installed ? t("Whisper, on this computer") : t("Download it first")}</span>
+          <b>{t("Accurate")}</b><span>{model?.installed ? t("On this computer") : t("Download it first")}</span>
+        </button>
+      {/if}
+      {#if desktop && parakeet}
+        <button type="button" role="radio" class="choice" class:on={engine === "parakeet"} aria-checked={engine === "parakeet"} disabled={!parakeet.installed || parakeet.unsupported} onclick={() => void session.setVoiceEngine("parakeet")}>
+          <b>{t("Most accurate")}</b><span>{parakeet.unsupported ? t("Not on this computer") : parakeet.installed ? t("On this computer, needs 8 GB") : t("Download it first")}</span>
         </button>
       {/if}
       {#each SERVICES as service (service)}
@@ -96,6 +114,7 @@
         </button>
       {/each}
     </div>
+    <p class="where" role="status">{whereSoundGoes}</p>
   </div>
   {#each SERVICES as service (service)}
     <div class="row stack">
@@ -135,6 +154,33 @@
         <button type="button" class="btn" onclick={() => void session.deleteAccurate()}>{t("Remove")}</button>
       {:else}
         <button type="button" class="btn primary" onclick={() => void session.downloadAccurate()}>{t("Download")}</button>
+      {/if}
+    </div>
+  </section>
+{/if}
+
+{#if desktop && parakeet}
+  <section class="rows">
+    <div class="row">
+      <div class="row-copy">
+        <strong>{t("Most accurate listening model")}</strong>
+        <span>
+          {#if parakeet.unsupported}{parakeet.reason || t("Most accurate listening does not run on this computer.")}
+          {:else if session.parakeet.progress !== null}{t("Downloading… {percent}%", { percent: Math.round(session.parakeet.progress * 100) })}
+          {:else if session.parakeet.error}{session.parakeet.error}
+          {:else if parakeet.installed}{t("Downloaded ({size}). It stays on this computer, and uses about 1 GB of memory while listening.", { size: megabytes(parakeet.bytes) })}
+          {:else}{t("A one-time download of {size}. It uses about 1 GB of memory while listening, and half the processor at most.", { size: megabytes(parakeet.bytes || 670_619_706) })}{/if}
+        </span>
+        {#if session.parakeet.progress !== null}<progress max="1" value={session.parakeet.progress}></progress>{/if}
+      </div>
+      {#if !parakeet.unsupported}
+        {#if session.parakeet.progress !== null}
+          <button type="button" class="btn" onclick={() => session.cancelParakeet()}>{t("Cancel")}</button>
+        {:else if parakeet.installed}
+          <button type="button" class="btn" onclick={() => void session.deleteParakeet()}>{t("Remove")}</button>
+        {:else}
+          <button type="button" class="btn primary" onclick={() => void session.downloadParakeet()}>{t("Download")}</button>
+        {/if}
       {/if}
     </div>
   </section>
@@ -228,6 +274,7 @@
   .choice.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   .choice:disabled { opacity: .55; cursor: default; }
   progress { width: 100%; height: 6px; margin-top: 8px; accent-color: var(--accent); }
+  .where { margin: 0; font-size: 12.5px; color: var(--muted); }
   .stack { flex-direction: column; align-items: stretch !important; gap: 10px; }
   .card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); }
   .say { display: flex; align-items: baseline; gap: 10px; } .say span, .heard span { min-width: 64px; font-size: 12px; font-weight: 650; color: var(--muted); }

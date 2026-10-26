@@ -149,25 +149,40 @@ pub fn download(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 fn fetch(app: &tauri::AppHandle, path: &Path, run: u64) -> Result<(), String> {
+    let mut last = Instant::now();
+    fetch_file(MODEL_URL, MODEL_SHA256, MODEL_BYTES, path, run, &|| RUN.load(Ordering::SeqCst) == run, &mut |received| {
+        if last.elapsed() >= Duration::from_millis(250) {
+            let _ = app.emit("whisper-download", Progress { received, total: MODEL_BYTES, done: false, error: None });
+            last = Instant::now();
+        }
+    })
+}
+
+/// Download one model file to `path`, checked against its size and SHA-256 (Parakeet's files too).
+/// `current` turns false when the download is cancelled; `progress` hears the bytes received so far.
+pub(crate) fn fetch_file(url: &str, sha256: &str, bytes: u64, path: &Path, run: u64, current: &dyn Fn() -> bool, progress: &mut dyn FnMut(u64)) -> Result<(), String> {
     let dir = path.parent().ok_or("No folder for the model.")?;
     std::fs::create_dir_all(dir).map_err(|error| format!("Could not make the models folder. {error}"))?;
     let part = path.with_extension(format!("part{run}"));
-    // A dead connection fails instead of waiting for ever; the whole 60 MB may take 20 minutes.
+    // A dead connection fails instead of waiting for ever; a large model may take a long while.
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(15)))
         .timeout_recv_response(Some(Duration::from_secs(30)))
-        .timeout_recv_body(Some(Duration::from_secs(20 * 60)))
+        .timeout_recv_body(Some(Duration::from_secs(90 * 60)))
         .build()
         .into();
-    let response = agent.get(MODEL_URL).call().map_err(|error| format!("The download could not start. Check the internet connection. ({error})"))?;
+    let response = agent.get(url).call().map_err(|error| {
+        // The detail (it can hold the download's address) goes to the log only.
+        log::warn!("model download: {error}");
+        "The download could not start. Check the internet connection.".to_string()
+    })?;
     let mut body = response.into_body().into_reader();
     let mut file = std::fs::File::create(&part).map_err(|error| format!("Could not save the model. {error}"))?;
     let mut hash = Sha256::new();
     let mut buffer = vec![0u8; 256 * 1024];
     let mut received = 0u64;
-    let mut last = Instant::now();
     loop {
-        if RUN.load(Ordering::SeqCst) != run {
+        if !current() {
             drop(file);
             let _ = std::fs::remove_file(&part);
             return Err("Download cancelled.".into());
@@ -179,19 +194,16 @@ fn fetch(app: &tauri::AppHandle, path: &Path, run: u64) -> Result<(), String> {
         hash.update(&buffer[..read]);
         file.write_all(&buffer[..read]).map_err(|error| format!("Could not save the model. Is the disk full? ({error})"))?;
         received += read as u64;
-        if last.elapsed() >= Duration::from_millis(250) {
-            let _ = app.emit("whisper-download", Progress { received, total: MODEL_BYTES, done: false, error: None });
-            last = Instant::now();
-        }
+        progress(received);
     }
     file.flush().map_err(|error| error.to_string())?;
     drop(file);
     let digest = hash.finalize().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
-    if digest != MODEL_SHA256 || received != MODEL_BYTES {
+    if digest != sha256 || received != bytes {
         let _ = std::fs::remove_file(&part);
         return Err("The downloaded model did not match the published one, so it was not used. Try again.".into());
     }
-    if RUN.load(Ordering::SeqCst) != run {
+    if !current() {
         let _ = std::fs::remove_file(&part);
         return Err("Download cancelled.".into());
     }
@@ -223,7 +235,10 @@ fn context(app: &tauri::AppHandle) -> Result<Arc<whisper_rs::WhisperContext>, St
     whisper_rs::install_logging_hooks();
     let mut params = whisper_rs::WhisperContextParameters::default();
     params.use_gpu(true);
-    let context = whisper_rs::WhisperContext::new_with_params(model_path(app)?, params).map_err(|error| format!("The model could not be loaded. Download it again in Settings › Sound & voice. ({error})"))?;
+    let context = whisper_rs::WhisperContext::new_with_params(model_path(app)?, params).map_err(|error| {
+        log::warn!("listening model: {error}");
+        "The model could not be loaded. Download it again in Settings › Sound & voice.".to_string()
+    })?;
     let context = Arc::new(context);
     *guard = Some(context.clone());
     Ok(context)
@@ -238,6 +253,22 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
     *STOPPED_AT.lock().unwrap_or_else(|poison| poison.into_inner()) = None;
     let context = context(&app)?;
     let prompt = prompt_for(words);
+    let (feed, audio) = capture(&app, run, mix)?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let flag = stop.clone();
+    let worker_app = app.clone();
+    let worker = std::thread::spawn(move || listen(worker_app, run, context, audio, flag, prompt));
+    emit(&app, run, serde_json::json!({ "kind": "status", "message": "Listening (accurate). Speak a reference or read a verse." }));
+    *RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(Running { stop, feed: Some(feed), worker: Some(worker) });
+    Ok(())
+}
+
+/// 16 kHz mono samples gathering as they are heard.
+pub(crate) type Samples = Arc<Mutex<Vec<f32>>>;
+
+/// The microphone, cleaned by the noise filter (`mix`), as 16 kHz mono samples gathering in a buffer;
+/// levels and a lost microphone are reported as `listen-phrase` lines. Parakeet listens through it too.
+pub(crate) fn capture(app: &tauri::AppHandle, run: u64, mix: f32) -> Result<(crate::noise::Feed, Samples), String> {
     let audio: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let sink_audio = audio.clone();
     let levels_app = app.clone();
@@ -261,13 +292,7 @@ pub fn start(app: tauri::AppHandle, run: u64, mix: f32, words: &str) -> Result<(
             let _ = lost_app.emit("listen-phrase", crate::voice::ListenLine { run, line: r#"{"kind":"end"}"#.into() });
         },
     )?;
-    let stop = Arc::new(AtomicBool::new(false));
-    let flag = stop.clone();
-    let worker_app = app.clone();
-    let worker = std::thread::spawn(move || listen(worker_app, run, context, audio, flag, prompt));
-    emit(&app, run, serde_json::json!({ "kind": "status", "message": "Listening (accurate). Speak a reference or read a verse." }));
-    *RUNNING.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(Running { stop, feed: Some(feed), worker: Some(worker) });
-    Ok(())
+    Ok((feed, audio))
 }
 
 /// Listening stopped: the model leaves memory (about 150 MB) after a few quiet minutes, unless
@@ -301,7 +326,7 @@ pub fn stop() {
     }
 }
 
-fn emit(app: &tauri::AppHandle, run: u64, value: serde_json::Value) {
+pub(crate) fn emit(app: &tauri::AppHandle, run: u64, value: serde_json::Value) {
     let _ = app.emit("listen-phrase", crate::voice::ListenLine { run, line: value.to_string() });
 }
 
@@ -347,7 +372,7 @@ fn echoes_prompt(text: &str, prompt: &str) -> bool {
 }
 
 /// What Whisper writes for silence, music or noise, never a phrase to show.
-fn is_noise(text: &str) -> bool {
+pub(crate) fn is_noise(text: &str) -> bool {
     let plain = text.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
     plain.is_empty()
         || text.trim().starts_with('[')
@@ -405,6 +430,12 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
         }
     };
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 6) as i32;
+    follow(&app, run, &audio, &stop, |samples| transcribe(&mut state, samples, &prompt, threads), |text| !is_noise(text) && !echoes_prompt(text, &prompt));
+}
+
+/// Follow the speech gathering in `audio` until `stop`: about once a step, `decode` the phrase so far
+/// and send it as a partial phrase, and as a final one at a pause. `keep` drops what is not speech.
+pub(crate) fn follow(app: &tauri::AppHandle, run: u64, audio: &Mutex<Vec<f32>>, stop: &AtomicBool, mut decode: impl FnMut(&[f32]) -> Option<String>, keep: impl Fn(&str) -> bool) {
     let mut last_text = String::new();
     let mut decoded_len = 0usize;
     while !stop.load(Ordering::SeqCst) {
@@ -429,7 +460,7 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
             continue;
         }
         let paused = window.len() > PAUSE + RATE && speech_ended(take);
-        let Some(text) = transcribe(&mut state, take, &prompt, threads) else {
+        let Some(text) = decode(take) else {
             // A failed decode still lets go of what is older than one phrase, so the buffer (and the
             // copy made each step) cannot grow for the rest of the sermon.
             let mut buffer = audio.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -442,8 +473,8 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
         };
         decoded_len = window.len();
         let final_phrase = paused || full;
-        if !is_noise(&text) && !echoes_prompt(&text, &prompt) && (final_phrase || text != last_text) {
-            emit(&app, run, serde_json::json!({ "kind": "phrase", "text": text, "final": final_phrase, "alternatives": [] }));
+        if keep(&text) && (final_phrase || text != last_text) {
+            emit(app, run, serde_json::json!({ "kind": "phrase", "text": text, "final": final_phrase, "alternatives": [] }));
             last_text = text;
         }
         if final_phrase {
@@ -456,7 +487,7 @@ fn listen(app: tauri::AppHandle, run: u64, context: Arc<whisper_rs::WhisperConte
             last_text.clear();
         }
     }
-    emit(&app, run, serde_json::json!({ "kind": "end" }));
+    emit(app, run, serde_json::json!({ "kind": "end" }));
 }
 
 #[cfg(test)]

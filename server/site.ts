@@ -167,7 +167,7 @@ export function privacyPage(site: Site): string {
 
   <h2 id="features">4. Features that use other services, when you turn them on</h2>
   <ul>
-    <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. If you choose <b>Accurate</b> listening, Whisper runs entirely on your computer and audio never leaves it; its model is downloaded once from Hugging Face, which sees your IP address. We do not receive the audio or the words.</li>
+    <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. If you choose <b>Accurate</b> or <b>Most accurate</b> listening, the speech model runs entirely on your computer and audio never leaves it; the model is downloaded once from a third-party model host, which sees your IP address. We do not receive the audio or the words.</li>
     <li><b>AI summaries and translation</b> send the text involved to the AI provider whose key you enter (for example OpenAI or Anthropic), under that provider's terms.</li>
     <li><b>Online Bibles</b> are fetched from API.Bible, which receives the passages requested and anonymous usage counts required by the publishers.</li>
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
@@ -242,7 +242,7 @@ export function licensesPage(site: Site): string {
   </tbody></table>
   <p>Other translations come from API.Bible under each publisher's license, when you choose them.</p>
   <h2>Speech model</h2>
-  <p>Accurate listening uses <a href="https://github.com/openai/whisper" rel="noopener">OpenAI Whisper</a> through <a href="https://github.com/ggml-org/whisper.cpp" rel="noopener">whisper.cpp</a>, both under the MIT License. The model is downloaded only when you turn it on.</p>
+  <p>Accurate listening uses <a href="https://github.com/openai/whisper" rel="noopener">OpenAI Whisper</a> through <a href="https://github.com/ggml-org/whisper.cpp" rel="noopener">whisper.cpp</a>, both under the MIT License. Most accurate listening uses <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" rel="noopener">Parakeet TDT 0.6B v3</a> by NVIDIA, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a> and converted for <a href="https://onnxruntime.ai" rel="noopener">ONNX Runtime</a> (MIT License), run through <a href="https://github.com/cjpais/transcribe-rs" rel="noopener">transcribe-rs</a> (MIT License) with a change to how many processor cores it uses. Each model is downloaded only when you turn it on.</p>
   <h2>Fonts</h2>
   <p>Inter, Figtree, Instrument Sans and Instrument Serif are licensed under the <a href="https://openfontlicense.org" rel="noopener">SIL Open Font License 1.1</a>.</p>
   <h2>Software components</h2>

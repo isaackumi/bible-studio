@@ -138,7 +138,7 @@ export class ServiceChecks {
       libraryFree: found?.raw?.libraryFree ?? null,
       frames: this.lastFrames,
       audienceOpen: this.host.output.online,
-      spare: { model: this.host.workspace.voice.engine === "accurate" ? 0 : (found?.usage?.models ?? 0), cache: found?.usage?.cache ?? 0, unused: found?.unusedBytes ?? 0 },
+      spare: { model: this.host.workspace.voice.engine === "accurate" || this.host.workspace.voice.engine === "parakeet" ? 0 : (found?.usage?.models ?? 0), cache: found?.usage?.cache ?? 0, unused: found?.unusedBytes ?? 0 },
       dateText: (at) => new Date(at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "long" }),
     };
     return { rows: healthRows(facts), tips: healthTips(facts), desktop: this.desktop() };

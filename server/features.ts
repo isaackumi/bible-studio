@@ -279,7 +279,7 @@ ${chapter("listen", 1, `It <span class="serif">listens</span>, so you don't have
     <ul class="list reveal d1">
       ${item("Verses by voice", "References and close quotes, in any translation you have. Matches go to Preview only.", "premium")}
       ${item("Your accent, understood", "About 250 mishearings put right (“efficient 4” is Ephesians 4), and it learns your church's own words.", "premium")}
-      ${item("Accurate listening", "Whisper running on your own computer: audio never leaves the building.", "premium", mac.replace("Mac today", "Mac & Windows"))}
+      ${item("Accurate listening", "Speech recognition on your own computer: audio never leaves the building.", "premium", mac.replace("Mac today", "Mac & Windows"))}
       ${item("Verses by meaning", "When the preacher describes a verse, the AI names it. Off until you switch it on.", "free", '<span class="tag tag-os">your AI key</span>')}
       ${item("Follows the singing and the sermon", "Finds the song part being sung, and the sermon slide being preached.", "premium")}
       ${item("AI that helps you prepare", "Sermon summaries, slide decks from notes or a passage, songs suggested for the sermon.", "premium", '<span class="tag tag-os">your AI key</span>')}

@@ -168,8 +168,11 @@ export function stitchTranscript(
   return { committed, text: spoken, alternatives };
 }
 
+/** The recognizers on this computer: the system's, Whisper ("accurate") and Parakeet. */
+export type LocalEngine = "system" | "accurate" | "parakeet";
+
 /** macOS Listen uses the system lecture model. The browser keeps Web Speech. */
-export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off", words: string[] = [], engine: "system" | "accurate" = "system"): () => void {
+export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilter = "off", words: string[] = [], engine: LocalEngine = "system"): () => void {
   let detach = () => {};
   let stopped = false;
   let ended = false;
@@ -447,3 +450,29 @@ export async function downloadAccurateModel(onProgress: (progress: AccurateProgr
 
 export const cancelAccurateModel = () => invoke("whisper_cancel");
 export const deleteAccurateModel = () => invoke("whisper_delete");
+
+/**
+ * Parakeet listening's model (NVIDIA Parakeet, on this computer): as Accurate's, plus `reason`
+ * when this computer cannot carry it (too little memory, too few cores, an Intel Mac).
+ */
+export type ParakeetModel = AccurateModel & { reason?: string | null };
+
+export async function parakeetModel(): Promise<ParakeetModel> {
+  if (!isDesktop()) return { installed: false, downloading: false, bytes: 0, unsupported: true };
+  const status = await invoke<ParakeetModel & { supported?: boolean }>("parakeet_status");
+  return { installed: status.installed, downloading: status.downloading, bytes: status.bytes, unsupported: status.supported === false, reason: status.reason ?? null };
+}
+
+export async function downloadParakeetModel(onProgress: (progress: AccurateProgress) => void): Promise<() => void> {
+  const unlisten = await listen<AccurateProgress>("parakeet-download", (event) => onProgress(event.payload));
+  try {
+    await invoke("parakeet_download");
+  } catch (error) {
+    unlisten();
+    throw error;
+  }
+  return unlisten;
+}
+
+export const cancelParakeetModel = () => invoke("parakeet_cancel");
+export const deleteParakeetModel = () => invoke("parakeet_delete");
