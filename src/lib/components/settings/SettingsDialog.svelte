@@ -16,7 +16,6 @@
   import AudioSettings from "../AudioSettings.svelte";
   import CapabilityList from "../CapabilityList.svelte";
   import RemotePanel from "../RemotePanel.svelte";
-  import { audienceRoom } from "../../app/rooms.svelte";
   import { session } from "../../app/session.svelte";
   import { COMMANDS } from "../../commands/registry";
   import { audienceStatus } from "../../display/status";
@@ -44,7 +43,7 @@
   import PickList from "../PickList.svelte";
   import ReadyCheck from "./ReadyCheck.svelte";
   import PerformanceCheck from "./PerformanceCheck.svelte";
-  import { AI_DEFAULTS, AI_PROVIDERS, LOCAL_AI_APPS, type AiFeature } from "../../ai/summarize";
+  import { AI_DEFAULTS, AI_PROVIDERS, aiReady, LOCAL_AI_APPS, type AiFeature } from "../../ai/summarize";
   import { WARN_CHOICES } from "../../domain/timer-cues";
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
   import { SETTINGS_GROUPS, type SettingsEntry, type SettingsSectionId } from "./sections";
@@ -542,21 +541,23 @@
     session.settingsOpen = false;
   }
 
-  function openSermonPage() {
-    close();
-    session.goToDesk("presenter", "sermon");
-  }
-
-  /** Everything the AI assistant is used for, each with its switch and a way there. */
-  const AI_USES: Array<{ feature: AiFeature; title: string; about: string; where: string; open: () => void }> = [
-    { feature: "summary", title: msg("Sermon summary"), about: msg("Turns sermon notes into a short summary and points to show. Sermon page › Summarize."), where: msg("Open Sermon"), open: openSermonPage },
-    { feature: "slides", title: msg("Slides from notes, a passage or a topic"), about: msg("Writes a slide deck in your theme, ready to edit. Sermon page › Make slides."), where: msg("Open Sermon"), open: openSermonPage },
-    { feature: "songSuggest", title: msg("Songs for a sermon"), about: msg("Picks songs from your library that fit the sermon, and names a few you could add. Sermon page › Suggest songs."), where: msg("Open Sermon"), open: openSermonPage },
-    { feature: "songLookup", title: msg("Look up a song"), about: msg("For songs you don't have: words for old hymns, SongSelect for the rest. Songs › Import."), where: msg("Look up"), open: () => session.lookUpSongWithAi() },
-    { feature: "captions", title: msg("Caption translation"), about: msg("Translates live captions into up to four languages for phones in the room."), where: msg("Open Captions"), open: () => (section = "captions") },
-    { feature: "verses", title: msg("Verses by meaning, while listening"), about: msg("When the preacher paraphrases a verse or describes it, the AI names it: sure ones go on Preview, others wait under Detections. Only phrases that sound like scripture are sent. Off until you switch it on."), where: msg("Open Scripture"), open: () => { close(); session.goToDesk("presenter", "scriptures"); } },
-    { feature: "notes", title: msg("Live sermon notes"), about: msg("While the pastor preaches and listening is on, the AI turns what it hears into clean notes every few minutes and puts misheard words right. You accept each version. Sermon page › Take live notes."), where: msg("Open Sermon"), open: openSermonPage },
-    { feature: "games", title: msg("Quizzes from a sermon or a reading"), about: msg("Writes a quiz from today's sermon, a book you are reading together, a passage or a topic, to play on phones. You check every question first. Audience › Quizzes and polls › Make with AI."), where: msg("Open Audience"), open: () => { close(); audienceRoom.show(); } },
+  /** Everything the AI assistant is used for, each with its switch, grouped by where it helps. */
+  type AiGroup = "sermons" | "listening" | "songs" | "room";
+  const AI_GROUPS: Array<{ id: AiGroup; label: string }> = [
+    { id: "sermons", label: msg("Sermons") },
+    { id: "listening", label: msg("Listening") },
+    { id: "songs", label: msg("Songs") },
+    { id: "room", label: msg("Captions and phones") },
+  ];
+  const AI_USES: Array<{ feature: AiFeature; group: AiGroup; title: string; about: string }> = [
+    { feature: "summary", group: "sermons", title: msg("Sermon summary"), about: msg("A short summary and points to show, from your notes. Sermon › Summarize.") },
+    { feature: "slides", group: "sermons", title: msg("Slides from notes, a passage or a topic"), about: msg("A deck in your theme, ready to edit. Sermon › Make slides.") },
+    { feature: "songSuggest", group: "sermons", title: msg("Songs for a sermon"), about: msg("Songs from your library that fit, and a few to add. Sermon › Suggest songs.") },
+    { feature: "notes", group: "sermons", title: msg("Live sermon notes"), about: msg("Clean notes from what the preacher says, every few minutes; you accept each version. Sermon › Take live notes.") },
+    { feature: "verses", group: "listening", title: msg("Verses by meaning, while listening"), about: msg("Names a verse the preacher paraphrases; sure ones go on Preview. Only phrases that sound like scripture are sent.") },
+    { feature: "songLookup", group: "songs", title: msg("Look up a song"), about: msg("Words for songs you don't have yet. Songs › Import.") },
+    { feature: "captions", group: "room", title: msg("Caption translation"), about: msg("Live captions in up to four languages, on phones in the room.") },
+    { feature: "games", group: "room", title: msg("Quizzes"), about: msg("A quiz from a sermon, a reading or a topic, to play on phones. You check every question first.") },
   ];
 
   function setMode(mode: OutputMode) {
@@ -730,7 +731,7 @@
         <section class="card">
           <label class="contrast-row">
             <span><h3>{t("Stronger borders")}</h3><span class="contrast-note">{t("Lines around panels, fields and buttons drawn brighter, so the desk is easier to read in a bright room or for tired eyes.")}</span></span>
-            <input type="checkbox" class="switch" role="switch" checked={session.workspace.appearance.contrast === true} onchange={(event) => session.setAppearance({ contrast: event.currentTarget.checked })} />
+            <input type="checkbox" class="switch" role="switch" checked={session.workspace.appearance.contrast === true} onchange={(event) => session.setAppearance({ contrast: event.currentTarget.checked, contrastChosen: true })} />
           </label>
         </section>
         <section class="card split">
@@ -1196,7 +1197,7 @@
         {@const ai = session.workspace.ai}
         <section class="rows">
           <div class="row">
-            <div class="row-copy"><strong>{t("Which AI")}</strong><span>{isDesktop() ? t("Claude, ChatGPT and Gemini work over the internet with a key from their website. An AI on this computer works without a key or the internet.") : t("Claude, ChatGPT and Gemini work over the internet with a key from their website.")}</span></div>
+            <div class="row-copy"><strong>{t("Which AI")}</strong><span>{isDesktop() ? t("Claude, ChatGPT and Gemini work over the internet with your own key. An AI on this computer needs no key or internet.") : t("Claude, ChatGPT and Gemini work over the internet with your own key.")}</span></div>
             <select class="field" aria-label={t("AI service")} value={ai.provider} onchange={(event) => { const provider = AI_PROVIDERS.find((name) => name === event.currentTarget.value) ?? "anthropic"; session.setAiSettings({ provider, key: provider === ai.provider ? ai.key : "", model: AI_DEFAULTS[provider].model, baseUrl: provider === "local" ? AI_DEFAULTS.local.baseUrl : "" }); aiNote = ""; aiModels = []; modelsNote = ""; }}>
               <option value="anthropic">{t("Claude (by Anthropic)")}</option>
               <option value="openai">{t("ChatGPT (by OpenAI)")}</option>
@@ -1207,42 +1208,19 @@
           </div>
           {#if ai.provider === "local"}
             <div class="row">
-              <div class="row-copy"><strong>{t("Set it up once")}</strong><span>{t("Install Ollama (ollama.com) or LM Studio (lmstudio.ai), download a model in it, and keep the app open while you use Church Studio. Nothing leaves this computer.")}</span></div>
-            </div>
-            <div class="row">
-              <div class="row-copy"><strong>{t("Which app")}</strong><span>{t("Where the AI app listens on this computer. Pick yours, or type another address.")}</span></div>
+              <div class="row-copy"><strong>{t("Which app")}</strong><span>{t("Install Ollama (ollama.com) or LM Studio (lmstudio.ai), download a model in it, and keep it open. Nothing leaves this computer.")}</span></div>
               <div class="row-end">
                 {#each LOCAL_AI_APPS as app (app.name)}
                   <button type="button" class="btn" class:primary={ai.baseUrl === app.baseUrl} onclick={() => { session.setAiSettings({ baseUrl: app.baseUrl }); aiNote = ""; aiModels = []; modelsNote = ""; }}>{app.name}</button>
                 {/each}
-                <input class="field" aria-label={t("AI address")} placeholder={AI_DEFAULTS.local.baseUrl} value={ai.baseUrl} oninput={(event) => { session.setAiSettings({ baseUrl: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
               </div>
             </div>
           {:else}
             <div class="row">
-              <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("Get one at console.anthropic.com › API Keys.") : ai.provider === "openai" ? t("Get one at platform.openai.com › API keys.") : t("Get one at aistudio.google.com › Get API key. Google has a free tier.")} {t("It stays on this computer. The company may charge you for what you use.")}</span></div>
+              <div class="row-copy"><strong>{t("Your key")}</strong><span>{ai.provider === "anthropic" ? t("From console.anthropic.com › API Keys.") : ai.provider === "openai" ? t("From platform.openai.com › API keys.") : t("From aistudio.google.com › Get API key (there is a free tier).")} {t("It stays on this computer; the company may charge for use.")}</span></div>
               <input class="field" type="password" aria-label={t("AI key")} placeholder={t("Paste your key")} autocomplete="off" value={ai.key} oninput={(event) => { session.setAiSettings({ key: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
             </div>
           {/if}
-          <div class="row">
-            <div class="row-copy"><strong>{t("Model")}</strong><span class:form-error={!!modelsNote}>{modelsNote || (ai.provider === "anthropic" ? t("The version of the AI to use. claude-sonnet-5-5 is a good balance; claude-haiku-5-5 is quicker and cheaper.") : t("The version of the AI to use. Press Find models to see the ones you can use."))}</span></div>
-            <div class="row-end">
-              {#if aiModels.length}
-                <select class="field" aria-label={t("AI model")} value={ai.model} onchange={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }}>
-                  {#if !aiModels.includes(ai.model)}<option value={ai.model}>{ai.model || t("Choose a model")}</option>{/if}
-                  {#each aiModels as model (model)}<option value={model}>{model}</option>{/each}
-                </select>
-              {:else}
-                <input class="field" aria-label={t("AI model")} placeholder={t("Model name")} value={ai.model} oninput={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }} />
-              {/if}
-              <button type="button" class="btn" disabled={modelsBusy || (ai.provider !== "local" && !ai.key)} onclick={async () => {
-                modelsBusy = true;
-                modelsNote = "";
-                try { aiModels = await session.aiModels(); if (!session.workspace.ai.model) session.setAiSettings({ model: aiModels[0] }); } catch (error) { modelsNote = error instanceof Error ? error.message : String(error); }
-                modelsBusy = false;
-              }}>{modelsBusy ? t("Looking…") : t("Find models")}</button>
-            </div>
-          </div>
           <div class="row">
             <div class="row-copy"><strong>{t("Check it works")}</strong><span class:form-error={aiNote && !aiOk} class:ai-ok={aiOk && !aiBusy && !!aiNote}>{aiNote || t("Sends a short test to the AI.")}</span></div>
             <div class="row-end">
@@ -1257,20 +1235,50 @@
             </div>
           </div>
         </section>
-        <h3 class="ai-uses-title">{t("What the AI can do")}</h3>
-        <section class="rows" aria-label={t("What the AI can do")}>
-          {#each AI_USES as use (use.feature)}
-            {@const on = session.aiOn(use.feature)}
-            <div class="row" class:ai-off={!on}>
-              <div class="row-copy"><strong>{t(use.title)}</strong><span>{t(use.about)}</span></div>
+        <details class="ai-more">
+          <summary>{t("Advanced")}</summary>
+          <section class="rows">
+            <div class="row">
+              <div class="row-copy"><strong>{t("Model")}</strong><span class:form-error={!!modelsNote}>{modelsNote || t("Which version of the AI answers. A good one is chosen for you; Find models lists the others.")}</span></div>
               <div class="row-end">
-                {#if on}<button type="button" class="btn" onclick={use.open}>{t(use.where)}</button>{/if}
-                <input type="checkbox" class="switch" role="switch" aria-label={t(use.title)} checked={on} onchange={(event) => session.setAiFeature(use.feature, event.currentTarget.checked)} />
+                {#if aiModels.length}
+                  <select class="field" aria-label={t("AI model")} value={ai.model} onchange={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }}>
+                    {#if !aiModels.includes(ai.model)}<option value={ai.model}>{ai.model || t("Choose a model")}</option>{/if}
+                    {#each aiModels as model (model)}<option value={model}>{model}</option>{/each}
+                  </select>
+                {:else}
+                  <input class="field" aria-label={t("AI model")} placeholder={t("Model name")} value={ai.model} oninput={(event) => { session.setAiSettings({ model: event.currentTarget.value }); aiNote = ""; }} />
+                {/if}
+                <button type="button" class="btn" disabled={modelsBusy || (ai.provider !== "local" && !ai.key)} onclick={async () => {
+                  modelsBusy = true;
+                  modelsNote = "";
+                  try { aiModels = await session.aiModels(); if (!session.workspace.ai.model) session.setAiSettings({ model: aiModels[0] }); } catch (error) { modelsNote = error instanceof Error ? error.message : String(error); }
+                  modelsBusy = false;
+                }}>{modelsBusy ? t("Looking…") : t("Find models")}</button>
               </div>
             </div>
-          {/each}
-        </section>
-        <p class="note stand">{t("Switch off what your church doesn't want; its buttons disappear. Your words go to the AI only when you use one of these. With an AI on this computer, nothing leaves the building.")}</p>
+            {#if ai.provider === "local"}
+              <div class="row">
+                <div class="row-copy"><strong>{t("Address")}</strong><span>{t("Where the AI app listens on this computer, if it is not one of the apps above.")}</span></div>
+                <input class="field" aria-label={t("AI address")} placeholder={AI_DEFAULTS.local.baseUrl} value={ai.baseUrl} oninput={(event) => { session.setAiSettings({ baseUrl: event.currentTarget.value }); aiNote = ""; aiModels = []; modelsNote = ""; }} />
+              </div>
+            {/if}
+          </section>
+        </details>
+        <p class="section-label">{t("What the AI can do")}</p>
+        <p class="note stand ai-privacy">{aiReady(ai) ? t("Your words go to the AI only when one of these is used. With an AI on this computer, nothing leaves the building. Switch off what your church doesn't want; its buttons disappear.") : t("Set up an AI above, then switch on what your church wants.")}</p>
+        {#each AI_GROUPS as group (group.id)}
+          <h3 class="ai-uses-title">{t(group.label)}</h3>
+          <section class="rows" aria-label={t(group.label)}>
+            {#each AI_USES.filter((use) => use.group === group.id) as use (use.feature)}
+              {@const on = session.aiOn(use.feature)}
+              <label class="row ai-use" class:ai-off={!on || !aiReady(ai)}>
+                <div class="row-copy"><strong>{t(use.title)}</strong><span>{t(use.about)}</span></div>
+                <input type="checkbox" class="switch" role="switch" checked={on} onchange={(event) => session.setAiFeature(use.feature, event.currentTarget.checked)} />
+              </label>
+            {/each}
+          </section>
+        {/each}
       {:else if section === "planning"}
         <section class="rows">
           <form class="row" onsubmit={(event) => { event.preventDefault(); void connectPco(); }}>
@@ -2090,7 +2098,13 @@
   .settings-body :global(.pill) { flex: none; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
   .ai-ok { color: var(--presence, #3fb950); }
   .ai-off .row-copy { opacity: 0.6; }
-  .ai-uses-title { margin: 22px 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .ai-more { margin-top: 10px; }
+  .ai-more > summary { padding: 6px 4px; font-size: 13px; font-weight: 650; color: var(--muted); cursor: pointer; }
+  .ai-more > summary:hover { color: var(--ink); }
+  .ai-more[open] > summary { margin-bottom: 6px; }
+  .ai-privacy { margin-top: 0; }
+  .ai-use { cursor: pointer; }
+  .ai-uses-title { margin: 16px 4px 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .ai-connected { display: inline-flex; align-items: center; gap: 6px; }
   .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
   .settings-body :global(.pill.ok) { background: color-mix(in srgb, var(--presence, #3fb950) 18%, transparent); color: var(--presence, #3fb950); }

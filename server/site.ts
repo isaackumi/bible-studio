@@ -168,7 +168,7 @@ export function privacyPage(site: Site): string {
   <h2 id="features">4. Features that use other services, when you turn them on</h2>
   <ul>
     <li><b>Voice and captions</b> use your computer's speech recognition. On a Mac this is Apple's Speech Recognition, which may process audio on Apple's servers under Apple's privacy policy; on Windows, the recognizer built into Windows runs on the computer. If you choose <b>Accurate</b> or <b>Most accurate</b> listening, the speech model runs entirely on your computer and audio never leaves it; the model is downloaded once from a third-party model host, which sees your IP address. We do not receive the audio or the words.</li>
-    <li><b>AI summaries and translation</b> send the text involved to the AI provider whose key you enter (for example OpenAI or Anthropic), under that provider's terms.</li>
+    <li><b>AI features</b> (summaries, slides, translation and the like) send the text involved to the AI provider whose key you enter (for example OpenAI or Anthropic), under that provider's terms. Once an AI is set up, <b>verses by meaning</b> is on: while listening, short phrases that sound like scripture are sent to that provider so it can name the verse. Each feature can be switched off in Settings › AI assistant, and with an AI on your own computer nothing is sent.</li>
     <li><b>Online Bibles</b> are fetched from API.Bible, which receives the passages requested and anonymous usage counts required by the publishers.</li>
     <li><b>Planning Center</b>, when you connect it, exchanges service plans with your Planning Center account.</li>
     <li><b>Streaming</b> sends your program straight from your computer to the platform you choose (for example YouTube or Facebook), under its terms.</li>
