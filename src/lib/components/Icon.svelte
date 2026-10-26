@@ -11,6 +11,7 @@
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Church from "@lucide/svelte/icons/church";
+  import MonitorPlay from "@lucide/svelte/icons/monitor-play";
   import CircleQuestionMark from "@lucide/svelte/icons/circle-question-mark";
   import Clapperboard from "@lucide/svelte/icons/clapperboard";
   import Columns2 from "@lucide/svelte/icons/columns-2";
@@ -83,7 +84,7 @@
   import type { Component } from "svelte";
 
   const ICONS: Record<string, Component<{ size?: number; strokeWidth?: number }>> = {
-    pew: Church,
+    pew: MonitorPlay,
     obs: Clapperboard,
     outputs: Monitor,
     themes: SwatchBook,
