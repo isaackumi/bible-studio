@@ -61,7 +61,9 @@ function appearance(value: Partial<AppearanceSettings> | undefined, base: Appear
     accent: sanitizeAccent(value?.accent?.toLowerCase() === "#c6a15b" ? undefined : (value?.accent ?? base.accent)),
     desk: value?.desk === "obs" || value?.desk === "pewbeam" || value?.desk === "conductor" ? value.desk : base.desk,
     calm: value?.calm === true,
-    contrast: value?.contrast === true,
+    // Stronger borders unless the operator switched them off themselves.
+    contrast: value?.contrastChosen === true ? value.contrast === true : true,
+    ...(value?.contrastChosen === true ? { contrastChosen: true } : {}),
     screenShape: sanitizeScreenShape(value?.screenShape),
     ...(value?.measuredAspect ? { measuredAspect: cleanAspect(value.measuredAspect) } : {}),
     ...(value?.language ? { language: sanitizeUiLanguage(value.language) } : {}),

@@ -19,12 +19,13 @@ describe("verses by meaning and AI feature switches", () => {
     expect(parseHeardVerses("nothing")).toEqual([]);
   });
 
-  it("keeps features on by default except verses, and saves only the changes", () => {
-    const settings = sanitizeAiSettings({ provider: "gemini", key: "k", features: { songLookup: false, verses: true, summary: true, bogus: false } });
-    expect(settings.features).toEqual({ songLookup: false, verses: true });
+  it("keeps every feature on by default, verses too, and saves only the changes", () => {
+    const settings = sanitizeAiSettings({ provider: "gemini", key: "k", features: { songLookup: false, verses: false, summary: true, bogus: false } });
+    expect(settings.features).toEqual({ songLookup: false, verses: false });
     expect(aiFeatureOn(settings, "summary")).toBe(true);
     expect(aiFeatureOn(settings, "songLookup")).toBe(false);
-    expect(aiFeatureOn(emptyAiSettings(), "verses")).toBe(false);
+    expect(aiFeatureOn(settings, "verses")).toBe(false);
+    expect(aiFeatureOn(emptyAiSettings(), "verses")).toBe(true);
     expect(sanitizeAiSettings({ provider: "gemini" }).features).toBeUndefined();
   });
 });

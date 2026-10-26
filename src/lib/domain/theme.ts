@@ -281,7 +281,7 @@ export function emptyCursor() {
 }
 
 export function defaultAppearance(): AppearanceSettings {
-  return { theme: "dark", density: "comfortable", scale: 1, accent: "#fa4f00", desk: "pewbeam", calm: false };
+  return { theme: "dark", density: "comfortable", scale: 1, accent: "#fa4f00", desk: "pewbeam", calm: false, contrast: true };
 }
 
 export function defaultWorkspace(): Workspace {

@@ -114,4 +114,12 @@ describe("workspace document", () => {
     expect(clean.sources).toEqual([shared]);
     expect((clean.compositions[0]!.layers[0] as { sourceKey?: string }).sourceKey).toBe("src:a");
   });
+
+  it("draws stronger borders unless the operator switched them off", () => {
+    expect(normalizeWorkspace({}).appearance.contrast).toBe(true);
+    // An older save said off without anyone choosing it.
+    expect(normalizeWorkspace({ appearance: { contrast: false } }).appearance.contrast).toBe(true);
+    expect(normalizeWorkspace({ appearance: { contrast: false, contrastChosen: true } }).appearance).toMatchObject({ contrast: false, contrastChosen: true });
+    expect(normalizeWorkspace({ appearance: { contrast: true, contrastChosen: true } }).appearance.contrast).toBe(true);
+  });
 });

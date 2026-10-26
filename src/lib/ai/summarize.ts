@@ -13,8 +13,8 @@ export type AiFeature = "summary" | "slides" | "songSuggest" | "songLookup" | "c
 
 export const AI_FEATURES: readonly AiFeature[] = ["summary", "slides", "songSuggest", "songLookup", "captions", "verses", "games", "notes"];
 
-/** On unless switched off, except verses by meaning: it sends what the preacher says while listening. */
-const FEATURE_DEFAULTS: Record<AiFeature, boolean> = { summary: true, slides: true, songSuggest: true, songLookup: true, captions: true, verses: false, games: true, notes: true };
+/** Every use is on until switched off (verses by meaning too: it sends only phrases that sound like scripture). */
+const FEATURE_DEFAULTS: Record<AiFeature, boolean> = { summary: true, slides: true, songSuggest: true, songLookup: true, captions: true, verses: true, games: true, notes: true };
 
 export type AiSettings = {
   provider: AiProvider;
