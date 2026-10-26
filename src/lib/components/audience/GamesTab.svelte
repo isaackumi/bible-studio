@@ -364,7 +364,7 @@
     {/if}
 
     <div class="find">
-      <span class="search"><Icon name="search" size={14} /><input type="text" bind:value={query} placeholder={t("Search quizzes, polls and questions")} aria-label={t("Search games")} />{#if query}<button type="button" class="x" aria-label={t("Clear search")} onclick={() => (query = "")}>×</button>{/if}</span>
+      <span class="search focus-box"><Icon name="search" size={14} /><input type="text" bind:value={query} placeholder={t("Search quizzes, polls and questions")} aria-label={t("Search games")} />{#if query}<button type="button" class="x" aria-label={t("Clear search")} onclick={() => (query = "")}>×</button>{/if}</span>
       <div class="chips" role="radiogroup" aria-label={t("Show")}>
         {#each [{ id: "all", label: t("All") }, { id: "quiz", label: t("Quizzes") }, { id: "poll", label: t("Polls") }, { id: "mine", label: t("Mine") }] as chip (chip.id)}
           <button type="button" role="radio" aria-checked={show === chip.id} class:on={show === chip.id} onclick={() => (show = chip.id as typeof show)}>{chip.label}</button>

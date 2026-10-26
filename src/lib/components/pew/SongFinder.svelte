@@ -152,7 +152,7 @@
 <div class="finder-layer" transition:fade={{ duration: 120 }}>
   <button type="button" class="finder-backdrop" aria-label={t("Close song search")} onclick={onclose}></button>
   <div class="finder" role="dialog" aria-modal="true" aria-label={t("Find a song")} transition:scale={{ start: 0.98, duration: 140 }}>
-    <header class="finder-search">
+    <header class="finder-search focus-box">
       <Icon name="search" size={18} />
       <!-- svelte-ignore a11y_autofocus -->
       <input

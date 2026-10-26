@@ -106,7 +106,7 @@
 <div class="layer">
   <button type="button" class="backdrop" aria-label={t("Close")} tabindex="-1" onclick={onclose}></button>
   <div class="palette" role="dialog" aria-modal="true" aria-label={t("Search settings")}>
-    <label class="find">
+    <label class="find focus-box">
       <Icon name="search" size={16} />
       <input
         bind:this={input}

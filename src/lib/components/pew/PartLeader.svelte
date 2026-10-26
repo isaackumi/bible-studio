@@ -34,7 +34,7 @@
 </script>
 
 <div class="meta">
-  <label class="who" title={t("Who leads {part}", { part: section.name })}>
+  <label class="who focus-box" title={t("Who leads {part}", { part: section.name })}>
     <Icon name="user" size={12} />
     <input aria-label={t("Who leads {part}", { part: section.name })} placeholder={t("Led by…")} value={section.leader ?? ""} onchange={(event) => session.setSectionLeader(section.id, event.currentTarget.value)} />
   </label>

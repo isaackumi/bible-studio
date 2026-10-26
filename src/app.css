@@ -431,6 +431,13 @@ select:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+/* A box that lights up itself while its field is in use (a search box with its icon): the field
+   inside draws no ring of its own, or two outlines show, one inside the other. */
+.focus-box input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):focus-visible,
+.focus-box textarea:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
 ::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
 .item-row {
   display: grid;

@@ -230,7 +230,7 @@
         </section>
 
         {#if keyOpen}
-          <form class="key-form" onsubmit={addKey} transition:fly={{ y: -8, duration: 200 }}>
+          <form class="key-form focus-box" onsubmit={addKey} transition:fly={{ y: -8, duration: 200 }}>
             <Icon name="key" size={16} />
             <input aria-label={t("License key")} placeholder="CS1-…" bind:value={keyText} />
             <button type="submit" class="cta small" disabled={keyBusy || !keyText.trim()}>{keyBusy ? t("Checking…") : t("Add key")}</button>

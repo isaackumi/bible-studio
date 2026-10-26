@@ -1135,7 +1135,7 @@
                 </select>
               {/if}
               <button type="button" class="mini" class:on={wrapVerses} aria-label={t("Verse layout")} onclick={() => (wrapVerses = !wrapVerses)}>{@render icon("columns")}</button>
-              <label class="bible-search">
+              <label class="bible-search focus-box">
                 <Icon name="search" size={14} />
                 <input bind:this={bibleInput} type="search" aria-label={t("Bible search")} placeholder={t("John 3:16, or a book")} bind:value={query} onkeydown={bibleKey} />
                 {#if query}

@@ -197,7 +197,7 @@
         </div>
       {/if}
       <div class="tools">
-        <label class="find">
+        <label class="find focus-box">
           <Icon name="search" size={14} />
           <!-- svelte-ignore a11y_autofocus -->
           <input bind:this={search} type="search" autofocus placeholder={t("Search {count}", { count: items.length })} aria-label={t("Search")} bind:value={query} />
