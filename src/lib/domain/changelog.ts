@@ -17,7 +17,7 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 export const CHANGELOG: Release[] = [
   {
     version: "0.6.5",
-    date: "2026-10-27",
+    date: "2026-10-26",
     highlights: [
       { icon: "sparkles", title: msg("Autopilot on the Conductor Desk"), text: msg("Turn it on in Tools. Songs follow the singing onto the screen and slides follow the sermon; with Verses go live, a verse goes up when its whole reference is said. It stands back the moment you take over, and Undo puts back what was showing."), show: { tour: "conductor", target: ".conductor .tools-button" } },
       { icon: "grid", title: msg("Tools, one button away"), text: msg("The Conductor Desk keeps to Next, the lever and Live. Captions, the countdown, messages, Autopilot and help are in Tools; pin the ones you use to the desk."), show: { tour: "conductor", target: ".conductor .tools-button" } },
