@@ -26,7 +26,8 @@
   import type { ShortcutAction } from "../../domain/types";
   import { canUse } from "../../platform/capabilities";
   import { APP_VERSION, isDesktop, openExternal } from "../../platform/runtime";
-  import { SITE_URL } from "../../domain/billing";
+  import { serverCall, SITE_URL } from "../../domain/billing";
+  import { saveFile, savedName } from "../../platform/save-file";
   import { onWindows, openPrivacySettings, prepareListening } from "../../voice/listen";
   import Icon from "../Icon.svelte";
   import BrandMark from "../BrandMark.svelte";
@@ -232,14 +233,26 @@
     supportNote = copied ? (mail ? t("The support file is copied: paste it into the email.") : t("The support file is copied. Send it to Church Studio support.")) : t("Save the support file below and attach it to your email.");
   }
 
+  /** The support file sent to Church Studio support, only when this is pressed; the code it comes back with is what the church reads out to us. */
+  let sendingReport = $state(false);
+  let sentCode = $state("");
+  async function sendProblemReport() {
+    sendingReport = true;
+    supportNote = "";
+    const answer = await serverCall<{ code: string }>("/v1/report", { report: await buildReport(), kind: "support-file", version: APP_VERSION, platform: navigator.userAgent.slice(0, 40) });
+    sendingReport = false;
+    if (answer.ok) sentCode = answer.data.code;
+    else supportNote = answer.offline ? t("No internet: save the support file and email it instead.") : answer.error;
+  }
+
   async function saveProblemReport() {
-    const report = await buildReport();
-    const url = URL.createObjectURL(new Blob([report], { type: "text/plain" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Church Studio support file ${APP_VERSION} ${new Date().toISOString().slice(0, 10)}.txt`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    supportNote = t("Preparing the support file…");
+    try {
+      const saved = await saveFile(`Church Studio support file ${APP_VERSION} ${new Date().toISOString().slice(0, 10)}.txt`, await buildReport(), "text/plain");
+      supportNote = saved ? t("Saved as {name}. Attach it to an email to Church Studio support.", { name: savedName(saved) }) : "";
+    } catch (error) {
+      supportNote = error instanceof Error ? error.message : String(error);
+    }
   }
 
   // Planning Center.
@@ -304,13 +317,13 @@
     return new Date(now.getFullYear(), now.getMonth() - months, now.getDate()).toISOString().slice(0, 10);
   });
 
-  function exportUsage(rows: UsageRow[]) {
-    const url = URL.createObjectURL(new Blob([usageCsv(rows, session.workspace.ccliLicense)], { type: "text/csv" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `CCLI usage ${usageFrom} to ${usageTo}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function exportUsage(rows: UsageRow[]) {
+    try {
+      const saved = await saveFile(`CCLI usage ${usageFrom} to ${usageTo}.csv`, usageCsv(rows, session.workspace.ccliLicense), "text/csv");
+      if (saved) session.notify(t("Saved as {name}.", { name: savedName(saved) }));
+    } catch (error) {
+      session.warn(error instanceof Error ? error.message : String(error));
+    }
   }
 
   // Licensed translations through API.Bible.
@@ -444,14 +457,12 @@
 
   async function downloadLibrary() {
     const snapshot = await session.exportLibrary();
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "church-studio-library.json";
-    link.click();
-    URL.revokeObjectURL(url);
-    fileMessage = t("Library exported.");
+    try {
+      const saved = await saveFile("church-studio-library.json", JSON.stringify(snapshot, null, 2), "application/json");
+      if (saved) fileMessage = t("Library exported as {name}.", { name: savedName(saved) });
+    } catch (error) {
+      fileMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 
   async function importFile(event: Event) {
@@ -1586,10 +1597,12 @@
           <div class="row">
             <div class="row-copy"><strong>{problems.length ? tn(problems.length, "{n} problem noted on this computer", "{n} problems noted on this computer") : t("No problems noted")}</strong><span>{t("If something went wrong, save a support file and send it to Church Studio support. It holds technical details about the app and this computer, never your songs, sermons, notes, keys or passwords. Nothing is sent by itself.")}</span></div>
             <div class="row-end">
+              <button type="button" class="btn" disabled={sendingReport} title={t("Sends the support file to Church Studio support now, and gives you a code to tell us")} onclick={() => void sendProblemReport()}><Icon name="cloud" size={14} /> {sendingReport ? t("Sending…") : t("Send to support")}</button>
               <button type="button" class="btn" onclick={() => void saveProblemReport()}><Icon name="download" size={14} /> {t("Save a support file")}</button>
               {#if problems.length}<button type="button" class="btn" onclick={() => { clearProblems(); problems = []; }}>{t("Clear")}</button>{/if}
             </div>
           </div>
+          {#if sentCode}<p class="note stand" role="status">{t("Sent. Tell Church Studio support this code: {code}", { code: sentCode })}</p>{/if}
         </section>
         <p class="section-label">{t("Legal")}</p>
         <section class="rows">

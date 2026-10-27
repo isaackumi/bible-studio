@@ -190,7 +190,7 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   function show(id, on) { $(id).classList.toggle("hidden", !on); }
   function post(path, body) {
     return fetch(API + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) { var e = new Error(d.error || tr("Something went wrong.")); e.suggestion = d.suggestion; throw e; } return d; }); });
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) { var e = new Error(d.retry ? tr("Lots of people are joining at once. Trying again…") : tr(d.error || "Something went wrong.")); e.suggestion = d.suggestion; e.retry = !!d.retry; throw e; } return d; }); });
   }
   function note(id, text, kind) { var n = $(id); n.textContent = text || ""; n.className = "note" + (kind ? " " + kind : ""); }
 
@@ -208,7 +208,11 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       pid = d.pid; try { localStorage.setItem(KEY, pid); } catch (e) {}
       rememberName($("name").value.trim());
       show("join", false); show("live", true); refresh();
-    }).catch(function (e) { if (!taken(e, $("name"), "join-note")) note("join-note", e.message, "bad"); $("join-btn").disabled = false; });
+    }).catch(function (e) {
+      // A whole congregation scanning at once: wait a moment (a different one on each phone) and try again.
+      if (e.retry) { note("join-note", e.message); setTimeout(join, 2000 + Math.random() * 4000); return; }
+      if (!taken(e, $("name"), "join-note")) note("join-note", e.message, "bad"); $("join-btn").disabled = false;
+    });
   }
 
   // Tapping your own name changes it.

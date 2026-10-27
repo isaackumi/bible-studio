@@ -189,3 +189,17 @@ Tests: `npx vitest run server`.
 ## Cloud space
 
 Media synced between a licence's computers lives in the R2 bucket `church-studio-cloud` (binding `CLOUD`), made once with `npx wrangler r2 bucket create church-studio-cloud`. Each licence's library is a `LibraryObject` Durable Object (binding `LIBRARIES`). Limits per plan are set from the admin page (Cloud space) and kept in KV under `cfg:cloud`; a licence's own cap under `cloudcap:<licence>`.
+
+## Support reports
+
+A church sends a report with **Settings › Updates › Send to support**, or by running the Windows
+listening check (`scripts/listening-check-windows.ps1`). Either way they get an 8-letter code. The
+Worker keeps the report in the `ACTIVATIONS` KV for 14 days under `report:<CODE>`.
+
+`POST /v1/report` is write-only and rate-limited (`LIMITS`), and nothing on the internet reads a
+report back. Read them from here, signed in to Cloudflare, in `server/`:
+
+```sh
+npx wrangler kv key list --binding ACTIVATIONS --prefix report: --remote   # codes, with when/kind/version
+npx wrangler kv key get "report:ABCD2345" --binding ACTIVATIONS --remote   # one report
+```

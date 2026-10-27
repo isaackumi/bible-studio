@@ -924,6 +924,51 @@ fn crash_log(app: tauri::AppHandle) -> String {
         .unwrap_or_default()
 }
 
+/// The microphones this computer has, for Settings › Audio & voice (name and whether it is the default).
+#[tauri::command(async)]
+fn listen_inputs() -> serde_json::Value {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    return serde_json::to_value(noise::input_devices()).unwrap_or_default();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    serde_json::json!([])
+}
+
+/// Listen to every microphone at once for a moment (or only `only`): which ones are live, and which hears the operator.
+#[tauri::command(async)]
+fn listen_probe_inputs(ms: u64, only: Option<String>) -> serde_json::Value {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    return serde_json::to_value(noise::probe_inputs(ms, only.as_deref())).unwrap_or_default();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = (ms, only);
+        serde_json::json!([])
+    }
+}
+
+/// The microphone listening uses (None: the computer's default). Kept by the desk, sent at launch.
+#[tauri::command]
+fn listen_choose_input(name: Option<String>) {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    noise::choose_input(name);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let _ = name;
+}
+
+/// Kinds of file the app exports: what Save may write (never a program, wherever it is chosen).
+const SAVE_KINDS: &[&str] = &["txt", "csv", "json", "html", "xml", "zip"];
+
+/// An export written where the operator chose in the Save window (the webview's own download link
+/// does nothing in the Windows app).
+#[tauri::command(async)]
+fn save_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    let kind = target.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase();
+    if !SAVE_KINDS.contains(&kind.as_str()) {
+        return Err(format!("Church Studio does not save .{kind} files."));
+    }
+    std::fs::write(target, data).map_err(|error| format!("The file could not be saved. {error}"))
+}
+
 /// The last lines of church-studio.log, sent with a crash or hang report.
 #[tauri::command(async)]
 fn diagnostic_log(app: tauri::AppHandle) -> String {
@@ -1148,6 +1193,7 @@ pub fn run() {
         // what the watchdog names when the window stops answering.
         .invoke_handler({
             let handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
+            save_file,
             entitlement::entitlement_status,
             entitlement::entitlement_set,
             entitlement::entitlement_note_time,
@@ -1241,6 +1287,9 @@ pub fn run() {
             parakeet_delete,
             stop_sermon_listen,
             start_noise_test,
+            listen_inputs,
+            listen_probe_inputs,
+            listen_choose_input,
             start_ndi,
             ndi_available,
             stop_ndi,

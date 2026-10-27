@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveFile, savedName } from "../platform/save-file";
   import { session } from "../app/session.svelte";
   import { DISPLAY_WASHES, backgroundFill, displayWash } from "../domain/backgrounds";
   import { SCREEN_FONTS, screenFont } from "../domain/fonts";
@@ -21,13 +22,8 @@
   async function exportTheme() {
     try {
       const { fileName, json } = await session.exportTheme();
-      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(url);
-      themeNote = `${fileName} saved.`;
+      const saved = await saveFile(fileName, json, "application/json");
+      if (saved) themeNote = t("Saved as {name}.", { name: savedName(saved) });
     } catch (error) {
       themeNote = error instanceof Error ? error.message : t("The theme was not exported.");
     }

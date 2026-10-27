@@ -59,6 +59,8 @@ export type Env = {
   LIBRARIES?: LibraryNamespace;
   /** Cloudflare's rate limiter (ratelimits in wrangler.jsonc): a few requests a minute per key. */
   LIMITS?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+  /** The roomy limiter for a congregation joining a room at once (per room and address). */
+  CROWD?: { limit(options: { key: string }): Promise<{ success: boolean }> };
   /** "mock" (built-in test checkout, the default) or "paddle". */
   BILLING_PROVIDER?: string;
   /** Promo codes charged through Paddle discounts: "EASTER25:dsc_01abc,…". */
@@ -196,7 +198,7 @@ export default {
     if (path === "/paddle/webhook") return handle(request, env, fetch, Date.now(), apiConfig(env));
     const config = apiConfig(env);
     // Rooms: the audience's phones join from the public address, whichever one the desk used.
-    const rooms = await handleRooms(request, env.ROOMS, env.PUBLIC_URL?.replace(/\/+$/, "") || url.origin, roomPage, config?.limit);
+    const rooms = await handleRooms(request, env.ROOMS, env.PUBLIC_URL?.replace(/\/+$/, "") || url.origin, roomPage, config?.limit, env.CROWD ? async (key) => (await env.CROWD!.limit({ key }).catch(() => ({ success: true }))).success : undefined);
     if (rooms) return rooms;
     if (!config) return new Response("The server is not set up yet (KV binding and signing key).", { status: 503 });
     // Cloud space: a licence's computers keeping one library (cloud.ts).

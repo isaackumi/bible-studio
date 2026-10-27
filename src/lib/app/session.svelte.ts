@@ -142,6 +142,7 @@ import type { ScreenTransition, ShortcutAction, TransitionKind } from "../domain
 import { secondOutputModel, type SecondOutputSettings } from "../domain/second-output";
 import { clockLabel, DEFAULT_START, minutesOfDay, parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming, shiftSchedule } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
+import { draftService, type ServiceDraft } from "../domain/service-draft";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
@@ -235,6 +236,7 @@ import {
   type ParakeetModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
+import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicHeard } from "../voice/microphone";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
@@ -280,6 +282,9 @@ const AUTO_TRIAL_KEY = "cs-auto-trial";
 /** Below this the microphone gives digital silence: blocked, muted or unplugged, not a quiet room. */
 const SILENT_LEVEL = 0.005;
 const SILENCE_HINT_MS = 10_000;
+/** How long listening checks the microphones before it starts, and how often it checks the one in use. */
+const MIC_PROBE_MS = 900;
+const MIC_WATCH_MS = 10_000;
 /** The last sign-in reminder given during the trial ("halfway", "ending"). */
 const TRIAL_NUDGE_KEY = "cs-trial-nudge";
 function readFlag(key: string): string | null {
@@ -3102,8 +3107,11 @@ class Session {
     const local = engine === "accurate" || engine === "parakeet" ? engine : "system";
     // Keep a recording of what the recognizer hears, and what it understood (Settings › Audio & voice).
     if (isDesktop() && this.workspace.voice.keepRecording) await this.startListeningRecording(local);
+    await this.resolveMicrophone();
+    if (this.voice.status !== "listening") return;
     this.stopVoiceEngine = isDesktop() ? startNativeListening(handlers, filter, words, local) : startListening(handlers, filter);
     this.watchForSilence(this.stopVoiceEngine, () => soundReached);
+    this.watchMicrophone();
   };
 
   /** Still nothing from the microphone after a while: say where to look instead of waiting quietly. */
@@ -3111,7 +3119,7 @@ class Session {
     window.setTimeout(() => {
       if (this.stopVoiceEngine !== engine || this.voice.status !== "listening" || reached()) return;
       this.voice.message = onWindows()
-        ? t("Nothing is reaching the microphone. Check it is plugged in and not muted, and that Windows Settings › Privacy & security › Microphone lets desktop apps use it.")
+        ? t("Nothing is reaching the microphone. If this computer has a phone-as-webcam app or a virtual mixer, it may be listening to a silent one: choose the microphone in Settings › Sound & voice (Find my microphone). Check too that it is plugged in and not muted.")
         : t("Nothing is reaching the microphone. Check it is plugged in, not muted, and chosen as the computer's input.");
     }, SILENCE_HINT_MS);
   }
@@ -3119,6 +3127,7 @@ class Session {
   stopVoice = (message = t("Listening stopped.")) => {
     const stop = this.stopVoiceEngine;
     this.stopVoiceEngine = null;
+    clearInterval(this.micWatch);
     this.voice = { ...this.voice, status: "stopped", error: null, level: 0, hearing: false, message };
     stop?.();
     void this.finishListeningRecording();
@@ -3407,6 +3416,94 @@ class Session {
   saveVoiceSettings = (patch: Partial<VoiceSettings>) => {
     this.workspace = { ...this.workspace, voice: sanitizeVoiceSettings({ ...this.workspace.voice, ...patch }) };
     this.persistSoon();
+  };
+
+  /** The microphone chosen on this computer (null: the computer's default). Kept here, never synced. */
+  microphone = $state<string | null>(savedMicrophone());
+  /** The microphone listening is on now (desktop), shown beside the level. */
+  micInUse = $state<string | null>(null);
+  private micWatch: ReturnType<typeof setInterval> | undefined;
+
+  /** Tell the desktop core which microphone to open (the room check opens the chosen one as it is). */
+  applyMicrophone = async () => {
+    if (!isDesktop()) return;
+    await invoke("listen_choose_input", { name: this.microphone }).catch(() => {});
+  };
+
+  /**
+   * Before listening: every microphone for a moment. One that sends nothing but silence (a virtual
+   * microphone with nothing behind it, a muted or missing one) is passed over for one that is live,
+   * and the operator is told. A live one is kept, whichever is louder.
+   */
+  private resolveMicrophone = async () => {
+    if (!isDesktop()) return;
+    const [heard, inputs] = await Promise.all([
+      invoke<MicHeard[]>("listen_probe_inputs", { ms: MIC_PROBE_MS, only: null }).catch(() => null),
+      invoke<Array<{ name: string; default: boolean }>>("listen_inputs").catch(() => []),
+    ]);
+    if (!heard?.length) {
+      await this.applyMicrophone();
+      return;
+    }
+    const fallback = inputs.find((input) => input.default)?.name ?? null;
+    const choice = pickMicrophone(heard, this.microphone, fallback);
+    // The computer's default with nothing chosen goes as null, so Windows' own recognizer keeps
+    // opening it itself; any other one comes through this app.
+    const name = choice.name && (this.microphone || choice.name !== fallback) ? choice.name : null;
+    await invoke("listen_choose_input", { name }).catch(() => {});
+    this.micInUse = choice.name;
+    if (choice.moved && choice.name) {
+      const picked = choice.name;
+      const from = choice.moved.from;
+      this.notify(t("Listening on {name}", { name: picked }), {
+        detail: choice.moved.because === "unplugged" ? t("{from} is not plugged in.", { from }) : t("{from} sends no sound, so listening moved to one that does.", { from }),
+        actions: [{ label: t("Always use this one"), run: () => void this.setMicrophone(picked) }],
+        ms: 12_000,
+      });
+    } else if (choice.allSilent) {
+      this.voice.message = t("No microphone is sending any sound. Check one is plugged in and not muted, then choose it in Settings › Sound & voice.");
+    }
+  };
+
+  /** While listening: the microphone in use, every few seconds. Twice silent in a row, listening moves to a live one. */
+  private watchMicrophone = () => {
+    clearInterval(this.micWatch);
+    if (!isDesktop() || !this.micInUse) return;
+    let silent = 0;
+    let busy = false;
+    this.micWatch = setInterval(async () => {
+      if (this.voice.status !== "listening" || !this.micInUse) return void clearInterval(this.micWatch);
+      if (busy) return;
+      busy = true;
+      try {
+        const using = this.micInUse;
+        const heard = await invoke<MicHeard[]>("listen_probe_inputs", { ms: 1500, only: using }).catch(() => null);
+        if (!heard || this.voice.status !== "listening" || this.micInUse !== using) return;
+        silent = micDead(heard, using) ? silent + 1 : 0;
+        if (silent < 2) return;
+        silent = 0;
+        const all = await invoke<MicHeard[]>("listen_probe_inputs", { ms: MIC_PROBE_MS, only: null }).catch(() => []);
+        if (!all.some((entry) => entry.live && entry.name !== using)) {
+          this.voice.message = t("{name} stopped sending sound, and no other microphone is. Check it is plugged in and not muted.", { name: using });
+          return;
+        }
+        clearInterval(this.micWatch);
+        this.stopVoice(t("{name} stopped sending sound. Moving to a microphone that does…", { name: using }));
+        await this.startVoice();
+      } finally {
+        busy = false;
+      }
+    }, MIC_WATCH_MS);
+  };
+
+  /** The microphone listening uses on this computer (null: the computer's default). While listening, restarts on the new one. */
+  setMicrophone = async (name: string | null) => {
+    this.microphone = name;
+    saveMicrophone(name);
+    await this.applyMicrophone();
+    if (this.voice.status !== "listening") return;
+    this.stopVoice(t("Changing the microphone. Listening again…"));
+    await this.startVoice();
   };
 
   /** Noise filter for listening. While listening, restarts it so the change is heard at once. */
@@ -4278,6 +4375,28 @@ class Session {
     await this.persist();
     this.services = await api.serviceList();
     this.message = t("{name} is ready with {length} parts. Add the songs and readings.", { name: service.name, length: service.sections.length });
+  };
+
+  /** A pasted order of service as a draft service, for review: nothing is saved yet. */
+  draftServiceFrom = (text: string): ServiceDraft => {
+    // The desk's Bible when it is installed, else the KJV, else any Bible here (as the starter service does).
+    const installed = (id: string | null | undefined) => (id && this.translations.some((entry) => entry.id === id) ? id : undefined);
+    const translationId = installed(this.workspace.deskTranslationId) ?? installed("kjv") ?? this.translations.find((entry) => !entry.id.startsWith("api:"))?.id ?? this.translations[0]?.id ?? "kjv";
+    return draftService(text, { songs: this.songs, translationId, newId: uid, books: this.books });
+  };
+
+  /** Keep a reviewed draft as a service and open it. Preview and Program do not change. */
+  createServiceFromDraft = async (draft: ServiceDraft) => {
+    const service: Service = { ...draft.service, updatedAt: new Date().toISOString(), ...this.serviceDefaults() };
+    await api.serviceSave(service);
+    this.services = await api.serviceList();
+    await this.openService(service.id);
+    this.message = t("{name} is ready: {parts}, {songs}, {readings}. Check it, then run it from the Service page.", {
+      name: service.name,
+      parts: tn(draft.counts.parts, "{n} part", "{n} parts"),
+      songs: tn(draft.counts.songs, "{n} song", "{n} songs"),
+      readings: tn(draft.counts.readings, "{n} reading", "{n} readings"),
+    });
   };
 
   private saveTemplates(templates: ServiceTemplate[]) {
@@ -5781,7 +5900,7 @@ class Session {
     void this.selectItem(item.id);
   };
 
-  /** A YouTube or Vimeo video from its link, into the service (it plays in its own player). */
+  /** A video from its link, into the service: YouTube or Vimeo in their own player, a video file or live stream as a video. */
   addWebVideo = async (url: string, options: { mute: boolean; loop: boolean; sectionId?: string }) => {
     const target = webTarget(url, options);
     if (!target) {
@@ -5793,7 +5912,7 @@ class Session {
       this.warn(t("Add a section first."));
       return;
     }
-    const item: PresentationItem = { id: uid(), kind: "web", title: target.kind === "youtube" ? t("YouTube video") : target.kind === "vimeo" ? t("Vimeo video") : target.label, web: { url: url.trim(), mute: options.mute, loop: options.loop } };
+    const item: PresentationItem = { id: uid(), kind: "web", title: target.kind === "youtube" ? t("YouTube video") : target.kind === "vimeo" ? t("Vimeo video") : target.kind === "video" ? t(target.label) : target.label, web: { url: url.trim(), mute: options.mute, loop: options.loop } };
     this.insertItem(section, item);
     void this.selectItem(item.id);
   };
@@ -7762,6 +7881,12 @@ class Session {
 
   /** A Pictures slideshow is playing its own music: its picture changes do not fade it. */
   slideshowMusic = false;
+  /**
+   * A running Pictures slideshow, told each time Program changes (it stops when what went live is not
+   * its own picture). Pictures loads only when opened, so it hands the session this rather than the
+   * session importing it.
+   */
+  slideshowWatch: ((sourceId: string | null) => void) | null = null;
   /** Music started with a slideshow's Test: a try, stopped when Pictures closes or anything goes LIVE. */
   musicAudition = false;
 
@@ -8274,6 +8399,9 @@ class Session {
       { title: this.logoTitle(), imageUrl },
       takeTransition ? { transition: takeTransition.type } : undefined,
     );
+    // Anything else on Program ends a running slideshow there and then: its title, clock and countdown
+    // never stay over what the operator put up.
+    this.slideshowWatch?.(this.live.program.sourceId);
     // A video going live starts on a shared clock, so every screen plays it in step.
     if ((action === "take" || action === "cut") && this.live.program.model.layout === "video" && this.live.program.model.video) {
       const model = this.live.program.model;

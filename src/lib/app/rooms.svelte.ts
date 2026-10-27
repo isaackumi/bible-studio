@@ -142,10 +142,17 @@ class AudienceRoom {
   end = async () => {
     const saved = this.current;
     if (!saved) return;
+    // Close it on the server first: a room dropped here but still open there keeps taking questions
+    // nobody reads, from a code that may still be on the screen.
+    const closed = await serverCall(`/v1/rooms/${saved.code}/close`, { hostKey: saved.hostKey });
+    if (!closed.ok && closed.status !== 404) {
+      this.error = closed.offline ? t("No internet, so the room is still open. Close it again once this computer is back online.") : closed.error;
+      return;
+    }
+    this.error = "";
     this.stopWatching?.();
     this.stopWatching = null;
     this.sharing = false;
-    await serverCall(`/v1/rooms/${saved.code}/close`, { hostKey: saved.hostKey });
     this.save(null);
     this.view = null;
     clearTimeout(this.timer);
@@ -186,7 +193,7 @@ class AudienceRoom {
       this.save(null);
       this.view = null;
       return;
-    } else if (!answer.offline) this.error = answer.error;
+    } else this.error = answer.offline ? t("No internet: the room carries on, and this desk catches up when it is back.") : answer.error;
     void this.refreshScreen();
     const busy = (this.view?.activity.kind ?? "none") !== "none" || this.screenStage !== null;
     if (this.open || busy) this.timer = setTimeout(() => void this.poll(), busy ? GAME_POLL_MS : POLL_MS);

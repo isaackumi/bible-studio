@@ -16,6 +16,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.6",
+    date: "2026-10-27",
+    highlights: [
+      { icon: "mic", title: msg("Choose the microphone that hears you"), text: msg("If listening never heard you, the computer may have been using a silent microphone that a phone-as-webcam app or a virtual mixer added. In Settings › Sound & voice, press Find my microphone and speak: every microphone listens at once, and you pick the one that heard you."), show: null },
+      { icon: "list", title: msg("Paste an order of service"), text: msg("On the Service page, press Paste and paste the running order from the bulletin, an email or a message. The parts, leaders, times, your library's songs, the readings and the announcements are ready to check before anything is kept."), show: null },
+      { icon: "users", title: msg("The whole church can join from one Wi-Fi"), text: msg("Questions, quizzes and polls no longer turn people away when everyone joins from the church's Wi-Fi at once."), show: null },
+      { icon: "screens", title: msg("TVs keep the picture through a Wi-Fi blip"), text: msg("A phone, tablet or TV showing your screen keeps the last picture when the connection drops for a moment, and picks up again by itself."), show: null },
+      { icon: "download", title: msg("Saving works everywhere"), text: msg("Support files, CCLI reports, service reports and other exports open a Save window, so you choose where they go and see that they went."), show: null },
+    ],
+  },
+  {
     version: "0.6.5",
     date: "2026-10-26",
     highlights: [

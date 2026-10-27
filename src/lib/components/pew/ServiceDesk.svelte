@@ -13,6 +13,7 @@
   import ItemThumb from "./ItemThumb.svelte";
   import ServiceTimeline from "./ServiceTimeline.svelte";
   import TemplatesDialog from "./TemplatesDialog.svelte";
+  import PasteServiceDialog from "./PasteServiceDialog.svelte";
   import OutlineDialog from "./OutlineDialog.svelte";
   import MacroBar from "../MacroBar.svelte";
   import FollowSermon from "./FollowSermon.svelte";
@@ -79,6 +80,7 @@
   let sectionName = $state("");
   /** The templates window, opened on a template (or the first). */
   let templatesOpen = $state<{ id: string | null } | null>(null);
+  let pasteOpen = $state(false);
   /** A service whose delete button was pressed once (press again to delete). */
   let armedService = $state<string | null>(null);
   let outlineOpen = $state(false);
@@ -383,6 +385,7 @@
   <LibrarySidebar title={t("Services")} icon="list" count={session.services.length} storageKey="services" bind:collapsed={listHidden}>
     {#snippet actions()}
       <button type="button" class="desk-btn" title={t("Start a service from a template, or edit the templates")} onclick={() => (templatesOpen = { id: null })}><Icon name="list" size={14} /> {t("Templates")}</button>
+      <button type="button" class="desk-btn" title={t("Paste an order of service")} onclick={() => (pasteOpen = true)}><Icon name="copy" size={14} /> {t("Paste")}</button>
       <button type="button" class="desk-btn" onclick={() => void session.createService(`${t("Service")} ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`)}><Icon name="plus" size={14} /> {t("New")}</button>
     {/snippet}
     <div class="list">
@@ -743,6 +746,10 @@
           <strong>{sampleBusy ? t("Adding the sample…") : t("Try the sample service")}</strong>
           <span>{t("Everything filled in: songs, readings, a sermon, announcements and a quiz. See how a whole Sunday runs.")}</span>
         </button>
+        <button type="button" class="tpl-card sample" onclick={() => (pasteOpen = true)}>
+          <strong>{t("Paste an order of service")}</strong>
+          <span>{t("From the bulletin, an email or a message: the parts, your library's songs and the readings, ready to check.")}</span>
+        </button>
         {#if session.workspace.serviceTemplates.length}
           <p class="from-label">{t("Start from a template, with its parts and times in place")}</p>
           <div class="from-templates">
@@ -839,6 +846,9 @@
 {/if}
 {#if templatesOpen}
   <TemplatesDialog initialId={templatesOpen.id} onclose={() => (templatesOpen = null)} />
+{/if}
+{#if pasteOpen}
+  <PasteServiceDialog onclose={() => (pasteOpen = false)} />
 {/if}
 
 <style>

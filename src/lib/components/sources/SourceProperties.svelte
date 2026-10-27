@@ -414,15 +414,16 @@
         <input
           class="field"
           aria-label={t("Web address")}
-          placeholder={t("yourchurch.org/live, a YouTube or Vimeo link, a Google Slides link")}
+          placeholder={t("yourchurch.org/live, a YouTube, Vimeo, video or Google Slides link")}
           value={fields.url}
           oninput={(event) => fields.type === "web" && (fields = { ...fields, url: event.currentTarget.value })}
         />
       </label>
       <p class="hint">
-        {#if !fields.url.trim()}{t("Paste any link. YouTube, Vimeo and Google Slides links become a full-screen player.")}
+        {#if !fields.url.trim()}{t("Paste any link. YouTube, Vimeo, video and Google Slides links become a full-screen player.")}
         {:else if !target}{t("That does not look like a web address.")}
         {:else if target.kind === "website"}{t("Shows {label} live. Some sites refuse to be shown inside other apps; if the preview stays blank, that site does not allow it.", { label: target.label })}
+        {:else if target.kind === "video"}{t("A video from the internet: it plays on the screen like a video on this computer, while the computer is online.")}
         {:else}{target.kind === "youtube" ? t("Plays as a YouTube player.") : target.kind === "vimeo" ? t("Plays as a Vimeo player.") : t("Plays as a Google Slides slideshow.")}{/if}
       </p>
       {#if target && target.kind !== "slides"}

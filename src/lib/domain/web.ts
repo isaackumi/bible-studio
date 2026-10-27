@@ -1,8 +1,12 @@
 // Web sources: a page shown live on the screen. People paste whatever link they have; this turns
 // a watch or share link into one that can be shown full screen (YouTube and Vimeo players,
-// Google Slides as a slideshow) and says what it is.
+// Google Slides as a slideshow) and says what it is. A link straight to a video file or a live HLS
+// stream (.m3u8) is a video: it plays on the screen like one from this computer (display/stream.ts).
 
-export type WebKind = "website" | "youtube" | "vimeo" | "slides";
+export type WebKind = "website" | "youtube" | "vimeo" | "slides" | "video";
+
+/** A link straight to a video file or an HLS live stream, by the end of its path. */
+const VIDEO_PATH = /\.(mp4|m4v|mov|webm|m3u8)$/i;
 
 export type WebTarget = { kind: WebKind; url: string; label: string };
 
@@ -70,6 +74,8 @@ export function webTarget(raw: string, options: { autoplay?: boolean; mute?: boo
       return { kind: "slides", url: `https://docs.google.com${path}/embed?start=false&loop=false&delayms=60000&rm=minimal`, label: "Google Slides" };
     }
   }
+
+  if (VIDEO_PATH.test(url.pathname)) return { kind: "video", url: clean, label: /\.m3u8$/i.test(url.pathname) ? "Live stream" : "Video" };
 
   return { kind: "website", url: clean, label: url.hostname.replace(/^www\./, "") };
 }

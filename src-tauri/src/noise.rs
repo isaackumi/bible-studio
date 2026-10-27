@@ -255,10 +255,135 @@ pub fn start(
 
 /// The default input as mono (-1..1), sent as it arrives. An error from the device is kept in
 /// `failed` for the reading loop to report.
-fn open_microphone(tx: mpsc::Sender<Vec<f32>>, failed: Arc<Mutex<Option<String>>>) -> Result<(cpal::Stream, f64), String> {
+/// The microphone the church chose in Settings › Audio & voice (by its name), or None for the
+/// computer's default. A PC with a phone-as-webcam app (Iriun, DroidCam, Camo), OBS or a virtual
+/// mixer has silent extra microphones, and Windows often makes the newest one the default.
+static CHOSEN: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn choose_input(name: Option<String>) {
+    *CHOSEN.lock().unwrap_or_else(|poison| poison.into_inner()) = name.filter(|name| !name.trim().is_empty());
+}
+
+pub fn chosen_input() -> Option<String> {
+    CHOSEN.lock().unwrap_or_else(|poison| poison.into_inner()).clone()
+}
+
+/// The chosen microphone when it is plugged in, else the computer's default.
+fn input_device(host: &cpal::Host) -> Result<cpal::Device, String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    if let Some(wanted) = chosen_input() {
+        let found = host.input_devices().ok().and_then(|mut devices| devices.find(|device| device.name().is_ok_and(|name| name == wanted)));
+        match found {
+            Some(device) => return Ok(device),
+            None => log::warn!("microphone {wanted:?} is not plugged in; using the default"),
+        }
+    }
+    host.default_input_device().ok_or_else(|| "No microphone is available.".to_string())
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct InputDevice {
+    pub name: String,
+    /// The computer's default recording device.
+    pub default: bool,
+}
+
+/// Every microphone (recording device) this computer has, for the picker.
+pub fn input_devices() -> Vec<InputDevice> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    let default = host.default_input_device().and_then(|device| device.name().ok());
+    let mut seen = std::collections::HashSet::new();
+    host.input_devices()
+        .map(|devices| {
+            devices
+                .filter_map(|device| device.name().ok())
+                .filter(|name| seen.insert(name.clone()))
+                .map(|name| InputDevice { default: default.as_deref() == Some(name.as_str()), name })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct InputHeard {
+    pub name: String,
+    /// The loudest moment, 0 to 1 (speech near a working microphone reaches 0.05 or more).
+    pub peak: f32,
+    /// It sent anything but exact digital silence. A real microphone always hears a little hiss;
+    /// a virtual one with nothing behind it (a phone-as-webcam app with no phone) or a muted one
+    /// sends zeros. So this tells a dead microphone from a quiet room without anyone speaking.
+    pub live: bool,
+    /// It could not be opened (in use elsewhere, or unplugged as it was listed).
+    pub error: Option<String>,
+}
+
+/// Every microphone at once for `ms` (or only the one named `only`): how loud each heard the room,
+/// and whether it sent any sound at all. Silent virtual microphones read 0 and not live.
+pub fn probe_inputs(ms: u64, only: Option<&str>) -> Vec<InputHeard> {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     let host = cpal::default_host();
-    let device = host.default_input_device().ok_or("No microphone is available.")?;
+    let Ok(devices) = host.input_devices() else { return Vec::new() };
+    let mut seen = std::collections::HashSet::new();
+    /// One microphone being listened to: its loudest moment so far, and its stream (or why it would not open).
+    struct Probe {
+        name: String,
+        peak: Arc<Mutex<f32>>,
+        live: Arc<AtomicBool>,
+        opened: Result<cpal::Stream, String>,
+    }
+    let mut open: Vec<Probe> = Vec::new();
+    for device in devices {
+        let Ok(name) = device.name() else { continue };
+        if !seen.insert(name.clone()) || only.is_some_and(|wanted| wanted != name) {
+            continue;
+        }
+        let peak = Arc::new(Mutex::new(0.0f32));
+        let live = Arc::new(AtomicBool::new(false));
+        let opened = (|| -> Result<cpal::Stream, String> {
+            let config = device.default_input_config().map_err(|error| error.to_string())?;
+            let format = config.sample_format();
+            let stream_config: cpal::StreamConfig = config.into();
+            // The loudest 10 ms stretch, as an RMS level: a click does not count as a voice.
+            fn note<T: Copy>(data: &[T], peak: &Mutex<f32>, live: &AtomicBool, to_f32: impl Fn(T) -> f32) {
+                if !live.load(Ordering::Relaxed) && data.iter().any(|s| to_f32(*s) != 0.0) {
+                    live.store(true, Ordering::Relaxed);
+                }
+                for chunk in data.chunks(480) {
+                    let rms = (chunk.iter().map(|s| to_f32(*s).powi(2)).sum::<f32>() / chunk.len().max(1) as f32).sqrt();
+                    let mut best = peak.lock().unwrap_or_else(|poison| poison.into_inner());
+                    if rms > *best {
+                        *best = rms;
+                    }
+                }
+            }
+            let err = |error: cpal::StreamError| log::warn!("microphone probe: {error}");
+            let stream = match format {
+                cpal::SampleFormat::F32 => { let (p, l) = (peak.clone(), live.clone()); device.build_input_stream(&stream_config, move |data: &[f32], _: &_| note(data, &p, &l, |s| s), err, None) }
+                cpal::SampleFormat::I16 => { let (p, l) = (peak.clone(), live.clone()); device.build_input_stream(&stream_config, move |data: &[i16], _: &_| note(data, &p, &l, |s| f32::from(s) / 32_768.0), err, None) }
+                cpal::SampleFormat::U16 => { let (p, l) = (peak.clone(), live.clone()); device.build_input_stream(&stream_config, move |data: &[u16], _: &_| note(data, &p, &l, |s| (f32::from(s) - 32_768.0) / 32_768.0), err, None) }
+                other => return Err(format!("{other} samples")),
+            }
+            .map_err(|error| error.to_string())?;
+            stream.play().map_err(|error| error.to_string())?;
+            Ok(stream)
+        })();
+        open.push(Probe { name, peak, live, opened });
+    }
+    std::thread::sleep(Duration::from_millis(ms.clamp(500, 10_000)));
+    open.into_iter()
+        .map(|probe| {
+            let error = probe.opened.err();
+            let peak = *probe.peak.lock().unwrap_or_else(|poison| poison.into_inner());
+            InputHeard { name: probe.name, peak, live: probe.live.load(Ordering::Relaxed), error }
+        })
+        .collect()
+}
+
+fn open_microphone(tx: mpsc::Sender<Vec<f32>>, failed: Arc<Mutex<Option<String>>>) -> Result<(cpal::Stream, f64), String> {
+    use cpal::traits::{DeviceTrait, StreamTrait};
+    let host = cpal::default_host();
+    let device = input_device(&host)?;
     let config = device.default_input_config().map_err(|error| format!("The microphone could not be read. {error}"))?;
     let channels = usize::from(config.channels().max(1));
     let rate = f64::from(config.sample_rate().0);
@@ -455,6 +580,16 @@ mod tests {
         let total = bytes.load(Ordering::SeqCst);
         println!("16 kHz bytes in 2 s: {total}; level reports: {}", levels.lock().unwrap().len());
         assert!(total > 40_000, "about 64 000 bytes expected, got {total}");
+    }
+
+    #[test]
+    #[ignore]
+    fn probe_every_microphone() {
+        // A real microphone is never exactly silent; a virtual one with nothing behind it is.
+        // cargo test probe_every_microphone -- --ignored --nocapture
+        for heard in super::probe_inputs(1500, None) {
+            println!("{:<50} live={:<5} peak={:.5} error={:?}", heard.name, heard.live, heard.peak, heard.error);
+        }
     }
 
     #[test]

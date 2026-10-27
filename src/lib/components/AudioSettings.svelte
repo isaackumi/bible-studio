@@ -44,6 +44,7 @@
       if (rooms.length % 6 === 0) cut = noiseCut(rooms, cleans);
     });
     try {
+      await session.applyMicrophone();
       await invoke("start_noise_test", { filter: current });
     } catch (error) {
       unlisten();
@@ -70,6 +71,34 @@
   }
 
   onDestroy(() => stopCheck?.());
+
+  // ---- Which microphone listening uses (desktop): the computer's default unless one is chosen.
+  type Input = { name: string; default: boolean };
+  type Heard = { name: string; peak: number; live: boolean; error: string | null };
+  /** Speech near a microphone reaches this; a silent virtual microphone reads 0. */
+  const HEARS = 0.02;
+  const PROBE_MS = 4000;
+  let inputs = $state<Input[]>([]);
+  const chosenMic = $derived(session.microphone ?? "");
+  const defaultMic = $derived(inputs.find((input) => input.default)?.name ?? "");
+  const chosenMissing = $derived(!!chosenMic && inputs.length > 0 && !inputs.some((input) => input.name === chosenMic));
+  let probing = $state(false);
+  let heard = $state<Heard[] | null>(null);
+  const loudest = $derived(heard?.filter((entry) => !entry.error).sort((a, b) => b.peak - a.peak)[0] ?? null);
+
+  async function loadInputs() {
+    if (desktop) inputs = await invoke<Input[]>("listen_inputs").catch(() => []);
+  }
+  void loadInputs();
+
+  async function findMicrophone() {
+    stopCheck?.();
+    probing = true;
+    heard = null;
+    heard = await invoke<Heard[]>("listen_probe_inputs", { ms: PROBE_MS }).catch(() => []);
+    probing = false;
+    await loadInputs();
+  }
 
   // ---- 20-second microphone test (its own stream; it never starts listening or touches Program)
   let testing = $state(false);
@@ -224,6 +253,44 @@
 
 <p class="section-label">{t("Microphone")}</p>
 <section class="rows">
+  {#if desktop}
+    <div class="row">
+      <div class="row-copy"><strong>{t("Listening hears")}</strong><span>{t("A phone-as-webcam app, OBS or a virtual mixer adds microphones that hear nothing, and the computer may pick one of them. Choose the one in the room.")}</span></div>
+      <select class="field mic-pick" aria-label={t("Microphone for listening")} value={chosenMic} onfocus={() => void loadInputs()} onchange={(event) => void session.setMicrophone(event.currentTarget.value || null)}>
+        <option value="">{defaultMic ? t("The computer's default ({name})", { name: defaultMic }) : t("The computer's default")}</option>
+        {#each inputs as input (input.name)}<option value={input.name}>{input.name}</option>{/each}
+        {#if chosenMissing}<option value={chosenMic}>{t("{name} (not plugged in)", { name: chosenMic })}</option>{/if}
+      </select>
+    </div>
+    {#if chosenMissing}<div class="row"><p class="verdict" data-status="cut-out" role="status">! {t("{name} is not plugged in, so listening uses the computer's default until it is.", { name: chosenMic })}</p></div>{/if}
+    <div class="row">
+      <div class="row-copy"><strong>{t("Find my microphone")}</strong><span>{probing ? t("Speak now: listening to every microphone at once…") : t("Press, then speak for a few seconds. Every microphone listens at once, and the one that hears you is shown.")}</span></div>
+      <button type="button" class="btn" class:primary={!probing} disabled={probing} onclick={() => void findMicrophone()}>{probing ? t("Listening…") : t("Find my microphone")}</button>
+    </div>
+    {#if heard}
+      {#if !heard.length}
+        <div class="row"><p class="verdict" data-status="cut-out" role="status">! {t("This computer has no microphone Church Studio can open.")}</p></div>
+      {:else}
+        {#each [...heard].sort((a, b) => b.peak - a.peak) as entry (entry.name)}
+          <div class="row heard-row">
+            <div class="row-copy">
+              <strong>{entry.name}</strong>
+              <span>{entry.error ? t("Could not open it: {error}", { error: entry.error }) : !entry.live ? t("Sends no sound (nothing behind it, or muted)") : entry.peak >= HEARS ? (entry === loudest ? t("Heard you") : t("Heard something")) : t("Works, but did not hear you")}{entry.name === (chosenMic || defaultMic) ? ` · ${t("in use now")}` : ""}</span>
+            </div>
+            <div class="meter small-meter" role="meter" aria-label={t("How loud {name} heard you", { name: entry.name })} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(Math.min(1, entry.peak * 8) * 100)}>
+              {#each Array.from({ length: 10 }) as _, index (index)}<i class:on={index < Math.round(Math.min(1, entry.peak * 8) * 10)}></i>{/each}
+            </div>
+            {#if !entry.error && entry.live && entry.name !== chosenMic}
+              <button type="button" class="btn" class:primary={entry === loudest && entry.peak >= HEARS} onclick={() => void session.setMicrophone(entry.name)}>{t("Use this")}</button>
+            {/if}
+          </div>
+        {/each}
+        {#if !loudest || loudest.peak < HEARS}
+          <div class="row"><p class="verdict" data-status="cut-out" role="status">! {t("None of the microphones heard you. Check one is plugged in and not muted, then try again while speaking.")}</p></div>
+        {/if}
+      {/if}
+    {/if}
+  {/if}
   <div class="row">
     <div class="row-copy"><strong>{t("Test microphone")}</strong><span>{t("Listens for 20 seconds, long enough to catch a microphone that cuts out shortly after it starts.")}</span></div>
     <button type="button" class="btn" class:primary={!testing} onclick={() => (testing ? stopTest?.() : void startTest())}>
@@ -294,6 +361,8 @@
   .meter { display: flex; gap: 3px; flex: none; }
   .meter i { width: 6px; height: 20px; border-radius: 2px; background: var(--line); }
   .meter i.on { background: #3ccf6e; }
+  .small-meter i { width: 5px; height: 14px; }
+  .heard-row .btn { flex: none; }
   .filter-seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
   .filter-seg button { height: 28px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .filter-seg button:hover { color: var(--ink); }
@@ -306,4 +375,5 @@
   .say-title { padding-top: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
   code { padding: 4px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; font-weight: 500; }
   form.row select.field { width: 190px; }
+  select.mic-pick { flex: none; width: 260px; max-width: 48%; }
 </style>

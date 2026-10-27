@@ -378,13 +378,15 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
   if (!input) return json(400, { error: "Send JSON." });
   // The routes that send email, make records or could be guessed at: a few a minute from one address.
   // Check-ins too: each new computer id is a stored record, so one address cannot make thousands.
-  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start" || path === "/v1/hello" || path === "/v1/tv") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
+  if ((path === "/v1/checkout" || path === "/v1/promo" || path === "/v1/signin/start" || path === "/v1/hello" || path === "/v1/tv" || path === "/v1/report") && (await tooFast(config, request, path.slice(4)))) return json(429, { error: SLOW_DOWN });
 
   switch (path) {
     case "/v1/hello":
       return hello(config, input);
     case "/v1/tv":
       return tvRegister(config, input);
+    case "/v1/report":
+      return supportReport(config, input);
     case "/v1/trial":
       return trial(config, input, request.headers.get("cf-connecting-ip"));
     case "/v1/promo": {
@@ -406,6 +408,27 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     default:
       return (await accountApi(config, path, input, origin, request)) ?? json(404, { error: "Not found" });
   }
+}
+
+/** The largest support report kept: a support file, or the Windows listening check's output. */
+export const REPORT_BYTES = 256 * 1024;
+/** How long a report waits to be read before it goes by itself. */
+const REPORT_DAYS = 14;
+const REPORT_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+/**
+ * A support report sent from a church's computer when someone presses Send (or runs the listening
+ * check): kept for two weeks under a short code they read out to us. Write only: nothing here hands
+ * a report back; the team reads them with wrangler (server/README.md › Support reports).
+ */
+async function supportReport(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
+  const report = typeof input.report === "string" ? input.report : "";
+  if (!report.trim()) return json(400, { error: "Send the report." });
+  if (new TextEncoder().encode(report).length > REPORT_BYTES) return json(413, { error: "That report is too large." });
+  const kind = input.kind === "listening-check" ? "listening-check" : "support-file";
+  const code = Array.from(crypto.getRandomValues(new Uint32Array(8)), (n) => REPORT_LETTERS[n % REPORT_LETTERS.length]).join("");
+  await config.store.put(`report:${code}`, report, { at: config.now(), kind, version: text(input.version, 20), platform: text(input.platform, 40) }, REPORT_DAYS * 86_400);
+  return json(200, { code });
 }
 
 async function body(request: Request): Promise<Record<string, unknown> | null> {

@@ -419,3 +419,24 @@ describe("email logo", () => {
     expect([...bytes.slice(1, 4)].map((b) => String.fromCharCode(b)).join("")).toBe("PNG");
   });
 });
+
+describe("support reports", () => {
+  it("keeps a report under a short code for two weeks, and never hands one back", async () => {
+    const { call, config } = setup();
+    const sent = await call("/v1/report", { report: "=== 4. Speech recognizers ===\n  NONE", kind: "listening-check", version: "0.6.5", platform: "Windows 11 24H2" });
+    expect(sent.status).toBe(200);
+    const code = String(sent.data.code);
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(await config.store.get(`report:${code}`)).toContain("Speech recognizers");
+    expect((await config.store.list("report:"))[0]!.meta).toMatchObject({ kind: "listening-check", version: "0.6.5", platform: "Windows 11 24H2" });
+    // Write only: there is no way to read a report back over the internet.
+    expect((await call(`/v1/report/${code}`)).status).toBe(404);
+    expect((await call(`/v1/report`, { code })).status).toBe(400);
+  });
+
+  it("refuses an empty or oversized report", async () => {
+    const { call } = setup();
+    expect((await call("/v1/report", { report: "  " })).status).toBe(400);
+    expect((await call("/v1/report", { report: "x".repeat(256 * 1024 + 1) })).status).toBe(413);
+  });
+});

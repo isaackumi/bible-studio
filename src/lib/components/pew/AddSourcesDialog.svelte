@@ -166,7 +166,7 @@
     event.preventDefault();
     if (!videoTarget) return;
     await session.addWebVideo(videoLink, { mute: !videoSound, loop: videoLoop, sectionId: target ?? undefined });
-    note(`web:${videoLink}`, videoTarget.kind === "youtube" ? t("YouTube video") : videoTarget.kind === "vimeo" ? t("Vimeo video") : videoTarget.label);
+    note(`web:${videoLink}`, videoTarget.kind === "youtube" ? t("YouTube video") : videoTarget.kind === "vimeo" ? t("Vimeo video") : videoTarget.kind === "video" ? t(videoTarget.label) : videoTarget.label);
     videoLink = "";
   }
 
@@ -445,13 +445,14 @@
           <label>
             <span>{t("Link")}</span>
             <!-- svelte-ignore a11y_autofocus -->
-            <input bind:value={videoLink} autofocus placeholder={t("Paste a YouTube or Vimeo link")} aria-label={t("YouTube or Vimeo link")} />
+            <input bind:value={videoLink} autofocus placeholder={t("Paste a YouTube, Vimeo or video link")} aria-label={t("Video link")} />
           </label>
           <p class="hint">
             {#if !videoLink.trim()}{t("Copy the link from YouTube (Share › Copy) and paste it here. It plays in YouTube's own player, so the computer needs the internet.")}
             {:else if !videoTarget}{t("That does not look like a web address.")}
             {:else if videoTarget.kind === "youtube"}{t("A YouTube video.")}
             {:else if videoTarget.kind === "vimeo"}{t("A Vimeo video.")}
+            {:else if videoTarget.kind === "video"}{t("A video from the internet: it plays on the screen like a video on this computer, while the computer is online.")}
             {:else}{t("Not a YouTube or Vimeo video: it will show the page {label}.", { label: videoTarget.label })}{/if}
           </p>
           <label class="switch-row"><input type="checkbox" class="switch" bind:checked={videoLoop} /> <span><b>{t("Loop")}</b>{t("Play again from the start each time it ends.")}</span></label>

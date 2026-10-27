@@ -44,5 +44,11 @@ describe("muted players for desk monitors", () => {
     expect(new URL(webTarget("https://youtu.be/dQw4w9WgXcQ")!.url).searchParams.get("loop")).toBeNull();
     expect(webTarget("https://vimeo.com/76979871", { loop: true })!.url).toContain("&loop=1");
   });
-});
 
+  it("treats a link straight to a video file or a live stream as a video, and a page as a page", () => {
+    expect(webTarget("https://media.church.org/sunday/welcome.mp4")).toEqual({ kind: "video", url: "https://media.church.org/sunday/welcome.mp4", label: "Video" });
+    expect(webTarget("stream.church.org/live/index.m3u8?token=abc")).toMatchObject({ kind: "video", label: "Live stream" });
+    expect(webTarget("https://church.org/videos/welcome")!.kind).toBe("website");
+    expect(webTarget("https://church.org/watch.mp4.html")!.kind).toBe("website");
+  });
+});

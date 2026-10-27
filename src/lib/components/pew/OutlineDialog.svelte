@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveFile } from "../../platform/save-file";
   import { session } from "../../app/session.svelte";
   import { buildOutline, outlineHtml, outlineText, type OutlineOptions } from "../../domain/outline";
   import type { Service } from "../../domain/types";
@@ -40,15 +41,13 @@
     }
   }
 
-  function download() {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${service.name.replace(/[^\w\- ]+/g, "").trim() || "service"}.html`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    note = t("Saved as a page you can open in any browser, print or send.");
+  async function download() {
+    try {
+      const saved = await saveFile(`${service.name.replace(/[^\w\- ]+/g, "").trim() || "service"}.html`, html, "text/html");
+      if (saved) note = t("Saved as a page you can open in any browser, print or send.");
+    } catch (error) {
+      note = error instanceof Error ? error.message : String(error);
+    }
   }
 </script>
 

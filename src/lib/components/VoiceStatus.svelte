@@ -2,6 +2,7 @@
   import { session } from "../app/session.svelte";
   import { isDesktop } from "../platform/runtime";
   import { t } from "../i18n/core";
+  import { micLabel } from "../voice/microphone";
 
   let { compact = false }: { compact?: boolean } = $props();
 
@@ -35,7 +36,8 @@
       {label}
     </span>
     {#if voice.status === "listening"}
-      <span class="meter" aria-hidden="true"><span style="width: {Math.max(4, Math.round(voice.level * 100))}%"></span></span>
+      <span class="meter" aria-hidden="true" title={session.micInUse ?? ""}><span style="width: {Math.max(4, Math.round(voice.level * 100))}%"></span></span>
+      {#if session.micInUse && !compact}<span class="mic" title={t("Listening on {name}. Choose another in Settings › Sound & voice.", { name: session.micInUse })}>{micLabel(session.micInUse)}</span>{/if}
     {/if}
     <label class="live" data-tip={t("Let voice go live, cut, clear, black and show the logo. Off on every launch.")}>
       <input type="checkbox" checked={voice.allowLive} onchange={(event) => session.setVoiceAllowLive(event.currentTarget.checked)} />
@@ -79,6 +81,7 @@
   [data-status="error"] .chip { border-color: #ff5a5a; color: #ff8a8a; }
   .meter { flex: 0 0 64px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
   .meter span { display: block; height: 100%; background: #3ccf6e; }
+  .mic { min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
   .live { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--muted); }
   .heard { margin: 0; color: var(--accent-text); font-style: italic; overflow-wrap: anywhere; }
   .heard.interim { opacity: 0.7; }

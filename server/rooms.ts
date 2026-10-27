@@ -84,6 +84,10 @@ export const wordKey = (text: string) =>
 /** Words kept off the screen until the operator says otherwise. Kept short: the operator decides the rest. */
 const HIDDEN_WORDS = new Set(["fuck", "fucking", "shit", "bitch", "bastard", "asshole", "dick", "cunt", "porn", "sex", "idiot", "stupid", "hate", "nigger", "faggot", "whore", "slut", "damn", "crap"]);
 const offends = (key: string) => key.split(/[\s-]+/).some((part) => HIDDEN_WORDS.has(part));
+/** Words that are also people's names: fine as a name, still kept off a word cloud. */
+const NAMES_TOO = new Set(["dick"]);
+/** A name the screen would show to the whole church: none of the hidden words, other than real names. */
+const offensiveName = (name: string) => wordKey(name).split(/[\s-]+/).some((part) => HIDDEN_WORDS.has(part) && !NAMES_TOO.has(part));
 
 /** The words sent to the current word cloud: each once with how many sent it, the most first. */
 export function wordCounts(state: RoomState): Array<{ text: string; key: string; count: number; hidden: boolean }> {
@@ -199,8 +203,11 @@ export const LIMITS = {
   participants: 2000,
   /** Questions one person may ask in ten minutes. */
   asksPer10Min: 5,
-  /** Upvotes for one question from one network address (a church's Wi-Fi is one address). */
-  votesPerAddress: 40,
+  /**
+   * Upvotes for one question from one network address. A church's Wi-Fi is one address for everyone
+   * in the room, and each person votes once, so this only stops one phone posing as a crowd.
+   */
+  votesPerAddress: 600,
   /** A room nobody uses for this long closes by itself. */
   idleMs: 24 * 60 * 60_000,
 };
@@ -482,6 +489,7 @@ export class RoomCore {
     if (!state) return fail(404, "This room has ended.");
     if (Object.keys(state.participants).length >= LIMITS.participants) return fail(429, "This room is full.");
     const wanted = clean(name, LIMITS.nameLength).replace(/\s+/g, " ");
+    if (offensiveName(wanted)) return fail(400, "Choose another name: this one is shown on the screen.");
     const clash = nameTaken(state, wanted);
     if (clash) return clash;
     const pid = randomId(12);
@@ -504,6 +512,7 @@ export class RoomCore {
     this.touch(pid);
     const wanted = clean(name, LIMITS.nameLength).replace(/\s+/g, " ");
     if (!wanted) return fail(400, "Type a name.");
+    if (offensiveName(wanted)) return fail(400, "Choose another name: this one is shown on the screen.");
     const clash = nameTaken(state, wanted, pid);
     if (clash) return clash;
     state.participants[pid]!.name = wanted;
@@ -990,7 +999,19 @@ export type RoomNamespace = { idFromName(name: string): unknown; get(id: unknown
  * The public routes: open a room (the desk), and everything a phone does in one. `limit` is the
  * per-address rate limiter (api.ts tooFast); `page` draws the audience page.
  */
-export async function handleRooms(request: Request, rooms: RoomNamespace | undefined, origin: string, page: (code: string, origin: string, language?: PhoneLanguage) => string, limit?: (key: string) => Promise<boolean>): Promise<Response | null> {
+/**
+ * `limit` is the strict per-address limiter (a few a minute): opening rooms. `crowd` is the roomy one
+ * for a congregation joining at once: a church's whole Wi-Fi reaches us as one address, so joins,
+ * questions and renames are counted per room and address, and each person's own limits stay in the room.
+ */
+export async function handleRooms(
+  request: Request,
+  rooms: RoomNamespace | undefined,
+  origin: string,
+  page: (code: string, origin: string, language?: PhoneLanguage) => string,
+  limit?: (key: string) => Promise<boolean>,
+  crowd?: (key: string) => Promise<boolean>,
+): Promise<Response | null> {
   const language = phoneLanguage(request.headers.get("accept-language"));
   const url = new URL(request.url);
   const path = url.pathname;
@@ -1030,7 +1051,8 @@ export async function handleRooms(request: Request, rooms: RoomNamespace | undef
   const code = match[1]!.toUpperCase();
   const action = match[2]!;
   if (!isCode(code)) return json(404, { error: "No such room." });
-  if ((action === "ask" || action === "join" || action === "rename") && (await slow(action))) return json(429, { error: "Too many at once from this network. Wait a minute." });
+  if ((action === "ask" || action === "join" || action === "rename") && address && crowd && !(await crowd(`room-${action}:${code}:${address}`)))
+    return json(429, { error: "Lots of people are joining at once. Trying again…", retry: true });
   const stub = rooms.get(rooms.idFromName(code));
   const headers = { "content-type": "application/json", "x-room-ip": await sha256(`${address}:${code}`) };
   const target = `https://room/${action}${url.search}`;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveFile, savedName } from "../../platform/save-file";
   import InlineWords from "../InlineWords.svelte";
   import { session } from "../../app/session.svelte";
   import { songFileName, songToOpenLyrics } from "../../domain/openlyrics";
@@ -459,13 +460,13 @@
 
   // Export: OpenLyrics, one .xml per song; several songs go out as one .zip.
 
-  function save(name: string, data: BlobPart, type: string) {
-    const url = URL.createObjectURL(new Blob([data], { type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function save(name: string, data: string | Uint8Array | ArrayBuffer | Blob, type: string) {
+    try {
+      const saved = await saveFile(name, data, type);
+      if (saved) note = t("Saved as {name}.", { name: savedName(saved) });
+    } catch (error) {
+      note = error instanceof Error ? error.message : String(error);
+    }
   }
 
   function exportSong(song: Song) {

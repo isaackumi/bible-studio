@@ -64,5 +64,9 @@ describe("a video from a link", () => {
     expect(model.web).toMatchObject({ kind: "youtube", mute: true });
     expect(model.web!.url).toContain("loop=1");
     expect(presentWeb({ theme, url: "not a link" }).layout).toBe("empty");
+    // A video file or live stream from a link plays as a video (with its sound choice), not in a page frame.
+    const stream = presentWeb({ theme, url: "https://stream.church.org/live/index.m3u8", mute: true, loop: false });
+    expect(stream.layout).toBe("video");
+    expect(stream.video).toMatchObject({ url: "https://stream.church.org/live/index.m3u8", muted: true, loop: false });
   });
 });

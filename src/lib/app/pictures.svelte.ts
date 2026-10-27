@@ -202,6 +202,9 @@ class Pictures {
   start = async (from = this.current) => {
     if (!this.images.length) return;
     this.slideshow = { ...this.slideshow, running: true, paused: false };
+    session.slideshowWatch = (sourceId) => {
+      if (sourceId !== this.shownId) this.stop();
+    };
     this.sequence = slideOrder(this.images, this.slideshow.order, from);
     this.position = 0;
     // Music first, so the first picture's take does not fade it (session.slideshowMusic).
@@ -301,6 +304,7 @@ class Pictures {
     clearInterval(this.watchTimer);
     const wasRunning = this.slideshow.running;
     this.slideshow = { ...this.slideshow, running: false, paused: false };
+    session.slideshowWatch = null;
     if (!wasRunning) return;
     if (session.slideCountdown) void session.setSlideCountdown(null);
     if (session.slideBanner) void session.setSlideBanner(null);

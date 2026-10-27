@@ -21,7 +21,10 @@
 
   let model = $state<PresentationModel>(emptyModel(defaultTheme()));
   let aspect = $state(16 / 9);
-  let status = $state<"waiting" | "showing" | "ended" | "offline">("waiting");
+  let status = $state<"waiting" | "showing" | "ended">("waiting");
+  /** The computer has not answered for a while. The picture stays up meanwhile: a dropped beat of
+   * Wi-Fi must never blank the church's screen. */
+  let offline = $state(false);
   let church = $state("");
   let width = $state(0);
   let height = $state(0);
@@ -38,6 +41,9 @@
     let timer: ReturnType<typeof setTimeout> | undefined;
     let lock: { release(): Promise<void> } | null = null;
     let stopped = false;
+    /** Asks in a row that went unanswered: the wait grows after each (to 5 s), so a TV whose
+     * computer is off does not hammer the network, and comes back within seconds when it is on. */
+    let misses = 0;
 
     const keepAwake = async () => {
       try {
@@ -53,9 +59,13 @@
         const response = await fetch(lan ? `/display/screen?after=${revision}` : `${SERVER_URL}/v1/rooms/${code}/screen?after=${revision}`, { cache: "no-store" });
         if (response.status === 404) {
           status = "ended";
+          offline = false;
           return;
         }
-        if (response.ok) lastSeen = Date.now();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        lastSeen = Date.now();
+        misses = 0;
+        offline = false;
         if (response.status === 200) {
           const data = (await response.json()) as { on: boolean; revision: number; frame?: string; name: string };
           revision = data.revision;
@@ -72,9 +82,11 @@
             if (status !== "showing") void keepAwake();
             status = "showing";
           } else status = "waiting";
-        } else if (status === "offline") status = revision ? "showing" : "waiting";
+        }
       } catch {
-        status = "offline";
+        misses += 1;
+        // Short drops pass unseen; past ten seconds, say so (a small mark, the picture stays).
+        offline = Date.now() - lastSeen > 10_000;
         // Came by the church's TV link and the computer has gone quiet a while (its Wi-Fi address
         // changed): back through the link, which knows where it is now.
         if (lan && via && Date.now() - lastSeen > 20_000) {
@@ -82,14 +94,16 @@
           return;
         }
       }
-      // Once a second while the page is in view; slower when it is not.
-      timer = setTimeout(ask, document.hidden ? 5000 : 1000);
+      // Once a second while the page is in view; slower when it is not, or while the computer is quiet.
+      const quiet = misses ? Math.min(5000, 1000 * 2 ** (misses - 1)) * (0.8 + Math.random() * 0.4) : 1000;
+      timer = setTimeout(ask, document.hidden ? Math.max(5000, quiet) : quiet);
     };
     void ask();
 
     const visible = () => {
       if (!document.hidden) {
         clearTimeout(timer);
+        misses = 0;
         void ask();
         if (status === "showing") void keepAwake();
       }
@@ -129,13 +143,16 @@
     <div class="screen" style:width="{box.w}px" style:height="{box.h}px">
       <Screen {model} {aspect} />
     </div>
+    {#if offline}
+      <p class="drop" role="status">Reconnecting…</p>
+    {/if}
   {:else}
     <div class="wait">
       <svg class="mark" viewBox="0 0 256 256" width="64" height="64" aria-hidden="true"><path d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z" fill="#f5f5f5" /><path d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z" fill="#fa4f00" /><path d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z" fill="#f5f5f5" /><path d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z" fill="#f5f5f5" /></svg>
       {#if status === "ended"}
         <h1>This screen has ended</h1>
         <p>The church is no longer sharing it.</p>
-      {:else if status === "offline"}
+      {:else if offline}
         <h1>Reconnecting…</h1>
         <p>{lan ? "Check that this device is on the church Wi-Fi and Church Studio is open." : "Check this device's internet connection."}</p>
       {:else if lan}
@@ -157,4 +174,6 @@
   .wait h1 { margin: 6px 0 0; font-size: 22px; font-weight: 700; }
   .wait p { margin: 0; color: #a3a3ad; font-size: 15px; }
   .wait b { color: #f5f5f5; letter-spacing: 0.12em; }
+  /* Over the last picture while the computer is out of reach: small, in a corner, out of the words' way. */
+  .drop { position: fixed; right: 12px; bottom: 12px; margin: 0; padding: 4px 10px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: #d4d4d8; font-size: 12px; }
 </style>

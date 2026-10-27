@@ -531,3 +531,17 @@ Built and tested in the browser build or by unit tests; anything marked "needs a
 | Auto-update | Signed updater, release workflow, Settings › Updates | First tagged release (add TAURI_SIGNING_PRIVATE_KEY secret) |
 
 Not done: interface languages (needs choosing languages and translating every screen), bundled hymn texts (needs the files), payments (parked as CS-BIZ-001).
+
+## Status update — 2026-10-27 (audit: ready for a real Sunday)
+
+| Area | Now | Verified | Still needed |
+| --- | --- | --- | --- |
+| Rooms on church Wi-Fi | Joins, questions and renames are counted per room and network address (`CROWD`, 600 a minute) instead of 10 a minute per address across all rooms; a crowded phone waits and retries by itself; one question can take every person's vote | Unit tests (40 joins from one address, 120 votes) | Deploy the Worker with the new `CROWD` rate limit binding |
+| Names on the screen | Join and rename refuse names with the hidden words (real names such as Dick still pass); server errors reach the phone in its language | Unit tests | — |
+| Desk honesty | The Audience panel says when the room cannot be reached while it polls; closing a room offline keeps it open and says so, instead of leaving it live with no host | svelte-check | A real offline run |
+| TV / browser displays | A dropped connection keeps the picture; a small "Reconnecting…" shows after 10 s; retries back off to 5 s with jitter | Browser: 14 s outage held the verse, badge appeared, the next verse showed within 7 s of the network returning | A stale picture when the desk dies but the server answers (needs `screen.at` exposed) |
+| Slideshow | Stops the moment anything else goes LIVE (title, clock, countdown and music with it), not at its next change | svelte-check | Desktop run (Pictures needs the desktop app) |
+| Video from a link | A link straight to a video file or an HLS stream (.m3u8) is a real video item, in Add sources and in scene sources, through display/stream.ts | Unit tests | A real HLS stream on the audience screen; media-src in the `hardening/csp` branch |
+| Paste an order of service | Service page › Paste (and the empty Service page): parts, leaders, times, library songs, readings and announcements, reviewed before it is kept; songs not in the library are listed, never made up | Unit tests; browser: 8 parts, 2 songs, 2 readings, Preview and Program untouched | An optional AI pass for messy notes |
+
+Found and left as designed: answers during the reading time count as the quickest (tested, phones hide the buttons); "Screen follows the game" takes Program because the operator pressed Play with it on.

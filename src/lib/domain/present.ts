@@ -83,6 +83,7 @@ export function presentImageOrEmpty(theme: Theme, imageUrl: string | null | unde
 export function presentWeb(input: BuildBase & { url: string; mute?: boolean; loop?: boolean }): PresentationModel {
   const target = webTarget(input.url, { mute: input.mute, loop: input.loop });
   if (!target) return emptyModel(input.theme);
+  if (target.kind === "video") return presentVideo({ theme: input.theme, videoUrl: target.url, loop: input.loop, muted: input.mute });
   return { layout: "web", theme: input.theme, reference: target.label, attribution: null, lines: [], imageUrl: null, backgroundImageUrl: null, web: { url: target.url, kind: target.kind, label: target.label, zoom: 1, mute: input.mute ?? false } };
 }
 

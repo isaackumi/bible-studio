@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveFile, savedName } from "../../platform/save-file";
   import { session } from "../../app/session.svelte";
   import { mediaUrl } from "../../db/api";
   import { DEFAULT_BACKDROP, DISPLAY_WASHES, MOTIONS, gradientCss } from "../../domain/backgrounds";
@@ -161,13 +162,8 @@
   async function exportTheme() {
     try {
       const { fileName, json } = await session.exportTheme();
-      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      note = `${fileName} saved.`;
+      const saved = await saveFile(fileName, json, "application/json");
+      if (saved) note = t("Saved as {name}.", { name: savedName(saved) });
     } catch (error) {
       note = error instanceof Error ? error.message : t("The theme was not exported.");
     }

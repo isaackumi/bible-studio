@@ -294,6 +294,54 @@ describe("rooms on Cloudflare", () => {
   });
 });
 
+describe("rooms: a congregation on one Wi-Fi", () => {
+  /** A fake limiter: true while a key has asked fewer than `most` times. */
+  const limiter = (most: number) => {
+    const seen = new Map<string, number>();
+    return { keys: seen, check: async (key: string) => (seen.set(key, (seen.get(key) ?? 0) + 1), seen.get(key)! <= most) };
+  };
+  const from = (address: string) => (path: string, body?: unknown) =>
+    new Request(`https://church.test${path}`, { headers: { "cf-connecting-ip": address }, ...(body === undefined ? {} : { method: "POST", body: JSON.stringify(body) }) });
+
+  it("lets a whole church join from one address, counted per room, and keeps the strict limit for opening rooms", async () => {
+    const namespace = memoryRooms();
+    const strict = limiter(10);
+    const crowd = limiter(600);
+    const call = (path: string, body?: unknown) => handleRooms(from("203.0.113.7")(path, body), namespace, "https://church.test", () => "page", strict.check, crowd.check);
+    const opened = (await (await call("/v1/rooms", { name: "Grace" }))!.json()) as { code: string };
+    // Forty people on the church Wi-Fi: every one joins, well past the strict limit of ten a minute.
+    for (let i = 0; i < 40; i++) expect((await call(`/v1/rooms/${opened.code}/join`, { name: `Person ${i}` }))!.status).toBe(200);
+    expect([...strict.keys.keys()]).toEqual(["room-create:203.0.113.7"]);
+    expect(crowd.keys.get(`room-join:${opened.code}:203.0.113.7`)).toBe(40);
+  });
+
+  it("asks a crowded phone to try again rather than refusing it", async () => {
+    const call = (path: string, body?: unknown) => handleRooms(from("203.0.113.7")(path, body), memoryRooms(), "https://church.test", () => "page", undefined, async () => false);
+    const refused = (await call("/v1/rooms/ABC234/join", { name: "Ama" }))!;
+    expect(refused.status).toBe(429);
+    expect(await refused.json()).toMatchObject({ retry: true });
+  });
+
+  it("refuses a name the screen should not show, but not a real name that is also a hidden word", async () => {
+    const { core } = room();
+    data(await core.create("ABC234", ""));
+    expect(await core.join("Big Shit", "")).toMatchObject({ ok: false, status: 400 });
+    const { pid } = data<{ pid: string }>(await core.join("Dick Owusu", ""));
+    expect(await core.rename(pid, "f*ck no FUCK")).toMatchObject({ ok: false, status: 400 });
+    expect(data(await core.rename(pid, "Richard"))).toEqual({ name: "Richard" });
+  });
+
+  it("counts every person's upvote on one question, all from the church's one address", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    data(await core.settings(hostKey, { open: true }));
+    const asker = data<{ pid: string }>(await core.join("Asker", "")).pid;
+    const { id } = data<{ id: string }>(await core.ask(asker, "Will there be a baptism?", ""));
+    for (let i = 0; i < 120; i++) data(await core.vote(data<{ pid: string }>(await core.join(`Voter ${i}`, "")).pid, id, "church-wifi"));
+    expect(data<{ questions: Array<{ votes: number }> }>(await core.hostView(hostKey)).questions[0]!.votes).toBe(120);
+  });
+});
+
 describe("rooms: joining by code", () => {
   it("serves a page to type the code in at /j, and the room page at /j/CODE", async () => {
     const { roomPage } = await import("./room-page");

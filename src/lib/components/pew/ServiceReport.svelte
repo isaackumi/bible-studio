@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveFile } from "../../platform/save-file";
   import { overBy, runCsv, runParts, usedLabel, usualOver, type ServiceRun } from "../../domain/service-run";
   import { lengthLabel } from "../../domain/schedule";
   import type { Service } from "../../domain/types";
@@ -70,17 +71,15 @@
     }
   }
 
-  function download() {
+  async function download() {
     if (!run) return;
-    const blob = new Blob([runCsv(parts)], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
     const day = new Date(run.startedAt).toISOString().slice(0, 10);
-    link.download = `${service.name.replace(/[^\w\- ]+/g, "").trim() || "service"} ${day}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    note = t("Saved as a spreadsheet (CSV).");
+    try {
+      const saved = await saveFile(`${service.name.replace(/[^\w\- ]+/g, "").trim() || "service"} ${day}.csv`, runCsv(parts), "text/csv");
+      if (saved) note = t("Saved as a spreadsheet (CSV).");
+    } catch (error) {
+      note = error instanceof Error ? error.message : String(error);
+    }
   }
 </script>
 

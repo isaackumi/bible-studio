@@ -325,16 +325,17 @@ mod windows {
         command.env("CHURCH_STUDIO_WORDS", words);
         // The helper watches for this process and ends if it is gone (a crash leaves no other trace).
         command.env("CHURCH_STUDIO_PARENT", std::process::id().to_string());
-        if filter != crate::noise::Filter::Off {
-            command.arg("-Stdin");
-        }
         {
             use std::os::windows::process::CommandExt;
             // No console window flashing up behind the desk.
             command.creation_flags(0x0800_0000);
         }
         // Recording listening: the sound comes through the app (filtered or not) so it can be kept.
-        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active()).then(|| filter.for_recognizer());
+        // A chosen microphone too: Windows' recognizer can only open the default one itself.
+        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active() || crate::noise::chosen_input().is_some()).then(|| filter.for_recognizer());
+        if feed.is_some() {
+            command.arg("-Stdin");
+        }
         super::helper::start(app, run, command, feed)
     }
 }
@@ -528,7 +529,7 @@ mod macos {
         let mut command = std::process::Command::new(&path);
         command.env("CHURCH_STUDIO_WORDS", words);
         // Recording listening: the sound comes through the app (filtered or not) so it can be kept.
-        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active()).then(|| filter.for_recognizer());
+        let feed = (filter != crate::noise::Filter::Off || crate::listen_record::active() || crate::noise::chosen_input().is_some()).then(|| filter.for_recognizer());
         if feed.is_some() {
             command.env("CHURCH_STUDIO_AUDIO", "stdin");
         }
