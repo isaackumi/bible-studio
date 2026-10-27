@@ -71,14 +71,17 @@ export function recordGoneLive(
   const previous = options.previous;
   if (previous && isStep(previous, passage)) {
     // The entry the operator was stepping through: the latest whose verses hold the previous step.
-    const owner = list.findLastIndex((entry) => {
+    // (A plain loop from the end: the license server builds this file too, for ES2022.)
+    let owner = -1;
+    for (let at = list.length - 1; at >= 0 && owner < 0; at -= 1) {
+      const entry = list[at]!;
       const span = goneLiveSpan(entry);
-      return (
+      const holds =
         goneLiveKey({ ...entry.passage, startVerse: 1, endVerse: 1 }) === goneLiveKey({ ...previous, startVerse: 1, endVerse: 1 }) &&
         previous.startVerse >= span.startVerse &&
-        previous.endVerse <= span.endVerse
-      );
-    });
+        previous.endVerse <= span.endVerse;
+      if (holds) owner = at;
+    }
     if (owner >= 0) {
       const entry = list[owner]!;
       const span = goneLiveSpan(entry);
