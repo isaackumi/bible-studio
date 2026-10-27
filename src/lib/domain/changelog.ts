@@ -16,6 +16,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.7",
+    date: "2026-10-27",
+    highlights: [
+      { icon: "mic", title: msg("Listening knows how sure it is"), text: msg("A verse it is sure of goes to Preview as before. When it is not sure, the verse waits under Detections marked Check, and nothing on your screens changes. Autopilot puts a verse live only when listening is sure of it."), show: null },
+      { icon: "speed", title: msg("A warning before the computer struggles"), text: msg("When the processors stay too busy or memory runs low, an alert says what is causing it and offers what helps, such as lighter listening or holding backgrounds still. See it and set it in Settings › Performance."), show: null },
+      { icon: "users", title: msg("Prayer requests and reactions from phones"), text: msg("People can send a prayer request that only the desk sees, and react during the service. New questions wait for you to approve them, and the Audience button shows how many are waiting."), show: null },
+      { icon: "media", title: msg("Pictures load faster, with search and Favourites"), text: msg("Pictures shows small copies, so big folders open quickly. Find a picture by name, and star the ones you use often."), show: null },
+      { icon: "list", title: msg("Who, how long and notes on each item"), text: msg("On the Service page, the note button on an item keeps who brings it, how many minutes it takes, and notes for the desk. None of it is shown on the screen."), show: null },
+    ],
+  },
+  {
     version: "0.6.6",
     date: "2026-10-27",
     highlights: [
