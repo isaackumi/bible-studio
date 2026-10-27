@@ -5764,6 +5764,23 @@ class Session {
     log: (line) => this.noteListening(line),
   });
 
+  /**
+   * A change of Program that stages itself on Preview first (a running slideshow's next picture),
+   * after which what the operator had staged is put back: a slideshow never takes Preview away.
+   */
+  takeKeepingPreview = async (stage: () => void, transition?: ScreenTransition, ms?: number) => {
+    const staged = this.live.preview;
+    const focus = this.songFocus;
+    stage();
+    const ours = this.live.preview.sourceId;
+    await this.take(transition, ms);
+    const operators = staged.model.layout !== "empty" && staged.sourceId !== ours && !staged.sourceId?.startsWith("picture:");
+    if (operators && this.live.preview.sourceId === ours) {
+      this.live = setPreview(this.live, staged);
+      this.songFocus = focus;
+    }
+  };
+
   /** A song part straight to Program. Whatever else the operator staged on Preview stays there. */
   private async songToProgram(song: Song, sectionId: string, screen: number) {
     const staged = this.live.preview;

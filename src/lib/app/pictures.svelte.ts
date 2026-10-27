@@ -237,8 +237,13 @@ class Pictures {
     const found = this.model(index);
     if (!found) return;
     this.current = index;
-    session.previewModel(found.model, found.id);
     this.shownId = found.id;
+    // Running, the slideshow changes Program only: what the operator staged on Preview stays there.
+    if (this.slideshow.running) {
+      await session.takeKeepingPreview(() => session.previewModel(found.model, found.id), transition, ms);
+      return;
+    }
+    session.previewModel(found.model, found.id);
     await session.take(transition, ms);
   };
 
