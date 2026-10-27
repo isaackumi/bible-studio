@@ -708,7 +708,7 @@
                         <Icon name="refresh" size={12} /> {looping ? t("Stop loop") : t("Loop")}
                       </button>
                     {/if}
-                    <button type="button" class="row-tool" class:on={detailsOpen === item.id} aria-expanded={detailsOpen === item.id} aria-label={t("Who, how long and notes for {title}", { title: item.title })} title={t("Who brings it, how long, and notes for the desk")} onclick={() => (detailsOpen = detailsOpen === item.id ? null : item.id)}><Icon name="note" size={13} /></button>
+                    <button type="button" class="row-tool" class:on={detailsOpen === item.id} aria-expanded={detailsOpen === item.id} aria-label={t("Who, how long and notes for {title}", { title: item.title })} title={t("Who brings it, how long, and notes for the desk")} onclick={() => (detailsOpen = detailsOpen === item.id ? null : item.id)}><Icon name="sticky-note" size={13} /></button>
                     <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
                     <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Remove from the service (Undo comes up)")} onclick={() => session.deleteItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>

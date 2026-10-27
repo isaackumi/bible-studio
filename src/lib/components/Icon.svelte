@@ -4,6 +4,7 @@
   import Bell from "@lucide/svelte/icons/bell";
   import BellOff from "@lucide/svelte/icons/bell-off";
   import Book from "@lucide/svelte/icons/book";
+  import StickyNote from "@lucide/svelte/icons/sticky-note";
   import BookOpen from "@lucide/svelte/icons/book-open";
   import Cast from "@lucide/svelte/icons/cast";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
@@ -96,6 +97,7 @@
     help: CircleQuestionMark,
     settings: Settings,
     note: Music,
+    "sticky-note": StickyNote,
     mic: Mic,
     "mic-off": MicOff,
     wave: Search,

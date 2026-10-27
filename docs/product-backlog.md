@@ -545,3 +545,19 @@ Not done: interface languages (needs choosing languages and translating every sc
 | Paste an order of service | Service page › Paste (and the empty Service page): parts, leaders, times, library songs, readings and announcements, reviewed before it is kept; songs not in the library are listed, never made up | Unit tests; browser: 8 parts, 2 songs, 2 readings, Preview and Program untouched | An optional AI pass for messy notes |
 
 Found and left as designed: answers during the reading time count as the quickest (tested, phones hide the buttons); "Screen follows the game" takes Program because the operator pressed Play with it on.
+
+## Status update — 2026-10-27 (round 2: everything the audit found, built at core)
+
+| Area | Now | Verified | Still needed |
+| --- | --- | --- | --- |
+| Listening confidence | Every verse found is rated (voice/confidence.ts, fitted to voice/confidence-corpus.ts by scripts/fit-confidence.ts): sure / likely / maybe. Maybe waits under Detections and changes nothing; Autopilot takes only sure verses live. Fixed at the source: impossible verses, counting and amounts read as references; a looser sound-alike book only when "chapter"/"verse" is said | 128-line corpus: sure 46 right, 0 wrong; wrong finds 13 → 4 | Real service recordings into the corpus, then fit again |
+| Load watch | CPU and memory every 5 s; sustained thresholds with hysteresis; alerts name the cause and offer lighter listening, still backgrounds, the task manager, restart (never while showing); live meters and thresholds in Settings › Performance | Unit tests; Rust reading tested on the Mac | A real overloaded Windows PC |
+| Audience | Questions held for approval by default; private prayer requests; reactions (Preview only through Take); a count on the Audience button | Server tests, curl on the local server | Real phones; Worker deploy |
+| TV / browser screens | Says "The church computer is not sending" after 30 s without a heartbeat (internet and Wi-Fi); video over Wi-Fi streams with Range/206, HEAD, caching, no size cap | Rust socket tests | A real iPhone / Apple TV / smart TV |
+| Phone remote | Preview only or full control per phone; controller keys expire; rate limits on desk, relay and Wi-Fi server | Unit tests | A real phone and Companion |
+| Media | Live streams recover from dropped connections; the desk is told when a video plays muted; BMP everywhere; Pictures thumbnails, search and Favourites; slideshow leaves Preview alone | Unit and Rust tests | Long streams on the audience screen |
+| Service | Items carry who brings them, minutes and desk notes | Browser: saved, shown, kept after reload; Preview untouched | — |
+| Songs / AI | Suggestions reach the whole library (most relevant 800); a staged song stays staged when a sung song goes live | Unit tests | — |
+
+Left as decided: "Live on click" stays on by default while a service runs (owner's call); HEIC is not accepted (Windows cannot show it).
+Not started, each a project of its own: NDI in and out (Vizrt SDK licence), recording and streaming, several operators on one service, cloud remote control.
