@@ -91,6 +91,7 @@ const rangeEnd = (start: number, end: string | undefined) => (end && Number(end)
  */
 function numbersAfter(tail: string, chapters: number, cued = false): { chapter: number; verse: number; end?: number; exact: boolean } | null {
   const pair = tail.match(new RegExp(String.raw`^\s+(?:ch\s+)?(\d+)\s+(?:and\s+)?(?:v\s+)?(\d+)\b` + RANGE));
+  if (pair && !/\bv\b/.test(pair[0]) && notAReference(Number(pair[1]), Number(pair[2]), tail.slice(pair[0].length))) return null;
   if (pair) return { chapter: Number(pair[1]), verse: Number(pair[2]), end: rangeEnd(Number(pair[2]), pair[3]), exact: true };
   const glued = tail.match(/^\s+(\d{3,4})\b/);
   const split = glued ? splitGlued(chapters, glued[1]!) : null;
@@ -102,6 +103,19 @@ function numbersAfter(tail: string, chapters: number, cued = false): { chapter: 
   const chapterOnly = tail.match(/^\s+ch\s+(\d+)\b(?!\s+(?:\d|v\s))/) ?? (cued ? tail.match(/^\s+(\d+)\b(?!\s+(?:\d|v\s))/) : null);
   if (chapterOnly) return { chapter: Number(chapterOnly[1]), verse: 1, exact: false };
   return null;
+}
+
+/** Words that, right after two numbers, make them a count or an amount ("10 12 years", "4 5 6 seats"). */
+const UNITS = new Set(["years", "year", "times", "seats", "people", "minutes", "minute", "hours", "hour", "days", "weeks", "months", "kids", "children", "members", "dollars", "cedis", "pounds", "percent", "oclock", "pm", "am", "of"]);
+
+/**
+ * Two numbers after a book's name, without "verse" said, that are not a reference: counting
+ * ("John 1 2 3 testing") or an amount ("Daniel 10 12 years"). "Proverbs 3 5 6" still reads 3:5-6.
+ */
+function notAReference(chapter: number, verse: number, rest: string): boolean {
+  const next = rest.trim().split(" ")[0] ?? "";
+  if (verse === chapter + 1 && Number(next) === verse + 1) return true;
+  return UNITS.has(next);
 }
 
 /** Words that say a reference is coming ("turn to", "go with me to", "open to", "the book of"). */
@@ -192,7 +206,9 @@ function fuzzyReferences(prepared: string, accept: (book: CanonBook, at: number,
       if (FILLER.has(words[0]!)) continue;
       const volumeToken = tokens[first - 1];
       const volume = volumeToken && /^[123]$/.test(volumeToken) ? Number(volumeToken) : null;
-      const guess = closestBook(words.join(" "), CANON, volume);
+      // "Chapter" or "verse" said with the numbers: a reference is surely meant.
+      const marked = isChapterMark || tokens.slice(index, index + 3).includes("v");
+      const guess = closestBook(words.join(" "), CANON, volume, marked);
       if (guess && (!best || guess.score > best.score)) best = { ...guess, first };
     }
     if (best) accept(best.book, starts[best.first]!, 0, " " + tokens.slice(index).join(" "));
@@ -209,7 +225,17 @@ export type QuoteVerse = {
   normalized: string;
 };
 
-export type SpokenMatch = { item: BibleItem; text: string; hits: number };
+/**
+ * How a verse was found, and what spoke for it (voice/confidence.ts turns this into how sure to be).
+ * citation: a reference said aloud ("John chapter 3 verse 16"). phrase: a run of the verse's own
+ * words. quote: its telling words in order, with words between.
+ */
+export type MatchEvidence =
+  | { via: "citation"; cued: boolean; named: boolean; words: number }
+  | { via: "phrase"; run: number; telling: number; share: number; places: number; edge: boolean }
+  | { via: "quote"; hits: number; needle: number; span: number; gap: number };
+
+export type SpokenMatch = { item: BibleItem; text: string; hits: number; evidence?: MatchEvidence };
 
 function skeleton(word: string): string {
   return word.replace(/[aeiou]/g, "").replace(/(.)\1+/g, "$1");
@@ -418,7 +444,8 @@ function findQuote(needle: string[], index: QuoteIndex, translationId: string): 
   if (!best) return null;
   const clear = !runner || best.hits > runner.hits || best.span + 2 < runner.span;
   if (!clear) return null;
-  return { item: passageFor(best.verse, translationId), text: best.verse.text, hits: best.hits };
+  const evidence: MatchEvidence = { via: "quote", hits: best.hits, needle: needle.length, span: best.span, gap: runner ? best.hits - runner.hits : best.hits };
+  return { item: passageFor(best.verse, translationId), text: best.verse.text, hits: best.hits, evidence };
 }
 
 function hasStartVerse(spoken: ParsedReference | null): spoken is ParsedReference & { startVerse: number } {
@@ -432,8 +459,15 @@ function citationMatch(
 ): SpokenMatch {
   const book = CANON.find((entry) => entry.ord === spoken.bookOrd);
   const end = spoken.endVerse ?? spoken.startVerse;
-  const short = wordsOf(heard).length <= 10;
+  const words = wordsOf(heard).length;
+  const short = words <= 10;
+  // Said with its markers ("chapter", "verse"), and the book heard by one of its names rather than
+  // guessed from a sound-alike ("efficient" for Ephesians).
+  const lower = ` ${spellNumbers(normalizeOrdinals(heard.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()))} `;
+  const cued = /\b(chapters?|verses?)\b/.test(lower);
+  const named = spokenAliases().some((entry) => entry.book.ord === spoken.bookOrd && lower.includes(` ${entry.alias} `));
   return {
+    evidence: { via: "citation", cued, named, words },
     item: {
       translationId,
       bookOrd: spoken.bookOrd,
@@ -541,12 +575,36 @@ export function matchPhrase(heard: string, source: QuoteVerse[] | QuoteIndex, tr
   const share = best.length / tokens[first]!.length;
   if (!edge && ((best.length < 6 && share < 0.25) || (best.length < 8 && share < 0.15))) return null;
   const verse = index.catalog[first]!;
-  return { item: passageFor(verse, translationId), text: verse.text, hits: best.length };
+  const evidence: MatchEvidence = { via: "phrase", run: best.length, telling: tellingWords, share, places: places.size, edge };
+  return { item: passageFor(verse, translationId), text: verse.text, hits: best.length, evidence };
+}
+
+/** The last verse of each chapter in a catalog (book × 1000 + chapter). */
+const lastVerses = new WeakMap<QuoteIndex, Map<number, number>>();
+
+/** Whether a passage is in the Bible at all: a verse heard past the end of its chapter is a misheard number. Null when the catalog has no such chapter to say. */
+export function passageExists(source: QuoteVerse[] | QuoteIndex, item: Pick<BibleItem, "bookOrd" | "chapter" | "startVerse" | "endVerse">): boolean | null {
+  const index = asIndex(source);
+  if (!index.catalog.length) return null;
+  let map = lastVerses.get(index);
+  if (!map) {
+    map = new Map();
+    for (const verse of index.catalog) {
+      const key = verse.bookOrd * 1000 + verse.chapter;
+      if ((map.get(key) ?? 0) < verse.verse) map.set(key, verse.verse);
+    }
+    lastVerses.set(index, map);
+  }
+  const last = map.get(item.bookOrd * 1000 + item.chapter);
+  if (last === undefined) return map.size > 900 ? false : null;
+  return item.startVerse >= 1 && item.endVerse <= last;
 }
 
 export function matchSpoken(heard: string, source: QuoteVerse[] | QuoteIndex, translationId: string): SpokenMatch | null {
   const spoken = spokenReference(heard);
-  const citation = hasStartVerse(spoken) ? citationMatch(heard, spoken, translationId) : null;
+  const said = hasStartVerse(spoken) ? citationMatch(heard, spoken, translationId) : null;
+  // "John 3 verse 99": no such verse, so a number was misheard; whatever else was said may still be one.
+  const citation = said && passageExists(source, said.item) !== false ? said : null;
   if (citation && citation.hits >= 12) return citation;
   // A run of the verse's own words, small words included: what a preacher quotes most.
   const phrase = matchPhrase(heard, source, translationId);

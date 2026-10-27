@@ -236,6 +236,8 @@ import {
   type ParakeetModel,
 } from "../voice/listen";
 import { spokenReference } from "../voice/detect";
+import { LoadWatch } from "./load-watch.svelte";
+import type { LoadActionId } from "../domain/load-watch";
 import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicHeard } from "../voice/microphone";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
@@ -602,6 +604,8 @@ class Session {
       });
     // A part whose time is up moves on (Service settings); checked every few seconds.
     if (typeof window !== "undefined") this.every(5_000, () => void this.checkAdvance());
+    // How hard the computer is working, with an alert before it shows on the screen (desktop).
+    if (isDesktop()) this.every(5_000, () => void this.loadWatch.tick());
     const keepLive = this.live.revision > 0;
     const keepOutput = this.output.desired;
     try {
@@ -5733,6 +5737,42 @@ class Session {
 
   /** Readiness, Performance and the support file (service-checks.svelte.ts). */
   private checks = new ServiceChecks(this, () => this.desktop());
+
+  /** The computer's processors and memory, watched while the app runs (app/load-watch.svelte.ts). */
+  loadWatch = new LoadWatch({
+    read: () => (isDesktop() ? invoke<Omit<import("../domain/load-watch").LoadSample, "at">>("system_load").catch(() => null) : Promise.resolve(null)),
+    context: () => {
+      const engine = this.workspace.voice.engine ?? "system";
+      const program = this.live.program.model;
+      return {
+        showing: this.output.online && program.layout !== "empty",
+        listening: this.voice.status === "listening",
+        heavyListening: engine === "accurate" || engine === "parakeet",
+        movingBackgrounds: this.workspace.appearance.calm !== true && (this.theme().background.type === "motion" || this.theme().background.type === "video" || !!program.backgroundVideoUrl),
+      };
+    },
+    show: (alert, run) =>
+      this.notify(t(alert.title, alert.values), {
+        detail: t(alert.detail, alert.values),
+        actions: alert.actions.map((action) => ({ label: t(action.label), run: () => run(action.id) })),
+        ms: alert.level === "critical" ? 30_000 : 20_000,
+        tone: "warn",
+      }),
+    act: (action: LoadActionId) => void this.loadAction(action),
+    log: (line) => void invoke("log_note", { line }).catch(() => {}),
+  });
+
+  private loadAction = async (action: LoadActionId) => {
+    if (action === "lighter-listening") await this.setVoiceEngine("system");
+    else if (action === "stop-listening") this.stopVoice();
+    else if (action === "calm-backgrounds") this.setCalmBackgrounds(true);
+    else if (action === "open-monitor") await invoke("open_system_monitor").catch((error) => this.warn(String(error)));
+    else if (action === "settings") this.openSettings("performance");
+    else if (action === "restart") {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    }
+  };
 
   checkReady = () => this.checks.ready();
 

@@ -87,7 +87,11 @@ export type BookGuess = { book: CanonBook; score: number };
  * The closest book to some heard or typed words, or null when nothing is close enough.
  * `volume` is a number said before the name (1, 2 or 3), if any.
  */
-export function closestBook(words: string, books: CanonBook[], volume: number | null = null): BookGuess | null {
+/**
+ * `marked`: "chapter" or "verse" was said right after, so a reference is surely meant and a slightly
+ * looser sound-alike is taken ("efficient two verse eight" is Ephesians 2:8).
+ */
+export function closestBook(words: string, books: CanonBook[], volume: number | null = null, marked = false): BookGuess | null {
   let best: BookGuess | null = null;
   for (const book of books) {
     const { base, volume: bookVolume } = baseName(book);
@@ -96,7 +100,7 @@ export function closestBook(words: string, books: CanonBook[], volume: number | 
     const names = [base, ...book.aliases.filter((alias) => alias.length >= 4 && !/^\d|^i+ /.test(alias))];
     const score = Math.max(...names.map((name) => nameScore(words, name)));
     // Short names (Job, Joel, Amos, Mark) need a near-exact hit; one wrong letter is a different word.
-    const needed = soundKey(base).length <= 4 ? 0.75 : 0.66;
+    const needed = (soundKey(base).length <= 4 ? 0.75 : 0.66) - (marked ? 0.06 : 0);
     if (score < needed) continue;
     // With no volume said, "corinthians" means 1 Corinthians: prefer the first volume on a tie.
     const better = !best || score > best.score + 0.001 || (Math.abs(score - best.score) <= 0.001 && (bookVolume ?? 0) < (baseName(best.book).volume ?? 0));

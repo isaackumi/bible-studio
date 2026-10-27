@@ -954,6 +954,30 @@ fn listen_choose_input(name: Option<String>) {
     let _ = name;
 }
 
+/// How hard the computer is working now (processors and memory), for the load watch.
+#[tauri::command(async)]
+fn system_load() -> diagnostics::Load {
+    diagnostics::load()
+}
+
+/// A line from the desk for the app's log (what the computer went through, for a support file).
+#[tauri::command]
+fn log_note(line: String) {
+    log::info!("desk: {}", line.chars().filter(|c| !c.is_control()).take(400).collect::<String>());
+}
+
+/// The computer's own task manager (Task Manager, Activity Monitor), from a load alert.
+#[tauri::command]
+fn open_system_monitor() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("taskmgr.exe").spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").args(["-a", "Activity Monitor"]).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let result = std::process::Command::new("gnome-system-monitor").spawn();
+    result.map(|_| ()).map_err(|error| format!("Could not open the task manager. {error}"))
+}
+
 /// Kinds of file the app exports: what Save may write (never a program, wherever it is chosen).
 const SAVE_KINDS: &[&str] = &["txt", "csv", "json", "html", "xml", "zip"];
 
@@ -1194,6 +1218,9 @@ pub fn run() {
         .invoke_handler({
             let handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
             save_file,
+            system_load,
+            log_note,
+            open_system_monitor,
             entitlement::entitlement_status,
             entitlement::entitlement_set,
             entitlement::entitlement_note_time,

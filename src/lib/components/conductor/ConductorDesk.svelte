@@ -5,6 +5,7 @@
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { CANON, formatReference, parseReference } from "../../bible/reference";
   import { buildQuoteIndex, chooseHeard, searchQuotes, type QuoteIndex } from "../../voice/detect";
+  import { rateMatch } from "../../voice/confidence";
   import { searchSongHits, type SongHit } from "../../domain/song-search";
   import type { BibleItem, PresentationModel } from "../../domain/types";
   import { t } from "../../i18n/core";
@@ -184,12 +185,19 @@
     if (!text) return;
     if (final) lastHeard = text;
     if (!listenIndex) return;
-    const match = chooseHeard(alternatives.length ? alternatives : [text], listenIndex, translationId);
+    const phrases = alternatives.length ? alternatives : [text];
+    const match = chooseHeard(phrases, listenIndex, translationId);
     if (!match) return;
     const passage = { ...match.item, translationId };
+    // Too doubtful to move Next: said, not shown. Only a sure find may go live by itself.
+    const rated = rateMatch(match, { phrases, index: listenIndex });
+    if (rated.tier === "maybe") {
+      if (final && match.item.reference !== lastFound) session.voice.message = t("Did you mean {reference}? Next did not change.", { reference: match.item.reference });
+      return;
+    }
     // The finished phrase may let Autopilot show a verse found while it was still being said. It
     // puts the verse on Next itself, so the desk does not load it again (the later load would win).
-    if (final && pilot.on && pilot.verses && (await pilot.verse(passage, text, final))) {
+    if (final && pilot.on && pilot.verses && (await pilot.verse(passage, text, final, rated.tier === "sure"))) {
       lastFound = match.item.reference;
       return;
     }

@@ -247,6 +247,49 @@ pub fn memory() -> Memory {
     Memory { total: system.total_memory(), available: system.available_memory(), app }
 }
 
+/// How hard the computer is working, read every few seconds by the desk (domain/load-watch.ts).
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Load {
+    /// The whole computer's processors, 0 to 100.
+    pub cpu: f32,
+    /// This app and the processes it started, as a share of the whole computer, 0 to 100.
+    pub app_cpu: f32,
+    pub memory_total: u64,
+    pub memory_available: u64,
+    pub app_memory: u64,
+    pub cores: usize,
+}
+
+/// One reader kept between calls: processor use is the change since the last reading, so the
+/// first answer after launch reads 0 and the next ones are true.
+static LOAD: std::sync::Mutex<Option<sysinfo::System>> = std::sync::Mutex::new(None);
+
+pub fn load() -> Load {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut guard = LOAD.lock().unwrap_or_else(|poison| poison.into_inner());
+    let system = guard.get_or_insert_with(System::new);
+    system.refresh_cpu_usage();
+    system.refresh_memory();
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_memory().with_cpu());
+    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).max(1);
+    let me = sysinfo::get_current_pid().ok();
+    let (app_cpu, app_memory) = system
+        .processes()
+        .values()
+        .filter(|process| Some(process.pid()) == me || (me.is_some() && process.parent() == me))
+        .fold((0.0f32, 0u64), |(cpu, memory), process| (cpu + process.cpu_usage(), memory + process.memory()));
+    Load {
+        cpu: system.global_cpu_usage().clamp(0.0, 100.0),
+        // sysinfo counts a process's use per processor (a busy process on 4 cores reads 400).
+        app_cpu: (app_cpu / cores as f32).clamp(0.0, 100.0),
+        memory_total: system.total_memory(),
+        memory_available: system.available_memory(),
+        app_memory,
+        cores,
+    }
+}
+
 pub fn uptime_secs() -> u64 {
     started().elapsed().as_secs()
 }
@@ -340,6 +383,15 @@ mod tests {
         let log = "[100] HANG Not responding for 9s while importing a video (began 2.0s ago); last command import_media (2.1s ago); 40s after launch; macos 0.4.1\n[50] HANG Not responding for 12s while starting; last command none yet; 8s after launch; windows 0.4.0\n[120] panic at somewhere\n";
         assert_eq!(hangs_since(log, 60), vec![Hang { at: 100, seconds: 9, during: "importing a video (began 2.0s ago)".into() }]);
         assert_eq!(hangs_since(log, 0).len(), 2);
+    }
+
+    #[test]
+    fn reads_how_hard_the_computer_works() {
+        let _ = load();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        let load = load();
+        assert!((0.0..=100.0).contains(&load.cpu) && (0.0..=100.0).contains(&load.app_cpu));
+        assert!(load.memory_total > 0 && load.memory_available <= load.memory_total && load.app_memory > 0 && load.cores >= 1);
     }
 
     #[test]

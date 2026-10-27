@@ -775,6 +775,8 @@ export type SearchHit = {
   text: string;
   /** Named by the church's AI from what the preacher described: worth a look before using. */
   ai?: boolean;
+  /** Found by listening: how sure (voice/confidence.ts); missing when found by Find or sure. */
+  confidence?: "likely" | "maybe";
 };
 
 export type DisplayInfo = {

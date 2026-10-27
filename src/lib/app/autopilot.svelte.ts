@@ -93,9 +93,9 @@ export class Autopilot {
     }
   };
 
-  /** A verse found by listening (the desk put it on Next). True when Autopilot showed it. */
-  verse = async (passage: BibleItem, text: string, final: boolean): Promise<boolean> => {
-    if (!this.on || !this.verses || this.moving) return false;
+  /** A verse found by listening (the desk put it on Next). True when Autopilot showed it. `sure`: listening is sure of it (voice/confidence.ts); a likely find waits on Next for the operator. */
+  verse = async (passage: BibleItem, text: string, final: boolean, sure = true): Promise<boolean> => {
+    if (!this.on || !this.verses || this.moving || !sure) return false;
     const now = Date.now();
     this.watch(now);
     const said = spokenReference(text);

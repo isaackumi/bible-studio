@@ -31,6 +31,7 @@
   import { bundledQuoteCatalog } from "../../bible/texts";
   import { isOnlineTranslation, WORDS_TRANSLATION } from "../../bible/online-bibles";
   import { buildQuoteIndex, chooseHeard, detectVerse, searchQuotes, type QuoteIndex } from "../../voice/detect";
+  import { rateMatch } from "../../voice/confidence";
   import DeskSwitcher from "../DeskSwitcher.svelte";
   import Icon from "../Icon.svelte";
   import FavoriteStar from "../FavoriteStar.svelte";
@@ -666,7 +667,16 @@
       if (final) askAiForVerse(text);
       return;
     }
-    takeHeard(match.item, match.text);
+    // How sure: a doubtful find waits under Detections and leaves Preview as it is.
+    const rated = quoted && words ? rateMatch(quoted, { phrases, index: words }) : null;
+    if (rated?.tier === "maybe") {
+      if (match.item.reference !== lastSpokenRef) {
+        noteHeard(match.item, match.text, false, "maybe");
+        session.voice.message = t("Did you mean {reference}? It is under Detections; Preview did not change.", { reference: match.item.reference });
+      }
+      return;
+    }
+    takeHeard(match.item, match.text, false, rated?.tier === "likely" ? "likely" : undefined);
   }
 
   /** The last finished phrases, so the AI hears a whole thought rather than a fragment. */
@@ -706,19 +716,19 @@
   }
 
   /** A verse heard (or named by the AI) goes to the top of Detections. */
-  function noteHeard(hit: BibleItem, text: string, ai = false) {
+  function noteHeard(hit: BibleItem, text: string, ai = false, confidence?: "likely" | "maybe") {
     const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
     // A verse heard again moves to the top instead of being listed twice (a repeated key stops the
     // list from drawing).
     const again = (entry: SearchHit) => entry.bookOrd === hit.bookOrd && entry.chapter === hit.chapter && entry.verse === hit.startVerse;
     detections = [
-      { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text, ...(ai ? { ai: true } : {}) },
+      { bookOrd: hit.bookOrd, bookName: named, chapter: hit.chapter, verse: hit.startVerse, text, ...(ai ? { ai: true } : {}), ...(confidence ? { confidence } : {}) },
       ...detections.filter((entry) => !again(entry)),
     ].slice(0, 12);
   }
 
   /** A verse heard: listed, and staged on Preview (or offered beside it on the Service page). */
-  function takeHeard(hit: BibleItem, text: string, ai = false) {
+  function takeHeard(hit: BibleItem, text: string, ai = false, confidence?: "likely") {
     if (hit.reference === lastSpokenRef) return;
     lastSpokenRef = hit.reference;
     takenCount++;
@@ -731,7 +741,7 @@
     }
     anchor = hit.startVerse;
     session.voice.message = ai ? t("{reference} (found by the AI) is on Preview. LIVE still sends Program.", { reference: hit.reference }) : `${hit.reference} is on Preview. LIVE still sends Program.`;
-    noteHeard(hit, text, ai);
+    noteHeard(hit, text, ai, confidence);
     // A pending arrow-key Take must never carry a spoken verse to Program.
     takeAfterPreview = false;
     // On the Service page the running order keeps Preview: the verse heard is offered beside it.
@@ -1079,7 +1089,7 @@
               <div class="pb-body detections">
                 {#each detections as hit (`${hit.bookOrd}-${hit.chapter}-${hit.verse}`)}
                   <button type="button" onclick={() => openHit(hit)}>
-                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}</strong>
+                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}{#if hit.confidence}<em class="sure-tag" data-confidence={hit.confidence} title={hit.confidence === "maybe" ? t("Not sure this is what was meant: check it before showing it") : t("Probably what was meant: glance at it before LIVE")}>{hit.confidence === "maybe" ? t("Check") : t("Likely")}</em>{/if}</strong>
                     <span>{hit.text}</span>
                   </button>
                 {:else}
@@ -1632,6 +1642,8 @@
   .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
+  .sure-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+  .sure-tag[data-confidence="maybe"] { background: color-mix(in srgb, #f5a524 20%, transparent); color: var(--warn-text, #f5a524); }
   .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
