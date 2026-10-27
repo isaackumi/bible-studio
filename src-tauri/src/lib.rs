@@ -122,6 +122,66 @@ fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
     Ok(entries)
 }
 
+/// A picture's small copy for the Pictures grid, made once and kept in the app's thumbs folder
+/// (named by the picture's path, size and change time, so a changed picture gets a new one). The
+/// grid then loads a few kilobytes per tile, not a phone photo of several megabytes each.
+#[tauri::command(async)]
+async fn picture_thumb(app: AppHandle, path: String) -> Result<String, String> {
+    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("thumbs");
+    tauri::async_runtime::spawn_blocking(move || make_thumb(&dir, std::path::Path::new(&path)))
+        .await
+        .map_err(|error| error.to_string())?
+        .map(|thumb| thumb.to_string_lossy().to_string())
+}
+
+/// Thumbnails kept at most; past it, the oldest go.
+const THUMBS_KEPT: usize = 3000;
+const THUMB_SIZE: u32 = 360;
+
+fn make_thumb(dir: &std::path::Path, source: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    use std::hash::{Hash, Hasher};
+    let meta = std::fs::metadata(source).map_err(|error| format!("That picture could not be read. {error}"))?;
+    if meta.len() > 200 * 1024 * 1024 {
+        return Err("That picture is too large for a thumbnail.".into());
+    }
+    let changed = meta.modified().ok().and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok()).map(|at| at.as_millis()).unwrap_or(0);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (source, meta.len(), changed).hash(&mut hasher);
+    let thumb = dir.join(format!("{:016x}.jpg", hasher.finish()));
+    if thumb.exists() {
+        return Ok(thumb);
+    }
+    std::fs::create_dir_all(dir).map_err(|error| error.to_string())?;
+    let picture = image::ImageReader::open(source)
+        .and_then(|reader| reader.with_guessed_format())
+        .map_err(|error| format!("That picture could not be read. {error}"))?
+        .decode()
+        .map_err(|error| format!("That picture could not be read. {error}"))?;
+    // JPEG has no transparency: flatten onto white, as the grid shows it.
+    let small = image::DynamicImage::ImageRgb8(picture.thumbnail(THUMB_SIZE, THUMB_SIZE).to_rgb8());
+    let partial = thumb.with_extension("part");
+    small.save_with_format(&partial, image::ImageFormat::Jpeg).map_err(|error| error.to_string())?;
+    std::fs::rename(&partial, &thumb).map_err(|error| error.to_string())?;
+    prune_thumbs(dir);
+    Ok(thumb)
+}
+
+/// Past THUMBS_KEPT, the least recently made go (a few hundred at a time).
+fn prune_thumbs(dir: &std::path::Path) {
+    let Ok(read) = std::fs::read_dir(dir) else { return };
+    let mut all: Vec<(std::time::SystemTime, std::path::PathBuf)> = read
+        .flatten()
+        .filter_map(|entry| Some((entry.metadata().ok()?.modified().ok()?, entry.path())))
+        .collect();
+    if all.len() <= THUMBS_KEPT {
+        return;
+    }
+    all.sort();
+    for (_, path) in all.iter().take(all.len() - THUMBS_KEPT + 300) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 /// Where pictures usually are on this computer: Pictures, Desktop, and synced cloud drives.
 #[tauri::command(async)]
 fn picture_places(app: AppHandle) -> Vec<places::Place> {
@@ -1235,6 +1295,7 @@ pub fn run() {
             startup_notice,
             signin_listen,
             picture_folder,
+            picture_thumb,
             picture_places,
             pco_get,
             easyworship_songs,
@@ -1434,6 +1495,25 @@ mod vmix_tests {
         std::fs::create_dir_all(dir.join("Easter").join("Sunrise")).unwrap();
         let easter = super::list_pictures(&dir).unwrap().into_iter().find(|entry| entry.kind == "folder").unwrap();
         assert_eq!((easter.items, easter.folders), (2, 1));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn makes_a_small_copy_once_and_again_when_the_picture_changes() {
+        let dir = std::env::temp_dir().join(format!("church-studio-thumbs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("big.png");
+        image::RgbImage::from_pixel(1600, 900, image::Rgb([200, 30, 30])).save(&source).unwrap();
+        let thumbs = dir.join("thumbs");
+        let first = super::make_thumb(&thumbs, &source).unwrap();
+        let small = image::open(&first).unwrap();
+        assert_eq!((small.width(), small.height()), (360, 203));
+        assert_eq!(super::make_thumb(&thumbs, &source).unwrap(), first, "kept, not made again");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        image::RgbImage::from_pixel(800, 800, image::Rgb([0, 0, 0])).save(&source).unwrap();
+        assert_ne!(super::make_thumb(&thumbs, &source).unwrap(), first, "a changed picture gets a new one");
+        assert!(super::make_thumb(&thumbs, &dir.join("missing.jpg")).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

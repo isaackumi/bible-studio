@@ -149,6 +149,7 @@ import { secondOutputModel, type SecondOutputSettings } from "../domain/second-o
 import { clockLabel, DEFAULT_START, minutesOfDay, parseClock, planSchedule, readSavedStarts, sectionDeadline, sectionTiming, shiftSchedule } from "../domain/schedule";
 import { serviceFromTemplate, serviceNameFor, templateFromService, type ServiceTemplate } from "../domain/service-templates";
 import { draftService, type ServiceDraft } from "../domain/service-draft";
+import { withItemDetails, type ItemDetails } from "../domain/item-details";
 import { addHeard, captionRows, emptyCaptions, linesFor, withTranslation, CAPTION_LANGUAGES, type CaptionSettings } from "../domain/captions";
 import { parseTranslations, translateRequest } from "../ai/translate";
 import { clearGoneLive, goneLiveKey, pinGoneLive, recordGoneLive, removeGoneLive } from "../domain/gone-live";
@@ -6028,6 +6029,16 @@ class Session {
     const item: PresentationItem = { id: uid(), kind: "image", title, image: { assetId } };
     this.insertItem(target, item);
     void this.selectItem(item.id);
+  };
+
+  /** Who brings an item, how long it takes, and the desk's notes on it. Preview and Program do not change. */
+  setItemDetails = (itemId: string, details: ItemDetails) => {
+    if (!this.service) return;
+    this.service = {
+      ...this.service,
+      sections: this.service.sections.map((section) => ({ ...section, items: section.items.map((entry) => (entry.id === itemId ? withItemDetails(entry, details) : entry)) })),
+    };
+    this.persistSoon();
   };
 
   updateItem = (item: PresentationItem) => {

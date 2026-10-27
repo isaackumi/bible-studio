@@ -34,6 +34,8 @@ fs4 = "1"
 # Nearby (nearby.rs): finding the other computers on this network and licence, over Bonjour (mDNS).
 mdns-sd = "0.21"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+# Pictures' thumbnails (lib.rs picture_thumb): decoding only the formats Pictures shows.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

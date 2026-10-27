@@ -38,6 +38,44 @@ export function crumbsOf(path: string, keep = 4): Array<{ name: string; path: st
 }
 
 const PINNED_KEY = "church-studio:picture-folders";
+const FAVORITES_KEY = "church-studio:picture-favorites";
+/** Starred pictures kept at most (from any folder). */
+const MOST_FAVORITES = 300;
+/** The Favourites place: not a folder on disk, the starred pictures from every folder. */
+export const FAVORITES = "::favorites";
+
+/** A picture's small copy for the grid (made and kept by the desktop core), four at a time. */
+const thumbs = new Map<string, Promise<string>>();
+const waiting: Array<() => void> = [];
+let making = 0;
+export function thumbFor(path: string): Promise<string> {
+  const known = thumbs.get(path);
+  if (known) return known;
+  const made = new Promise<string>((resolve, reject) => {
+    const run = () => {
+      making += 1;
+      invoke<string>("picture_thumb", { path })
+        .then((thumb) => resolve(convertFileSrc(thumb)), reject)
+        .finally(() => {
+          making -= 1;
+          waiting.shift()?.();
+        });
+    };
+    if (making < 4) run();
+    else waiting.push(run);
+  });
+  // A picture that would not shrink (an odd file) shows itself instead, next time too.
+  made.catch(() => thumbs.set(path, Promise.resolve(convertFileSrc(path))));
+  thumbs.set(path, made);
+  return made;
+}
+
+/** Pictures whose names hold every word typed, in any order ("easter 2024" finds "2024 Easter Sunday 3"). */
+export function matchesQuery(name: string, query: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const plain = name.toLowerCase().replace(/[_\-.]+/g, " ");
+  return words.every((word) => plain.includes(word));
+}
 /** The playlist the slideshow keeps for its own music. */
 const MUSIC_KEY = "church-studio:slideshow-playlist";
 const OPTIONS_KEY = "church-studio:slideshow";
@@ -76,6 +114,10 @@ class Pictures {
   folder = $state<string | null>(null);
   entries = $state<FolderEntry[]>([]);
   pinned = $state<string[]>(typeof localStorage === "undefined" ? [] : read<string[]>(PINNED_KEY, []));
+  /** Starred pictures and videos, from any folder (kept on this computer). */
+  favorites = $state<FolderEntry[]>(typeof localStorage === "undefined" ? [] : read<FolderEntry[]>(FAVORITES_KEY, []));
+  /** Words to find pictures by name in the folder shown. */
+  query = $state("");
   places = $state<Place[]>([]);
   error = $state("");
   loading = $state(false);
@@ -120,7 +162,25 @@ class Pictures {
     if (typeof picked === "string") await this.openFolder(picked);
   };
 
+  /** The starred pictures, as if they were one folder (they stay where they are). */
+  openFavorites = () => {
+    this.entries = [...this.favorites];
+    this.folder = FAVORITES;
+    this.current = -1;
+    this.query = "";
+  };
+
+  isFavorite = (path: string) => this.favorites.some((entry) => entry.path === path);
+
+  toggleFavorite = (entry: FolderEntry) => {
+    this.favorites = this.isFavorite(entry.path) ? this.favorites.filter((item) => item.path !== entry.path) : [entry, ...this.favorites].slice(0, MOST_FAVORITES);
+    write(FAVORITES_KEY, this.favorites);
+    // Unstarred while Favourites is open: it leaves the list.
+    if (this.folder === FAVORITES) this.entries = [...this.favorites];
+  };
+
   openFolder = async (path: string) => {
+    if (path === FAVORITES) return this.openFavorites();
     this.loading = true;
     this.error = "";
     try {
@@ -128,6 +188,7 @@ class Pictures {
       this.entries = entries.sort((a, b) => (a.kind === b.kind ? byName.compare(a.name, b.name) : a.kind === "folder" ? -1 : 1));
       this.folder = path;
       this.current = -1;
+      this.query = "";
       write(LAST_KEY, path);
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
@@ -137,12 +198,12 @@ class Pictures {
   };
 
   up = () => {
-    const parent = this.folder ? parentOf(this.folder) : null;
+    const parent = this.folder && this.folder !== FAVORITES ? parentOf(this.folder) : null;
     if (parent) void this.openFolder(parent);
   };
 
   togglePin = (path = this.folder) => {
-    if (!path) return;
+    if (!path || path === FAVORITES) return;
     this.pinned = this.pinned.includes(path) ? this.pinned.filter((entry) => entry !== path) : [path, ...this.pinned].slice(0, MOST_PINNED);
     write(PINNED_KEY, this.pinned);
   };
@@ -233,7 +294,7 @@ class Pictures {
 
   /** Pictures added to the folder while it runs (someone filling a shared Drive folder) join the end. */
   private pickUpNew = async () => {
-    if (!this.folder || !this.slideshow.running) return;
+    if (!this.folder || this.folder === FAVORITES || !this.slideshow.running) return;
     const folder = this.folder;
     const before = new Set(this.images.map((entry) => entry.path));
     const shownPath = this.images[this.current]?.path;

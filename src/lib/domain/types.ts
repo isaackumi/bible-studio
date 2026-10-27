@@ -283,6 +283,12 @@ export type PresentationItem = {
   /** Text styling for slide and announcement items. */
   style?: TextStyle;
   composition?: { compositionId: string };
+  /** Who it is by or who brings it ("Ama", "The choir"): on the desk, never on the screen. */
+  owner?: string;
+  /** How long it takes, in minutes (a part's own time is kept on the part). */
+  minutes?: number;
+  /** Notes for the desk only ("mention the youth camp"), never on the screen. */
+  notes?: string;
 };
 
 export type ServiceSection = {

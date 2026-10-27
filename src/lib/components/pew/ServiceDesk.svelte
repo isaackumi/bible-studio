@@ -81,6 +81,8 @@
   /** The templates window, opened on a template (or the first). */
   let templatesOpen = $state<{ id: string | null } | null>(null);
   let pasteOpen = $state(false);
+  /** The item whose who, how long and notes are open below it. */
+  let detailsOpen = $state<string | null>(null);
   /** A service whose delete button was pressed once (press again to delete). */
   let armedService = $state<string | null>(null);
   let outlineOpen = $state(false);
@@ -672,6 +674,9 @@
                       {:else}
                         <em>{detail(item)}</em>
                       {/if}
+                      {#if item.owner || item.minutes || item.notes}
+                        <span class="item-details">{[item.owner, item.minutes ? t("{n} min", { n: item.minutes }) : "", item.notes].filter(Boolean).join(" · ")}</span>
+                      {/if}
                       {#if hint(item)}<span class="next-hint">{hint(item)}</span>{/if}
                     </span>
                     {#if live(item)}<span class="badge live-badge"><i aria-hidden="true"></i>{t("LIVE")}</span>{:else if session.cursor.itemId === item.id}<span class="badge preview-badge">{t("Preview")}</span>{/if}
@@ -703,9 +708,17 @@
                         <Icon name="refresh" size={12} /> {looping ? t("Stop loop") : t("Loop")}
                       </button>
                     {/if}
+                    <button type="button" class="row-tool" class:on={detailsOpen === item.id} aria-expanded={detailsOpen === item.id} aria-label={t("Who, how long and notes for {title}", { title: item.title })} title={t("Who brings it, how long, and notes for the desk")} onclick={() => (detailsOpen = detailsOpen === item.id ? null : item.id)}><Icon name="note" size={13} /></button>
                     <button type="button" class="row-tool" aria-label={t("Edit {title}", { title: item.title })} title={t("Edit")} onclick={() => edit(item.id)}><Icon name="pencil" size={13} /></button>
                     <button type="button" class="row-tool del" aria-label={t("Remove {title}", { title: item.title })} title={t("Remove from the service (Undo comes up)")} onclick={() => session.deleteItem(item.id)}><Icon name="trash" size={14} /></button>
                   </span>
+                  {#if detailsOpen === item.id}
+                    <div class="item-edit" role="group" aria-label={t("Who, how long and notes for {title}", { title: item.title })}>
+                      <input aria-label={t("Who brings it")} placeholder={t("Who brings it")} maxlength="80" value={item.owner ?? ""} onchange={(event) => session.setItemDetails(item.id, { owner: event.currentTarget.value })} />
+                      <input type="number" min="0" max="240" aria-label={t("Minutes")} placeholder={t("Min")} value={item.minutes ?? ""} onchange={(event) => session.setItemDetails(item.id, { minutes: event.currentTarget.value ? Number(event.currentTarget.value) : null })} />
+                      <textarea rows="2" aria-label={t("Notes for the desk")} placeholder={t("Notes for the desk (never on the screen)")} maxlength="2000" value={item.notes ?? ""} onchange={(event) => session.setItemDetails(item.id, { notes: event.currentTarget.value })}></textarea>
+                    </div>
+                  {/if}
                 </li>
               {/each}
             </ol>
@@ -968,7 +981,7 @@
   .item .row-tool.del { opacity: 0.4; }
   .item:hover .row-tool, .item:focus-within .row-tool, .item.on .row-tool, .item.live .row-tool { opacity: 1; }
   @media (hover: none) { .item .row-tool { opacity: 1; } }
-  .item { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; }
+  .item { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 8px; }
   .item:hover { background: var(--field); }
   .item.on { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); box-shadow: inset 4px 0 0 var(--accent); }
   .item.live { border-color: color-mix(in srgb, var(--live, #e5484d) 55%, transparent); background: color-mix(in srgb, var(--live, #e5484d) 11%, var(--panel)); box-shadow: inset 4px 0 0 var(--live, #e5484d); }
@@ -979,6 +992,10 @@
   .item-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mini-map { display: flex; gap: 2px; overflow: hidden; }
   .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 10px; font-weight: 700; line-height: 15px; }
+  .item-details { font-size: 11px; color: var(--ink); opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item-edit { flex: 1 0 100%; display: grid; grid-template-columns: minmax(0, 1fr) 70px; gap: 6px; padding: 6px 8px 8px 36px; }
+  .item-edit textarea { grid-column: 1 / -1; resize: vertical; }
+  .item-edit input, .item-edit textarea { min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 750; }
   .live-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--live); color: #fff; letter-spacing: 0.04em; }

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { crumbsOf, folderColor, folderName, pictures, type Place } from "../../app/pictures.svelte";
+  import { crumbsOf, FAVORITES, folderColor, folderName, matchesQuery, pictures, thumbFor, type Place } from "../../app/pictures.svelte";
+  import { releaseVideo } from "../../display/stream";
   import { isDesktop } from "../../platform/runtime";
   import { msg, t, tn } from "../../i18n/core";
   import type { SlideTransition } from "../../domain/slideshow";
@@ -11,13 +12,17 @@
   // slideshow that runs on its own until the operator takes over.
   const selected = $derived(pictures.images[pictures.current] ?? null);
   const videos = $derived(pictures.images.filter((entry) => entry.kind === "video").length);
-  const crumbs = $derived(pictures.folder ? crumbsOf(pictures.folder) : []);
+  const favoritesOpen = $derived(pictures.folder === FAVORITES);
+  const crumbs = $derived(pictures.folder && !favoritesOpen ? crumbsOf(pictures.folder) : []);
+  const folderLabel = $derived(favoritesOpen ? t("Favourites") : pictures.folder ? folderName(pictures.folder) : "");
+  /** What the grid shows: every picture, or those whose names hold the words typed. */
+  const shownImages = $derived(pictures.query.trim() ? pictures.images.filter((entry) => matchesQuery(entry.name, pictures.query)) : pictures.images);
   const parent = $derived(crumbs.length > 1 ? crumbs[crumbs.length - 2]! : null);
   // Folders with no pictures and no folders inside are kept out of the way, a click from showing.
   let showEmpty = $state(false);
   const isEmpty = (entry: { items: number; folders?: number }) => !entry.items && !entry.folders;
   const emptyFolders = $derived(pictures.folders.filter(isEmpty).length);
-  const shownFolders = $derived(showEmpty ? pictures.folders : pictures.folders.filter((entry) => !isEmpty(entry)));
+  const shownFolders = $derived((showEmpty ? pictures.folders : pictures.folders.filter((entry) => !isEmpty(entry))).filter((entry) => !pictures.query.trim() || matchesQuery(entry.name, pictures.query)));
   const show = $derived(pictures.slideshow);
   const playlists = $derived(session.workspace.playlists.filter((list) => list.trackIds.length));
   /** The songs the slideshow will play (its playlist's, in order). */
@@ -104,7 +109,30 @@
       }
     });
     observer.observe(node);
-    return { destroy: () => observer.disconnect() };
+    // The tile gone (another folder, a search): its decoder goes with it (WebKit allows only so many).
+    return {
+      destroy: () => {
+        observer.disconnect();
+        releaseVideo(node);
+      },
+    };
+  }
+
+  /** A picture's small copy, asked for only when its tile scrolls into view. */
+  function thumb(node: HTMLImageElement, path: string) {
+    let gone = false;
+    const observer = new IntersectionObserver((seen) => {
+      if (!seen.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      void thumbFor(path).then((src) => !gone && (node.src = src)).catch(() => !gone && (node.src = pictures.url({ path } as never)));
+    }, { rootMargin: "200px" });
+    observer.observe(node);
+    return {
+      destroy: () => {
+        gone = true;
+        observer.disconnect();
+      },
+    };
   }
 
   function onkeydown(event: KeyboardEvent) {
@@ -144,14 +172,15 @@
         <button type="button" class="icon-btn up" disabled={!parent} aria-label={parent ? t("Up to {folder}", { folder: parent.name }) : t("Up")} data-tip={parent ? t("Up to {folder}", { folder: parent.name }) : undefined} onclick={() => parent && pictures.openFolder(parent.path)}><Icon name="chevron-left" size={16} /></button>
         <span class="loc-icon" style:color={folderColor(folderName(pictures.folder))}><Icon name="folder-open" size={20} /></span>
         <div class="loc-text">
-          <strong title={pictures.folder}>{folderName(pictures.folder)}</strong>
+          <strong title={favoritesOpen ? undefined : pictures.folder}>{folderLabel}</strong>
           {#if crumbs.length > 1}
             <nav class="loc-path" aria-label={t("Folder path")}>
               {#each crumbs.slice(0, -1) as crumb, index (crumb.path)}{#if index}<span aria-hidden="true">›</span>{/if}<button type="button" title={crumb.path} onclick={() => pictures.openFolder(crumb.path)}>{crumb.name}</button>{/each}
             </nav>
           {/if}
         </div>
-        <button type="button" class="icon-btn pin" class:on={pinned} aria-pressed={pinned} aria-label={pinned ? t("Unpin this folder") : t("Pin this folder")} data-tip={pinned ? t("Unpin this folder") : t("Pin this folder to Go to")} onclick={() => pictures.togglePin()}><Icon name="star" size={16} /></button>
+        <input class="find" type="search" aria-label={t("Find pictures by name")} placeholder={t("Find by name")} bind:value={pictures.query} />
+        {#if !favoritesOpen}<button type="button" class="icon-btn pin" class:on={pinned} aria-pressed={pinned} aria-label={pinned ? t("Unpin this folder") : t("Pin this folder")} data-tip={pinned ? t("Unpin this folder") : t("Pin this folder to Go to")} onclick={() => pictures.togglePin()}><Icon name="star" size={16} /></button>{/if}
         <button type="button" class="btn open" onclick={() => pictures.choose()}><Icon name="folder" size={14} /> {t("Open…")}</button>
       </div>
     {:else}
@@ -162,9 +191,14 @@
       </div>
     {/if}
     <!-- Go to: the usual places (synced cloud drives included) and pinned folders, on one line. -->
-    {#if pictures.places.length || pictures.pinned.length}
+    {#if pictures.places.length || pictures.pinned.length || pictures.favorites.length}
       <div class="places" role="group" aria-label={t("Go to")}>
         <span class="places-label">{t("Go to")}</span>
+        {#if pictures.favorites.length}
+          <button type="button" class="place" class:on={favoritesOpen} onclick={() => pictures.openFavorites()}>
+            <i style:background="#f5a524"><Icon name="star" size={11} /></i>{t("Favourites")}
+          </button>
+        {/if}
         {#each pictures.places as place (place.path)}
           <button type="button" class="place" class:on={pictures.folder === place.path} title={place.path} onclick={() => pictures.openFolder(place.path)}>
             <i style:background={PLACE_COLORS[place.kind]}><Icon name={place.kind === "desktop" ? "laptop" : place.kind === "pictures" ? "media" : "globe"} size={11} /></i>{place.kind === "pictures" ? t("Pictures") : place.kind === "desktop" ? t("Desktop") : place.name}
@@ -196,21 +230,28 @@
       {#if emptyFolders}
         <button type="button" class="link-btn" onclick={() => (showEmpty = !showEmpty)}>{showEmpty ? t("Hide empty folders") : tn(emptyFolders, "Show {n} empty folder", "Show {n} empty folders")}</button>
       {/if}
-      {#if pictures.images.length}
-        <ul class="grid" role="listbox" tabindex="0" aria-label={t("Pictures in {folder}", { folder: folderName(pictures.folder) })} {onkeydown}>
-          {#each pictures.images as entry, index (entry.path)}
+      {#if shownImages.length}
+        <ul class="grid" role="listbox" tabindex="0" aria-label={t("Pictures in {folder}", { folder: folderLabel })} {onkeydown}>
+          {#each shownImages as entry (entry.path)}
+            {@const index = pictures.images.indexOf(entry)}
+            {@const starred = pictures.isFavorite(entry.path)}
             <li>
               <button type="button" role="option" aria-selected={index === pictures.current} class:on={index === pictures.current} title={entry.name} onclick={() => pictures.preview(index)} ondblclick={() => pictures.showNow(index)}>
                 {#if entry.kind === "video"}
                   <video use:frame={pictures.url(entry)} muted playsinline preload="metadata" aria-label={entry.name}></video>
                   <span class="badge" aria-hidden="true"><Icon name="play" size={11} /></span>
                 {:else}
-                  <img src={pictures.url(entry)} alt={entry.name} loading="lazy" decoding="async" />
+                  <img use:thumb={entry.path} alt={entry.name} decoding="async" />
                 {/if}
               </button>
+              <button type="button" class="star" class:on={starred} aria-pressed={starred} aria-label={starred ? t("Take {name} out of Favourites", { name: entry.name }) : t("Add {name} to Favourites", { name: entry.name })} onclick={() => pictures.toggleFavorite(entry)}><Icon name="star" size={12} /></button>
             </li>
           {/each}
         </ul>
+      {:else if pictures.query.trim() && pictures.images.length}
+        <p class="note">{t("No pictures here have “{query}” in their name.", { query: pictures.query.trim() })}</p>
+      {:else if favoritesOpen}
+        <p class="note">{t("Star a picture in any folder to keep it here.")}</p>
       {:else if !pictures.loading && !pictures.folders.length}
         <p class="note">{t("No pictures or videos in this folder (JPEG, PNG, GIF, BMP, WebP, MP4, MOV or WebM).")}</p>
       {/if}
@@ -443,7 +484,13 @@
   .note { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
   /* A grid of thumbnails, drawn only as they scroll into view. */
   .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 44vh; overflow: auto; }
-  .grid li { content-visibility: auto; contain-intrinsic-size: 92px 64px; }
+  .grid li { position: relative; content-visibility: auto; contain-intrinsic-size: 92px 64px; }
+  /* Star a picture into Favourites: shows on hover or focus, and stays lit once starred. */
+  .grid .star { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.55); color: #e5e7eb; opacity: 0; cursor: pointer; aspect-ratio: auto; }
+  .grid li:hover .star, .grid .star:focus-visible, .grid .star.on { opacity: 1; }
+  .grid .star.on { background: #f5a524; color: #1a1a1a; }
+  @media (hover: none) { .grid .star { opacity: 1; } }
+  .find { flex: 0 1 160px; min-width: 90px; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
   .grid button { display: block; width: 100%; aspect-ratio: 16 / 11; padding: 0; border: 2px solid transparent; border-radius: 8px; background: #000; overflow: hidden; cursor: pointer; }
   .grid button.on { border-color: var(--accent); }
   .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
