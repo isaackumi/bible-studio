@@ -3398,7 +3398,6 @@ export const es: Readonly<Record<string, string>> = {
   "Open Screen Recording settings": "Abrir ajustes de grabación de pantalla",
   "Stream & record settings": "Ajustes de Transmitir y grabar",
   "Streaming and recording did not start": "La transmisión y la grabación no empezaron",
-  "Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.": "Active Church Studio en Grabación de pantalla y audio del sistema. Tras una actualización, desactívelo y vuelva a activarlo.",
   "macOS needs your permission to capture the audience window.": "macOS necesita su permiso para capturar la ventana del público.",
   "Your {plan} plan is now on your account": "Su plan {plan} ya está en su cuenta",
   "Sign in on another computer and it comes along, with no key to type.": "Inicie sesión en otra computadora y lo acompaña, sin clave que escribir.",
@@ -5470,4 +5469,8 @@ export const es: Readonly<Record<string, string>> = {
   "Stream & record now works on Windows too: to YouTube, Facebook or any RTMP service, and to a video file in Videos › Church Studio. The first time, the recording engine downloads once. If the stream drops, the recording carries on.": "Transmitir y grabar ahora también funciona en Windows: a YouTube, Facebook o cualquier servicio RTMP, y a un archivo de vídeo en Vídeos › Church Studio. La primera vez, el motor de grabación se descarga una sola vez. Si la transmisión se corta, la grabación sigue.",
   "See how sure listening is": "Ver lo segura que está la escucha",
   "Every verse listening finds shows a percentage: green for a close match, yellow for a medium one, red for one that does not match well. Red ones wait under Detections and change nothing.": "Cada versículo que encuentra la escucha muestra un porcentaje: verde si coincide bien, amarillo si coincide a medias, rojo si no coincide bien. Los rojos esperan en Detecciones y no cambian nada.",
+  "macOS asked for permission to capture the audience window. Allow it, then quit and reopen Church Studio: macOS only applies it after a restart.": "macOS pidió permiso para capturar la ventana de la congregación. Permítelo y luego cierra y vuelve a abrir Church Studio: macOS solo lo aplica tras reiniciar.",
+  "macOS has not given Church Studio permission to capture the audience window yet.": "macOS aún no ha dado permiso a Church Studio para capturar la ventana de la congregación.",
+  "Quit and reopen": "Cerrar y volver a abrir",
+  "Turn on Church Studio in Screen & System Audio Recording, then quit and reopen it. If it is on already but macOS still asks (this happens after an update), remove Church Studio from that list with the − button, reopen Church Studio and allow it again.": "Activa Church Studio en Grabación de pantalla y audio del sistema, luego ciérralo y vuelve a abrirlo. Si ya está activado pero macOS sigue preguntando (pasa tras una actualización), quita Church Studio de esa lista con el botón −, vuelve a abrir Church Studio y permítelo otra vez.",
 };

@@ -5427,10 +5427,12 @@ class Session {
       }
       rtmp = target.url;
     }
-    // macOS must allow capturing the audience window. The first time it asks; after that (and after
-    // an update, until the app is signed by Apple) it is switched on in System Settings. Windows does not ask.
-    if (!options.pattern && !(await invoke<boolean>("screen_capture_allowed", { ask: true }).catch(() => true))) {
-      this.broadcastFailed(t("macOS needs your permission to capture the audience window."), "permission");
+    // macOS must allow capturing the audience window. It asks once; what is allowed only applies after
+    // Church Studio is reopened, so asking again on every press would only bring the question back. Windows does not ask.
+    if (!options.pattern && !(await invoke<boolean>("screen_capture_allowed", { ask: !this.screenAsked }).catch(() => true))) {
+      const first = !this.screenAsked;
+      this.screenAsked = true;
+      this.broadcastFailed(first ? t("macOS asked for permission to capture the audience window. Allow it, then quit and reopen Church Studio: macOS only applies it after a restart.") : t("macOS has not given Church Studio permission to capture the audience window yet."), "permission");
       return false;
     }
     // A recording that would run out of room partway through the service is stopped before it starts.
@@ -5494,11 +5496,15 @@ class Session {
    * Streaming or recording could not start (or stopped): said where it is seen, with the one thing to
    * do about it, not only inside the closed menu.
    */
+  /** Screen Recording was asked for in this launch (macOS shows its question once; the answer applies after a restart). */
+  private screenAsked = false;
+
   private broadcastFailed = (message: string, fix: "permission" | "settings" | "space" | null = null) => {
     this.broadcastState = { ...this.broadcastState, status: "error", message };
     const actions: Array<{ label: string; run: () => void }> = [];
     if (fix === "permission") {
       actions.push({ label: t("Open Screen Recording settings"), run: () => { void openPrivacySettings("screen").catch(() => {}); this.dismissToast(); } });
+      actions.push({ label: t("Quit and reopen"), run: () => void import("@tauri-apps/plugin-process").then(({ relaunch }) => relaunch()).catch(() => {}) });
     } else if (fix === "settings") {
       actions.push({ label: t("Stream & record settings"), run: () => { this.openSettings("broadcast"); this.dismissToast(); } });
     } else if (fix === "space") {
@@ -5506,7 +5512,7 @@ class Session {
     }
     this.notify(t("Streaming and recording did not start"), {
       tone: "warn",
-      detail: fix === "permission" ? t("Turn on Church Studio in Screen & System Audio Recording. After an update, switch it off and on again.") : message,
+      detail: fix === "permission" ? `${message} ${t("Turn on Church Studio in Screen & System Audio Recording, then quit and reopen it. If it is on already but macOS still asks (this happens after an update), remove Church Studio from that list with the − button, reopen Church Studio and allow it again.")}` : message,
       ms: 30_000,
       actions,
     });
