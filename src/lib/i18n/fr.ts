@@ -5547,4 +5547,8 @@ export const fr: Readonly<Record<string, string>> = {
   "The recording engine could not be fetched: {error} Check the internet connection and try again.": "Le moteur d’enregistrement n’a pas pu être téléchargé : {error} Vérifiez la connexion internet et réessayez.",
   "The recording engine is ready": "Le moteur d’enregistrement est prêt",
   "It stays on this computer. Recording and streaming start straight away from now on.": "Il reste sur cet ordinateur. L’enregistrement et la diffusion démarrent tout de suite désormais.",
+  "Stream and record on Windows": "Diffuser et enregistrer sous Windows",
+  "Stream & record now works on Windows too: to YouTube, Facebook or any RTMP service, and to a video file in Videos › Church Studio. The first time, the recording engine downloads once. If the stream drops, the recording carries on.": "Diffuser et enregistrer fonctionne maintenant aussi sous Windows : vers YouTube, Facebook ou tout service RTMP, et dans un fichier vidéo dans Vidéos › Church Studio. La première fois, le moteur d’enregistrement se télécharge une seule fois. Si la diffusion coupe, l’enregistrement continue.",
+  "See how sure listening is": "Voir à quel point l’écoute est sûre",
+  "Every verse listening finds shows a percentage: green for a close match, yellow for a medium one, red for one that does not match well. Red ones wait under Detections and change nothing.": "Chaque verset trouvé par l’écoute affiche un pourcentage : vert pour une correspondance proche, jaune pour une moyenne, rouge pour une mauvaise. Les rouges attendent dans Détections et ne changent rien.",
 };

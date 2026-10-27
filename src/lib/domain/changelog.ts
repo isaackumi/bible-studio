@@ -16,6 +16,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.8",
+    date: "2026-10-27",
+    highlights: [
+      { icon: "video", title: msg("Stream and record on Windows"), text: msg("Stream & record now works on Windows too: to YouTube, Facebook or any RTMP service, and to a video file in Videos › Church Studio. The first time, the recording engine downloads once. If the stream drops, the recording carries on."), show: null },
+      { icon: "mic", title: msg("See how sure listening is"), text: msg("Every verse listening finds shows a percentage: green for a close match, yellow for a medium one, red for one that does not match well. Red ones wait under Detections and change nothing."), show: null },
+    ],
+  },
+  {
     version: "0.6.7",
     date: "2026-10-27",
     highlights: [
