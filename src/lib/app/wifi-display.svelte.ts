@@ -1,7 +1,7 @@
 // The audience screen on a TV browser over the church's own Wi-Fi: the desk's local server (the one
 // the phone remote uses) serves the app at /?lan=1 and the newest Program, so a TV with a browser
-// shows the screen without an HDMI cable or the internet. Words, songs, scripture and pictures
-// from Media show; a video stays on this computer.
+// shows the screen without an HDMI cable or the internet. Words, songs, scripture, and pictures and
+// videos from Media show (the desk streams files in parts, as Safari and Apple TV need for video).
 
 import { invoke } from "@tauri-apps/api/core";
 import { serverCall, SITE_URL } from "../domain/billing";

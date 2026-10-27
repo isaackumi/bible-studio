@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
@@ -50,8 +50,15 @@ struct LanScreen {
 const WATCHING: Duration = Duration::from_secs(10);
 /// A screen is a model (words, theme, layout), never pictures themselves: this is generous.
 const SCREEN_BYTES: usize = 512 * 1024;
-/// Pictures only (a video needs streaming): larger files are not sent.
-const MEDIA_BYTES: u64 = 40 * 1024 * 1024;
+/// Pictures and videos go out from disk this much at a time, never whole, so any size streams.
+const STREAM_CHUNK: usize = 64 * 1024;
+/// A TV keeps a picture or video this long before asking again (then a 304 if it is unchanged), so
+/// each slide does not fetch its background afresh. Short, because a file can be replaced in place.
+const MEDIA_MAX_AGE: u32 = 600;
+/// The app's own /_app/immutable/ files carry their hash in their name: they never change.
+const IMMUTABLE_MAX_AGE: u32 = 365 * 24 * 60 * 60;
+/// A TV that stops reading a video (paused, switched off) lets its connection go after this.
+const WRITE_WAIT: Duration = Duration::from_secs(30);
 
 impl Default for LanRemote {
     fn default() -> Self {
@@ -66,6 +73,15 @@ impl Default for LanRemote {
             screen: Mutex::new(LanScreen::default()),
             watchers: Mutex::new(HashMap::new()),
         }
+    }
+}
+
+/// One of the MAX_CONNECTIONS, held while a connection is served.
+struct Slot<'a>(&'a AtomicUsize);
+
+impl Drop for Slot<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -199,8 +215,9 @@ pub fn start(app: AppHandle, lan: Arc<LanRemote>) {
             let app = app.clone();
             let lan = lan.clone();
             thread::spawn(move || {
+                // The slot is given back however serve ends, a TV hanging up mid-video included.
+                let _slot = Slot(&lan.connections);
                 serve(stream, &app, &lan);
-                lan.connections.fetch_sub(1, Ordering::SeqCst);
             });
         }
         *lock(&lan.listening) = false;
@@ -272,6 +289,7 @@ pub fn reply(lan: &LanRemote, id: String, envelope: Value) {
 
 fn serve(mut stream: TcpStream, app: &AppHandle, lan: &LanRemote) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(4)));
+    let _ = stream.set_write_timeout(Some(WRITE_WAIT));
     let mut buf = Vec::new();
     let mut chunk = [0_u8; 2048];
     loop {
@@ -304,7 +322,15 @@ struct HttpRequest {
     method: String,
     path: String,
     query: String,
+    /// Header names in lower case.
+    headers: Vec<(String, String)>,
     body: Vec<u8>,
+}
+
+impl HttpRequest {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers.iter().find(|(key, _)| key == name).map(|(_, value)| value.as_str())
+    }
 }
 
 enum Parsed {
@@ -327,8 +353,10 @@ fn parse_http(buf: &[u8]) -> Parsed {
         return Parsed::Invalid;
     };
     let mut length = 0usize;
+    let mut headers = Vec::new();
     for line in lines {
         if let Some((name, value)) = line.split_once(':') {
+            headers.push((name.trim().to_ascii_lowercase(), value.trim().to_string()));
             if name.eq_ignore_ascii_case("content-length") {
                 match value.trim().parse::<usize>() {
                     Ok(parsed) if parsed <= MAX_REQUEST => length = parsed,
@@ -349,6 +377,7 @@ fn parse_http(buf: &[u8]) -> Parsed {
         method: method.to_string(),
         path,
         query,
+        headers,
         body: rest[..length].to_vec(),
     })
 }
@@ -369,19 +398,23 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
         match reply {
             Some(body) => write_json(stream, body),
             // Nothing new, and how long the desk has been quiet (as the internet path says it).
-            None => write_http_with(stream, 204, "text/plain", &age.map(|age| format!("X-Screen-Age: {age}\r\n")).unwrap_or_default(), b""),
+            None => write_http_with(stream, 204, "text/plain", &age.map(|age| vec![("X-Screen-Age", age.to_string())]).unwrap_or_default(), b""),
         }
         return;
     }
-    if req.method == "GET" {
+    if req.method == "GET" || req.method == "HEAD" {
         if let Some(token) = req.path.strip_prefix("/media/") {
-            serve_media(stream, app, token);
+            serve_media(stream, app, token, &req);
             return;
         }
-        if req.path.starts_with("/_app/") {
-            serve_app_file(stream, app, req.path.trim_start_matches('/'));
+        if let Some(name) = req.path.strip_prefix("/_app/immutable/") {
+            serve_immutable(stream, app, name, &req);
             return;
         }
+    }
+    if req.method == "GET" && req.path.starts_with("/_app/") {
+        serve_app_file(stream, app, req.path.trim_start_matches('/'));
+        return;
     }
     if req.method == "GET" && (req.path == "/" || req.path == "/remote.html" || req.path == "/index.html") {
         write_http(stream, 200, "text/html; charset=utf-8", PAD.as_bytes());
@@ -427,8 +460,30 @@ fn serve_app_file(stream: &mut TcpStream, app: &AppHandle, path: &str) {
     }
 }
 
-/// A picture on the screen, for the TV browser: only a file that is in Media, never any other path.
-fn serve_media(stream: &mut TcpStream, app: &AppHandle, token: &str) {
+/// One of the app's hashed files (scripts, styles, fonts): kept by the TV, since its name changes
+/// whenever its contents do.
+fn serve_immutable(stream: &mut TcpStream, app: &AppHandle, name: &str, req: &HttpRequest) {
+    let Some(asset) = app.asset_resolver().get(format!("_app/immutable/{name}")) else {
+        write_http(stream, 404, "text/plain", b"Not found");
+        return;
+    };
+    let etag = bytes_etag(&asset.bytes);
+    let cache = format!("public, max-age={IMMUTABLE_MAX_AGE}, immutable");
+    let (head, part) = file_reply(req, &asset.mime_type, asset.bytes.len() as u64, &etag, &cache);
+    if stream.write_all(head.as_bytes()).is_err() {
+        return;
+    }
+    if let Some((start, length)) = part {
+        // file_reply keeps the part inside the file; min() makes sure a slice never goes past it.
+        let from = usize::try_from(start).unwrap_or(usize::MAX).min(asset.bytes.len());
+        let to = usize::try_from(start.saturating_add(length)).unwrap_or(usize::MAX).min(asset.bytes.len());
+        let _ = stream.write_all(&asset.bytes[from..to]);
+    }
+}
+
+/// A picture, video or song on the screen, for the TV browser: only a file that is in Media, never
+/// any other path. Sent in parts when the browser asks (Safari and Apple TV play video only that way).
+fn serve_media(stream: &mut TcpStream, app: &AppHandle, token: &str, req: &HttpRequest) {
     use tauri::Manager;
     let Some(path) = media_path(token) else {
         write_http(stream, 404, "text/plain", b"Not found");
@@ -442,15 +497,144 @@ fn serve_media(stream: &mut TcpStream, app: &AppHandle, token: &str) {
         };
         conn.query_row("SELECT 1 FROM media_assets WHERE path = ?1", [&path], |_| Ok(())).is_ok()
     };
-    let file = std::path::Path::new(&path);
-    let small = std::fs::metadata(file).map(|meta| meta.len() <= MEDIA_BYTES).unwrap_or(false);
-    match (known && small).then(|| std::fs::read(file).ok()).flatten() {
-        Some(bytes) => {
-            let ext = file.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase();
-            write_http(stream, 200, crate::cloud::content_type(&ext), &bytes);
-        }
-        None => write_http(stream, 404, "text/plain", b"Not found"),
+    if !known {
+        write_http(stream, 404, "text/plain", b"Not found");
+        return;
     }
+    send_media_file(stream, std::path::Path::new(&path), req);
+}
+
+/// A file from disk, whole or the part asked for, streamed. A browser that hangs up while it seeks
+/// in a video only ends this reply.
+fn send_media_file(stream: &mut impl Write, path: &std::path::Path, req: &HttpRequest) {
+    let opened = std::fs::File::open(path).and_then(|file| Ok((file.metadata()?, file)));
+    let Some((meta, mut file)) = opened.ok().filter(|(meta, _)| meta.is_file()) else {
+        write_http(stream, 404, "text/plain", b"Not found");
+        return;
+    };
+    let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_ascii_lowercase();
+    let etag = file_etag(&meta);
+    let cache = format!("public, max-age={MEDIA_MAX_AGE}");
+    let (head, part) = file_reply(req, crate::cloud::content_type(&ext), meta.len(), &etag, &cache);
+    if stream.write_all(head.as_bytes()).is_err() {
+        return;
+    }
+    if let Some((start, length)) = part {
+        if let Err(error) = send_part(stream, &mut file, start, length) {
+            log::debug!("remote: media stopped: {error}");
+        }
+    }
+}
+
+/// `length` bytes from `start`, a chunk at a time.
+fn send_part(stream: &mut impl Write, file: &mut (impl Read + Seek), start: u64, length: u64) -> std::io::Result<()> {
+    file.seek(SeekFrom::Start(start))?;
+    let mut chunk = vec![0_u8; STREAM_CHUNK];
+    let mut left = length;
+    while left > 0 {
+        let want = usize::try_from(left).unwrap_or(STREAM_CHUNK).min(STREAM_CHUNK);
+        let read = file.read(&mut chunk[..want])?;
+        if read == 0 {
+            // The file got shorter while it was being sent.
+            return Err(std::io::ErrorKind::UnexpectedEof.into());
+        }
+        stream.write_all(&chunk[..read])?;
+        left -= read as u64;
+    }
+    stream.flush()
+}
+
+/// A file's version for the browser's cache: its size and when it last changed.
+fn file_etag(meta: &std::fs::Metadata) -> String {
+    let changed = meta.modified().ok().and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok()).map(|at| at.as_nanos()).unwrap_or(0);
+    format!("\"{:x}-{changed:x}\"", meta.len())
+}
+
+/// The version of a file built into the app, from its contents.
+fn bytes_etag(bytes: &[u8]) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    format!("\"{:x}-{:x}\"", bytes.len(), hasher.finish())
+}
+
+/// Which bytes of a file a browser asked for in its Range header.
+#[derive(Debug, PartialEq)]
+enum Wanted {
+    /// No range, or one this server does not read (several ranges, a typo): the whole file.
+    Whole,
+    /// First and last byte, both included, inside the file.
+    Part(u64, u64),
+    /// A range that starts past the end: 416.
+    Unsatisfiable,
+}
+
+/// Reads "bytes=start-end", "bytes=start-" and "bytes=-last" (one range only).
+fn wanted_range(header: Option<&str>, size: u64) -> Wanted {
+    let Some(spec) = header.and_then(|value| value.trim().strip_prefix("bytes=")) else {
+        return Wanted::Whole;
+    };
+    if spec.contains(',') {
+        return Wanted::Whole;
+    }
+    let Some((from, to)) = spec.split_once('-') else {
+        return Wanted::Whole;
+    };
+    let number = |text: &str| Some(text.trim()).filter(|text| !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())).and_then(|text| text.parse::<u64>().ok());
+    let (from, to) = (from.trim(), to.trim());
+    match (number(from), number(to)) {
+        // The last N bytes.
+        (None, Some(last)) if from.is_empty() => {
+            if last == 0 || size == 0 {
+                Wanted::Unsatisfiable
+            } else {
+                Wanted::Part(size - last.min(size), size - 1)
+            }
+        }
+        (Some(start), end) if to.is_empty() || end.is_some() => {
+            if end.is_some_and(|end| end < start) {
+                Wanted::Whole
+            } else if start >= size {
+                Wanted::Unsatisfiable
+            } else {
+                Wanted::Part(start, end.unwrap_or(u64::MAX).min(size - 1))
+            }
+        }
+        _ => Wanted::Whole,
+    }
+}
+
+/// Does If-None-Match name this version ("*" names any)?
+fn etag_matches(header: Option<&str>, etag: &str) -> bool {
+    header.is_some_and(|value| value.split(',').map(|tag| tag.trim().trim_start_matches("W/")).any(|tag| tag == "*" || tag == etag))
+}
+
+/// The reply's head for a file of `size` bytes, and which bytes follow it as (first, length): none
+/// for HEAD, 304 or 416.
+fn file_reply(req: &HttpRequest, content_type: &str, size: u64, etag: &str, cache: &str) -> (String, Option<(u64, u64)>) {
+    let mut lines = vec![("Cache-Control", cache.to_string()), ("ETag", etag.to_string()), ("Accept-Ranges", "bytes".to_string())];
+    if etag_matches(req.header("if-none-match"), etag) {
+        return (head(304, &lines), None);
+    }
+    // If-Range: the part only if the browser's copy is this version, else the whole file again.
+    let range = match req.header("if-range") {
+        Some(version) if version != etag => None,
+        _ => req.header("range"),
+    };
+    let (status, first, length) = match wanted_range(range, size) {
+        Wanted::Whole => (200, 0, size),
+        Wanted::Part(first, last) => {
+            lines.push(("Content-Range", format!("bytes {first}-{last}/{size}")));
+            (206, first, last - first + 1)
+        }
+        Wanted::Unsatisfiable => {
+            lines.extend([("Content-Range", format!("bytes */{size}")), ("Content-Type", "text/plain".to_string()), ("Content-Length", "0".to_string())]);
+            return (head(416, &lines), None);
+        }
+    };
+    lines.extend([("Content-Type", content_type.to_string()), ("Content-Length", length.to_string())]);
+    let body = (req.method != "HEAD" && length > 0).then_some((first, length));
+    (head(status, &lines), body)
 }
 
 /// One query value, percent-decoded ("token=ab%2Bc" → "ab+c").
@@ -508,28 +692,40 @@ fn write_json(stream: &mut TcpStream, value: Value) {
     write_http(stream, 200, "application/json", &body);
 }
 
-fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u8]) {
-    write_http_with(stream, status, content_type, "", body);
+fn write_http(stream: &mut impl Write, status: u16, content_type: &str, body: &[u8]) {
+    write_http_with(stream, status, content_type, &[], body);
 }
 
-/// `extra`: more header lines, each ending in \r\n.
-fn write_http_with(stream: &mut TcpStream, status: u16, content_type: &str, extra: &str, body: &[u8]) {
+/// `extra`: more headers, beside the ones every dynamic answer carries.
+fn write_http_with(stream: &mut impl Write, status: u16, content_type: &str, extra: &[(&str, String)], body: &[u8]) {
+    // Dynamic answers (the screen, commands, state) are never kept by the browser.
+    let mut lines = vec![("Content-Type", content_type.to_string()), ("Content-Length", body.len().to_string()), ("Cache-Control", "no-store".to_string())];
+    lines.extend(extra.iter().cloned());
+    let _ = stream.write_all(head(status, &lines).as_bytes());
+    let _ = stream.write_all(body);
+}
+
+/// A reply's status line and headers, with the ones every reply carries.
+fn head(status: u16, lines: &[(&str, String)]) -> String {
     let reason = match status {
         200 => "OK",
         204 => "No Content",
+        206 => "Partial Content",
+        304 => "Not Modified",
         400 => "Bad Request",
         404 => "Not Found",
         413 => "Payload Too Large",
+        416 => "Range Not Satisfiable",
         503 => "Service Unavailable",
         _ => "Error",
     };
+    let mut out = format!("HTTP/1.1 {status} {reason}\r\n");
+    for (name, value) in lines {
+        out.push_str(&format!("{name}: {value}\r\n"));
+    }
     // Same-origin only: no CORS headers. No referrer, so the QR token never leaves the page.
-    let head = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n{extra}Connection: close\r\n\r\n",
-        body.len()
-    );
-    let _ = stream.write_all(head.as_bytes());
-    let _ = stream.write_all(body);
+    out.push_str("X-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n");
+    out
 }
 
 #[cfg(test)]
@@ -643,5 +839,160 @@ mod tests {
         assert!(!usable_lan_ip("127.0.0.1".parse().expect("ip")));
         assert!(!usable_lan_ip("169.254.10.2".parse().expect("ip")));
         assert!(usable_lan_ip("192.168.1.20".parse().expect("ip")));
+    }
+
+    #[test]
+    fn reads_the_part_of_a_video_a_browser_asks_for() {
+        assert_eq!(wanted_range(None, 1000), Wanted::Whole);
+        assert_eq!(wanted_range(Some("bytes=0-499"), 1000), Wanted::Part(0, 499));
+        assert_eq!(wanted_range(Some("bytes=0-1"), 1000), Wanted::Part(0, 1), "Safari's first probe");
+        assert_eq!(wanted_range(Some("bytes=500-"), 1000), Wanted::Part(500, 999), "open-ended");
+        assert_eq!(wanted_range(Some("bytes=-100"), 1000), Wanted::Part(900, 999), "the last 100 bytes");
+        assert_eq!(wanted_range(Some("bytes=-5000"), 1000), Wanted::Part(0, 999), "more than there is");
+        assert_eq!(wanted_range(Some("bytes=900-5000"), 1000), Wanted::Part(900, 999), "an end past the file stops at it");
+        assert_eq!(wanted_range(Some("bytes=1000-"), 1000), Wanted::Unsatisfiable, "starts at the end");
+        assert_eq!(wanted_range(Some("bytes=2000-3000"), 1000), Wanted::Unsatisfiable);
+        assert_eq!(wanted_range(Some("bytes=-0"), 1000), Wanted::Unsatisfiable);
+        assert_eq!(wanted_range(Some("bytes=0-"), 0), Wanted::Unsatisfiable, "an empty file has no bytes");
+        for ignored in ["bytes=5-1", "bytes=a-b", "bytes=-", "bytes=1-2,4-5", "items=0-1", "bytes=+1-2", "bytes 0-1"] {
+            assert_eq!(wanted_range(Some(ignored), 1000), Wanted::Whole, "{ignored}");
+        }
+    }
+
+    fn request(raw: &str) -> HttpRequest {
+        complete(raw.as_bytes())
+    }
+
+    #[test]
+    fn answers_a_range_with_its_part_and_says_so() {
+        let ask = request("GET /media/x HTTP/1.1\r\nRange: bytes=10-19\r\n\r\n");
+        let (head, part) = file_reply(&ask, "video/mp4", 100, "\"v1\"", "public, max-age=600");
+        assert!(head.starts_with("HTTP/1.1 206 Partial Content\r\n"), "{head}");
+        assert!(head.contains("\r\nContent-Range: bytes 10-19/100\r\n"), "{head}");
+        assert!(head.contains("\r\nContent-Length: 10\r\n"), "{head}");
+        assert!(head.contains("\r\nAccept-Ranges: bytes\r\n"), "{head}");
+        assert!(head.contains("\r\nContent-Type: video/mp4\r\n"), "{head}");
+        assert!(head.contains("\r\nCache-Control: public, max-age=600\r\n"), "{head}");
+        assert!(head.contains("\r\nETag: \"v1\"\r\n"), "{head}");
+        assert!(!head.contains("no-store"), "{head}");
+        assert_eq!(part, Some((10, 10)));
+
+        let (head, part) = file_reply(&request("GET /media/x HTTP/1.1\r\nRange: bytes=100-\r\n\r\n"), "video/mp4", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 416 Range Not Satisfiable\r\n"), "{head}");
+        assert!(head.contains("\r\nContent-Range: bytes */100\r\n"), "{head}");
+        assert!(head.contains("\r\nContent-Length: 0\r\n"), "{head}");
+        assert_eq!(part, None);
+
+        let (head, part) = file_reply(&request("GET /media/x HTTP/1.1\r\n\r\n"), "image/png", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 200 OK\r\n") && head.contains("\r\nContent-Length: 100\r\n"), "{head}");
+        assert_eq!(part, Some((0, 100)));
+    }
+
+    #[test]
+    fn a_tv_that_has_the_picture_keeps_it_and_head_sends_no_body() {
+        let (head, part) = file_reply(&request("GET /media/x HTTP/1.1\r\nIf-None-Match: \"v1\"\r\n\r\n"), "image/png", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 304 Not Modified\r\n") && head.contains("\r\nETag: \"v1\"\r\n"), "{head}");
+        assert_eq!(part, None);
+        let (head, _) = file_reply(&request("GET /media/x HTTP/1.1\r\nIf-None-Match: W/\"old\", \"v1\"\r\n\r\n"), "image/png", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 304"), "{head}");
+        let (head, _) = file_reply(&request("GET /media/x HTTP/1.1\r\nIf-None-Match: \"old\"\r\n\r\n"), "image/png", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 200"), "a changed picture is sent again: {head}");
+
+        let (head, part) = file_reply(&request("HEAD /media/x HTTP/1.1\r\n\r\n"), "video/mp4", 100, "\"v1\"", "c");
+        assert!(head.starts_with("HTTP/1.1 200") && head.contains("\r\nContent-Length: 100\r\n"), "{head}");
+        assert_eq!(part, None);
+
+        // A part of an older copy would not fit with what the browser has: the whole file again.
+        let stale = request("GET /media/x HTTP/1.1\r\nRange: bytes=10-19\r\nIf-Range: \"old\"\r\n\r\n");
+        assert_eq!(file_reply(&stale, "video/mp4", 100, "\"v1\"", "c").1, Some((0, 100)));
+    }
+
+    #[test]
+    fn dynamic_answers_are_never_kept() {
+        let mut out = Vec::new();
+        write_http(&mut out, 200, "application/json", b"{}");
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("\r\nCache-Control: no-store\r\n") && text.ends_with("\r\n\r\n{}"), "{text}");
+    }
+
+    /// A file of `size` bytes whose every byte says where it is.
+    fn sample_file(name: &str, size: usize) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("cs-remote-{}-{name}.mp4", std::process::id()));
+        std::fs::write(&path, (0..size).map(|at| (at % 251) as u8).collect::<Vec<_>>()).unwrap();
+        path
+    }
+
+    /// A one-request server on a free port that sends `path` as /media would.
+    fn serve_once(path: std::path::PathBuf) -> (u16, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = [0_u8; 2048];
+            let req = loop {
+                let n = stream.read(&mut chunk).unwrap();
+                buf.extend_from_slice(&chunk[..n]);
+                if let Parsed::Complete(req) = parse_http(&buf) {
+                    break req;
+                }
+            };
+            let _ = stream.set_write_timeout(Some(WRITE_WAIT));
+            send_media_file(&mut stream, &path, &req);
+        });
+        (port, server)
+    }
+
+    #[test]
+    fn streams_part_of_a_file_to_a_browser_over_the_network() {
+        let path = sample_file("part", 300_000);
+        let (port, server) = serve_once(path.clone());
+        let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+        client.write_all(b"GET /media/x HTTP/1.1\r\nHost: tv\r\nRange: bytes=100000-\r\n\r\n").unwrap();
+        let mut reply = Vec::new();
+        client.read_to_end(&mut reply).unwrap();
+        server.join().unwrap();
+        let split = reply.windows(4).position(|window| window == b"\r\n\r\n").unwrap();
+        let head = std::str::from_utf8(&reply[..split]).unwrap();
+        assert!(head.starts_with("HTTP/1.1 206 Partial Content"), "{head}");
+        assert!(head.contains("Content-Range: bytes 100000-299999/300000"), "{head}");
+        assert!(head.contains("Content-Type: video/mp4"), "{head}");
+        let body = &reply[split + 4..];
+        assert_eq!(body.len(), 200_000);
+        assert!(body.iter().enumerate().all(|(at, byte)| *byte == ((at + 100_000) % 251) as u8));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_browser_that_hangs_up_mid_video_only_ends_its_reply() {
+        let path = sample_file("hangup", 16 * 1024 * 1024);
+        let (port, server) = serve_once(path.clone());
+        {
+            let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+            client.write_all(b"GET /media/x HTTP/1.1\r\n\r\n").unwrap();
+            let mut first = [0_u8; 4096];
+            client.read_exact(&mut first).unwrap();
+        }
+        // The client is gone (as when a TV seeks): the server stops writing and returns, no panic.
+        server.join().expect("serving ended cleanly");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn hands_back_a_connection_slot_however_serving_ends() {
+        let count = AtomicUsize::new(1);
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _slot = Slot(&count);
+            panic!("a reply went wrong");
+        }));
+        assert!(caught.is_err());
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn names_the_kind_of_each_picture_video_and_song() {
+        for (ext, kind) in [("mp4", "video/mp4"), ("m4v", "video/mp4"), ("mov", "video/quicktime"), ("webm", "video/webm"), ("mp3", "audio/mpeg"), ("m4a", "audio/mp4"), ("wav", "audio/wav"), ("jpg", "image/jpeg"), ("jpeg", "image/jpeg"), ("png", "image/png"), ("webp", "image/webp"), ("gif", "image/gif"), ("svg", "image/svg+xml")] {
+            assert_eq!(crate::cloud::content_type(ext), kind, "{ext}");
+        }
     }
 }
