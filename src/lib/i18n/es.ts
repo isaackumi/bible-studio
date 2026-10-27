@@ -5452,4 +5452,11 @@ export const es: Readonly<Record<string, string>> = {
   "Pictures shows small copies, so big folders open quickly. Find a picture by name, and star the ones you use often.": "Imágenes muestra copias pequeñas, así que las carpetas grandes se abren rápido. Busca una imagen por su nombre y marca con estrella las que usas a menudo.",
   "Who, how long and notes on each item": "Quién, cuánto tiempo y notas en cada elemento",
   "On the Service page, the note button on an item keeps who brings it, how many minutes it takes, and notes for the desk. None of it is shown on the screen.": "En la página Culto, el botón de nota de un elemento guarda quién lo presenta, cuántos minutos dura y notas para el puesto. Nada de eso se muestra en pantalla.",
+  "Did you mean {reference} ({percent}% sure)? It is under Detections; Preview did not change.": "¿Quisiste decir {reference} (seguro al {percent} %)? Está en Detecciones; la vista previa no cambió.",
+  "Did you mean {reference} ({percent}% sure)? Next did not change.": "¿Quisiste decir {reference} (seguro al {percent} %)? Siguiente no cambió.",
+  "{reference} is on Next ({percent}% sure). Push the lever to show it.": "{reference} está en Siguiente (seguro al {percent} %). Empuje la palanca para mostrarlo.",
+  "{reference} is on Preview ({percent}% sure). LIVE still sends Program.": "{reference} está en Vista previa (seguro al {percent} %). EN VIVO sigue enviando el Programa.",
+  "{reference} is on Preview. LIVE still sends Program.": "{reference} está en Vista previa. EN VIVO sigue enviando el Programa.",
+  "Not a good match: check it before showing it": "No coincide bien: revísalo antes de mostrarlo",
+  "A close match to what was said": "Coincide bien con lo que se dijo",
 };

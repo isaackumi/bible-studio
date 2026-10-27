@@ -5533,4 +5533,11 @@ export const fr: Readonly<Record<string, string>> = {
   "Pictures shows small copies, so big folders open quickly. Find a picture by name, and star the ones you use often.": "Images affiche de petites copies, pour que les grands dossiers s’ouvrent vite. Cherchez une image par son nom et mettez une étoile à celles que vous utilisez souvent.",
   "Who, how long and notes on each item": "Qui, combien de temps et notes sur chaque élément",
   "On the Service page, the note button on an item keeps who brings it, how many minutes it takes, and notes for the desk. None of it is shown on the screen.": "Sur la page Culte, le bouton de note d’un élément garde qui l’apporte, combien de minutes il prend et des notes pour le poste. Rien de tout cela n’apparaît à l’écran.",
+  "Did you mean {reference} ({percent}% sure)? It is under Detections; Preview did not change.": "Vouliez-vous dire {reference} (sûr à {percent} %) ? C’est dans Détections ; l’aperçu n’a pas changé.",
+  "Did you mean {reference} ({percent}% sure)? Next did not change.": "Vouliez-vous dire {reference} (sûr à {percent} %) ? Suivant n’a pas changé.",
+  "{reference} is on Next ({percent}% sure). Push the lever to show it.": "{reference} est dans Suivant (sûr à {percent} %). Poussez le levier pour l’afficher.",
+  "{reference} is on Preview ({percent}% sure). LIVE still sends Program.": "{reference} est dans l’Aperçu (sûr à {percent} %). DIRECT l’envoie toujours au Direct.",
+  "{reference} is on Preview. LIVE still sends Program.": "{reference} est dans l’Aperçu. DIRECT l’envoie toujours au Direct.",
+  "Not a good match: check it before showing it": "Pas une bonne correspondance : vérifiez avant de l’afficher",
+  "A close match to what was said": "Correspond bien à ce qui a été dit",
 };

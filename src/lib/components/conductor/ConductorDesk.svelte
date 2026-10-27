@@ -192,7 +192,7 @@
     // Too doubtful to move Next: said, not shown. Only a sure find may go live by itself.
     const rated = rateMatch(match, { phrases, index: listenIndex });
     if (rated.tier === "maybe") {
-      if (final && match.item.reference !== lastFound) session.voice.message = t("Did you mean {reference}? Next did not change.", { reference: match.item.reference });
+      if (final && match.item.reference !== lastFound) session.voice.message = t("Did you mean {reference} ({percent}% sure)? Next did not change.", { reference: match.item.reference, percent: Math.round(rated.p * 100) });
       return;
     }
     // The finished phrase may let Autopilot show a verse found while it was still being said. It
@@ -205,7 +205,7 @@
     lastFound = match.item.reference;
     session.noteListening(`found by listening: ${match.item.reference}`);
     void session.previewPassage(passage);
-    session.voice.message = t("{reference} is on Next. Push the lever to show it.", { reference: match.item.reference });
+    session.voice.message = t("{reference} is on Next ({percent}% sure). Push the lever to show it.", { reference: match.item.reference, percent: Math.round(rated.p * 100) });
   }
 
   onMount(() => {

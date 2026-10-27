@@ -669,14 +669,15 @@
     }
     // How sure: a doubtful find waits under Detections and leaves Preview as it is.
     const rated = quoted && words ? rateMatch(quoted, { phrases, index: words }) : null;
+    const sure = rated ? { tier: rated.tier, p: rated.p } : undefined;
     if (rated?.tier === "maybe") {
       if (match.item.reference !== lastSpokenRef) {
-        noteHeard(match.item, match.text, false, "maybe");
-        session.voice.message = t("Did you mean {reference}? It is under Detections; Preview did not change.", { reference: match.item.reference });
+        noteHeard(match.item, match.text, false, sure);
+        session.voice.message = t("Did you mean {reference} ({percent}% sure)? It is under Detections; Preview did not change.", { reference: match.item.reference, percent: Math.round(rated.p * 100) });
       }
       return;
     }
-    takeHeard(match.item, match.text, false, rated?.tier === "likely" ? "likely" : undefined);
+    takeHeard(match.item, match.text, false, sure);
   }
 
   /** The last finished phrases, so the AI hears a whole thought rather than a fragment. */
@@ -716,7 +717,7 @@
   }
 
   /** A verse heard (or named by the AI) goes to the top of Detections. */
-  function noteHeard(hit: BibleItem, text: string, ai = false, confidence?: "likely" | "maybe") {
+  function noteHeard(hit: BibleItem, text: string, ai = false, confidence?: SearchHit["confidence"]) {
     const named = session.books.find((entry) => entry.ord === hit.bookOrd)?.name ?? hit.reference;
     // A verse heard again moves to the top instead of being listed twice (a repeated key stops the
     // list from drawing).
@@ -728,7 +729,7 @@
   }
 
   /** A verse heard: listed, and staged on Preview (or offered beside it on the Service page). */
-  function takeHeard(hit: BibleItem, text: string, ai = false, confidence?: "likely") {
+  function takeHeard(hit: BibleItem, text: string, ai = false, confidence?: SearchHit["confidence"]) {
     if (hit.reference === lastSpokenRef) return;
     lastSpokenRef = hit.reference;
     takenCount++;
@@ -740,7 +741,11 @@
       chapter = hit.chapter;
     }
     anchor = hit.startVerse;
-    session.voice.message = ai ? t("{reference} (found by the AI) is on Preview. LIVE still sends Program.", { reference: hit.reference }) : `${hit.reference} is on Preview. LIVE still sends Program.`;
+    session.voice.message = ai
+      ? t("{reference} (found by the AI) is on Preview. LIVE still sends Program.", { reference: hit.reference })
+      : confidence
+        ? t("{reference} is on Preview ({percent}% sure). LIVE still sends Program.", { reference: hit.reference, percent: Math.round(confidence.p * 100) })
+        : t("{reference} is on Preview. LIVE still sends Program.", { reference: hit.reference });
     noteHeard(hit, text, ai, confidence);
     // A pending arrow-key Take must never carry a spoken verse to Program.
     takeAfterPreview = false;
@@ -1089,7 +1094,7 @@
               <div class="pb-body detections">
                 {#each detections as hit (`${hit.bookOrd}-${hit.chapter}-${hit.verse}`)}
                   <button type="button" onclick={() => openHit(hit)}>
-                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}{#if hit.confidence}<em class="sure-tag" data-confidence={hit.confidence} title={hit.confidence === "maybe" ? t("Not sure this is what was meant: check it before showing it") : t("Probably what was meant: glance at it before LIVE")}>{hit.confidence === "maybe" ? t("Check") : t("Likely")}</em>{/if}</strong>
+                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}{#if hit.confidence}<em class="sure-tag" data-confidence={hit.confidence.tier} title={hit.confidence.tier === "maybe" ? t("Not a good match: check it before showing it") : hit.confidence.tier === "likely" ? t("Probably what was meant: glance at it before LIVE") : t("A close match to what was said")}>{Math.round(hit.confidence.p * 100)}%</em>{/if}</strong>
                     <span>{hit.text}</span>
                   </button>
                 {:else}
@@ -1642,8 +1647,11 @@
   .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
-  .sure-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
-  .sure-tag[data-confidence="maybe"] { background: color-mix(in srgb, #f5a524 20%, transparent); color: var(--warn-text, #f5a524); }
+  /* How sure listening is: green a close match, yellow a medium one, red not a good match. */
+  .sure-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 750; font-variant-numeric: tabular-nums; vertical-align: 1px; }
+  .sure-tag[data-confidence="sure"] { background: color-mix(in srgb, var(--presence) 18%, transparent); color: var(--presence-text); }
+  .sure-tag[data-confidence="likely"] { background: color-mix(in srgb, #f5a524 22%, transparent); color: var(--warn-text); }
+  .sure-tag[data-confidence="maybe"] { background: color-mix(in srgb, var(--live) 18%, transparent); color: var(--live-text); }
   .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }

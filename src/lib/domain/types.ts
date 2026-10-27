@@ -781,8 +781,8 @@ export type SearchHit = {
   text: string;
   /** Named by the church's AI from what the preacher described: worth a look before using. */
   ai?: boolean;
-  /** Found by listening: how sure (voice/confidence.ts); missing when found by Find or sure. */
-  confidence?: "likely" | "maybe";
+  /** Found by listening: how sure it is the verse meant (voice/confidence.ts), 0–1, and its tier. Missing when found by Find. */
+  confidence?: { tier: "sure" | "likely" | "maybe"; p: number };
 };
 
 export type DisplayInfo = {
