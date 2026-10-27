@@ -184,3 +184,112 @@ describe("captions links", () => {
     expect(routeRemote(gate, remoteEnvelope("captions", { token: "t" }), ctx("s".repeat(64))).action).toBeNull();
   });
 });
+
+describe("Preview-only phones", async () => {
+  const { allowedCommands, remoteAccess, remoteAllows, REMOTE_COMMANDS, REMOTE_LIVE_COMMANDS, REMOTE_MUSIC_COMMANDS, setDeviceAccess } = await import("./remote");
+  function paired(access?: "full" | "preview"): RemoteGate {
+    const asked = routeRemote(opened(0), remoteEnvelope("pair", { code: "123456", name: "Usher" }), ctx(0));
+    return approvePending(asked.gate, asked.reply.payload.request!, "t", HASH, 0, access);
+  }
+
+  it("move Preview and pick items, and never go live, black, clear, undo, open or close the screen, or play music", () => {
+    const gate = paired("preview");
+    expect(gate.devices[0]).toMatchObject({ access: "preview" });
+    for (const id of ["next", "previous", "next-item", "previous-item"]) {
+      expect(routeRemote(gate, remoteEnvelope("command", { id }), ctx(10, HASH)).action).toEqual({ kind: "command", id });
+    }
+    for (const id of [...REMOTE_LIVE_COMMANDS, ...REMOTE_MUSIC_COMMANDS]) {
+      const pressed = routeRemote(gate, remoteEnvelope("command", { id }), ctx(10, HASH));
+      expect(pressed.action, id).toBeNull();
+      expect(pressed.reply.type).toBe("denied");
+      expect(pressed.reply.payload.reason).toMatch(/Preview only/);
+    }
+    expect(routeRemote(gate, remoteEnvelope("preview-item", { itemId: "i1" }), ctx(10, HASH)).action).toEqual({ kind: "preview-item", itemId: "i1" });
+    expect(routeRemote(gate, remoteEnvelope("preview-scene", { sceneId: "s1" }), ctx(10, HASH)).action).toEqual({ kind: "preview-scene", sceneId: "s1" });
+    expect(routeRemote(gate, remoteEnvelope("state", {}), ctx(10, HASH)).action).toEqual({ kind: "state" });
+  });
+
+  it("tells the phone which buttons to show", () => {
+    expect(allowedCommands({ access: "preview" })).toEqual(["next", "previous", "next-item", "previous-item"]);
+    expect(allowedCommands({})).toEqual([...REMOTE_COMMANDS]);
+    expect(remoteAllows({}, "take")).toBe(true);
+    expect(remoteAllows({ access: "preview" }, "take")).toBe(false);
+  });
+
+  it("keeps full control for phones paired before levels, and for a plain approval", () => {
+    const stored = sanitizeRemoteDevices([{ id: "old", name: "Old", tokenHash: HASH, pairedAt: 1, lastSeen: 1, expiresAt: REMOTE_SESSION_MS }]);
+    expect(remoteAccess(stored[0]!)).toBe("full");
+    expect(routeRemote({ ...emptyRemoteGate(), devices: stored }, remoteEnvelope("command", { id: "take" }), ctx(10, HASH)).action).toEqual({ kind: "command", id: "take" });
+    expect(remoteAccess(paired().devices[0]!)).toBe("full");
+    expect(sanitizeRemoteDevices([{ ...stored[0]!, access: "preview" }, { ...stored[0]!, id: "x", access: "admin" }]).map((device) => device.access)).toEqual(["preview", undefined]);
+  });
+
+  it("changes level later, and the next press follows it", () => {
+    const gate = paired("full");
+    const limited = setDeviceAccess(gate, gate.devices[0]!.id, "preview");
+    expect(routeRemote(limited, remoteEnvelope("command", { id: "cut" }), ctx(10, HASH)).reply.type).toBe("denied");
+    const restored = setDeviceAccess(limited, gate.devices[0]!.id, "full");
+    expect(restored.devices[0]).not.toHaveProperty("access");
+    expect(routeRemote(restored, remoteEnvelope("command", { id: "cut" }), ctx(10, HASH)).action).toEqual({ kind: "command", id: "cut" });
+  });
+});
+
+describe("controller key expiry", async () => {
+  const { controllerDevice, controllerExpires, controllerExpiry, pruneRemoteGate } = await import("./remote");
+  const DAY = 24 * 60 * 60 * 1000;
+  const route = (gate: RemoteGate, now: number) => routeRemote(gate, remoteEnvelope("command", { id: "next" }), ctx(now, HASH));
+
+  it("works until its day, then is refused with the reason and stays listed", () => {
+    const key = controllerDevice("k", "Stream Deck", HASH, 1_000, 7);
+    expect(key.expiresAt).toBe(1_000 + 7 * DAY);
+    expect(controllerExpires(key)).toBe(true);
+    const gate = { ...emptyRemoteGate(), devices: [key] };
+    expect(route(gate, 1_000 + 7 * DAY - 1).action).toEqual({ kind: "command", id: "next" });
+    // Using it does not push its expiry back.
+    expect(route(gate, 1_000 + DAY).gate.devices[0]!.expiresAt).toBe(key.expiresAt);
+    const late = route(gate, 1_000 + 7 * DAY);
+    expect(late.action).toBeNull();
+    expect(late.reply.type).toBe("expired");
+    expect(late.reply.payload.reason).toMatch(/expired/);
+    expect(pruneRemoteGate(gate, 1_000 + 30 * DAY).devices).toHaveLength(1);
+  });
+
+  it("never expires when asked, or for a choice not on the list", () => {
+    expect(controllerExpires(controllerDevice("k", "Deck", HASH, 1_000))).toBe(false);
+    expect(controllerExpiry(0, 0)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(controllerExpiry(0, 3)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(controllerExpiry(0, 1)).toBe(DAY);
+    expect(controllerExpiry(0, 30)).toBe(30 * DAY);
+  });
+});
+
+describe("press budget", async () => {
+  const { REMOTE_BURST, REMOTE_PER_SECOND, spendRemoteBudget } = await import("./remote");
+  type Budget = ReturnType<typeof spendRemoteBudget>["budget"];
+
+  it("lets a burst through, drops the rest, then refills at the sustained rate", () => {
+    let budget: Budget | undefined;
+    let passed = 0;
+    for (let i = 0; i < REMOTE_BURST + 10; i++) {
+      const spent = spendRemoteBudget(budget, 0);
+      budget = spent.budget;
+      if (spent.ok) passed += 1;
+    }
+    expect(passed).toBe(REMOTE_BURST);
+    // One second later: REMOTE_PER_SECOND more, and no more than that.
+    let later = 0;
+    for (let i = 0; i < 20; i++) {
+      const spent = spendRemoteBudget(budget, 1_000);
+      budget = spent.budget;
+      if (spent.ok) later += 1;
+    }
+    expect(later).toBe(REMOTE_PER_SECOND);
+  });
+
+  it("never stores more than a burst, however long it is left", () => {
+    const spent = spendRemoteBudget({ tokens: 0, at: 0 }, 60 * 60 * 1000);
+    expect(spent.ok).toBe(true);
+    expect(spent.budget.tokens).toBe(REMOTE_BURST - 1);
+    expect(spendRemoteBudget({ tokens: 0.5, at: 0 }, 0).ok).toBe(false);
+  });
+});

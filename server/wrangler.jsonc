@@ -56,7 +56,8 @@
   // (api.ts tooFast). namespace_id is any number unique to this account.
   // Once a day at 06:00 UTC: cloud-space reminders after a plan ends (cloud.ts runCloudCron).
   "triggers": { "crons": ["0 6 * * *"] },
-  // CROWD: a congregation joining a room, asking and renaming, counted per room and network address
+  // CROWD: a congregation joining a room, asking and renaming, and phone remotes reaching the desk,
+  // each counted per room and network address
   // (a church's Wi-Fi is one address for everyone): 600 a minute (rooms.ts handleRooms).
   "ratelimits": [
     { "name": "LIMITS", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },

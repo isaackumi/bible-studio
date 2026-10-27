@@ -315,6 +315,18 @@ describe("rooms: a congregation on one Wi-Fi", () => {
     expect(crowd.keys.get(`room-join:${opened.code}:203.0.113.7`)).toBe(40);
   });
 
+  it("counts phone remote messages per room and address, and slows a runaway one", async () => {
+    const crowd = limiter(3);
+    const call = (path: string, body?: unknown) => handleRooms(from("203.0.113.7")(path, body), memoryRooms(), "https://church.test", () => "page", undefined, crowd.check);
+    const message = { v: 2, type: "state", payload: {} };
+    // No room yet: the first three reach the room (and hear it has ended); the fourth is slowed down.
+    for (let i = 0; i < 3; i++) expect((await call("/v1/rooms/ABC234/remote", message))!.status).toBe(404);
+    const slowed = (await call("/v1/rooms/ABC234/remote", message))!;
+    expect(slowed.status).toBe(429);
+    expect(await slowed.json()).toMatchObject({ retry: true });
+    expect([...crowd.keys.keys()]).toEqual(["room-remote:ABC234:203.0.113.7"]);
+  });
+
   it("asks a crowded phone to try again rather than refusing it", async () => {
     const call = (path: string, body?: unknown) => handleRooms(from("203.0.113.7")(path, body), memoryRooms(), "https://church.test", () => "page", undefined, async () => false);
     const refused = (await call("/v1/rooms/ABC234/join", { name: "Ama" }))!;

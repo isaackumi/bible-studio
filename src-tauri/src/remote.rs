@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
@@ -35,6 +35,45 @@ pub struct LanRemote {
     screen: Mutex<LanScreen>,
     /// Browsers that asked for the screen lately, by address: how many TVs are watching.
     watchers: Mutex<HashMap<String, std::time::Instant>>,
+    /// Each address's allowance of remote messages: a stuck script cannot flood the desk.
+    budgets: Mutex<HashMap<IpAddr, Budget>>,
+}
+
+/// A token bucket: messages left, and when it was last topped up.
+#[derive(Clone, Copy, Debug)]
+struct Budget {
+    tokens: f64,
+    at: Instant,
+}
+
+/// Remote messages one address may send: a burst of this many, then this many a second. A phone
+/// asks once a second and presses now and then; the desk also budgets each phone's presses.
+const BURST: f64 = 40.0;
+const PER_SECOND: f64 = 10.0;
+/// Addresses kept before quiet ones are forgotten.
+const BUDGETS_KEPT: usize = 256;
+
+/// Spend one message from an address's budget; false means refuse it.
+fn spend(budget: &mut Budget, now: Instant) -> bool {
+    let refill = now.saturating_duration_since(budget.at).as_secs_f64() * PER_SECOND;
+    budget.tokens = (budget.tokens + refill).min(BURST);
+    budget.at = now;
+    if budget.tokens < 1.0 {
+        return false;
+    }
+    budget.tokens -= 1.0;
+    true
+}
+
+/// Whether this address may send another remote message now.
+fn allow(lan: &LanRemote, who: IpAddr, now: Instant) -> bool {
+    let mut budgets = lock(&lan.budgets);
+    if budgets.len() >= BUDGETS_KEPT && !budgets.contains_key(&who) {
+        // A full bucket is the same as no bucket, so addresses that have been quiet a while go.
+        budgets.retain(|_, budget| now.saturating_duration_since(budget.at).as_secs_f64() * PER_SECOND < BURST);
+    }
+    let budget = budgets.entry(who).or_insert(Budget { tokens: BURST, at: now });
+    spend(budget, now)
 }
 
 #[derive(Default)]
@@ -62,6 +101,7 @@ impl Default for LanRemote {
             pending: Mutex::new(HashMap::new()),
             screen: Mutex::new(LanScreen::default()),
             watchers: Mutex::new(HashMap::new()),
+            budgets: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -378,6 +418,16 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
         write_http(stream, 200, "text/html; charset=utf-8", CAPTIONS.as_bytes());
         return;
     }
+    // Remote messages are budgeted per address before they reach the desk.
+    let message = req.path.starts_with("/v1/command/") || (req.method == "POST" && req.path == "/v1/remote");
+    if message {
+        let who = stream.peer_addr().map(|addr| addr.ip()).unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+        if !allow(lan, who, Instant::now()) {
+            let body = json!({ "v": 2, "type": "denied", "payload": { "reason": "Too many presses at once. Wait a moment." } });
+            write_http(stream, 429, "application/json", &serde_json::to_vec(&body).unwrap_or_default());
+            return;
+        }
+    }
     // Controllers (Stream Deck via Companion, scripts): GET /v1/command/<id>?token=…
     // becomes the same command message a phone sends, checked by the desk the same way.
     if let Some(command) = req.path.strip_prefix("/v1/command/") {
@@ -494,6 +544,7 @@ fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u
         400 => "Bad Request",
         404 => "Not Found",
         413 => "Payload Too Large",
+        429 => "Too Many Requests",
         503 => "Service Unavailable",
         _ => "Error",
     };
@@ -522,6 +573,32 @@ mod tests {
         set_screen(&lan, None).unwrap();
         assert_eq!(screen_reply(&lock(&lan.screen), first["revision"].as_u64().unwrap()).unwrap()["on"], false);
         assert!(set_screen(&lan, Some("x".repeat(SCREEN_BYTES + 1))).is_err());
+    }
+
+    #[test]
+    fn budgets_remote_messages_per_address() {
+        let start = Instant::now();
+        let mut budget = Budget { tokens: BURST, at: start };
+        // A burst goes through at once, then the next is refused.
+        for _ in 0..BURST as usize {
+            assert!(spend(&mut budget, start));
+        }
+        assert!(!spend(&mut budget, start));
+        // A tenth of a second later there is one more (ten a second).
+        assert!(spend(&mut budget, start + Duration::from_millis(100)));
+        assert!(!spend(&mut budget, start + Duration::from_millis(100)));
+        // A long quiet refills to the burst, never past it.
+        spend(&mut budget, start + Duration::from_secs(60));
+        assert!(budget.tokens <= BURST);
+
+        let lan = LanRemote::default();
+        let phone: IpAddr = "192.168.1.20".parse().expect("ip");
+        let other: IpAddr = "192.168.1.21".parse().expect("ip");
+        for _ in 0..BURST as usize {
+            assert!(allow(&lan, phone, start));
+        }
+        assert!(!allow(&lan, phone, start));
+        assert!(allow(&lan, other, start), "another phone has its own budget");
     }
 
     #[test]

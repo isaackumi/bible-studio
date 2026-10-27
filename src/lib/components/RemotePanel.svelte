@@ -1,7 +1,7 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import { isDesktop } from "../platform/runtime";
-  import { commandUrl, REMOTE_COMMANDS } from "../domain/remote";
+  import { CONTROLLER_EXPIRY_DAYS, commandUrl, controllerExpires, REMOTE_COMMANDS, remoteAccess, type RemoteAccess, type RemoteDevice } from "../domain/remote";
   import { REMOTE_PAIR_MS } from "../domain/remote";
   import { t } from "../i18n/core";
   import Icon from "./Icon.svelte";
@@ -9,7 +9,21 @@
   import { internetRemote } from "../app/remote-relay.svelte";
 
   let keyName = $state("");
+  let keyDays = $state<number>(0);
   let newKey = $state<string | null>(null);
+
+  /** How long a new controller key lasts, in words. */
+  function lifetime(days: number) {
+    if (days === 0) return t("Never expires");
+    return days === 1 ? t("Expires after 1 day") : t("Expires after {days} days", { days });
+  }
+
+  /** A key's expiry for the list: never, the date it stops, or that it already has. */
+  function keyExpiry(device: RemoteDevice) {
+    if (!controllerExpires(device)) return t("never expires");
+    if (device.expiresAt <= now) return t("expired: make a new key");
+    return t("expires {date}", { date: new Date(device.expiresAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) });
+  }
 
   let now = $state(Date.now());
 
@@ -157,10 +171,13 @@
 
 <p class="section-label">{t("Stream Deck and other controllers")}</p>
 <section class="rows">
-  <form class="row" onsubmit={async (event) => { event.preventDefault(); newKey = await session.createControllerKey(keyName); keyName = ""; }}>
+  <form class="row" onsubmit={async (event) => { event.preventDefault(); newKey = await session.createControllerKey(keyName, keyDays); keyName = ""; }}>
     <div class="row-copy"><strong>{t("Add a controller")}</strong><span>{t("Bitfocus Companion (Stream Deck), MIDI bridges and scripts press buttons by opening a link. Each controller gets its own key.")}</span></div>
     <div class="row-end">
       <input class="field" aria-label={t("Controller name")} placeholder={t("Stream Deck")} bind:value={keyName} />
+      <select class="field" aria-label={t("How long the key works")} bind:value={keyDays}>
+        {#each CONTROLLER_EXPIRY_DAYS as days (days)}<option value={days}>{lifetime(days)}</option>{/each}
+      </select>
       <button type="submit" class="btn primary" disabled={!isDesktop()}>{t("Create key")}</button>
     </div>
   </form>
@@ -185,7 +202,7 @@
   {/if}
   {#each session.remoteDevices.filter((device) => device.controller) as device (device.id)}
     <div class="row">
-      <div class="row-copy"><strong>{device.name}</strong><span>{device.lastSeen ? t("Last used {ago}", { ago: ago(device.lastSeen) }) : t("Not used yet")} · {t("never signs out")}</span></div>
+      <div class="row-copy"><strong>{device.name}</strong><span>{device.lastSeen ? t("Last used {ago}", { ago: ago(device.lastSeen) }) : t("Not used yet")} · <span class:expired={controllerExpires(device) && device.expiresAt <= now}>{keyExpiry(device)}</span></span></div>
       <button type="button" class="btn danger" aria-label={armed === device.id ? t("Confirm remove {name}", { name: device.name }) : t("Remove {name}", { name: device.name })} onclick={() => removeDevice(device.id)}>{armed === device.id ? t("Remove? Its buttons stop") : t("Remove")}</button>
     </div>
   {/each}
@@ -196,6 +213,16 @@
   {#each session.remoteDevices.filter((device) => !device.controller && !device.viewer) as device (device.id)}
     <div class="row">
       <div class="row-copy"><strong>{device.name}</strong><span>{t("Last seen {lastSeen} · signs out after 12 h idle", { lastSeen: ago(device.lastSeen) })}</span></div>
+      <!-- What this phone may do; the desk checks it on every press. -->
+      <select
+        class="field access"
+        aria-label={t("What {name} may do", { name: device.name })}
+        value={remoteAccess(device)}
+        onchange={(event) => session.setRemoteAccess(device.id, event.currentTarget.value as RemoteAccess)}
+      >
+        <option value="full">{t("Full control")}</option>
+        <option value="preview">{t("Preview only")}</option>
+      </select>
       <button
         type="button"
         class="btn danger"
@@ -247,5 +274,7 @@
   .overlay-link { display: grid; gap: 4px; justify-items: start; margin-top: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
   .overlay-link span { font-size: 12px; color: var(--muted); }
   .overlay-link code { font-size: 11px; word-break: break-all; }
+  .access { width: auto; flex: none; }
+  .expired { color: var(--live-text); font-weight: 650; }
   .error { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, #ff5a5a 14%, transparent); color: #ff8a8a; font-size: 13px; }
 </style>

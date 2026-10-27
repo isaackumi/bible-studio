@@ -107,6 +107,7 @@ import {
 import { broadcastRelayTransport, CameraRelaySender, relayEnabled, tauriRelayTransport } from "../display/camera-relay";
 import { importDocument as parseImportedDocument } from "../domain/import-content";
 import {
+  allowedCommands,
   approvePending,
   createPairing,
   declinePending,
@@ -114,9 +115,14 @@ import {
   pairingUrl,
   readRemoteEnvelope,
   REMOTE_LIVE_COMMANDS,
+  remoteAccess,
   remoteEnvelope,
   revokeDevice,
   routeRemote,
+  setDeviceAccess,
+  spendRemoteBudget,
+  type RemoteAccess,
+  type RemoteBudget,
   type RemoteDevice,
   type RemoteEnvelope,
   type RemoteGate,
@@ -518,6 +524,9 @@ class Session {
    */
   remoteVia = $state<"lan" | "internet">(readRemoteVia());
   private remoteDevicesSaved = 0;
+  /** Each phone's or key's allowance of presses (by device id), and which ones are being told to slow down. */
+  private remoteBudgets = new Map<string, RemoteBudget>();
+  private remoteThrottled = new Set<string>();
   translations = $state<TranslationInfo[]>([]);
   books = $state<CanonBook[]>(CANON);
   private selectToken = 0;
@@ -1476,12 +1485,28 @@ class Session {
     this.message = t("Pairing closed. Paired phones still work until you remove them.");
   };
 
-  approveRemote = async (requestId: string) => {
+  /** Allow a waiting phone: full control, or Preview only (it can never change what the audience sees). */
+  approveRemote = async (requestId: string, access: RemoteAccess = "full") => {
     const token = randomToken();
-    const gate = approvePending(this.remoteGate(), requestId, token, await sha256Hex(token), Date.now());
+    const gate = approvePending(this.remoteGate(), requestId, token, await sha256Hex(token), Date.now(), access);
     this.applyRemoteGate(gate, true);
     const device = gate.devices.find((entry) => entry.id === requestId);
-    this.message = t("{name} can control this desk. Go live on the phone changes what the audience sees.", { name: device?.name ?? t("Phone") });
+    const name = device?.name ?? t("Phone");
+    this.message =
+      access === "preview"
+        ? t("{name} can move Preview on this desk. Only the desk goes live.", { name })
+        : t("{name} can control this desk. Go live on the phone changes what the audience sees.", { name });
+  };
+
+  /** Change what a paired phone may do, from the phone list in Settings. */
+  setRemoteAccess = (deviceId: string, access: RemoteAccess) => {
+    const device = this.remoteDevices.find((entry) => entry.id === deviceId);
+    if (!device || remoteAccess(device) === access) return;
+    this.applyRemoteGate(setDeviceAccess(this.remoteGate(), deviceId, access), true);
+    this.message =
+      access === "preview"
+        ? t("{name} can now move Preview only.", { name: device.name })
+        : t("{name} now has full control, including going live.", { name: device.name });
   };
 
   declineRemote = (requestId: string) => {
@@ -1492,6 +1517,8 @@ class Session {
   revokeRemote = (deviceId: string) => {
     const name = this.remoteDevices.find((device) => device.id === deviceId)?.name ?? "Phone";
     this.applyRemoteGate(revokeDevice(this.remoteGate(), deviceId), true);
+    this.remoteBudgets.delete(deviceId);
+    this.remoteThrottled.delete(deviceId);
     this.message = t("{name} removed. It can no longer control this desk.", { name });
   };
 
@@ -1499,10 +1526,10 @@ class Session {
    * A key for Stream Deck (Bitfocus Companion), scripts or other controllers. Only its hash is
    * stored; the key itself is returned once to show the operator. Starts the network server.
    */
-  createControllerKey = async (name: string): Promise<string | null> => {
+  createControllerKey = async (name: string, days = 0): Promise<string | null> => {
     if (!this.requireFeature("phone-remote")) return null;
     const token = randomToken(24);
-    const device = controllerDevice(crypto.randomUUID(), name.trim() || "Stream Deck", await sha256Hex(token), Date.now());
+    const device = controllerDevice(crypto.randomUUID(), name.trim() || "Stream Deck", await sha256Hex(token), Date.now(), days);
     const gate = this.remoteGate();
     this.applyRemoteGate({ ...gate, devices: [...gate.devices, device] }, true);
     if (this.desktop() && !this.remoteLanUrl) await this.attachLanRemote(true);
@@ -2267,6 +2294,21 @@ class Session {
     if (!action) return routed.reply;
     if (action.kind === "stage") return remoteEnvelope("stage", this.stageRemoteState());
     if (action.kind === "captions") return remoteEnvelope("captions", this.captionsRemoteState(Number(envelope.payload.after) || 0, envelope.payload.lang || null));
+    const device = routed.device;
+    // Presses are budgeted per phone or key (reading the state is not): a stuck button or a runaway
+    // script is dropped, and the operator hears about it once, not once per press.
+    if (action.kind !== "state" && device) {
+      const spent = spendRemoteBudget(this.remoteBudgets.get(device.id), Date.now());
+      this.remoteBudgets.set(device.id, spent.budget);
+      if (!spent.ok) {
+        if (!this.remoteThrottled.has(device.id)) {
+          this.remoteThrottled.add(device.id);
+          this.message = t("{name} is pressing faster than the desk allows. Some presses were ignored.", { name: device.name });
+        }
+        return remoteEnvelope("denied", { reason: "Too many presses at once. Wait a moment." });
+      }
+      this.remoteThrottled.delete(device.id);
+    }
     try {
       if (action.kind === "command") await this.runFromRemote(action.id);
       else if (action.kind === "preview-item") await this.selectItem(action.itemId);
@@ -2277,11 +2319,11 @@ class Session {
     } catch (error) {
       return remoteEnvelope("denied", { reason: errorText(error, t("The desk could not do that.")) });
     }
-    return remoteEnvelope(action.kind === "command" ? "ack" : "state", this.remoteState(action.kind === "command" ? action.id : ""));
+    return remoteEnvelope(action.kind === "command" ? "ack" : "state", this.remoteState(action.kind === "command" ? action.id : "", device));
   };
 
   /** What a paired phone sees. Lists are JSON strings because envelope payloads are strings. */
-  private remoteState = (done: string): Record<string, string> => {
+  private remoteState = (done: string, device: RemoteDevice | null): Record<string, string> => {
     const service = this.service;
     const items = service
       ? service.sections.flatMap((section) =>
@@ -2305,6 +2347,9 @@ class Session {
       items: JSON.stringify(items.slice(0, 200)),
       scenes: JSON.stringify(scenes.slice(0, 100)),
       live: REMOTE_LIVE_COMMANDS.join(","),
+      // What this phone may press: it hides the rest. The desk checks every press anyway.
+      access: device ? remoteAccess(device) : "full",
+      allowed: device ? allowedCommands(device).join(",") : "",
       timer: this.programTimerState,
       music: this.audio.current ? (this.audio.playing && !this.audio.fading ? "playing" : "paused") : "",
       track: this.audio.current?.name ?? "",

@@ -1002,7 +1002,8 @@ export type RoomNamespace = { idFromName(name: string): unknown; get(id: unknown
 /**
  * `limit` is the strict per-address limiter (a few a minute): opening rooms. `crowd` is the roomy one
  * for a congregation joining at once: a church's whole Wi-Fi reaches us as one address, so joins,
- * questions and renames are counted per room and address, and each person's own limits stay in the room.
+ * questions, renames and phone remote messages are counted per room and address, and each person's
+ * own limits stay in the room.
  */
 export async function handleRooms(
   request: Request,
@@ -1053,6 +1054,10 @@ export async function handleRooms(
   if (!isCode(code)) return json(404, { error: "No such room." });
   if ((action === "ask" || action === "join" || action === "rename") && address && crowd && !(await crowd(`room-${action}:${code}:${address}`)))
     return json(429, { error: "Lots of people are joining at once. Trying again…", retry: true });
+  // The phone remote through the relay, counted the same way (a phone asks about once a second,
+  // so a few remotes on the church Wi-Fi sit well inside it; a runaway script does not).
+  if (action === "remote" && address && crowd && !(await crowd(`room-remote:${code}:${address}`)))
+    return json(429, { error: "Too many presses at once. Wait a moment.", retry: true });
   const stub = rooms.get(rooms.idFromName(code));
   const headers = { "content-type": "application/json", "x-room-ip": await sha256(`${address}:${code}`) };
   const target = `https://room/${action}${url.search}`;

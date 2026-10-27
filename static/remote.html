@@ -137,6 +137,9 @@
   .empty { margin: 0; padding: 18px 14px; color: var(--muted); text-align: center; font-size: 13px; }
   .msg { margin: 0; color: var(--warn); font-size: 13px; text-align: center; }
   .msg:empty { display: none; }
+  /* A Preview-only phone: says why the live buttons are gone, and Previous and Next share the bar. */
+  .note { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); font-size: 13px; line-height: 1.45; text-align: center; }
+  #pad.preview-only .transport { grid-template-columns: 1fr 1fr; }
   .link { display: block; margin: 6px auto 0; min-height: 44px; padding: 0 14px; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 
   /* ---- The transport, where the thumb is: Previous, GO LIVE, Next ---- */
@@ -269,6 +272,8 @@
       </section>
     </div>
 
+    <p class="note" id="accessNote" hidden data-t="This phone can move Preview only. The desk decides what goes live.">This phone can move Preview only. The desk decides what goes live.</p>
+
     <div class="actions">
       <button class="btn" data-cmd="cut" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg><span data-t="Cut">Cut</span></button>
       <button class="btn ghost" data-cmd="clear-words" type="button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="m3 3 18 18"/></svg><span data-t="Clear words">Clear words</span></button>
@@ -348,6 +353,8 @@
       "This phone was unpaired. Pair again to control the desk.": "Ce téléphone a été dissocié. Jumelez-le à nouveau pour piloter le bureau.",
       "The desk did not answer. Check this phone's internet, and that Church Studio is open.": "Le bureau n’a pas répondu. Vérifiez l’internet du téléphone et que Church Studio est ouvert.",
       "The desk did not answer. Check that the phone is on the same Wi-Fi.": "Le bureau n’a pas répondu. Vérifiez que le téléphone est sur le même Wi-Fi.",
+      "This phone can move Preview only. The desk decides what goes live.": "Ce téléphone ne peut déplacer que l’aperçu. Le bureau décide de ce qui passe à l’écran.",
+      "Too many presses at once. Wait a moment.": "Trop d’appuis à la fois. Patientez un instant.",
     },
     es: {
       "Live": "En vivo", "Undo": "Deshacer", "Audience screen": "Pantalla del público", "On the projector": "En el proyector", "Closed": "Cerrada", "Close": "Cerrar", "Open": "Abrir", "Tap again to close": "Toca de nuevo para cerrar",
@@ -362,6 +369,8 @@
       "This phone was unpaired. Pair again to control the desk.": "Este teléfono se desvinculó. Vincúlalo de nuevo para controlar la mesa.",
       "The desk did not answer. Check this phone's internet, and that Church Studio is open.": "La mesa no respondió. Revisa el internet del teléfono y que Church Studio esté abierto.",
       "The desk did not answer. Check that the phone is on the same Wi-Fi.": "La mesa no respondió. Revisa que el teléfono esté en el mismo Wi-Fi.",
+      "This phone can move Preview only. The desk decides what goes live.": "Este teléfono solo puede mover la vista previa. La mesa decide qué sale en vivo.",
+      "Too many presses at once. Wait a moment.": "Demasiadas pulsaciones a la vez. Espera un momento.",
     },
   };
   let lang = ((navigator.language || "en").slice(0, 2) in WORDS) ? navigator.language.slice(0, 2) : "en";
@@ -404,6 +413,8 @@
           body: JSON.stringify(envelope),
           signal: controller.signal,
         });
+        // Pressed too fast for the desk (or the relay): say so, rather than "desk unavailable".
+        if (response.status === 429) return { v: V, type: "denied", payload: { reason: "Too many presses at once. Wait a moment." } };
         if (!response.ok) return null;
         return await response.json();
       } catch {
@@ -556,8 +567,22 @@
     $("timerState").textContent = tr(payload.timer === "running" ? "Running" : "Paused");
     $("musicToggle").textContent = tr(payload.music === "playing" ? "Pause" : "Play");
     $("musicNow").textContent = payload.track ? (payload.music === "playing" ? "♪ " : tr("Paused") + ": ") + payload.track : tr("Nothing playing");
+    showAccess(payload);
     last = payload;
     renderList();
+  }
+
+  // A Preview-only phone shows only what it may press, and says why. The desk refuses the rest anyway.
+  function showAccess(payload) {
+    const preview = payload.access === "preview";
+    const allowed = new Set(String(payload.allowed || "").split(",").filter(Boolean));
+    $("pad").classList.toggle("preview-only", preview);
+    $("accessNote").hidden = !preview;
+    document.querySelectorAll("[data-cmd]").forEach((button) => { button.hidden = preview && !allowed.has(button.dataset.cmd); });
+    document.querySelector(".actions").hidden = preview;
+    $("screenToggle").hidden = preview;
+    $("timerToggle").hidden = preview;
+    $("musicRow").hidden = preview;
   }
 
   // Small pictures for what each service item is.
@@ -630,7 +655,7 @@
       render(reply.payload);
       return true;
     }
-    $("padMsg").textContent = reply.payload.reason || "";
+    $("padMsg").textContent = tr(reply.payload.reason || "");
     return true;
   }
 
