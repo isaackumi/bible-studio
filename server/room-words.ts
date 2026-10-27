@@ -60,6 +60,22 @@ const FR: Record<string, string> = {
   Blue: "bleue",
   Gold: "or",
   Green: "verte",
+  React: "Réagir",
+  Praying: "En prière",
+  Love: "J’aime",
+  Clap: "Applaudir",
+  Praise: "Louange",
+  Amen: "Amen",
+  "Prayer request": "Demande de prière",
+  "What can the church pray for?": "Pour quoi l’église peut-elle prier ?",
+  "Send without my name": "Envoyer sans mon nom",
+  "Send prayer request": "Envoyer la demande de prière",
+  "Only the church sees this. It is never shown on the screen or on other phones.": "Seule l’église la voit. Elle n’est jamais affichée à l’écran ni sur d’autres téléphones.",
+  "Sent. Only the church sees it.": "Envoyée. Seule l’église la voit.",
+  "Prayer requests are closed for now.": "Les demandes de prière sont fermées pour le moment.",
+  "Type your prayer request first.": "Écrivez d’abord votre demande de prière.",
+  "This room has taken all the prayer requests it can.": "Cette salle a reçu toutes les demandes de prière possibles.",
+  "You have sent a few already. Try again in a few minutes.": "Vous en avez déjà envoyé plusieurs. Réessayez dans quelques minutes.",
 };
 
 const ES: Record<string, string> = {
@@ -119,7 +135,24 @@ const ES: Record<string, string> = {
   Blue: "azul",
   Gold: "oro",
   Green: "verde",
+  React: "Reaccionar",
+  Praying: "Orando",
+  Love: "Me encanta",
+  Clap: "Aplaudir",
+  Praise: "Alabanza",
+  Amen: "Amén",
+  "Prayer request": "Petición de oración",
+  "What can the church pray for?": "¿Por qué puede orar la iglesia?",
+  "Send without my name": "Enviar sin mi nombre",
+  "Send prayer request": "Enviar petición de oración",
+  "Only the church sees this. It is never shown on the screen or on other phones.": "Solo la iglesia la ve. Nunca se muestra en la pantalla ni en otros teléfonos.",
+  "Sent. Only the church sees it.": "Enviada. Solo la iglesia la ve.",
+  "Prayer requests are closed for now.": "Las peticiones de oración están cerradas por ahora.",
+  "Type your prayer request first.": "Escribe primero tu petición de oración.",
+  "This room has taken all the prayer requests it can.": "Esta sala ya recibió todas las peticiones de oración que puede.",
+  "You have sent a few already. Try again in a few minutes.": "Ya enviaste varias. Inténtalo de nuevo en unos minutos.",
 };
+
 
 export const PHONE_WORDS: Record<PhoneLanguage, Record<string, string>> = { en: {}, fr: FR, es: ES };
 

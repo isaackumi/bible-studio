@@ -19,10 +19,10 @@ describe("rooms: Q&A", () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace Chapel"));
     const { pid } = data<{ pid: string }>(await core.join("Ama", "ip1"));
-    // A new room is not taking questions and holds none for approval until the desk says so.
+    // A new room is not taking questions until the desk says so, and then holds each for approval.
     expect(await core.ask(pid, "Too soon?", "")).toMatchObject({ ok: false, status: 403 });
-    expect(data<{ room: { open: boolean; moderate: boolean } }>(await core.hostView(hostKey)).room).toMatchObject({ open: false, moderate: false });
-    data(await core.settings(hostKey, { open: true, moderate: true }));
+    expect(data<{ room: { open: boolean; moderate: boolean } }>(await core.hostView(hostKey)).room).toMatchObject({ open: false, moderate: true });
+    data(await core.settings(hostKey, { open: true }));
     const asked = data<{ id: string; state: string }>(await core.ask(pid, "  What does grace mean?  ", ""));
     expect(asked.state).toBe("pending");
     expect(data<View>(await core.view(pid))).toMatchObject({ questions: [], waiting: 1 });
@@ -266,7 +266,131 @@ describe("rooms: the screen on browsers and phones", () => {
   });
 });
 
+describe("rooms: prayer requests", () => {
+  it("go to the desk only: never on another phone, never in the questions, never voted on", async () => {
+    const { core } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace"));
+    const ama = data<{ pid: string }>(await core.join("Ama", "")).pid;
+    const kofi = data<{ pid: string }>(await core.join("Kofi", "")).pid;
+    // Off until the desk turns them on; phones are told when they are.
+    expect(await core.pray(ama, "For my mother", "", false)).toMatchObject({ ok: false, status: 403 });
+    data(await core.settings(hostKey, { prayer: true, open: true, moderate: false }));
+    expect(data<{ room: { prayer: boolean } }>(await core.view(ama)).room.prayer).toBe(true);
+    const sent = data<{ id: string }>(await core.pray(ama, "  For my mother in hospital  ", "", false));
+    data(await core.pray(kofi, "For a new job", "Kofi", true));
+    // Nothing of them on any phone, the sender's own included, nor anything that would show one.
+    for (const pid of [ama, kofi, null]) {
+      const seen = JSON.stringify(data(await core.view(pid)));
+      expect(seen).not.toContain("mother");
+      expect(seen).not.toContain("new job");
+    }
+    expect(data<View>(await core.view(kofi)).questions).toEqual([]);
+    expect(await core.vote(kofi, sent.id, "net")).toMatchObject({ ok: false, status: 404 });
+    // The desk sees both: with a name, or without one when sent anonymously.
+    const desk = data<{ prayers: Array<{ id: string; text: string; name: string; state: string }> }>(await core.hostView(hostKey));
+    expect(desk.prayers).toMatchObject([
+      { text: "For my mother in hospital", name: "Ama", state: "new" },
+      { text: "For a new job", name: "", state: "new" },
+    ]);
+    // Only the desk marks them.
+    expect((await core.prayer("wrong", sent.id, "prayed")).ok).toBe(false);
+    data(await core.prayer(hostKey, sent.id, "prayed"));
+    data(await core.prayer(hostKey, desk.prayers[1]!.id, "archive"));
+    expect(data<{ prayers: Array<{ state: string }> }>(await core.hostView(hostKey)).prayers.map((prayer) => prayer.state)).toEqual(["prayed", "archived"]);
+    expect(await core.prayer(hostKey, sent.id, "show")).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("checks them as questions are checked: words, length, a few per person", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    data(await core.settings(hostKey, { prayer: true }));
+    const { pid } = data<{ pid: string }>(await core.join("", ""));
+    expect(await core.pray("nobody", "For peace", "", false)).toMatchObject({ ok: false, status: 401 });
+    expect(await core.pray(pid, " \u0007 ", "", false)).toMatchObject({ ok: false, status: 400 });
+    data(await core.pray(pid, "x\u0000".repeat(400), "", false));
+    for (let i = 1; i < LIMITS.asksPer10Min; i++) data(await core.pray(pid, `Request ${i}`, "", false));
+    expect(await core.pray(pid, "One too many", "", false)).toMatchObject({ ok: false, status: 429 });
+    advance(11 * 60_000);
+    data(await core.pray(pid, "Later on", "", false));
+    const prayers = data<{ prayers: Array<{ text: string }> }>(await core.hostView(hostKey)).prayers;
+    expect(prayers[0]!.text).toBe("x".repeat(LIMITS.questionLength));
+    // Questions are counted apart: praying does not use up a person's questions.
+    data(await core.settings(hostKey, { open: true }));
+    expect((await core.ask(pid, "A question too", "")).ok).toBe(true);
+  });
+});
+
+describe("rooms: reactions", () => {
+  it("takes one every two seconds from each phone and counts the last minute's for the desk", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
+    const a = data<{ pid: string }>(await core.join("A", "")).pid;
+    const b = data<{ pid: string }>(await core.join("B", "")).pid;
+    expect(await core.react(a, "pray")).toMatchObject({ ok: false, status: 403 });
+    data(await core.settings(hostKey, { reactions: true }));
+    expect(data<{ room: { reactions: boolean } }>(await core.view(a)).room.reactions).toBe(true);
+    data(await core.react(a, "pray"));
+    expect(await core.react(a, "love")).toMatchObject({ ok: false, status: 429 });
+    data(await core.react(b, "pray"));
+    expect(await core.react(b, "boo")).toMatchObject({ ok: false, status: 400 });
+    expect(await core.react("nobody", "amen")).toMatchObject({ ok: false, status: 401 });
+    advance(LIMITS.reactEveryMs);
+    data(await core.react(a, "amen"));
+    expect(data<{ reactions: Record<string, number> }>(await core.hostView(hostKey)).reactions).toEqual({ pray: 2, love: 0, clap: 0, praise: 0, amen: 1 });
+    // A minute on, they have faded.
+    advance(LIMITS.reactWindowMs);
+    expect(data<{ reactions: Record<string, number> }>(await core.hostView(hostKey)).reactions).toEqual({ pray: 0, love: 0, clap: 0, praise: 0, amen: 0 });
+  });
+});
+
+describe("rooms: a display knows when the desk has stopped", () => {
+  it("says how long since the desk last sent the screen or said it is still sharing", async () => {
+    const { core, advance } = room();
+    const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", "Grace"));
+    // Not sharing: nothing to be quiet about.
+    expect(await core.quietFor()).toBeNull();
+    const { revision } = data<{ revision: number }>(await core.share(hostKey, { frame: "{}" }));
+    expect(data<{ age: number }>(await core.screen(0)).age).toBe(0);
+    advance(12_000);
+    expect(await core.quietFor()).toBe(12_000);
+    // A beat changes nothing a display draws (the revision stays), only how long it has been.
+    expect(await core.share("wrong", { beat: true })).toMatchObject({ ok: false, status: 403 });
+    expect(data<{ revision: number }>(await core.share(hostKey, { beat: true })).revision).toBe(revision);
+    expect(data(await core.screen(revision))).toBeNull();
+    expect(await core.quietFor()).toBe(0);
+    advance(LIMITS.quietScreenMs + 1);
+    expect(await core.quietFor()).toBeGreaterThan(LIMITS.quietScreenMs);
+    data(await core.share(hostKey, { on: false }));
+    expect(await core.quietFor()).toBeNull();
+  });
+
+  it("puts the age on the cheap 'nothing new' answer too", async () => {
+    const namespace = memoryRooms();
+    const call = (path: string, body?: unknown) => handleRooms(new Request(`https://church.test${path}`, body === undefined ? {} : { method: "POST", body: JSON.stringify(body) }), namespace, "https://church.test", () => "page");
+    const opened = (await (await call("/v1/rooms", { name: "Grace" }))!.json()) as { code: string; hostKey: string };
+    const nothing = (await call(`/v1/rooms/${opened.code}/screen?after=0`))!;
+    expect(nothing.status).toBe(204);
+    expect(nothing.headers.get("x-screen-age")).toBeNull();
+    const shared = (await (await call(`/v1/rooms/${opened.code}/share`, { hostKey: opened.hostKey, frame: "{}" }))!.json()) as { revision: number };
+    const first = (await (await call(`/v1/rooms/${opened.code}/screen?after=0`))!.json()) as { age: number };
+    expect(first.age).toBeGreaterThanOrEqual(0);
+    expect((await call(`/v1/rooms/${opened.code}/share`, { hostKey: opened.hostKey, beat: true }))!.status).toBe(200);
+    const quiet = (await call(`/v1/rooms/${opened.code}/screen?after=${shared.revision}`))!;
+    expect(quiet.status).toBe(204);
+    expect(Number(quiet.headers.get("x-screen-age"))).toBeGreaterThanOrEqual(0);
+    expect(quiet.headers.get("access-control-expose-headers")).toContain("x-screen-age");
+    // Prayer requests and reactions go through to the room.
+    const { pid } = (await (await call(`/v1/rooms/${opened.code}/join`, { name: "Ama" }))!.json()) as { pid: string };
+    expect((await call(`/v1/rooms/${opened.code}/pray`, { pid, text: "For peace" }))!.status).toBe(403);
+    expect((await call(`/v1/rooms/${opened.code}/react`, { pid, kind: "amen" }))!.status).toBe(403);
+    expect((await call(`/v1/rooms/${opened.code}/settings`, { hostKey: opened.hostKey, prayer: true, reactions: true }))!.status).toBe(200);
+    expect((await call(`/v1/rooms/${opened.code}/pray`, { pid, text: "For peace" }))!.status).toBe(200);
+    expect((await call(`/v1/rooms/${opened.code}/react`, { pid, kind: "amen" }))!.status).toBe(200);
+  });
+});
+
 describe("rooms on Cloudflare", () => {
+
   it("opens a room with a join link, and passes phones through to their room", async () => {
     const namespace = memoryRooms();
     const call = (path: string, body?: unknown) => handleRooms(new Request(`https://church.test${path}`, body === undefined ? {} : { method: "POST", body: JSON.stringify(body) }), namespace, "https://church.test", (code) => `page ${code}`);
@@ -334,7 +458,7 @@ describe("rooms: a congregation on one Wi-Fi", () => {
   it("counts every person's upvote on one question, all from the church's one address", async () => {
     const { core } = room();
     const { hostKey } = data<{ hostKey: string }>(await core.create("ABC234", ""));
-    data(await core.settings(hostKey, { open: true }));
+    data(await core.settings(hostKey, { open: true, moderate: false }));
     const asker = data<{ pid: string }>(await core.join("Asker", "")).pid;
     const { id } = data<{ id: string }>(await core.ask(asker, "Will there be a baptism?", ""));
     for (let i = 0; i < 120; i++) data(await core.vote(data<{ pid: string }>(await core.join(`Voter ${i}`, "")).pid, id, "church-wifi"));

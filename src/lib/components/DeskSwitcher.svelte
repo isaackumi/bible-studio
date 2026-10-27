@@ -29,7 +29,12 @@
             ? t("Offline: changes stay on this computer and sync when the internet is back.")
             : t("Sync needs a look: {reason}", { reason: cloud.message || t("open Cloud space for details.") }),
   );
-  const waiting = $derived((audienceRoom.view?.questions.filter((question) => question.state === "pending").length ?? 0) > 0);
+  // Questions waiting for approval and prayer requests not read yet, counted while the panel is
+  // closed too (the room is looked at now and then). Premium, as the panel is.
+  const waiting = $derived(session.entitled("audience") ? audienceRoom.waiting : 0);
+  $effect(() => {
+    if (session.entitled("audience")) audienceRoom.resume();
+  });
 </script>
 
 <nav class="desk-switch" class:compact aria-label={t("Desk")}>
@@ -54,10 +59,10 @@
       <span class="name">{t("Studio")}</span>
     </button>
     <!-- The congregation's phones: Q&A, quizzes and polls (a drawer beside the desk). -->
-    <button type="button" class:on={audienceRoom.open} aria-label={t("Audience")} aria-pressed={audienceRoom.open} data-tip={t("Audience: live Q&A, quizzes, Bible games and polls on people's phones")} onclick={() => (audienceRoom.open ? audienceRoom.hide() : audienceRoom.show())}>
+    <button type="button" class:on={audienceRoom.open} aria-label={waiting ? t("Audience: {n} waiting", { n: waiting }) : t("Audience")} aria-pressed={audienceRoom.open} data-tip={t("Audience: live Q&A, quizzes, Bible games and polls on people's phones")} onclick={() => (audienceRoom.open ? audienceRoom.hide() : audienceRoom.show())}>
       <Icon name="users" size={16} />
       <span class="name">{t("Audience")}</span>
-      {#if waiting}<span class="dot" aria-hidden="true"></span>{/if}
+      {#if waiting}<span class="count" aria-hidden="true">{waiting > 99 ? "99+" : waiting}</span>{/if}
     </button>
     <!-- Pictures straight from a folder, and slideshows (a drawer, like Audience). Folders need the desktop app. -->
     {#if isDesktop()}
@@ -87,8 +92,10 @@
   .desk-switch .group button.on { border-color: var(--accent); background: var(--panel); color: var(--ink); }
   .name { display: none; white-space: nowrap; font-size: 12px; font-weight: 650; }
   .on .name { display: inline; }
-  /* Questions are waiting for the operator. */
+  /* Questions or prayer requests are waiting for the operator: how many. */
+  .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10.5px; font-weight: 750; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
   /* A slideshow is on the screen (amber while paused). */
   .dot.paused { background: #f5a524; }
   /* Sync: under way (pulsing), or needing a look (red). */

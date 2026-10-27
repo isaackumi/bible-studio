@@ -6,6 +6,7 @@
   import type { PresentationModel } from "../domain/types";
   import Screen from "./Screen.svelte";
   import { screenShows, type ScreenOutput } from "../display/screens";
+  import { t } from "../i18n/core";
 
   // A phone, tablet or TV browser used as a display (/d/CODE): it shows what the church's screen
   // shows, as the church's Church Studio shares it over the internet. Only the picture: no controls,
@@ -25,6 +26,9 @@
   /** The computer has not answered for a while. The picture stays up meanwhile: a dropped beat of
    * Wi-Fi must never blank the church's screen. */
   let offline = $state(false);
+  /** The server answers, but the church computer has not sent anything (nor said it is still
+   * sharing) for a while: it may have stopped. The picture stays up, with a small word. */
+  let silent = $state(false);
   let church = $state("");
   let width = $state(0);
   let height = $state(0);
@@ -35,6 +39,9 @@
     if (!width || !height) return { w: 0, h: 0 };
     return width / height > aspect ? { w: height * aspect, h: height } : { w: width, h: width / aspect };
   });
+
+  /** The church computer says it is still sharing every ten seconds: three missed, and the TV says so. */
+  const QUIET_MS = 30_000;
 
   onMount(() => {
     let revision = 0;
@@ -66,8 +73,13 @@
         lastSeen = Date.now();
         misses = 0;
         offline = false;
+        // How long since the computer was last heard from: on a "nothing new" answer in a header,
+        // on a new screen in the answer itself. Absent from an older server: then nothing is said.
+        const quiet = (age: unknown) => (silent = typeof age === "number" && Number.isFinite(age) && age > QUIET_MS);
+        if (response.status === 204) quiet(response.headers.get("x-screen-age") === null ? null : Number(response.headers.get("x-screen-age")));
         if (response.status === 200) {
-          const data = (await response.json()) as { on: boolean; revision: number; frame?: string; name: string };
+          const data = (await response.json()) as { on: boolean; revision: number; frame?: string; name: string; age?: number };
+          quiet(data.on ? data.age : null);
           revision = data.revision;
           church = data.name;
           if (data.on && data.frame) {
@@ -145,7 +157,10 @@
     </div>
     {#if offline}
       <p class="drop" role="status">Reconnecting…</p>
+    {:else if silent}
+      <p class="drop" role="status">{t("The church computer is not sending")}</p>
     {/if}
+
   {:else}
     <div class="wait">
       <svg class="mark" viewBox="0 0 256 256" width="64" height="64" aria-hidden="true"><path d="M52 32H108A8 8 0 0 1 116 40V80A8 8 0 0 1 108 88H40A8 8 0 0 1 32 80V52A20 20 0 0 1 52 32Z" fill="#f5f5f5" /><path d="M148 32H204A20 20 0 0 1 224 52V80A8 8 0 0 1 216 88H148A8 8 0 0 1 140 80V40A8 8 0 0 1 148 32Z" fill="#fa4f00" /><path d="M40 112H108A8 8 0 0 1 116 120V216A8 8 0 0 1 108 224H52A20 20 0 0 1 32 204V120A8 8 0 0 1 40 112Z" fill="#f5f5f5" /><path d="M148 112H216A8 8 0 0 1 224 120V204A20 20 0 0 1 204 224H148A8 8 0 0 1 140 216V120A8 8 0 0 1 148 112Z" fill="#f5f5f5" /></svg>
