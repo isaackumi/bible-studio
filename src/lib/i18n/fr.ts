@@ -5554,4 +5554,6 @@ export const fr: Readonly<Record<string, string>> = {
   "macOS has not given Church Studio permission to capture the audience window yet.": "macOS n’a pas encore autorisé Church Studio à capturer la fenêtre de l’assemblée.",
   "Quit and reopen": "Quitter et rouvrir",
   "Turn on Church Studio in Screen & System Audio Recording, then quit and reopen it. If it is on already but macOS still asks (this happens after an update), remove Church Studio from that list with the − button, reopen Church Studio and allow it again.": "Activez Church Studio dans Enregistrement de l’écran et de l’audio du système, puis quittez-le et rouvrez-le. S’il est déjà activé mais que macOS demande encore (cela arrive après une mise à jour), retirez Church Studio de cette liste avec le bouton −, rouvrez Church Studio et autorisez-le de nouveau.",
+  "Streaming on a Mac asks once": "Sur Mac, la diffusion ne demande qu’une fois",
+  "After you allow screen recording, quit and reopen Church Studio: macOS only applies it after a restart. The notice now says so and reopens it for you, instead of asking again each time.": "Après avoir autorisé l’enregistrement de l’écran, quittez et rouvrez Church Studio : macOS ne l’applique qu’après un redémarrage. L’avis le dit maintenant et le rouvre pour vous, au lieu de redemander à chaque fois.",
 };

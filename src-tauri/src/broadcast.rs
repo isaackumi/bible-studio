@@ -228,7 +228,9 @@ mod tests {
     #[test]
     fn recordings_go_to_movies_by_default() {
         let path = record_path(None, "2026-10-18 10:30");
-        assert!(path.ends_with("Movies/Church Studio/Service 2026-10-18 10-30.mp4"), "{}", path.display());
+        // Movies on a Mac, Videos on Windows: each system's own folder for films.
+        let folder = if cfg!(target_os = "windows") { "Videos" } else { "Movies" };
+        assert!(path.ends_with(format!("{folder}/Church Studio/Service 2026-10-18 10-30.mp4")), "{}", path.display());
         let chosen = record_path(Some("~/Desktop/Recordings"), "x");
         assert!(chosen.ends_with("Desktop/Recordings/Service x.mp4"));
     }
