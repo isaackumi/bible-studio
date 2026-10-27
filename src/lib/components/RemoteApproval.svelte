@@ -10,9 +10,12 @@
     {#each waiting as request (request.id)}
       <div class="request">
         <p><strong>{request.name}</strong> {t("wants to control this desk.")}</p>
+        <!-- The operator chooses how much the phone may do; Preview only can never go live. -->
+        <p class="hint">{t("Preview only: it can move Preview and pick items, but only the desk goes live.")}</p>
         <div class="buttons">
-          <button type="button" class="desk-btn primary" onclick={() => void session.approveRemote(request.id)}>{t("Allow")}</button>
           <button type="button" class="desk-btn" onclick={() => session.declineRemote(request.id)}>{t("Decline")}</button>
+          <button type="button" class="desk-btn" onclick={() => void session.approveRemote(request.id, "preview")}>{t("Preview only")}</button>
+          <button type="button" class="desk-btn primary" onclick={() => void session.approveRemote(request.id, "full")}>{t("Full control")}</button>
         </div>
       </div>
     {/each}
@@ -40,5 +43,6 @@
     font: 13px/1.4 var(--font-ui);
   }
   .request p { margin: 0 0 10px; }
-  .buttons { display: flex; gap: 8px; justify-content: flex-end; }
+  .request .hint { margin-top: -4px; color: var(--muted); font-size: 12px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 </style>

@@ -24,6 +24,25 @@ export type RemoteCommandId = (typeof REMOTE_COMMANDS)[number];
 /** These change Program (or the audience screen itself). Next/Previous only move Preview; live-next/live-previous step and go live at once. */
 export const REMOTE_LIVE_COMMANDS: readonly RemoteCommandId[] = ["take", "cut", "live-next", "live-previous", "undo", "clear", "clear-words", "black", "logo", "open-output", "close-output", "timer-pause", "timer-resume", "timer-reset"];
 
+/**
+ * What a paired phone may do. Full control is every command (as before levels existed). Preview
+ * only moves Preview and picks what is next; it never changes what the audience sees or hears.
+ */
+export type RemoteAccess = "full" | "preview";
+/** The commands a Preview-only phone may send: they move Preview, never Program. */
+export const REMOTE_PREVIEW_COMMANDS: readonly RemoteCommandId[] = ["next", "previous", "next-item", "previous-item"];
+
+/** A controller key can last for ever or a set number of days (0: never expires). */
+export const CONTROLLER_EXPIRY_DAYS = [0, 1, 7, 30] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How fast one phone or key may press: a burst of this many, refilled at this many a second.
+ * Generous for a person (or a Stream Deck page of buttons), far short of a stuck script.
+ */
+export const REMOTE_BURST = 20;
+export const REMOTE_PER_SECOND = 5;
+
 export type RemotePairing = { code: string; token: string; expiresAt: number; attempts: number };
 
 export type RemoteDevice = {
@@ -39,6 +58,8 @@ export type RemoteDevice = {
   viewer?: boolean;
   /** A captions link (congregants' phones): reads the captions only, never expires. */
   captions?: boolean;
+  /** "preview": may move Preview only. Absent is full control, so phones paired before levels keep it. */
+  access?: "preview";
 };
 
 export type RemotePending = {
@@ -136,6 +157,7 @@ export function pruneRemoteGate(gate: RemoteGate, now: number): RemoteGate {
   return {
     pairing: gate.pairing && gate.pairing.expiresAt > now ? gate.pairing : null,
     pending: gate.pending.filter((entry) => now - entry.at < REMOTE_PENDING_MS),
+    // An expired controller key stays listed (and refused) until the operator removes it.
     devices: gate.devices.filter((device) => device.controller || device.viewer || device.captions || device.expiresAt > now),
   };
 }
@@ -215,6 +237,8 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
 
   const device = ctx.tokenHash ? gate.devices.find((entry) => entry.tokenHash === ctx.tokenHash) : undefined;
   if (!device) return deny(gate, "unauthorized", "This phone is not paired, or the desk removed it. Pair again.");
+  // A controller key that has run out: refused, with the reason, until a new key replaces it.
+  if (device.controller && device.expiresAt <= ctx.now) return deny(gate, "expired", "This controller key has expired. Make a new key in Settings › Phone remote.");
   const seen: RemoteDevice = { ...device, lastSeen: ctx.now, expiresAt: device.controller || device.viewer || device.captions ? device.expiresAt : ctx.now + REMOTE_SESSION_MS };
   const next = { ...gate, devices: gate.devices.map((entry) => (entry.id === device.id ? seen : entry)) };
   const ok = (action: RemoteAction, type = "state"): RemoteRoute => ({
@@ -238,6 +262,8 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
       return ok({ kind: "state" });
     case "command":
       if (!payload.id || !isRemoteCommand(payload.id)) return deny(next, "denied", "Unknown command.");
+      // Checked here on the desk, whatever buttons the phone showed.
+      if (!remoteAllows(device, payload.id)) return deny(next, "denied", "This phone can move Preview only. The desk decides what goes live.");
       return ok({ kind: "command", id: payload.id });
     case "preview-item":
       if (!payload.itemId) return deny(next, "denied", "No service item was chosen.");
@@ -250,11 +276,37 @@ export function routeRemote(input: RemoteGate, envelope: RemoteEnvelope, ctx: Re
   }
 }
 
+export function remoteAccess(device: Pick<RemoteDevice, "access">): RemoteAccess {
+  return device.access === "preview" ? "preview" : "full";
+}
+
+/** Whether this device may send this command. Preview-only devices move Preview and nothing else. */
+export function remoteAllows(device: Pick<RemoteDevice, "access">, command: RemoteCommandId): boolean {
+  return remoteAccess(device) === "full" || REMOTE_PREVIEW_COMMANDS.includes(command);
+}
+
+/** The commands this device may send, so the phone shows only those buttons. */
+export function allowedCommands(device: Pick<RemoteDevice, "access">): RemoteCommandId[] {
+  return REMOTE_COMMANDS.filter((command) => remoteAllows(device, command));
+}
+
+/** Change what a paired device may do; the operator can do this at any time. */
+export function setDeviceAccess(gate: RemoteGate, deviceId: string, access: RemoteAccess): RemoteGate {
+  return {
+    ...gate,
+    devices: gate.devices.map((device) => {
+      if (device.id !== deviceId) return device;
+      const { access: _old, ...rest } = device;
+      return access === "preview" ? { ...rest, access: "preview" } : rest;
+    }),
+  };
+}
+
 /** Operator approval: the device is stored by token hash; the token itself is handed out once. */
-export function approvePending(gate: RemoteGate, requestId: string, token: string, tokenHash: string, now: number): RemoteGate {
+export function approvePending(gate: RemoteGate, requestId: string, token: string, tokenHash: string, now: number, access: RemoteAccess = "full"): RemoteGate {
   const request = gate.pending.find((entry) => entry.id === requestId && entry.status === "waiting");
   if (!request) return gate;
-  const device: RemoteDevice = { id: request.id, name: request.name, tokenHash, pairedAt: now, lastSeen: now, expiresAt: now + REMOTE_SESSION_MS };
+  const device: RemoteDevice = { id: request.id, name: request.name, tokenHash, pairedAt: now, lastSeen: now, expiresAt: now + REMOTE_SESSION_MS, ...(access === "preview" ? { access: "preview" as const } : {}) };
   return {
     ...gate,
     pending: gate.pending.map((entry) => (entry === request ? { ...entry, status: "approved", token } : entry)),
@@ -291,6 +343,7 @@ export function sanitizeRemoteDevices(value: unknown): RemoteDevice[] {
         ...(record.controller === true ? { controller: true } : {}),
         ...(record.viewer === true ? { viewer: true } : {}),
         ...(record.captions === true ? { captions: true } : {}),
+        ...(record.access === "preview" ? { access: "preview" as const } : {}),
       },
     ];
   });
@@ -318,9 +371,33 @@ export function framePayload(
   };
 }
 
-/** A controller key: stored by hash like a phone, but never expires. The token is shown once. */
-export function controllerDevice(id: string, name: string, tokenHash: string, now: number): RemoteDevice {
-  return { id, name: deviceName(name) || "Controller", tokenHash, pairedAt: now, lastSeen: 0, expiresAt: Number.MAX_SAFE_INTEGER, controller: true };
+/** A controller key: stored by hash like a phone; it lasts `days` (0: never expires). The token is shown once. */
+export function controllerDevice(id: string, name: string, tokenHash: string, now: number, days = 0): RemoteDevice {
+  return { id, name: deviceName(name) || "Controller", tokenHash, pairedAt: now, lastSeen: 0, expiresAt: controllerExpiry(now, days), controller: true };
+}
+
+/** When a key made now for `days` stops working: never, for 0 or a choice not on the list. */
+export function controllerExpiry(now: number, days: number): number {
+  return days > 0 && (CONTROLLER_EXPIRY_DAYS as readonly number[]).includes(days) ? now + days * DAY_MS : Number.MAX_SAFE_INTEGER;
+}
+
+/** Whether a key ever expires (keys made before expiry existed never do). */
+export function controllerExpires(device: Pick<RemoteDevice, "expiresAt">): boolean {
+  return device.expiresAt < Number.MAX_SAFE_INTEGER;
+}
+
+/** One phone's or key's allowance of presses: tokens left, and when it was last topped up. */
+export type RemoteBudget = { tokens: number; at: number };
+
+/**
+ * Spend one press from a budget (a token bucket); `ok` false means drop the press. A budget starts
+ * full, so a burst of REMOTE_BURST goes through at once, then REMOTE_PER_SECOND keep coming.
+ */
+export function spendRemoteBudget(budget: RemoteBudget | undefined, now: number, burst = REMOTE_BURST, perSecond = REMOTE_PER_SECOND): { budget: RemoteBudget; ok: boolean } {
+  const start = budget ?? { tokens: burst, at: now };
+  const tokens = Math.min(burst, start.tokens + (Math.max(0, now - start.at) / 1000) * perSecond);
+  if (tokens < 1) return { budget: { tokens, at: now }, ok: false };
+  return { budget: { tokens: tokens - 1, at: now }, ok: true };
 }
 
 /** A stage link for a phone or tablet: read-only, stored by hash, never expires. The token is shown once. */
