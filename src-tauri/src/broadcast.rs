@@ -31,6 +31,9 @@ pub struct Line {
 /// One status line for the desk ("broadcast-status"), for the Windows engine (the Mac helper prints its own).
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub fn line(line: String) -> Line {
+    if !line.starts_with(r#"{"kind":"stats""#) {
+        log::info!("broadcast: {}", line.chars().take(400).collect::<String>());
+    }
     Line { line }
 }
 
@@ -122,6 +125,10 @@ pub fn start(app: tauri::AppHandle, options: Options, stamp: String) -> Result<O
         let stdin = child.stdin.take().ok_or("The streaming helper could not be stopped later.")?;
         std::thread::spawn(move || {
             for line in std::io::BufRead::lines(std::io::BufReader::new(stdout)).map_while(Result::ok) {
+                // What it says, not the running counts, goes to the log, so a support file shows why it stopped.
+                if !line.starts_with(r#"{"kind":"stats""#) {
+                    log::info!("broadcast: {}", line.chars().take(400).collect::<String>());
+                }
                 let _ = app.emit("broadcast-status", Line { line });
             }
             let _ = app.emit("broadcast-status", Line { line: r#"{"kind":"end"}"#.into() });

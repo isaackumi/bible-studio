@@ -5451,7 +5451,9 @@ class Session {
     try {
       if (!options.pattern && !this.output.online) await this.openAudience();
       const saved = await invoke<string | null>("start_broadcast", {
-        options: { rtmp, recordFolder: options.record ? settings.recordFolder || null : null, width: quality.width, height: quality.height, fps: quality.fps, videoKbps: quality.videoKbps, audio: settings.sound, pattern: options.pattern === true },
+        // Recording with no folder chosen is still recording: an empty folder means the usual one
+        // (Movies or Videos › Church Studio). Null is "do not record".
+        options: { rtmp, recordFolder: options.record ? settings.recordFolder : null, width: quality.width, height: quality.height, fps: quality.fps, videoKbps: quality.videoKbps, audio: settings.sound, pattern: options.pattern === true },
         stamp: recordingStamp(),
       });
       this.broadcastState = { ...this.broadcastState, saved: saved ?? null };
@@ -5501,6 +5503,7 @@ class Session {
 
   private broadcastFailed = (message: string, fix: "permission" | "settings" | "space" | null = null) => {
     this.broadcastState = { ...this.broadcastState, status: "error", message };
+    if (this.desktop()) void invoke("log_note", { line: `broadcast did not start: ${message}` }).catch(() => {});
     const actions: Array<{ label: string; run: () => void }> = [];
     if (fix === "permission") {
       actions.push({ label: t("Open Screen Recording settings"), run: () => { void openPrivacySettings("screen").catch(() => {}); this.dismissToast(); } });

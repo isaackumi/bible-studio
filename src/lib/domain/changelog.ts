@@ -20,6 +20,7 @@ export const CHANGELOG: Release[] = [
     date: "2026-10-27",
     highlights: [
       { icon: "video", title: msg("Stream and record on Windows"), text: msg("Stream & record now works on Windows too: to YouTube, Facebook or any RTMP service, and to a video file in Videos › Church Studio. The first time, the recording engine downloads once. If the stream drops, the recording carries on."), show: null },
+      { icon: "download", title: msg("Record only works straight away"), text: msg("Recording no longer needs a folder chosen first: it goes to Movies › Church Studio on a Mac and Videos › Church Studio on Windows unless you pick another."), show: null },
       { icon: "check", title: msg("Streaming on a Mac asks once"), text: msg("After you allow screen recording, quit and reopen Church Studio: macOS only applies it after a restart. The notice now says so and reopens it for you, instead of asking again each time."), show: null },
       { icon: "mic", title: msg("See how sure listening is"), text: msg("Every verse listening finds shows a percentage: green for a close match, yellow for a medium one, red for one that does not match well. Red ones wait under Detections and change nothing."), show: null },
     ],
