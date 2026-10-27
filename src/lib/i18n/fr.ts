@@ -5540,4 +5540,11 @@ export const fr: Readonly<Record<string, string>> = {
   "{reference} is on Preview. LIVE still sends Program.": "{reference} est dans l’Aperçu. DIRECT l’envoie toujours au Direct.",
   "Not a good match: check it before showing it": "Pas une bonne correspondance : vérifiez avant de l’afficher",
   "A close match to what was said": "Correspond bien à ce qui a été dit",
+  "Streaming and recording work in the Church Studio app for Mac and Windows.": "La diffusion et l’enregistrement fonctionnent dans l’application Church Studio pour Mac et Windows.",
+  "Streaming and recording work on Mac and Windows. On this computer, OBS can capture the audience window and stream or record it.": "La diffusion et l’enregistrement fonctionnent sur Mac et Windows. Sur cet ordinateur, OBS peut capturer la fenêtre de l’assemblée et la diffuser ou l’enregistrer.",
+  "Getting the recording engine (once, {size} MB)…": "Téléchargement du moteur d’enregistrement (une seule fois, {size} Mo)…",
+  "Getting the recording engine: {percent}%": "Téléchargement du moteur d’enregistrement : {percent} %",
+  "The recording engine could not be fetched: {error} Check the internet connection and try again.": "Le moteur d’enregistrement n’a pas pu être téléchargé : {error} Vérifiez la connexion internet et réessayez.",
+  "The recording engine is ready": "Le moteur d’enregistrement est prêt",
+  "It stays on this computer. Recording and streaming start straight away from now on.": "Il reste sur cet ordinateur. L’enregistrement et la diffusion démarrent tout de suite désormais.",
 };

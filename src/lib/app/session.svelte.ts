@@ -5408,14 +5408,15 @@ class Session {
   startBroadcast = async (options: { stream: boolean; record: boolean; pattern?: boolean }) => {
     if (!this.requireFeature(options.stream ? "streaming" : "recording")) return false;
     if (!this.desktop()) {
-      this.broadcastFailed(t("Streaming and recording work in the Church Studio app for Mac."));
+      this.broadcastFailed(t("Streaming and recording work in the Church Studio app for Mac and Windows."));
       return false;
     }
-    // Only the Mac app streams and records so far; elsewhere the permission check below would wrongly name macOS.
-    if (computerOs() !== "mac") {
-      this.broadcastFailed(t("Streaming and recording work on a Mac for now. On this computer, OBS can capture the audience window and stream or record it."));
+    if (computerOs() !== "mac" && computerOs() !== "windows") {
+      this.broadcastFailed(t("Streaming and recording work on Mac and Windows. On this computer, OBS can capture the audience window and stream or record it."));
       return false;
     }
+    // Windows records with an engine fetched once, the first time it is needed (it is too large to ship to everyone).
+    if (!(await this.recordingEngineReady())) return false;
     const settings = this.workspace.broadcast;
     let rtmp: string | null = null;
     if (options.stream) {
@@ -5427,7 +5428,7 @@ class Session {
       rtmp = target.url;
     }
     // macOS must allow capturing the audience window. The first time it asks; after that (and after
-    // an update, until the app is signed by Apple) it is switched on in System Settings.
+    // an update, until the app is signed by Apple) it is switched on in System Settings. Windows does not ask.
     if (!options.pattern && !(await invoke<boolean>("screen_capture_allowed", { ask: true }).catch(() => true))) {
       this.broadcastFailed(t("macOS needs your permission to capture the audience window."), "permission");
       return false;
@@ -5457,6 +5458,36 @@ class Session {
       this.broadcastFailed(error instanceof Error ? error.message : String(error));
       return false;
     }
+  };
+
+  /**
+   * Windows' recording engine: here already, or fetched now (once, ~80 MB, checked against its
+   * published fingerprint) with its progress in the broadcast line. False when it could not be had.
+   */
+  private recordingEngineReady = async (): Promise<boolean> => {
+    const engine = await invoke<{ needed: boolean; ready: boolean; bytes: number }>("broadcast_engine").catch(() => ({ needed: false, ready: true, bytes: 0 }));
+    if (!engine.needed || engine.ready) return true;
+    this.broadcastState = { ...this.broadcastState, status: "starting", message: t("Getting the recording engine (once, {size} MB)…", { size: Math.round(engine.bytes / 1_000_000) }) };
+    const done = new Promise<string | null>((resolve) => {
+      void listen<{ received: number; total: number; done: boolean; error: string | null }>("broadcast-engine", (event) => {
+        const progress = event.payload;
+        if (progress.done) resolve(progress.error);
+        else this.broadcastState = { ...this.broadcastState, message: t("Getting the recording engine: {percent}%", { percent: Math.round((100 * progress.received) / Math.max(1, progress.total)) }) };
+      }).then((stop) => done.finally(stop));
+    });
+    try {
+      await invoke("broadcast_engine_install");
+    } catch (error) {
+      this.broadcastFailed(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+    const error = await done;
+    if (error) {
+      this.broadcastFailed(t("The recording engine could not be fetched: {error} Check the internet connection and try again.", { error }));
+      return false;
+    }
+    this.notify(t("The recording engine is ready"), { detail: t("It stays on this computer. Recording and streaming start straight away from now on.") });
+    return true;
   };
 
   /**

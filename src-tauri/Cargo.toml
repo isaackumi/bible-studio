@@ -81,7 +81,7 @@ windows-registry = "0.6"
 # Sound outputs (audio_out.rs): Windows' own list of them, and choosing the default. Already built
 # for Tauri; this only turns on the parts used.
 windows-core = "0.62"
-windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_Devices_FunctionDiscovery", "Win32_UI_Shell_PropertiesSystem", "Win32_Foundation", "Win32_System_Variant", "Win32_Devices_Display", "Win32_Graphics_Gdi"] }
+windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_Devices_FunctionDiscovery", "Win32_UI_Shell_PropertiesSystem", "Win32_Foundation", "Win32_System_Variant", "Win32_Devices_Display", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common"] }
 
 [profile.release]
 codegen-units = 1

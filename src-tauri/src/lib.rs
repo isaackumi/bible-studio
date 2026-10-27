@@ -15,6 +15,7 @@ mod remote;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod noise;
 mod broadcast;
+mod broadcast_win;
 mod ndi;
 mod voice;
 mod bundle;
@@ -1044,6 +1045,36 @@ fn open_system_monitor() -> Result<(), String> {
     result.map(|_| ()).map_err(|error| format!("Could not open the task manager. {error}"))
 }
 
+/// Windows' recording engine (FFmpeg, downloaded once): whether it is here, and its download size.
+#[tauri::command]
+fn broadcast_engine(app: tauri::AppHandle) -> serde_json::Value {
+    #[cfg(target_os = "windows")]
+    return serde_json::json!({ "needed": true, "ready": broadcast_win::windows::ready(&app), "bytes": broadcast_win::ENGINE_BYTES });
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        serde_json::json!({ "needed": false, "ready": true, "bytes": 0 })
+    }
+}
+
+/// Download the recording engine (Windows); `broadcast-engine` events say how far it is.
+#[tauri::command]
+fn broadcast_engine_install(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    return broadcast_win::windows::install(app);
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn broadcast_engine_cancel() {
+    #[cfg(target_os = "windows")]
+    broadcast_win::windows::cancel_install();
+}
+
 /// Kinds of file the app exports: what Save may write (never a program, wherever it is chosen).
 const SAVE_KINDS: &[&str] = &["txt", "csv", "json", "html", "xml", "zip"];
 
@@ -1284,6 +1315,9 @@ pub fn run() {
         .invoke_handler({
             let handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![
             save_file,
+            broadcast_engine,
+            broadcast_engine_install,
+            broadcast_engine_cancel,
             system_load,
             log_note,
             open_system_monitor,

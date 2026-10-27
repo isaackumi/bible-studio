@@ -80,6 +80,6 @@ export function capabilityReport(input: CapabilityInput): CapabilityRow[] {
     },
     { id: "media", label: "Images, video and PDF", available: true, detail: "Stored on this computer. PowerPoint/Keynote: save as PDF first." },
     { id: "ndi", label: "NDI in/out", available: false, detail: "Not built yet: needs the NDI runtime and the desktop app." },
-    { id: "recording", label: "Recording and streaming", available: false, detail: "Not built yet. Capture the audience window in OBS meanwhile." },
+    { id: "recording", label: "Recording and streaming", available: desktop, detail: desktop ? "The audience screen to YouTube, Facebook or any RTMP service, and to a video file, from this app (Mac and Windows)." : "In the Church Studio desktop app (Mac and Windows)." },
   ];
 }

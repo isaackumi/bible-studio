@@ -1,9 +1,8 @@
-//! Going live and recording: runs the church-studio-broadcast helper, which captures the audience
-//! window and encodes it with the Mac's own H.264 and AAC encoders, to an .mp4 file and/or an RTMP
-//! or RTMPS stream (YouTube, Facebook, any RTMP service). Its JSON status lines come to the app
-//! as "broadcast-status" events.
-// The helper exists on macOS only; elsewhere the commands answer "not available".
-#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
+//! Going live and recording: on macOS the church-studio-broadcast helper captures the audience
+//! window and encodes it with the Mac's own H.264 and AAC encoders; on Windows FFmpeg does
+//! (broadcast_win.rs). Either way to an .mp4 file and/or an RTMP or RTMPS stream (YouTube,
+//! Facebook, any RTMP service), with the same JSON status lines as "broadcast-status" events.
+#![cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
 
@@ -25,8 +24,14 @@ pub struct Options {
 }
 
 #[derive(Clone, Serialize)]
-struct Line {
+pub struct Line {
     line: String,
+}
+
+/// One status line for the desk ("broadcast-status"), for the Windows engine (the Mac helper prints its own).
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub fn line(line: String) -> Line {
+    Line { line }
 }
 
 #[cfg(target_os = "macos")]
@@ -39,14 +44,16 @@ mod running {
     pub static NOW: Mutex<Option<Running>> = Mutex::new(None);
 }
 
-/// Where a recording goes: the chosen folder (with ~ for the home folder), or Movies/Church Studio.
+/// Where a recording goes: the chosen folder (with ~ for the home folder), or Movies/Church Studio
+/// (Videos/Church Studio on Windows).
 pub fn record_path(folder: Option<&str>, stamp: &str) -> std::path::PathBuf {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("."));
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("."));
+    let movies = if cfg!(target_os = "windows") { "Videos" } else { "Movies" };
     let dir = match folder.map(str::trim).filter(|value| !value.is_empty()) {
         Some("~") => home,
         Some(value) if value.starts_with("~/") => home.join(&value[2..]),
         Some(value) => std::path::PathBuf::from(value),
-        None => home.join("Movies").join("Church Studio"),
+        None => home.join(movies).join("Church Studio"),
     };
     let clean: String = stamp.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == ' ' { c } else { '-' }).collect();
     dir.join(format!("Service {clean}.mp4"))
@@ -122,10 +129,27 @@ pub fn start(app: tauri::AppHandle, options: Options, stamp: String) -> Result<O
         *running::NOW.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(running::Running { child, stdin });
         Ok(saved)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(url) = options.rtmp.as_deref().filter(|url| !url.trim().is_empty()) {
+            if !stream_url_ok(url) {
+                return Err("The stream address must start with rtmp:// or rtmps:// and end with the stream key.".into());
+            }
+        }
+        let saved = options.record_folder.is_some().then(|| record_path(options.record_folder.as_deref(), &stamp));
+        if options.rtmp.as_deref().is_none_or(|url| url.trim().is_empty()) && saved.is_none() {
+            return Err("Choose to stream, record, or both.".into());
+        }
+        if let Some(dir) = saved.as_ref().and_then(|path| path.parent()) {
+            std::fs::create_dir_all(dir).map_err(|error| format!("The recordings folder could not be made. {error}"))?;
+        }
+        crate::broadcast_win::windows::start(app, options, saved.clone())?;
+        Ok(saved.map(|path| path.display().to_string()))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = (app, options, stamp);
-        Err("Streaming and recording work on macOS for now. OBS or vMix can take Program over NDI meanwhile.".into())
+        Err("Streaming and recording work on macOS and Windows. OBS or vMix can take Program over NDI meanwhile.".into())
     }
 }
 
@@ -150,7 +174,13 @@ pub fn screen_capture_allowed(ask: bool) -> bool {
         }
         false
     }
-    #[cfg(not(target_os = "macos"))]
+    // Windows lets a desktop app capture its own screens without asking.
+    #[cfg(target_os = "windows")]
+    {
+        let _ = ask;
+        true
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = ask;
         false
@@ -158,6 +188,8 @@ pub fn screen_capture_allowed(ask: bool) -> bool {
 }
 
 pub fn stop() {
+    #[cfg(target_os = "windows")]
+    crate::broadcast_win::windows::stop();
     #[cfg(target_os = "macos")]
     {
         let taken = running::NOW.lock().unwrap_or_else(|poison| poison.into_inner()).take();
