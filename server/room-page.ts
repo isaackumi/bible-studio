@@ -1,6 +1,7 @@
 // The page a phone opens from the QR code (/j/CODE): join, ask and upvote questions, answer quizzes
-// and polls. One small page, no app, any connection. Words from the room are always set as text,
-// never as HTML, so nothing anyone types can run on another person's phone.
+// and polls, send a prayer request (to the church alone) or a quick reaction. One small page, no
+// app, any connection. Words from the room are always set as text, never as HTML, so nothing anyone
+// types can run on another person's phone.
 
 import { CHOICE_STYLES, PLAYER_COLORS, TEAMS } from "../src/lib/domain/game-colors";
 import { PHONE_WORDS, phoneWord, type PhoneLanguage } from "./room-words";
@@ -125,6 +126,14 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   .choice:disabled { cursor: default; }
   .board { margin-top: 14px; }
   .board li { display: flex; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  /* Reactions: a row of big taps, each resting a moment after it is sent. */
+  .reactions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+  .reactions button { height: 52px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); font-size: 24px; line-height: 1; }
+  .reactions button.word { font-size: 15px; font-weight: 750; }
+  .reactions button:disabled { opacity: 0.45; }
+  .reactions button.sent { border-color: var(--accent); animation: pop 0.35s ease-out; }
+  .private { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .private input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
   .hidden { display: none !important; }
   .offline { position: sticky; top: 0; z-index: 5; margin: -4px 0 14px; padding: 10px 14px; border-radius: 12px; background: #5a3a12; color: #ffd9a3; font-size: 14px; font-weight: 650; text-align: center; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -159,6 +168,22 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       <div class="row"><span id="ask-hint"></span><span id="count">0 / 280</span></div>
       <button class="primary" id="ask-btn">${w("Send question")}</button>
       <p class="note" id="ask-note"></p>
+    </div>
+
+    <div id="react-bar" class="reactions hidden" role="group" aria-label="${w("React")}">
+      <button type="button" data-react="pray" aria-label="${w("Praying")}">🙏</button>
+      <button type="button" data-react="love" aria-label="${w("Love")}">❤️</button>
+      <button type="button" data-react="clap" aria-label="${w("Clap")}">👏</button>
+      <button type="button" data-react="praise" aria-label="${w("Praise")}">🙌</button>
+      <button type="button" class="word" data-react="amen">${w("Amen")}</button>
+    </div>
+
+    <div id="pray-card" class="card hidden">
+      <label for="prayer">${w("Prayer request")}</label>
+      <textarea id="prayer" maxlength="280" placeholder="${w("What can the church pray for?")}"></textarea>
+      <label class="private"><input type="checkbox" id="pray-anon"> ${w("Send without my name")}</label>
+      <button class="primary" id="pray-btn">${w("Send prayer request")}</button>
+      <p class="note" id="pray-note">${w("Only the church sees this. It is never shown on the screen or on other phones.")}</p>
     </div>
 
     <div class="tabs" role="tablist">
@@ -243,6 +268,30 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
       if (/Join/.test(e.message)) { try { localStorage.removeItem(KEY); } catch (x) {} pid = null; show("live", false); show("join", true); }
       note("ask-note", e.message, "bad");
     }).then(function () { busy = false; $("ask-btn").disabled = false; });
+  }
+
+  /** A prayer request: to the church alone, with this phone's name or without. */
+  function pray() {
+    var text = $("prayer").value.trim();
+    if (text.length < 3 || busy) return;
+    busy = true; $("pray-btn").disabled = true;
+    post("/pray", { pid: pid, text: text, anonymous: $("pray-anon").checked }).then(function () {
+      $("prayer").value = "";
+      note("pray-note", tr("Sent. Only the church sees it."), "ok");
+    }).catch(function (e) {
+      if (/Join/.test(e.message)) { try { localStorage.removeItem(KEY); } catch (x) {} pid = null; show("live", false); show("join", true); }
+      note("pray-note", e.message, "bad");
+    }).then(function () { busy = false; $("pray-btn").disabled = false; });
+  }
+
+  /** A reaction: sent at once; the buttons rest for two seconds (the room takes one that often). */
+  function react(button) {
+    var buttons = document.querySelectorAll("#react-bar button");
+    Array.prototype.forEach.call(buttons, function (b) { b.disabled = true; });
+    button.classList.add("sent");
+    if (navigator.vibrate) navigator.vibrate(15);
+    post("/react", { pid: pid, kind: button.getAttribute("data-react") }).catch(function () {});
+    setTimeout(function () { button.classList.remove("sent"); Array.prototype.forEach.call(buttons, function (b) { b.disabled = false; }); }, 2000);
   }
 
   function vote(id) {
@@ -339,6 +388,8 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
     });
     $("ask-hint").textContent = d.waiting ? tr("{n} of yours waiting", { n: d.waiting }) : "";
     show("ask-card", d.room.open);
+    show("pray-card", !!d.room.prayer);
+    show("react-bar", !!d.room.reactions);
   }
 
   function drawActivity(d) {
@@ -462,6 +513,9 @@ export function roomPage(code: string, origin: string, language: PhoneLanguage =
   $("new-name").onkeydown = function (e) { if (e.key === "Enter") rename(); };
   $("ask-btn").onclick = ask;
   $("question").oninput = count;
+  $("pray-btn").onclick = pray;
+  Array.prototype.forEach.call(document.querySelectorAll("#react-bar button"), function (b) { b.onclick = function () { react(b); }; });
+
   Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
     b.onclick = function () { sort = b.getAttribute("data-sort"); Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (x) { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", x === b); }); last = null; refresh(); };
   });

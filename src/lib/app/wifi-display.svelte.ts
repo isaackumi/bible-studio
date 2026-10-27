@@ -63,6 +63,7 @@ class WifiDisplay {
   private stopWatching: (() => void) | null = null;
   private sendTimer: ReturnType<typeof setTimeout> | undefined;
   private countTimer: ReturnType<typeof setInterval> | undefined;
+  private beatTimer: ReturnType<typeof setInterval> | undefined;
   private sent = "";
 
   /** Turned on before: on again after a restart, so a TV left on picks the screen back up. */
@@ -109,6 +110,11 @@ class WifiDisplay {
         this.sendTimer = setTimeout(() => void this.send(frame), 120);
       });
     });
+    // Program may stay the same a long while: every ten seconds this says the app is still drawing
+    // it, so a TV can tell a still screen from a computer whose app has stopped.
+    this.beatTimer = setInterval(() => {
+      if (this.sent) void invoke("lan_screen_beat").catch(() => {});
+    }, 10_000);
     this.countTimer = setInterval(() => {
       void invoke<number>("lan_screen_watching")
         .then((n) => {
@@ -135,7 +141,9 @@ class WifiDisplay {
     this.stopWatching = null;
     clearTimeout(this.sendTimer);
     clearInterval(this.countTimer);
+    clearInterval(this.beatTimer);
     this.sent = "";
+
     try {
       localStorage.removeItem(KEY);
     } catch {

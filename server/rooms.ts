@@ -16,13 +16,16 @@
 //   POST /v1/rooms/:code/ask             {pid, text, name?}      → {question}
 //   POST /v1/rooms/:code/vote            {pid, questionId}       → {votes}
 //   POST /v1/rooms/:code/answer          {pid, choice}           → {ok}
+//   POST /v1/rooms/:code/pray            {pid, text, name?, anonymous?} → {id}  (a prayer request: for the desk only)
+//   POST /v1/rooms/:code/react           {pid, kind}             → {ok}          (🙏 ❤️ 👏 🙌 Amen, counted for a minute)
 //   POST /v1/rooms/:code/host            {hostKey}               → everything, for the desk
 //   POST /v1/rooms/:code/moderate        {hostKey, questionId, action}
-//   POST /v1/rooms/:code/settings        {hostKey, moderate?, open?, name?}
+//   POST /v1/rooms/:code/prayer          {hostKey, prayerId, action}            (prayed, archive, restore)
+//   POST /v1/rooms/:code/settings        {hostKey, moderate?, open?, prayer?, reactions?, name?}
 //   POST /v1/rooms/:code/activity        {hostKey, activity}     (start/advance/reveal a quiz or poll)
 //   POST /v1/rooms/:code/close           {hostKey}
-//   POST /v1/rooms/:code/share           {hostKey, on?, frame?}  (the desk shares its screen, or stops)
-//   GET  /v1/rooms/:code/screen?after=   (a display: the latest screen, or 204 when nothing is new)
+//   POST /v1/rooms/:code/share           {hostKey, on?, frame?, beat?}  (the desk shares its screen, stops, or says it still is)
+//   GET  /v1/rooms/:code/screen?after=   (a display: the latest screen, or 204 when nothing is new; both say how long the desk has been quiet)
 //   POST /v1/rooms/:code/remote          {v, type, payload}      → the desk's answer   (phone remote, relay.ts)
 //   POST /v1/rooms/:code/inbox           {hostKey}               → {messages}          (the desk waits for presses)
 //   POST /v1/rooms/:code/reply           {hostKey, id, envelope} → {delivered}
@@ -50,6 +53,17 @@ export type Question = {
   /** When recent votes came, for "trending" (kept short). */
   recent: number[];
 };
+
+/**
+ * A prayer request: private by design. It goes to the desk and nowhere else: never on another
+ * phone, never voted on, never on the screen. `name` is empty when it was sent without one.
+ */
+export type PrayerState = "new" | "prayed" | "archived";
+export type Prayer = { id: string; text: string; name: string; at: number; state: PrayerState };
+
+/** The reactions a phone can send, in the order the phone shows them. */
+export const REACTIONS = ["pray", "love", "clap", "praise", "amen"] as const;
+export type Reaction = (typeof REACTIONS)[number];
 
 /** A quiz or poll question as the desk sends it (games.ts builds these from a game). */
 export type ActivityQuestion = {
@@ -163,6 +177,14 @@ export type RoomState = {
   moderate: boolean;
   /** Questions can be asked. */
   open: boolean;
+  /** Prayer requests can be sent (to the desk only). */
+  prayer?: boolean;
+  /** Phones can send reactions (🙏 ❤️ 👏 🙌 Amen). */
+  reactions?: boolean;
+  /** Prayer requests, oldest first; only ever shown to the desk. */
+  prayers?: Prayer[];
+  /** Prayer requests per participant, for the rate limit (times). */
+  prayed?: Record<string, number[]>;
   closed: boolean;
   questions: Question[];
   participants: Record<string, Participant>;
@@ -201,8 +223,17 @@ export const LIMITS = {
   nameLength: 40,
   questions: 500,
   participants: 2000,
-  /** Questions one person may ask in ten minutes. */
+  /** Questions one person may ask in ten minutes (and, counted apart, prayer requests). */
   asksPer10Min: 5,
+  prayers: 500,
+  /** One reaction per person every this long; the desk sees the last minute's. */
+  reactEveryMs: 2000,
+  reactWindowMs: 60_000,
+  /**
+   * The desk says it is still sharing every ten seconds or so: a display that has not heard from it
+   * for this long says the church computer is not sending (and keeps the picture).
+   */
+  quietScreenMs: 30_000,
   /**
    * Upvotes for one question from one network address. A church's Wi-Fi is one address for everyone
    * in the room, and each person votes once, so this only stops one phone posing as a crowd.
@@ -361,6 +392,14 @@ export class RoomCore {
    * otherwise: nobody is dropped from a game because the server forgot them.
    */
   private readonly startedAt: number;
+  /**
+   * Reactions in the last minute, and when each person last sent one. In memory only: a tap from
+   * every phone every two seconds is not worth writing down, and after a restart the minute is gone.
+   */
+  private reacted: Array<{ at: number; kind: Reaction }> = [];
+  private lastReaction = new Map<string, number>();
+  /** When the desk last said it is still sharing (in memory: a beat every ten seconds is not saved). */
+  private beatAt = 0;
 
   constructor(
     private store: RoomStorage,
@@ -461,16 +500,23 @@ export class RoomCore {
     const now = this.now();
     this.ranks = null;
     this.live = undefined;
+    this.reacted = [];
+    this.lastReaction.clear();
+    this.beatAt = 0;
     await this.store.put({
       code,
       name: clean(name, 60) || "Church",
       createdAt: now,
       touchedAt: now,
       hostKeyHash: await sha256(hostKey),
-      // A new room starts with questions off and nothing held for approval: most rooms are opened
-      // for a quiz or a poll, and the desk turns questions on when it wants them.
-      moderate: false,
+      // A new room starts with questions off; once the desk turns them on, each one waits for the
+      // operator before any phone sees it (Hold for approval, which the operator can turn off).
+      moderate: true,
       open: false,
+      prayer: false,
+      reactions: false,
+      prayers: [],
+      prayed: {},
       closed: false,
       questions: [],
       participants: {},
@@ -531,7 +577,7 @@ export class RoomCore {
     return {
       ok: true,
       data: {
-        room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate },
+        room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate, prayer: !!state.prayer, reactions: !!state.reactions },
         questions,
         waiting: mine,
         activity: publicActivity(state, known, this.now(), (n) => ({ rank: this.ranked(state).byN.get(n)?.rank ?? null, players: this.ranked(state).all.length }), this.sharedFor(state).counts),
@@ -571,6 +617,55 @@ export class RoomCore {
     state.asked[pid] = [...recent, now];
     await this.save(state);
     return { ok: true, data: { id: question.id, state: question.state } };
+  }
+
+  /**
+   * A prayer request, for the desk alone: the same checks as a question (words, length, a few per
+   * person), but it is never put through to anyone, so there is nothing to approve.
+   */
+  async pray(pid: unknown, text: unknown, name: unknown, anonymous: unknown): Promise<Result<{ id: string }>> {
+    const state = await this.load();
+    if (!state) return fail(404, "This room has ended.");
+    if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
+    if (!state.prayer) return fail(403, "Prayer requests are closed for now.");
+    const words = clean(text, LIMITS.questionLength);
+    if (words.length < 3) return fail(400, "Type your prayer request first.");
+    const prayers = (state.prayers ??= []);
+    if (prayers.length >= LIMITS.prayers) return fail(429, "This room has taken all the prayer requests it can.");
+    const now = this.now();
+    const recent = ((state.prayed ??= {})[pid] ?? []).filter((at) => now - at < 10 * 60_000);
+    if (recent.length >= LIMITS.asksPer10Min) return fail(429, "You have sent a few already. Try again in a few minutes.");
+    const prayer: Prayer = { id: randomId(8), text: words, name: anonymous === true ? "" : clean(name, LIMITS.nameLength) || state.participants[pid]!.name || "", at: now, state: "new" };
+    prayers.push(prayer);
+    state.prayed[pid] = [...recent, now];
+    await this.save(state);
+    return { ok: true, data: { id: prayer.id } };
+  }
+
+  /** A reaction from a phone: one every two seconds each, counted for a minute, never saved. */
+  async react(pid: unknown, kind: unknown): Promise<Result<{ ok: true }>> {
+    const state = await this.load();
+    if (!state) return fail(404, "This room has ended.");
+    if (typeof pid !== "string" || !state.participants[pid]) return fail(401, "Join the room first.");
+    this.touch(pid);
+    if (!state.reactions) return fail(403, "Reactions are off for now.");
+    if (!REACTIONS.includes(kind as Reaction)) return fail(400, "Unknown reaction.");
+    const now = this.now();
+    if (now - (this.lastReaction.get(pid) ?? -Infinity) < LIMITS.reactEveryMs) return fail(429, "One moment.");
+    this.lastReaction.set(pid, now);
+    this.reacted = this.reacted.filter((entry) => now - entry.at < LIMITS.reactWindowMs);
+    this.reacted.push({ at: now, kind: kind as Reaction });
+    return { ok: true, data: { ok: true } };
+  }
+
+  /** Reactions in the last minute, by kind (every kind, nought when none came). */
+  reactionCounts(): Record<Reaction, number> {
+    const now = this.now();
+    this.reacted = this.reacted.filter((entry) => now - entry.at < LIMITS.reactWindowMs);
+    const counts = Object.fromEntries(REACTIONS.map((kind) => [kind, 0])) as Record<Reaction, number>;
+    for (const entry of this.reacted) counts[entry.kind] += 1;
+    return counts;
   }
 
   async vote(pid: unknown, questionId: unknown, ipHash: string): Promise<Result<{ votes: number }>> {
@@ -657,7 +752,9 @@ export class RoomCore {
     return {
       ok: true,
       data: {
-        room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate, createdAt: state.createdAt },
+        room: { name: state.name, code: state.code, open: state.open, moderate: state.moderate, prayer: !!state.prayer, reactions: !!state.reactions, createdAt: state.createdAt },
+        prayers: state.prayers ?? [],
+        reactions: this.reactionCounts(),
         // Here now (phones heard from lately), not everyone who ever joined this room.
         people: this.here(state).length,
         questions: state.questions.map(({ recent, ...question }) => ({ ...question, trending: recent.filter((at) => this.now() - at < 15 * 60_000).length })),
@@ -724,12 +821,29 @@ export class RoomCore {
     return { ok: true, data: { ok: true } };
   }
 
-  async settings(hostKey: unknown, input: { moderate?: unknown; open?: unknown; name?: unknown }): Promise<Result<{ ok: true }>> {
+  /** The desk reads a prayer request: prayed for, put away, or back to new. */
+  async prayer(hostKey: unknown, prayerId: unknown, action: unknown): Promise<Result<{ ok: true }>> {
+    const found = await this.host(hostKey);
+    if (!found.ok) return found;
+    const state = found.data;
+    const prayer = (state.prayers ?? []).find((entry) => entry.id === prayerId);
+    if (!prayer) return fail(404, "No such prayer request.");
+    if (action === "prayed") prayer.state = "prayed";
+    else if (action === "archive") prayer.state = "archived";
+    else if (action === "restore") prayer.state = "new";
+    else return fail(400, "Unknown action.");
+    await this.save(state);
+    return { ok: true, data: { ok: true } };
+  }
+
+  async settings(hostKey: unknown, input: { moderate?: unknown; open?: unknown; prayer?: unknown; reactions?: unknown; name?: unknown }): Promise<Result<{ ok: true }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
     if (typeof input.moderate === "boolean") state.moderate = input.moderate;
     if (typeof input.open === "boolean") state.open = input.open;
+    if (typeof input.prayer === "boolean") state.prayer = input.prayer;
+    if (typeof input.reactions === "boolean") state.reactions = input.reactions;
     if (typeof input.name === "string" && clean(input.name, 60)) state.name = clean(input.name, 60);
     await this.save(state);
     return { ok: true, data: { ok: true } };
@@ -817,12 +931,18 @@ export class RoomCore {
     return { ok: true, data: { ok: true } };
   }
 
-  /** The desk sends what is on its screen (or stops sharing it). */
-  async share(hostKey: unknown, input: { on?: unknown; frame?: unknown }): Promise<Result<{ revision: number }>> {
+  /** The desk sends what is on its screen (or stops sharing it, or says it still is). */
+  async share(hostKey: unknown, input: { on?: unknown; frame?: unknown; beat?: unknown }): Promise<Result<{ revision: number }>> {
     const found = await this.host(hostKey);
     if (!found.ok) return found;
     const state = found.data;
     const current = state.screen ?? { on: false, revision: 0, frame: "", at: 0 };
+    this.beatAt = this.now();
+    // Still sharing, nothing new: kept in memory only, and the room touched hourly (as the inbox does).
+    if (input.beat === true) {
+      if (this.now() - state.touchedAt > 60 * 60_000) await this.save(state);
+      return { ok: true, data: { revision: current.revision } };
+    }
     if (input.on === false) {
       state.screen = { on: false, revision: current.revision + 1, frame: "", at: this.now() };
     } else {
@@ -840,12 +960,29 @@ export class RoomCore {
   }
 
   /** A display asks for the screen: nothing new since `after`, or the latest frame. */
-  async screen(after: number): Promise<Result<{ on: boolean; revision: number; frame?: string; name: string } | null>> {
+  async screen(after: number): Promise<Result<{ on: boolean; revision: number; frame?: string; name: string; age?: number } | null>> {
     const state = await this.load();
     if (!state) return fail(404, "This room has ended.");
     const screen = state.screen ?? { on: false, revision: 0, frame: "", at: 0 };
     if (screen.revision === after) return { ok: true, data: null };
-    return { ok: true, data: { on: screen.on, revision: screen.revision, name: state.name, ...(screen.on ? { frame: screen.frame } : {}) } };
+    const age = this.screenAge(state);
+    return { ok: true, data: { on: screen.on, revision: screen.revision, name: state.name, ...(screen.on ? { frame: screen.frame } : {}), ...(age !== null ? { age } : {}) } };
+  }
+
+  /**
+   * How long since the desk last sent the screen or said it is still sharing, while it shares (null
+   * when it does not). After a restart the room counts from then: a display is not told the computer
+   * stopped only because the server forgot, and still says so within half a minute if it did.
+   */
+  private screenAge(state: RoomState): number | null {
+    if (!state.screen?.on) return null;
+    return Math.max(0, this.now() - Math.max(state.screen.at, this.beatAt, this.startedAt));
+  }
+
+  /** The same, for a display's cheap "nothing new" answer. */
+  async quietFor(): Promise<number | null> {
+    const state = await this.load();
+    return state ? this.screenAge(state) : null;
   }
 
   /** Whether the room is open (a phone remote's message is only relayed into a live room). */
@@ -952,6 +1089,12 @@ export class RoomObject {
         return reply(await this.core.vote(input.pid, input.questionId, ip));
       case "answer":
         return reply(await this.core.answer(input.pid, input.choice, input.text));
+      case "pray":
+        return reply(await this.core.pray(input.pid, input.text, input.name, input.anonymous));
+      case "react":
+        return reply(await this.core.react(input.pid, input.kind));
+      case "prayer":
+        return reply(await this.core.prayer(input.hostKey, input.prayerId, input.action));
       case "host":
         return reply(await this.core.hostView(input.hostKey));
       case "moderate":
@@ -983,8 +1126,13 @@ export class RoomObject {
       }
       case "screen": {
         const result = await this.core.screen(Number(url.searchParams.get("after")) || 0);
-        // Nothing new: an empty answer, so a display asking every second costs almost nothing.
-        if (result.ok && result.data === null) return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "cache-control": "no-store" } });
+        // Nothing new: an empty answer, so a display asking every second costs almost nothing. It
+        // still says how long the desk has been quiet, so a display can tell a still screen from a
+        // computer that stopped.
+        if (result.ok && result.data === null) {
+          const age = await this.core.quietFor();
+          return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-expose-headers": "x-screen-age", "cache-control": "no-store", ...(age !== null ? { "x-screen-age": String(age) } : {}) } });
+        }
         return reply(result);
       }
       default:
@@ -1046,12 +1194,13 @@ export async function handleRooms(
     }
     return json(503, { error: "Could not open a room. Try again." });
   }
-  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|rename|player|state|ask|vote|answer|host|moderate|settings|activity|close|share|screen|remote|inbox|reply)$/);
+  const match = path.match(/^\/v1\/rooms\/([A-Za-z0-9]{6})\/(join|rename|player|state|ask|vote|answer|pray|react|host|moderate|prayer|settings|activity|close|share|screen|remote|inbox|reply)$/);
   if (!match) return json(404, { error: "Not found" });
   const code = match[1]!.toUpperCase();
   const action = match[2]!;
   if (!isCode(code)) return json(404, { error: "No such room." });
-  if ((action === "ask" || action === "join" || action === "rename") && address && crowd && !(await crowd(`room-${action}:${code}:${address}`)))
+  if ((action === "ask" || action === "pray" || action === "join" || action === "rename") && address
+ && crowd && !(await crowd(`room-${action}:${code}:${address}`)))
     return json(429, { error: "Lots of people are joining at once. Trying again…", retry: true });
   const stub = rooms.get(rooms.idFromName(code));
   const headers = { "content-type": "application/json", "x-room-ip": await sha256(`${address}:${code}`) };

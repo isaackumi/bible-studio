@@ -41,6 +41,9 @@ pub struct LanRemote {
 struct LanScreen {
     revision: u64,
     frame: Option<String>,
+    /// When the desk last sent the screen or said it is still sharing: a TV whose computer's app
+    /// stopped drawing can say so, though this server still answers.
+    beat: Option<std::time::Instant>,
 }
 
 /// A browser that has not asked for this long has stopped watching.
@@ -224,8 +227,22 @@ pub fn set_screen(lan: &LanRemote, frame: Option<String>) -> Result<(), String> 
     }
     let mut screen = lock(&lan.screen);
     screen.revision += 1;
+    screen.beat = frame.as_ref().map(|_| std::time::Instant::now());
     screen.frame = frame;
     Ok(())
+}
+
+/// The desk is still sharing, with nothing new to send.
+pub fn beat(lan: &LanRemote) {
+    let mut screen = lock(&lan.screen);
+    if screen.frame.is_some() {
+        screen.beat = Some(std::time::Instant::now());
+    }
+}
+
+/// How long since the desk was last heard from, in milliseconds, while it shares.
+fn screen_age(screen: &LanScreen) -> Option<u64> {
+    screen.frame.as_ref().and(screen.beat).map(|at| u64::try_from(at.elapsed().as_millis()).unwrap_or(u64::MAX))
 }
 
 /// How many browsers are showing the screen now.
@@ -237,7 +254,7 @@ pub fn watching(lan: &LanRemote) -> usize {
 
 /// What a TV browser gets for "anything newer than `after`?": nothing (204), or the screen.
 fn screen_reply(screen: &LanScreen, after: u64) -> Option<Value> {
-    (after != screen.revision).then(|| json!({ "on": screen.frame.is_some(), "revision": screen.revision, "frame": screen.frame, "name": "" }))
+    (after != screen.revision).then(|| json!({ "on": screen.frame.is_some(), "revision": screen.revision, "frame": screen.frame, "name": "", "age": screen_age(screen) }))
 }
 
 /// A picture's path from its /media/<token> (base64url of the path).
@@ -346,9 +363,13 @@ fn respond(stream: &mut TcpStream, app: &AppHandle, lan: &LanRemote, req: HttpRe
         let who = stream.peer_addr().map(|addr| addr.ip().to_string()).unwrap_or_default();
         lock(&lan.watchers).insert(who, std::time::Instant::now());
         let after = query_value(&req.query, "after").and_then(|value| value.parse().ok()).unwrap_or(0);
-        match screen_reply(&lock(&lan.screen), after) {
+        let screen = lock(&lan.screen);
+        let (reply, age) = (screen_reply(&screen, after), screen_age(&screen));
+        drop(screen);
+        match reply {
             Some(body) => write_json(stream, body),
-            None => write_http(stream, 204, "text/plain", b""),
+            // Nothing new, and how long the desk has been quiet (as the internet path says it).
+            None => write_http_with(stream, 204, "text/plain", &age.map(|age| format!("X-Screen-Age: {age}\r\n")).unwrap_or_default(), b""),
         }
         return;
     }
@@ -488,6 +509,11 @@ fn write_json(stream: &mut TcpStream, value: Value) {
 }
 
 fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u8]) {
+    write_http_with(stream, status, content_type, "", body);
+}
+
+/// `extra`: more header lines, each ending in \r\n.
+fn write_http_with(stream: &mut TcpStream, status: u16, content_type: &str, extra: &str, body: &[u8]) {
     let reason = match status {
         200 => "OK",
         204 => "No Content",
@@ -499,7 +525,7 @@ fn write_http(stream: &mut TcpStream, status: u16, content_type: &str, body: &[u
     };
     // Same-origin only: no CORS headers. No referrer, so the QR token never leaves the page.
     let head = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n{extra}Connection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
@@ -523,6 +549,23 @@ mod tests {
         assert_eq!(screen_reply(&lock(&lan.screen), first["revision"].as_u64().unwrap()).unwrap()["on"], false);
         assert!(set_screen(&lan, Some("x".repeat(SCREEN_BYTES + 1))).is_err());
     }
+
+    #[test]
+    fn says_how_long_the_desk_has_been_quiet_only_while_it_shares() {
+        let lan = LanRemote::default();
+        assert_eq!(screen_age(&lock(&lan.screen)), None);
+        beat(&lan);
+        assert_eq!(screen_age(&lock(&lan.screen)), None);
+        set_screen(&lan, Some("{}".into())).unwrap();
+        lock(&lan.screen).beat = std::time::Instant::now().checked_sub(Duration::from_secs(40));
+        assert!(screen_age(&lock(&lan.screen)).unwrap() >= 40_000);
+        beat(&lan);
+        assert!(screen_age(&lock(&lan.screen)).unwrap() < 5_000);
+        assert!(screen_reply(&lock(&lan.screen), 0).unwrap()["age"].is_u64());
+        set_screen(&lan, None).unwrap();
+        assert_eq!(screen_age(&lock(&lan.screen)), None);
+    }
+
 
     #[test]
     fn reads_a_pictures_path_back_from_its_address() {

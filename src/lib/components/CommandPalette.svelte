@@ -101,6 +101,7 @@
       { id: "p-service", group: "Pages", label: msg("Service"), icon: "list", run: go("service"), words: "running order plan sunday" },
       // The congregation's phones.
       { id: "aud-qa", group: "Audience", label: msg("Live Q&A"), detail: msg("People ask and vote from their phones"), icon: "users", run: () => audienceRoom.showTab("questions"), words: "q&a questions ask audience congregation phone qr room moderate vote" },
+      { id: "aud-prayer", group: "Audience", label: msg("Prayer requests"), detail: msg("Sent from phones, seen only on this desk"), icon: "users", run: () => audienceRoom.showTab("prayer"), words: "prayer requests pray private anonymous audience phone room" },
       { id: "aud-games", group: "Audience", label: msg("Quizzes and polls"), detail: msg("Played and answered on people's phones"), icon: "sparkles", run: () => audienceRoom.showTab("games"), words: "quiz quizzes game games bible trivia kahoot play youth children leaderboard poll vote voting survey word cloud rating" },
       { id: "aud-pick", group: "Audience", label: msg("Pick someone"), detail: msg("A name at random, or random groups"), icon: "users", run: () => audienceRoom.showTab("pick"), words: "pick random choose winner volunteer draw groups teams spin wheel" },
       { id: "aud-join", group: "Audience", label: msg("Show the join code"), detail: msg("The QR code on the screen"), icon: "qr", run: () => audienceRoom.show(), words: "join qr code room phones scan" },

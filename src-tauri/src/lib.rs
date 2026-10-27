@@ -845,6 +845,12 @@ fn lan_screen(lan: State<Arc<remote::LanRemote>>, frame: Option<String>) -> Resu
     remote::set_screen(&lan, frame)
 }
 
+/// The desk is still sharing the screen on the Wi-Fi, with nothing new (so a TV can tell it has stopped).
+#[tauri::command]
+fn lan_screen_beat(lan: State<Arc<remote::LanRemote>>) {
+    remote::beat(&lan);
+}
+
 /// How many TV browsers on this Wi-Fi are showing the screen now.
 #[tauri::command]
 fn lan_screen_watching(lan: State<Arc<remote::LanRemote>>) -> usize {
@@ -1306,7 +1312,9 @@ pub fn run() {
             stop_remote_lan,
             remote_reply,
             lan_screen,
+            lan_screen_beat,
             lan_screen_watching,
+
             network::network_name,
             listen_record::listen_record_start,
             listen_record::listen_record_stop,

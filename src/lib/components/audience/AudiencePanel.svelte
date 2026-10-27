@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { audienceRoom, type RoomQuestion } from "../../app/rooms.svelte";
+  import { audienceRoom, reactionMark, REACTIONS, type RoomQuestion } from "../../app/rooms.svelte";
   import { t, tn } from "../../i18n/core";
   import QrView from "../QrView.svelte";
   import Icon from "../Icon.svelte";
@@ -46,6 +46,20 @@
     answered: questions.filter((question) => question.state === "approved" && question.answered).length,
     "put-away": questions.filter((question) => question.state === "rejected" || question.state === "archived" || question.hidden).length,
   });
+  // Prayer requests: for this desk only. Read, marked prayed for, put away; never on the screen.
+  type PrayerFilter = "new" | "prayed" | "archived";
+  let prayerFilter = $state<PrayerFilter>("new");
+  const prayers = $derived(view?.prayers ?? []);
+  const prayerCounts = $derived({
+    new: prayers.filter((prayer) => prayer.state === "new").length,
+    prayed: prayers.filter((prayer) => prayer.state === "prayed").length,
+    archived: prayers.filter((prayer) => prayer.state === "archived").length,
+  });
+  const shownPrayers = $derived(prayers.filter((prayer) => prayer.state === prayerFilter).sort((a, b) => (prayerFilter === "new" ? a.at - b.at : b.at - a.at)));
+  // The last minute's reactions, as they come in.
+  const reactions = $derived(view?.reactions ?? {});
+  const reacted = $derived(REACTIONS.reduce((sum, kind) => sum + (reactions[kind] ?? 0), 0));
+
   const inFilter = (question: RoomQuestion) =>
     filter === "waiting"
       ? question.state === "pending"
@@ -134,11 +148,27 @@
         </div>
       {/if}
     </section>
+    <!-- Reactions from phones: counted here as they come; on the screen only through Preview and LIVE. -->
+    <section class="share">
+      <label class="share-head">
+        <input type="checkbox" class="switch" checked={view?.room.reactions ?? false} onchange={(event) => audienceRoom.settings({ reactions: event.currentTarget.checked })} />
+        <span><strong>{t("Reactions from phones")}</strong><em>{t("People tap 🙏 ❤️ 👏 🙌 or Amen. You see the last minute's here.")}</em></span>
+      </label>
+      {#if view?.room.reactions}
+        <div class="row reactions">
+          {#each REACTIONS as kind (kind)}
+            <span class="reaction" class:quiet={!reactions[kind]}>{reactionMark(kind)} <b>{reactions[kind] ?? 0}</b></span>
+          {/each}
+          <button type="button" class="btn" disabled={!reacted} onclick={() => audienceRoom.reactionsOnPreview()}>{t("On Preview")}</button>
+        </div>
+      {/if}
+    </section>
   {/if}
   {#if audienceRoom.error}<p class="error" role="alert">{audienceRoom.error}</p>{/if}
 
     <div class="tabs" role="tablist" data-tour="aud-tabs">
       <button type="button" role="tab" aria-selected={tab === "questions"} class:on={tab === "questions"} onclick={() => (audienceRoom.tab = "questions")}>{t("Questions")}{#if counts.waiting}<b>{counts.waiting}</b>{/if}</button>
+      <button type="button" role="tab" aria-selected={tab === "prayer"} class:on={tab === "prayer"} onclick={() => (audienceRoom.tab = "prayer")}>{t("Prayer")}{#if prayerCounts.new}<b>{prayerCounts.new}</b>{/if}</button>
       <button type="button" role="tab" aria-selected={tab === "games"} class:on={tab === "games"} data-tour="aud-tab-games" onclick={() => (audienceRoom.tab = "games")}>{t("Quizzes and polls")}</button>
       <button type="button" role="tab" aria-selected={tab === "pick"} class:on={tab === "pick"} data-tour="aud-tab-pick" onclick={() => (audienceRoom.tab = "pick")}>{t("Pick someone")}</button>
     </div>
@@ -150,6 +180,46 @@
       </div>
     {:else if tab === "pick"}
       <PickTab />
+    {:else if tab === "prayer" && !audienceRoom.current}
+      <div class="start">
+        <p>{t("Open a room and show its QR code. People can send a prayer request from their phone, with their name or without. Only this desk sees it: never the screen, never anyone else's phone.")}</p>
+        <button type="button" class="primary" disabled={audienceRoom.busy} onclick={() => audienceRoom.start()}>{audienceRoom.busy ? t("Opening…") : t("Open a room")}</button>
+      </div>
+    {:else if tab === "prayer"}
+      <div class="q-tools">
+        <div class="switches">
+          <label><input type="checkbox" class="switch" checked={view?.room.prayer ?? false} onchange={(event) => audienceRoom.settings({ prayer: event.currentTarget.checked })} /> {t("Taking prayer requests")}</label>
+        </div>
+        <p class="private-note"><Icon name="lock" size={13} /> {t("Private: only this desk sees them. They never go on the screen or on other phones.")}</p>
+        <div class="filters" role="radiogroup" aria-label={t("Show")}>
+          {#each [["new", t("New")], ["prayed", t("Prayed for")], ["archived", t("Put away")]] as [id, label] (id)}
+            <button type="button" role="radio" aria-checked={prayerFilter === id} class:on={prayerFilter === id} onclick={() => (prayerFilter = id as PrayerFilter)}>{label} <span>{prayerCounts[id as PrayerFilter]}</span></button>
+          {/each}
+        </div>
+      </div>
+      <ol class="list">
+        {#each shownPrayers as prayer (prayer.id)}
+          <li>
+            <div class="q-body">
+              <p class="text">{prayer.text}</p>
+              <div class="q-meta"><span>{prayer.name || t("Anonymous")}</span><span>{ago(prayer.at)}</span></div>
+              <div class="actions">
+                {#if prayer.state === "new"}
+                  <button type="button" class="btn accent" onclick={() => audienceRoom.prayer(prayer.id, "prayed")}><Icon name="check" size={13} /> {t("Mark prayed for")}</button>
+                  <button type="button" class="btn" onclick={() => audienceRoom.prayer(prayer.id, "archive")}>{t("Archive")}</button>
+                {:else if prayer.state === "prayed"}
+                  <button type="button" class="btn" onclick={() => audienceRoom.prayer(prayer.id, "archive")}>{t("Archive")}</button>
+                  <button type="button" class="btn" onclick={() => audienceRoom.prayer(prayer.id, "restore")}>{t("Back to new")}</button>
+                {:else}
+                  <button type="button" class="btn" onclick={() => audienceRoom.prayer(prayer.id, "restore")}>{t("Bring back")}</button>
+                {/if}
+              </div>
+            </div>
+          </li>
+        {:else}
+          <li class="empty">{prayerFilter === "new" ? (view?.room.prayer ? t("No new prayer requests.") : t("Turn on Taking prayer requests, and people can send one from their phone.")) : t("Nothing here.")}</li>
+        {/each}
+      </ol>
     {:else if tab === "questions" && !audienceRoom.current}
       <div class="start">
         <p>{t("Open a room and show its QR code. People join on their phones over the internet (no app, no Wi-Fi needed), then ask questions, vote, and play quizzes. Nothing reaches the screen until you put it there.")}</p>
@@ -263,13 +333,20 @@
   .share-head span { display: grid; gap: 2px; }
   .share-head strong { font-size: 13px; }
   .share-head em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  .tabs { display: grid; grid-template-columns: 1fr 1.25fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
+  .tabs { display: grid; grid-template-columns: 1fr 0.8fr 1.25fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
   .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
   /* The chosen tab in ink on the panel, like the filters below: panel-2 was too close to the panel to see. */
   .tabs button.on { background: var(--ink); color: var(--panel); }
   .tabs button.on b { background: var(--accent); }
   .tabs b { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; }
-  .q-tools { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .private-note { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .reactions { align-items: center; }
+  .reaction { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, currentColor 8%, transparent); font-size: 13px; }
+  .reaction b { font-variant-numeric: tabular-nums; }
+  .reaction.quiet { opacity: 0.5; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .q-tools { display: grid;
+ gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
   .switches { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); }
   .switches label { display: flex; align-items: center; gap: 6px; }
   .filters { display: flex; flex-wrap: wrap; gap: 6px; }

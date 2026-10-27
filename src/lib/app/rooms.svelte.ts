@@ -34,15 +34,28 @@ export type RoomQuestion = {
   trending: number;
 };
 
+/** A prayer request: for this desk alone (never on the screen or on anyone's phone). */
+export type RoomPrayer = { id: string; text: string; name: string; at: number; state: "new" | "prayed" | "archived" };
+
+/** The reactions phones can send, in the order they show them (server/rooms.ts REACTIONS). */
+export const REACTIONS = ["pray", "love", "clap", "praise", "amen"] as const;
+export type RoomReaction = (typeof REACTIONS)[number];
+/** How each reaction looks: an emoji, and Amen as a word (in the desk's language). */
+export const reactionMark = (kind: RoomReaction) => (kind === "pray" ? "🙏" : kind === "love" ? "❤️" : kind === "clap" ? "👏" : kind === "praise" ? "🙌" : t("Amen"));
+
 export type ActivityQuestion = { id: string; prompt: string; choices: string[]; correct?: number; seconds: number; points: number; image?: string; type?: "words" | "scale"; low?: string; high?: string };
 export type RoomActivity =
   | { kind: "none" }
   | { kind: "quiz" | "poll"; game: string; round: number; total: number; question: ActivityQuestion; phase: "open" | "closed" | "reveal"; openedAt: number; opensAt?: number };
 
 export type HostView = {
-  room: { name: string; code: string; open: boolean; moderate: boolean; createdAt: number };
+  room: { name: string; code: string; open: boolean; moderate: boolean; prayer?: boolean; reactions?: boolean; createdAt: number };
   people: number;
   questions: RoomQuestion[];
+  /** Prayer requests, oldest first. */
+  prayers?: RoomPrayer[];
+  /** Reactions in the last minute, by kind. */
+  reactions?: Partial<Record<RoomReaction, number>>;
   activity: RoomActivity;
   answers: number[];
   answered: number;
@@ -64,6 +77,10 @@ const KEY = "church-studio:room";
 const POLL_MS = 2000;
 /** While a game is on the screen or answers are coming in: every second, so the screen keeps up. */
 const GAME_POLL_MS = 1000;
+/** The panel closed and nothing running: now and then, so the Audience button can say something is waiting. */
+const SLOW_POLL_MS = 15_000;
+/** While sharing the screen: a word every so often, so a display can tell when this computer stops. */
+const SCREEN_BEAT_MS = 10_000;
 const GAME_PREFS = "church-studio:game-screen";
 /** Reading time before answers open, when the Get ready countdown is on. */
 const READ_MS = 4000;
@@ -112,10 +129,10 @@ class AudienceRoom {
   };
 
   /** Which tab the panel shows (kept here, so the desk can open it on the right one). */
-  tab = $state<"questions" | "games" | "pick">("questions");
+  tab = $state<"questions" | "prayer" | "games" | "pick">("questions");
 
   /** The panel, on one tab. */
-  showTab = (tab: "questions" | "games" | "pick") => {
+  showTab = (tab: "questions" | "prayer" | "games" | "pick") => {
     if (!session.requireFeature("audience")) return;
     this.tab = tab;
     this.show();
@@ -153,6 +170,7 @@ class AudienceRoom {
     this.stopWatching?.();
     this.stopWatching = null;
     this.sharing = false;
+    clearInterval(this.beatTimer);
     this.save(null);
     this.view = null;
     clearTimeout(this.timer);
@@ -172,14 +190,38 @@ class AudienceRoom {
   };
 
   moderate = (questionId: string, action: "approve" | "reject" | "archive" | "restore" | "hide" | "show" | "pin" | "feature" | "answered") => this.call("moderate", { questionId, action });
-  settings = (input: { moderate?: boolean; open?: boolean }) => this.call("settings", input);
+  /** A prayer request read: prayed for, put away, or back to new. */
+  prayer = (prayerId: string, action: "prayed" | "archive" | "restore") => this.call("prayer", { prayerId, action });
+  settings = (input: { moderate?: boolean; open?: boolean; prayer?: boolean; reactions?: boolean }) => this.call("settings", input);
+
+  /** Questions waiting for the operator and prayer requests not read yet: the Audience button's count. */
+  get waiting(): number {
+    const view = this.view;
+    if (!view) return 0;
+    return view.questions.filter((question) => question.state === "pending").length + (view.prayers ?? []).filter((prayer) => prayer.state === "new").length;
+  }
+
+  /** A room left open from before (this window reopened): look at it now and then, for the count. */
+  resume = () => {
+    if (this.current && !this.view) void this.poll();
+  };
+
+  /** The last minute's reactions on Preview, ready to send LIVE (phones never put anything on the screen). */
+  reactionsOnPreview = () => {
+    const counts = this.view?.reactions ?? {};
+    const body = REACTIONS.filter((kind) => (counts[kind] ?? 0) > 0)
+      .map((kind) => `${reactionMark(kind)} ${counts[kind]}`)
+      .join("   ");
+    if (!body) return;
+    session.previewModel(presentText({ theme: session.theme(), layout: "title", heading: t("Reactions"), body }), `room:${this.current?.code}:reactions`);
+  };
   /** Rename a player (still a name nobody else here has), or take them out: their phone goes back to joining. */
   player = (n: number, change: { name?: string; remove?: boolean }) => this.call("player", { n, ...change });
   /** Take a word off the word cloud on the screen, or put one back. */
   setWordShown = (word: string, shown: boolean) => this.activity({ action: shown ? "show-word" : "hide-word", word }).then(() => this.poll());
   activity = (input: { action: "open" | "close" | "reveal" | "end" | "reset-scores" | "teams" | "hide-word" | "show-word"; word?: string; kind?: "quiz" | "poll"; anonymous?: boolean; game?: string; round?: number; total?: number; question?: ActivityQuestion; readMs?: number; teams?: number }) => this.call("activity", input);
 
-  /** Ask the room what is new; while the panel is open, again every two seconds. */
+  /** Ask the room what is new; while the panel is open, again every two seconds, and now and then while it is closed. */
   poll = async (): Promise<void> => {
     clearTimeout(this.timer);
     const saved = this.current;
@@ -196,7 +238,10 @@ class AudienceRoom {
     } else this.error = answer.offline ? t("No internet: the room carries on, and this desk catches up when it is back.") : answer.error;
     void this.refreshScreen();
     const busy = (this.view?.activity.kind ?? "none") !== "none" || this.screenStage !== null;
-    if (this.open || busy) this.timer = setTimeout(() => void this.poll(), busy ? GAME_POLL_MS : POLL_MS);
+    // Two asks at once (a press while a poll is out) would each start a loop: only the last one goes on.
+    clearTimeout(this.timer);
+    if (!this.current) return;
+    this.timer = setTimeout(() => void this.poll(), busy ? GAME_POLL_MS : this.open ? POLL_MS : SLOW_POLL_MS);
   };
 
   /** The join QR code on Preview, ready to send LIVE. */
@@ -213,6 +258,7 @@ class AudienceRoom {
   /** Program is being shared with browsers and phones used as displays (/d/CODE). */
   sharing = $state(false);
   private shareTimer: ReturnType<typeof setTimeout> | undefined;
+  private beatTimer: ReturnType<typeof setInterval> | undefined;
   private shareSent = "";
   private stopWatching: (() => void) | null = null;
 
@@ -229,12 +275,20 @@ class AudienceRoom {
       this.stopWatching?.();
       this.stopWatching = null;
       clearTimeout(this.shareTimer);
+      clearInterval(this.beatTimer);
       this.shareSent = "";
       await serverCall(`/v1/rooms/${saved.code}/share`, { hostKey: saved.hostKey, on: false });
       return;
     }
     if (this.sharing) return;
     this.sharing = true;
+    // Program may not change for a long while (a sermon slide): this says the computer is still here,
+    // so a display can tell a still screen from one whose computer stopped.
+    clearInterval(this.beatTimer);
+    this.beatTimer = setInterval(() => {
+      const current = this.current;
+      if (current && this.sharing && this.shareSent) void serverCall(`/v1/rooms/${current.code}/share`, { hostKey: current.hostKey, beat: true });
+    }, SCREEN_BEAT_MS);
     // Every change to Program goes out (at most four times a second; the newest always wins).
     this.stopWatching = $effect.root(() => {
       $effect(() => {
