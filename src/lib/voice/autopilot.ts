@@ -4,12 +4,14 @@ import type { PresentationLayout } from "../domain/types";
 // eyes on the service. These are its rules, kept apart from the app so they can be tested.
 //
 // - Within the song on the screen, the part being sung goes live once it has been heard twice.
-// - A song of this service starts on its own only from an empty screen or the logo, after being
-//   heard three times over at least a second and a half (partial words arrive several a second). Never from Black (someone chose dark) and never over a verse, slide or
-//   anything else: then it waits on Next.
+// - A song of this service starts on its own from an empty screen, the logo or another song (the
+//   room moving on to the next song), after being heard three times over at least a second and a
+//   half (partial words arrive several a second). Never from Black (someone chose dark) and never
+//   over a verse, slide or anything else: then it waits on Next.
 // - Verses (only when the operator lets them): one goes live by itself only when the preacher said
-//   its whole reference ("John 3:16") in a finished phrase, matching the verse found, and the screen
-//   shows scripture, a slide, the logo or nothing. A half-heard "John 3:1" may still become 3:16.
+//   its whole reference ("John 3:16") in a finished phrase, matching the verse found, listening is
+//   sure of it (voice/confidence.ts), and the screen shows scripture, a slide, the logo or nothing.
+//   A half-heard "John 3:1" may still become 3:16.
 // - The operator always wins. When the screen changes and Autopilot did not change it (Undo, a
 //   click, Black), it stands back for a while, and never sends again the part that was taken off.
 

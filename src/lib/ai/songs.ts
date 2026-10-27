@@ -114,6 +114,28 @@ Best fit first. Answer with JSON only:
 /** At most this many library songs go with the request. */
 export const SUGGEST_LIBRARY_LIMIT = 800;
 
+const wordSet = (text: string) => new Set(text.toLowerCase().match(/[a-z']{4,}/g) ?? []);
+
+/**
+ * The library songs to send: all of them when they fit, else the ones sharing the most words with
+ * the sermon (title, notes and the songs' own words), so a large library is not cut off at "M".
+ */
+export function songsToSuggestFrom<T extends { title: string; author: string; sections?: Array<{ lines: string[] }> }>(songs: T[], sermon: { title: string; notes: string }, limit = SUGGEST_LIBRARY_LIMIT): T[] {
+  if (songs.length <= limit) return songs;
+  const sermonWords = wordSet(`${sermon.title} ${sermon.notes}`);
+  const score = (song: T) => {
+    let shared = 0;
+    for (const word of wordSet(`${song.title} ${song.title} ${(song.sections ?? []).flatMap((section) => section.lines).join(" ")}`)) if (sermonWords.has(word)) shared += 1;
+    return shared;
+  };
+  return songs
+    .map((song, order) => ({ song, order, score: score(song) }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, limit)
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => entry.song);
+}
+
 export function suggestSongsRequest(settings: AiSettings, input: { title: string; notes: string; songs: Array<{ title: string; author: string }> }): AiRequest {
   const list = input.songs
     .slice(0, SUGGEST_LIBRARY_LIMIT)

@@ -99,6 +99,11 @@
     feeds = next;
   }
 
+  /** A video meant to play with sound plays muted here: the desk says so, so the room is not left wondering. */
+  function soundBlocked() {
+    if (isDesktop()) void emit("audience-sound-blocked", {}).catch(() => {});
+  }
+
   /** Tell the desk whether this window could open a camera, so a failure never hides behind the camera card. */
   function report(id: string, error: string) {
     if (isDesktop()) void emit("audience-camera", { id, error }).catch(() => {});
@@ -216,6 +221,7 @@
   }
 
   onMount(() => {
+    document.addEventListener("soundblocked", soundBlocked);
     measureShape();
     window.addEventListener("resize", onResize);
     const desktop = isDesktop();
@@ -247,6 +253,7 @@
         stopStandby();
         window.removeEventListener("message", onMessage);
         window.removeEventListener("resize", onResize);
+        document.removeEventListener("soundblocked", soundBlocked);
         clearTimeout(shapeTimer);
         document.removeEventListener("fullscreenchange", onFullscreen);
         clearTimeout(testTimer);
@@ -286,6 +293,7 @@
       unlistenMeasure();
       window.removeEventListener("message", onMessage);
         window.removeEventListener("resize", onResize);
+        document.removeEventListener("soundblocked", soundBlocked);
         clearTimeout(shapeTimer);
       document.removeEventListener("fullscreenchange", onFullscreen);
       clearTimeout(testTimer);

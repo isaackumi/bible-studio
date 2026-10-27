@@ -11,3 +11,24 @@ describe("videos from the network", () => {
     expect(isHls("/a/playlist.M3U8")).toBe(true);
   });
 });
+
+describe("a live stream that stops", () => {
+  it("reloads after a growing wait on a dropped connection, recovers bad decoding twice, then gives up", async () => {
+    const { streamRecovery } = await import("./stream");
+    let tries = { network: 0, media: 0 };
+    const waits: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const step = streamRecovery("network", tries);
+      expect(step.action).toBe("reload");
+      waits.push(step.waitMs);
+      tries = step.tries;
+    }
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 8000, 8000]);
+    expect(streamRecovery("network", tries).action).toBe("give-up");
+    tries = { network: 0, media: 0 };
+    expect(streamRecovery("media", tries).action).toBe("recover");
+    expect(streamRecovery("media", { network: 0, media: 2 }).action).toBe("give-up");
+    expect(streamRecovery("other", tries).action).toBe("give-up");
+  });
+});
+

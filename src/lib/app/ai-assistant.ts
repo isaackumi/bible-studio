@@ -1,7 +1,7 @@
 import { api } from "../db/api";
 import { gameRequest, parseGame, type GameAudience, type GameLevel, type GameSource } from "../ai/games";
 import { parseSlides, slidesRequest, type SlideSource } from "../ai/slides";
-import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
+import { findSongRequest, hymnRequest, parseHymn, parseSongMatches, parseSongSuggestions, songsToSuggestFrom, suggestSongsRequest, wordsAreFree, type SongMatch } from "../ai/songs";
 import { aiFeatureOn, aiReady, modelsRequest, parseModels, parseSummary, replyText, summaryRequest, type AiFeature, type AiRequest, type AiSettings, type SermonSummary } from "../ai/summarize";
 import { parseHeardVerses, versesRequest, VERSE_ASK_GAP_SECONDS, type HeardVerse } from "../ai/verses";
 import { liveNotesRequest, parseLiveNotes } from "../ai/live-notes";
@@ -133,7 +133,7 @@ export class AiAssistant {
   suggestSongs = async (input: { title: string; notes: string }): Promise<{ library: Array<{ song: Song; why: string }>; others: Array<{ title: string; authors: string; why: string }> }> => {
     const settings = this.settingsFor("songSuggest");
     if (!input.notes.trim() && !input.title.trim()) throw new Error(t("Give the sermon a title or some notes first."));
-    const songs = [...this.host.songs()].sort((a, b) => a.title.localeCompare(b.title));
+    const songs = songsToSuggestFrom([...this.host.songs()].sort((a, b) => a.title.localeCompare(b.title)), input);
     const picks = parseSongSuggestions(replyText(settings.provider, await this.post(suggestSongsRequest(settings, { ...input, songs }))), songs.length);
     return { library: picks.library.map((pick) => ({ song: songs[pick.index]!, why: pick.why })), others: picks.others };
   };

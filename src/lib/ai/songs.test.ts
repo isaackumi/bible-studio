@@ -43,3 +43,15 @@ describe("songs with the church's own AI", () => {
     expect(songSelectUrl({ title: "It Is Well", ccli: "" })).toBe("https://songselect.ccli.com/search/results?search=It%20Is%20Well");
   });
 });
+
+describe("songs sent for suggestions", () => {
+  it("sends the whole library when it fits, and else the songs closest to the sermon, not the first by title", async () => {
+    const { songsToSuggestFrom } = await import("./songs");
+    const songs = Array.from({ length: 10 }, (_, i) => ({ title: `Song ${String.fromCharCode(65 + i)}`, author: "", sections: [{ lines: [i === 9 ? "grace abounding mercy forgiveness" : "light"] }] }));
+    expect(songsToSuggestFrom(songs, { title: "", notes: "" }, 20)).toHaveLength(10);
+    const picked = songsToSuggestFrom(songs, { title: "Grace", notes: "mercy and forgiveness" }, 3);
+    expect(picked).toHaveLength(3);
+    expect(picked.map((song) => song.title)).toContain("Song J");
+  });
+});
+

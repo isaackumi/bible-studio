@@ -114,6 +114,8 @@
   function playClip(node: HTMLVideoElement, options: { muted: boolean; control?: VideoControl; start?: number; stop?: number; loop?: boolean }) {
     const start = () => {
       void node.play().catch(() => {
+        // Sound was meant and refused: say so (the audience screen tells the desk), then play muted.
+        if (!node.muted) node.dispatchEvent(new CustomEvent("soundblocked", { bubbles: true }));
         node.muted = true;
         void node.play().catch(() => {});
       });

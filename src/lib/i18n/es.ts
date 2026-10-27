@@ -5412,4 +5412,6 @@ export const es: Readonly<Record<string, string>> = {
   "Prayer requests": "Peticiones de oración",
   "Sent from phones, seen only on this desk": "Enviadas desde los teléfonos, vistas solo en este puesto",
   "The church computer is not sending": "La computadora de la iglesia no está enviando",
+  "The video is playing without sound": "El vídeo se reproduce sin sonido",
+  "The audience screen was not allowed to play sound by itself. Click once on the audience screen, then play the video again.": "La pantalla de la congregación no pudo reproducir el sonido por sí sola. Haz clic una vez en esa pantalla y vuelve a reproducir el vídeo.",
 };

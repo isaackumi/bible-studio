@@ -531,6 +531,7 @@ class Session {
   private browserWatch: ReturnType<typeof setInterval> | undefined;
   private unlisten: UnlistenFn | undefined;
   private unlistenAudienceCamera: UnlistenFn | undefined;
+  private unlistenSoundBlocked: UnlistenFn | undefined;
   /** Cameras the audience window reported it could not open, by camera source id. */
   audienceCameraErrors = $state<Record<string, string>>({});
   private unlistenRemote: (() => void) | undefined;
@@ -766,6 +767,13 @@ class Session {
       // A monitor came or went: screens follow their own monitors.
       void this.placeScreenWindows();
     });
+    this.unlistenSoundBlocked = await listen("audience-sound-blocked", () =>
+      this.notify(t("The video is playing without sound"), {
+        detail: t("The audience screen was not allowed to play sound by itself. Click once on the audience screen, then play the video again."),
+        tone: "warn",
+        ms: 15_000,
+      }),
+    );
     this.unlistenAudienceCamera = await listen<{ id?: unknown; error?: unknown }>("audience-camera", (event) => {
       const id = typeof event.payload?.id === "string" ? event.payload.id : "";
       const error = typeof event.payload?.error === "string" ? event.payload.error.slice(0, 200) : "";
@@ -852,6 +860,7 @@ class Session {
   destroy = () => {
     this.unlisten?.();
     this.unlistenAudienceCamera?.();
+    this.unlistenSoundBlocked?.();
     this.unlistenRemote?.();
     this.unlistenLan?.();
     this.releaseCameras();
@@ -5717,7 +5726,8 @@ class Session {
     await this.take();
     // Put back what was staged, unless something newer (a verse heard meanwhile) has taken Preview.
     const stillOurs = this.live.preview.sourceId?.startsWith(`song:${song.id}:`) ?? false;
-    if (stillOurs && staged.model.layout !== "empty" && !staged.sourceId?.startsWith("song:")) {
+    // Another song the operator staged next stays staged too; only this song's own parts give way.
+    if (stillOurs && staged.model.layout !== "empty" && !staged.sourceId?.startsWith(`song:${song.id}:`)) {
       this.live = setPreview(this.live, staged);
       this.songFocus = focus;
     }

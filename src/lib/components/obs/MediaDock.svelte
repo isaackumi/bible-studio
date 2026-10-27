@@ -33,7 +33,7 @@
   async function chooseDesktop() {
     const picked = await open({
       multiple: false,
-      filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp4", "m4v", "mov", "webm"] }],
+      filters: [{ name: t("Image or video"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "mp4", "m4v", "mov", "webm"] }],
     });
     if (typeof picked === "string") await session.importImage(picked);
   }

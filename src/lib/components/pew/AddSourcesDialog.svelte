@@ -232,7 +232,7 @@
     }
     const picked = await openDialog({
       multiple: true,
-      filters: [{ name: t("Pictures and videos"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "mp4", "m4v", "mov", "webm"] }],
+      filters: [{ name: t("Pictures and videos"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "mp4", "m4v", "mov", "webm"] }],
     });
     await importMediaFiles(Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : []);
   }

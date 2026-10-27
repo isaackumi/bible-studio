@@ -426,7 +426,8 @@ pub fn media_kind(ext: &str) -> Option<&'static str> {
     match ext {
         // An SVG is turned into a PNG by the desk straight after (fit-image.ts); until then it is
         // only ever shown as a picture, which cannot run its scripts.
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg" => Some("image"),
+        // BMP too: Pictures shows it from a folder, so adding one to a service must work as well.
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "svg" => Some("image"),
         "mp4" | "m4v" | "mov" | "webm" => Some("video"),
         "mp3" | "m4a" | "aac" | "wav" | "ogg" | "oga" | "flac" => Some("audio"),
         _ => None,
@@ -635,6 +636,7 @@ mod tests {
         assert_eq!(super::media_kind("mp3"), Some("audio"));
         assert_eq!(super::media_kind("exe"), None);
         assert_eq!(super::media_kind("svg"), Some("image"));
+        assert_eq!(super::media_kind("bmp"), Some("image"));
     }
 
     use super::*;
