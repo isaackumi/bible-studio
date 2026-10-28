@@ -131,6 +131,7 @@ pub fn start(app: tauri::AppHandle, options: Options, stamp: String) -> Result<O
                 }
                 let _ = app.emit("broadcast-status", Line { line });
             }
+            log::info!("broadcast: the helper ended");
             let _ = app.emit("broadcast-status", Line { line: r#"{"kind":"end"}"#.into() });
         });
         *running::NOW.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(running::Running { child, stdin });

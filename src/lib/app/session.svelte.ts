@@ -5547,7 +5547,10 @@ class Session {
       }
       this.broadcastFailed(message.message ?? t("Streaming stopped."), refused ? "permission" : null);
     }
-    else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
+    else if (message.kind === "end" && state.status === "starting") {
+      // Ended before it ever said it had started: it stopped (or crashed) on the way up. Said, not silent.
+      this.broadcastFailed(t("Recording stopped as it was starting. Keep the audience screen open on its screen, then try again. If it happens again, send a support file."));
+    } else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
   };
 
   /** Sound with the NDI picture; a running sender restarts to take the change. */

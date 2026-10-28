@@ -677,11 +677,24 @@ private final class Broadcast: NSObject, SCStreamOutput, SCStreamDelegate, @unch
         let message: String
     }
 
+    /// The audience window, once it is on a screen. ScreenCaptureKit aborts the whole helper (an
+    /// assertion in SkyLight, not an error to catch) when given a window that is on no display, as
+    /// one is while it is still being opened or placed: so only a window that is on screen, has a
+    /// size and lies on a connected display is taken, the largest if there are several.
     private func findWindow() async throws -> SCWindow {
-        for attempt in 0..<10 {
+        var sawOffscreen = false
+        for attempt in 0..<20 {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-            if let window = content.windows.first(where: { $0.owningApplication?.processID == options.pid && ($0.title ?? "") == options.title }) { return window }
-            if attempt < 9 { try await Task.sleep(nanoseconds: 300_000_000) }
+            let ours = content.windows.filter { $0.owningApplication?.processID == options.pid && ($0.title ?? "") == options.title }
+            let placed = ours.filter { window in
+                window.isOnScreen && window.frame.width >= 2 && window.frame.height >= 2 && content.displays.contains { $0.frame.intersects(window.frame) }
+            }
+            if let window = placed.max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) { return window }
+            if !ours.isEmpty { sawOffscreen = true }
+            if attempt < 19 { try await Task.sleep(nanoseconds: 300_000_000) }
+        }
+        if sawOffscreen {
+            throw BroadcastError(code: "no-window", message: "The audience window is open but not on a screen. Show it on its screen, then start again.")
         }
         throw BroadcastError(code: "no-window", message: "The audience window is not open. Open output, then start again.")
     }

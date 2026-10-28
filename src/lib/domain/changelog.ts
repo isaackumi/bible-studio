@@ -16,6 +16,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.12",
+    date: "2026-10-28",
+    highlights: [
+      { icon: "video", title: msg("Recording on a Mac keeps going"), text: msg("Pressing Record as the audience screen opened could make recording stop at once. It now waits until the audience screen is on its screen, then records; if it cannot, it says why."), show: null },
+    ],
+  },
+  {
     version: "0.6.11",
     date: "2026-10-28",
     highlights: [
