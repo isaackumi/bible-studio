@@ -5427,14 +5427,9 @@ class Session {
       }
       rtmp = target.url;
     }
-    // macOS must allow capturing the audience window. It asks once; what is allowed only applies after
-    // Church Studio is reopened, so asking again on every press would only bring the question back. Windows does not ask.
-    if (!options.pattern && !(await invoke<boolean>("screen_capture_allowed", { ask: !this.screenAsked }).catch(() => true))) {
-      const first = !this.screenAsked;
-      this.screenAsked = true;
-      this.broadcastFailed(first ? t("macOS asked for permission to capture the audience window. Allow it, then quit and reopen Church Studio: macOS only applies it after a restart.") : t("macOS has not given Church Studio permission to capture the audience window yet."), "permission");
-      return false;
-    }
+    // No asking macOS beforehand: its answer to an app without a fixed signature can be "no" while
+    // System Settings shows it allowed, which kept the question coming back. The capture itself asks
+    // when it needs to, and a real refusal comes back from it as a "permission" error with what to do.
     // A recording that would run out of room partway through the service is stopped before it starts.
     if (options.record && !options.pattern) {
       const room = await this.checks.recordRoom();
@@ -5498,9 +5493,6 @@ class Session {
    * Streaming or recording could not start (or stopped): said where it is seen, with the one thing to
    * do about it, not only inside the closed menu.
    */
-  /** Screen Recording was asked for in this launch (macOS shows its question once; the answer applies after a restart). */
-  private screenAsked = false;
-
   private broadcastFailed = (message: string, fix: "permission" | "settings" | "space" | null = null) => {
     this.broadcastState = { ...this.broadcastState, status: "error", message };
     if (this.desktop()) void invoke("log_note", { line: `broadcast did not start: ${message}` }).catch(() => {});
