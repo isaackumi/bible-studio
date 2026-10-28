@@ -16,7 +16,7 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
-    version: "0.6.9",
+    version: "0.6.10",
     date: "2026-10-28",
     highlights: [
       { icon: "check", title: msg("Screen recording permission stays after updates"), text: msg("On a Mac, allow Church Studio to record the screen once more after this update. From now on it keeps that permission, and the microphone and camera ones, through every update."), show: null },
