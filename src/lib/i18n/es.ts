@@ -5479,4 +5479,8 @@ export const es: Readonly<Record<string, string>> = {
   "On a Mac, allow Church Studio to record the screen once more after this update. From now on it keeps that permission, and the microphone and camera ones, through every update.": "En Mac, permite una vez más que Church Studio grabe la pantalla tras esta actualización. A partir de ahora conserva ese permiso, y los del micrófono y la cámara, en cada actualización.",
   "Recording starts when you press it": "La grabación empieza cuando la pulsas",
   "On a Mac, Stream & record no longer asks macOS beforehand, which could say no while Settings showed it allowed. It just starts; if macOS really refuses, the notice says what to do.": "En Mac, Transmitir y grabar ya no pregunta antes a macOS, que podía decir que no aunque Ajustes lo mostrara permitido. Simplemente empieza; si macOS de verdad lo rechaza, el aviso dice qué hacer.",
+  "Recording asks macOS properly": "La grabación pregunta bien a macOS",
+  "When a Mac refuses to let Church Studio record the screen without asking, Church Studio now puts macOS's own question up, so it is listed in Screen & System Audio Recording to switch on.": "Cuando un Mac se niega sin preguntar a que Church Studio grabe la pantalla, Church Studio ahora muestra la pregunta de macOS, para que aparezca en Grabación de pantalla y audio del sistema, listo para activarlo.",
+  "A steadier audience screen on a Mac": "Una pantalla de la congregación más estable en Mac",
+  "The audience screen is no longer placed again every second when nothing has changed, which saves work and keeps the log readable.": "La pantalla de la congregación ya no se vuelve a colocar cada segundo cuando nada ha cambiado: menos trabajo para el ordenador y un registro legible.",
 };

@@ -286,6 +286,14 @@ pub fn reconcile(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Where the AppKit fallback put the audience window: x, y, width, height, and whether full screen.
+#[cfg(target_os = "macos")]
+type Placed = (i32, i32, u32, u32, bool);
+
+/// The AppKit fallback's last placement.
+#[cfg(target_os = "macos")]
+static APPKIT_PLACED: std::sync::Mutex<Option<Placed>> = std::sync::Mutex::new(None);
+
 /// Tauri sometimes reports no monitors while CoreGraphics still has the Dell.
 #[cfg(target_os = "macos")]
 fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
@@ -303,13 +311,21 @@ fn place_with_appkit(app: &AppHandle, output: &Output) -> Result<bool, String> {
     let fullscreen = lock(&output.mode).as_str() == "fullscreen";
     if release_native_fullscreen(&window, output) {
         log::info!("AUDIENCE_LEAVE_FULLSCREEN");
+        *lock(&APPKIT_PLACED) = None;
         return Ok(true);
     }
-    window.set_decorations(false).map_err(|e| e.to_string())?;
-    cover_cocoa_frame(&window, (x as f64, y as f64, width as f64, height as f64))?;
-    window.show().map_err(|e| e.to_string())?;
-    join_active_space(&window)?;
-    log::info!("AUDIENCE_PLACE cg-points={x},{y} {width}x{height} fullscreen={fullscreen}");
+    // The screens are checked every second: the window is placed again only when where it should be
+    // has changed or it is not showing, not every time (that redrew it and filled the log).
+    let target = (x, y, width, height, fullscreen);
+    let showing = window.is_visible().unwrap_or(false);
+    if !showing || *lock(&APPKIT_PLACED) != Some(target) {
+        window.set_decorations(false).map_err(|e| e.to_string())?;
+        cover_cocoa_frame(&window, (x as f64, y as f64, width as f64, height as f64))?;
+        window.show().map_err(|e| e.to_string())?;
+        join_active_space(&window)?;
+        log::info!("AUDIENCE_PLACE cg-points={x},{y} {width}x{height} fullscreen={fullscreen}");
+        *lock(&APPKIT_PLACED) = Some(target);
+    }
     let fallback_key = display_key("External display", width, height, 1.0);
     {
         let mut listed = lock(&output.displays).clone();

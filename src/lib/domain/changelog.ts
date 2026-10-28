@@ -16,6 +16,14 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.11",
+    date: "2026-10-28",
+    highlights: [
+      { icon: "video", title: msg("Recording asks macOS properly"), text: msg("When a Mac refuses to let Church Studio record the screen without asking, Church Studio now puts macOS's own question up, so it is listed in Screen & System Audio Recording to switch on."), show: null },
+      { icon: "speed", title: msg("A steadier audience screen on a Mac"), text: msg("The audience screen is no longer placed again every second when nothing has changed, which saves work and keeps the log readable."), show: null },
+    ],
+  },
+  {
     version: "0.6.10",
     date: "2026-10-28",
     highlights: [
