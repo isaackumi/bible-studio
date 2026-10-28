@@ -98,10 +98,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
+      # Mac builds are signed with the church's own certificate (self-signed, made once, kept in
+      # ~/.church-studio): every update keeps one identity, so macOS's Screen Recording, microphone
+      # and camera permissions carry over instead of being asked for again after each update. The
+      # public half is .github/macos-signing.crt; trusted here for signing on this build machine only.
+      - name: Trust the Mac signing certificate
+        if: matrix.platform == 'macos-latest'
+        run: sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain .github/macos-signing.crt
       # The release text is this version's highlights from src/lib/domain/changelog.ts.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Mac signing (tauri imports the certificate and signs; no Apple account, so no notarizing).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           # Error reports (src/lib/app/telemetry.ts): the Sentry project's DSN, a repository variable.
           # Empty: reports are off in this build.
           VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN }}

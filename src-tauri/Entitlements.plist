@@ -10,5 +10,8 @@
   <true/>
   <key>com.apple.security.personal-information.location</key>
   <true/>
+  <!-- Signed with our own certificate, the app still loads the NDI runtime, signed by its maker. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
 </dict>
 </plist>
