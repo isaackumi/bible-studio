@@ -5493,6 +5493,9 @@ class Session {
    * Streaming or recording could not start (or stopped): said where it is seen, with the one thing to
    * do about it, not only inside the closed menu.
    */
+  /** macOS was asked to show its Screen Recording question in this launch (it shows it once). */
+  private screenAsked = false;
+
   private broadcastFailed = (message: string, fix: "permission" | "settings" | "space" | null = null) => {
     this.broadcastState = { ...this.broadcastState, status: "error", message };
     if (this.desktop()) void invoke("log_note", { line: `broadcast did not start: ${message}` }).catch(() => {});
@@ -5534,7 +5537,16 @@ class Session {
     else if (message.kind === "saved" && message.path) {
       this.broadcastState = { ...state, saved: message.path };
       this.notify(t("Recording saved"), { detail: message.path, actions: this.desktop() ? [{ label: t(revealLabel()), run: () => void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(message.path!)).catch(() => {}) }] : [] });
-    } else if (message.kind === "error") this.broadcastFailed(message.message ?? t("Streaming stopped."), (message as { code?: string }).code === "permission" ? "permission" : null);
+    } else if (message.kind === "error") {
+      const refused = (message as { code?: string }).code === "permission";
+      // macOS refused without asking (it holds an old answer): ask it to put its question up, once
+      // a launch, so Church Studio is listed in Screen Recording to switch on.
+      if (refused && !this.screenAsked) {
+        this.screenAsked = true;
+        void invoke("screen_capture_allowed", { ask: true }).catch(() => {});
+      }
+      this.broadcastFailed(message.message ?? t("Streaming stopped."), refused ? "permission" : null);
+    }
     else if (message.kind === "end" && state.status !== "error") this.broadcastState = { ...state, status: "off", live: false };
   };
 
