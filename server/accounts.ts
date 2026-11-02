@@ -325,6 +325,8 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
     .map((entry) => ({ entry, license: readAnyLicense(config, entry.key)?.license ?? readLicense(entry.key) }))
     .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license> } => !!item.license)
     .sort((a, b) => PLAN_RANK[b.license.plan] - PLAN_RANK[a.license.plan]);
+  // The licence this computer is already on: the others are listed, and no seat is taken on them.
+  const current = text(input.license, 40);
   const summary = [];
   let lease: string | undefined;
   let activation: Record<string, unknown> | undefined;
@@ -342,7 +344,7 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
       by = holder ? holder.name || holder.email : undefined;
     }
     summary.push({ license: license.id, plan: license.plan, revoked, owner, ...(owner && ownership ? { members: ownership.members, people: peopleOf(ownership) } : {}), ...(by ? { by } : {}), ...(allowed ? {} : { removed: true }) });
-    if (!device || lease || revoked || !allowed) continue;
+    if (!device || lease || revoked || !allowed || (current && license.id !== current)) continue;
     const computer = text(input.name, 60) || "Computer";
     const result = await activateDevice(config, entry.key, device, computer);
     if (result.lease) {

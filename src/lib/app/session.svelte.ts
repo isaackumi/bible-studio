@@ -7262,7 +7262,7 @@ class Session {
   syncAccount = async (): Promise<string | null> => {
     const token = this.workspace.profile?.token;
     if (!token) return null;
-    const answer = await serverCall<AccountStatus>("/v1/account", { token, device: this.deviceId, name: this.deviceName() });
+    const answer = await serverCall<AccountStatus>("/v1/account", { token, device: this.deviceId, name: this.deviceName(), license: this.licenceHere() });
     if (!answer.ok) {
       if ((answer.data as { signedOut?: boolean }).signedOut && this.workspace.profile) {
         const { token: _dropped, ...rest } = this.workspace.profile;
@@ -7605,7 +7605,14 @@ class Session {
   nearbyComputers = async (): Promise<Array<{ device: string; name: string }>> => (this.nearbyOn ? invoke<Array<{ device: string; name: string }>>("nearby_peers").catch(() => []) : []);
 
   /** For the sync engine: who this computer is to the cloud. */
-  cloudIdentity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName() });
+  cloudIdentity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName(), licence: this.licenceHere() });
+
+  /** The paid licence this computer is on, by id ("" when it is not on one). */
+  private licenceHere(): string {
+    const { source, license } = this.workspace.entitlement;
+    if (source !== "license" || !license || this.ent.kind !== "license" || this.plan === "free") return "";
+    return readLicense(license)?.id ?? "";
+  }
 
   /** For the sync engine: a list the cloud wrote to is read back a moment later. */
   cloudWrote = (what: "songs" | "services" | "sermons" | "themes") => {

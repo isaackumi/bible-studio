@@ -358,3 +358,51 @@ describe("Ask me first", () => {
     expect(sync.asking).toBe(first + 1);
   });
 });
+
+describe("this computer moving to another licence", () => {
+  const onLicence = (licence: string) => {
+    const cloud = fakeCloud({ status: { licence } });
+    return cloud;
+  };
+
+  it("sends and fetches nothing until someone chooses, then syncs", async () => {
+    const computer = fakeComputer({ songs: [song("ours", "Our song")] });
+    await make(onLicence("A"), computer).syncNow();
+    const other = onLicence("B");
+    other.seed({ col: "song", id: "theirs", at: T0 - 1000, doc: song("theirs", "Another church's song") });
+    const sync = make(other, computer);
+    await sync.syncNow();
+    expect(sync.status).toBe("licenceChanged");
+    expect(other.log.filter((line) => /^(push|pull|claim)/.test(line))).toEqual([]);
+    expect(computer.songs().map((entry) => entry.id)).toEqual(["ours"]);
+    await sync.tick();
+    await sync.syncNow();
+    expect(other.log.filter((line) => /^(push|pull|claim)/.test(line))).toEqual([]);
+    await sync.acceptLicence();
+    expect(sync.status).toBe("idle");
+    expect(other.records.some((row) => row.id === "ours")).toBe(true);
+    expect(computer.songs().map((entry) => entry.id).sort()).toEqual(["ours", "theirs"]);
+  });
+
+  it("stays paused through a sign-in", async () => {
+    const computer = fakeComputer({ songs: [song("ours", "Our song")] });
+    await make(onLicence("A"), computer).syncNow();
+    const other = onLicence("B");
+    const sync = make(other, computer);
+    await sync.syncNow();
+    sync.resume();
+    await sync.syncNow();
+    expect(sync.status).toBe("licenceChanged");
+    expect(other.log.filter((line) => line.startsWith("push"))).toEqual([]);
+  });
+
+  it("goes on as ever on the same licence", async () => {
+    const computer = fakeComputer({ songs: [song("ours", "Our song")] });
+    const cloud = onLicence("A");
+    await make(cloud, computer).syncNow();
+    const sync = make(cloud, computer);
+    await sync.syncNow();
+    expect(sync.status).toBe("idle");
+  });
+});
+

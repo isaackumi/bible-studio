@@ -47,7 +47,7 @@ export function setCloudAsks(ask: boolean) {
   }
 }
 
-export type CloudSyncStatus = "off" | "free" | "signedOut" | "idle" | "syncing" | "noSeat" | "readOnly" | "offline" | "error";
+export type CloudSyncStatus = "off" | "free" | "signedOut" | "idle" | "syncing" | "noSeat" | "readOnly" | "offline" | "error" | "licenceChanged";
 
 const EVERY_MS = 3 * 60_000;
 const SOON_MS = 5000;
@@ -86,6 +86,7 @@ export class CloudSync {
   /** The count at the last Later: the card comes back only when there is more. */
   private later = $state(0);
   private pushOnce = false;
+  private licenceAccepted = false;
 
   private manifest: Kept = emptyManifest();
   private loaded = false;
@@ -128,6 +129,14 @@ export class CloudSync {
   tick = async () => {
     if (this.stopped) return;
     await this.syncNow();
+  };
+
+  /** This computer moved to another licence and someone chose to bring its library along. */
+  acceptLicence = (): Promise<void> => {
+    this.licenceAccepted = true;
+    this.stopped = false;
+    if (this.running) this.again = true;
+    return this.syncNow();
   };
 
   /** Ask me first: what is waiting, for the card; 0 once Later was pressed, until something new. */
@@ -245,7 +254,17 @@ export class CloudSync {
       return;
     }
     this.takeStatus(first.data);
-    if ((this.manifest.licence && this.manifest.licence !== first.data.licence) || first.data.seq < this.manifest.seq) {
+    // Another licence is another church's library: nothing moves until someone says so, or this
+    //    computer's library would go into it, and that one would come down here.
+    const moved = !!this.manifest.licence && this.manifest.licence !== first.data.licence;
+    if (moved && !this.licenceAccepted) {
+      this.status = "licenceChanged";
+      this.message = "";
+      this.stopped = true;
+      return;
+    }
+    this.licenceAccepted = false;
+    if (moved || first.data.seq < this.manifest.seq) {
       this.manifest = { ...emptyManifest(), licence: first.data.licence, fileHashes: this.manifest.fileHashes ?? {}, refused: {} };
     }
     this.manifest.licence = first.data.licence;

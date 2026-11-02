@@ -5537,4 +5537,9 @@ export const es: Readonly<Record<string, string>> = {
   "Larger song text": "Texto de las canciones más grande",
   "Smaller song text. A song on Program changes at once.": "Texto de las canciones más pequeño. Una canción en Programa cambia al instante.",
   "Larger song text. A song on Program changes at once.": "Texto de las canciones más grande. Una canción en Programa cambia al instante.",
+  "Sync is paused: this computer moved to another licence.": "Sincronización en pausa: este ordenador pasó a otra licencia.",
+  "Bring this library to the new licence?": "¿Llevar esta biblioteca a la nueva licencia?",
+  "Its songs, services and files will go into the new licence's library, and that library will come to this computer. Do this only if both belong to the same church, such as after an upgrade.": "Sus canciones, servicios y archivos irán a la biblioteca de la nueva licencia, y esa biblioteca vendrá a este ordenador. Hazlo solo si ambas pertenecen a la misma iglesia, por ejemplo tras una mejora de plan.",
+  "Press again to bring it": "Pulsa otra vez para llevarla",
+  "Bring it": "Llevarla",
 };

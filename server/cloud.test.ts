@@ -85,6 +85,61 @@ describe("cloud space", () => {
     expect((await call("/v1/cloud/pull", { token, device: "laptop", since: 0 })).status).toBe(200);
   });
 
+  describe("a person on two churches' licences", () => {
+    const CHURCH_A = "0a0b0c0d";
+    const CHURCH_B = "1a1b1c1d";
+    /** Ama: Premium at her own church, then added to Grace's Church plan, one computer on both seats. */
+    async function onBoth() {
+      const made = setup();
+      const own = await made.person("ama", "ama@a.org", { id: CHURCH_A, plan: "premium" }, ["pc"], "owner");
+      const grace = await made.person("grace", "grace@b.org", { id: CHURCH_B, plan: "church" }, ["pc"], "owner");
+      const raw = JSON.parse((await made.config.store.get("acct:ama"))!);
+      raw.licenses.push({ id: CHURCH_B, key: grace.key });
+      await putJson(made.config.store, "acct:ama", raw);
+      const owner = JSON.parse((await made.config.store.get(`owner:${CHURCH_B}`))!);
+      owner.members = ["ama@a.org"];
+      await putJson(made.config.store, `owner:${CHURCH_B}`, owner);
+      return { ...made, token: own.token };
+    }
+    const song = (id: string) => ({ col: "song", id, at: 1, doc: { id, title: id } });
+
+    it("writes to the licence the computer is on, not the account's best", async () => {
+      const { call, token } = await onBoth();
+      await call("/v1/cloud/push", { token, device: "pc", licence: CHURCH_A, changes: [song("from-a")] });
+      const a = await call("/v1/cloud/pull", { token, device: "pc", licence: CHURCH_A, since: 0 });
+      const b = await call("/v1/cloud/pull", { token, device: "pc", licence: CHURCH_B, since: 0 });
+      expect(a.data.changes.map((change: { id: string }) => change.id)).toEqual(["from-a"]);
+      expect(b.data.changes).toEqual([]);
+      expect((await call("/v1/cloud/status", { token, device: "pc", licence: CHURCH_A })).data.licence).toBe(CHURCH_A);
+    });
+
+    it("will not guess for a computer that does not say", async () => {
+      const { call, token } = await onBoth();
+      const answer = await call("/v1/cloud/push", { token, device: "pc", changes: [song("from-old-app")] });
+      expect(answer).toMatchObject({ status: 409, data: { chooseLicence: true } });
+    });
+
+    it("still answers an older app when only one plan is running", async () => {
+      const { call, person } = setup();
+      const one = await person("kojo", "kojo@a.org", { id: CHURCH_A, plan: "church" }, ["pc"], "owner");
+      expect((await call("/v1/cloud/pull", { token: one.token, device: "pc", since: 0 })).status).toBe(200);
+    });
+
+    it("refuses a licence that is not on the account", async () => {
+      const { call, person } = setup();
+      const one = await person("kojo", "kojo@a.org", { id: CHURCH_A, plan: "church" }, ["pc"], "owner");
+      expect(await call("/v1/cloud/pull", { token: one.token, device: "pc", licence: CHURCH_B, since: 0 })).toMatchObject({ status: 403, data: { noSeat: true } });
+    });
+
+    it("keeps files to the licence named in their address", async () => {
+      const { token, config } = await onBoth();
+      const response = (await handleCloud(new Request(`https://keys.test/v1/cloud/media/${HASH}`, { headers: { authorization: `Bearer ${token}`, "x-device": "pc" } }), config))!;
+      expect(response.status).toBe(409);
+      const named = (await handleCloud(new Request(`https://keys.test/v1/cloud/media/${HASH}?licence=${CHURCH_A}`, { headers: { authorization: `Bearer ${token}`, "x-device": "pc" } }), config))!;
+      expect(named.status).toBe(404);
+    });
+  });
+
   it("refuses a member the owner removed, and an account with no plan", async () => {
     const { call, person } = setup();
     await person("ama", "ama@grace.org", { id: "0a0b0c0d", plan: "church" }, ["media-pc"]);
