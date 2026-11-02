@@ -249,8 +249,15 @@
       <StatusLine />
       <UpdateNotice />
     </div>
-    <!-- The audience screen dropped out: its own chunk, loaded only when that happens. -->
-    {#if session.screenLost}{#await import("./ScreenLost.svelte") then { default: ScreenLost }}<ScreenLost name={session.screenLost} />{/await}{/if}
+    <!-- What needs the operator now, stacked so neither covers the other. Each its own chunk, loaded only when it happens. -->
+    <div class="top-alerts">
+      {#if session.screenLost}{#await import("./ScreenLost.svelte") then { default: ScreenLost }}<ScreenLost name={session.screenLost} />{/await}{/if}
+      {#if session.micAlert}{#await import("./MicAlert.svelte") then { default: MicAlert }}<MicAlert alert={session.micAlert} />{/await}{/if}
+      {#if session.cloud?.asking}{#await import("./CloudAsk.svelte") then { default: CloudAsk }}<CloudAsk cloud={session.cloud} />{/await}{/if}
+      {#if session.offerWaiting}{#await import("./OfferCard.svelte") then { default: OfferCard }}<OfferCard offer={session.offerWaiting} />{/await}{/if}
+    </div>
+    {#if session.pushing}{#await import("./PushDialog.svelte") then { default: PushDialog }}<PushDialog />{/await}{/if}
+    {#if session.reviewing}{#await import("./OfferDialog.svelte") then { default: OfferDialog }}<OfferDialog offer={session.reviewing} />{/await}{/if}
     <!-- Loaded just after start-up: nothing is running yet when the desk opens. -->
     {#await import("./NowRunning.svelte") then { default: NowRunning }}<NowRunning />{/await}
     <WhatsNew />
@@ -267,4 +274,6 @@
 <style>
   .corner-notes { position: fixed; left: 20px; bottom: 20px; z-index: 900; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
   .corner-notes > :global(*) { pointer-events: auto; }
+  .top-alerts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 890; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(620px, calc(100vw - 32px)); pointer-events: none; }
+  .top-alerts > :global(*) { pointer-events: auto; }
 </style>

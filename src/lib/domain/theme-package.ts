@@ -70,6 +70,7 @@ export function readThemePackage(
     background,
     fontFamily: typeof input.fontFamily === "string" && input.fontFamily.trim() ? input.fontFamily.slice(0, 120) : base.fontFamily,
     fontSize: number(input.fontSize, base.fontSize, 16, 220),
+    ...(input.songSize ? { songSize: number(input.songSize, base.fontSize, 16, 220) } : {}),
     color: color(input.color, base.color),
     margin: number(input.margin, base.margin, 0, 400),
     align: input.align === "left" || input.align === "right" ? input.align : "center",

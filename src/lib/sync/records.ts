@@ -158,8 +158,11 @@ export type Apply = {
   copy(col: string, doc: unknown, suffix: string): Promise<void>;
 };
 
+/** A kind of record that can be handed to another computer: everything but the church's settings. */
+export const isSharedCol = (col: string) => ["song", "service", "sermon", "theme"].includes(col) || LISTS.some(([, list]) => list === col);
+
 /** Write one pulled (or kept) version here: the library's own tables, or the workspace's lists. */
-async function write(change: Change, apply: Apply): Promise<void> {
+export async function writeRecord(change: Change, apply: Apply): Promise<void> {
   switch (change.col) {
     case "song":
       return apply.song(change.doc as Song | null, change.id);
@@ -223,7 +226,7 @@ export async function applyChanges(changes: Change[], apply: Apply, manifest: Ma
       if (known && !known.pending && known.hash === hash && known.at === change.at) continue;
       hashes[name] = { hash, at: change.at };
     }
-    await write(change, apply);
+    await writeRecord(change, apply);
   }
   return { ...manifest, hashes };
 }
@@ -250,7 +253,7 @@ export async function applyConflicts(conflicts: Array<{ col: string; id: string;
       if (firstContact && mine !== undefined && kept.col !== "settings") await apply.copy(kept.col, mine, suffix);
       hashes[name] = { hash: theirs, at: kept.keptAt };
     } else delete hashes[name];
-    await write({ col: kept.col, id: kept.id, at: kept.keptAt, doc: kept.doc }, apply);
+    await writeRecord({ col: kept.col, id: kept.id, at: kept.keptAt, doc: kept.doc }, apply);
   }
   return { ...manifest, hashes };
 }

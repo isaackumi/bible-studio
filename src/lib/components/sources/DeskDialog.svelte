@@ -102,6 +102,9 @@
     inset: 0;
     z-index: 65;
     display: grid;
+    /* The window's height, not the content's: the panel's max-height is a share of this row, so with
+       an auto row a long editor pushed the footer's Save and Cancel off the screen. */
+    grid-template-rows: minmax(0, 1fr);
     place-items: center;
   }
   .panel:focus { outline: none; }

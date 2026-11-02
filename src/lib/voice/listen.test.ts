@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessMessage, shouldRestartListening, stitchTranscript } from "./listen";
+import { accessMessage, nativeErrorKind, shouldRestartListening, stitchTranscript } from "./listen";
 
 describe("voice listen", () => {
   it("keeps listening through silence and engine restarts", () => {
@@ -51,5 +51,23 @@ describe("a reference said across two speech pieces", () => {
     expect(spokenReference("thirteen four")).toBeNull();
     const hit = spokenReference(second.text);
     expect(hit && `${hit.bookName} ${hit.chapter}:${hit.startVerse}`).toBe("1 Corinthians 13:4");
+  });
+});
+
+describe("a desktop listening failure", () => {
+  it("sends a microphone that would not open to the sound settings, not privacy", () => {
+    expect(nativeErrorKind("Windows could not open the microphone: The device is busy. Check it is plugged in and not muted, or choose another under Settings > Sound & voice.")).toBe("no-mic");
+    expect(nativeErrorKind("Windows stopped hearing the microphone (unplugged, or taken by another app).")).toBe("no-mic");
+    expect(nativeErrorKind("No microphone is available.", "unsupported")).toBe("no-mic");
+  });
+
+  it("says blocked only when something blocked it", () => {
+    expect(nativeErrorKind("Windows could not open the microphone: Access is denied. Check it is plugged in.")).toBe("denied");
+    expect(nativeErrorKind("Check Settings > Privacy & security.")).toBe("denied");
+  });
+
+  it("keeps what it was told for anything else", () => {
+    expect(nativeErrorKind("Windows has no English speech recognizer on this PC (installed: none).")).toBe("failed");
+    expect(nativeErrorKind("The Windows speech helper is missing from this install.", "unsupported")).toBe("unsupported");
   });
 });

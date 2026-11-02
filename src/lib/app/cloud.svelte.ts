@@ -27,6 +27,26 @@ export type CloudCommands = {
 /** Whether this computer may sync at all: the plan and the sign-in, before the server is asked. */
 export type CloudGate = () => "ok" | "free" | "signedOut" | "off";
 
+const ASK_KEY = "church-studio:cloud-ask";
+
+/** "Ask me first" on this computer: what changes here waits for Sync now. Never synced: it is this desk's choice. */
+export function cloudAsks(): boolean {
+  try {
+    return localStorage.getItem(ASK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setCloudAsks(ask: boolean) {
+  try {
+    if (ask) localStorage.setItem(ASK_KEY, "1");
+    else localStorage.removeItem(ASK_KEY);
+  } catch {
+    // Private storage off: syncing stays automatic.
+  }
+}
+
 export type CloudSyncStatus = "off" | "free" | "signedOut" | "idle" | "syncing" | "noSeat" | "readOnly" | "offline" | "error";
 
 const EVERY_MS = 3 * 60_000;
@@ -61,6 +81,11 @@ export class CloudSync {
   onlyHere = $state(new Set<string>());
   /** How many media files are still to go up or come down. */
   pendingMedia = $state(0);
+  /** Ask me first: records and files changed here, waiting for Sync now. */
+  held = $state(0);
+  /** The count at the last Later: the card comes back only when there is more. */
+  private later = $state(0);
+  private pushOnce = false;
 
   private manifest: Kept = emptyManifest();
   private loaded = false;
@@ -72,7 +97,7 @@ export class CloudSync {
   private everyTimer: ReturnType<typeof setInterval> | undefined;
   private stopped = false;
 
-  constructor(private deps: { protocol: CloudProtocol; commands: CloudCommands; library: CloudLibrary; gate: CloudGate; now: () => number; name: () => string; onRestored?: (records: number) => void }) {}
+  constructor(private deps: { protocol: CloudProtocol; commands: CloudCommands; library: CloudLibrary; gate: CloudGate; now: () => number; name: () => string; hold?: () => boolean; onRestored?: (records: number) => void }) {}
 
   /** Start syncing: now, and every few minutes while the app is open. */
   start = () => {
@@ -104,6 +129,31 @@ export class CloudSync {
     if (this.stopped) return;
     await this.syncNow();
   };
+
+  /** Ask me first: what is waiting, for the card; 0 once Later was pressed, until something new. */
+  get asking(): number {
+    return this.held > this.later ? this.held : 0;
+  }
+
+  askLater = () => {
+    this.later = this.held;
+  };
+
+  /** Ask me first: Sync now. What is waiting goes up, this once. */
+  sendHeld = (): Promise<void> => {
+    this.pushOnce = true;
+    if (this.running) this.again = true;
+    return this.syncNow();
+  };
+
+  /** The library and files this engine works on, for handing records to a computer nearby. */
+  get library(): CloudLibrary {
+    return this.deps.library;
+  }
+
+  get commands(): CloudCommands {
+    return this.deps.commands;
+  }
 
   /** Sign-in or the plan changed: refusals are forgotten and sync may run again. */
   resume = () => {
@@ -180,6 +230,9 @@ export class CloudSync {
     await this.load();
     this.dirty = false;
     this.status = "syncing";
+    // Ask me first: nothing goes up unless Sync now was pressed. What arrives still comes down.
+    const hold = !!this.deps.hold?.() && !this.pushOnce;
+    this.pushOnce = false;
     const now = this.deps.now();
 
     // 0. Which library, and how far it goes: another licence, or one wiped and begun again,
@@ -204,9 +257,14 @@ export class CloudSync {
     let records = collectRecords(library);
     const local = new Map(records.map((record) => [`${record.col}/${record.id}`, record.doc]));
     const suffix = `(from ${this.deps.name()})`;
+    let heldRecords = 0;
     for (let round = 0; round < 2; round++) {
       const diff = diffRecords(records, this.manifest, now);
       this.manifest = diff.manifest;
+      if (hold) {
+        heldRecords = diff.changes.length;
+        break;
+      }
       let copied = false;
       for (let at = 0; at < diff.changes.length; at += PAGE) {
         const page = diff.changes.slice(at, at + PAGE);
@@ -236,7 +294,8 @@ export class CloudSync {
         await this.save();
         return this.refused(answer);
       }
-      const live = this.dirty ? new Map(collectRecords(await this.deps.library.collect()).map((record) => [`${record.col}/${record.id}`, hashDoc(record.doc)])) : undefined;
+      // Waiting records count as edited here, so what arrives never lands on top of them.
+      const live = this.dirty || hold ? new Map(collectRecords(await this.deps.library.collect()).map((record) => [`${record.col}/${record.id}`, hashDoc(record.doc)])) : undefined;
       this.manifest = await applyChanges(answer.data.changes, this.deps.library.apply, this.manifest, live);
       arrived += answer.data.changes.filter((change) => change.doc !== null && (change.col === "song" || change.col === "service" || change.col === "sermon") && !local.has(`${change.col}/${change.id}`)).length;
       this.manifest.seq = Math.max(this.manifest.seq, answer.data.seq);
@@ -250,8 +309,10 @@ export class CloudSync {
     // 3. The media those records use: up from here, down to here.
     library = await this.deps.library.collect();
     records = collectRecords(library);
-    await this.moveMedia(mediaIdsIn(records));
+    const heldFiles = await this.moveMedia(mediaIdsIn(records), hold);
     await this.save();
+    this.held = heldRecords + heldFiles;
+    if (this.held < this.later || !this.held) this.later = this.held;
 
     const after = await this.deps.protocol.status();
     if (after.ok) this.takeStatus(after.data);
@@ -270,7 +331,7 @@ export class CloudSync {
   }
 
   /** Files the records use: send what is here and not in the cloud; fetch what the cloud has and this computer lacks. */
-  private async moveMedia(needed: Set<string>): Promise<void> {
+  private async moveMedia(needed: Set<string>, hold = false): Promise<number> {
     const here = await this.deps.library.media();
     const sent = this.manifest.media ?? (this.manifest.media = {});
     const hashes = this.manifest.fileHashes ?? (this.manifest.fileHashes = {});
@@ -280,7 +341,8 @@ export class CloudSync {
     let full = false;
     let paused = false;
     // Videos stay put when the switch is off; a file refused lately is not asked about again yet.
-    const toSend = [...needed].filter((id) => here.has(id) && !sent[id] && (here.get(id) !== "video" || this.syncVideos));
+    const unsent = [...needed].filter((id) => here.has(id) && !sent[id] && (here.get(id) !== "video" || this.syncVideos));
+    const toSend = hold ? [] : unsent;
     const toFetch = [...needed].filter((id) => !here.has(id));
     this.pendingMedia = toSend.length + toFetch.length;
     for (const id of toSend) {
@@ -351,6 +413,7 @@ export class CloudSync {
     this.full = full;
     this.paused = paused;
     this.pendingMedia = 0;
+    return hold ? unsent.length : 0;
   }
 
   /** No cloud to ask: the files this library's records use, from the computers nearby. */

@@ -7,7 +7,7 @@ import { api } from "../db/api";
 import { isDesktop } from "../platform/runtime";
 import { cloudProtocol } from "../sync/protocol";
 import { restoredNotice } from "../sync/notices";
-import { CloudSync } from "./cloud.svelte";
+import { CloudSync, cloudAsks } from "./cloud.svelte";
 import type { session as Session } from "./session.svelte";
 
 export function wireCloud(session: typeof Session): CloudSync {
@@ -71,6 +71,7 @@ export function wireCloud(session: typeof Session): CloudSync {
       media: async () => new Map([...session.media, ...session.audioTracks].map((asset) => [asset.id, asset.kind])),
     },
     gate: () => (!isDesktop() ? "off" : !session.signedIn ? "signedOut" : session.plan === "free" ? "free" : "ok"),
+    hold: cloudAsks,
     now: () => Date.now(),
     name: () => identity().name,
     onRestored: (records) => {

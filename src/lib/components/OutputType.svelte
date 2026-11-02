@@ -5,6 +5,7 @@
   import { SCREEN_FONTS, screenFont } from "../domain/fonts";
   import type { Theme } from "../domain/types";
   import { sanitizeTextStyle } from "../domain/text-style";
+  import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "../domain/theme";
   import TextStyleEditor from "./TextStyleEditor.svelte";
   import { t } from "../i18n/core";
 
@@ -90,7 +91,12 @@
 
   <label>
     {t("Size {fontSize}", { fontSize: theme.fontSize })}
-    <input class="field" type="range" min="28" max="120" value={theme.fontSize} aria-label={t("Font size")} oninput={(event) => save({ ...theme, fontSize: Number(event.currentTarget.value) })} />
+    <input class="field" type="range" min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} value={theme.fontSize} aria-label={t("Font size")} oninput={(event) => save({ ...theme, fontSize: Number(event.currentTarget.value) })} />
+  </label>
+
+  <label>
+    {t("Song size {fontSize}", { fontSize: theme.songSize ?? theme.fontSize })}
+    <input class="field" type="range" min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} value={theme.songSize ?? theme.fontSize} aria-label={t("Song text size")} oninput={(event) => save({ ...theme, songSize: Number(event.currentTarget.value) })} />
   </label>
 
   <TextStyleEditor

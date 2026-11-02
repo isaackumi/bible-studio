@@ -295,3 +295,66 @@ describe("cloud sync on this computer", () => {
     expect(cloud.log.at(-1)).toMatch(/^pull [1-9]/);
   });
 });
+
+describe("Ask me first", () => {
+  const asking = (cloud: ReturnType<typeof fakeCloud>, computer: ReturnType<typeof fakeComputer>) =>
+    new CloudSync({ protocol: cloud.protocol, commands: computer.commands, library: computer.library, gate: () => "ok", now: () => T0, name: () => "Test PC", hold: () => true });
+
+  it("sends nothing until Sync now, and says how much is waiting", async () => {
+    const cloud = fakeCloud();
+    const computer = fakeComputer({ songs: [song("mine", "New song")] });
+    const sync = asking(cloud, computer);
+    await sync.syncNow();
+    expect(cloud.log.filter((line) => line.startsWith("push"))).toEqual([]);
+    expect(sync.held).toBeGreaterThan(0);
+    expect(sync.asking).toBe(sync.held);
+    await sync.sendHeld();
+    expect(cloud.records.some((row) => row.id === "mine")).toBe(true);
+    expect(sync.held).toBe(0);
+  });
+
+  it("still brings in what changed elsewhere", async () => {
+    const cloud = fakeCloud();
+    cloud.seed({ col: "song", id: "theirs", at: T0 - 1000, doc: song("theirs", "From the office") });
+    const computer = fakeComputer();
+    await asking(cloud, computer).syncNow();
+    expect(computer.songs().map((entry) => entry.id)).toContain("theirs");
+  });
+
+  it("never lets what arrives land on a waiting edit", async () => {
+    const cloud = fakeCloud();
+    const computer = fakeComputer({ songs: [song("a", "Agreed")] });
+    await make(cloud, computer).syncNow();
+    await computer.library.apply.song(song("a", "Edited here, waiting"), "a");
+    cloud.seed({ col: "song", id: "a", at: T0 + 5000, doc: song("a", "Edited elsewhere, later") });
+    await asking(cloud, computer).syncNow();
+    expect(computer.songs().find((entry) => entry.id === "a")?.title).toBe("Edited here, waiting");
+  });
+
+  it("keeps a file here until Sync now, and counts it", async () => {
+    const cloud = fakeCloud();
+    const workspace = { ...defaultWorkspace(), logoAssetId: PIC };
+    const computer = fakeComputer({ workspace, media: [{ id: PIC, kind: "image" }] });
+    const sync = asking(cloud, computer);
+    await sync.syncNow();
+    expect(cloud.log.filter((line) => line.startsWith("claim"))).toEqual([]);
+    await sync.sendHeld();
+    expect(cloud.log.some((line) => line.startsWith("claim"))).toBe(true);
+  });
+
+  it("Later puts the card away until there is more", async () => {
+    const cloud = fakeCloud();
+    const computer = fakeComputer({ songs: [song("a", "One")] });
+    const sync = asking(cloud, computer);
+    await sync.syncNow();
+    const first = sync.held;
+    sync.askLater();
+    expect(sync.asking).toBe(0);
+    await sync.syncNow();
+    expect(sync.asking).toBe(0);
+    await computer.library.apply.song(song("b", "Two"), "b");
+    await sync.syncNow();
+    expect(sync.held).toBe(first + 1);
+    expect(sync.asking).toBe(first + 1);
+  });
+});
