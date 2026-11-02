@@ -23,6 +23,20 @@ export const STARTER_THEME_ID = "theme-ember";
 export const MIN_TRANSITION_MS = 0;
 export const MAX_TRANSITION_MS = 2000;
 
+/** The range of a theme's words, and one press of A− or A+. */
+export const FONT_SIZE_MIN = 28;
+export const FONT_SIZE_MAX = 120;
+const FONT_SIZE_STEP = 4;
+
+/** The theme as lyrics use it: their own size, when the church has set one. */
+export function themeForSong(theme: Theme): Theme {
+  return theme.songSize ? { ...theme, fontSize: theme.songSize } : theme;
+}
+
+export function steppedFontSize(size: number, direction: 1 | -1): number {
+  return Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, size + direction * FONT_SIZE_STEP));
+}
+
 export function sanitizeTransition(value: unknown): Theme["transition"] {
   const record = value && typeof value === "object" ? (value as { type?: unknown; ms?: unknown }) : {};
   const type = record.type === "cut" ? "cut" : "fade";
@@ -71,6 +85,7 @@ export function sanitizeTheme(theme: Theme): Theme {
     backdrop: sanitizeBackdrop(theme.backdrop),
     premium: theme.premium === true ? true : undefined,
     panel: sanitizePanel(theme.panel),
+    songSize: typeof theme.songSize === "number" && Number.isFinite(theme.songSize) ? Math.min(220, Math.max(16, theme.songSize)) : undefined,
   };
 }
 

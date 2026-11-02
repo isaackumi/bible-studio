@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { CloudSync } from "../../app/cloud.svelte";
+  import { cloudAsks, setCloudAsks, type CloudSync } from "../../app/cloud.svelte";
   import { formatBytes } from "../../app/move";
   import { session } from "../../app/session.svelte";
   import type { CloudBinItem, CloudMediaItem } from "../../sync/protocol";
@@ -20,6 +20,14 @@
   let armed = $state<string | null>(null);
   /** Computers on this licence found on this network: they lend each other files first. */
   let nearby = $state<Set<string>>(new Set());
+  let asks = $state(cloudAsks());
+
+  function setAsks(ask: boolean) {
+    asks = ask;
+    setCloudAsks(ask);
+    // Back to automatic: what was waiting goes now.
+    if (!ask) void cloud?.syncNow();
+  }
 
   onMount(() => {
     void session.nearbyComputers().then((found) => (nearby = new Set(found.map((computer) => computer.device))));
@@ -68,6 +76,18 @@
 
 <p class="section-label">{t("Cloud space")}</p>
 <section class="rows">
+  {#if session.nearbyActive}
+    <div class="row">
+      <div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{t("Send to computers on this network")}</strong><span>{t("Choose what to send. Someone at each computer accepts it. No internet or cloud space needed.")}</span></div></div>
+      <button type="button" class="btn" onclick={() => (session.pushing = true)}>{t("Send…")}</button>
+    </div>
+    {#each session.offers as offer (offer.id)}
+      <div class="row">
+        <div class="row-copy"><strong>{t("Waiting from {name}", { name: offer.from })}</strong><span>{tn(offer.items.length + offer.files.length, "{n} item", "{n} items")}</span></div>
+        <button type="button" class="btn" onclick={() => (session.reviewing = offer)}>{t("Review")}</button>
+      </div>
+    {/each}
+  {/if}
   {#if !cloud || loading}
     <div class="row"><div class="row-copy"><span>{t("Checking…")}</span></div></div>
   {:else if cloud.status === "free"}
@@ -77,6 +97,10 @@
   {:else if cloud.status === "off"}
     <div class="row"><div class="row-copy"><span>{t("Cloud space works in the desktop app.")}</span></div></div>
   {:else}
+    <label class="row">
+      <div class="row-copy"><strong>{t("Ask me first")}</strong><span>{t("On this computer, new songs, files and changes wait until you press Sync now. When this is off, they sync by themselves.")}</span></div>
+      <input type="checkbox" checked={asks} onchange={(event) => setAsks(event.currentTarget.checked)} />
+    </label>
     <div class="row stack">
       <div class="row-copy">
         <strong>{t("{used} of {limit}", { used: formatBytes(cloud.usedBytes), limit: formatBytes(cloud.limitBytes) })}</strong>

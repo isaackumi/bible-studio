@@ -34,6 +34,8 @@ export type Theme = {
   background: ThemeBackground;
   fontFamily: string;
   fontSize: number;
+  /** Lyrics' own size: a room often wants songs bigger than verses. Unset: the same as `fontSize`. */
+  songSize?: number;
   color: string;
   align: "left" | "center" | "right";
   vertical: "top" | "middle" | "bottom";

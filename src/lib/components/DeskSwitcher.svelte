@@ -4,7 +4,7 @@
   import { pictures } from "../app/pictures.svelte";
   import { isDesktop } from "../platform/runtime";
   import Icon from "./Icon.svelte";
-  import { t } from "../i18n/core";
+  import { t, tn } from "../i18n/core";
   import { keys } from "../platform/os";
 
   // Two small groups, so the bar stays short: which desk (Presenter, Conductor or Production), and what opens
@@ -22,7 +22,9 @@
       : cloud.status === "syncing"
         ? t("Syncing…")
         : cloud.status === "idle"
-          ? cloud.lastSyncAt
+          ? cloud.held
+            ? tn(cloud.held, "{n} change waiting to sync", "{n} changes waiting to sync")
+            : cloud.lastSyncAt
             ? t("Library synced, last at {time}", { time: new Date(cloud.lastSyncAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) })
             : t("Library synced")
           : cloud.status === "offline"

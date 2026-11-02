@@ -6,6 +6,11 @@
 //!
 //!   GET /v1/media/<id>   the file, with x-cs-name (base64), x-cs-kind, x-cs-ext, x-cs-created
 //!   (each request carries x-cs-time and x-cs-sign: HMAC-SHA256 of "GET <path> <time>")
+//!   POST /v1/offer       songs, services and the like one computer offers the others, as JSON
+//!   (signed over "POST <path> <time> <sha256 of the body>", so a body cannot be swapped)
+//!
+//! An offer is kept on disk until someone at the desk accepts or declines it, so it waits through
+//! an empty desk and a restart. Nothing in it reaches the library before that.
 //!
 //! Nothing starts until the desk says this computer is on a paid licence (nearby_start).
 
@@ -31,6 +36,12 @@ const SKEW_SECS: u64 = 24 * 60 * 60;
 const REST: Duration = Duration::from_secs(60);
 /// Files sent at once; a church has a handful of computers.
 const MAX_SENDING: usize = 6;
+/// The words of a whole library fit in far less; pictures and videos are fetched apart.
+const MAX_OFFER: usize = 32 * 1024 * 1024;
+/// Offers kept waiting at once: a mistake on another computer cannot fill this one's disk.
+const MAX_WAITING: usize = 50;
+/// How long an answered offer is remembered, so a replayed request cannot ask again.
+const ANSWERED_SECS: u64 = 3 * SKEW_SECS;
 
 #[derive(Clone, Serialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -86,8 +97,26 @@ fn sign(secret: &[u8; 32], path: &str, time: u64) -> String {
     hex(ring::hmac::sign(&key, format!("GET {path} {time}").as_bytes()).as_ref())
 }
 
+fn offer_text(path: &str, time: u64, body: &[u8]) -> String {
+    format!("POST {path} {time} {}", hex(&Sha256::digest(body)))
+}
+
+fn sign_offer(secret: &[u8; 32], path: &str, time: u64, body: &[u8]) -> String {
+    let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret);
+    hex(ring::hmac::sign(&key, offer_text(path, time, body).as_bytes()).as_ref())
+}
+
 fn verify(secret: &[u8; 32], path: &str, time: &str, signature: &str, now: u64) -> bool {
-    let Ok(time) = time.parse::<u64>() else { return false };
+    let Ok(parsed) = time.parse::<u64>() else { return false };
+    verify_text(secret, &format!("GET {path} {time}"), parsed, signature, now)
+}
+
+fn verify_offer(secret: &[u8; 32], path: &str, time: &str, signature: &str, body: &[u8], now: u64) -> bool {
+    let Ok(parsed) = time.parse::<u64>() else { return false };
+    verify_text(secret, &offer_text(path, parsed, body), parsed, signature, now)
+}
+
+fn verify_text(secret: &[u8; 32], text: &str, time: u64, signature: &str, now: u64) -> bool {
     if time.abs_diff(now) > SKEW_SECS || signature.len() != 64 {
         return false;
     }
@@ -95,7 +124,7 @@ fn verify(secret: &[u8; 32], path: &str, time: &str, signature: &str, now: u64) 
         return false;
     };
     let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret);
-    ring::hmac::verify(&key, format!("GET {path} {time}").as_bytes(), &bytes).is_ok()
+    ring::hmac::verify(&key, text.as_bytes(), &bytes).is_ok()
 }
 
 fn now_secs() -> u64 {
@@ -121,7 +150,7 @@ fn media_id(text: &str) -> Option<&str> {
 /// A file this computer can lend: its name, where it is, its kind and when it was added.
 type Lend = (String, PathBuf, String, String);
 
-fn serve_forever(nearby: Arc<Nearby>, listener: TcpListener, lookup: impl Fn(&str) -> Option<Lend> + Send + Sync + Clone + 'static) {
+fn serve_forever(nearby: Arc<Nearby>, listener: TcpListener, lookup: impl Fn(&str) -> Option<Lend> + Send + Sync + Clone + 'static, offered: impl Fn(&[u8]) -> bool + Send + Sync + Clone + 'static) {
     for stream in listener.incoming().flatten() {
         if nearby.sending.load(Ordering::Relaxed) >= MAX_SENDING {
             let mut stream = stream;
@@ -129,9 +158,9 @@ fn serve_forever(nearby: Arc<Nearby>, listener: TcpListener, lookup: impl Fn(&st
             continue;
         }
         nearby.sending.fetch_add(1, Ordering::Relaxed);
-        let (nearby, lookup) = (Arc::clone(&nearby), lookup.clone());
+        let (nearby, lookup, offered) = (Arc::clone(&nearby), lookup.clone(), offered.clone());
         std::thread::spawn(move || {
-            let _ = answer(&nearby, stream, &lookup);
+            let _ = answer(&nearby, stream, &lookup, &offered);
             nearby.sending.fetch_sub(1, Ordering::Relaxed);
         });
     }
@@ -147,8 +176,9 @@ fn library_lookup(app: tauri::AppHandle) -> impl Fn(&str) -> Option<Lend> + Send
     }
 }
 
-/// The request line and the headers this server reads; anything longer than a few KB is refused.
-fn read_request(stream: &TcpStream) -> Option<(String, String, HashMap<String, String>)> {
+/// The request line, the headers this server reads (anything longer than a few KB is refused), and
+/// what of the body was read along with them.
+fn read_request(stream: &TcpStream) -> Option<(String, String, HashMap<String, String>, Vec<u8>)> {
     let mut reader = BufReader::new(stream.take(16 * 1024));
     let mut line = String::new();
     reader.read_line(&mut line).ok()?;
@@ -164,15 +194,35 @@ fn read_request(stream: &TcpStream) -> Option<(String, String, HashMap<String, S
             headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
         }
     }
-    Some((method, path, headers))
+    let rest = reader.buffer().to_vec();
+    Some((method, path, headers, rest))
 }
 
-fn answer(nearby: &Nearby, mut stream: TcpStream, lookup: &impl Fn(&str) -> Option<Lend>) -> std::io::Result<()> {
+/// An offer's body: all of it, or None when it is too long or was cut short.
+fn read_body(stream: &TcpStream, headers: &HashMap<String, String>, mut body: Vec<u8>) -> Option<Vec<u8>> {
+    let length = headers.get("content-length")?.parse::<usize>().ok()?;
+    if length > MAX_OFFER || body.len() > length {
+        return None;
+    }
+    stream.take((length - body.len()) as u64).read_to_end(&mut body).ok()?;
+    (body.len() == length).then_some(body)
+}
+
+fn answer(nearby: &Nearby, mut stream: TcpStream, lookup: &impl Fn(&str) -> Option<Lend>, offered: &impl Fn(&[u8]) -> bool) -> std::io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(10)))?;
     stream.set_write_timeout(Some(Duration::from_secs(60)))?;
     let status = |stream: &mut TcpStream, code: &str| stream.write_all(format!("HTTP/1.1 {code}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n").as_bytes());
-    let Some((method, path, headers)) = read_request(&stream) else { return status(&mut stream, "400 Bad Request") };
+    let Some((method, path, headers, rest)) = read_request(&stream) else { return status(&mut stream, "400 Bad Request") };
     let secret = lock(&nearby.inner).secret;
+    if method == "POST" && path == "/v1/offer" {
+        let Some(secret) = secret else { return status(&mut stream, "403 Forbidden") };
+        let Some(body) = read_body(&stream, &headers, rest) else { return status(&mut stream, "413 Too Large") };
+        let (time, signature) = (headers.get("x-cs-time").map_or("", String::as_str), headers.get("x-cs-sign").map_or("", String::as_str));
+        if !verify_offer(&secret, &path, time, signature, &body, now_secs()) {
+            return status(&mut stream, "403 Forbidden");
+        }
+        return status(&mut stream, if offered(&body) { "200 OK" } else { "409 Not Kept" });
+    }
     let signed = secret.is_some_and(|secret| verify(&secret, &path, headers.get("x-cs-time").map_or("", String::as_str), headers.get("x-cs-sign").map_or("", String::as_str), now_secs()));
     if method != "GET" || !signed {
         return status(&mut stream, "403 Forbidden");
@@ -251,8 +301,8 @@ pub fn nearby_start(app: tauri::AppHandle, nearby: tauri::State<'_, Arc<Nearby>>
         // The usual port when it is free (one firewall rule fits every computer), else any port.
         let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, PORT)).or_else(|_| TcpListener::bind((Ipv4Addr::UNSPECIFIED, 0))).map_err(|error| error.to_string())?;
         inner.port = listener.local_addr().map_err(|error| error.to_string())?.port();
-        let (lookup, serving) = (library_lookup(app.clone()), Arc::clone(&nearby));
-        std::thread::Builder::new().name("nearby-files".into()).spawn(move || serve_forever(serving, listener, lookup)).map_err(|error| error.to_string())?;
+        let (lookup, offered, serving) = (library_lookup(app.clone()), offer_keeper(app.clone()), Arc::clone(&nearby));
+        std::thread::Builder::new().name("nearby-files".into()).spawn(move || serve_forever(serving, listener, lookup, offered)).map_err(|error| error.to_string())?;
     }
     if inner.tag != tag {
         inner.peers.clear();
@@ -293,6 +343,123 @@ pub fn nearby_peers(nearby: tauri::State<'_, Arc<Nearby>>) -> Vec<Peer> {
     peers.sort_by(|a, b| a.name.cmp(&b.name));
     peers.dedup_by(|a, b| a.device == b.device);
     peers
+}
+
+// --- Offers: one computer pushes, the others accept -----------------------------------------------
+
+/// The offer's id, from its JSON: a UUID, so it is safe as a file name.
+fn offer_id(body: &[u8]) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_slice(body).ok()?;
+    media_id(value.get("id")?.as_str()?).map(str::to_string)
+}
+
+/// Keep an offer for the desk, unless it was answered already or too many are waiting.
+fn keep_offer(dir: &std::path::Path, body: &[u8], now: SystemTime) -> Option<String> {
+    let id = offer_id(body)?;
+    std::fs::create_dir_all(dir).ok()?;
+    let (mut waiting, mut answered) = (0, false);
+    for entry in std::fs::read_dir(dir).ok()?.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.ends_with(".json") {
+            waiting += 1;
+        } else if name == format!("{id}.done") {
+            answered = true;
+        } else if name.ends_with(".done") {
+            let old = entry.metadata().and_then(|meta| meta.modified()).ok().and_then(|at| now.duration_since(at).ok());
+            if old.is_some_and(|age| age.as_secs() > ANSWERED_SECS) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+    let file = dir.join(format!("{id}.json"));
+    if answered || (waiting >= MAX_WAITING && !file.exists()) {
+        return None;
+    }
+    let part = dir.join(format!("{id}.part"));
+    std::fs::write(&part, body).ok()?;
+    std::fs::rename(&part, &file).ok()?;
+    Some(id)
+}
+
+fn offers_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app.path().app_data_dir().map_err(|error| error.to_string())?.join("nearby-offers"))
+}
+
+/// An offer that came in: kept on disk, and the desk told.
+fn offer_keeper(app: tauri::AppHandle) -> impl Fn(&[u8]) -> bool + Send + Sync + Clone + 'static {
+    move |body: &[u8]| {
+        use tauri::Emitter;
+        let Some(id) = offers_dir(&app).ok().and_then(|dir| keep_offer(&dir, body, SystemTime::now())) else { return false };
+        log::info!("NEARBY offer {id} came in");
+        let _ = app.emit("nearby-offer", ());
+        true
+    }
+}
+
+/// Offer one computer `body`, at each of its addresses in turn: true when it kept it.
+fn send_offer(peer: &Peer, secret: &[u8; 32], body: &[u8]) -> bool {
+    let path = "/v1/offer";
+    peer.hosts.iter().any(|host| {
+        let time = now_secs();
+        agent()
+            .post(&format!("http://{host}:{}{path}", peer.port))
+            .header("x-cs-time", &time.to_string())
+            .header("x-cs-sign", &sign_offer(secret, path, time, body))
+            .send(body)
+            .is_ok_and(|response| response.status().as_u16() == 200)
+    })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferSent {
+    device: String,
+    name: String,
+    sent: bool,
+}
+
+/// Offer `body` to every computer on this licence on this network, and say who has it.
+#[tauri::command(async)]
+pub fn nearby_offer_send(nearby: tauri::State<'_, Arc<Nearby>>, body: String) -> Result<Vec<OfferSent>, String> {
+    if body.len() > MAX_OFFER {
+        return Err("That is too much to send at once. Choose fewer items.".into());
+    }
+    let (secret, mut peers) = {
+        let inner = lock(&nearby.inner);
+        (inner.secret, inner.peers.values().cloned().collect::<Vec<_>>())
+    };
+    let secret = secret.ok_or("Sending to computers nearby needs a licence key on this computer.")?;
+    peers.sort_by(|a, b| a.device.cmp(&b.device));
+    peers.dedup_by(|a, b| a.device == b.device);
+    let sending: Vec<_> = peers
+        .into_iter()
+        .map(|peer| {
+            let body = body.clone();
+            std::thread::spawn(move || OfferSent { sent: send_offer(&peer, &secret, body.as_bytes()), device: peer.device, name: peer.name })
+        })
+        .collect();
+    Ok(sending.into_iter().filter_map(|thread| thread.join().ok()).collect())
+}
+
+/// The offers waiting for an answer, as they came.
+#[tauri::command(async)]
+pub fn nearby_offers(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let Ok(entries) = std::fs::read_dir(offers_dir(&app)?) else { return Ok(Vec::new()) };
+    Ok(entries
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+        .collect())
+}
+
+/// Accepted or declined: gone, and remembered for a while so it cannot be asked again.
+#[tauri::command(async)]
+pub fn nearby_offer_done(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let id = media_id(&id).ok_or("That offer has no proper id.")?;
+    let dir = offers_dir(&app)?;
+    std::fs::write(dir.join(format!("{id}.done")), b"").map_err(|error| error.to_string())?;
+    let _ = std::fs::remove_file(dir.join(format!("{id}.json")));
+    Ok(())
 }
 
 // --- Fetching -----------------------------------------------------------------------------------
@@ -428,7 +595,7 @@ mod tests {
         lock(&nearby.inner).secret = Some(secret_for(key));
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
-        std::thread::spawn(move || serve_forever(nearby, listener, move |asked: &str| (asked == id).then(|| ("Welcome slide.mp4".to_string(), file.clone(), "video".to_string(), "2026-10-25T08:00:00Z".to_string()))));
+        std::thread::spawn(move || serve_forever(nearby, listener, move |asked: &str| (asked == id).then(|| ("Welcome slide.mp4".to_string(), file.clone(), "video".to_string(), "2026-10-25T08:00:00Z".to_string())), |_: &[u8]| false));
         Peer { device: "office".into(), name: "Office PC".into(), hosts: vec!["127.0.0.1".into()], port }
     }
 
@@ -469,6 +636,60 @@ mod tests {
         let dir = scratch();
         assert!(matches!(fetch_from(&peer, &secret_for("CS1-KEY"), "1b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b", &dir), Reach::Unreachable));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn keeper(key: &str, kept: Arc<Mutex<Vec<Vec<u8>>>>) -> Peer {
+        let nearby = Arc::new(Nearby::default());
+        lock(&nearby.inner).secret = Some(secret_for(key));
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            serve_forever(nearby, listener, |_: &str| None, move |body: &[u8]| {
+                lock(&kept).push(body.to_vec());
+                true
+            })
+        });
+        Peer { device: "laptop".into(), name: "Laptop".into(), hosts: vec!["127.0.0.1".into()], port }
+    }
+
+    #[test]
+    fn an_offer_reaches_a_computer_on_the_same_licence_whole_and_no_one_else() {
+        let kept: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
+        let peer = keeper("CS1-OURS", kept.clone());
+        // Longer than the read that takes in the headers, so its start comes along with them.
+        let body = vec![b'x'; 200_000];
+        assert!(send_offer(&peer, &secret_for("CS1-OURS"), &body));
+        assert_eq!(lock(&kept).as_slice(), &[body.clone()]);
+        assert!(!send_offer(&peer, &secret_for("CS1-OTHER"), &body), "another licence");
+        assert_eq!(lock(&kept).len(), 1);
+    }
+
+    #[test]
+    fn a_signature_covers_the_offer_itself() {
+        let secret = secret_for("CS1-OURS");
+        let signature = sign_offer(&secret, "/v1/offer", 1_000, b"songs");
+        assert!(verify_offer(&secret, "/v1/offer", "1000", &signature, b"songs", 1_100));
+        assert!(!verify_offer(&secret, "/v1/offer", "1000", &signature, b"other songs", 1_100), "swapped body");
+        assert!(!verify(&secret, "/v1/offer", "1000", &signature, 1_100), "not a GET");
+        assert!(!verify_offer(&secret, "/v1/offer", "1000", &signature, b"songs", 1_000 + SKEW_SECS + 1), "too old");
+    }
+
+    #[test]
+    fn an_answered_offer_is_not_kept_again_and_the_wait_is_capped() {
+        let dir = scratch();
+        let id = "0b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b";
+        let body = format!(r#"{{"id":"{id}"}}"#).into_bytes();
+        let now = SystemTime::now();
+        assert_eq!(keep_offer(&dir, &body, now).as_deref(), Some(id));
+        assert!(dir.join(format!("{id}.json")).exists());
+        std::fs::remove_file(dir.join(format!("{id}.json"))).unwrap();
+        std::fs::write(dir.join(format!("{id}.done")), b"").unwrap();
+        assert_eq!(keep_offer(&dir, &body, now), None, "answered");
+        assert_eq!(keep_offer(&dir, br#"{"id":"../../evil"}"#, now), None, "not an id");
+        for n in 0..MAX_WAITING {
+            std::fs::write(dir.join(format!("{n}.json")), b"{}").unwrap();
+        }
+        assert_eq!(keep_offer(&dir, br#"{"id":"1b6c2f1e-3a4d-4e5f-8a9b-1c2d3e4f5a6b"}"#, now), None, "too many waiting");
     }
 
     #[test]

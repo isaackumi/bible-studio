@@ -2,6 +2,7 @@ import { richIsEmpty, richLines, type RichDoc } from "./rich-text";
 import { emptyModel } from "./theme";
 import { webTarget } from "./web";
 import type { PresentationLine, PresentationModel, Theme, VerseText } from "./types";
+import { themeForSong } from "./theme";
 
 type BuildBase = {
   theme: Theme;
@@ -37,7 +38,7 @@ export function presentLyrics(
 ): PresentationModel {
   return {
     layout: "lyrics",
-    theme: input.theme,
+    theme: themeForSong(input.theme),
     reference: input.label,
     attribution: input.credit?.trim() || null,
     lines: input.lines

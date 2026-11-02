@@ -204,7 +204,9 @@ mod helper {
                 let Ok(line) = line else { break };
                 // Its status and error lines go to the log too (never the words heard), so a
                 // support file says why listening stopped on a computer far away.
-                if line.starts_with(r#"{"kind":"error""#) || line.starts_with(r#"{"kind":"status""#) {
+                // Anywhere in the line: Windows PowerShell writes a hashtable's keys in no fixed order.
+                // Heard words cannot match: their quotes are escaped in the JSON.
+                if line.contains(r#""kind":"error""#) || line.contains(r#""kind":"status""#) {
                     log::info!("speech helper: {}", line.chars().take(400).collect::<String>());
                 }
                 let _ = app.emit("listen-phrase", super::ListenLine { run, line });

@@ -77,6 +77,17 @@ export function accessMessage(access: ListenAccess, windows = onWindows()): stri
 /** The settings page that fixes the last refusal: Sound when Windows found no microphone. */
 let fixPane: PrivacyPane = "microphone";
 
+/**
+ * What a desktop listening failure means, from what the helper or the core said: blocked, a
+ * microphone that would not open or went away, or `otherwise`. Also points the settings button at
+ * the page that fixes it.
+ */
+export function nativeErrorKind(text: string, otherwise: ListenErrorKind = "failed"): ListenErrorKind {
+  const kind = /denied|not authori[sz]ed|privacy/i.test(text) ? "denied" : /microphone/i.test(text) ? "no-mic" : otherwise;
+  fixPane = kind === "no-mic" ? "sound" : "microphone";
+  return kind;
+}
+
 /** Ask for (macOS) or check (Windows) the microphone before listening. Null when it may be used. */
 export async function prepareListening(): Promise<{ message: string; kind: ListenErrorKind } | null> {
   if (!isDesktop()) return null;
@@ -207,7 +218,7 @@ export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilt
       handlers.onStatus?.(message.message);
     } else if (message.kind === "error") {
       const text = message.message || t("Listening stopped.");
-      handlers.onError(text, /denied|not authori[sz]ed|privacy/i.test(text) ? "denied" : "failed");
+      handlers.onError(text, nativeErrorKind(text));
       end();
     } else if (message.kind === "end") {
       end();
@@ -222,7 +233,8 @@ export function startNativeListening(handlers: ListenHandlers, filter: NoiseFilt
       return invoke("start_sermon_listen", { run, filter, words, engine });
     })
     .catch((error: unknown) => {
-      handlers.onError(error instanceof Error ? error.message : String(error), "unsupported");
+      const text = error instanceof Error ? error.message : String(error);
+      handlers.onError(text, nativeErrorKind(text, "unsupported"));
       end();
     });
   return () => {

@@ -4,6 +4,9 @@
 // microphone is found in a second, without anyone speaking, and listening moves to one that is live.
 // A working microphone the church chose is never swapped for one that is merely louder.
 
+import { msg } from "../i18n/core";
+import type { ListenErrorKind } from "./listen";
+
 /** What the desktop core heard from one microphone (src-tauri/src/noise.rs probe_inputs). */
 export type MicHeard = { name: string; peak: number; live: boolean; error: string | null };
 
@@ -45,6 +48,25 @@ export const micDead = (heard: MicHeard[], name: string | null) => {
 export function micLabel(name: string): string {
   const inner = /^(?:microphone|mic|input)\s*\((.+)\)$/i.exec(name.trim())?.[1] ?? name.trim();
   return inner.replace(/^\d+-\s*/, "");
+}
+
+/** A problem with listening, for the card at the top of the desk. "silent": listening, but nothing arrives. */
+export type MicAlert = { kind: ListenErrorKind | "silent"; message: string };
+
+/** The card's heading (a source string: the card translates it). */
+export function micAlertTitle(kind: MicAlert["kind"] | null): string {
+  switch (kind) {
+    case "denied":
+      return msg("The microphone is blocked");
+    case "no-mic":
+      return msg("The microphone is not working");
+    case "silent":
+      return msg("No sound from the microphone");
+    case "network":
+      return msg("Listening lost its connection");
+    default:
+      return msg("Listening stopped");
+  }
 }
 
 const KEY = "church-studio:microphone";

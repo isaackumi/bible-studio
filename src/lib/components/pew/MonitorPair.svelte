@@ -2,6 +2,7 @@
   import { session } from "../../app/session.svelte";
   import Icon from "../Icon.svelte";
   import Screen from "../Screen.svelte";
+  import TextSizeControl from "../TextSizeControl.svelte";
   import VideoControls from "../VideoControls.svelte";
   import DocumentControls from "../DocumentControls.svelte";
   import GoLive from "./GoLive.svelte";
@@ -23,6 +24,7 @@
   <figcaption>
     <span class="kicker">{t("Preview")}</span>
     <span class="place">{place || (session.live.preview.model.layout === "empty" ? t("Nothing on Preview") : "")}</span>
+    {#if page === "songs"}<TextSizeControl kind="songs" />{/if}
     {#if onstep}
       <span class="steps">
         <button type="button" class="row-tool" aria-label={t("Previous on Preview")} title={t("Previous on Preview (←); LIVE shows it")} onclick={() => onstep(-1)}><Icon name="chevron-left" size={14} /></button>

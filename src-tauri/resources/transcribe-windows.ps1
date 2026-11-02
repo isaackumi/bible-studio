@@ -30,20 +30,32 @@ if (-not $info) {
   # another language only.
   $found = ($recognizers | ForEach-Object { $_.Culture.Name }) -join ", "
   if (-not $found) { $found = "none" }
-  Emit @{ kind = "error"; message = "Windows has no English speech recognizer on this PC (installed: $found). In Windows Settings > Time & language > Language & region, add English (United States), open its Language options and install Speech recognition. Or choose Accurate under Settings > Audio & voice." }
+  Emit @{ kind = "error"; message = "Windows has no English speech recognizer on this PC (installed: $found). In Windows Settings > Time & language > Language & region, add English (United States), open its Language options and install Speech recognition. Or choose Accurate under Settings > Sound & voice." }
   exit 1
 }
 
 $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine($info)
-try {
-  if ($Stdin) {
-    $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
-    $engine.SetInputToAudioStream([Console]::OpenStandardInput(), $format)
-  } else {
-    $engine.SetInputToDefaultAudioDevice()
+# The app has already read the privacy switches, so a failure here is usually the device itself, and
+# it can be brief (just released by the microphone check, or Windows changing devices): try again
+# before giving up, and say what Windows said, for the operator and for a support file.
+$opened = $false
+$why = ""
+for ($attempt = 1; $attempt -le 4 -and -not $opened; $attempt++) {
+  try {
+    if ($Stdin) {
+      $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
+      $engine.SetInputToAudioStream([Console]::OpenStandardInput(), $format)
+    } else {
+      $engine.SetInputToDefaultAudioDevice()
+    }
+    $opened = $true
+  } catch {
+    $why = $_.Exception.Message
+    if ($attempt -lt 4) { Start-Sleep -Milliseconds 500 }
   }
-} catch {
-  Emit @{ kind = "error"; message = "No microphone is available, or Windows blocked it. Check Settings > Privacy & security > Microphone." }
+}
+if (-not $opened) {
+  Emit @{ kind = "error"; message = "Windows could not open the microphone: $why Check it is plugged in and not muted, or choose another under Settings > Sound & voice." }
   exit 1
 }
 $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))

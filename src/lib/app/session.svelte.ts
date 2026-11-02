@@ -172,7 +172,7 @@ import { serviceFirst, serviceSongIds } from "../domain/service-first";
 import { activeRun, endRun, markPart } from "../domain/service-run";
 import { cleanSettings, pickSettings, withoutSettings, type ServiceSettingsValues } from "../domain/service-settings";
 import { plainFromRich, richIsEmpty, richLines, type RichDoc } from "../domain/rich-text";
-import { blackModel, DEFAULT_THEME_ID, defaultTheme, defaultWorkspace, emptyModel, factoryThemes, logoModel, mergeFactoryThemes, sanitizeTheme } from "../domain/theme";
+import { blackModel, DEFAULT_THEME_ID, defaultTheme, defaultWorkspace, emptyModel, factoryThemes, logoModel, mergeFactoryThemes, sanitizeTheme, steppedFontSize, themeForSong } from "../domain/theme";
 import { defaultPewDesk, normalizePew, samePew } from "../workspace/pew";
 import { defaultProductionLayout, normalizeProductionLayout, sameProductionLayout } from "../workspace/production";
 import type {
@@ -245,7 +245,8 @@ import {
 import { spokenReference } from "../voice/detect";
 import { LoadWatch } from "./load-watch.svelte";
 import type { LoadActionId } from "../domain/load-watch";
-import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicHeard } from "../voice/microphone";
+import { parseOffer, type Offer } from "../sync/offer";
+import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicAlert, type MicHeard } from "../voice/microphone";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
@@ -746,6 +747,8 @@ class Session {
   /** The audience screen that dropped out mid-service (its name), once it has been gone a few seconds. */
   screenLost = $state<string | null>(null);
   private lostScreen: string | null = null;
+  /** The screen whose card the operator closed: it stays closed until that screen is back. */
+  private closedScreen: string | null = null;
   private lostTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** A TV that blinks for a second says nothing; one gone for longer gets a banner, and a word when it is back. */
@@ -758,13 +761,20 @@ class Session {
     if (next.lost) {
       this.lostTimer ??= setTimeout(() => {
         this.lostTimer = undefined;
-        this.screenLost = this.lostScreen;
+        if (this.lostScreen !== this.closedScreen) this.screenLost = this.lostScreen;
       }, 3000);
       return;
     }
     clearTimeout(this.lostTimer);
     this.lostTimer = undefined;
-    if (next.back && this.screenLost) this.notify(t("{name} is back", { name: next.back }), { detail: t("The audience screen is showing Program again.") });
+    if (next.back && (this.screenLost || this.closedScreen)) this.notify(t("{name} is back", { name: next.back }), { detail: t("The audience screen is showing Program again.") });
+    this.screenLost = null;
+    this.closedScreen = null;
+  };
+
+  /** The operator has seen it: the card goes, and Program stays held until the screen returns. */
+  closeScreenLost = () => {
+    this.closedScreen = this.screenLost;
     this.screenLost = null;
   };
 
@@ -3119,6 +3129,8 @@ class Session {
       this.voice = { ...this.voice, status: "error", error: "unsupported", message: t("Voice is not available in this build.") };
       return;
     }
+    this.micWarning = null;
+    this.micAlertClosed = false;
     this.voice = { ...this.voice, status: "starting", error: null, heard: "", hearing: false, level: 0, message: t("Starting the microphone…") };
     const blocked = await prepareListening();
     if (this.voice.status !== "starting") return;
@@ -3128,20 +3140,48 @@ class Session {
     }
     // A blocked or muted microphone gives silence, not an error (Windows never asks a desktop app).
     let soundReached = false;
+    let retrying = false;
     const handlers = {
-      onHeard: (text: string, final: boolean, alternatives: string[], latest: string) =>
-        this.handleVoiceHeard(text, final, alternatives, latest),
+      onHeard: (text: string, final: boolean, alternatives: string[], latest: string) => {
+        this.micWarning = null;
+        this.handleVoiceHeard(text, final, alternatives, latest);
+      },
       onLevel: (level: number) => {
         this.voice.level = level;
-        if (level > SILENT_LEVEL) soundReached = true;
+        if (level > SILENT_LEVEL) {
+          soundReached = true;
+          this.micWarning = null;
+        }
       },
       onError: (message: string, kind: ListenErrorKind) => {
+        // Windows' recognizer could not open the default microphone: once, open it in this app
+        // and hand the recognizer the sound, before troubling the operator.
+        if (kind === "no-mic" && !this.micThroughApp && isDesktop() && onWindows() && (this.workspace.voice.engine ?? "system") === "system") {
+          this.micThroughApp = true;
+          retrying = true;
+          return;
+        }
+        clearInterval(this.micWatch);
+        this.micWarning = null;
         this.voice = { ...this.voice, status: "error", error: kind, message, level: 0 };
       },
       onEnd: () => {
         this.stopVoiceEngine = null;
         void this.finishListeningRecording();
+        if (retrying) {
+          clearInterval(this.micWatch);
+          this.voice = { ...this.voice, status: "stopped", level: 0 };
+          void this.startVoice();
+          return;
+        }
         if (this.voice.status === "error") return;
+        // Still listening as far as the desk knew, and nobody pressed Stop: the listener died unasked.
+        if (this.voice.status === "listening") {
+          clearInterval(this.micWatch);
+          this.micWarning = null;
+          this.voice = { ...this.voice, status: "error", error: "failed", level: 0, hearing: false, message: t("Listening stopped by itself. Try again, or choose another microphone or listening mode in Settings › Sound & voice.") };
+          return;
+        }
         this.voice = { ...this.voice, status: "stopped", level: 0, hearing: false, message: this.voice.message || t("Listening stopped.") };
       },
       onStatus: (message: string) => {
@@ -3177,16 +3217,36 @@ class Session {
   private watchForSilence(engine: (() => void) | null, reached: () => boolean) {
     window.setTimeout(() => {
       if (this.stopVoiceEngine !== engine || this.voice.status !== "listening" || reached()) return;
-      this.voice.message = onWindows()
+      this.warnMicrophone(onWindows()
         ? t("Nothing is reaching the microphone. If this computer has a phone-as-webcam app or a virtual mixer, it may be listening to a silent one: choose the microphone in Settings › Sound & voice (Find my microphone). Check too that it is plugged in and not muted.")
-        : t("Nothing is reaching the microphone. Check it is plugged in, not muted, and chosen as the computer's input.");
+        : t("Nothing is reaching the microphone. Check it is plugged in, not muted, and chosen as the computer's input."));
     }, SILENCE_HINT_MS);
   }
+
+  /** Listening runs but hears nothing: on the card at the top of the desk, not only in the voice strip. */
+  private warnMicrophone(message: string) {
+    this.voice.message = message;
+    // The same warning again (it repeats while the silence lasts) stays closed once closed.
+    if (this.micWarning !== message) this.micAlertClosed = false;
+    this.micWarning = message;
+  }
+
+  /** What is wrong with listening, for the card; null when all is well or the operator closed it. */
+  get micAlert(): MicAlert | null {
+    if (this.micAlertClosed) return null;
+    if (this.voice.status === "error") return { kind: this.voice.error ?? "failed", message: this.voice.message };
+    return this.micWarning ? { kind: "silent", message: this.micWarning } : null;
+  }
+
+  closeMicAlert = () => {
+    this.micAlertClosed = true;
+  };
 
   stopVoice = (message = t("Listening stopped.")) => {
     const stop = this.stopVoiceEngine;
     this.stopVoiceEngine = null;
     clearInterval(this.micWatch);
+    this.micWarning = null;
     this.voice = { ...this.voice, status: "stopped", error: null, level: 0, hearing: false, message };
     stop?.();
     void this.finishListeningRecording();
@@ -3479,6 +3539,11 @@ class Session {
 
   /** The microphone chosen on this computer (null: the computer's default). Kept here, never synced. */
   microphone = $state<string | null>(savedMicrophone());
+  /** Listening runs but no sound arrives: said on the card at the top of the desk. */
+  private micWarning = $state<string | null>(null);
+  private micAlertClosed = $state(false);
+  /** Windows' recognizer could not open the microphone: this app opens it for the rest of this run. */
+  private micThroughApp = false;
   /** The microphone listening is on now (desktop), shown beside the level. */
   micInUse = $state<string | null>(null);
   private micWatch: ReturnType<typeof setInterval> | undefined;
@@ -3508,7 +3573,7 @@ class Session {
     const choice = pickMicrophone(heard, this.microphone, fallback);
     // The computer's default with nothing chosen goes as null, so Windows' own recognizer keeps
     // opening it itself; any other one comes through this app.
-    const name = choice.name && (this.microphone || choice.name !== fallback) ? choice.name : null;
+    const name = choice.name && (this.microphone || choice.name !== fallback || this.micThroughApp) ? choice.name : null;
     await invoke("listen_choose_input", { name }).catch(() => {});
     this.micInUse = choice.name;
     if (choice.moved && choice.name) {
@@ -3520,7 +3585,7 @@ class Session {
         ms: 12_000,
       });
     } else if (choice.allSilent) {
-      this.voice.message = t("No microphone is sending any sound. Check one is plugged in and not muted, then choose it in Settings › Sound & voice.");
+      this.warnMicrophone(t("No microphone is sending any sound. Check one is plugged in and not muted, then choose it in Settings › Sound & voice."));
     }
   };
 
@@ -3543,7 +3608,7 @@ class Session {
         silent = 0;
         const all = await invoke<MicHeard[]>("listen_probe_inputs", { ms: MIC_PROBE_MS, only: null }).catch(() => []);
         if (!all.some((entry) => entry.live && entry.name !== using)) {
-          this.voice.message = t("{name} stopped sending sound, and no other microphone is. Check it is plugged in and not muted.", { name: using });
+          this.warnMicrophone(t("{name} stopped sending sound, and no other microphone is. Check it is plugged in and not muted.", { name: using }));
           return;
         }
         clearInterval(this.micWatch);
@@ -7471,7 +7536,50 @@ class Session {
   // Nearby (src-tauri/src/nearby.rs): on a paid licence, the computers on the same network find
   // each other and lend each other Media files before the cloud is asked.
 
-  private nearbyOn = false;
+  private nearbyOn = $state(false);
+  private offersWatched = false;
+
+  /** This computer can push to, and be offered by, the computers on its network. */
+  get nearbyActive(): boolean {
+    return this.nearbyOn;
+  }
+
+  /** What other computers on the licence offered, waiting for an answer. */
+  offers = $state<Offer[]>([]);
+  /** Offers put off with the card's close button: still waiting, and in Cloud space. */
+  private offersLater = $state<string[]>([]);
+  /** The push window is open. */
+  pushing = $state(false);
+  /** The offer being looked through, item by item. */
+  reviewing = $state<Offer | null>(null);
+
+  get offerWaiting(): Offer | null {
+    return this.reviewing ? null : (this.offers.find((offer) => !this.offersLater.includes(offer.id)) ?? null);
+  }
+
+  closeOfferCard = (id: string) => {
+    this.offersLater = [...this.offersLater, id];
+  };
+
+  private readOffers = async () => {
+    const kept = await invoke<string[]>("nearby_offers").catch(() => []);
+    this.offers = kept.map(parseOffer).filter((offer): offer is Offer => !!offer).sort((a, b) => a.at - b.at);
+  };
+
+  private watchOffers = async () => {
+    if (!this.offersWatched) {
+      this.offersWatched = true;
+      await listen("nearby-offer", () => void this.readOffers());
+    }
+    await this.readOffers();
+  };
+
+  /** Accepted or declined: gone from here and from the computer's waiting list. */
+  answerOffer = async (id: string) => {
+    await invoke("nearby_offer_done", { id }).catch(() => {});
+    this.offers = this.offers.filter((offer) => offer.id !== id);
+    if (this.reviewing?.id === id) this.reviewing = null;
+  };
 
   /** Start Nearby while this computer is on a licence key with a paid plan; stop it otherwise. */
   checkNearby = async () => {
@@ -7482,9 +7590,11 @@ class Session {
       if (key) {
         await invoke("nearby_start", { key, device: this.deviceId, name: this.deviceName() });
         this.nearbyOn = true;
+        void this.watchOffers();
       } else if (this.nearbyOn) {
         await invoke("nearby_stop");
         this.nearbyOn = false;
+        this.offers = [];
       }
     } catch (error) {
       console.warn("Nearby could not start", error);
@@ -8449,6 +8559,29 @@ class Session {
   };
 
   saveTheme = (theme: Theme) => {
+    this.showThemeOnPreview(this.storeTheme(theme));
+  };
+
+  /**
+   * The desk's A− and A+: verses' or songs' size in the theme, one step, and what is showing now of
+   * that kind. A press here is meant for the room, so Program changes at once; Preview keeps its
+   * place, and anything else on Program is left alone. Each frame steps from its own size, so an
+   * item with a size of its own moves the same way.
+   */
+  stepTextSize = (kind: "verses" | "songs", direction: 1 | -1) => {
+    const theme = this.theme();
+    const current = kind === "songs" ? themeForSong(theme).fontSize : theme.fontSize;
+    const size = steppedFontSize(current, direction);
+    if (size === current) return;
+    this.storeTheme(kind === "songs" ? { ...theme, songSize: size } : { ...theme, fontSize: size });
+    const layout = kind === "songs" ? "lyrics" : "scripture";
+    const sized = (model: PresentationModel) => ({ ...model, theme: { ...model.theme, fontSize: steppedFontSize(model.theme.fontSize, direction) } });
+    const { preview, program } = this.live;
+    if (preview.model.layout === layout) this.live = setPreview(this.live, { ...preview, model: sized(preview.model) });
+    if (program.model.layout === layout) this.live = replaceProgramModel(this.live, sized(program.model), "cut");
+  };
+
+  private storeTheme(theme: Theme): Theme {
     const next = sanitizeTheme(theme);
     this.themes = this.themes.map((entry) => (entry.id === next.id ? next : entry));
     if (!this.themes.some((entry) => entry.id === next.id)) this.themes = [...this.themes, next];
@@ -8457,8 +8590,8 @@ class Session {
       this.warn(errorText(error));
     });
     this.persistSoon();
-    this.showThemeOnPreview(next);
-  };
+    return next;
+  }
 
   /** A copy to customise (Premium). Built-in themes are left as they are. */
   duplicateTheme = (id: string): Theme | null => {
@@ -8495,7 +8628,8 @@ class Session {
       const current = this.live.preview.model;
       const words = current.layout === "scripture" || current.layout === "lyrics" || current.layout === "title" || current.layout === "lower-third";
       const photo = next.background.type === "image" ? this.mediaSrc(next.background.assetId) : null;
-      const model = words ? { ...current, theme: next, backgroundImageUrl: photo } : { ...current, theme: next };
+      const shown = current.layout === "lyrics" ? themeForSong(next) : next;
+      const model = words ? { ...current, theme: shown, backgroundImageUrl: photo } : { ...current, theme: shown };
       this.live = setPreview(this.live, frame(this.withBackdrop(model), this.live.preview.sourceId, "cut"));
     }
   }

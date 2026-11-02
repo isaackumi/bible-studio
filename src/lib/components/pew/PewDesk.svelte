@@ -12,6 +12,7 @@
   import GoLive from "./GoLive.svelte";
   import ServiceStrip from "./ServiceStrip.svelte";
   import TimerControls from "../TimerControls.svelte";
+  import TextSizeControl from "../TextSizeControl.svelte";
   import { findItem } from "../../domain/service";
   import { inPassages, preferService, serviceFirst, servicePassages } from "../../domain/service-first";
   import TextStyleEditor from "../TextStyleEditor.svelte";
@@ -1220,7 +1221,7 @@
 
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if mode === "scriptures"}<TextSizeControl kind="verses" onopen={() => (sheet = "type")} />{/if}{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
