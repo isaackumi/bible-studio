@@ -382,7 +382,7 @@ fn keep_offer(dir: &std::path::Path, body: &[u8], now: SystemTime) -> Option<Str
 }
 
 fn offers_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|error| error.to_string())?.join("nearby-offers"))
+    Ok(crate::library::data_dir(app)?.join("nearby-offers"))
 }
 
 /// An offer that came in: kept on disk, and the desk told.
@@ -538,7 +538,7 @@ pub fn nearby_fetch(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>, 
         (inner.secret, inner.peers.values().filter(|peer| !resting.contains_key(&peer.device)).cloned().collect::<Vec<_>>())
     };
     let Some(secret) = secret else { return Ok(None) };
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let dir = crate::library::data_dir(&app)?.join("media");
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     for peer in peers {
         let got = match fetch_from(&peer, &secret, &id, &dir) {

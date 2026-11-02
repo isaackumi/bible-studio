@@ -20,6 +20,7 @@ mod ndi;
 mod voice;
 mod bundle;
 mod cloud;
+mod library;
 mod nearby;
 mod network;
 mod listen_record;
@@ -128,7 +129,7 @@ fn list_pictures(dir: &std::path::Path) -> Result<Vec<FolderEntry>, String> {
 /// grid then loads a few kilobytes per tile, not a phone photo of several megabytes each.
 #[tauri::command(async)]
 async fn picture_thumb(app: AppHandle, path: String) -> Result<String, String> {
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("thumbs");
+    let dir = crate::library::data_dir(&app)?.join("thumbs");
     tauri::async_runtime::spawn_blocking(move || make_thumb(&dir, std::path::Path::new(&path)))
         .await
         .map_err(|error| error.to_string())?
@@ -438,7 +439,7 @@ fn health_facts(app: AppHandle) -> HealthFacts {
         startups: diagnostics::read_startups(&app),
         hangs: diagnostics::hangs_since(&crash_log, month_ago),
         memory: diagnostics::memory(),
-        library_free: app.path().app_data_dir().ok().and_then(|dir| storage::free_space(&dir)),
+        library_free: crate::library::data_dir(&app).ok().and_then(|dir| storage::free_space(&dir)),
         uptime_secs: diagnostics::uptime_secs(),
     }
 }
@@ -521,7 +522,7 @@ fn move_import(app: AppHandle, db: State<Db>, path: String) -> Result<Value, Str
     let file = std::path::Path::new(&path);
     let (_, library) = bundle::read_manifest(file)?;
     let known: std::collections::HashSet<String> = media_rows(&db)?.into_iter().map(|row| row.id).collect();
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let dir = crate::library::data_dir(&app)?.join("media");
     let added = bundle::extract_media(file, &dir, &known, move_progress(&app))?;
     let mut count = 0;
     for row in &added {
@@ -664,7 +665,7 @@ fn storage_clear_cache(app: tauri::AppHandle) -> u64 {
 
 #[tauri::command(async)]
 fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::Unused>, String> {
-    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let media = crate::library::data_dir(&app)?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
     storage::unused_media(&conn, &media)
 }
@@ -672,7 +673,7 @@ fn storage_unused_media(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> 
 /// Every picture and video with where it is used (Settings › Storage › Review files).
 #[tauri::command(async)]
 fn storage_media_usage(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> Result<Vec<storage::MediaUse>, String> {
-    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let media = crate::library::data_dir(&app)?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
     storage::media_usage(&conn, &media)
 }
@@ -680,7 +681,7 @@ fn storage_media_usage(app: tauri::AppHandle, db: tauri::State<'_, db::Db>) -> R
 /// Delete unused pictures and videos: Media entries by id, leftover files by path.
 #[tauri::command(async)]
 fn storage_remove_unused(app: tauri::AppHandle, db: tauri::State<'_, db::Db>, ids: Vec<String>, files: Vec<String>) -> Result<(), String> {
-    let media = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let media = crate::library::data_dir(&app)?.join("media");
     let conn = db.0.lock().map_err(|_| "The library is busy. Try again.".to_string())?;
     for id in ids {
         db::media_delete(&conn, &id)?;
@@ -1352,6 +1353,8 @@ pub fn run() {
             cloud::cloud_download,
             cloud::cloud_state_read,
             cloud::cloud_state_write,
+            library::library_switch,
+            library::library_carry_take,
             nearby::nearby_start,
             nearby::nearby_stop,
             nearby::nearby_peers,

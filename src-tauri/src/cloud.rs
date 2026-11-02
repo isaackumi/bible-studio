@@ -6,7 +6,6 @@
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tauri::Manager;
 
 /// A connection that stalls fails instead of waiting for ever; a large video may take a while.
 fn agent() -> ureq::Agent {
@@ -114,7 +113,7 @@ pub fn cloud_download(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>
     if kind_ok != kind {
         return Err("That file's kind does not match its name.".into());
     }
-    let dir = app.path().app_data_dir().map_err(|error| error.to_string())?.join("media");
+    let dir = crate::library::data_dir(&app)?.join("media");
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     let dest = dir.join(format!("{id}.{ext}"));
     if dest.exists() {
@@ -160,7 +159,7 @@ pub fn cloud_download(app: tauri::AppHandle, db: tauri::State<'_, crate::db::Db>
 }
 
 fn state_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app.path().app_data_dir().map_err(|error| error.to_string())?.join("cloud-sync.json"))
+    Ok(crate::library::data_dir(app)?.join("cloud-sync.json"))
 }
 
 /// The sync record as saved; "" when there is none yet.

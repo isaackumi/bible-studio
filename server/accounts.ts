@@ -84,7 +84,7 @@ type AccountToken = { user: string; device: string; name?: string; createdAt: nu
 /** Where an account is signed in: one entry per token, by the token's hash. */
 type TokenEntry = { hash: string; device: string; name: string; createdAt: number };
 export type LinkedLicense = { id: string; key: string };
-export type Account = { id: string; email: string; name: string; licenses: LinkedLicense[]; createdAt: number };
+export type Account = { id: string; email: string; name: string; licenses: LinkedLicense[]; createdAt: number; /** This email was proved at a sign-in, so an owner's invitation to it may be taken up. */ verified?: boolean };
 
 const SIGNIN_MINUTES = 10;
 /** A token nobody uses for this long goes by itself. */
@@ -165,6 +165,7 @@ async function upsertAccount(config: ApiConfig, person: Person): Promise<Account
   const account: Account = saved ?? { id: person.id, email: person.email, name: person.name, licenses: [], createdAt: config.now() };
   account.email = person.email;
   account.name = person.name || account.name;
+  account.verified = !!person.emailVerified;
   await putJson(config.store, `acct:${person.id}`, account, { email: account.email, createdAt: account.createdAt });
   // Only a verified email claims what was bought with it, or what an owner added it to. A license
   // someone else owns already is left alone.
@@ -254,6 +255,16 @@ export async function accountApi(config: ApiConfig, path: string, input: Record<
       if (!claimed.ok) return json(409, { owned: true, error: claimed.error });
       return json(200, { ok: true, owner: claimed.owner });
     }
+    case "/v1/account/use": {
+      // This computer chose a licence on its account: a seat on it, and what it needs to run on it.
+      const account = await accountOf(config, text(input.token, 80));
+      if (!account) return json(401, { signedOut: true, error: "Sign in again." });
+      const linked = account.licenses.find((entry) => entry.id === text(input.license, 40));
+      if (!linked) return json(404, { error: "That license is not on your account." });
+      if (!mayUse(await ownershipOf(config, linked.id), account)) return json(403, { removed: true, error: "The owner of this license took you off it." });
+      const result = await activateDevice(config, linked.key, text(input.device, 80), text(input.name, 60) || "Computer");
+      return result.lease ? json(200, { lease: result.lease, key: linked.key }) : json(result.status, result.body);
+    }
     case "/v1/account/devices": {
       const token = text(input.token, 80);
       const account = await accountOf(config, token);
@@ -321,6 +332,12 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
   if (deviceTrial) await noteAccountTrial(config, account.id, deviceTrial);
   // The admin page shows which computers each person uses.
   if (device) await noteDevice(config, device, { account: account.id });
+  // Added to a licence since signing in: it joins the account now, not at the next sign-in.
+  if (account.verified) {
+    const waiting = (await getJson<LinkedLicense[]>(config.store, `member:${normalEmail(account.email)}`)) ?? [];
+    for (const license of waiting) if (!account.licenses.some((entry) => entry.id === license.id)) await claimLicense(config, account, license);
+    if (waiting.length) account.licenses = (await getJson<Account>(config.store, `acct:${account.id}`))?.licenses ?? account.licenses;
+  }
   const licenses = account.licenses
     .map((entry) => ({ entry, license: readAnyLicense(config, entry.key)?.license ?? readLicense(entry.key) }))
     .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license> } => !!item.license)
