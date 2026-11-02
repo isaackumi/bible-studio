@@ -247,6 +247,23 @@ describe("signing in safely, and who a license belongs to", () => {
     expect((await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" })).data).toMatchObject({ licenses: [{ license: bought.license, owner: false }], lease: expect.any(String) });
   });
 
+  it("a computer already on a licence takes no seat on another the person was added to", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy, config } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const theirs = await buy("", { token: aliceToken });
+    await call("/v1/license/members", { token: aliceToken, license: theirs.license, add: bob.email });
+    const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
+    const seated = async () => JSON.parse((await config.store.get(`act:${theirs.license}`)) ?? "[]").map((seat: { device: string }) => seat.device);
+    const status = (await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC", license: "another-licence" })).data;
+    // Listed, so the person can see it; not taken.
+    expect(status.licenses).toMatchObject([{ license: theirs.license, owner: false }]);
+    expect(status.lease).toBeUndefined();
+    expect(await seated()).not.toContain("pc-2");
+    await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC" });
+    expect(await seated()).toContain("pc-2");
+  });
+
   it("an added person is emailed an invitation naming who and which church; the owner sees invited, then joined", async () => {
     const { identity, signInAs } = fakeIdentity();
     const { call, page, buy, mails } = setup(identity);

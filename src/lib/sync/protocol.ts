@@ -26,7 +26,8 @@ export type CloudProtocol = {
   mediaUrl(hash: string): string;
 };
 
-export type Identity = { token: string; device: string; name: string };
+/** `licence`: the one this computer is on, so its library goes nowhere else ("" on a trial). */
+export type Identity = { token: string; device: string; name: string; licence: string };
 
 export function cloudProtocol(identity: () => Identity, base = SERVER_URL, call: typeof serverCall = serverCall): CloudProtocol {
   const post = <T>(route: string, body: Record<string, unknown> = {}) => call<T>(`/v1/cloud/${route}`, { ...identity(), ...body }, base);
@@ -42,6 +43,9 @@ export function cloudProtocol(identity: () => Identity, base = SERVER_URL, call:
     bin: () => post("bin"),
     restore: (col, id) => post("bin/restore", { col, id }),
     emptyBin: () => post("bin/empty"),
-    mediaUrl: (hash) => `${base}/v1/cloud/media/${hash}`,
+    mediaUrl: (hash) => {
+      const { licence } = identity();
+      return `${base}/v1/cloud/media/${hash}${licence ? `?licence=${encodeURIComponent(licence)}` : ""}`;
+    },
   };
 }

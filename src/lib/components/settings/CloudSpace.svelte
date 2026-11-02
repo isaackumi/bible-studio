@@ -97,6 +97,12 @@
   {:else if cloud.status === "off"}
     <div class="row"><div class="row-copy"><span>{t("Cloud space works in the desktop app.")}</span></div></div>
   {:else}
+    {#if cloud.status === "licenceChanged"}
+      <div class="row">
+        <div class="row-copy"><strong>{t("Bring this library to the new licence?")}</strong><span>{t("Its songs, services and files will go into the new licence's library, and that library will come to this computer. Do this only if both belong to the same church, such as after an upgrade.")}</span></div>
+        <button type="button" class="btn" onclick={() => arm("licence", async () => { await cloud?.acceptLicence(); return null; })}>{armed === "licence" ? t("Press again to bring it") : t("Bring it")}</button>
+      </div>
+    {/if}
     <label class="row">
       <div class="row-copy"><strong>{t("Ask me first")}</strong><span>{t("On this computer, new songs, files and changes wait until you press Sync now. When this is off, they sync by themselves.")}</span></div>
       <input type="checkbox" checked={asks} onchange={(event) => setAsks(event.currentTarget.checked)} />
@@ -110,7 +116,8 @@
           <em><b>{t("Songs & services")}</b> {t("a few MB")}</em>
         </span>
         <span>
-          {#if cloud.status === "noSeat"}{cloud.message}
+          {#if cloud.status === "licenceChanged"}{t("Sync is paused: this computer moved to another licence.")}
+          {:else if cloud.status === "noSeat"}{cloud.message}
           {:else if cloud.readOnlyUntil}{t("Your plan has ended. The cloud copy can be read until {date}; renew to keep it.", { date: new Date(cloud.readOnlyUntil).toLocaleDateString() })}
           {:else if cloud.over}{t("You are over your cloud space. Remove some files below, or ask about more space.")}
           {:else if cloud.paused}{t("Cloud space is paused for everyone at the moment. Songs and services still sync.")}

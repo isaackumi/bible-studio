@@ -35,28 +35,38 @@ const planName = (plan: LicensePlan) => (plan === "church" ? "Church" : "Premium
 
 type Access = { account: Account; licence: string; plan: LicensePlan; endsAt: number | null; ended: boolean; device: string; name: string };
 
-/** Who is calling, on which licence, from which seat; or the answer that says why not. */
-async function access(config: ApiConfig, token: string, device: string, name: string): Promise<Access | Response> {
+/**
+ * Who is calling, on which licence, from which seat; or the answer that says why not. The licence is
+ * the computer's own (`wanted`), never the account's best: a person can be on two churches' licences,
+ * and this answer decides whose library a computer writes to. A computer that does not say (a version
+ * before this, or one on a trial) is only guessed for when just one plan is running.
+ */
+async function access(config: ApiConfig, token: string, device: string, name: string, wanted = ""): Promise<Access | Response> {
   const account = token ? await accountOf(config, token) : null;
   if (!account) return json(401, { signedOut: true, error: "Sign in to use cloud space." });
   if (!device) return json(400, { error: "Which computer?" });
   const now = config.now();
   let best: { licence: string; plan: LicensePlan; endsAt: number | null; rank: number } | null = null;
   let removed = false;
+  let running = 0;
   for (const entry of account.licenses) {
     const read = readAnyLicense(config, entry.key);
     if (!read) continue;
+    if (wanted && read.license.id !== wanted) continue;
     if (await config.store.get(`revoked:${read.license.id}`)) continue;
     if (!mayUse(await ownershipOf(config, read.license.id), account)) {
       removed = true;
       continue;
     }
     const endsAt = await keyEnds(config, read.license);
+    if (endsAt === null || now < endsAt) running += 1;
     // A plan still running beats an ended one; then Church beats Premium.
     const rank = (endsAt === null || now < endsAt ? 10 : 0) + (read.license.plan === "church" ? 2 : 1);
     if (!best || rank > best.rank) best = { licence: read.license.id, plan: read.license.plan, endsAt, rank };
   }
+  if (!best && wanted && account.licenses.length && !removed) return json(403, { noSeat: true, error: "This computer's licence is not on your account. Sign in with the account it belongs to." });
   if (!best) return removed ? json(403, { removed: true, error: "The owner of this licence took you off it. Ask them to add you again." }) : json(402, { plan: "free", error: "Cloud space comes with Premium and Church." });
+  if (!wanted && running > 1) return json(409, { chooseLicence: true, error: "Your account is on more than one licence. Update Church Studio to keep syncing, so each computer stays with its own church's library." });
   const seats = ((await getJson<Device[]>(config.store, `act:${best.licence}`)) ?? []).filter((seat) => now - Date.parse(seat.seenAt) < STALE_DAYS * DAY);
   if (!seats.some((seat) => seat.device === device)) return json(403, { noSeat: true, error: "This computer is not on the licence. Sign in and activate it, then sync." });
   return { account, licence: best.licence, plan: best.plan, endsAt: best.endsAt, ended: best.endsAt !== null && now >= best.endsAt, device, name: name || seats.find((seat) => seat.device === device)?.name || "Computer" };
@@ -183,7 +193,7 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
   // The file itself, up or down, named in the address.
   if (file && (request.method === "PUT" || request.method === "GET")) {
     // The token travels in a header, never the address: addresses end up in logs.
-    const who = await access(config, text(request.headers.get("authorization"), 90).replace(/^Bearer\s+/i, ""), text(request.headers.get("x-device"), 80), "");
+    const who = await access(config, text(request.headers.get("authorization"), 90).replace(/^Bearer\s+/i, ""), text(request.headers.get("x-device"), 80), "", text(url.searchParams.get("licence"), 40));
     if (who instanceof Response) return who;
     await renewedOrLapsed(config, who);
     const hash = file[1]!;
@@ -225,7 +235,7 @@ export async function handleCloud(request: Request, config: ApiConfig): Promise<
   const route = url.pathname.slice("/v1/cloud/".length);
   // Pushes are few (one every few minutes per computer); claims and pulls are many and already need an account.
   if (route === "push" && (await tooFast(config, request, "cloud"))) return json(429, { error: "Too many requests from this network. Wait a minute and try again." });
-  const who = await access(config, text(body.token, 80), text(body.device, 80), text(body.name, 60));
+  const who = await access(config, text(body.token, 80), text(body.device, 80), text(body.name, 60), text(body.licence, 40));
   if (who instanceof Response) return who;
   await renewedOrLapsed(config, who);
   const readOnly = () => json(403, { readOnly: true, error: `${planName(who.plan)} has ended: the cloud copy can be read but not changed.` });
