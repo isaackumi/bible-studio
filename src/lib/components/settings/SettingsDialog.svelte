@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { usableLicences } from "../../app/licences";
   import { modalFocus } from "../../ui/modal-focus";
   import StageLinks from "./StageLinks.svelte";
   import SwitcherSettings from "./SwitcherSettings.svelte";
@@ -370,6 +371,21 @@
   let signInError = $state("");
 
   /** "Mac app, used today" / "Edge on Windows, used 3 days ago": what it is, and when it was last used. */
+  /** The licence whose Switch was pressed once; a second press restarts onto it. */
+  let switching = $state<string | null>(null);
+
+  async function switchTo(id: string) {
+    if (switching !== id) {
+      switching = id;
+      setTimeout(() => (switching = null), 4000);
+      return;
+    }
+    switching = null;
+    accountBusy = true;
+    signInError = (await session.switchLicence(id)) ?? "";
+    accountBusy = false;
+  }
+
   /** Where an added person is: invited (and when), or joined. */
   function memberLine(person: LicenseMember | undefined): string {
     const day = (at: number) => new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -1662,6 +1678,21 @@
               </div>
             </div>
             {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
+            {#if profile.token && usableLicences(session.accountLicenses).length > 1}
+              <div class="row stack">
+                <div class="row-copy"><strong>{t("Your licences")}</strong><span>{t("Each licence keeps its own library on this computer. Switching restarts Church Studio and leaves this library exactly as it is, to come back to. Bibles and settings are kept with each one.")}</span></div>
+              </div>
+              {#each usableLicences(session.accountLicenses) as entry (entry.license)}
+                <div class="row">
+                  <div class="row-copy"><strong>{entry.plan === "church" ? "Church" : "Premium"}</strong><span>{entry.owner ? t("Your own") : entry.by ? t("From {name}", { name: entry.by }) : t("Added to it")}</span></div>
+                  {#if entry.license === session.licenceId}
+                    <span class="pill">{t("On this computer")}</span>
+                  {:else}
+                    <button type="button" class="btn" disabled={accountBusy} onclick={() => void switchTo(entry.license)}>{switching === entry.license ? t("Press again to switch and restart") : t("Switch")}</button>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
             {#if profile.token}
               {#each session.accountLicenses.filter((entry) => entry.owner && !entry.revoked) as owned (owned.license)}
                 <div class="row stack">

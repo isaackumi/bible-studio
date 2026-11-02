@@ -14,7 +14,7 @@ pub struct Db(pub Mutex<Connection>);
 /// Open the library. One that cannot be opened is set aside (never deleted) and a new one started,
 /// so the app still opens on a Sunday morning; the second value is the set-aside file's name, for the desk.
 pub fn open(app: &AppHandle) -> Result<(Db, Option<String>), String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dir = crate::library::data_dir(app)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("church.db");
     let resources = resource_dir(app);
@@ -482,11 +482,7 @@ fn store_media(
 /// A new file name in the media folder: its id and path.
 pub fn media_dest(app: &AppHandle, ext: &str) -> Result<(String, PathBuf), String> {
     let id = Uuid::new_v4().to_string();
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("media");
+    let dir = crate::library::data_dir(app)?.join("media");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dest = dir.join(format!("{id}.{ext}"));
     Ok((id, dest))

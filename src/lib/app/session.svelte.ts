@@ -245,6 +245,7 @@ import {
 import { spokenReference } from "../voice/detect";
 import { LoadWatch } from "./load-watch.svelte";
 import type { LoadActionId } from "../domain/load-watch";
+import { licenceToOffer, readNotNow, saveNotNow } from "./licences";
 import { parseOffer, type Offer } from "../sync/offer";
 import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicAlert, type MicHeard } from "../voice/microphone";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
@@ -633,6 +634,7 @@ class Session {
       }
       this.bootStep("reading your settings");
       this.workspace = await this.loadWorkspace();
+      await this.takeSwitchCarry();
       this.workspaceLoaded = true;
       this.applyAudioSettings();
       this.startRoomOutput();
@@ -6873,8 +6875,8 @@ class Session {
         tone: "warn",
       });
     }
-    // Signed in, but not on a license yet (a plan bought on another computer): pick it up.
-    if (this.workspace.profile?.token && this.ent.kind !== "license") await this.syncAccount();
+    // Signed in: pick up a plan bought on another computer, and see any licence this person was added to.
+    if (this.workspace.profile?.token) await this.syncAccount();
     // Moving from a build that kept the trial on the computer: a trial still running there is
     // started again on the server (one per computer, so it cannot repeat).
     const old = this.workspace.entitlement.trialEndsAt;
@@ -7607,7 +7609,65 @@ class Session {
   /** For the sync engine: who this computer is to the cloud. */
   cloudIdentity = () => ({ token: this.workspace.profile?.token ?? "", device: this.deviceId, name: this.deviceName(), licence: this.licenceHere() });
 
+  /** Someone else's licence this person was added to and has not answered about here. */
+  get licenceInvite() {
+    return licenceToOffer(this.accountLicenses, this.licenceHere(), this.licencesNotNow);
+  }
+
+  private licencesNotNow = $state<string[]>(readNotNow());
+
+  notNowLicence = (id: string) => {
+    this.licencesNotNow = [...this.licencesNotNow, id];
+    saveNotNow(this.licencesNotNow);
+  };
+
+  /**
+   * Move this computer to another licence on the account, and to that church's own library: the one
+   * here stays exactly as it is, to come back to. The app restarts. Returns an error to show, or null.
+   */
+  switchLicence = async (target: string): Promise<string | null> => {
+    const token = this.workspace.profile?.token;
+    if (!token) return t("Sign in first.");
+    const answer = await serverCall<{ lease: string; key: string }>("/v1/account/use", { token, license: target, device: this.deviceId, name: this.deviceName() });
+    if (!answer.ok) return answer.offline ? t("Switching needs the internet. Connect, then try again.") : answer.error;
+    await this.flushSave();
+    // The lease goes with it and is kept on arrival, so a switch that fails here changes nothing.
+    const carry = JSON.stringify({ key: answer.data.key, lease: answer.data.lease, profile: this.workspace.profile });
+    try {
+      await invoke("library_switch", { current: this.licenceHere(), target, carry });
+    } catch (error) {
+      return errorText(error);
+    }
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+    return null;
+  };
+
+  /** The first start after a switch: who is signed in and the licence come with it, kept in each library's settings. */
+  private takeSwitchCarry = async () => {
+    if (!isDesktop()) return;
+    const text = await invoke<string | null>("library_carry_take").catch(() => null);
+    if (!text) return;
+    try {
+      const carried = JSON.parse(text) as { key?: string; lease?: string; profile?: Workspace["profile"] };
+      if (carried.lease) await this.keepLease(carried.lease);
+      const entitlement = carried.key ? redeemCode(this.workspace.entitlement, carried.key, { now: Date.now() }) : null;
+      this.workspace = {
+        ...this.workspace,
+        ...(carried.profile ? { profile: sanitizeProfile(carried.profile) } : {}),
+        ...(entitlement?.ok ? { entitlement: entitlement.entitlement } : {}),
+      };
+      this.persistSoon();
+    } catch (error) {
+      console.warn("The licence switch could not be finished", error);
+    }
+  };
+
   /** The paid licence this computer is on, by id ("" when it is not on one). */
+  get licenceId(): string {
+    return this.licenceHere();
+  }
+
   private licenceHere(): string {
     const { source, license } = this.workspace.entitlement;
     if (source !== "license" || !license || this.ent.kind !== "license" || this.plan === "free") return "";

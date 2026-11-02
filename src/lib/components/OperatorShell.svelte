@@ -253,6 +253,7 @@
     <div class="top-alerts">
       {#if session.screenLost}{#await import("./ScreenLost.svelte") then { default: ScreenLost }}<ScreenLost name={session.screenLost} />{/await}{/if}
       {#if session.micAlert}{#await import("./MicAlert.svelte") then { default: MicAlert }}<MicAlert alert={session.micAlert} />{/await}{/if}
+      {#if session.licenceInvite}{#await import("./LicenceInvite.svelte") then { default: LicenceInvite }}<LicenceInvite invite={session.licenceInvite} />{/await}{/if}
       {#if session.cloud?.asking}{#await import("./CloudAsk.svelte") then { default: CloudAsk }}<CloudAsk cloud={session.cloud} />{/await}{/if}
       {#if session.offerWaiting}{#await import("./OfferCard.svelte") then { default: OfferCard }}<OfferCard offer={session.offerWaiting} />{/await}{/if}
     </div>

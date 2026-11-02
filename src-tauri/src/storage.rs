@@ -49,7 +49,7 @@ fn cache_dirs(app: &AppHandle) -> Vec<PathBuf> {
 }
 
 pub fn usage(app: &AppHandle) -> Result<Usage, String> {
-    let data = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    let data = crate::library::data_dir(app)?;
     let library = ["church.db", "church.db-wal", "church.db-shm"].iter().map(|name| size_of(&data.join(name))).sum();
     Ok(Usage {
         library,

@@ -264,6 +264,22 @@ describe("signing in safely, and who a license belongs to", () => {
     expect(await seated()).toContain("pc-2");
   });
 
+  it("someone already signed in sees a new licence at the next check, and a chosen one comes with a seat", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, buy } = setup(identity);
+    const aliceToken = await signedIn(call, page, signInAs, alice, "mac-1");
+    const bobToken = await signedIn(call, page, signInAs, bob, "pc-2");
+    const theirs = await buy("", { token: aliceToken });
+    await call("/v1/license/members", { token: aliceToken, license: theirs.license, add: bob.email });
+    const status = (await call("/v1/account", { token: bobToken, device: "pc-2", name: "PC", license: "another-licence" })).data;
+    expect(status.licenses).toMatchObject([{ license: theirs.license, owner: false }]);
+    const used = await call("/v1/account/use", { token: bobToken, license: theirs.license, device: "pc-2", name: "PC" });
+    expect(used).toMatchObject({ status: 200, data: { key: theirs.key, lease: expect.any(String) } });
+    expect((await call("/v1/account/use", { token: bobToken, license: "nope", device: "pc-2" })).status).toBe(404);
+    await call("/v1/license/members", { token: aliceToken, license: theirs.license, remove: "bob@grace.org" });
+    expect((await call("/v1/account/use", { token: bobToken, license: theirs.license, device: "pc-2" })).status).toBe(403);
+  });
+
   it("an added person is emailed an invitation naming who and which church; the owner sees invited, then joined", async () => {
     const { identity, signInAs } = fakeIdentity();
     const { call, page, buy, mails } = setup(identity);
