@@ -176,9 +176,12 @@ fn library_lookup(app: tauri::AppHandle) -> impl Fn(&str) -> Option<Lend> + Send
     }
 }
 
+/// Method, path, headers, and what of the body was read along with them.
+type Request = (String, String, HashMap<String, String>, Vec<u8>);
+
 /// The request line, the headers this server reads (anything longer than a few KB is refused), and
 /// what of the body was read along with them.
-fn read_request(stream: &TcpStream) -> Option<(String, String, HashMap<String, String>, Vec<u8>)> {
+fn read_request(stream: &TcpStream) -> Option<Request> {
     let mut reader = BufReader::new(stream.take(16 * 1024));
     let mut line = String::new();
     reader.read_line(&mut line).ok()?;
@@ -659,7 +662,7 @@ mod tests {
         // Longer than the read that takes in the headers, so its start comes along with them.
         let body = vec![b'x'; 200_000];
         assert!(send_offer(&peer, &secret_for("CS1-OURS"), &body));
-        assert_eq!(lock(&kept).as_slice(), &[body.clone()]);
+        assert_eq!(lock(&kept).as_slice(), std::slice::from_ref(&body));
         assert!(!send_offer(&peer, &secret_for("CS1-OTHER"), &body), "another licence");
         assert_eq!(lock(&kept).len(), 1);
     }
