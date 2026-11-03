@@ -386,7 +386,7 @@ function draw() {
   if (tab === "activity") note = '<p class="note">Every change and every refused attempt, newest first. Nobody can remove entries; each one was also emailed to the alert address.</p>';
   if (tab === "approvals") note = '<p class="note">Big changes wait here until an owner approves them from the emailed link.</p>';
   if (tab === "computers" || tab === "accounts" || tab === "licenses") note = '<p class="note">Click a row for details and actions.</p>';
-  $("list").innerHTML = (tab === "accounts" ? twoLicencesCard() : "") + table(TABLES[tab], items, q) + note;
+  $("list").innerHTML = (tab === "accounts" ? twoLicencesCard() : "") + (tab === "licenses" ? issueCard() : "") + table(TABLES[tab], items, q) + note;
 }
 
 // People on two or more licences: a computer seated on two of them may have sent one church's
@@ -398,6 +398,12 @@ function twoLicencesCard() {
   const state = { check: '<span class="tag bad">check</span>', seated: '<span class="tag warn">one computer on both</span>', ok: '<span class="tag good">separate</span>' };
   const rows = T.people.map((p) => "<tr><td>" + two(esc(p.name || p.email), p.name ? esc(p.email) : "") + "</td><td>" + state[p.risk] + "</td><td>" + p.licences.map((l) => '<span class="mono">' + esc(l.license) + "</span> " + l.computers + " computers · cloud " + gb(l.cloudBytes) + (l.stopped ? ' <span class="tag">stopped</span>' : "")).join("<br>") + "</td><td>" + (p.shared.map((c) => esc(c.name) + ' <span class="dim">on ' + c.licences.map(esc).join(" + ") + "</span>").join("<br>") || '<span class="dim">—</span>') + '</td><td style="text-align:right">' + (p.id ? '<button class="sm" data-open="account:' + esc(p.id) + '">Open</button>' : "") + "</td></tr>").join("");
   return '<div class="card" style="margin-bottom:14px"><h2>People on two or more licences</h2><p class="note">' + (T.needCheck ? T.needCheck + " need a look: a computer is on two of their licences and one of those has cloud space, so one church’s songs and files may be in the other’s. Ask each licence’s owner to look through their library for anything that is not theirs." : "Nobody needs a look: no computer is on two licences with cloud space.") + '</p><div class="table"><table><thead><tr><th>Person</th><th>State</th><th>Licences</th><th>Computers on more than one</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div></div>";
+}
+
+// A key given rather than sold: a gift, a partner church, the team's own computers.
+function issueCard() {
+  if (!can("owner")) return "";
+  return '<div class="card" style="margin-bottom:14px"><h2>Issue a key</h2><form class="grid" id="issue-form"><label class="field">Plan<select name="plan"><option value="church">Church</option><option value="premium">Premium</option></select></label><label class="field">Email<input name="email" type="email" required placeholder="pastor@church.org"></label><label class="field">Name on the key<input name="holder" placeholder="Grace Chapel"></label><label class="field">Ends<input name="until" type="date"></label><label class="field">Or days from first use<input name="days" type="number" min="1" max="3650" placeholder="—"></label><label class="field">Reason<input name="reason" required placeholder="Why"></label><button class="hot">Issue key</button></form><p class="note">Leave both end fields empty for a key that never ends. Every key waits for an owner’s approval by email; once approved it is emailed to that address and shown on the approval page. Whoever signs in with that email owns it.</p></div>';
 }
 
 function promos() {
@@ -516,7 +522,7 @@ async function approvalPage(id, token) {
   $("approve").innerHTML = '<h2 style="font-size:18px;display:flex;gap:10px;align-items:center">' + ICONS.check + "Approve this change?</h2>" + facts([["Asked by", esc(a.by) + " (" + esc(a.role) + ")"], ["Change", "<b>" + esc(a.words) + "</b>"], ["Reason", esc(a.reason || "—")], ["Asked", when(a.at) + ' <span class="muted small">(' + ago(a.at) + ")</span>"], ["State", a.expired && a.status === "pending" ? "expired" : esc(a.status)]])
     + (done ? '<p class="note">Nothing to do. <a href="/admin">Open the admin page</a>.</p>' : ME.role !== "owner" ? '<p class="note">Only an owner can approve.</p>' : '<div class="acts" style="margin-top:18px"><button class="hot" id="yes">Approve</button><button class="danger" id="no">Decline</button></div><p class="note">You are signed in as ' + esc(ME.email) + ".</p>");
   const go = async (decline) => {
-    try { const r = await call("/admin/api/approve", { id, token, decline }); $("approve").innerHTML = "<h2>" + (decline ? "Declined" : "Approved and done") + '</h2><p class="muted">' + esc(r.detail || "Nothing was changed.") + '</p><p><a href="/admin">Open the admin page</a></p>'; }
+    try { const r = await call("/admin/api/approve", { id, token, decline }); $("approve").innerHTML = "<h2>" + (decline ? "Declined" : "Approved and done") + '</h2><p class="muted">' + esc(r.detail || "Nothing was changed.") + "</p>" + (r.key ? '<p class="note">The key (shown once here; it was also emailed):</p><p class="mono" style="user-select:all;word-break:break-all;padding:10px;background:var(--panel2);border-radius:8px">' + esc(r.key) + "</p>" : "") + '<p><a href="/admin">Open the admin page</a></p>'; }
     catch (e) { say(e.message); }
   };
   if ($("yes")) { $("yes").onclick = () => go(false); $("no").onclick = () => go(true); }
@@ -562,6 +568,12 @@ document.addEventListener("submit", (event) => {
     return run(body, "Limits saved");
   }
   if (el.id === "cap-form") return run({ action: "set-cloud-cap", license: f.license, ...(f.gb ? { gb: Number(f.gb) } : { gb: "" }) }, f.gb ? "Cap set" : "Cap cleared");
+  if (el.id === "issue-form") {
+    const body = { action: "issue-key", plan: f.plan, email: f.email, holder: f.holder, reason: f.reason };
+    if (f.until) body.until = f.until;
+    if (f.days) body.days = Number(f.days);
+    return run(body, "Key");
+  }
   if (el.id === "promo-form") {
     const body = { action: "create-promo", code: f.code, maxUses: Number(f.maxUses), expiresAt: f.expiresAt + "T23:59:59Z" };
     if (f.percentOff) body.percentOff = Number(f.percentOff);

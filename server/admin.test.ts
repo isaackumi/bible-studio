@@ -327,3 +327,42 @@ describe("admin: people on two licences", () => {
     expect((await as(null, "/admin/api/two-licences")).status).not.toBe(200);
   });
 });
+
+describe("admin: issuing a key", () => {
+  it("an owner asks, the emailed link approves, and the key works, is emailed and stays out of the log", async () => {
+    const { as, config, mails } = await setup();
+    const asked = await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "church", email: "Me@HeiTech.test", holder: "Isaac Kumi", reason: "my own computers" });
+    expect(asked.status).toBe(202);
+    const [, id, token] = /\/admin\/approve\/([0-9a-f]{20})#([0-9a-f]+)/.exec(mails.find((item) => item.subject.includes("Approve?"))!.text)!;
+    const done = await as("owner@heitech.test", "/admin/api/approve", { id, token });
+    expect(done.status).toBe(200);
+    const key = done.data.key as string;
+    const license = done.data.license as string;
+    expect(key).toMatch(/^CS1-/);
+    // A real key, for Church, that never ends, linked to the email (so its owner can claim it).
+    const { readLicense } = await import("../src/lib/domain/license");
+    expect(readLicense(key, pair.publicKey)).toMatchObject({ plan: "church", until: null, days: null, holder: "Isaac Kumi", id: license });
+    expect(await getJson(config.store, "email:me@heitech.test")).toEqual([{ id: license, key }]);
+    expect(await getJson(config.store, `license:${license}`)).toBeNull();
+    expect(mails.some((item) => item.to === "me@heitech.test" && item.text.includes(key))).toBe(true);
+    // A computer can activate it.
+    const activated = await as(null, "/v1/activate", { key, device: "dev-isaac", name: "Isaac's PC" });
+    expect(activated.status).toBe(200);
+    expect(activated.data.lease).toBeTruthy();
+    // Logged by id; the key itself is in no log entry or alert.
+    const audit = await as("owner@heitech.test", "/admin/api/audit");
+    expect(JSON.stringify(audit.data)).toContain(license);
+    expect(JSON.stringify(audit.data)).not.toContain(key);
+    expect(mails.filter((item) => item.to === "alerts@heitech.test").some((item) => item.text.includes(key))).toBe(false);
+  });
+
+  it("only owners, only with a plan, an email and one kind of end", async () => {
+    const { as } = await setup();
+    expect((await as("help@heitech.test", "/admin/api/action", { action: "issue-key", plan: "church", email: "a@b.org" })).status).toBe(403);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "gold", email: "a@b.org" })).status).toBe(400);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "church", email: "nope" })).status).toBe(400);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "church", email: "a@b.org", until: "2030-01-01", days: 30 })).status).toBe(400);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "church", email: "a@b.org", until: "2020-01-01" })).status).toBe(400);
+    expect((await as("owner@heitech.test", "/admin/api/action", { action: "issue-key", plan: "premium", email: "a@b.org", until: "2030-01-01" })).status).toBe(202);
+  });
+});

@@ -39,7 +39,17 @@ export function webDevice(): string {
   }
 }
 
+/**
+ * Development on this computer runs on every plan with no license: a dev build (`npm run dev`)
+ * opened at localhost, 127.0.0.1 or [::1] (from WSL too, through Windows' localhost forwarding).
+ * Shipped builds never do, so a copy of the web build served locally still needs a plan.
+ */
+export function localUnlimited(hostname = globalThis.location?.hostname ?? "", dev = import.meta.env?.DEV === true): boolean {
+  return dev && ["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname.toLowerCase());
+}
+
 function statusOf(saved: Saved): EntitlementStatus {
+  if (localUnlimited()) return { ...freeStatus(webDevice()), plan: "church", reason: null, kind: "license", leasePlan: "church", holder: "This computer (development)" };
   const lease = saved.lease ? readLease(saved.lease) : null;
   const device = webDevice();
   const result = standing(lease, device, Date.now(), saved.seen);

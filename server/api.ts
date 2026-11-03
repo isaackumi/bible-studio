@@ -48,6 +48,11 @@ export type ApiConfig = {
   libraries?: LibraryNamespace;
   /** Ed25519 secret key (hex) for license keys and leases. */
   signingKey: string;
+  /**
+   * The team's own accounts (STAFF_ACCOUNTS): each, once its email is proved at a sign-in, has a
+   * Church key that never ends put on the account by the server (accounts.ts › staffLicense).
+   */
+  staffAccounts?: string[];
   /** Only tests pass a public key; the app embeds the real one. */
   publicKey?: string;
   /**

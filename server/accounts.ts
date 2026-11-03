@@ -28,7 +28,7 @@
 //
 // Tokens last 180 days from their last use, so a computer nobody opens any more signs itself out.
 
-import { readLicense, type LicensePlan } from "../src/lib/domain/license.ts";
+import { readLicense, signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { activateDevice, noteAccountTrial, noteDevice, readAnyLicense, type ApiConfig } from "./api.ts";
 import { changeMembers, claimLicense, mayUse, noteJoined, ownershipOf, peopleOf } from "./ownership.ts";
 import { seatsFullEmail } from "./email.ts";
@@ -323,9 +323,28 @@ async function tellOwnerFull(config: ApiConfig, ownerId: string, account: Accoun
 }
 
 /** The account, its licenses, and (with a device) a lease for the best plan it has a seat on. */
+/**
+ * A staff account (STAFF_ACCOUNTS) whose email was proved at sign-in: a Church key that never ends,
+ * put on the account once. Its id comes from the email, so it is always the same key and the same
+ * seats; suspending it from the admin page stops it like any other.
+ */
+export async function staffLicense(config: ApiConfig, account: Account): Promise<void> {
+  const email = normalEmail(account.email);
+  if (!account.verified || !config.staffAccounts?.includes(email)) return;
+  const id = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`staff:${email}`))).slice(0, 4);
+  const license = hex(id);
+  if (account.licenses.some((entry) => entry.id === license)) return;
+  const key = signLicense({ plan: "church", until: null, holder: "Church Studio team", id }, config.signingKey);
+  const claimed = await claimLicense(config, account, { id: license, key });
+  if (!claimed.ok) return;
+  await putJson(config.store, `issued:${license}`, { plan: "church", email, holder: "Church Studio team", until: null, days: null, by: "STAFF_ACCOUNTS", at: config.now(), reason: "staff account" });
+  account.licenses = (await getJson<Account>(config.store, `acct:${account.id}`))?.licenses ?? account.licenses;
+}
+
 async function accountStatus(config: ApiConfig, input: Record<string, unknown>): Promise<Response> {
   const account = await accountOf(config, text(input.token, 80));
   if (!account) return json(401, { signedOut: true, error: "Sign in again." });
+  await staffLicense(config, account);
   const device = text(input.device, 80);
   // A trial started on this computer before signing in now belongs to the account too.
   const deviceTrial = device ? await getJson<{ device: string; startedAt: number; endsAt: number }>(config.store, `trial:${device}`) : null;
