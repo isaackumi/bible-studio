@@ -5,6 +5,10 @@
 //   signs each request; the server checks that signature itself and takes the email from it. Roles
 //   come from ADMIN_USERS, a server setting nobody can change from the admin page.
 //
+//   Keys: an owner may issue a license key (a gift, a partner, the team's own computers). Every one
+//   waits for approval from the emailed link, is emailed to whoever it is for, and is logged by its
+//   id; the key itself is never written to the log.
+//
 //   Limits: changes are capped by role and per license or computer in a year; nobody may change
 //   anything of their own; the big ones (long extensions, generous codes, undoing a suspension)
 //   wait for an owner to approve them from an email link. Everything is suspended or ended, never
@@ -20,7 +24,8 @@
 import { setCloudLimits } from "./cloud-config";
 import { ownershipOf } from "./ownership.ts";
 import { audience, readAnyLicense, details, listPromos, noteDevice, revoke, SEATS, stats, type AccountTrial, type ApiConfig, type Device, type DeviceMeta, type LicenseRecord, type Subscription, type Trial, markMoved, cloudDetails } from "./api.ts";
-import type { Account, LinkedLicense } from "./accounts.ts";
+import { noteLicenseEmail, type Account, type LinkedLicense } from "./accounts.ts";
+import { signLicense, type LicensePlan } from "../src/lib/domain/license.ts";
 import { licenseKeyEmail } from "./email.ts";
 import { adminPage } from "./admin-page.ts";
 import { makePromo, type Promo } from "./pricing.ts";
@@ -77,6 +82,7 @@ const ACTIONS = {
   "set-cloud-limits": "owner",
   "set-cloud-cap": "owner",
   "end-promo": "owner",
+  "issue-key": "owner",
 } as const satisfies Record<string, AdminRole>;
 export type AdminAction = keyof typeof ACTIONS;
 
@@ -96,6 +102,31 @@ const text = (value: unknown, max: number) => (typeof value === "string" ? value
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 const random = (bytes: number) => hex(crypto.getRandomValues(new Uint8Array(bytes)));
 const sha256 = async (value: string) => hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
+const emailOf = (value: unknown) => {
+  const email = text(value, 120).toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+};
+
+/** What a key to be issued says: its plan, who it is for and when (if ever) it ends. Null with the reason when something is missing. */
+export function keyRequest(input: Record<string, unknown>, now: number): { plan: LicensePlan; email: string; holder: string; until: string | null; days: number | null } | { error: string } {
+  const plan = input.plan === "premium" || input.plan === "church" ? input.plan : null;
+  if (!plan) return { error: "Which plan (Premium or Church)?" };
+  const email = emailOf(input.email);
+  if (!email) return { error: "Whose email? The key is sent there, and whoever signs in with it owns the key." };
+  const holder = text(input.holder, 60);
+  const untilText = text(input.until, 30);
+  const days = input.days === undefined || input.days === null || input.days === "" ? null : input.days;
+  if (untilText && days !== null) return { error: "Give an end date or a number of days, not both." };
+  if (days !== null && (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 3650)) return { error: "Days must be a whole number from 1 to 3650." };
+  let until: string | null = null;
+  if (untilText) {
+    const at = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(untilText) ? `${untilText}T23:59:59Z` : untilText);
+    if (Number.isNaN(at) || at <= now) return { error: "The end date must be a date in the future." };
+    until = new Date(at).toISOString().slice(0, 10);
+  }
+  return { plan, email, holder, until, days: days as number | null };
+}
+
 const licenseId = (value: unknown) => {
   const id = text(value, 16).toLowerCase();
   return /^[0-9a-f]{8}$/.test(id) ? id : null;
@@ -217,6 +248,11 @@ export function decide(admin: Admin, action: AdminAction, input: Record<string, 
     return { ok: true, approval: false };
   }
   if (action === "resume") return ask("Undoing a suspension or refund needs approval.");
+  if (action === "issue-key") {
+    const request = keyRequest(input, context.now);
+    if ("error" in request) return { ok: false, kind: "input", error: request.error };
+    return ask("Every new key needs approval.");
+  }
   if (action === "suspend" && !text(input.reason, 120)) return { ok: false, kind: "input", error: "Say why (the customer may ask)." };
   if (action === "create-promo") {
     const rules = LIMITS.promo;
@@ -278,7 +314,7 @@ type AuditEntry = {
 const auditKey = (at: number) => `audit:${String(9_999_999_999_999 - at).padStart(13, "0")}:${random(3)}`;
 
 const targetOf = (action: string, input: Record<string, unknown>) =>
-  action.endsWith("promo") ? `code ${text(input.code, 40).toUpperCase()}` : action === "extend-trial" || action === "mark-team" ? `computer ${text(input.device, 80).slice(0, 8)}` : `license ${text(input.license, 16)}`;
+  action === "issue-key" ? `key for ${text(input.email, 120).toLowerCase()}` : action.endsWith("promo") ? `code ${text(input.code, 40).toUpperCase()}` : action === "extend-trial" || action === "mark-team" ? `computer ${text(input.device, 80).slice(0, 8)}` : `license ${text(input.license, 16)}`;
 
 async function record(config: ApiConfig, entry: AuditEntry): Promise<void> {
   await putJson(config.store, auditKey(entry.at), entry, { at: entry.at, by: entry.by, action: entry.action, target: entry.target, outcome: entry.outcome });
@@ -306,6 +342,10 @@ const CHANGE_WORDS: Record<AdminAction, (input: Record<string, unknown>) => stri
   "set-cloud-limits": (input) => `set cloud space limits ${["premiumGb", "churchGb", "maxFileGb", "totalCapGb"].filter((key) => typeof input[key] === "number").map((key) => `${key}=${input[key]}`).join(" ") || "(nothing)"}`,
   "set-cloud-cap": (input) => `${typeof input.gb === "number" ? `cap cloud space for license ${text(input.license, 16)} at ${input.gb} GB` : `clear the cloud space cap on license ${text(input.license, 16)}`}`,
   "end-promo": (input) => `end promo code ${text(input.code, 40).toUpperCase()}`,
+  "issue-key": (input) => {
+    const ends = text(input.until, 30) ? `until ${text(input.until, 30)}` : typeof input.days === "number" ? `for ${input.days} days from first use` : "that never ends";
+    return `issue a ${input.plan === "church" ? "Church" : "Premium"} key ${ends} to ${text(input.holder, 60) || "(no name)"} <${text(input.email, 120).toLowerCase()}>`;
+  },
 };
 
 /** Changes this person made in the current hour; past the limit, no more until the next. */
@@ -348,6 +388,23 @@ async function perform(config: ApiConfig, admin: Admin, action: AdminAction, inp
     // Ended, not deleted: the record of who used it stays.
     await putJson(store, `promo:${code}`, { ...promo, expiresAt: Math.min(promo.expiresAt ?? now, now) }, { used: promo.used });
     return { ok: true, detail: `${code} ended after ${promo.used} uses` };
+  }
+  if (action === "issue-key") {
+    const request = keyRequest(input, now);
+    if ("error" in request) return { ok: false, error: request.error };
+    const id = crypto.getRandomValues(new Uint8Array(4));
+    const key = signLicense({ plan: request.plan, until: request.until, days: request.days, holder: request.holder, id }, config.signingKey);
+    const license = hex(id);
+    // No license record: that is for paid periods, and its date would end the key. The key's own
+    // end date (if any) holds. Linked to the email, so whoever signs in with it owns the key.
+    await noteLicenseEmail(config, request.email, { id: license, key });
+    await putJson(store, `issued:${license}`, { plan: request.plan, email: request.email, holder: request.holder, until: request.until, days: request.days, by: admin.email, at: now, reason: text(input.reason, 120) });
+    let sent = false;
+    if (config.mail) {
+      const email = licenseKeyEmail({ key, plan: request.plan }, config.publicUrl ?? "https://church-studio.heitechinc.com");
+      sent = await config.mail(request.email, email.subject, email.text, email.html).then(() => true, () => false);
+    }
+    return { ok: true, detail: `${request.plan === "church" ? "Church" : "Premium"} license ${license} for ${request.email}${sent ? ", emailed" : " (not emailed: copy the key)"}`, data: { key, license } };
   }
   if (action === "set-cloud-limits") {
     const patch: Record<string, number> = {};
