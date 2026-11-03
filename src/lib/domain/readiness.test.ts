@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backupCheck, internetCheck, isServiceDay, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck } from "./readiness";
+import { backupCheck, cloudCheck, internetCheck, micCheck, isServiceDay, libraryCheck, planCheck, recordingMinutes, screenCheck, serviceCheck, sortChecks, spaceCheck } from "./readiness";
 
 const now = Date.parse("2026-10-25T08:30:00Z");
 const DAY = 86_400_000;
@@ -57,5 +57,30 @@ describe("the service-day check on the desk", () => {
     expect(isServiceDay(wednesday, `Bible study, ${today(wednesday)}`)).toBe(true);
     expect(isServiceDay(wednesday, `Sunday service, ${today(sunday)}`)).toBe(false);
   });
-});
 
+  it("says whether a microphone sends sound, and which one listening will use", () => {
+    const mic = (name: string, live: boolean, error: string | null = null) => ({ name, peak: live ? 0.02 : 0, live, error });
+    const base = { chosen: null, fallback: "Microphone (Realtek(R) Audio)", listening: false, problem: null };
+    expect(micCheck({ ...base, heard: [] })).toMatchObject({ state: "fail", title: "No microphone is plugged in", fix: { action: "sound" } });
+    expect(micCheck({ ...base, heard: [mic("Microphone (Realtek(R) Audio)", false), mic("Camo", false)] })).toMatchObject({ state: "fail", title: "No microphone is sending sound" });
+    expect(micCheck({ ...base, heard: [mic("Microphone (Realtek(R) Audio)", true)] })).toMatchObject({ state: "ok", values: { name: "Realtek(R) Audio" } });
+    // The default is silent (a virtual one) but another is live: listening moves, worth a look.
+    expect(micCheck({ ...base, heard: [mic("Microphone (Realtek(R) Audio)", false), mic("Shure MV7", true)] })).toMatchObject({ state: "warn", title: "{from} sends no sound", values: { from: "Realtek(R) Audio", name: "Shure MV7" } });
+    expect(micCheck({ ...base, chosen: "Shure MV7", heard: [mic("Microphone (Realtek(R) Audio)", true)] })).toMatchObject({ state: "warn", title: "{from} is not plugged in", values: { from: "Shure MV7" } });
+    // Already listening: no probing, only how it goes.
+    expect(micCheck({ ...base, heard: [], listening: true })).toMatchObject({ state: "ok", title: "Listening is on" });
+    expect(micCheck({ ...base, heard: [], listening: true, problem: "Nothing is reaching the microphone." })).toMatchObject({ state: "fail", detail: "Nothing is reaching the microphone." });
+  });
+
+  it("says whether this computer's songs and files reach the others", () => {
+    const base = { held: 0, pendingMedia: 0, full: false, lastSyncAt: null, timeText: () => "9:05" };
+    for (const status of ["off", "free", "signedOut"]) expect(cloudCheck({ ...base, status })).toBeNull();
+    expect(cloudCheck({ ...base, status: "licenceChanged" })).toMatchObject({ state: "fail", fix: { action: "cloud" } });
+    expect(cloudCheck({ ...base, status: "offline" })?.state).toBe("warn");
+    expect(cloudCheck({ ...base, status: "readOnly" })).toMatchObject({ state: "warn", fix: { action: "plans" } });
+    expect(cloudCheck({ ...base, status: "idle", held: 3 })).toMatchObject({ state: "warn", values: { n: 3 } });
+    expect(cloudCheck({ ...base, status: "idle", full: true })?.title).toBe("Some files are only on this computer");
+    expect(cloudCheck({ ...base, status: "syncing", pendingMedia: 2 })).toMatchObject({ state: "warn", values: { n: 2 } });
+    expect(cloudCheck({ ...base, status: "idle", lastSyncAt: now })).toMatchObject({ state: "ok", values: { time: "9:05" } });
+  });
+});

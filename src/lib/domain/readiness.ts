@@ -1,4 +1,5 @@
 import { msg } from "../i18n/core";
+import { micLabel, pickMicrophone, type MicHeard } from "../voice/microphone";
 
 // Readiness check: one press checks what a service depends on, and says it the church's way.
 // Each check turns facts the desk gathered into a line: fine, worth a look, or needs fixing, with
@@ -7,7 +8,7 @@ import { msg } from "../i18n/core";
 export type ReadyState = "ok" | "warn" | "fail";
 
 /** What a check's button does; the settings page runs it. */
-export type ReadyFix = "open-audience" | "displays" | "service" | "backup" | "storage" | "plans" | "ai" | "recording";
+export type ReadyFix = "open-audience" | "displays" | "service" | "backup" | "storage" | "plans" | "ai" | "recording" | "sound" | "cloud";
 
 export type ReadyCheck = {
   id: string;
@@ -106,6 +107,55 @@ export function aiCheck(facts: { problem: string | null }): ReadyCheck {
   return facts.problem
     ? { id: "ai", state: "fail", title: msg("The AI is not answering"), detail: facts.problem, fix: { label: msg("AI assistant"), action: "ai" } }
     : { id: "ai", state: "ok", title: msg("The AI is answering"), detail: msg("Summaries, slides, songs and captions can use it.") };
+}
+
+/**
+ * The microphone, for a church that listens: each one was opened for a moment, and a real one always
+ * hears a little hiss, so a dead one shows without anyone speaking. Already listening: how that goes.
+ */
+export function micCheck(facts: { heard: MicHeard[]; chosen: string | null; fallback: string | null; listening: boolean; problem: string | null }): ReadyCheck {
+  const fix = { label: msg("Sound & voice"), action: "sound" as const };
+  if (facts.listening) {
+    return facts.problem
+      ? { id: "mic", state: "fail", title: msg("Listening has a problem"), detail: facts.problem, fix }
+      : { id: "mic", state: "ok", title: msg("Listening is on"), detail: msg("Verses read aloud go to Preview.") };
+  }
+  if (!facts.heard.length) return { id: "mic", state: "fail", title: msg("No microphone is plugged in"), detail: msg("Plug one in, then check again."), fix };
+  const choice = pickMicrophone(facts.heard, facts.chosen, facts.fallback);
+  if (choice.allSilent) return { id: "mic", state: "fail", title: msg("No microphone is sending sound"), detail: msg("Check it is plugged in, switched on and not muted. A wireless one needs its receiver on too."), fix };
+  const name = micLabel(choice.name ?? "");
+  if (choice.moved) {
+    const from = micLabel(choice.moved.from);
+    return choice.moved.because === "unplugged"
+      ? { id: "mic", state: "warn", title: msg("{from} is not plugged in"), detail: msg("Listening will use {name} instead."), values: { from, name }, fix }
+      : { id: "mic", state: "warn", title: msg("{from} sends no sound"), detail: msg("Listening will use {name} instead."), values: { from, name }, fix };
+  }
+  return { id: "mic", state: "ok", title: msg("The microphone is sending sound"), detail: msg("Listening will use {name}."), values: { name } };
+}
+
+/** Cloud sync, for a church that uses it: whether this computer's songs and files reach the others. */
+export function cloudCheck(facts: { status: string; held: number; pendingMedia: number; full: boolean; lastSyncAt: number | null; timeText: (time: number) => string }): ReadyCheck | null {
+  const fix = { label: msg("Cloud space"), action: "cloud" as const };
+  switch (facts.status) {
+    case "off":
+    case "free":
+    case "signedOut":
+      return null;
+    case "licenceChanged":
+      return { id: "cloud", state: "fail", title: msg("Cloud sync is paused"), detail: msg("This computer's licence changed. Choose in Cloud space whether to bring this library along."), fix };
+    case "noSeat":
+      return { id: "cloud", state: "warn", title: msg("This computer is not syncing"), detail: msg("It is not on the licence. Sign in and activate it, then sync."), fix: { label: msg("Account"), action: "cloud" } };
+    case "readOnly":
+      return { id: "cloud", state: "warn", title: msg("The cloud is read-only"), detail: msg("Changes made here stay on this computer until the plan is renewed."), fix: { label: msg("Plans"), action: "plans" } };
+    case "offline":
+      return { id: "cloud", state: "warn", title: msg("Cloud sync is offline"), detail: msg("Changes made here wait until the internet is back; your other computers do not have them yet.") };
+    case "error":
+      return { id: "cloud", state: "warn", title: msg("Cloud sync stopped"), detail: msg("Open Cloud space to try again."), fix };
+  }
+  if (facts.held > 0) return { id: "cloud", state: "warn", title: msg("Changes are waiting to go to the cloud"), detail: msg("{n} waiting for Sync now, so your other computers do not have them yet."), values: { n: facts.held }, fix };
+  if (facts.full) return { id: "cloud", state: "warn", title: msg("Some files are only on this computer"), detail: msg("The cloud space is full, so other computers cannot show them."), fix };
+  if (facts.pendingMedia > 0) return { id: "cloud", state: "warn", title: msg("Files are still syncing"), detail: msg("{n} to go. Leave the app open until they finish."), values: { n: facts.pendingMedia } };
+  return { id: "cloud", state: "ok", title: msg("Synced with the cloud"), detail: facts.lastSyncAt ? msg("Last synced at {time}.") : msg("Songs and files reach your other computers."), values: facts.lastSyncAt ? { time: facts.timeText(facts.lastSyncAt) } : undefined };
 }
 
 /** Worst first, so what needs doing is at the top. */

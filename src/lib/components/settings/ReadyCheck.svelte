@@ -33,7 +33,7 @@
       session.settingsOpen = false;
       session.goToDesk("service");
     } else if (action === "plans") session.openPlans();
-    else ongo({ displays: "displays", backup: "storage", storage: "storage", ai: "ai", recording: "broadcast" }[action]);
+    else ongo({ displays: "displays", backup: "storage", storage: "storage", ai: "ai", recording: "broadcast", sound: "audio", cloud: "account" }[action]);
   }
 
   onMount(() => void run());
@@ -49,7 +49,7 @@
         {:else if looking}{tn(looking, "Ready, with {n} thing to look at", "Ready, with {n} things to look at")}
         {:else}{t("All set")}{/if}
       </strong>
-      <span>{checkedAt ? t("Checked at {time}.", { time: checkedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) }) : t("Screens, the service, space, backups and more.")}</span>
+      <span>{checkedAt ? t("Checked at {time}.", { time: checkedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) }) : t("Screens, the service, the microphone, cloud sync and more.")}</span>
     </div>
   </div>
   <button type="button" class="btn primary" disabled={busy} onclick={() => void run()}>{busy ? t("Checking…") : t("Check again")}</button>

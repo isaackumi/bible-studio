@@ -247,7 +247,7 @@ import { LoadWatch } from "./load-watch.svelte";
 import type { LoadActionId } from "../domain/load-watch";
 import { licenceToOffer, readNotNow, saveNotNow } from "./licences";
 import { parseOffer, type Offer } from "../sync/offer";
-import { micDead, pickMicrophone, saveMicrophone, savedMicrophone, type MicAlert, type MicHeard } from "../voice/microphone";
+import { micDead, noteListened, pickMicrophone, saveMicrophone, savedMicrophone, type MicAlert, type MicHeard } from "../voice/microphone";
 import { MAX_SCREENS, monitorLabel, newScreen, placeScreens, screenLetter, screensNow, switchRole, writeScreensLocal, type ContentKind, type ScreenOutput, type ScreenRole } from "../display/screens";
 import { expectedWords, fixHeard, learnFix, nearMisses, type Applied, type NearMiss } from "../voice/words";
 import { parseLibrarySnapshot } from "../platform/library";
@@ -3195,6 +3195,7 @@ class Session {
       status: "listening",
       message: t("Listening. Read a verse to put it on Preview, or say “Studio next”, “Studio open songs”."),
     };
+    noteListened();
     const filter = this.workspace.voice.noiseFilter ?? "off";
     const engine = this.workspace.voice.engine ?? "system";
     const words = expectedWords(this.workspace.voice.words ?? []);
@@ -5997,7 +5998,7 @@ class Session {
     if (action === "open-audience") await this.openAudience();
     else if (action === "service") this.goToDesk("service");
     else if (action === "plans") this.openPlans();
-    else this.openSettings({ displays: "displays", backup: "storage", storage: "storage", ai: "ai", recording: "broadcast" }[action]);
+    else this.openSettings({ displays: "displays", backup: "storage", storage: "storage", ai: "ai", recording: "broadcast", sound: "audio", cloud: "account" }[action]);
   };
   checkHealth = () => this.checks.health();
   measureSmoothness = () => this.checks.measureSmoothness();

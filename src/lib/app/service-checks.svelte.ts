@@ -7,10 +7,11 @@ import { SERVER_URL, type EntitlementStatus } from "../domain/billing";
 import { healthRows, healthTips, type Frames, type HealthFacts } from "../domain/health";
 import type { SlideDeck } from "../domain/decks";
 import type { PlanId } from "../domain/plans";
-import { aiCheck, backupCheck, internetCheck, libraryCheck, planCheck, screenCheck, serviceCheck, sortChecks, spaceCheck, type ReadyCheck } from "../domain/readiness";
+import { aiCheck, backupCheck, cloudCheck, internetCheck, libraryCheck, micCheck, planCheck, screenCheck, serviceCheck, sortChecks, spaceCheck, type ReadyCheck } from "../domain/readiness";
 import type { MediaAsset, OutputStatus, Sermon, Service, Song, Workspace } from "../domain/types";
 import { t } from "../i18n/core";
 import { APP_VERSION } from "../platform/runtime";
+import { listensHere, type MicAlert, type MicHeard } from "../voice/microphone";
 import { problemReport, readProblems } from "./diagnostics";
 
 /** What the checks read from the session (all of it as it is now, at the moment of checking). */
@@ -29,6 +30,11 @@ export type ChecksHost = {
   readonly ent: EntitlementStatus;
   /** Listening as it stands: a support file says why it stopped (never the words heard). */
   readonly voice: { status: string; error: string | null; message: string };
+  /** The microphone chosen on this computer (null: its default), and what is wrong with listening. */
+  readonly microphone: string | null;
+  readonly micAlert: MicAlert | null;
+  /** Cloud sync, once it has started (null: not yet, or not used). */
+  readonly cloud: { status: string; held: number; pendingMedia: number; full: boolean; lastSyncAt: number | null } | null;
   aiModels(): Promise<string[]>;
 };
 
@@ -95,10 +101,27 @@ export class ServiceChecks {
       planCheck({ plan: this.host.plan, endsAt: this.host.ent.endsAt, renewBy: this.host.ent.kind === "license" ? this.host.ent.renewBy : null, now: Date.now(), dateText: (time) => new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "long" }) }),
       facts ? libraryCheck(facts.libraryOk) : null,
       internetCheck(online, needed),
+      desktop && listensHere() ? await this.micCheck() : null,
+      this.host.cloud ? cloudCheck({ ...this.host.cloud, timeText: (time) => new Date(time).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) }) : null,
       aiUsed && online ? aiCheck({ problem: await this.host.aiModels().then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error))) }) : null,
     ];
     return sortChecks(checks.filter((check): check is ReadyCheck => check !== null));
   };
+
+  /** Each microphone opened for a moment (as listening does before it starts), or how listening is going. */
+  private async micCheck(): Promise<ReadyCheck | null> {
+    const listening = this.host.voice.status === "listening";
+    const problem = this.host.micAlert?.message ?? (this.host.voice.status === "error" ? this.host.voice.message : null);
+    if (listening) return micCheck({ heard: [], chosen: null, fallback: null, listening, problem });
+    const [heard, inputs] = await Promise.all([
+      invoke<MicHeard[]>("listen_probe_inputs", { ms: 900, only: null }).catch(() => null),
+      invoke<Array<{ name: string; default: boolean }>>("listen_inputs").catch(() => []),
+    ]);
+    // The core could not look (an older build, or sound blocked): say nothing rather than guess. Heard
+    // nothing at all: only "none plugged in" when the computer lists no microphone either.
+    if (!heard || (!heard.length && inputs.length)) return null;
+    return micCheck({ heard, chosen: this.host.microphone, fallback: inputs.find((input) => input.default)?.name ?? null, listening, problem: null });
+  }
 
   /** The audience window's last smoothness measurement (Settings › Performance). */
   lastFrames = $state<Frames | null>(null);
