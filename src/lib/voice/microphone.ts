@@ -88,3 +88,25 @@ export function saveMicrophone(name: string | null) {
     // Private storage off: the choice lasts until the app closes.
   }
 }
+
+const LISTENED = "church-studio:listened-at";
+const LISTENED_DAYS = 60;
+
+/** Listening started on this computer: the readiness check then looks at the microphone too. */
+export function noteListened(now = Date.now()) {
+  try {
+    localStorage.setItem(LISTENED, String(now));
+  } catch {
+    // Private storage off: the microphone check is left out.
+  }
+}
+
+/** This computer listened in the last couple of months, so a working microphone matters here. */
+export function listensHere(now = Date.now()): boolean {
+  try {
+    const at = Number(localStorage.getItem(LISTENED));
+    return at > 0 && now - at < LISTENED_DAYS * 86_400_000;
+  } catch {
+    return false;
+  }
+}
