@@ -232,6 +232,13 @@ pub struct Memory {
     pub app: u64,
 }
 
+/// This app's process or one it started. On Linux the list also holds each process's threads, with
+/// the process as their parent and its whole memory as theirs: counted, a 1 GB app with 16 threads
+/// read 16 GB and warned of a leak that was not there.
+fn ours(process: &sysinfo::Process, me: Option<sysinfo::Pid>) -> bool {
+    process.thread_kind().is_none() && me.is_some() && (Some(process.pid()) == me || process.parent() == me)
+}
+
 pub fn memory() -> Memory {
     use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
     let mut system = System::new();
@@ -241,7 +248,7 @@ pub fn memory() -> Memory {
     let app = system
         .processes()
         .values()
-        .filter(|process| Some(process.pid()) == me || (me.is_some() && process.parent() == me))
+        .filter(|process| ours(process, me))
         .map(|process| process.memory())
         .sum();
     Memory { total: system.total_memory(), available: system.available_memory(), app }
@@ -277,7 +284,7 @@ pub fn load() -> Load {
     let (app_cpu, app_memory) = system
         .processes()
         .values()
-        .filter(|process| Some(process.pid()) == me || (me.is_some() && process.parent() == me))
+        .filter(|process| ours(process, me))
         .fold((0.0f32, 0u64), |(cpu, memory), process| (cpu + process.cpu_usage(), memory + process.memory()));
     Load {
         cpu: system.global_cpu_usage().clamp(0.0, 100.0),
@@ -392,6 +399,21 @@ mod tests {
         let load = load();
         assert!((0.0..=100.0).contains(&load.cpu) && (0.0..=100.0).contains(&load.app_cpu));
         assert!(load.memory_total > 0 && load.memory_available <= load.memory_total && load.app_memory > 0 && load.cores >= 1);
+    }
+
+    #[test]
+    fn counts_the_apps_memory_once_however_many_threads_it_has() {
+        let (stop, wait) = std::sync::mpsc::channel::<()>();
+        let wait = std::sync::Arc::new(std::sync::Mutex::new(wait));
+        let threads: Vec<_> = (0..12).map(|_| { let wait = wait.clone(); std::thread::spawn(move || { let _ = wait.lock().map(|w| w.recv()); }) }).collect();
+        let mut system = sysinfo::System::new();
+        system.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::nothing().with_memory());
+        let own = system.process(sysinfo::get_current_pid().unwrap()).map(|process| process.memory()).unwrap();
+        let app = memory().app;
+        drop(stop);
+        for thread in threads { let _ = thread.join(); }
+        // Children (none here) aside, the app is itself: not itself once more for every thread.
+        assert!(app < own * 2, "app {app} vs own {own}");
     }
 
     #[test]
