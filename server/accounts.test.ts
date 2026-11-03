@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { getMigrations } from "better-auth/db/migration";
 import { describe, expect, it } from "vitest";
-import { licenseKeyPair, TEST_LICENSE_PUBLIC_KEY } from "../src/lib/domain/license";
+import { licenseKeyPair, signLicense, TEST_LICENSE_PUBLIC_KEY, TEST_LICENSE_SECRET } from "../src/lib/domain/license";
 import { readLease } from "../src/lib/domain/lease";
 import type { Identity, Person } from "./accounts";
 import { completeCheckout, handleApi, type ApiConfig } from "./api";
@@ -488,6 +488,20 @@ describe("staff accounts", () => {
     const again = (await call("/v1/account", { token, device: "pc-1" })).data;
     expect(again.licenses).toHaveLength(1);
     expect(again.licenses[0].license).toBe(first.licenses[0].license);
+  });
+
+  it("a test key on the account first does not take the seat from the real staff key", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, config } = setup(identity);
+    const isaac: Person = { id: "user-isaac", email: "isaac.k.kumi29@gmail.com", name: "Isaac", emailVerified: true };
+    const token = await signedIn(call, page, signInAs, isaac, "pc-1");
+    // A Church key signed with the public test key, linked before staff was turned on.
+    const testKey = signLicense({ plan: "church", until: null, holder: "Test Church", id: new Uint8Array([1, 2, 3, 4]) }, TEST_LICENSE_SECRET);
+    expect((await call("/v1/account/link", { token, key: testKey })).status).toBe(200);
+    config.staffAccounts = ["isaac.k.kumi29@gmail.com"];
+    const status = (await call("/v1/account", { token, device: "pc-1", name: "Isaac's PC" })).data;
+    expect(status.licenses).toHaveLength(2);
+    expect(readLease(status.lease, pair.publicKey)).toMatchObject({ plan: "church", device: "pc-1", holder: "Church Studio team" });
   });
 
   it("never for an email that was not proved, or is not on the list", async () => {

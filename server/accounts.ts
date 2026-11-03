@@ -358,9 +358,13 @@ async function accountStatus(config: ApiConfig, input: Record<string, unknown>):
     if (waiting.length) account.licenses = (await getJson<Account>(config.store, `acct:${account.id}`))?.licenses ?? account.licenses;
   }
   const licenses = account.licenses
-    .map((entry) => ({ entry, license: readAnyLicense(config, entry.key)?.license ?? readLicense(entry.key) }))
-    .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license> } => !!item.license)
-    .sort((a, b) => PLAN_RANK[b.license.plan] - PLAN_RANK[a.license.plan]);
+    .map((entry) => {
+      const read = readAnyLicense(config, entry.key);
+      return { entry, license: read?.license ?? readLicense(entry.key), test: read?.signer.test === true };
+    })
+    .filter((item): item is { entry: LinkedLicense; license: NonNullable<typeof item.license>; test: boolean } => !!item.license)
+    // A test key's lease unlocks only development builds: a real key on the same plan gets the seat first.
+    .sort((a, b) => PLAN_RANK[b.license.plan] - PLAN_RANK[a.license.plan] || Number(a.test) - Number(b.test));
   // The licence this computer is already on: the others are listed, and no seat is taken on them.
   const current = text(input.license, 40);
   const summary = [];
