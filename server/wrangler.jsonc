@@ -36,6 +36,10 @@
     // "1": a new trial or key needs a signed-in account (one trial per person). Apps before 0.3,
     // which cannot send their sign-in, go on as before (api.ts › mustSignIn).
     "REQUIRE_ACCOUNT": "1",
+    // The team's own accounts: each gets Church, never ending, once it signs in with that email
+    // proved (accounts.ts › staffLicense). Taking an email out stops new keys; suspend an existing
+    // one from the admin page.
+    "STAFF_ACCOUNTS": "isaac.k.kumi29@gmail.com",
     // The public pages (home, terms, privacy, refunds): who sells, and an inbox someone reads.
     "COMPANY_NAME": "HeiTech",
     "CONTACT_EMAIL": "support@heitechinc.com",

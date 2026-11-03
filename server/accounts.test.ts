@@ -467,3 +467,36 @@ describe("trials and accounts", () => {
     expect((await call("/v1/trial", { device: "pc-2", token })).status).toBe(403);
   });
 });
+
+describe("staff accounts", () => {
+  async function signedIn(call: ReturnType<typeof setup>["call"], page: ReturnType<typeof setup>["page"], signInAs: (who: Person | null) => void, who: Person, device: string) {
+    const start = (await call("/v1/signin/start", { device, name: device })).data;
+    signInAs(who);
+    await page(`/signin/${start.id}/confirm`, { number: String(start.number) });
+    return (await call("/v1/signin/poll", { id: start.id, secret: start.secret })).data.token as string;
+  }
+
+  it("a listed account with a proved email gets Church on its computers, the same key every time", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, config } = setup(identity);
+    config.staffAccounts = ["isaac.k.kumi29@gmail.com"];
+    const isaac: Person = { id: "user-isaac", email: "Isaac.K.Kumi29@gmail.com", name: "Isaac", emailVerified: true };
+    const token = await signedIn(call, page, signInAs, isaac, "pc-1");
+    const first = (await call("/v1/account", { token, device: "pc-1", name: "Isaac's PC" })).data;
+    expect(first.licenses).toEqual([expect.objectContaining({ plan: "church", owner: true })]);
+    expect(readLease(first.lease, pair.publicKey)).toMatchObject({ plan: "church", device: "pc-1" });
+    const again = (await call("/v1/account", { token, device: "pc-1" })).data;
+    expect(again.licenses).toHaveLength(1);
+    expect(again.licenses[0].license).toBe(first.licenses[0].license);
+  });
+
+  it("never for an email that was not proved, or is not on the list", async () => {
+    const { identity, signInAs } = fakeIdentity();
+    const { call, page, config } = setup(identity);
+    config.staffAccounts = ["isaac.k.kumi29@gmail.com"];
+    const unproved = await signedIn(call, page, signInAs, { id: "user-x", email: "isaac.k.kumi29@gmail.com", name: "X", emailVerified: false }, "pc-2");
+    expect((await call("/v1/account", { token: unproved, device: "pc-2" })).data).toMatchObject({ licenses: [] });
+    const other = await signedIn(call, page, signInAs, alice, "pc-3");
+    expect((await call("/v1/account", { token: other, device: "pc-3" })).data).toMatchObject({ licenses: [] });
+  });
+});

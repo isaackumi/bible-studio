@@ -74,6 +74,8 @@ export type Env = {
   ADMIN_USERS?: string;
   /** Where every admin change is reported and approvals are sent (a secret). */
   ADMIN_ALERT_EMAIL?: string;
+  /** The team's own accounts, which get Church without buying it: "you@x.com,helper@y.com". */
+  STAFF_ACCOUNTS?: string;
   /** Days a computer may stay offline before it must check in (default 30). */
   LEASE_DAYS?: string;
   /** Free trial length (default 14). */
@@ -144,6 +146,7 @@ export function apiConfig(env: Env, http: Fetch = fetch): ApiConfig | null {
     usage: env.USAGE ? analyticsEngine(env.USAGE, env.ANALYTICS_TOKEN && env.CLOUDFLARE_ACCOUNT_ID ? { accountId: env.CLOUDFLARE_ACCOUNT_ID, token: env.ANALYTICS_TOKEN } : null, http) : undefined,
     limit: env.LIMITS ? async (key) => (await env.LIMITS!.limit({ key }).catch(() => ({ success: true }))).success : undefined,
     signingKey: env.CHURCH_STUDIO_SIGNING_KEY,
+    staffAccounts: (env.STAFF_ACCOUNTS ?? "").split(",").map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@")),
     provider,
     adminToken: env.ADMIN_TOKEN,
     admin: {
