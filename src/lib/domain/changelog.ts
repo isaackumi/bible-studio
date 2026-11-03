@@ -16,6 +16,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.13",
+    date: "2026-11-03",
+    highlights: [
+      { icon: "mic", title: msg("Listening says what is wrong"), text: msg("If the microphone cannot be opened, a card at the top of the desk says why and how to fix it. The readiness check now tries each microphone and cloud sync before the service, not during it."), show: null },
+      { icon: "text", title: msg("Quick text sizes for verses and songs"), text: msg("A− and A+ on the Presenter and song preview change verses and songs separately, and what is on screen changes at once."), show: null },
+      { icon: "cloud", title: msg("Cloud space can ask first, and send to nearby computers"), text: msg("Choose Ask me first to hold changes until you press Sync now. Send passes chosen songs and files to another computer on your plan; nothing there is overwritten."), show: null },
+      { icon: "folder", title: msg("Each church keeps its own library"), text: msg("Someone added to more than one church's plan sees each church's library apart, and can switch between them in Settings › Plan & account."), show: null },
+      { icon: "alerts", title: msg("Fewer false alarms"), text: msg("The screen-disconnected card can be closed, and on Linux the app no longer warns of a memory leak that is not there."), show: null },
+    ],
+  },
+  {
     version: "0.6.12",
     date: "2026-10-28",
     highlights: [
