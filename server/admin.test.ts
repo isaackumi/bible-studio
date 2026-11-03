@@ -297,3 +297,33 @@ describe("admin: who uses what", () => {
     expect(decide({ ...support, role: "owner" }, "extend-trial", { days: 61 }, { added: 0, approved: true, now })).toMatchObject({ ok: false, kind: "limit" });
   });
 });
+
+describe("admin: people on two licences", () => {
+  it("flags a computer seated on two of a person's licences when one has cloud space", async () => {
+    const { as, config } = await setup();
+    const seat = (device: string, name: string) => ({ device, name, seenAt: "2026-10-01" });
+    const account = (id: string, email: string, licences: string[]) => putJson(config.store, `acct:${id}`, { id, email, name: "", licenses: licences.map((item) => ({ id: item, key: "k" })), createdAt: 0 }, { email, createdAt: 0 });
+    await account("mixed", "both@grace.org", ["aaaa0001", "bbbb0002"]);
+    await account("apart", "apart@hope.org", ["cccc0003", "dddd0004"]);
+    await account("seated", "seated@life.org", ["eeee0005", "ffff0006"]);
+    await account("one", "one@peace.org", ["aaaa0001"]);
+    await putJson(config.store, "act:aaaa0001", [seat("pc1", "Office"), seat("pc2", "Stage")]);
+    await putJson(config.store, "act:bbbb0002", [seat("pc1", "Office")]);
+    await putJson(config.store, "act:cccc0003", [seat("pc3", "Hall")]);
+    await putJson(config.store, "act:dddd0004", [seat("pc4", "Annex")]);
+    await putJson(config.store, "act:eeee0005", [seat("pc5", "Desk")]);
+    await putJson(config.store, "act:ffff0006", [seat("pc5", "Desk")]);
+    await putJson(config.store, "cloudused:bbbb0002", { usedBytes: 5e8, at: 0 }, { usedBytes: 5e8, plan: "church" });
+    await putJson(config.store, "cloudused:cccc0003", { usedBytes: 1e9, at: 0 }, { usedBytes: 1e9, plan: "church" });
+
+    const { status, data } = await as("eyes@heitech.test", "/admin/api/two-licences");
+    expect(status).toBe(200);
+    const people = data.people as Array<{ email: string; risk: string; shared: Array<{ device: string; licences: string[] }>; licences: Array<{ license: string; cloudBytes: number }> }>;
+    expect(people.map((item) => [item.email, item.risk])).toEqual([["both@grace.org", "check"], ["seated@life.org", "seated"], ["apart@hope.org", "ok"]]);
+    expect(people[0]!.shared).toEqual([{ device: "pc1", name: "Office", licences: ["aaaa0001", "bbbb0002"] }]);
+    expect(people[0]!.licences.find((item) => item.license === "bbbb0002")!.cloudBytes).toBe(5e8);
+    expect(data.needCheck).toBe(1);
+    expect(((await as("eyes@heitech.test", "/admin/api/details")).data.twoLicences as { needCheck: number }).needCheck).toBe(1);
+    expect((await as(null, "/admin/api/two-licences")).status).not.toBe(200);
+  });
+});

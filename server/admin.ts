@@ -592,6 +592,47 @@ async function accountView(config: ApiConfig, id: string) {
   };
 }
 
+/**
+ * People on two or more licences, for the check before the licence-picker release. Before it, the
+ * app's account check could seat a computer on a second licence while it was still on its first,
+ * and the cloud then took the account's best plan: so one church's library could be uploaded into
+ * another's. A computer seated on two of a person's licences is the sign it may have happened; the
+ * cloud space each licence uses says whether there is anything to look at.
+ */
+export async function twoLicences(config: ApiConfig) {
+  const seatsOf = new Map<string, Device[]>();
+  const seats = async (licence: string) => {
+    if (!seatsOf.has(licence)) seatsOf.set(licence, (await getJson<Device[]>(config.store, `act:${licence}`)) ?? []);
+    return seatsOf.get(licence)!;
+  };
+  const cloudBytes = new Map((await config.store.list("cloudused:")).map((entry) => [entry.key.slice("cloudused:".length), Number(entry.meta?.usedBytes) || 0]));
+  const people = [];
+  for (const entry of await config.store.list("acct:")) {
+    const account = await getJson<Account>(config.store, entry.key);
+    const ids = [...new Set(account?.licenses.map((item) => item.id) ?? [])];
+    if (!account || ids.length < 2) continue;
+    const licences = [];
+    const onWhich = new Map<string, { name: string; licences: string[] }>();
+    for (const id of ids) {
+      const here = await seats(id);
+      const stopped = !!(await config.store.get(`revoked:${id}`));
+      licences.push({ license: id, computers: here.length, cloudBytes: cloudBytes.get(id) ?? 0, stopped });
+      for (const seat of here) {
+        const known = onWhich.get(seat.device) ?? { name: seat.name, licences: [] };
+        known.licences.push(id);
+        onWhich.set(seat.device, known);
+      }
+    }
+    const shared = [...onWhich.entries()].filter(([, item]) => item.licences.length > 1).map(([device, item]) => ({ device, name: item.name, licences: item.licences }));
+    // Only worth a look when a shared computer could have sent something: a licence with cloud space.
+    const risk: "check" | "seated" | "ok" = shared.length > 0 && shared.some((item) => item.licences.some((id) => (cloudBytes.get(id) ?? 0) > 0)) ? "check" : shared.length ? "seated" : "ok";
+    people.push({ id: account.id, email: account.email, name: account.name, licences, shared, risk });
+  }
+  const order = { check: 0, seated: 1, ok: 2 } as const;
+  people.sort((a, b) => order[a.risk] - order[b.risk] || a.email.localeCompare(b.email));
+  return { people, needCheck: people.filter((item) => item.risk === "check").length };
+}
+
 /** The lists for the admin page, with each computer's setup and account, and each account's setups. */
 async function richDetails(config: ApiConfig) {
   const base = await details(config);
@@ -645,7 +686,9 @@ export async function adminRoute(request: Request, config: ApiConfig, path: stri
       case "/admin/api/stats":
         return json(200, await stats(config));
       case "/admin/api/details":
-        return json(200, { ...(await richDetails(config)), promos: await listPromos(config.store), cloud: await cloudDetails(config) });
+        return json(200, { ...(await richDetails(config)), promos: await listPromos(config.store), cloud: await cloudDetails(config), twoLicences: await twoLicences(config) });
+      case "/admin/api/two-licences":
+        return json(200, await twoLicences(config));
       case "/admin/api/audit": {
         // Keys count down with time, so sorted they are newest first (as Cloudflare KV lists them).
         const entries = (await config.store.list("audit:")).sort((x, y) => (x.key < y.key ? -1 : 1)).slice(0, 300);
