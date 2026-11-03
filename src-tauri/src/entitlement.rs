@@ -198,6 +198,14 @@ fn persist(app: &AppHandle, saved: &Saved) {
 }
 
 fn status_of(saved: &Saved) -> Value {
+    // Development builds (`tauri dev`) run on every plan with no license, like the browser build on
+    // localhost (src/lib/platform/web-entitlement.ts). Release builds never compile this in.
+    if cfg!(debug_assertions) {
+        return json!({
+            "plan": "church", "reason": null, "device": device_id(), "kind": "license", "leasePlan": "church",
+            "license": null, "holder": "This computer (development)", "endsAt": null, "renewBy": null, "issuedAt": null,
+        });
+    }
     let lease = saved.lease.as_deref().and_then(read_trusted);
     let now = now_ms();
     let (plan, reason) = standing(lease.as_ref(), device_id(), now, saved.seen);
