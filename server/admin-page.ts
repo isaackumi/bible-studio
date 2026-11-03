@@ -386,7 +386,18 @@ function draw() {
   if (tab === "activity") note = '<p class="note">Every change and every refused attempt, newest first. Nobody can remove entries; each one was also emailed to the alert address.</p>';
   if (tab === "approvals") note = '<p class="note">Big changes wait here until an owner approves them from the emailed link.</p>';
   if (tab === "computers" || tab === "accounts" || tab === "licenses") note = '<p class="note">Click a row for details and actions.</p>';
-  $("list").innerHTML = table(TABLES[tab], items, q) + note;
+  $("list").innerHTML = (tab === "accounts" ? twoLicencesCard() : "") + table(TABLES[tab], items, q) + note;
+}
+
+// People on two or more licences: a computer seated on two of them may have sent one church's
+// library into the other's cloud before the licence-picker release.
+function twoLicencesCard() {
+  const T = D.twoLicences;
+  if (!T || !T.people.length) return "";
+  const gb = (bytes) => (bytes ? (bytes / 1e9).toFixed(2) + " GB" : "empty");
+  const state = { check: '<span class="tag bad">check</span>', seated: '<span class="tag warn">one computer on both</span>', ok: '<span class="tag good">separate</span>' };
+  const rows = T.people.map((p) => "<tr><td>" + two(esc(p.name || p.email), p.name ? esc(p.email) : "") + "</td><td>" + state[p.risk] + "</td><td>" + p.licences.map((l) => '<span class="mono">' + esc(l.license) + "</span> " + l.computers + " computers · cloud " + gb(l.cloudBytes) + (l.stopped ? ' <span class="tag">stopped</span>' : "")).join("<br>") + "</td><td>" + (p.shared.map((c) => esc(c.name) + ' <span class="dim">on ' + c.licences.map(esc).join(" + ") + "</span>").join("<br>") || '<span class="dim">—</span>') + '</td><td style="text-align:right">' + (p.id ? '<button class="sm" data-open="account:' + esc(p.id) + '">Open</button>' : "") + "</td></tr>").join("");
+  return '<div class="card" style="margin-bottom:14px"><h2>People on two or more licences</h2><p class="note">' + (T.needCheck ? T.needCheck + " need a look: a computer is on two of their licences and one of those has cloud space, so one church’s songs and files may be in the other’s. Ask each licence’s owner to look through their library for anything that is not theirs." : "Nobody needs a look: no computer is on two licences with cloud space.") + '</p><div class="table"><table><thead><tr><th>Person</th><th>State</th><th>Licences</th><th>Computers on more than one</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div></div>";
 }
 
 function promos() {
