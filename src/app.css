@@ -60,9 +60,10 @@
   --sec-ending: #8a94a6;
   --presence: #3dce7a;
   --mustard: #e2cc9d;
-  /* SF Pro is the Mac system face. Instrument Sans remains the fallback off Apple platforms. */
-  --font-ui: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Instrument Sans", sans-serif;
-  --font-label: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Instrument Sans", sans-serif;
+  /* SF Pro is the Mac system face. Elsewhere (Windows, Linux, the browser version) Inter, which is
+     made for small text on screen: Instrument Sans, a display face, read cramped at the desk's 10-13px. */
+  --font-ui: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Inter Variable", Inter, sans-serif;
+  --font-label: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Inter Variable", Inter, sans-serif;
   --font-scripture: "Instrument Serif", serif;
   --font-screen: "Inter Variable", Inter, sans-serif;
   font-family: var(--font-ui);
