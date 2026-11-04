@@ -337,7 +337,6 @@ export async function staffLicense(config: ApiConfig, account: Account): Promise
   const key = signLicense({ plan: "church", until: null, holder: "Church Studio team", id }, config.signingKey);
   const claimed = await claimLicense(config, account, { id: license, key });
   if (!claimed.ok) return;
-  await putJson(config.store, `issued:${license}`, { plan: "church", email, holder: "Church Studio team", until: null, days: null, by: "STAFF_ACCOUNTS", at: config.now(), reason: "staff account" });
   account.licenses = (await getJson<Account>(config.store, `acct:${account.id}`))?.licenses ?? account.licenses;
 }
 
