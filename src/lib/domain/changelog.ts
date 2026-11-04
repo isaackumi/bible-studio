@@ -16,6 +16,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.15",
+    date: "2026-11-04",
+    highlights: [
+      { icon: "type", title: msg("Clearer text on Windows and Linux"), text: msg("The desk's lists, buttons and labels now use a typeface made for small text on screen, so they read more easily at a glance. Macs keep their own system type."), show: null },
+    ],
+  },
+  {
     version: "0.6.14",
     date: "2026-11-04",
     highlights: [

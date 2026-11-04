@@ -5657,4 +5657,6 @@ export const es: Readonly<Record<string, string>> = {
   "The song list scrolls smoothly in a big library, and each song shows its first line and how many parts it has.": "La lista de canciones se desplaza con fluidez en una biblioteca grande, y cada canción muestra su primera línea y cuántas partes tiene.",
   "Cloud space says where things stand": "El espacio en la nube dice cómo va todo",
   "Settings › Cloud space opens with one answer: in sync, changes waiting, or offline. With Ask me first on, Sync now sends what is waiting.": "Ajustes › Espacio en la nube empieza con una respuesta: sincronizado, cambios en espera o sin conexión. Con Preguntarme primero activado, Sincronizar ahora envía lo que espera.",
+  "Clearer text on Windows and Linux": "Texto más claro en Windows y Linux",
+  "The desk's lists, buttons and labels now use a typeface made for small text on screen, so they read more easily at a glance. Macs keep their own system type.": "Las listas, botones y etiquetas del escritorio usan ahora una tipografía pensada para texto pequeño en pantalla, así se leen mejor de un vistazo. Los Mac mantienen su propia tipografía del sistema.",
 };
