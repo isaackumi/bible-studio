@@ -398,7 +398,6 @@ async function perform(config: ApiConfig, admin: Admin, action: AdminAction, inp
     // No license record: that is for paid periods, and its date would end the key. The key's own
     // end date (if any) holds. Linked to the email, so whoever signs in with it owns the key.
     await noteLicenseEmail(config, request.email, { id: license, key });
-    await putJson(store, `issued:${license}`, { plan: request.plan, email: request.email, holder: request.holder, until: request.until, days: request.days, by: admin.email, at: now, reason: text(input.reason, 120) });
     let sent = false;
     if (config.mail) {
       const email = licenseKeyEmail({ key, plan: request.plan }, config.publicUrl ?? "https://church-studio.heitechinc.com");

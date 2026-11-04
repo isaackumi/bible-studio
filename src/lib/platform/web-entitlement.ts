@@ -45,7 +45,7 @@ export function webDevice(): string {
  * Shipped builds never do, so a copy of the web build served locally still needs a plan.
  */
 export function localUnlimited(hostname = globalThis.location?.hostname ?? "", dev = import.meta.env?.DEV === true): boolean {
-  return dev && ["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname.toLowerCase());
+  return dev && ["localhost", "127.0.0.1", "[::1]"].includes(hostname.toLowerCase());
 }
 
 function statusOf(saved: Saved): EntitlementStatus {
