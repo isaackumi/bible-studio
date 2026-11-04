@@ -1279,6 +1279,16 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        // Closing the desk ends the app. Otherwise a hidden window (the audience window waiting for
+        // its projector, a stage or second screen) kept it running unseen, and opening it again only
+        // handed over to that copy, which has no desk: nothing opened until the computer restarted.
+        // Destroyed, not CloseRequested: the desk has saved by then (OperatorShell's onCloseRequested).
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                use tauri::Manager;
+                window.app_handle().exit(0);
+            }
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

@@ -5565,6 +5565,8 @@ export const fr: Readonly<Record<string, string>> = {
   "A steadier audience screen on a Mac": "Un écran de l’assemblée plus stable sur Mac",
   "The audience screen is no longer placed again every second when nothing has changed, which saves work and keeps the log readable.": "L’écran de l’assemblée n’est plus replacé chaque seconde quand rien n’a changé : moins de travail pour l’ordinateur, et un journal lisible.",
   "Recording stopped as it was starting. Keep the audience screen open on its screen, then try again. If it happens again, send a support file.": "L’enregistrement s’est arrêté au démarrage. Gardez l’écran de l’assemblée ouvert sur son écran, puis réessayez. Si cela se reproduit, envoyez un fichier d’assistance.",
+  "Closing Church Studio closes it": "Fermer Church Studio le ferme vraiment",
+  "On Windows, closing the desk could leave Church Studio running unseen, so it would not open again until the computer restarted. Closing the desk now ends it fully.": "Sous Windows, fermer le bureau pouvait laisser Church Studio tourner sans être vu, et il ne se rouvrait plus avant le redémarrage de l’ordinateur. Fermer le bureau l’arrête maintenant complètement.",
   "Recording on a Mac keeps going": "Sur Mac, l’enregistrement continue",
   "Pressing Record as the audience screen opened could make recording stop at once. It now waits until the audience screen is on its screen, then records; if it cannot, it says why.": "Appuyer sur Enregistrer pendant que l’écran de l’assemblée s’ouvrait pouvait arrêter l’enregistrement aussitôt. Il attend maintenant que l’écran de l’assemblée soit sur son écran, puis enregistre ; s’il ne peut pas, il dit pourquoi.",
   "Choose microphone": "Choisir le micro",
