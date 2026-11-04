@@ -95,15 +95,16 @@
   /** Favorites and Recently used always show; the others once they have songs. */
   const shownLists = $derived(lists.filter((list) => list.id !== "all" && (list.id === "favorites" || list.id === "recent" || list.songs.length > 0)));
   const openList = $derived(folder?.startsWith(LIST) ? lists.find((list) => `${LIST}${list.id}` === folder) ?? null : null);
+  // Worked out once for the whole list, so a row reads a set or a map and not the workspace: the
+  // list stays smooth to scroll in a library of thousands.
+  const starred = $derived(new Set(session.workspace.favorites.songs));
+  const isStarred = (song: Song) => starred.has(song.id);
   const visible = $derived(
     openList
       ? openList.id === "recent" || openList.id === "most" || openList.id === "service"
         ? openList.songs
-        : favoritesFirst(openList.songs, (song) => session.isFavorite("songs", song.id))
-      : favoritesFirst(
-          folder === "" ? session.songs.filter((song) => !cleanFolder(song.folder)) : filterSongs(session.songs, folder, ""),
-          (song) => session.isFavorite("songs", song.id),
-        ),
+        : favoritesFirst(openList.songs, isStarred)
+      : favoritesFirst(folder === "" ? session.songs.filter((song) => !cleanFolder(song.folder)) : filterSongs(session.songs, folder, ""), isStarred),
   );
   // Browsing a long list: a filter, an order (kept on this computer), letter headings for A–Z,
   // and rows drawn a page at a time so hundreds of songs stay quick.
@@ -128,7 +129,7 @@
   let listEl = $state<HTMLUListElement | undefined>();
   const mostSung = $derived(lists.find((list) => list.id === "most")?.songs.map((song) => song.id) ?? []);
   const shown = $derived(
-    sortSongs(quickFilter(visible, listQuery), sort, { starred: (song) => session.isFavorite("songs", song.id), mostSung }),
+    sortSongs(quickFilter(visible, listQuery), sort, { starred: isStarred, mostSung }),
   );
   const lettered = $derived(sort === "az" && shown.length > 20);
   const rows = $derived(lettered ? withLetters(shown) : shown.map((song) => ({ kind: "song" as const, song })));
@@ -168,9 +169,17 @@
   /** Where new songs and imports go: the open folder, or none. */
   const targetFolder = $derived(folder && !folder.startsWith(LIST) ? folder : "");
 
-  /** First lyric line. */
-  function snippet(song: Song): string {
-    return song.sections.flatMap((section) => section.lines).map((line) => line.trim()).find(Boolean) ?? "";
+  /** First lyric line of each song, worked out once when the songs change (not per row as it scrolls). */
+  const firstLines = $derived(new Map(session.songs.map((song) => [song.id, firstLine(song)])));
+  function firstLine(song: Song): string {
+    for (const section of song.sections) for (const line of section.lines) if (line.trim()) return line.trim();
+    return "";
+  }
+  /** A gentle colour per song for its letter tile, the same each time. */
+  function tint(title: string): number {
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) % 360;
+    return hash;
   }
 
   // While Songs is open, the desk's Find key ("/") opens the song search.
@@ -213,6 +222,9 @@
   const listening = $derived(session.voice.status === "listening" || session.voice.status === "starting");
   const programSource = $derived(session.live.program.sourceId ?? "");
   const programLive = $derived(!session.programHeld && session.live.program.model.layout !== "empty" && session.live.program.model.layout !== "black");
+  /** The song LIVE now and the one on Preview, once for the list. */
+  const liveSongId = $derived(programLive && programSource.startsWith("song:") ? programSource.slice(5).split(":")[0] : null);
+  const previewSongId = $derived(onPreview?.songId ?? null);
   /** A part is on the screen: whole, or (line by line) any of its screens ("song:id:part#2"). */
   const partLive = (songId: string, sectionId: string) => {
     const base = `song:${songId}:${sectionId}`;
@@ -859,15 +871,20 @@
           <li class="letter" data-letter={row.letter}>{row.letter}</li>
         {:else}
         {@const song = row.song}
+        {@const isLive = liveSongId === song.id}
         <li class="song-item">
-          <span class="song-star"><FavoriteStar on={session.isFavorite("songs", song.id)} label={song.title || t("this song")} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
-          <button type="button" class="song" class:on={selectedId === song.id && !draft} onclick={() => pick(song)}>
-            <strong>
-              {song.title || t("Untitled song")}
-              {#if programSource.startsWith(`song:${song.id}:`) && programLive}<em class="badge live">{t("Live")}</em>
-              {:else if onPreview?.songId === song.id}<em class="badge">{t("Preview")}</em>{/if}
-            </strong>
-            <span class="sub">{snippet(song) || song.author}<em>{song.sections.length}</em></span>
+          <span class="song-star"><FavoriteStar on={starred.has(song.id)} label={song.title || t("this song")} onclick={() => session.toggleFavorite("songs", song.id)} /></span>
+          <button type="button" class="song" class:on={selectedId === song.id && !draft} class:live={isLive} onclick={() => pick(song)}>
+            <span class="tile" style:--hue={tint(song.title)} aria-hidden="true">{(song.title || "?").trim().charAt(0).toUpperCase()}</span>
+            <span class="words">
+              <strong>
+                <span class="name">{song.title || t("Untitled song")}</span>
+                {#if isLive}<em class="badge live">{t("Live")}</em>
+                {:else if previewSongId === song.id}<em class="badge">{t("Preview")}</em>{/if}
+              </strong>
+              <span class="sub">{firstLines.get(song.id) || song.author || "—"}</span>
+            </span>
+            <span class="parts" title={tn(song.sections.length, "{n} part", "{n} parts")}>{song.sections.length}</span>
           </button>
         </li>
         {/if}
@@ -1373,12 +1390,15 @@
   .fold-head { display: flex; align-items: center; gap: 6px; margin: 0 10px 6px; padding: 4px 6px; border: 0; border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; text-align: left; flex: none; }
   .fold-head:hover { color: var(--ink); background: var(--field); }
   .fold-head em { margin-left: auto; font-style: normal; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Rows off screen are not laid out or painted: a long library scrolls as smoothly as a short one. */
+  .songs > li.song-item { flex: none; content-visibility: auto; contain-intrinsic-size: auto 50px; }
   .song {
     width: 100%;
     display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 7px 10px;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 6px 8px;
     border: 1px solid transparent;
     border-radius: var(--radius-control, 8px);
     background: none;
@@ -1388,14 +1408,18 @@
   }
   .song-item { position: relative; }
   .song-item .song { padding-right: 32px; }
-  .song-star { position: absolute; top: 6px; right: 6px; z-index: 1; opacity: 0; transition: opacity 120ms; }
+  .song-star { position: absolute; top: 50%; right: 6px; z-index: 1; opacity: 0; transform: translateY(-50%); transition: opacity 120ms; }
   .song-item:hover .song-star, .song-star:focus-within, .song-star:has(:global(.fav-star.on)) { opacity: 1; }
-  .song strong { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
-  .song span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .song .sub { display: flex; gap: 8px; font-size: 12px; }
-  .song .sub em { margin-left: auto; flex: none; font-style: normal; font-size: 11px; opacity: 0.8; }
+  .song .tile { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: hsl(var(--hue) 55% 50% / 0.16); color: hsl(var(--hue) 60% 62%); font-size: 14px; font-weight: 750; }
+  .song .words { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .song strong { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 650; }
+  .song .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song .sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song .parts { flex: none; min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--field); color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+  .song-item:hover .song .parts { opacity: 0; }
   .song:hover { background: var(--field); }
   .song.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .song.live { box-shadow: inset 3px 0 0 #e5484d; }
   .empty { padding: 12px 6px; color: var(--muted); font-size: 12px; }
   .empty .starter { display: grid; gap: 4px; justify-items: start; margin-top: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
   .empty .starter strong { color: var(--ink); font-size: 13px; }

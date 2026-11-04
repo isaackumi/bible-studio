@@ -62,6 +62,8 @@
   let anchor = $state<number | null>(1);
   let query = $state("Genesis 1");
   let detections = $state<SearchHit[]>([]);
+  /** The last lines heard, for the transcript (older ones fade back). */
+  const heard = $derived(session.captions.lines.slice(-40));
   const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
   const keyOf = (action: "take" | "black" | "clear" | "clear-words") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
@@ -1045,7 +1047,7 @@
 {#snippet panel_transcript()}
           <section class="pb-panel">
             <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "transcript")} ondragend={endPanelDrag}>
-              <span>{t("Live transcript")}</span>
+              <span class="head-title">{t("Live transcript")}<em class="listen-chip" data-state={session.voice.status === "starting" ? "starting" : voiceActive ? "on" : "off"}><i aria-hidden="true"></i>{session.voice.status === "starting" ? t("Starting") : voiceActive ? t("Listening") : t("Off")}</em></span>
               {#if session.captions.lines.length}
                 <button type="button" class="quiet" title={t("Clear what was heard")} onclick={() => session.clearCaptions()}><Icon name="close" size={14} /> {t("Clear")}</button>
               {/if}
@@ -1054,12 +1056,18 @@
             <div class="pb-body transcript" bind:this={transcriptEl}>
               {#if session.voice.status !== "idle"}<VoiceStatus />{/if}
               {#if note}<p class="transcript-note">{note}</p>{/if}
-              {#each session.captions.lines.slice(-40) as line (line.id)}
-                <p class="heard">{line.text}</p>
+              {#each heard as line, index (line.id)}
+                <!-- Older lines fade back, so the latest is the one the eye lands on. -->
+                <p class="heard" class:latest={index === heard.length - 1 && !session.captions.interim} style:--age={Math.min(heard.length - 1 - index, 6)}>{line.text}</p>
               {/each}
-              {#if session.captions.interim}<p class="heard interim">{session.captions.interim}</p>{/if}
+              {#if session.captions.interim}<p class="heard interim">{session.captions.interim}<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></p>{/if}
               {#if !session.captions.lines.length && !session.captions.interim}
-                <p class="transcript-empty">{voiceActive ? t("Listening. What is said shows here, and verses it hears go to Preview.") : t("Press Listen: what is said shows here, and verses it hears go to Preview.")}</p>
+                <div class="panel-empty">
+                  <span class="empty-icon" class:on={voiceActive}>{@render icon("mic")}</span>
+                  <strong>{voiceActive ? t("Listening…") : t("Not listening")}</strong>
+                  <span>{voiceActive ? t("What is said shows here, and verses it hears go to Preview.") : t("Start listening: what is said shows here, and verses it hears go to Preview.")}</span>
+                  {#if !voiceActive && session.voice.status !== "starting"}<button type="button" class="empty-action" onclick={toggleVoice}>{@render icon("mic")} {t("Start listening")}</button>{/if}
+                </div>
               {/if}
             </div>
             <footer class="pb-foot">
@@ -1094,12 +1102,24 @@
             {#if sideTab === "detections"}
               <div class="pb-body detections">
                 {#each detections as hit (`${hit.bookOrd}-${hit.chapter}-${hit.verse}`)}
-                  <button type="button" onclick={() => openHit(hit)}>
-                    <strong>{hit.bookName} {hit.chapter}:{hit.verse}{#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}{#if hit.confidence}<em class="sure-tag" data-confidence={hit.confidence.tier} title={hit.confidence.tier === "maybe" ? t("Not a good match: check it before showing it") : hit.confidence.tier === "likely" ? t("Probably what was meant: glance at it before LIVE") : t("A close match to what was said")}>{Math.round(hit.confidence.p * 100)}%</em>{/if}</strong>
-                    <span>{hit.text}</span>
+                  <button type="button" class="hit" data-confidence={hit.confidence?.tier ?? "sure"} onclick={() => openHit(hit)}>
+                    <span class="hit-top">
+                      <strong>{hit.bookName} {hit.chapter}:{hit.verse}</strong>
+                      {#if hit.ai}<em class="ai-tag" title={t("Named by the AI from what was said")}>{t("AI")}</em>{/if}
+                      {#if hit.confidence}
+                        <em class="sure" title={hit.confidence.tier === "maybe" ? t("Not a good match: check it before showing it") : hit.confidence.tier === "likely" ? t("Probably what was meant: glance at it before LIVE") : t("A close match to what was said")}>
+                          <span class="sure-bar"><i style:width="{Math.round(hit.confidence.p * 100)}%"></i></span>{Math.round(hit.confidence.p * 100)}%
+                        </em>
+                      {/if}
+                    </span>
+                    <span class="hit-text">{hit.text}</span>
                   </button>
                 {:else}
-                  <p class="side-empty">{t("Verses heard while listening, or found with Find, show here.")}</p>
+                  <div class="panel-empty">
+                    <span class="empty-icon">{@render icon("wave")}</span>
+                    <strong>{t("No verses heard yet")}</strong>
+                    <span>{t("Verses heard while listening, or found with Find, show here. Click one to put it on Preview.")}</span>
+                  </div>
                 {/each}
               </div>
             {:else}
@@ -1648,31 +1668,33 @@
   .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
-  /* How sure listening is: green a close match, yellow a medium one, red not a good match. */
-  .sure-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 750; font-variant-numeric: tabular-nums; vertical-align: 1px; }
-  .sure-tag[data-confidence="sure"] { background: color-mix(in srgb, var(--presence) 18%, transparent); color: var(--presence-text); }
-  .sure-tag[data-confidence="likely"] { background: color-mix(in srgb, #f5a524 22%, transparent); color: var(--warn-text); }
-  .sure-tag[data-confidence="maybe"] { background: color-mix(in srgb, var(--live) 18%, transparent); color: var(--live-text); }
   .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
   .side-tabs button[aria-selected="true"] { background: var(--field); color: var(--ink); }
   .side-tabs em { font-style: normal; font-size: 11px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: color-mix(in srgb, var(--ink) 12%, transparent); text-align: center; }
-  .side-empty { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
   .gone { overflow: hidden; padding: var(--panel-pad); display: flex; flex-direction: column; }
   .side-actions { display: inline-flex; align-items: center; gap: 2px; }
-  .detections button {
-    border: 1px solid var(--line);
-    background: var(--field);
-    color: var(--ink);
-    border-radius: 8px;
-    text-align: left;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .detections span { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* A heard verse: its reference, how sure listening is (colour and bar), and the words. */
+  .detections .hit { --sure: var(--presence); position: relative; display: grid; gap: 4px; padding: 9px 11px 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); text-align: left; font: inherit; overflow: hidden; }
+  .detections .hit::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--sure); }
+  .detections .hit[data-confidence="likely"] { --sure: #f5a524; }
+  .detections .hit[data-confidence="maybe"] { --sure: var(--live); }
+  .hit-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .hit-top strong { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+  .hit-top .ai-tag { margin-left: 0; }
+  .sure { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sure-bar { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+  .sure-bar i { display: block; height: 100%; border-radius: inherit; background: var(--sure); }
+  .hit-text { color: var(--muted); font-size: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* An empty panel says what it is for, and the one thing to do. */
+  .panel-empty { flex: 1; display: grid; place-content: center; justify-items: center; gap: 6px; min-height: 140px; padding: 16px; text-align: center; }
+  .panel-empty strong { font-size: 14px; color: var(--ink); }
+  .panel-empty > span:not(.empty-icon) { max-width: 260px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .empty-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); }
+  .empty-icon.on { background: color-mix(in srgb, var(--presence) 16%, transparent); color: var(--presence-text); }
+  .empty-action { margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .empty-action:hover { filter: brightness(1.08); }
   .queue-actions { display: flex; gap: 8px; }
   .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
@@ -1811,9 +1833,23 @@
     .now-audio-name { padding: 0 5px; }
     .now-audio-btn { width: 24px; }
   }
-  .transcript .heard { margin: 0 0 8px; line-height: 1.45; color: var(--ink); }
-  .transcript .heard.interim { color: var(--muted); font-style: italic; }
+  .transcript { display: flex; flex-direction: column; }
+  .transcript .heard { margin: 0 0 10px; padding-left: 10px; border-left: 2px solid transparent; line-height: 1.5; color: var(--ink); opacity: calc(1 - var(--age, 0) * 0.09); }
+  .transcript .heard.latest { border-left-color: var(--presence); font-weight: 520; }
+  .transcript .heard.interim { border-left-color: color-mix(in srgb, var(--presence) 45%, transparent); color: var(--muted); font-style: italic; }
+  .dots { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+  .dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: heard-dot 1.2s ease-in-out infinite; }
+  .dots i:nth-child(2) { animation-delay: 0.15s; }
+  .dots i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes heard-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+  .head-title { display: inline-flex; align-items: center; gap: 8px; }
+  .listen-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); font-size: 11px; font-style: normal; font-weight: 650; }
+  .listen-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .listen-chip[data-state="on"] { background: color-mix(in srgb, var(--presence) 16%, transparent); color: var(--presence-text); }
+  .listen-chip[data-state="on"] i { animation: listen-pulse 1.6s ease-out infinite; }
+  .listen-chip[data-state="starting"] { color: var(--warn-text); }
+  @keyframes listen-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--presence) 70%, transparent); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .dots i, .listen-chip[data-state="on"] i { animation: none; } }
   .transcript-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
-  .transcript-empty { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
   .free-left { align-self: center; font-size: 11px; font-weight: 650; color: var(--muted); white-space: nowrap; }
 </style>
