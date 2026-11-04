@@ -133,7 +133,7 @@
   @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 
   .bar { position: relative; display: flex; gap: 4px; height: 52px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; padding-bottom: 4px; }
-  .block { position: relative; flex-basis: 0; flex-shrink: 0; min-width: 84px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 10px 0 12px; border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--tone) 12%, var(--field)); color: var(--ink); font: inherit; text-align: left; overflow: hidden; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease; }
+  .block { position: relative; flex-basis: 0; flex-shrink: 0; min-width: 96px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 10px 0 12px; border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--tone) 12%, var(--field)); color: var(--ink); font: inherit; text-align: left; overflow: hidden; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease; }
   /* Its colour as a stripe down the left edge, matching the dot on the part below. */
   .block::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
   .block:hover { border-color: color-mix(in srgb, var(--tone) 60%, var(--line)); background: color-mix(in srgb, var(--tone) 20%, var(--field)); }
@@ -144,7 +144,7 @@
   .block.running { min-width: 150px; background: color-mix(in srgb, #30a46c 16%, var(--field)); border-color: color-mix(in srgb, #30a46c 55%, var(--line)); }
   .block-name { display: block; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tl-dot { display: none; }
-  .block-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+  .block-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #e5484d; border-radius: 1px; pointer-events: none; }
   .ticks { display: flex; justify-content: space-between; align-items: center; min-height: 14px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .pace { padding: 1px 8px; border-radius: 8px; background: color-mix(in srgb, #30a46c 16%, transparent); color: var(--ink); font-weight: 650; }

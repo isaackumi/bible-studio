@@ -333,12 +333,8 @@ button { cursor: pointer; }
   gap: 8px;
   padding: 12px 16px !important;
 }
-.frame.nested.timer .ref {
-  font-size: 22px !important;
-}
-.frame.nested.timer .line {
-  font-size: 64px !important;
-}
+/* A timer in a scene keeps the size chosen for it (Look and position), shrunk only to fit its box:
+   a fixed size here made the desk's setting do nothing on the audience screen. */
 /* Last stretch of a countdown: beaming red. At zero it holds solid red. */
 .frame.timer.warning .line { color: #ff2b2b !important; text-shadow: 0 0 28px rgba(255, 43, 43, 0.7); animation: timer-beam 1s ease-in-out infinite; }
 .frame.timer.done .line { color: #ff2b2b !important; text-shadow: 0 0 28px rgba(255, 43, 43, 0.6); }

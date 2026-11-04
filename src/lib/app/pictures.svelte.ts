@@ -127,9 +127,17 @@ class Pictures {
   /** The church's choices (remembered), and whether one is running now. */
   slideshow = $state<SlideOptions & { running: boolean; paused: boolean }>({ ...cleanSlideOptions(typeof localStorage === "undefined" ? null : read<unknown>(OPTIONS_KEY, null)), running: false, paused: false });
   private timer: ReturnType<typeof setTimeout> | undefined;
-  /** The order this run plays in (places in `images`), and where it is in it. */
+  /**
+   * The pictures this run plays: the folder's as it started, kept apart from the folder on view, so
+   * browsing another folder while it runs neither changes what it shows nor starts one there.
+   */
+  private playing: FolderEntry[] = [];
+  /** The folder the slideshow plays (shown on the panel while another folder is open). */
+  playingFolder = $state<string | null>(null);
+  /** The order this run plays in (places in `playing`), where it is in it, and the place on screen. */
   private sequence: number[] = [];
   private position = 0;
+  private playIndex = -1;
   private countdownTimer: ReturnType<typeof setTimeout> | undefined;
   private watchTimer: ReturnType<typeof setInterval> | undefined;
   /** What the slideshow last put on Program, so it knows when the operator has taken over. */
@@ -210,8 +218,7 @@ class Pictures {
 
   url = (entry: FolderEntry) => convertFileSrc(entry.path);
 
-  private model(index: number) {
-    const entry = this.images[index];
+  private model(entry: FolderEntry | undefined) {
     if (!entry) return null;
     const show = this.slideshow;
     // In a running slideshow, a picture zooms for as long as it shows (and a little into the change).
@@ -226,25 +233,49 @@ class Pictures {
 
   /** Put a picture on Preview (Program does not change). */
   preview = (index: number) => {
-    const found = this.model(index);
+    const found = this.model(this.images[index]);
     if (!found) return;
     this.current = index;
     session.previewModel(found.model, found.id);
   };
 
-  /** A picture straight to the screen: on Preview, then LIVE. */
+  /**
+   * A picture from the folder on view straight to the screen: on Preview, then LIVE. In the folder a
+   * slideshow is playing, it jumps there and the slideshow goes on from it; from any other folder it
+   * is the operator taking over, and the slideshow stops.
+   */
   showNow = async (index: number, transition?: ScreenTransition, ms?: number) => {
-    const found = this.model(index);
+    const entry = this.images[index];
+    if (!entry) return;
+    if (this.slideshow.running) {
+      const at = this.folder === this.playingFolder ? this.playing.findIndex((item) => item.path === entry.path) : -1;
+      if (at >= 0) {
+        const place = this.sequence.indexOf(at);
+        if (place >= 0) this.position = place;
+        await this.play(at, transition, ms);
+        this.schedule();
+        return;
+      }
+      this.stop();
+    }
+    const found = this.model(entry);
     if (!found) return;
     this.current = index;
     this.shownId = found.id;
-    // Running, the slideshow changes Program only: what the operator staged on Preview stays there.
-    if (this.slideshow.running) {
-      await session.takeKeepingPreview(() => session.previewModel(found.model, found.id), transition, ms);
-      return;
-    }
     session.previewModel(found.model, found.id);
     await session.take(transition, ms);
+  };
+
+  /** The slideshow's picture at `at` to Program; what the operator staged on Preview stays there. */
+  private play = async (at: number, transition?: ScreenTransition, ms?: number) => {
+    const entry = this.playing[at];
+    const found = this.model(entry);
+    if (!entry || !found) return;
+    this.playIndex = at;
+    this.shownId = found.id;
+    // The highlight follows only while the slideshow's own folder is on view.
+    if (this.folder === this.playingFolder) this.current = this.images.findIndex((item) => item.path === entry.path);
+    await session.takeKeepingPreview(() => session.previewModel(found.model, found.id), transition, ms);
   };
 
   /** Changes of picture so far, so Mix takes turns. */
@@ -257,21 +288,31 @@ class Pictures {
   }
 
   step = (by: 1 | -1) => {
+    if (this.slideshow.running) {
+      const count = this.playing.length;
+      if (!count) return;
+      const next = this.playIndex < 0 ? 0 : (this.playIndex + by + count) % count;
+      const place = this.sequence.indexOf(next);
+      if (place >= 0) this.position = place;
+      void this.play(next, ...this.change(by)).then(() => this.schedule());
+      return;
+    }
     if (!this.images.length) return;
     const next = this.current < 0 ? 0 : (this.current + by + this.images.length) % this.images.length;
-    if (this.slideshow.running) void this.showNow(next, ...this.change(by));
-    else this.preview(next);
+    this.preview(next);
   };
 
   // --- Slideshow ------------------------------------------------------------------------------
 
   start = async (from = this.current) => {
     if (!this.images.length) return;
+    this.playing = [...this.images];
+    this.playingFolder = this.folder;
     this.slideshow = { ...this.slideshow, running: true, paused: false };
     session.slideshowWatch = (sourceId) => {
       if (sourceId !== this.shownId) this.stop();
     };
-    this.sequence = slideOrder(this.images, this.slideshow.order, from);
+    this.sequence = slideOrder(this.playing, this.slideshow.order, from);
     this.position = 0;
     // Music first, so the first picture's take does not fade it (session.slideshowMusic).
     // It loops for as long as the pictures run, whatever the playlist's own setting.
@@ -293,25 +334,24 @@ class Pictures {
       clearInterval(this.watchTimer);
       this.watchTimer = setInterval(() => void this.pickUpNew(), 20_000);
     }
-    await this.showNow(this.sequence[0]!, ...this.change(1));
+    await this.play(this.sequence[0]!, ...this.change(1));
     this.schedule();
   };
 
   /** Pictures added to the folder while it runs (someone filling a shared Drive folder) join the end. */
   private pickUpNew = async () => {
-    if (!this.folder || this.folder === FAVORITES || !this.slideshow.running) return;
-    const folder = this.folder;
-    const before = new Set(this.images.map((entry) => entry.path));
-    const shownPath = this.images[this.current]?.path;
+    const folder = this.playingFolder;
+    if (!folder || folder === FAVORITES || !this.slideshow.running) return;
+    const before = new Set(this.playing.map((entry) => entry.path));
     try {
       const entries = await invoke<FolderEntry[]>("picture_folder", { path: folder });
-      if (this.folder !== folder || !this.slideshow.running) return;
+      if (this.playingFolder !== folder || !this.slideshow.running) return;
       const added = entries.filter((entry) => entry.kind !== "folder" && !before.has(entry.path));
       if (!added.length) return;
-      this.entries = [...this.entries, ...added];
-      // Places stay true for what is already in the order; the new ones play next round.
-      this.current = this.images.findIndex((entry) => entry.path === shownPath);
-      for (const entry of added) this.sequence.push(this.images.findIndex((image) => image.path === entry.path));
+      // New ones join the end: places already in the order stay true, and they play next round.
+      for (const entry of added) this.sequence.push(this.playing.push(entry) - 1);
+      // The folder on view shows them too when it is the slideshow's.
+      if (this.folder === folder) this.entries = [...this.entries, ...added];
       session.notify(t("{count} new pictures joined the slideshow.", { count: added.length }));
     } catch {
       // The folder is gone or offline for a moment: the slideshow carries on with what it has.
@@ -322,7 +362,7 @@ class Pictures {
     clearTimeout(this.timer);
     if (!this.slideshow.running || this.slideshow.paused) return;
     // A video plays to its end; the next comes once it has (checked twice a second).
-    if (this.images[this.current]?.kind === "video") {
+    if (this.playing[this.playIndex]?.kind === "video") {
       this.timer = setTimeout(() => (session.programVideoDone() === false ? this.schedule() : void this.tick()), 500);
       return;
     }
@@ -344,13 +384,13 @@ class Pictures {
       // A new round: a shuffled show mixes again (and does not repeat the last picture first).
       position = 0;
       if (this.slideshow.order === "shuffle") {
-        const mixed = slideOrder(this.images, "shuffle", -1);
-        if (mixed.length > 1 && mixed[0] === this.current) mixed.push(mixed.shift()!);
+        const mixed = slideOrder(this.playing, "shuffle", -1);
+        if (mixed.length > 1 && mixed[0] === this.playIndex) mixed.push(mixed.shift()!);
         this.sequence = mixed;
       }
     }
     this.position = position;
-    await this.showNow(this.sequence[position]!, ...this.change(1));
+    await this.play(this.sequence[position]!, ...this.change(1));
     this.schedule();
   };
 
@@ -370,6 +410,9 @@ class Pictures {
     clearInterval(this.watchTimer);
     const wasRunning = this.slideshow.running;
     this.slideshow = { ...this.slideshow, running: false, paused: false };
+    this.playing = [];
+    this.playingFolder = null;
+    this.playIndex = -1;
     session.slideshowWatch = null;
     if (!wasRunning) return;
     if (session.slideCountdown) void session.setSlideCountdown(null);

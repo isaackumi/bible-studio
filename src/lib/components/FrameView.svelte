@@ -252,7 +252,7 @@
     <RichView doc={model.rich} fontSize={model.theme.fontSize} />
   {:else}
   {#each displayLines as line}
-    <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size={model.layout === "logo" || model.layout === "timer" ? `${model.layout === "logo" ? 92 : model.theme.fontSize}px` : `calc(${model.theme.fontSize}px * var(--fit, 1))`}>
+    <p class="line" class:clock={model.layout === "timer"} class:paired={!!line.alt} style:font-size={model.layout === "logo" ? "92px" : `calc(${model.theme.fontSize}px * var(--fit, 1))`}>
       {#if line.marker}<sup class="marker">{line.marker}</sup>{/if}{#if line.runs}<InlineRich runs={line.runs} />{:else}{line.text}{/if}
       {#if line.alt}<span class="alt-line">{line.alt}</span>{/if}
     </p>

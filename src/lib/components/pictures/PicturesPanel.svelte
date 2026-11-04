@@ -288,6 +288,11 @@
             {/if}
             <button type="button" class="btn" onclick={() => pictures.stop()}>{t("Stop")}</button>
           </div>
+          {#if pictures.playingFolder && pictures.folder !== pictures.playingFolder}
+            <button type="button" class="elsewhere" onclick={() => pictures.playingFolder && pictures.openFolder(pictures.playingFolder)}>
+              <Icon name="folder-open" size={14} /><span>{t("Playing from {folder}", { folder: pictures.playingFolder === FAVORITES ? t("Favourites") : folderName(pictures.playingFolder) })}</span><b>{t("Go there")}</b>
+            </button>
+          {/if}
         {/if}
         <div class="pair">
           <button type="button" class="btn" disabled={!selected} onclick={() => pictures.showNow(pictures.current)}>{t("Show now")}</button>
@@ -546,6 +551,10 @@
   .running .btn, .pair .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+  .elsewhere { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--accent) 9%, transparent); color: inherit; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  .elsewhere span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .elsewhere b { color: var(--accent-text); font-weight: 600; }
+  .elsewhere:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
   .live { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--onair, #f21b1b) 16%, transparent); color: var(--ink); font-size: 11.5px; font-weight: 700; }
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--onair, #f21b1b); animation: blink 1.4s ease-in-out infinite; }
   @keyframes blink { 50% { opacity: 0.3; } }

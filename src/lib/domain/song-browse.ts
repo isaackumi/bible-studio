@@ -27,13 +27,22 @@ export function letterOf(title: string): string {
   return first >= "A" && first <= "Z" ? first : "#";
 }
 
-const byTitle = (a: Song, b: Song) => fold(a.title || "￿").localeCompare(fold(b.title || "￿"), undefined, { numeric: true });
+const collator = new Intl.Collator(undefined, { numeric: true });
+
+/**
+ * Songs in title order. Each title is folded once (not in every comparison), which keeps A–Z quick
+ * for a library of thousands; untitled songs go last.
+ */
+function byTitle(songs: Song[], before?: (a: Song, b: Song) => number): Song[] {
+  const keys = new Map(songs.map((song) => [song, fold(song.title || "￿")]));
+  return [...songs].sort((a, b) => before?.(a, b) || collator.compare(keys.get(a)!, keys.get(b)!));
+}
 
 export function sortSongs(songs: Song[], sort: SongSort, context: { starred: (song: Song) => boolean; mostSung: string[] }): Song[] {
-  if (sort === "az") return [...songs].sort(byTitle);
+  if (sort === "az") return byTitle(songs);
   if (sort === "most") {
     const rank = new Map(context.mostSung.map((id, index) => [id, index]));
-    return [...songs].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || byTitle(a, b));
+    return byTitle(songs, (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
   }
   return [...songs.filter(context.starred), ...songs.filter((song) => !context.starred(song))];
 }
