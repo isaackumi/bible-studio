@@ -5649,4 +5649,12 @@ export const es: Readonly<Record<string, string>> = {
   "Computers on this licence": "Computadoras en esta licencia",
   "Files in the cloud": "Archivos en la nube",
   "Without the cloud": "Sin la nube",
+  "A slideshow stays in its folder": "La presentación se queda en su carpeta",
+  "Opening another folder while a slideshow runs no longer changes what it shows. The panel says which folder it is playing, with a way back.": "Abrir otra carpeta mientras corre una presentación ya no cambia lo que muestra. El panel dice qué carpeta se está reproduciendo, con una forma de volver.",
+  "Countdowns show at the size you set": "Las cuentas regresivas salen al tamaño elegido",
+  "A countdown in a production scene now shows on the screen at the size chosen in Look and position.": "Una cuenta regresiva en una escena de producción ahora sale en la pantalla con el tamaño elegido en Aspecto y posición.",
+  "A smoother song list": "Una lista de canciones más fluida",
+  "The song list scrolls smoothly in a big library, and each song shows its first line and how many parts it has.": "La lista de canciones se desplaza con fluidez en una biblioteca grande, y cada canción muestra su primera línea y cuántas partes tiene.",
+  "Cloud space says where things stand": "El espacio en la nube dice cómo va todo",
+  "Settings › Cloud space opens with one answer: in sync, changes waiting, or offline. With Ask me first on, Sync now sends what is waiting.": "Ajustes › Espacio en la nube empieza con una respuesta: sincronizado, cambios en espera o sin conexión. Con Preguntarme primero activado, Sincronizar ahora envía lo que espera.",
 };
