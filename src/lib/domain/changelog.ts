@@ -20,6 +20,10 @@ export const CHANGELOG: Release[] = [
     date: "2026-11-04",
     highlights: [
       { icon: "refresh", title: msg("Closing Church Studio closes it"), text: msg("On Windows, closing the desk could leave Church Studio running unseen, so it would not open again until the computer restarted. Closing the desk now ends it fully."), show: null },
+      { icon: "media", title: msg("A slideshow stays in its folder"), text: msg("Opening another folder while a slideshow runs no longer changes what it shows. The panel says which folder it is playing, with a way back."), show: null },
+      { icon: "screens", title: msg("Countdowns show at the size you set"), text: msg("A countdown in a production scene now shows on the screen at the size chosen in Look and position."), show: null },
+      { icon: "lyrics", title: msg("A smoother song list"), text: msg("The song list scrolls smoothly in a big library, and each song shows its first line and how many parts it has."), show: null },
+      { icon: "cloud", title: msg("Cloud space says where things stand"), text: msg("Settings › Cloud space opens with one answer: in sync, changes waiting, or offline. With Ask me first on, Sync now sends what is waiting."), show: null },
     ],
   },
   {
