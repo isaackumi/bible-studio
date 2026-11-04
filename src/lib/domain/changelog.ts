@@ -16,6 +16,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.14",
+    date: "2026-11-04",
+    highlights: [
+      { icon: "refresh", title: msg("Closing Church Studio closes it"), text: msg("On Windows, closing the desk could leave Church Studio running unseen, so it would not open again until the computer restarted. Closing the desk now ends it fully."), show: null },
+    ],
+  },
+  {
     version: "0.6.13",
     date: "2026-11-03",
     highlights: [

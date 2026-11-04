@@ -1,6 +1,6 @@
 [package]
 name = "church-studio"
-version = "0.6.13"
+version = "0.6.14"
 description = "Church Studio"
 authors = ["Church Studio"]
 edition = "2024"
