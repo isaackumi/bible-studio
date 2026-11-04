@@ -7,6 +7,12 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push replaces a run still going on the same branch or pull request, so a burst of merges
+# does not queue a Mac build for each one (GitHub's macOS runners are often short).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   web:
     name: Tests and type check
