@@ -100,9 +100,9 @@ Checked against vendor pages and release notes, November 2026. These are often t
 | Gap | Who has it | Why churches care | Effort | Recommendation |
 |---|---|---|---|---|
 | **Automatic CCLI reporting** (sending the usage report straight to CCLI) | ProPresenter, EasyWorship, Proclaim | It's a legal duty, done by hand every quarter. | Medium; needs CCLI partner approval | **1st.** Apply to CCLI now: the report data already exists (`song-usage.ts`). |
-| **Stage display layout editor** (free placement of current, next, notes, clock and timer; several layouts) | ProPresenter, FreeShow, Holyrics | Worship leaders and preachers read it every week. | Medium | **2nd.** It builds on the existing stage output. |
+| **Stage display layouts** (several layouts for different readers) | ProPresenter, FreeShow, Holyrics | Worship leaders and preachers read it every week. | Medium | **Built:** four arrangements (Standard, Side by side, Preacher, Clock) picked from cards with a picture of each, plus the running part's time. **Next:** free placement, if churches ask for it. |
 | **NIV / ESV / NKJV text** | ProPresenter (paid add-ons) | Most English-speaking churches expect them. | Business, not code: publisher licences | **3rd**, through Bible API partners (e.g. API.Bible). |
-| **MIDI and timecode triggers** (a button on a pad or a cue from the band's tracks moves slides) | ProPresenter | Bands with click tracks run whole sets this way. | Medium (Web MIDI or a Tauri plugin) | **4th.** MIDI first; DMX and timecode later. |
+| **MIDI and timecode triggers** (a button on a pad or a cue from the band's tracks moves slides) | ProPresenter | Bands with click tracks run whole sets this way. | Medium | **Built: MIDI.** LIVE, Next, Previous, Cut, BLACK, CLEAR, CLEAR WORDS and LOGO are learned from any pad, footswitch, keyboard or virtual port (Settings › MIDI controller). **Next:** timecode, then DMX. |
 | **Real-time co-editing of a service** | Proclaim, ProPresenter 22 | A team plans from home and the booth sees it live. | Hard (needs merging or locking) | **Later.** Today's library sync covers most of the need. |
 | **Mobile planning app** | Proclaim | Volunteers prepare on their phones. | Medium (the UI is already web) | **Later.** Start with a read-only service view on the phone remote. |
 | **Text animations and per-slide transitions** | ProPresenter 22 | They look polished on stream. | Medium | **Later.** |
@@ -122,9 +122,7 @@ Checked against vendor pages and release notes, November 2026. These are often t
 ## 7. Suggested order of work
 
 1. **Decisions:** opt-in Auto LIVE (7), and one desk vocabulary (17).
-2. **Stage display layout editor.**
-3. **CCLI auto-reporting** (start the partner application now; it takes time).
-4. **MIDI triggers.**
-5. **Bible licensing** (business development).
+2. **CCLI auto-reporting** (start the partner application now; it takes time).
+3. **Bible licensing** (business development).
 
 **Budget:** the language files now have their own budget and are left out of the desktop total, so the total is about 4.2 MB of 5.12 MB. The stage editor and MIDI should still load on demand, as the Conductor desk does.

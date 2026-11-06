@@ -6,6 +6,7 @@ mod audio_out;
 mod easyworship;
 mod bible;
 mod entitlement;
+mod midi;
 mod signin;
 mod db;
 mod diagnostics;
@@ -1294,6 +1295,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(Output::default())
+        .manage(midi::Midi::default())
         .setup(|app| {
             record_panics(app.handle());
             diagnostics::open_log(app.handle());
@@ -1459,7 +1461,10 @@ pub fn run() {
             listen_record::listen_record_note,
             network::network_allow_location,
             audio_out::audio_outputs,
-            audio_out::set_audio_output
+            audio_out::set_audio_output,
+            midi::midi_inputs,
+            midi::midi_listen,
+            midi::midi_stop
         ]);
             move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
                 diagnostics::command(invoke.message.command());

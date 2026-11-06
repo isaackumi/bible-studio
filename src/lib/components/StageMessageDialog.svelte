@@ -1,7 +1,8 @@
 <script lang="ts">
   import { session } from "../app/session.svelte";
   import DeskDialog from "./sources/DeskDialog.svelte";
-  import { msg, t } from "../i18n/core";
+  import { t } from "../i18n/core";
+  import { STAGE_READY_MESSAGES as READY } from "../domain/stage-messages";
 
   // A word to the people on stage (the preacher, the band), straight from the desk: it shows on the
   // stage screen until cleared, and the audience never sees it. Opened from On the screen, so it no
@@ -9,8 +10,6 @@
   let { onclose }: { onclose: () => void } = $props();
 
   let text = $state("");
-  /** What stage managers send most weeks, one tap each. */
-  const READY = [msg("5 minutes left"), msg("Please wrap up"), msg("Slow down"), msg("Speak up, please"), msg("One more song"), msg("Look at the screen")];
 
   function send(message = text) {
     if (!message.trim()) return;

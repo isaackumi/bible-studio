@@ -18,6 +18,7 @@ export type SettingsSectionId =
   | "screens"
   | "captions"
   | "remote"
+  | "midi"
   | "switcher"
   | "broadcast"
   | "bible"
@@ -79,6 +80,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: msg("Sound & devices"),
     items: [
       { id: "audio", title: msg("Sound & voice"), icon: "audio", color: "#3e63dd", about: msg("Sound output, microphone, listening and voice commands."), keywords: "sound output speakers usb interface hdmi mixer microphone voice speech listen detection" },
+      { id: "midi", title: msg("MIDI controller"), icon: "keys", color: "#8e4ec6", about: msg("A pad, footswitch, keyboard or the band's software drives LIVE, Next and the rest."), keywords: "midi pad footswitch foot pedal controller keyboard launchpad akai nanopad loopmidi iac band tracks ableton playback trigger" },
       { id: "remote", title: msg("Phone remote"), icon: "phone", color: "#30a46c", about: msg("Pair a phone as a controller. It is never a display."), keywords: "phone tablet pair qr lan" },
     ],
   },

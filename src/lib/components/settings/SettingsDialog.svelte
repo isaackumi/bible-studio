@@ -50,6 +50,16 @@
   import { UI_LANGUAGES, msg, t, tn } from "../../i18n/core";
   import { SETTINGS_GROUPS, type SettingsEntry, type SettingsSectionId } from "./sections";
   import { computerOs, keys } from "../../platform/os";
+  import { STAGE_READY_MESSAGES } from "../../domain/stage-messages";
+  import type { StageArrangement } from "../../display/channel";
+
+  /** The stage screen's arrangements, as cards: who each is for. */
+  const STAGE_CHOICES: Array<{ id: StageArrangement; title: string; detail: string }> = [
+    { id: "standard", title: msg("Standard"), detail: msg("The words now, large; what is next under them.") },
+    { id: "split", title: msg("Side by side"), detail: msg("The words on the left; next and notes on the right.") },
+    { id: "preacher", title: msg("Preacher"), detail: msg("The sermon notes large; the words on the screen smaller.") },
+    { id: "clock", title: msg("Clock"), detail: msg("A big clock and the running part's time, for before the service or the band.") },
+  ];
 
 
   let audioNote = $state("");
@@ -1158,6 +1168,8 @@
         <BroadcastSettings />
       {:else if section === "switcher"}
         <SwitcherSettings />
+      {:else if section === "midi"}
+        {#await import("./MidiSettings.svelte") then { default: MidiSettings }}<MidiSettings />{/await}
       {:else if section === "remote"}
         {#if session.entitled("phone-remote")}
           <RemotePanel />
@@ -1195,16 +1207,31 @@
           <div class="row">
             <div class="row-copy"><strong>{t("Quick messages")}</strong></div>
             <div class="row-end wrap">
-              {#each ["5 minutes", "2 minutes", "Wrap up", "Slow down", "Speak up", "Look at the screen"] as quick (quick)}
-                <button type="button" class="btn" onclick={() => session.sendStageMessage(quick)}>{quick}</button>
+              {#each STAGE_READY_MESSAGES as quick (quick)}
+                <button type="button" class="btn" onclick={() => session.sendStageMessage(t(quick))}>{t(quick)}</button>
               {/each}
             </div>
           </div>
         </section>
         <p class="section-label">{t("On phones and tablets")}</p>
         <StageLinks />
+        <p class="section-label">{t("Arrangement")}</p>
+        <!-- Laid out for whoever reads it. Each card is a small picture of the screen it makes. -->
+        <div class="arrangements" role="radiogroup" aria-label={t("Stage arrangement")}>
+          {#each STAGE_CHOICES as choice (choice.id)}
+            <button type="button" role="radio" class="arrangement" class:on={session.workspace.stageLayout.arrange === choice.id} aria-checked={session.workspace.stageLayout.arrange === choice.id} onclick={() => session.setStageLayout({ arrange: choice.id })}>
+              <span class="stage-mini stage-mini-{choice.id}" aria-hidden="true"><i class="m-now"></i><i class="m-side"></i><i class="m-next"></i><i class="m-clock"></i></span>
+              <strong>{t(choice.title)}</strong>
+              <span>{t(choice.detail)}</span>
+            </button>
+          {/each}
+        </div>
         <p class="section-label">{t("What the stage screen shows")}</p>
         <section class="rows">
+          <div class="row">
+            <div class="row-copy"><strong>{t("Running part's time")}</strong><span>{t("The part of the service running now and its minutes left, turning amber near the end and red when over.")}</span></div>
+            <input type="checkbox" class="switch" role="switch" aria-label={t("Running part's time")} checked={session.workspace.stageLayout.section} onchange={(event) => session.setStageLayout({ section: event.currentTarget.checked })} />
+          </div>
           {#each [["next", "Next", "What is on Preview, so the speaker knows what comes."], ["clock", "Clock", "The time of day, top right."], ["notes", "Desk notes", "Private sermon notes for the point that is up."], ["chords", "Chords", "Chords above the words for the band, when a song has them (from ChordPro files). Transpose on the song desk."]] as [key, title, detail] (key)}
             <div class="row">
               <div class="row-copy"><strong>{title}</strong><span>{detail}</span></div>
@@ -1947,6 +1974,30 @@
 </div>
 
 <style>
+  /* Stage arrangements: cards with a small picture of each layout. */
+  .arrangements { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .arrangement { display: grid; gap: 4px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .arrangement:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .arrangement.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+  .arrangement strong { font-size: 13px; }
+  .arrangement > span:last-child { color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .stage-mini { position: relative; display: grid; gap: 4px; width: 100%; height: 78px; box-sizing: border-box; margin-bottom: 4px; padding: 6px; border-radius: 7px; background: #0b0b0d; }
+  .stage-mini i { display: none; min-height: 4px; border-radius: 3px; }
+  .m-now { background: rgb(255 255 255 / 0.85); }
+  .m-side { background: rgb(255 255 255 / 0.3); }
+  .m-next { background: rgb(255 255 255 / 0.18); }
+  .m-clock { background: #f5c451; }
+  .stage-mini-standard { grid-template-rows: 3fr 1fr; }
+  .stage-mini-standard .m-now, .stage-mini-standard .m-next { display: block; }
+  .stage-mini-split { grid-template-columns: 3fr 2fr; grid-template-rows: 2fr 1fr; }
+  .stage-mini-split .m-now { display: block; grid-row: 1 / 3; }
+  .stage-mini-split .m-side, .stage-mini-split .m-next { display: block; }
+  .stage-mini-preacher { grid-template-rows: 3fr 1fr; }
+  .stage-mini-preacher .m-side { display: block; background: rgb(255 255 255 / 0.55); }
+  .stage-mini-preacher .m-now { display: block; background: rgb(255 255 255 / 0.3); }
+  .stage-mini-clock { grid-template-rows: 3fr 1fr; justify-items: center; }
+  .stage-mini-clock .m-clock { display: block; width: 60%; order: -1; }
+  .stage-mini-clock .m-now { display: block; width: 100%; background: rgb(255 255 255 / 0.3); }
   /* Layer and window */
   .settings-layer { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; }
   .settings-backdrop {

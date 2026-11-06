@@ -164,15 +164,34 @@ export type StageSnapshot = {
   chords?: ChordLine[];
 };
 
-export type StageLayout = { next: boolean; clock: boolean; notes: boolean; chords: boolean; size: "s" | "m" | "l" };
+/**
+ * How the stage screen is laid out, for whoever reads it:
+ *  - standard: the words now, large, and what is next under them;
+ *  - split: the words now on the left, next and notes on the right;
+ *  - preacher: the notes large, the words now smaller;
+ *  - clock: a big clock and the running part's time (before the service, or for the band).
+ */
+export type StageArrangement = "standard" | "split" | "preacher" | "clock";
+export const STAGE_ARRANGEMENTS: StageArrangement[] = ["standard", "split", "preacher", "clock"];
+
+/** `section`: the running part of the service and its minutes left, at the top. */
+export type StageLayout = { next: boolean; clock: boolean; notes: boolean; chords: boolean; section: boolean; size: "s" | "m" | "l"; arrange: StageArrangement };
 
 export function defaultStageLayout(): StageLayout {
-  return { next: true, clock: true, notes: true, chords: true, size: "m" };
+  return { next: true, clock: true, notes: true, chords: true, section: true, size: "m", arrange: "standard" };
 }
 
 export function sanitizeStageLayout(value: unknown): StageLayout {
   const record = value && typeof value === "object" ? (value as Partial<StageLayout>) : {};
-  return { next: record.next !== false, clock: record.clock !== false, notes: record.notes !== false, chords: record.chords !== false, size: record.size === "s" || record.size === "l" ? record.size : "m" };
+  return {
+    next: record.next !== false,
+    clock: record.clock !== false,
+    notes: record.notes !== false,
+    chords: record.chords !== false,
+    section: record.section !== false,
+    size: record.size === "s" || record.size === "l" ? record.size : "m",
+    arrange: STAGE_ARRANGEMENTS.includes(record.arrange as StageArrangement) ? (record.arrange as StageArrangement) : "standard",
+  };
 }
 
 export function parseStage(raw: string | null): StageSnapshot | null {

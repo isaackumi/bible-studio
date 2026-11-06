@@ -66,17 +66,26 @@
   const sectionLeft = $derived(snapshot?.section ? Math.round((snapshot.section.endsAt - now) / 60_000) : null);
 </script>
 
-<div class="stage size-{layout.size}">
+<div class="stage size-{layout.size} arrange-{layout.arrange}">
   <header>
     <span class="tag" class:live={snapshot?.live}>{snapshot?.live ? t("LIVE") : t("Output off")}</span>
     <span class="desk">{snapshot?.desk || "Church Studio"}</span>
-    {#if snapshot?.section && sectionLeft !== null}
+    {#if layout.section && layout.arrange !== "clock" && snapshot?.section && sectionLeft !== null}
       <span class="section-left" class:short={sectionLeft >= 0 && sectionLeft <= 5} class:over={sectionLeft < 0}>
         {snapshot.section.name} · {sectionLeft >= 0 ? t("{minutes} min left", { minutes: sectionLeft }) : t("{minutes} min over", { minutes: -sectionLeft })}
       </span>
     {/if}
-    {#if layout.clock}<span class="clock">{clock}</span>{/if}
+    {#if layout.clock && layout.arrange !== "clock"}<span class="clock">{clock}</span>{/if}
   </header>
+  {#if layout.arrange === "clock"}
+    <!-- Before the service, or for the band: the time large, and the running part's time under it. -->
+    <section class="big-time">
+      <p class="big-clock">{clock}</p>
+      {#if layout.section && snapshot?.section && sectionLeft !== null}
+        <p class="big-section" class:short={sectionLeft >= 0 && sectionLeft <= 5} class:over={sectionLeft < 0}>{snapshot.section.name} · {sectionLeft >= 0 ? t("{minutes} min left", { minutes: sectionLeft }) : t("{minutes} min over", { minutes: -sectionLeft })}</p>
+      {/if}
+    </section>
+  {/if}
   {#if snapshot?.message}
     <p class="stage-message" role="alert">{snapshot.message}</p>
   {/if}
@@ -98,16 +107,19 @@
       {/each}
     {/if}
   </section>
-  {#if layout.notes && snapshot?.notes}
-    <section class="notes"><p class="label">{t("Notes")}</p>{#if snapshot.notesRich}<div class="rich-notes"><RichView doc={snapshot.notesRich} base="3vh" /></div>{:else}<p>{snapshot.notes}</p>{/if}</section>
-  {/if}
-  {#if layout.next}
-    <section class="next">
-      <p class="label">{t("Next")}</p>
-      <p class="next-cue">{cue(snapshot?.next) || "—"}</p>
-      {#if upcoming.length}<p class="next-line">{upcoming.slice(0, 2).join(" / ")}</p>{/if}
-    </section>
-  {/if}
+  <!-- Notes and Next: a column on the right in Side by side; in the other layouts they flow in turn. -->
+  <div class="side">
+    {#if layout.notes && snapshot?.notes}
+      <section class="notes"><p class="label">{t("Notes")}</p>{#if snapshot.notesRich}<div class="rich-notes"><RichView doc={snapshot.notesRich} base={layout.arrange === "preacher" ? "4.4vh" : "3vh"} /></div>{:else}<p>{snapshot.notes}</p>{/if}</section>
+    {/if}
+    {#if layout.next}
+      <section class="next">
+        <p class="label">{t("Next")}</p>
+        <p class="next-cue">{cue(snapshot?.next) || "—"}</p>
+        {#if upcoming.length}<p class="next-line">{upcoming.slice(0, 2).join(" / ")}</p>{/if}
+      </section>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -149,6 +161,42 @@
   .size-l .line { font-size: 8.4vh; }
   @media (prefers-reduced-motion: reduce) { .stage-message { animation: none; } }
   .next { border-top: 2px solid #333; padding-top: 1.5vh; color: #c9ced6; }
+
+  /* --- Arrangements ------------------------------------------------------------------------- */
+  .stage { grid-template-areas: "head" "message" "alert" "big" "now" "side"; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; }
+  header { grid-area: head; }
+  .stage-message { grid-area: message; }
+  .stage-alert { grid-area: alert; }
+  .big-time { grid-area: big; }
+  .now { grid-area: now; }
+  .side { grid-area: side; display: flex; flex-direction: column; gap: 2vh; min-height: 0; }
+  /* Side by side: the words on the left; notes and next in a column on the right. */
+  .arrange-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-areas: "head head" "message message" "alert alert" "big big" "now side"; grid-template-rows: auto auto auto auto minmax(0, 1fr); column-gap: 3vw; }
+  .arrange-split .side { justify-content: flex-start; padding-left: 2vw; border-left: 2px solid #222; }
+  .arrange-split .side .next { border-top: 0; padding-top: 0; }
+  .arrange-split .notes p:last-child, .arrange-split .rich-notes { max-height: 48vh; }
+  /* Preacher: the notes first and large; the words on the screen smaller beneath. */
+  /* Notes first, then the words on the screen, then what is next: the order the preacher reads. */
+  .arrange-preacher { grid-template-areas: "head" "message" "alert" "big" "notes" "now" "next"; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto; }
+  .arrange-preacher .side { display: contents; }
+  .arrange-preacher .notes { grid-area: notes; }
+  .arrange-preacher .next { grid-area: next; }
+  .arrange-preacher .notes { flex: 1; min-height: 0; border-style: solid; border-color: #333; }
+  .arrange-preacher .notes p:last-child { font-size: 4.4vh; max-height: none; }
+  .arrange-preacher .rich-notes { max-height: none; }
+  .arrange-preacher .now { max-height: 26vh; }
+  .arrange-preacher .line { font-size: 3.8vh; }
+  /* Clock: the time large in the middle, the running part's time under it, the words small below. */
+  .arrange-clock { grid-template-rows: auto auto auto minmax(0, 1fr) auto auto; }
+  .big-time { display: grid; place-content: center; justify-items: center; gap: 2vh; }
+  .big-clock { margin: 0; font: 800 22vh/1 "Inter Variable", system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .big-section { margin: 0; padding: 0.4em 1em; border-radius: 999px; background: #1f3d2c; font-size: 4.4vh; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .big-section.short { background: #8a5a00; }
+  .big-section.over { background: #c8102e; }
+  .arrange-clock .now { max-height: 20vh; }
+  /* A clock for before the service or the band: sermon notes stay off it. */
+  .arrange-clock .notes { display: none; }
+  .arrange-clock .line { font-size: 3.6vh; }
   .label { margin: 0; font-size: 2vh; letter-spacing: 0.2em; text-transform: uppercase; color: #7d8794; }
   .next-cue { margin: 0.4vh 0 0; font-size: 3.4vh; font-weight: 700; color: #fff; }
   .next-line { margin: 0.6vh 0 0; font-size: 3vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
