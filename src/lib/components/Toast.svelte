@@ -6,12 +6,33 @@
 
   // A short note after an action, bottom left: clear of Go LIVE, Program and the queue on the right: what happened, where, and one or two buttons.
   const toast = $derived(session.toast);
+
+  // A note never blocks what lies under it: with the pointer over its words it turns see-through and
+  // clicks pass to the list or panel beneath. Its buttons (Undo, close) stay solid and pressable, and
+  // the note waits meanwhile, so an Undo never slips away under the hand.
+  let box = $state<HTMLElement | null>(null);
+  let clear = $state(false);
+  $effect(() => {
+    if (!toast) return;
+    const move = (event: PointerEvent) => {
+      const rect = box?.getBoundingClientRect();
+      const inside = !!rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      const onButton = inside && !!(event.target instanceof Element && event.target.closest(".toast button"));
+      if (inside !== clear || onButton) session.holdToast(inside);
+      clear = inside && !onButton;
+    };
+    window.addEventListener("pointermove", move, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      clear = false;
+    };
+  });
 </script>
 
 {#if toast}
   {#key toast.id}
     <!-- It waits while the pointer or focus is on it, so an Undo never slips away under the hand. -->
-    <div class="toast" class:warn={toast.tone === "warn"} role={toast.tone === "warn" ? "alert" : "status"} aria-live={toast.tone === "warn" ? "assertive" : "polite"} onpointerenter={() => session.holdToast(true)} onpointerleave={() => session.holdToast(false)} onfocusin={() => session.holdToast(true)} onfocusout={() => session.holdToast(false)} transition:fly={{ y: 10, duration: 180 }}>
+    <div class="toast" class:warn={toast.tone === "warn"} class:clear bind:this={box} role={toast.tone === "warn" ? "alert" : "status"} aria-live={toast.tone === "warn" ? "assertive" : "polite"} onfocusin={() => session.holdToast(true)} onfocusout={() => session.holdToast(false)} transition:fly={{ y: 10, duration: 180 }}>
       <span class="tick"><Icon name={toast.tone === "warn" ? "alerts" : "check"} size={14} /></span>
       <div class="copy">
         <strong>{toast.text}</strong>
@@ -28,6 +49,8 @@
 <style>
   .toast {
     position: relative;
+    pointer-events: none;
+    transition: opacity 140ms ease;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -49,5 +72,8 @@
   .act:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .x { flex: none; width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; }
   .x:hover { color: var(--ink); background: var(--field); }
+  .toast button { pointer-events: auto; }
+  /* Over its words: see-through, so the panel beneath reads and takes the click. */
+  .toast.clear { opacity: 0.18; }
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 </style>

@@ -427,8 +427,10 @@ class Session {
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   /** Every stored file: pictures, videos and audio. */
   #allMedia = $state<MediaAsset[]>([]);
-  #visualMedia = $derived(this.#allMedia.filter((asset) => asset.kind !== "audio"));
-  #audioMedia = $derived(this.#allMedia.filter((asset) => asset.kind === "audio"));
+  /** Deleted a moment ago, with Undo still on offer: hidden everywhere, the file not yet removed. */
+  #deleting = $state(new Set<string>());
+  #visualMedia = $derived(this.#allMedia.filter((asset) => asset.kind !== "audio" && !this.#deleting.has(asset.id)));
+  #audioMedia = $derived(this.#allMedia.filter((asset) => asset.kind === "audio" && !this.#deleting.has(asset.id)));
   /** Pictures and videos (what screens show). Assigning keeps the audio files. */
   get media(): MediaAsset[] {
     return this.#visualMedia;
@@ -4601,10 +4603,47 @@ class Session {
   };
 
   /** Delete a picture, video or audio file; playlists, the logo and overlays let go of it. */
+  /**
+   * Delete a picture, video or audio file, with Undo. It leaves every list (and the playlists, logo,
+   * overlays and favourites) at once, but the file itself goes only after the Undo has passed; if the
+   * app closes first, it simply stays.
+   */
   deleteMedia = async (id: string) => {
     const asset = [...this.media, ...this.audioTracks].find((entry) => entry.id === id);
-    await api.mediaDelete(id);
-    this.media = (await api.mediaList());
+    const before = { logoAssetId: this.workspace.logoAssetId, playlists: this.workspace.playlists, overlays: this.workspace.overlays, favorites: this.workspace.favorites.media };
+    this.#deleting = new Set([...this.#deleting, id]);
+    const forget = () => (this.#deleting = new Set([...this.#deleting].filter((entry) => entry !== id)));
+    const timer = setTimeout(() => {
+      void api.mediaDelete(id).then(async () => {
+        this.media = await api.mediaList();
+        forget();
+      }).catch((error) => {
+        forget();
+        this.warn(t("{name} could not be deleted: {reason}", { name: asset?.name ?? t("The file"), reason: error instanceof Error ? error.message : String(error) }));
+      });
+    }, 10_000);
+    this.notify(t("{name} deleted.", { name: asset?.name ?? t("The file") }), {
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        clearTimeout(timer);
+        this.dismissToast();
+        forget();
+        // Back where it was used, unless that place has been given to something else since.
+        const workspace = this.workspace;
+        this.workspace = {
+          ...workspace,
+          logoAssetId: before.logoAssetId === id && workspace.logoAssetId === null ? id : workspace.logoAssetId,
+          playlists: workspace.playlists.map((list) => {
+            const was = before.playlists.find((entry) => entry.id === list.id);
+            return was?.trackIds.includes(id) && !list.trackIds.includes(id) && JSON.stringify(was.trackIds.filter((track) => track !== id)) === JSON.stringify(list.trackIds) ? { ...list, trackIds: was.trackIds } : list;
+          }),
+          overlays: workspace.overlays.map((overlay) => (overlay.assetId === null && before.overlays.find((entry) => entry.id === overlay.id)?.assetId === id ? { ...overlay, assetId: id } : overlay)),
+          favorites: before.favorites.includes(id) && !workspace.favorites.media.includes(id) ? { ...workspace.favorites, media: [...workspace.favorites.media, id] } : workspace.favorites,
+        };
+        this.persistSoon();
+        this.message = t("{name} is back.", { name: asset?.name ?? t("The file") });
+      } }],
+    });
     this.workspace = {
       ...this.workspace,
       logoAssetId: this.workspace.logoAssetId === id ? null : this.workspace.logoAssetId,
@@ -4613,7 +4652,6 @@ class Session {
       favorites: { ...this.workspace.favorites, media: this.workspace.favorites.media.filter((entry) => entry !== id) },
     };
     this.persistSoon();
-    this.message = t("{name} deleted.", { name: asset?.name ?? t("The file") });
   };
 
   /** Open a service made elsewhere (the sample service) as a new one, and keep it. */

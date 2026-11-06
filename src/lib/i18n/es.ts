@@ -5681,4 +5681,5 @@ export const es: Readonly<Record<string, string>> = {
   "{n} things need fixing": "{n} cosas necesitan arreglo",
   "{n} thing to look at": "{n} cosa que revisar",
   "{n} things to look at": "{n} cosas que revisar",
+  "{name} could not be deleted: {reason}": "{name} no se pudo borrar: {reason}",
 };

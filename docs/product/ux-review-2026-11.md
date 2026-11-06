@@ -48,9 +48,9 @@ The weak spots weren't missing features. The biggest was **live safety**: keys a
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
 | 11 | Toasts timed out while the pointer was on them. | The Undo slipped away under your hand. | **Fixed.** Toasts wait while hovered or focused. |
-| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, sermons, slide decks and themes (Undo for 10 seconds). **Next:** media. Deleting it removes the file from disk, so Undo needs a bin on the native side. |
+| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, sermons, slide decks, themes and media (Undo for 10 seconds). A media file leaves every list at once, but is removed from disk only after the Undo has passed. |
 | 13 | There is only one toast at a time, so a new one replaces the last. "Program is black, Undo" disappears as soon as "Added to service" arrives. | The important message loses to the trivial one. | **Fixed.** A warning or Undo toast stays; a plain confirmation that follows goes to the status line. |
-| 14 | Toasts sit bottom-left, over the song list, the Conductor's listening bar and Production's Scenes panel. | They cover the controls you need next. | **Next:** dock them above the monitors, or bottom-centre at a narrower width. |
+| 14 | Toasts sit bottom-left, over the song list, the Conductor's listening bar and Production's Scenes panel. | They cover the controls you need next. | **Fixed.** With the pointer over its words a note turns see-through and the click goes to what's beneath. Its buttons still work, and it waits meanwhile. |
 | 15 | Some failures say nothing: Bible word search, chapter load, the starter kit, the sign-in browser, and unused-media clean-up (where a failed lookup reads as "no files"). | A silent failure looks like the app is broken, or worse, gives a wrong answer. | **Fixed.** Each now says why it failed, where it happened. |
 | 16 | "Reset workspace" has no confirmation or Undo. | It throws away a whole desk layout in one click. | **Fixed.** Undo in the toast for 10 seconds. |
 
@@ -121,12 +121,10 @@ Checked against vendor pages and release notes, November 2026. These are often t
 
 ## 7. Suggested order of work
 
-1. **Live safety, finished:** opt-in Auto LIVE (7, a product decision); where toasts sit (14).
-2. **Recovery:** Undo for media (12), via a bin on the native side.
-3. **One desk vocabulary** (17).
-4. **Stage display layout editor.**
-5. **CCLI auto-reporting** (start the partner application now; it takes time).
-6. **MIDI triggers.**
-7. **Bible licensing** (business development).
+1. **Decisions:** opt-in Auto LIVE (7), and one desk vocabulary (17).
+2. **Stage display layout editor.**
+3. **CCLI auto-reporting** (start the partner application now; it takes time).
+4. **MIDI triggers.**
+5. **Bible licensing** (business development).
 
 **Budget:** the language files now have their own budget and are left out of the desktop total, so the total is about 4.2 MB of 5.12 MB. The stage editor and MIDI should still load on demand, as the Conductor desk does.

@@ -295,6 +295,8 @@
 <style>
   .corner-notes { position: fixed; left: 20px; bottom: 20px; z-index: 900; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
   .corner-notes > :global(*) { pointer-events: auto; }
+  /* The note itself lets clicks through to what is beneath; only its buttons take them (Toast). */
+  .corner-notes > :global(.toast) { pointer-events: none; }
   .top-alerts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 890; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(620px, calc(100vw - 32px)); pointer-events: none; }
   .top-alerts > :global(*) { pointer-events: auto; }
 </style>

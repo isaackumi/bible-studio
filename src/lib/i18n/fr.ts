@@ -5762,4 +5762,5 @@ export const fr: Readonly<Record<string, string>> = {
   "{n} things need fixing": "{n} choses à corriger",
   "{n} thing to look at": "{n} chose à regarder",
   "{n} things to look at": "{n} choses à regarder",
+  "{name} could not be deleted: {reason}": "{name} n’a pas pu être supprimé : {reason}",
 };
