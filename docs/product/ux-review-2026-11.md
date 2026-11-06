@@ -41,18 +41,18 @@ The weak spots weren't missing features. The biggest was **live safety**: keys a
 | 7 | **Auto LIVE was a chip that could only turn off**, and it read like a button. | People didn't know whether a click would go live. | **Fixed.** It's an on/off switch for as long as a service runs. **Next:** make it opt-in per service. That changes what existing churches are used to, so it's left as a product decision. |
 | 8 | **The running service could be deleted mid-service**, and another one silently opened in its place. | That's the whole running order gone in front of everyone. | **Fixed.** It's refused, and the message says to end the service first. |
 | 9 | **Keys pressed inside small pop-ups** (a part's time, the Conductor's Tools panel) reached the desk, so Space ran Take. | You pressed a button in a pop-up, and the screen changed. | **Fixed.** Keys inside any dialog belong to it. |
-| 10 | **The L key shows the logo, but Presenter has no Logo button.** | An accidental L has no visible cause or control. | **Next:** add LOGO beside CLEAR, as on the other two desks. |
+| 10 | **The L key shows the logo, but Presenter has no Logo button.** | An accidental L has no visible cause or control. | **Fixed.** LOGO sits beside CLEAR, as on the other two desks. |
 
 ## 2. Feedback, errors and recovery
 
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
 | 11 | Toasts timed out while the pointer was on them. | The Undo slipped away under your hand. | **Fixed.** Toasts wait while hovered or focused. |
-| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, with Undo for 10 seconds. **Next:** the same for sermons, slide decks, themes and media (or a 30-day bin, as the cloud already has). |
-| 13 | There is only one toast at a time, so a new one replaces the last. "Program is black, Undo" disappears as soon as "Added to service" arrives. | The important message loses to the trivial one. | **Next:** a short queue, where warnings and Undo toasts are never replaced by plain confirmations. |
+| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, sermons and slide decks (Undo for 10 seconds). **Next:** themes and media, or a 30-day bin like the cloud's. |
+| 13 | There is only one toast at a time, so a new one replaces the last. "Program is black, Undo" disappears as soon as "Added to service" arrives. | The important message loses to the trivial one. | **Fixed.** A warning or Undo toast stays; a plain confirmation that follows goes to the status line. |
 | 14 | Toasts sit bottom-left, over the song list, the Conductor's listening bar and Production's Scenes panel. | They cover the controls you need next. | **Next:** dock them above the monitors, or bottom-centre at a narrower width. |
-| 15 | Some failures say nothing: Bible word search, chapter load, the starter kit, the sign-in browser, and unused-media clean-up (where a failed lookup reads as "no files"). | A silent failure looks like the app is broken, or worse, gives a wrong answer. | **Next:** each should show its error where it happened. |
-| 16 | "Reset workspace" has no confirmation or Undo. | It throws away a whole desk layout in one click. | **Next:** add Undo to the toast it shows. |
+| 15 | Some failures say nothing: Bible word search, chapter load, the starter kit, the sign-in browser, and unused-media clean-up (where a failed lookup reads as "no files"). | A silent failure looks like the app is broken, or worse, gives a wrong answer. | **Fixed.** Each now says why it failed, where it happened. |
+| 16 | "Reset workspace" has no confirmation or Undo. | It throws away a whole desk layout in one click. | **Fixed.** Undo in the toast for 10 seconds. |
 
 ## 3. Consistency
 
@@ -70,9 +70,9 @@ The weak spots weren't missing features. The biggest was **live safety**: keys a
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
 | 23 | "Message to the stage…" opens the whole Settings dialog, and the desk's keys stop while it's open. | It's a live action buried in Settings. | **Next:** a small inline pop-up from the "On the screen" menu. |
-| 24 | Preview and Program are only explained under More › "How this desk works". | They're the two words a newcomer must understand first. | **Next:** one line under each monitor title until the operator has used LIVE a few times. |
+| 24 | Preview and Program are only explained under More › "How this desk works". | They're the two words a newcomer must understand first. | **Fixed.** For the first five times LIVE: *only you see this* beside Preview, *what the congregation sees* beside Program. |
 | 25 | The Readiness check is in the More menu. | Its best moment is just before the service starts. | **Next:** offer it in the Start service dialog. |
-| 26 | The favourite star only shows on hover in song search. | People can't see what they can star. | **Next:** a faint outline star, always shown. |
+| 26 | The favourite star only shows on hover in song search. | People can't see what they can star. | **Fixed.** Shown faintly at rest. |
 
 ## 5. Already improved this week
 
@@ -121,12 +121,12 @@ Checked against vendor pages and release notes, November 2026. These are often t
 
 ## 7. Suggested order of work
 
-1. **Live safety, finished:** LOGO on Presenter (10); opt-in Auto LIVE (7); the toast queue and its position (13, 14).
-2. **Recovery:** Undo for every library delete (12), and errors shown where they happen (15).
+1. **Live safety, finished:** opt-in Auto LIVE (7, a product decision); where toasts sit (14).
+2. **Recovery:** Undo for themes and media (12).
 3. **One desk vocabulary** (17), and one English (18).
 4. **Stage display layout editor.**
 5. **CCLI auto-reporting** (start the partner application now; it takes time).
 6. **MIDI triggers.**
 7. **Bible licensing** (business development).
 
-**One constraint to plan for:** the desktop JavaScript is about 5.1 MB against its 5.12 MB budget (`npm run budget`). The stage editor and MIDI will need either a higher budget or loading on demand, as the Conductor desk already does.
+**Budget:** the language files now have their own budget and are left out of the desktop total, so the total is about 4.2 MB of 5.12 MB. The stage editor and MIDI should still load on demand, as the Conductor desk does.
