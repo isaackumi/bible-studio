@@ -1168,6 +1168,8 @@
         <BroadcastSettings />
       {:else if section === "switcher"}
         <SwitcherSettings />
+      {:else if section === "midi"}
+        {#await import("./MidiSettings.svelte") then { default: MidiSettings }}<MidiSettings />{/await}
       {:else if section === "remote"}
         {#if session.entitled("phone-remote")}
           <RemotePanel />

@@ -58,6 +58,14 @@
 
   onMount(() => {
     void session.init();
+    // MIDI triggers: loaded only on a computer where an input was chosen, then listening from the start.
+    if (isDesktop()) {
+      try {
+        if (JSON.parse(localStorage.getItem("church-studio.midi") ?? "null")?.device) void import("../app/midi.svelte").then(({ midi }) => midi.start());
+      } catch {
+        // Nothing saved, or storage blocked: no MIDI until it is set up in Settings.
+      }
+    }
     // Development builds only: a handle for the browser console and end-to-end checks.
     if (import.meta.env.DEV) (window as unknown as { __churchStudio?: typeof session }).__churchStudio = session;
     // The audience window reports the shape of its screen; every monitor here follows it.

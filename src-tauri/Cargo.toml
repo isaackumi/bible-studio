@@ -59,6 +59,9 @@ whisper-rs = { version = "0.16", features = ["log_backend", "metal"] }
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-single-instance = "2"
+# MIDI triggers (midi.rs): pads, footswitches, keyboards and band software drive the desk. ALSA on
+# Linux (libasound2-dev to build), CoreMIDI on a Mac, WinMM on Windows.
+midir = "0.10"
 
 # Noise filter for listening: microphone capture and RNNoise (pure Rust), desktop only.
 # Accurate listening: Whisper (whisper.cpp) on the computer; its model downloads only when chosen.

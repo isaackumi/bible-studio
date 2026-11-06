@@ -33,7 +33,7 @@ jobs:
       - name: Linux libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
       - run: npm ci
       - run: npm run check
       - run: npm run check:server
@@ -96,7 +96,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
       - run: npm ci
       # Mac builds are signed with the church's own certificate (self-signed, made once, kept in
       # ~/.church-studio): every update keeps one identity, so macOS's Screen Recording, microphone
