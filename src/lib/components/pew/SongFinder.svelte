@@ -278,7 +278,8 @@
   .row-main strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row.on .row-main strong { color: var(--accent-text); }
   .row-main span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row-end { padding-right: 6px; opacity: 0; }
+  .row-end { padding-right: 6px; opacity: 0.3; }
+  /* Faint until hovered, so it is clear every song can be starred (hidden, nobody found it). */
   .row:hover .row-end, .row.on .row-end, .row-end.starred, .row-end:focus-within { opacity: 1; }
   .none { padding: 32px 16px; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }
   .link { margin-left: 4px; padding: 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-weight: 600; cursor: pointer; }

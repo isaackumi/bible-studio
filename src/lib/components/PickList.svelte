@@ -313,7 +313,7 @@
   .thumb b { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
   .copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
   .copy strong { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .copy em { flex: none; padding: 1px 7px; border-radius: 99px; background: var(--field); color: var(--muted); font-style: normal; font-size: 10.5px; font-weight: 700; }
+  .copy em { flex: none; padding: 1px 7px; border-radius: 99px; background: var(--field); color: var(--muted); font-style: normal; font-size: 11px; font-weight: 700; }
   .copy span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bytes { flex: none; font-size: 12.5px; font-weight: 650; color: var(--muted); font-variant-numeric: tabular-nums; }
   .on .bytes { color: var(--ink); }

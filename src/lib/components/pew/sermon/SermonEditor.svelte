@@ -521,7 +521,7 @@
   .outline-from { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, var(--field)); }
   .parts-preview { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
   .parts-preview li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: 12px; }
-  .parts-preview b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; }
+  .parts-preview b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; }
   .parts-preview em { display: inline-flex; align-items: center; gap: 3px; font-style: normal; color: #d4a017; font-weight: 650; }
   .row-end { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 

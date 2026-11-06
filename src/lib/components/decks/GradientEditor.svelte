@@ -80,15 +80,15 @@
 
 <div class="gradient" role="group" aria-label={label}>
   <div class="kinds" role="radiogroup" aria-label={t("Paint")}>
-    {#each [["solid", t("Colour")], ["linear", t("Straight")], ["radial", t("Round")]] as [kind, name] (kind)}
+    {#each [["solid", t("Color")], ["linear", t("Straight")], ["radial", t("Round")]] as [kind, name] (kind)}
       <button type="button" role="radio" aria-checked={shown.kind === kind} class:on={shown.kind === kind} onclick={() => setKind(kind as Fill["kind"])}>{name}</button>
     {/each}
   </div>
 
   {#if shown.kind === "solid"}
     <label class="row">
-      <span>{t("Colour")}</span>
-      <input type="color" value={shown.color} aria-label={t("Colour")} oninput={(event) => onchange({ kind: "solid", color: event.currentTarget.value })} />
+      <span>{t("Color")}</span>
+      <input type="color" value={shown.color} aria-label={t("Color")} oninput={(event) => onchange({ kind: "solid", color: event.currentTarget.value })} />
     </label>
   {:else}
     <!-- The colours left to right, whatever the gradient's direction. -->
@@ -98,7 +98,7 @@
       style:background={`linear-gradient(90deg, ${stops.map((stop) => `${stop.color} ${stop.at}%`).join(", ")})`}
       onpointerdown={addAt}
       role="presentation"
-      title={stops.length < MOST_STOPS ? t("Click to add a colour") : undefined}
+      title={stops.length < MOST_STOPS ? t("Click to add a color") : undefined}
     >
       {#each stops as stop, index (index)}
         <button
@@ -107,7 +107,7 @@
           class:on={index === picked}
           style:left="{stop.at}%"
           style:--stop={stop.color}
-          aria-label={t("Colour stop at {at}%", { at: stop.at })}
+          aria-label={t("Color stop at {at}%", { at: stop.at })}
           onpointerdown={(event) => drag(event, index)}
           onkeydown={(event) => nudge(event, index)}
           onfocus={() => (picked = index)}
@@ -116,7 +116,7 @@
     </div>
     {#if selected}
       <div class="row">
-        <input type="color" value={selected.color} aria-label={t("Stop colour")} oninput={(event) => setStop({ color: event.currentTarget.value })} />
+        <input type="color" value={selected.color} aria-label={t("Stop color")} oninput={(event) => setStop({ color: event.currentTarget.value })} />
         <input class="field num" type="number" min="0" max="100" value={selected.at} aria-label={t("Stop position")} onchange={(event) => setStop({ at: Math.min(100, Math.max(0, Number(event.currentTarget.value) || 0)) })} />
         <span class="unit">%</span>
         <button type="button" class="quiet" disabled={stops.length <= 2} onclick={() => { onchange(withStops(stops.filter((_, i) => i !== picked))); picked = 0; }}>{t("Remove")}</button>
@@ -132,9 +132,9 @@
     {:else}
       {@const centre = shown}
       <div class="row">
-        <span>{t("Centre")}</span>
-        <input type="range" min="-50" max="150" value={centre.x} aria-label={t("Centre across")} onchange={(event) => onchange({ ...centre, x: Number(event.currentTarget.value) })} />
-        <input type="range" min="-50" max="150" value={centre.y} aria-label={t("Centre down")} onchange={(event) => onchange({ ...centre, y: Number(event.currentTarget.value) })} />
+        <span>{t("Center")}</span>
+        <input type="range" min="-50" max="150" value={centre.x} aria-label={t("Center across")} onchange={(event) => onchange({ ...centre, x: Number(event.currentTarget.value) })} />
+        <input type="range" min="-50" max="150" value={centre.y} aria-label={t("Center down")} onchange={(event) => onchange({ ...centre, y: Number(event.currentTarget.value) })} />
       </div>
     {/if}
   {/if}

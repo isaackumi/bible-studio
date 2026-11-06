@@ -102,7 +102,7 @@
   :global(.output-trigger.unseen) { border-color: #f5a524 !important; color: var(--warn-text) !important; background: color-mix(in srgb, #f5a524 12%, var(--field)) !important; }
   @keyframes warn-blink { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .lamp.warn { animation: none; } }
-  .ndi { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
+  .ndi { flex: none; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: var(--muted); }
   .ndi.live { border-color: color-mix(in srgb, var(--presence) 60%, var(--line)); color: var(--presence-text); }
   .ndi.bad { border-color: #e5484d; color: #e5484d; }
   .ndi b { font-weight: 800; }

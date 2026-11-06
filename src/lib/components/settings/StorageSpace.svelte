@@ -45,9 +45,17 @@
   async function findUnused() {
     busy = "find";
     note = "";
-    // Save first, so the search sees every song, service and setting as they are now.
-    await session.flushSave().catch(() => {});
-    unused = await invoke<MediaUse[]>("storage_media_usage").catch(() => []);
+    // Save first, so the search sees every song, service and setting as they are now. If either step
+    // fails, say so: guessing "nothing is used" could offer files still in use for removal.
+    try {
+      await session.flushSave();
+      unused = await invoke<MediaUse[]>("storage_media_usage");
+    } catch (error) {
+      note = t("Could not check which files are used: {reason}", { reason: (error instanceof Error ? error.message : String(error)) });
+      unused = null;
+      busy = "";
+      return;
+    }
     busy = "";
     if (unused && !unused.length) {
       note = t("No pictures or videos have been added to Media yet.");
@@ -64,6 +72,8 @@
       await invoke("storage_remove_unused", { ids: chosen.filter((item) => item.id).map((item) => item.id), files: chosen.filter((item) => !item.id).map((item) => item.path) });
       note = t("{count} unused files removed: {size} freed.", { count: chosen.length, size: size(freed) });
       await session.reloadMedia();
+    } catch (error) {
+      note = t("Some files could not be removed: {reason}", { reason: (error instanceof Error ? error.message : String(error)) });
     } finally {
       busy = "";
       await refresh();

@@ -64,9 +64,29 @@
   let detections = $state<SearchHit[]>([]);
   /** The last lines heard, for the transcript (older ones fade back). */
   const heard = $derived(session.captions.lines.slice(-40));
+  /** The screen is black on purpose: BLACK stays lit so it does not look like "nothing sent". */
+  const isBlack = $derived(session.live.program.model.layout === "black");
+
+  // A newcomer's first few times LIVE: a word beside Preview and Program says which is whose. Counted
+  // on this computer; after five it gets out of the way.
+  const LIVES_KEY = "church-studio.lives";
+  let livesSeen = $state(typeof localStorage === "undefined" ? 5 : Number(localStorage.getItem(LIVES_KEY)) || 0);
+  const newcomer = $derived(livesSeen < 5);
+  let lastLive: string | null = null;
+  $effect(() => {
+    const source = displayLive ? session.live.program.sourceId : null;
+    if (!source || source === lastLive || !newcomer) return;
+    lastLive = source;
+    livesSeen = untrack(() => livesSeen) + 1;
+    try {
+      localStorage.setItem(LIVES_KEY, String(livesSeen));
+    } catch {
+      // Storage blocked: the hint shows again next time.
+    }
+  });
   const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
-  const keyOf = (action: "take" | "black" | "clear" | "clear-words") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
+  const keyOf = (action: "take" | "black" | "clear" | "clear-words" | "logo") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   /** The queue's Clear all was pressed once. */
   let clearArmed = $state(false);
   // The transcript follows the newest words as they are heard.
@@ -238,7 +258,7 @@
   let applying = false;
   let chromeReady = false;
   const chrome = $derived(
-    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}`,
+    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}:${session.layoutVersion}`,
   );
 
   function retarget() {
@@ -796,6 +816,8 @@
   }
 
   let alertsOpen = $state(false);
+  /** The quick message to the stage (its own small dialog, not Settings). */
+  let stageMessageOpen = $state(false);
   let overlaysOpen = $state(false);
 </script>
 
@@ -823,10 +845,10 @@
         <button type="button" class="desk-btn" data-tip={t("Send to the audience from this window")} onclick={() => session.claimAudience()}>{t("Take control")}</button>
       {/if}
       <OutputMenu />
-      {#if session.liveOnClick}
-        <!-- Auto LIVE: while the service runs a click or an arrow goes straight to the audience. Said
-             beside LIVE, and one click puts Preview first again. -->
-        <button type="button" class="desk-btn auto-live" data-tip={t("Auto LIVE is on: a click or an arrow goes straight to the audience. Click for Preview first.")} onclick={() => session.setLiveOnClick(false)}>{t("Auto LIVE")}</button>
+      {#if session.liveOnClick || session.serviceRunning}
+        <!-- Auto LIVE: while the service runs a click or an arrow goes straight to the audience. A
+             switch beside LIVE that says which it is, on or off, and turns either way. -->
+        <button type="button" role="switch" aria-checked={session.liveOnClick} class="desk-btn auto-live" class:off={!session.liveOnClick} data-tip={session.liveOnClick ? t("Auto LIVE is on: a click or an arrow goes straight to the audience. Click for Preview first.") : t("Auto LIVE is off: a click goes to Preview, and LIVE sends it. Click to send clicks straight to the audience.")} onclick={() => session.setLiveOnClick(!session.liveOnClick)}><span class="switch-knob" aria-hidden="true"></span>{t("Auto LIVE")}</button>
       {/if}
       <button
         type="button"
@@ -836,9 +858,10 @@
         data-tip={`${displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")} (${keyOf("take")})`}
         onclick={() => session.take()}
       ><span class="pip"></span>{t("LIVE")}</button>
-      <!-- BLACK always shows: it is the button for when the wrong thing is up. CLEAR shows too;
-           hovering (or tabbing to) it slides out CLEAR WORDS. Every key works whether or not it shows. -->
-      <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
+      <!-- BLACK always shows: it is the button for when the wrong thing is up, and it stays lit while
+           the screen is black. CLEAR shows too; hovering (or tabbing to) it drops CLEAR WORDS below it,
+           so nothing in this row moves under the pointer. Every key works whether or not it shows. -->
+      <button type="button" class="desk-btn danger" class:lit={isBlack} aria-pressed={isBlack} data-tip={`${isBlack ? t("The screen is black now") : t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
       <span class="clears" role="group" aria-label={t("Clear")}>
         <span class="clears-more">
           <span class="clears-row">
@@ -847,10 +870,11 @@
         </span>
         <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
-      {#if session.canUndoProgram}
-        <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. -->
-        <button type="button" class="desk-btn ghost" data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
-      {/if}
+      <!-- LOGO, as on the other desks: the L key had no button, so an accidental L had no visible cause. -->
+      <button type="button" class="desk-btn ghost" data-tip={`${t("Logo on Program")} (${keyOf("logo")})`} onclick={() => session.logo()}>{t("LOGO")}</button>
+      <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. Its
+           place is kept while there is nothing to undo, so LIVE and BLACK never shift. -->
+      <button type="button" class="desk-btn ghost undo-slot" class:idle={!session.canUndoProgram} disabled={!session.canUndoProgram} aria-hidden={!session.canUndoProgram} tabindex={session.canUndoProgram ? 0 : -1} data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
       <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={keys(t("Go to a page, song, verse, part or setting (⌘K)"))} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
@@ -904,7 +928,7 @@
           <button type="button" role="menuitem" onclick={() => { overlaysOpen = true; close(); }}>{@render icon("layers")} {t("Overlays…")}{#if overlaysOn}<span class="menu-state on">{overlaysOn}</span>{/if}</button>
           <div class="menu-sep"></div>
           <p class="menu-label">{t("For the people on stage")}</p>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} {t("Message to the stage…")}</button>
+          <button type="button" role="menuitem" onclick={() => { stageMessageOpen = true; close(); }}>{@render icon("stage")} {t("Message to the stage…")}{#if session.stageMessage}<span class="menu-state on">{t("On")}</span>{/if}</button>
         {/snippet}
       </ToolMenu>
       <ToolMenu label={t("More")} tip={t("Displays, look, help and settings")} tour="more">
@@ -1066,7 +1090,6 @@
                   <span class="empty-icon" class:on={voiceActive}>{@render icon("mic")}</span>
                   <strong>{voiceActive ? t("Listening…") : t("Not listening")}</strong>
                   <span>{voiceActive ? t("What is said shows here, and verses it hears go to Preview.") : t("Start listening: what is said shows here, and verses it hears go to Preview.")}</span>
-                  {#if !voiceActive && session.voice.status !== "starting"}<button type="button" class="empty-action" onclick={toggleVoice}>{@render icon("mic")} {t("Start listening")}</button>{/if}
                 </div>
               {/if}
             </div>
@@ -1241,7 +1264,7 @@
 
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if mode === "scriptures"}<TextSizeControl kind="verses" onopen={() => (sheet = "type")} />{/if}{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if newcomer}<span class="kicker-hint">{t("only you see this")}</span>{/if}{#if mode === "scriptures"}<TextSizeControl kind="verses" onopen={() => (sheet = "type")} />{/if}{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
@@ -1249,7 +1272,7 @@
 {#snippet panel_program()}
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "program")} ondragend={endPanelDrag}>
-                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
+                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>{#if newcomer && !(programSet && !displayLive)}<span class="kicker-hint">{t("what the congregation sees")}</span>{/if}
                     {#if programSet && !displayLive}<span class="unseen" role="status" title={t("The audience can't see this")}>{t("Not on the screen")}</span>{/if}
                     <button
                       type="button"
@@ -1339,6 +1362,9 @@
 {#if overlaysOpen}
   <OverlaysDialog onclose={() => (overlaysOpen = false)} />
 {/if}
+{#if stageMessageOpen}
+  {#await import("../StageMessageDialog.svelte") then { default: StageMessageDialog }}<StageMessageDialog onclose={() => (stageMessageOpen = false)} />{/await}
+{/if}
 {#if alertsOpen}
   <AlertsDialog onclose={() => (alertsOpen = false)} />
 {/if}
@@ -1352,7 +1378,14 @@
   .shows-on { min-width: 0; margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .shows-on:hover { color: var(--ink); }
   /* Auto LIVE is on: said beside LIVE, in its colour. */
-  .auto-live { border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: #ff6b6b; font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
+  .auto-live { display: inline-flex; align-items: center; gap: 7px; border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: var(--live-text, #ff6b6b); font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
+  .auto-live.off { border-color: var(--line); color: var(--muted); }
+  /* A small switch: lit and to the right when on, grey and to the left when off. */
+  .switch-knob { position: relative; width: 22px; height: 12px; border-radius: 999px; background: currentColor; opacity: 0.9; }
+  .switch-knob::after { content: ""; position: absolute; top: 2px; left: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--panel); transition: left 160ms ease; }
+  .auto-live.off .switch-knob { opacity: 0.5; }
+  .auto-live.off .switch-knob::after { left: 2px; }
+  @media (prefers-reduced-motion: reduce) { .switch-knob::after { transition: none; } }
   .pb {
     height: 100%;
     min-height: 0;
@@ -1402,7 +1435,7 @@
   .pb-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
   /* White on the accent is 3.4:1 for the default orange: bold keeps it readable. */
   .pb-modes button.on { background: var(--accent); color: var(--on-accent, #fff); font-weight: 750; }
-  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
   .pb-modes button.on .lock { background: rgb(255 255 255 / 0.22); color: white; }
   .pb-actions {
     margin-left: auto;
@@ -1668,7 +1701,7 @@
   .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
-  .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+  .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 11px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
   .side-tabs button[aria-selected="true"] { background: var(--field); color: var(--ink); }
@@ -1693,8 +1726,6 @@
   .panel-empty > span:not(.empty-icon) { max-width: 260px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
   .empty-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); }
   .empty-icon.on { background: color-mix(in srgb, var(--presence) 16%, transparent); color: var(--presence-text); }
-  .empty-action { margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
-  .empty-action:hover { filter: brightness(1.08); }
   .queue-actions { display: flex; gap: 8px; }
   .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
@@ -1717,6 +1748,7 @@
     background: #050505;
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+  .kicker-hint { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .kicker.plain { font-size: 12px; letter-spacing: 0; text-transform: none; }
   .kicker.program { color: var(--live-text); }
   .pb-panel.preview { border-style: dashed; }
@@ -1728,7 +1760,7 @@
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.12em;
     cursor: pointer;
     min-width: 0;
@@ -1749,14 +1781,17 @@
     padding: 0 10px;
   }
   .steppers { display: flex; gap: 6px; }
-  .clears { display: inline-flex; align-items: center; gap: 6px; }
+  .clears { position: relative; display: inline-flex; align-items: center; gap: 6px; }
   /* CLEAR WORDS slides out of CLEAR on hover. A grid track from 0fr to 1fr animates to the words'
      real width (max-width to a guess overshot: done in a third of the time, then a wait before it
      closed), with the gap folded in so nothing jumps. */
-  .clears-more { display: grid; grid-template-columns: 0fr; margin-right: -6px; opacity: 0; transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease 40ms; }
-  .clears-row { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; padding-right: 6px; transform: translateX(6px); transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .clears:hover .clears-more, .clears:focus-within .clears-more { grid-template-columns: 1fr; margin-right: 0; opacity: 1; transition-delay: 0ms, 0ms, 0ms; }
-  .clears:hover .clears-row, .clears:focus-within .clears-row { transform: none; }
+  /* CLEAR WORDS drops below CLEAR (over the desk, never across the bar), with a bridge so the pointer
+     can travel down to it. */
+  .clears-more { position: absolute; top: 100%; right: 0; z-index: 40; padding-top: 6px; opacity: 0; pointer-events: none; transform: translateY(-4px); transition: opacity 140ms ease, transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .clears-row { display: inline-flex; align-items: center; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: 0 10px 28px rgb(0 0 0 / 0.35); white-space: nowrap; }
+  .clears:hover .clears-more, .clears:focus-within .clears-more { opacity: 1; pointer-events: auto; transform: none; }
+  .undo-slot.idle { visibility: hidden; }
+  .desk-btn.danger.lit { background: #000; color: #fff; box-shadow: inset 0 0 0 2px var(--live, #e5484d); }
   .clears-main { position: relative; }
   .clears-main::after { content: ""; position: absolute; right: 3px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: currentColor; opacity: 0.45; transition: opacity 160ms ease; }
   .clears:hover .clears-main::after, .clears:focus-within .clears-main::after { opacity: 0; }
@@ -1806,7 +1841,7 @@
   @container desk (max-width: 1560px) { .chip-name { display: none; } }
   /* Guided tours are also in the More menu; narrower desks keep the bar for live tools. */
   .pb-tools :global(.tool-menu > button) { position: relative; }
-  .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
+  .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; font-weight: 800; line-height: 16px; text-align: center; }
   .menu-state { margin-left: auto; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--field); color: var(--muted); }
   .menu-state.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }

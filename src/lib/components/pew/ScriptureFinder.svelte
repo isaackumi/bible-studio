@@ -101,7 +101,10 @@
     if (!target) return;
     void api.verses(tid, target.bookOrd, target.chapter).then((rows) => {
       if (chapterKey === key) chapterVerses = rows;
-    }).catch(() => {});
+    }).catch((error) => {
+      // Said, not swallowed: an empty chapter would look like a Bible with no words.
+      if (chapterKey === key) session.warn(t("This chapter could not be opened: {reason}", { reason: (error instanceof Error ? error.message : String(error)) }));
+    });
   });
 
   // Words: searched after a short pause in typing.
@@ -114,7 +117,9 @@
     const timer = setTimeout(() => {
       void searchWords(phrase, translation).then((found) => {
         if (read.phrase === phrase && tid === translation) hits = found.slice(0, 40);
-      }).catch(() => {}).finally(() => (searching = false));
+      }).catch((error) => {
+        if (read.phrase === phrase) session.warn(t("The search could not finish: {reason}", { reason: (error instanceof Error ? error.message : String(error)) }));
+      }).finally(() => (searching = false));
     }, 160);
     return () => clearTimeout(timer);
   });

@@ -26,5 +26,5 @@
   .now { display: inline-grid; place-items: center; border-inline: 1px solid var(--line); color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
   button:hover:not(:disabled) { background: var(--field); }
   button:disabled { color: var(--muted); opacity: 0.5; }
-  small { font-size: 10px; }
+  small { font-size: 11px; }
 </style>

@@ -69,7 +69,7 @@ export const OVERLAY_SPOTS: Array<[OverlaySpot, string]> = [
   ["top-left", "Top left"],
   ["top", "Top"],
   ["top-right", "Top right"],
-  ["center", "Centre"],
+  ["center", "Center"],
   ["bottom-left", "Bottom left"],
   ["bottom", "Bottom"],
   ["bottom-right", "Bottom right"],

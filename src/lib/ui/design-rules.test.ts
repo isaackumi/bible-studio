@@ -22,11 +22,11 @@ const lineOf = (source: string, index: number) => source.slice(0, index).split("
 const MINIATURES = [/AlertsDialog\.svelte$/, /SettingsDialog\.svelte$/];
 
 describe("design rules", () => {
-  it("keeps text at 10 px or larger (the desktop minimum)", () => {
+  it("keeps text at 11 px or larger (the desktop minimum: read at arm's length in a dim booth)", () => {
     const small = files.flatMap(({ path, source }) =>
       MINIATURES.some((pattern) => pattern.test(path))
         ? []
-        : [...styleOf(source).matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].filter((match) => Number(match[1]) < 10).map((match) => `${path}: ${match[0]}`),
+        : [...styleOf(source).matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].filter((match) => Number(match[1]) < 11).map((match) => `${path}: ${match[0]}`),
     );
     expect(small).toEqual([]);
   });

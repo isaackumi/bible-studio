@@ -427,8 +427,10 @@ class Session {
   sermonFocus = $state<{ sermonId: string; sectionId: string } | null>(null);
   /** Every stored file: pictures, videos and audio. */
   #allMedia = $state<MediaAsset[]>([]);
-  #visualMedia = $derived(this.#allMedia.filter((asset) => asset.kind !== "audio"));
-  #audioMedia = $derived(this.#allMedia.filter((asset) => asset.kind === "audio"));
+  /** Deleted a moment ago, with Undo still on offer: hidden everywhere, the file not yet removed. */
+  #deleting = $state(new Set<string>());
+  #visualMedia = $derived(this.#allMedia.filter((asset) => asset.kind !== "audio" && !this.#deleting.has(asset.id)));
+  #audioMedia = $derived(this.#allMedia.filter((asset) => asset.kind === "audio" && !this.#deleting.has(asset.id)));
   /** Pictures and videos (what screens show). Assigning keeps the audio files. */
   get media(): MediaAsset[] {
     return this.#visualMedia;
@@ -4058,7 +4060,7 @@ class Session {
     if (this.queuedStart === null) return;
     clearTimeout(this.queueTimer);
     this.queuedStart = null;
-    if (say) this.message = t("The waiting start is cancelled.");
+    if (say) this.message = t("The waiting start is canceled.");
   };
 
   /** The service running now (a part has begun and it has not been ended). */
@@ -4560,6 +4562,11 @@ class Session {
   /** Delete a service; if it is the one open, the next one opens (or none). */
   deleteService = async (id: string) => {
     const name = this.services.find((entry) => entry.id === id)?.name ?? "Service";
+    // Never the one running now: another service would open in its place mid-service.
+    if (this.service?.id === id && this.serviceRunning) {
+      this.warn(t("{name} is running. End the service before deleting it.", { name }));
+      return;
+    }
     await api.serviceDelete(id);
     this.cloudSoon();
     this.services = await api.serviceList();
@@ -4596,10 +4603,47 @@ class Session {
   };
 
   /** Delete a picture, video or audio file; playlists, the logo and overlays let go of it. */
+  /**
+   * Delete a picture, video or audio file, with Undo. It leaves every list (and the playlists, logo,
+   * overlays and favourites) at once, but the file itself goes only after the Undo has passed; if the
+   * app closes first, it simply stays.
+   */
   deleteMedia = async (id: string) => {
     const asset = [...this.media, ...this.audioTracks].find((entry) => entry.id === id);
-    await api.mediaDelete(id);
-    this.media = (await api.mediaList());
+    const before = { logoAssetId: this.workspace.logoAssetId, playlists: this.workspace.playlists, overlays: this.workspace.overlays, favorites: this.workspace.favorites.media };
+    this.#deleting = new Set([...this.#deleting, id]);
+    const forget = () => (this.#deleting = new Set([...this.#deleting].filter((entry) => entry !== id)));
+    const timer = setTimeout(() => {
+      void api.mediaDelete(id).then(async () => {
+        this.media = await api.mediaList();
+        forget();
+      }).catch((error) => {
+        forget();
+        this.warn(t("{name} could not be deleted: {reason}", { name: asset?.name ?? t("The file"), reason: error instanceof Error ? error.message : String(error) }));
+      });
+    }, 10_000);
+    this.notify(t("{name} deleted.", { name: asset?.name ?? t("The file") }), {
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        clearTimeout(timer);
+        this.dismissToast();
+        forget();
+        // Back where it was used, unless that place has been given to something else since.
+        const workspace = this.workspace;
+        this.workspace = {
+          ...workspace,
+          logoAssetId: before.logoAssetId === id && workspace.logoAssetId === null ? id : workspace.logoAssetId,
+          playlists: workspace.playlists.map((list) => {
+            const was = before.playlists.find((entry) => entry.id === list.id);
+            return was?.trackIds.includes(id) && !list.trackIds.includes(id) && JSON.stringify(was.trackIds.filter((track) => track !== id)) === JSON.stringify(list.trackIds) ? { ...list, trackIds: was.trackIds } : list;
+          }),
+          overlays: workspace.overlays.map((overlay) => (overlay.assetId === null && before.overlays.find((entry) => entry.id === overlay.id)?.assetId === id ? { ...overlay, assetId: id } : overlay)),
+          favorites: before.favorites.includes(id) && !workspace.favorites.media.includes(id) ? { ...workspace.favorites, media: [...workspace.favorites.media, id] } : workspace.favorites,
+        };
+        this.persistSoon();
+        this.message = t("{name} is back.", { name: asset?.name ?? t("The file") });
+      } }],
+    });
     this.workspace = {
       ...this.workspace,
       logoAssetId: this.workspace.logoAssetId === id ? null : this.workspace.logoAssetId,
@@ -4608,7 +4652,6 @@ class Session {
       favorites: { ...this.workspace.favorites, media: this.workspace.favorites.media.filter((entry) => entry !== id) },
     };
     this.persistSoon();
-    this.message = t("{name} deleted.", { name: asset?.name ?? t("The file") });
   };
 
   /** Open a service made elsewhere (the sample service) as a new one, and keep it. */
@@ -5150,11 +5193,25 @@ class Session {
   };
 
   deleteDeck = (id: string) => {
-    const deck = this.decks.find((entry) => entry.id === id);
+    const at = this.decks.findIndex((entry) => entry.id === id);
+    const deck = this.decks[at];
     this.workspace = { ...this.workspace, decks: this.decks.filter((entry) => entry.id !== id) };
     this.persistSoon();
     if (this.deckFocus?.deckId === id) this.deckFocus = null;
-    this.message = t("{name} deleted. Program was not changed.", { name: deck?.name ?? t("Deck") });
+    if (!deck) return;
+    // Back where it was, from the toast, if it went by mistake.
+    this.notify(t("{name} deleted. Program was not changed.", { name: deck.name }), {
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        this.dismissToast();
+        if (this.decks.some((entry) => entry.id === deck.id)) return;
+        const decks = [...this.decks];
+        decks.splice(Math.min(at, decks.length), 0, deck);
+        this.workspace = { ...this.workspace, decks };
+        this.persistSoon();
+        this.message = t("{name} is back.", { name: deck.name });
+      } }],
+    });
   };
 
   /** Put one deck page on Preview. Program waits for LIVE. */
@@ -6560,6 +6617,13 @@ class Session {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   notify = (text: string, options: { detail?: string; actions?: Array<{ label: string; run: () => void }>; ms?: number; tone?: "warn" } = {}) => {
+    // A warning or an Undo on show is never pushed off by a plain "done": that one goes to the status
+    // line instead ("Program is black, Undo" stays when "Added to the service" follows).
+    const showing = this.toast;
+    if (showing && (showing.tone === "warn" || showing.actions.length) && !options.tone && !options.actions?.length) {
+      this.message = options.detail ? `${text} · ${options.detail}` : text;
+      return;
+    }
     if (this.toastTimer) clearTimeout(this.toastTimer);
     const id = Date.now();
     this.toast = { id, text, detail: options.detail, actions: options.actions ?? [], ...(options.tone ? { tone: options.tone } : {}) };
@@ -6571,6 +6635,16 @@ class Session {
   dismissToast = () => {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toast = null;
+  };
+
+  /** The pointer or keyboard is on the toast (reaching for Undo): it waits, and goes a little after. */
+  holdToast = (held: boolean) => {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (held || !this.toast) return;
+    const id = this.toast.id;
+    this.toastTimer = setTimeout(() => {
+      if (this.toast?.id === id) this.toast = null;
+    }, 3000);
   };
 
   /** Start a tour, on its own page or desk, from any step. */
@@ -7914,14 +7988,30 @@ class Session {
   };
 
   deleteSong = async (id: string) => {
+    const kept = this.songs.find((entry) => entry.id === id);
     await api.songDelete(id);
     this.cloudSoon();
     this.songs = await api.songList();
+    // A song deleted by mistake comes back as it was, from the toast.
+    if (kept) {
+      this.notify(t("{name} deleted.", { name: kept.title || t("Untitled song") }), {
+        ms: 10_000,
+        actions: [{ label: t("Undo"), run: () => { this.dismissToast(); void this.restoreSong(kept); } }],
+      });
+    }
     if (this.songFocus?.songId === id) {
       this.songFocus = null;
       this.warn(t("That song is no longer available."));
       this.previewModel(emptyModel(this.theme()), null);
     }
+  };
+
+  /** Put back a song deleted a moment ago (Undo). */
+  restoreSong = async (song: Song) => {
+    await api.songSave(sanitizeSong(song));
+    this.cloudSoon();
+    this.songs = await api.songList();
+    this.message = t("{name} is back.", { name: song.title || t("Untitled song") });
   };
 
   searchSongs = async (query: string) => {
@@ -7989,6 +8079,7 @@ class Session {
   };
 
   deleteSermon = async (id: string) => {
+    const kept = this.sermons.find((entry) => entry.id === id);
     await api.sermonDelete(id);
     this.cloudSoon();
     this.sermons = await api.sermonList();
@@ -7996,7 +8087,24 @@ class Session {
       this.sermonFocus = null;
       this.previewModel(emptyModel(this.theme()), null);
     }
-    this.message = t("Sermon deleted.");
+    if (!kept) {
+      this.message = t("Sermon deleted.");
+      return;
+    }
+    // A sermon deleted by mistake comes back as it was, from the toast.
+    this.notify(t("Sermon deleted."), {
+      detail: kept.title,
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => { this.dismissToast(); void this.restoreSermon(kept); } }],
+    });
+  };
+
+  /** Put back a sermon deleted a moment ago (Undo). */
+  restoreSermon = async (sermon: Sermon) => {
+    await api.sermonSave(sanitizeSermon(sermon));
+    this.cloudSoon();
+    this.sermons = await api.sermonList();
+    this.message = t("{name} is back.", { name: sermon.title || t("Sermon") });
   };
 
   addSermonSection = (section: Sermon["sections"][number], title: string, sectionId?: string) => {
@@ -8673,11 +8781,32 @@ class Session {
   /** Delete a theme you made. Built-in themes stay. */
   deleteTheme = async (id: string) => {
     if (factoryThemes().some((theme) => theme.id === id)) return;
+    const at = this.themes.findIndex((theme) => theme.id === id);
+    const kept = this.themes[at];
+    const wasInUse = this.workspace.themeId === id;
     await api.themeDelete(id);
     this.cloudSoon();
     this.themes = this.themes.filter((theme) => theme.id !== id);
-    if (this.workspace.themeId === id) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
-    this.message = t("Theme deleted.");
+    if (wasInUse) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
+    if (!kept) {
+      this.message = t("Theme deleted.");
+      return;
+    }
+    // Back as it was (and in use again, if it was), from the toast.
+    this.notify(t("Theme deleted."), {
+      detail: kept.name,
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        this.dismissToast();
+        if (this.themes.some((theme) => theme.id === kept.id)) return;
+        const themes = [...this.themes];
+        themes.splice(Math.min(at, themes.length), 0, kept);
+        this.themes = themes;
+        void api.themeSave(kept).then(() => this.cloudSoon());
+        if (wasInUse) this.useTheme(kept.id);
+        this.message = t("{name} is back.", { name: kept.name });
+      } }],
+    });
   };
 
   useTheme = (id: string) => {
@@ -9132,9 +9261,14 @@ class Session {
     this.persistSoon();
   };
 
+  /** Bumped when a layout is put back or reset, so each desk sizes its panes again. */
+  layoutVersion = $state(0);
+
   resetActiveLayout = () => {
     const layout = this.activeLayout();
     if (!layout) return;
+    // What it was, for Undo: one click should never throw a desk's arrangement away for good.
+    const before = { layouts: this.workspace.layouts, activeLayoutId: this.workspace.activeLayoutId, pew: this.workspace.pew, production: this.workspace.production };
     this.commitLayout(resetLayout(layout));
     this.workspace = {
       ...this.workspace,
@@ -9142,7 +9276,17 @@ class Session {
       production: defaultProductionLayout(),
     };
     this.persistSoon();
-    this.message = t("{name} restored. Program was not changed.", { name: layout.name });
+    this.layoutVersion += 1;
+    this.notify(t("{name} restored. Program was not changed.", { name: layout.name }), {
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        this.dismissToast();
+        this.workspace = { ...this.workspace, ...before };
+        this.persistSoon();
+        this.layoutVersion += 1;
+        this.message = t("The desk is back as it was.");
+      } }],
+    });
   };
 
   /** A window's own library search (Songs, Sermon) takes "/" while it is open; otherwise Find. */

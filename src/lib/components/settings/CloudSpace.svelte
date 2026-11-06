@@ -73,7 +73,7 @@
   const headline = $derived.by((): Headline | null => {
     if (!cloud) return null;
     const computers = tn(cloud.devices.length, "{n} computer", "{n} computers");
-    if (cloud.status === "licenceChanged") return { tone: "wait", icon: "pause", title: t("Sync is paused"), detail: t("This computer moved to another licence. Choose below whether to bring this library along.") };
+    if (cloud.status === "licenceChanged") return { tone: "wait", icon: "pause", title: t("Sync is paused"), detail: t("This computer moved to another license. Choose below whether to bring this library along.") };
     if (cloud.status === "noSeat") return { tone: "bad", icon: "alerts", title: t("Not syncing on this computer"), detail: cloud.message };
     if (cloud.status === "offline") return { tone: "wait", icon: "cloud", title: t("Offline"), detail: t("Changes are kept here and go up when the internet is back.") };
     if (cloud.status === "error") return { tone: "bad", icon: "alerts", title: t("Sync could not finish"), detail: cloud.message };
@@ -83,7 +83,7 @@
     if (cloud.over) return { tone: "bad", icon: "alerts", title: t("Over your cloud space"), detail: t("Remove some files below, or ask about more space.") };
     if (cloud.full) return { tone: "wait", icon: "alerts", title: t("Cloud space is full"), detail: t("Songs and services still sync. New pictures and videos stay on this computer until some room is made below.") };
     if (cloud.pendingMedia) return { tone: "busy", icon: "refresh", title: t("Almost in sync"), detail: tn(cloud.pendingMedia, "{n} file still to go", "{n} files still to go") };
-    return { tone: "good", icon: "check", title: t("Everything is in sync"), detail: t("Last synced {when} · {computers} on this licence", { when: ago(cloud.lastSyncAt), computers }) };
+    return { tone: "good", icon: "check", title: t("Everything is in sync"), detail: t("Last synced {when} · {computers} on this license", { when: ago(cloud.lastSyncAt), computers }) };
   });
 
   /** Sync now: with Ask me first on, this is also what sends the waiting changes. */
@@ -112,9 +112,9 @@
   {#if !cloud || loading}
     <div class="row"><div class="row-copy"><span>{t("Checking…")}</span></div></div>
   {:else if cloud.status === "free"}
-    <div class="row"><div class="row-copy"><strong>{t("Cloud space comes with Premium and Church")}</strong><span>{t("Your songs, services, slides and media on every computer on the licence, and a copy if a computer is lost.")}</span></div><button type="button" class="btn primary" onclick={() => (session.upgradeFor = "cloud-sync")}>{t("See plans")}</button></div>
+    <div class="row"><div class="row-copy"><strong>{t("Cloud space comes with Premium and Church")}</strong><span>{t("Your songs, services, slides and media on every computer on the license, and a copy if a computer is lost.")}</span></div><button type="button" class="btn primary" onclick={() => (session.upgradeFor = "cloud-sync")}>{t("See plans")}</button></div>
   {:else if cloud.status === "signedOut"}
-    <div class="row"><div class="row-copy"><strong>{t("Sign in to use your cloud space")}</strong><span>{t("Your library then follows the licence: this computer and the others on it keep one copy.")}</span></div></div>
+    <div class="row"><div class="row-copy"><strong>{t("Sign in to use your cloud space")}</strong><span>{t("Your library then follows the license: this computer and the others on it keep one copy.")}</span></div></div>
   {:else if cloud.status === "off"}
     <div class="row"><div class="row-copy"><span>{t("Cloud space works in the desktop app.")}</span></div></div>
   {:else}
@@ -128,7 +128,7 @@
     {/if}
     {#if cloud.status === "licenceChanged"}
       <div class="row">
-        <div class="row-copy"><strong>{t("Bring this library to the new licence?")}</strong><span>{t("Its songs, services and files will go into the new licence's library, and that library will come to this computer. Do this only if both belong to the same church, such as after an upgrade.")}</span></div>
+        <div class="row-copy"><strong>{t("Bring this library to the new license?")}</strong><span>{t("Its songs, services and files will go into the new license's library, and that library will come to this computer. Do this only if both belong to the same church, such as after an upgrade.")}</span></div>
         <button type="button" class="btn" onclick={() => arm("licence", async () => { await cloud?.acceptLicence(); return null; })}>{armed === "licence" ? t("Press again to bring it") : t("Bring it")}</button>
       </div>
     {/if}
@@ -161,7 +161,7 @@
   </section>
 
   {#if cloud.devices.length}
-    <p class="section-label">{t("Computers on this licence")}</p>
+    <p class="section-label">{t("Computers on this license")}</p>
     <section class="rows">
       {#each cloud.devices as device (device.device)}
         <div class="row"><div class="row-lead"><span class="row-icon"><Icon name="laptop" size={16} /></span><div class="row-copy"><strong>{device.name}</strong><span>{t("Last synced {when}", { when: new Date(device.lastSyncAt).toLocaleString() })}</span></div></div>{#if nearby.has(device.device)}<span class="always">{t("On this network")}</span>{/if}</div>

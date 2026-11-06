@@ -307,7 +307,7 @@ export const TOURS: Record<TourId, { name: string; steps: TourStep[] }> = {
       {
         target: ['.deck-editor .canvas-area'],
         title: msg("The page"),
-        body: msg("Click an element to edit it; double-click text to type. The inspector on the right changes fonts, colours, fit and animation."),
+        body: msg("Click an element to edit it; double-click text to type. The inspector on the right changes fonts, colors, fit and animation."),
       },
       {
         target: ['.deck-editor .pages'],

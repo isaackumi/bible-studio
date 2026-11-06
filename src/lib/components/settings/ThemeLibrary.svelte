@@ -368,9 +368,9 @@
             <input type="range" min="0" max="40" step="1" aria-label={t("Background blur")} value={look.blur} oninput={(event) => setLook({ blur: Number(event.currentTarget.value) })} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>{t("Colour over it")}</strong><span>{look.tintOpacity ? t("{percent}% of the colour over the picture.", { percent: Math.round(look.tintOpacity * 100) }) : t("A wash of your church colour over the picture. Off at 0.")}</span></div>
+            <div class="row-copy"><strong>{t("Color over it")}</strong><span>{look.tintOpacity ? t("{percent}% of the color over the picture.", { percent: Math.round(look.tintOpacity * 100) }) : t("A wash of your church color over the picture. Off at 0.")}</span></div>
             <div class="row-end">
-              <input type="color" class="swatch-input" aria-label={t("Overlay colour")} value={look.tint} onchange={(event) => setLook({ tint: event.currentTarget.value })} />
+              <input type="color" class="swatch-input" aria-label={t("Overlay color")} value={look.tint} onchange={(event) => setLook({ tint: event.currentTarget.value })} />
               <input type="range" min="0" max="80" step="5" aria-label={t("Overlay strength")} value={Math.round(look.tintOpacity * 100)} oninput={(event) => setLook({ tintOpacity: Number(event.currentTarget.value) / 100 })} />
             </div>
           </div>
@@ -547,7 +547,7 @@
   .thumb { display: block; border-radius: 7px; overflow: hidden; background: #000; container-type: inline-size; pointer-events: none; }
   .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 2px 2px; }
   .card-meta strong { font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .card-meta em { font-style: normal; display: inline-flex; align-items: center; gap: 3px; font-size: 10px !important; padding: 1px 7px !important; }
+  .card-meta em { font-style: normal; display: inline-flex; align-items: center; gap: 3px; font-size: 11px !important; padding: 1px 7px !important; }
 
   @media (max-width: 860px) {
     .hero { grid-template-columns: 1fr; }

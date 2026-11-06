@@ -28,6 +28,13 @@ const BUDGETS = {
  * and hls.js (HLS streams where the engine cannot play them, ~560 KB).
  */
 const DESKTOP_TOTAL_JS = 5 * 1024 * KB;
+/**
+ * A language's lines (i18n/fr.ts, es.ts): one loads, only when that language is chosen, so they are
+ * kept out of the total above (each new line is added once per language, which counted every
+ * feature twice) and held to their own budget each instead.
+ */
+const LANGUAGE_JS = 600 * KB;
+const isLanguage = (key) => /src\/lib\/i18n\/[a-z]{2}\.ts$/.test(key);
 
 const manifest = JSON.parse(readFileSync(`${ROOT}.vite/manifest.json`, "utf8"));
 
@@ -60,12 +67,15 @@ for (const [name, budget] of Object.entries(BUDGETS)) {
   }
   rows.push({ name, ...weigh(closure(key, new Set(base))), budget });
 }
-const totalJs = Object.values(manifest)
-  .filter((entry) => entry.file.endsWith(".js"))
-  .reduce((sum, entry) => sum + statSync(ROOT + entry.file).size, 0);
+const totalJs = Object.entries(manifest)
+  .filter(([key, entry]) => entry.file.endsWith(".js") && !isLanguage(key))
+  .reduce((sum, [, entry]) => sum + statSync(ROOT + entry.file).size, 0);
+const languages = Object.entries(manifest)
+  .filter(([key]) => isLanguage(key))
+  .map(([key, entry]) => ({ name: key.match(/([a-z]{2})\.ts$/)[1], js: statSync(ROOT + entry.file).size }));
 
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ windows: rows, totalJs }, null, 2));
+  console.log(JSON.stringify({ windows: rows, totalJs, languages }, null, 2));
   process.exit(0);
 }
 
@@ -83,5 +93,10 @@ for (const row of rows) {
 }
 const heavy = totalJs > DESKTOP_TOTAL_JS;
 over ||= heavy;
-console.log(`${heavy ? "✗" : "✓"} All desktop JavaScript ${show(totalJs)} / ${show(DESKTOP_TOTAL_JS)}${heavy ? " (are the bundled Bibles back? see __BUNDLED_BIBLES__)" : ""}`);
+console.log(`${heavy ? "✗" : "✓"} All desktop JavaScript ${show(totalJs)} / ${show(DESKTOP_TOTAL_JS)} (languages apart)${heavy ? " (are the bundled Bibles back? see __BUNDLED_BIBLES__)" : ""}`);
+for (const language of languages) {
+  const big = language.js > LANGUAGE_JS;
+  over ||= big;
+  console.log(`${big ? "✗" : "✓"} Language ${language.name}            ${show(language.js)} / ${show(LANGUAGE_JS)}`);
+}
 process.exit(over ? 1 : 0);

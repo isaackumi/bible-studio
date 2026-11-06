@@ -140,7 +140,7 @@
   const mediaOpen = $derived(session.workspace.production.mediaOpen);
   const docksVisible = $derived<[boolean, boolean, boolean, boolean]>([scenesOpen, true, mediaOpen, controlsOpen]);
   const chrome = $derived(
-    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(mediaOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}`,
+    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(mediaOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}:${session.layoutVersion}`,
   );
 
   function retarget() {
@@ -501,16 +501,17 @@
         <Icon name="scissors" size={16} /> {t("CUT")}
       </button>
       <button type="button" class="desk-btn" data-tip={t("Fade Preview in over the set duration")} onclick={() => void fade(duration)}>
-        {t("FADE")}
+        <Icon name="transition" size={16} /> {t("FADE")}
       </button>
       <div class="resets">
-        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear the words; the background, camera or video stays")} (${keyOf("clear-words")})`} onclick={() => void session.clearWords()}>
-          {t("CLEAR WORDS")}
+        <!-- One style for every reset (GO LIVE is the only filled button); each with its icon. -->
+        <button type="button" class="desk-btn" data-tip={`${t("Clear the words; the background, camera or video stays")} (${keyOf("clear-words")})`} onclick={() => void session.clearWords()}>
+          <Icon name="type" size={16} /> {t("CLEAR WORDS")}
         </button>
-        <button type="button" class="desk-btn ghost" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>
+        <button type="button" class="desk-btn" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>
           <Icon name="square" size={16} /> {t("CLEAR")}
         </button>
-        <button type="button" class="desk-btn danger" data-tip={`${t("Black Program")} (${keyOf("black")})`} onclick={() => session.black()}>
+        <button type="button" class="desk-btn danger" class:lit={session.live.program.model.layout === "black"} aria-pressed={session.live.program.model.layout === "black"} data-tip={`${t("Black Program")} (${keyOf("black")})`} onclick={() => session.black()}>
           <Icon name="moon" size={16} /> {t("BLACK")}
         </button>
         <button type="button" class="desk-btn" data-tip={`${t("Logo on Program")} (${keyOf("logo")})`} onclick={() => session.logo()}>
@@ -1145,7 +1146,7 @@
   .scene-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
   .scene-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
+  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
   .badge.live { background: var(--live); color: #fff; }
   .scene-rename { height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-weight: 600; min-width: 0; }
   /* Row tools appear on hover, focus or selection; what is switched on always shows. */
@@ -1214,4 +1215,6 @@
   .listen { justify-content: center; }
   .ctl-hint { margin: 0; padding: 0 2px; font-size: 11px; color: var(--muted); line-height: 1.45; }
   .prod :global(svg) { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  /* BLACK stays lit while the screen is black, so it never looks like "nothing sent". */
+  .resets .desk-btn.danger.lit { background: #000; color: #fff; box-shadow: inset 0 0 0 2px var(--live, #e5484d); }
 </style>

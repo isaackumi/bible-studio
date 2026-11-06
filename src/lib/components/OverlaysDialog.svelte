@@ -231,7 +231,7 @@
   }
   /* A small screen map to place the countdown. */
   .ov-spots { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 34px); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: #000; aspect-ratio: 16 / 9; max-width: 260px; }
-  .ov-spots button { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, #fff 18%, transparent); border-radius: 6px; background: none; color: #fff; font: inherit; font-size: 10px; }
+  .ov-spots button { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, #fff 18%, transparent); border-radius: 6px; background: none; color: #fff; font: inherit; font-size: 11px; }
   .ov-spots button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .ov-spots button i { width: 22px; height: 10px; border-radius: 3px; background: color-mix(in srgb, #fff 30%, transparent); }
   .ov-spots button.on { border-style: solid; border-color: var(--accent); }

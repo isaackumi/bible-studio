@@ -4,7 +4,7 @@
   import type { Service } from "../../domain/types";
   import DeskDialog from "../sources/DeskDialog.svelte";
   import Icon from "../Icon.svelte";
-  import { t } from "../../i18n/core";
+  import { t, tn } from "../../i18n/core";
 
   // Before the service starts: the time now against the planned start. Late, the plan can move to
   // now (each part keeps its length) or run behind; early, the start can wait for the planned time.
@@ -27,6 +27,15 @@
     onclose();
   });
 
+  // The readiness check, where it matters most: just before the service. Quiet when all is set.
+  type Open = { title: string; values?: Record<string, string | number>; state: string };
+  let ready = $state<Open[] | null>(null);
+  $effect(() => {
+    if (check.kind === "on-time") return;
+    void session.checkReady().then((checks) => (ready = checks.filter((entry) => entry.state !== "ok"))).catch(() => (ready = []));
+  });
+  const failing = $derived(ready?.filter((entry) => entry.state === "fail").length ?? 0);
+
   function start(move: boolean) {
     session.startService(move);
     onclose();
@@ -44,6 +53,16 @@
       <span class="clock"><span>{t("Now")}</span><strong>{clockLabel(now)}</strong></span>
       <Icon name="chevron-right" size={16} />
       <span class="clock" class:late={check.kind === "late"} class:early={check.kind === "early"}><span>{t("Planned start")}</span><strong>{clockLabel(check.planned)}</strong></span>
+    </div>
+
+    <div class="ready" class:bad={failing > 0} class:warn={!failing && !!ready?.length} role="status">
+      <Icon name={ready === null ? "refresh" : ready.length ? "alerts" : "check"} size={15} />
+      <span>
+        {#if ready === null}{t("Checking screens, sound and space…")}
+        {:else if !ready.length}{t("All set: screens, sound and space look ready.")}
+        {:else}<strong>{failing ? tn(failing, "{n} thing needs fixing", "{n} things need fixing") : tn(ready.length, "{n} thing to look at", "{n} things to look at")}</strong> {ready.slice(0, 3).map((entry) => t(entry.title, entry.values)).join(" · ")}{/if}
+      </span>
+      {#if ready?.length}<button type="button" class="ghost small" onclick={() => { onclose(); session.openSettings("ready"); }}>{t("See all")}</button>{/if}
     </div>
 
     {#if check.kind === "late"}
@@ -97,5 +116,11 @@
   .choice em { font-style: normal; font-size: 12px; color: var(--muted); }
   .also { display: flex; align-items: center; gap: 8px; margin: -2px 0 4px 14px; font-size: 12px; color: var(--muted); }
   .foot { display: flex; justify-content: flex-end; }
+  .ready { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, #30a46c 45%, var(--line)); border-radius: 10px; background: color-mix(in srgb, #30a46c 8%, transparent); color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+  .ready span { flex: 1; min-width: 0; }
+  .ready strong { color: var(--ink); }
+  .ready.warn { border-color: color-mix(in srgb, #f5a524 50%, var(--line)); background: color-mix(in srgb, #f5a524 8%, transparent); }
+  .ready.bad { border-color: color-mix(in srgb, #e5484d 55%, var(--line)); background: color-mix(in srgb, #e5484d 8%, transparent); }
+  .ghost.small { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
   .ghost { height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); font: inherit; font-size: 13px; }
 </style>

@@ -14,7 +14,7 @@
   const videos = $derived(pictures.images.filter((entry) => entry.kind === "video").length);
   const favoritesOpen = $derived(pictures.folder === FAVORITES);
   const crumbs = $derived(pictures.folder && !favoritesOpen ? crumbsOf(pictures.folder) : []);
-  const folderLabel = $derived(favoritesOpen ? t("Favourites") : pictures.folder ? folderName(pictures.folder) : "");
+  const folderLabel = $derived(favoritesOpen ? t("Favorites") : pictures.folder ? folderName(pictures.folder) : "");
   /** What the grid shows: every picture, or those whose names hold the words typed. */
   const shownImages = $derived(pictures.query.trim() ? pictures.images.filter((entry) => matchesQuery(entry.name, pictures.query)) : pictures.images);
   const parent = $derived(crumbs.length > 1 ? crumbs[crumbs.length - 2]! : null);
@@ -196,7 +196,7 @@
         <span class="places-label">{t("Go to")}</span>
         {#if pictures.favorites.length}
           <button type="button" class="place" class:on={favoritesOpen} onclick={() => pictures.openFavorites()}>
-            <i style:background="#f5a524"><Icon name="star" size={11} /></i>{t("Favourites")}
+            <i style:background="#f5a524"><Icon name="star" size={11} /></i>{t("Favorites")}
           </button>
         {/if}
         {#each pictures.places as place (place.path)}
@@ -244,7 +244,7 @@
                   <img use:thumb={entry.path} alt={entry.name} decoding="async" />
                 {/if}
               </button>
-              <button type="button" class="star" class:on={starred} aria-pressed={starred} aria-label={starred ? t("Take {name} out of Favourites", { name: entry.name }) : t("Add {name} to Favourites", { name: entry.name })} onclick={() => pictures.toggleFavorite(entry)}><Icon name="star" size={12} /></button>
+              <button type="button" class="star" class:on={starred} aria-pressed={starred} aria-label={starred ? t("Take {name} out of Favorites", { name: entry.name }) : t("Add {name} to Favorites", { name: entry.name })} onclick={() => pictures.toggleFavorite(entry)}><Icon name="star" size={12} /></button>
             </li>
           {/each}
         </ul>
@@ -290,7 +290,7 @@
           </div>
           {#if pictures.playingFolder && pictures.folder !== pictures.playingFolder}
             <button type="button" class="elsewhere" onclick={() => pictures.playingFolder && pictures.openFolder(pictures.playingFolder)}>
-              <Icon name="folder-open" size={14} /><span>{t("Playing from {folder}", { folder: pictures.playingFolder === FAVORITES ? t("Favourites") : folderName(pictures.playingFolder) })}</span><b>{t("Go there")}</b>
+              <Icon name="folder-open" size={14} /><span>{t("Playing from {folder}", { folder: pictures.playingFolder === FAVORITES ? t("Favorites") : folderName(pictures.playingFolder) })}</span><b>{t("Go there")}</b>
             </button>
           {/if}
         {/if}
@@ -355,7 +355,7 @@
             </div>
           {/if}
           <label class="opt"><input type="checkbox" class="switch" checked={show.captions} onchange={(event) => pictures.setOptions({ captions: event.currentTarget.checked })} /><span><b>{t("Names as captions")}</b>{t("A picture's file name shows along the bottom: name a file “Youth Night – Friday 7pm”.")}</span></label>
-          <label class="opt"><input type="checkbox" class="switch" checked={show.themeBackground} onchange={(event) => pictures.setOptions({ themeBackground: event.currentTarget.checked })} /><span><b>{t("Theme background")}</b>{t("The theme's colour or motion shows around a picture that does not fill the screen. Off: plain black.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.themeBackground} onchange={(event) => pictures.setOptions({ themeBackground: event.currentTarget.checked })} /><span><b>{t("Theme background")}</b>{t("The theme's color or motion shows around a picture that does not fill the screen. Off: plain black.")}</span></label>
           <label class="opt"><input type="checkbox" class="switch" checked={show.fill} onchange={(event) => pictures.setOptions({ fill: event.currentTarget.checked })} /><span><b>{t("Fill the screen")}</b>{t("Each picture fills the whole screen, trimming its edges if its shape differs. Off: the whole picture shows.")}</span></label>
         </details>
 

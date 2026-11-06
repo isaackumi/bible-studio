@@ -149,7 +149,7 @@
   .part:hover, .part:focus-visible { border-color: var(--accent); outline: none; background: color-mix(in srgb, var(--accent) 8%, var(--field)); }
   .part:hover :global(svg), .part:focus-visible :global(svg) { color: var(--accent-text); }
   .part.here { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-  .tag { flex: none; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, #f5a524 18%, transparent); color: var(--warn-text); font-size: 10px; font-style: normal; font-weight: 750; }
+  .tag { flex: none; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, #f5a524 18%, transparent); color: var(--warn-text); font-size: 11px; font-style: normal; font-weight: 750; }
   .newpart { display: flex; gap: 6px; }
   .newpart input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; font-size: 13px; }
   .go { flex: none; height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }

@@ -26,7 +26,7 @@
   const COLORS = ["#30a46c", "#fa4f00", "#e5484d", "#3b82f6", "#a855f7", "#f5a524", "#ffffff"];
   const FILLS: Array<[OverlayFill, string, string]> = [
     ["dark", msg("Dark"), msg("A dark box behind it")],
-    ["color", msg("Colour"), msg("A box filled with the colour")],
+    ["color", msg("Color"), msg("A box filled with the color")],
     ["clear", msg("None"), msg("Words only, no box")],
   ];
   const SIZES: Array<[OverlaySize, string]> = [["s", msg("Small")], ["m", msg("Medium")], ["l", msg("Large")], ["xl", msg("Huge")]];
@@ -153,12 +153,12 @@
           </div>
         </div>
         <div class="field">
-          <span class="field-name">{t("Colour")}</span>
-          <div class="swatches" role="radiogroup" aria-label={t("Colour")}>
+          <span class="field-name">{t("Color")}</span>
+          <div class="swatches" role="radiogroup" aria-label={t("Color")}>
             {#each COLORS as color (color)}
               <button type="button" role="radio" class="swatch" aria-checked={current?.color === color} aria-label={color} title={color} style:--swatch={color} onclick={() => setLook({ color })}></button>
             {/each}
-            <label class="swatch custom" title={t("Any colour")}><input type="color" aria-label={t("Any colour")} value={current?.color ?? "#30a46c"} onchange={(event) => setLook({ color: event.currentTarget.value })} /></label>
+            <label class="swatch custom" title={t("Any color")}><input type="color" aria-label={t("Any color")} value={current?.color ?? "#30a46c"} onchange={(event) => setLook({ color: event.currentTarget.value })} /></label>
           </div>
         </div>
         {#if tab === "countdown"}

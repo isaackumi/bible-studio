@@ -58,8 +58,8 @@
       : engine === "elevenlabs" || engine === "deepgram"
         ? t("Your sound goes to {service} while listening.", { service: CLOUD_SPEECH[engine].name })
         : desktop
-          ? t("The computer's own recognizer. A Mac may send the sound to Apple when it cannot recognise it on the computer.")
-          : t("The browser sends the sound to Google or Microsoft to recognise it."),
+          ? t("The computer's own recognizer. A Mac may send the sound to Apple when it cannot recognize it on the computer.")
+          : t("The browser sends the sound to Google or Microsoft to recognize it."),
   );
 
   let heard = $state("");

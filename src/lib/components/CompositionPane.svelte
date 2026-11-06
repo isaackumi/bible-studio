@@ -929,7 +929,7 @@
             {/each}
           </div>
           {#if (draft.edges ?? DEFAULT_EDGES) === "line" || (draft.edges ?? DEFAULT_EDGES) === "framed"}
-            <div class="edge-colors" role="radiogroup" aria-label={t("Edge colour")}>
+            <div class="edge-colors" role="radiogroup" aria-label={t("Edge color")}>
               {#each EDGE_COLORS as color (color)}
                 <button
                   type="button"
@@ -943,8 +943,8 @@
                   onclick={() => draft && touch(setCompositionEdgeColor(draft, color))}
                 ></button>
               {/each}
-              <label class="swatch custom" class:on={!EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff")} title={t("Another colour")} style:background={EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff") ? undefined : draft.edgeColor}>
-                <input type="color" aria-label={t("Another colour")} disabled={draft.locked} value={draft.edgeColor ?? "#ffffff"} oninput={(event) => draft && touch(setCompositionEdgeColor(draft, event.currentTarget.value))} />
+              <label class="swatch custom" class:on={!EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff")} title={t("Another color")} style:background={EDGE_COLORS.includes(draft.edgeColor ?? "#ffffff") ? undefined : draft.edgeColor}>
+                <input type="color" aria-label={t("Another color")} disabled={draft.locked} value={draft.edgeColor ?? "#ffffff"} oninput={(event) => draft && touch(setCompositionEdgeColor(draft, event.currentTarget.value))} />
               </label>
             </div>
           {/if}
@@ -1396,7 +1396,7 @@
   .layer-frame { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); cursor: move; z-index: 2; }
   .layer-frame.on { border: 2px solid var(--accent); }
   .layer-frame:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
-  .frame-label { position: absolute; left: 0; top: 0; padding: 1px 6px; border-radius: 0 0 4px 0; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+  .frame-label { position: absolute; left: 0; top: 0; padding: 1px 6px; border-radius: 0 0 4px 0; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none; }
   .handle { position: absolute; width: 10px; height: 10px; padding: 0; border: 2px solid #fff; border-radius: 2px; background: var(--accent); }
   .handle.n { top: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }
   .handle.s { bottom: -6px; left: 50%; margin-left: -5px; cursor: ns-resize; }

@@ -22,6 +22,7 @@
   import { isDesktop } from "../platform/runtime";
   import { loadLanguage, sanitizeUiLanguage, t, type UiLanguage } from "../i18n/core";
   import { createKeyboardManager, defaultShortcuts } from "../keyboard/manager";
+  import type { ShortcutMap } from "../domain/types";
   import FindOverlay from "./FindOverlay.svelte";
   import PartPickerDialog from "./pew/PartPickerDialog.svelte";
   import ObsDesk from "./obs/ObsDesk.svelte";
@@ -147,15 +148,40 @@
     const target = event.target instanceof HTMLElement ? event.target : null;
     // Inside a modal dialog, keys belong to the dialog (Space presses its button, never Take).
     // Escape still reaches the desk, which closes Find.
-    if (target?.closest('[aria-modal="true"]') && event.code !== "Escape") return;
+    // So do keys inside any pop-up dialog (a part's time, the Tools panel), modal or not.
+    if (target?.closest('[aria-modal="true"], [role="dialog"]') && event.code !== "Escape") return;
     // ⌘Z / Ctrl+Z outside text fields undoes the last Program change (text fields keep their own undo).
     const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
+    // Escape closes a drawer (Audience, Pictures) when not typing in it, after Find has had its turn.
+    if (event.code === "Escape" && !typing && !session.findOpen && !target?.closest('[aria-modal="true"]') && (audienceRoom.open || pictures.open)) {
+      event.preventDefault();
+      if (audienceRoom.open) audienceRoom.hide();
+      else pictures.hide();
+      return;
+    }
     if (event.code === "KeyZ" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && !typing) {
       event.preventDefault();
       void session.undoProgram();
       return;
     }
-    createKeyboardManager(session.workspace.shortcuts ?? defaultShortcuts, {
+    keyboardFor(session.workspace.shortcuts ?? defaultShortcuts).onKeyDown({
+      code: event.code,
+      target: target
+        ? { tagName: target.tagName, isContentEditable: target.isContentEditable, role: target.getAttribute("role") }
+        : null,
+      modified: event.metaKey || event.ctrlKey || event.altKey || event.shiftKey,
+      defaultPrevented: event.defaultPrevented,
+      preventDefault: () => event.preventDefault(),
+    });
+  }
+
+  // One manager for as long as the shortcuts stay the same: it remembers when a box was last typed
+  // in, so Backspace just after typing fixes a typo instead of clearing the screen. (A new one each
+  // key forgot that, and the guard never held.)
+  let keyboard: { map: ShortcutMap; manager: ReturnType<typeof createKeyboardManager> } | null = null;
+  function keyboardFor(map: ShortcutMap) {
+    if (keyboard?.map === map) return keyboard.manager;
+    const manager = createKeyboardManager(map, {
       take: () => void session.run("take"),
       cut: () => void session.run("cut"),
       previous: () => void session.run("previous"),
@@ -169,15 +195,9 @@
       library: () => session.run("library"),
       queue: () => session.run("queue"),
       find: () => session.run("find"),
-    }).onKeyDown({
-      code: event.code,
-      target: target
-        ? { tagName: target.tagName, isContentEditable: target.isContentEditable, role: target.getAttribute("role") }
-        : null,
-      modified: event.metaKey || event.ctrlKey || event.altKey,
-      defaultPrevented: event.defaultPrevented,
-      preventDefault: () => event.preventDefault(),
     });
+    keyboard = { map, manager };
+    return manager;
   }
 
   /** Black or white text, whichever reads on this accent (a light Mustard accent needs black). */
@@ -275,6 +295,8 @@
 <style>
   .corner-notes { position: fixed; left: 20px; bottom: 20px; z-index: 900; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
   .corner-notes > :global(*) { pointer-events: auto; }
+  /* The note itself lets clicks through to what is beneath; only its buttons take them (Toast). */
+  .corner-notes > :global(.toast) { pointer-events: none; }
   .top-alerts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 890; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(620px, calc(100vw - 32px)); pointer-events: none; }
   .top-alerts > :global(*) { pointer-events: auto; }
 </style>

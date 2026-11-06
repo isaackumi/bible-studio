@@ -923,7 +923,7 @@
             <input type="checkbox" class="switch" role="switch" aria-label={t("Send sound with the picture")} disabled={!isDesktop() || ndiSoon} checked={session.workspace.ndiAudio} onchange={(event) => void session.setNdiAudio(event.currentTarget.checked)} />
           </div>
           <div class="row">
-            <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends colour bars, and a beep each second when sound is on, under the same name, so you can add the source in vMix, OBS or any NDI app and check the sound before the service.")}</span></div>
+            <div class="row-copy"><strong>{t("Find it first")}</strong><span>{t("Sends color bars, and a beep each second when sound is on, under the same name, so you can add the source in vMix, OBS or any NDI app and check the sound before the service.")}</span></div>
             <button type="button" class="btn" disabled={!isDesktop() || ndiSoon || session.ndi.status === "starting"} onclick={() => (session.ndi.status === "on" && session.ndi.pattern ? void session.stopNdi() : void session.startNdi({ pattern: true }))}>
               {session.ndi.status === "on" && session.ndi.pattern ? t("Stop test") : t("Send test pattern")}
             </button>
@@ -1680,7 +1680,7 @@
             {#if signInError}<p class="form-error" role="alert">{signInError}</p>{/if}
             {#if profile.token && usableLicences(session.accountLicenses).length > 1}
               <div class="row stack">
-                <div class="row-copy"><strong>{t("Your licences")}</strong><span>{t("Each licence keeps its own library on this computer. Switching restarts Church Studio and leaves this library exactly as it is, to come back to. Bibles and settings are kept with each one.")}</span></div>
+                <div class="row-copy"><strong>{t("Your licenses")}</strong><span>{t("Each license keeps its own library on this computer. Switching restarts Church Studio and leaves this library exactly as it is, to come back to. Bibles and settings are kept with each one.")}</span></div>
               </div>
               {#each usableLicences(session.accountLicenses) as entry (entry.license)}
                 <div class="row">

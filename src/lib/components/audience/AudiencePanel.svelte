@@ -333,8 +333,8 @@
   .share-head span { display: grid; gap: 2px; }
   .share-head strong { font-size: 13px; }
   .share-head em { font-style: normal; color: var(--muted); font-size: 12px; line-height: 1.4; }
-  .tabs { display: grid; grid-template-columns: 1fr 0.8fr 1.25fr 1fr; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
-  .tabs button { height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
+  .tabs { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: color-mix(in srgb, currentColor 7%, transparent); }
+  .tabs button { flex: 1 1 auto; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; white-space: nowrap; cursor: pointer; }
   /* The chosen tab in ink on the panel, like the filters below: panel-2 was too close to the panel to see. */
   .tabs button.on { background: var(--ink); color: var(--panel); }
   .tabs button.on b { background: var(--accent); }

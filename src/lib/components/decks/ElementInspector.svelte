@@ -86,7 +86,7 @@
       <div class="field-row">
         <span>{t("Outline")}</span>
         <span class="inline">
-          <input type="color" aria-label={t("Outline colour")} value={payload.stroke ?? "#ffffff"} oninput={(event) => setPayload({ stroke: event.currentTarget.value, strokeWidth: payload.strokeWidth && Number(payload.strokeWidth) > 0 ? payload.strokeWidth : "4" })} />
+          <input type="color" aria-label={t("Outline color")} value={payload.stroke ?? "#ffffff"} oninput={(event) => setPayload({ stroke: event.currentTarget.value, strokeWidth: payload.strokeWidth && Number(payload.strokeWidth) > 0 ? payload.strokeWidth : "4" })} />
           <input class="field" type="range" min="0" max="24" aria-label={t("Outline width")} value={Number(payload.strokeWidth ?? 0)} onchange={(event) => setPayload({ strokeWidth: event.currentTarget.value, stroke: payload.stroke ?? "#ffffff" })} />
         </span>
       </div>
@@ -100,8 +100,8 @@
     {/if}
   {:else if layer.source.type === "icon"}
     <div class="field-row">
-      <span>{t("Colour")}</span>
-      <input type="color" aria-label={t("Icon colour")} value={payload.color ?? "#ffffff"} oninput={(event) => setPayload({ color: event.currentTarget.value })} />
+      <span>{t("Color")}</span>
+      <input type="color" aria-label={t("Icon color")} value={payload.color ?? "#ffffff"} oninput={(event) => setPayload({ color: event.currentTarget.value })} />
     </div>
     <label class="field-row">
       <span>{t("Line weight")}</span>
@@ -205,7 +205,7 @@
   <div class="stack">
     <span>{t("Line up on the page")}</span>
     <div class="align" role="group" aria-label={t("Line up on the page")}>
-      {#each [["left", t("Left")], ["center", t("Centre")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
+      {#each [["left", t("Left")], ["center", t("Center")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
         <button type="button" disabled={layer.locked} onclick={() => oncommit(resizeLayer(page, layer.id, alignToPage(layer.bounds, where as "left")))}>{label}</button>
       {/each}
     </div>

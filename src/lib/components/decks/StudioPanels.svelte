@@ -162,7 +162,7 @@
         <button type="button" class="swatch" aria-label={t("Gradient {n}", { n: index + 1 })} style:background={fillCss(fill)} onclick={() => actions.setFill(fill)}></button>
       {/each}
     </div>
-    <h3>{t("Colours")}</h3>
+    <h3>{t("Colors")}</h3>
     <div class="swatches">
       {#each SOLIDS as color (color)}
         <button type="button" class="swatch" aria-label={color} style:background={color} onclick={() => actions.setFill({ kind: "solid", color })}></button>
@@ -189,7 +189,7 @@
   .combo span + span { opacity: 0.75; }
   .shapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .shape { display: grid; grid-template-rows: 46px auto; gap: 4px; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; font: inherit; }
-  .shape small { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shape small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mark { display: block; width: 60%; height: 100%; justify-self: center; background: var(--ink); }
   .icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
   .icon { aspect-ratio: 1; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; padding: 0; }

@@ -361,6 +361,9 @@
 
   function onKey(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null;
+    // Handled already (Alt+↓ on a grip moved the item): stepping too would also send the next item
+    // LIVE with Auto LIVE on. Keys inside a dialog are the dialog's.
+    if (event.defaultPrevented || target?.closest('[aria-modal="true"]')) return;
     if (target?.closest("input, textarea, select, [contenteditable]")) return;
     if ((event.key === "a" || event.key === "A") && !event.metaKey && !event.ctrlKey && !event.altKey && service && barPart && !addOpen && !editing) {
       event.preventDefault();
@@ -897,7 +900,7 @@
   .row.live::before { background: #30a46c; }
   /* A small calendar leaf: the day it last ran (or was edited). */
   .svc-date { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 38px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); line-height: 1; }
-  .svc-date small { font-size: 10px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .svc-date small { font-size: 11px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .svc-date b { margin-top: 3px; font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
   .row.on .svc-date { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
   .row.on .svc-date small { color: var(--accent-text); }
@@ -991,13 +994,13 @@
   .item-copy { flex: 1; display: grid; gap: 1px; min-width: 0; }
   .item-copy strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mini-map { display: flex; gap: 2px; overflow: hidden; }
-  .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 10px; font-weight: 700; line-height: 15px; }
+  .mini-map i { flex: none; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--tone) 26%, var(--field)); color: var(--ink); font-style: normal; font-size: 11px; font-weight: 700; line-height: 15px; }
   .item-details { font-size: 11px; color: var(--ink); opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item-edit { flex: 1 0 100%; display: grid; grid-template-columns: minmax(0, 1fr) 70px; gap: 6px; padding: 6px 8px 8px 36px; }
   .item-edit textarea { grid-column: 1 / -1; resize: vertical; }
   .item-edit input, .item-edit textarea { min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
   .item-copy em { font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 750; }
+  .badge { flex: none; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 750; }
   .live-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--live); color: #fff; letter-spacing: 0.04em; }
   .live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: live-dot 1.4s ease-in-out infinite; }
   @keyframes live-dot { 50% { opacity: 0.35; } }
@@ -1039,7 +1042,7 @@
   .desk-tag:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .desk-jump { display: inline-flex; align-items: center; gap: 4px; flex: none; }
   .desk-tag.production { border-color: color-mix(in srgb, #a855f7 50%, var(--line)); background: color-mix(in srgb, #a855f7 12%, transparent); }
-  .head-main :global(.menu .menu-note) { margin: 6px 10px 2px; font-size: 10.5px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .head-main :global(.menu .menu-note) { margin: 6px 10px 2px; font-size: 11px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .part-add { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
   .part-add:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent-text); }
   .service-desk.no-stage { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -1085,7 +1088,7 @@
   .key-hints { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px 14px; margin: 6px 14px 0; font-size: 11px; color: var(--muted); opacity: 0.75; mask-image: linear-gradient(90deg, #000 85%, transparent); }
   .key-hints:hover { opacity: 1; }
   .key-hints span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-  .key-hints kbd { min-width: 18px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--field); color: var(--ink); font: inherit; font-size: 10px; font-weight: 700; text-align: center; }
+  .key-hints kbd { min-width: 18px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--field); color: var(--ink); font: inherit; font-size: 11px; font-weight: 700; text-align: center; }
   .time-up { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 10px 14px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, #f5a524 60%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #f5a524 14%, var(--panel)); animation: time-up-in 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
   .time-up-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #f5a524; color: #111; animation: time-up-pulse 1.6s ease-out infinite; }
   .time-up-copy { flex: 1 1 200px; display: grid; gap: 1px; min-width: 0; }

@@ -84,7 +84,7 @@ export const CHANGELOG: Release[] = [
       { icon: "mic", title: msg("Listening knows how sure it is"), text: msg("A verse it is sure of goes to Preview as before. When it is not sure, the verse waits under Detections marked Check, and nothing on your screens changes. Autopilot puts a verse live only when listening is sure of it."), show: null },
       { icon: "speed", title: msg("A warning before the computer struggles"), text: msg("When the processors stay too busy or memory runs low, an alert says what is causing it and offers what helps, such as lighter listening or holding backgrounds still. See it and set it in Settings › Performance."), show: null },
       { icon: "users", title: msg("Prayer requests and reactions from phones"), text: msg("People can send a prayer request that only the desk sees, and react during the service. New questions wait for you to approve them, and the Audience button shows how many are waiting."), show: null },
-      { icon: "media", title: msg("Pictures load faster, with search and Favourites"), text: msg("Pictures shows small copies, so big folders open quickly. Find a picture by name, and star the ones you use often."), show: null },
+      { icon: "media", title: msg("Pictures load faster, with search and Favorites"), text: msg("Pictures shows small copies, so big folders open quickly. Find a picture by name, and star the ones you use often."), show: null },
       { icon: "list", title: msg("Who, how long and notes on each item"), text: msg("On the Service page, the note button on an item keeps who brings it, how many minutes it takes, and notes for the desk. None of it is shown on the screen."), show: null },
     ],
   },
@@ -116,7 +116,7 @@ export const CHANGELOG: Release[] = [
     highlights: [
       { icon: "transition", title: msg("A third desk: the Conductor Desk"), text: msg("Next and Live side by side with a lever between them: push it up and Next goes live. The service runs along the top, one box finds verses, songs and service items, and listening drops the verses it hears onto Next. Choose it in the desk switcher.") },
       { icon: "type", title: msg("The screen's look, changed while it shows"), text: msg("On the Conductor Desk, text size, font, lining up, where the words sit, the theme and the Bible version are on one line under the screens. Changes show on the screen at once, or wait on Next for the lever.") },
-      { icon: "eye", title: msg("Easier to read and use"), text: msg("Clearer colours on the Day desk, a visible outline on every search box, larger small text, and the computer's Increase contrast and Reduce motion settings followed.") },
+      { icon: "eye", title: msg("Easier to read and use"), text: msg("Clearer colors on the Day desk, a visible outline on every search box, larger small text, and the computer's Increase contrast and Reduce motion settings followed.") },
     ],
   },
   {
@@ -193,7 +193,7 @@ export const CHANGELOG: Release[] = [
     version: "0.5.4",
     date: "2026-10-24",
     highlights: [
-      { icon: "cloud", title: msg("Your library in the cloud"), text: msg("Premium and Church keep songs, services, slides and media in the cloud: every computer on the licence sees the same library, and a new computer gets it all back when it signs in. Settings › Account shows the space used and lets you free some.") },
+      { icon: "cloud", title: msg("Your library in the cloud"), text: msg("Premium and Church keep songs, services, slides and media in the cloud: every computer on the license sees the same library, and a new computer gets it all back when it signs in. Settings › Account shows the space used and lets you free some.") },
       { icon: "laptop", title: msg("Moving to a new computer"), text: msg("Move Premium to this computer in one step; the one it left drops to Free. Or carry the whole library in a .churchstudio file from Settings › Storage, media included.") },
       { icon: "layout", title: msg("Design studio: show without leaving"), text: msg("Going live keeps the studio open. A glass bar over the canvas says which page is live, steps pages, previews, runs a slideshow at the pace you choose, and can be dragged anywhere or folded to a dot.") },
       { icon: "sparkles", title: msg("Tours, search, and games"), text: msg("Guided tours for the audience, the design studio, pictures and sound. Go to anything (⌘K / Ctrl+K) finds settings, actions and help. The quiz leaderboard climbs between answers again, and questions move on by themselves.") },
@@ -266,7 +266,7 @@ export const CHANGELOG: Release[] = [
     version: "0.4.6",
     date: "2026-10-24",
     highlights: [
-      { icon: "layout", title: msg("A proper design studio"), text: msg("Templates, Text, Elements, Pictures and Background sit beside the canvas, with your pages along the bottom. About 400 templates in 16 kinds of page, each laid out for your screen, in any of 20 colour palettes and 6 font pairs.") },
+      { icon: "layout", title: msg("A proper design studio"), text: msg("Templates, Text, Elements, Pictures and Background sit beside the canvas, with your pages along the bottom. About 400 templates in 16 kinds of page, each laid out for your screen, in any of 20 color palettes and 6 font pairs.") },
       { icon: "download", title: msg("More templates to download"), text: msg("Add packs for Advent and Christmas, Easter, youth and kids, outreach, weddings and funerals, and sermon series when you want them.") },
       { icon: "screens", title: msg("From the studio to the screen"), text: msg("Show puts the page on Preview, shows it now, adds the deck to the service, or plays every page as a slideshow. My designs opens any deck, the newest first.") },
     ],
@@ -305,9 +305,9 @@ export const CHANGELOG: Release[] = [
     version: "0.4.2",
     date: "2026-10-24",
     highlights: [
-      { icon: "users", title: msg("Quizzes like a game show"), text: msg("Each player gets a colour. The screen shows a lobby, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as their points count up, and a podium with confetti. Music and sounds, and it can run by itself.") },
+      { icon: "users", title: msg("Quizzes like a game show"), text: msg("Each player gets a color. The screen shows a lobby, a Get ready countdown, the clock, how the room answered and who was fastest, a leaderboard where people climb as their points count up, and a podium with confetti. Music and sounds, and it can run by itself.") },
       { icon: "sparkles", title: msg("Quizzes written by your AI"), text: msg("From today's sermon, a book you are reading together, a Bible passage, a topic, or anything you paste: a summary, an article, notes or questions. You check every question before anyone plays.") },
-      { icon: "phone", title: msg("Phones in the game"), text: msg("Each phone shows its player's colour, the answer shapes and the clock, then their points, their streak and their place: 2nd of 23.") },
+      { icon: "phone", title: msg("Phones in the game"), text: msg("Each phone shows its player's color, the answer shapes and the clock, then their points, their streak and their place: 2nd of 23.") },
       { icon: "speed", title: msg("Steady for a whole service"), text: msg("The audience screen stays awake, videos free their memory when they leave the screen, moving backgrounds take far less of the computer, and the Audience drawer opens to the full window.") },
     ],
   },
@@ -317,7 +317,7 @@ export const CHANGELOG: Release[] = [
     highlights: [
       { icon: "layout", title: msg("Settings always in reach"), text: msg("The top bar fits any screen and text size: the desks are two small groups, and the tools on the right, with Settings, never leave the screen.") },
       { icon: "phone", title: msg("The phone remote over the internet"), text: msg("In Settings \u203a Phone remote, choose Internet: a phone on mobile data or another Wi-Fi controls the desk, after you approve it here. Wi-Fi stays the default.") },
-      { icon: "folder", title: msg("Pictures: folders, Google Drive and videos"), text: msg("Folders show as coloured tiles with a path to click back through. Google Drive, iCloud, Dropbox and OneDrive appear when synced to this computer, and videos play in a slideshow to the end.") },
+      { icon: "folder", title: msg("Pictures: folders, Google Drive and videos"), text: msg("Folders show as colored tiles with a path to click back through. Google Drive, iCloud, Dropbox and OneDrive appear when synced to this computer, and videos play in a slideshow to the end.") },
       { icon: "media", title: msg("Slideshow options"), text: msg("Switch on what you want: shuffle or newest first, a slow zoom, file names as captions, a countdown over the pictures, music that fades when it ends, and new pictures joining as they arrive.") },
     ],
   },
@@ -385,7 +385,7 @@ export const CHANGELOG: Release[] = [
       { icon: "list", title: msg("Each part runs where you choose"), text: msg("On the Service page, a part can use the running order, the Presenter desk, the Production desk or any mix, skip this week, and show a countdown or the leader’s name your way.") },
       { icon: "search", title: msg("Go to anything"), text: msg("Press Command-K (Ctrl+K on Windows) on any page to jump to a part, a song, a verse or a setting.") },
       { icon: "globe", title: msg("Church Studio in Spanish"), text: msg("The whole desk in Spanish, chosen in Settings or from the computer’s language.") },
-      { icon: "layout", title: msg("Cleaner looks on Production"), text: msg("Choose how regions meet (none, line, gap or framed panels) and the line’s colour, with more room for the picture.") },
+      { icon: "layout", title: msg("Cleaner looks on Production"), text: msg("Choose how regions meet (none, line, gap or framed panels) and the line’s color, with more room for the picture.") },
       { icon: "check", title: msg("Fixes"), text: msg("Stronger borders and other settings are kept, the Privacy switch sits beside its text, long names fit, and Settings › Updates links the terms and privacy policy.") },
     ],
   },

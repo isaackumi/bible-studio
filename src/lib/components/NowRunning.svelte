@@ -182,7 +182,7 @@
 {:else if lead}
   <div class="island" class:expanded class:placed={place} bind:this={island} style:left={place ? `${place.x}px` : undefined} style:top={place ? `${place.y}px` : undefined} role="region" data-tour="now-running" aria-label={t("Now running")} transition:fly={{ y: -16, duration: 220 }}>
     <div class="pill tone-{lead.tone}">
-      <span class="grip" role="button" tabindex="-1" aria-label={t("Move")} data-tip={t("Drag to move · double-click to centre")} onpointerdown={grab} onpointermove={move} onpointerup={release} onpointercancel={release} ondblclick={recentre}><Icon name="grip" size={14} /></span>
+      <span class="grip" role="button" tabindex="-1" aria-label={t("Move")} data-tip={t("Drag to move · double-click to center")} onpointerdown={grab} onpointermove={move} onpointerup={release} onpointercancel={release} ondblclick={recentre}><Icon name="grip" size={14} /></span>
       <span class="pulse" aria-hidden="true"></span>
       <Icon name={lead.icon} size={14} />
       <button type="button" class="what" onclick={() => (lead.open ? lead.open() : (expanded = !expanded))} title={lead.open ? t("Go to it") : undefined}>

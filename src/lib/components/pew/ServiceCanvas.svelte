@@ -489,7 +489,7 @@
   .node-name { flex: 1; min-width: 0; height: 30px; padding: 0 6px; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 750; cursor: text; }
   .node-name:hover, .node-name:focus { border-color: var(--line); background: var(--field); outline: none; }
   .node-name:focus-visible { border-color: var(--accent); }
-  .now { padding: 2px 8px; border-radius: 9px; background: #30a46c; color: #fff; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+  .now { padding: 2px 8px; border-radius: 9px; background: #30a46c; color: #fff; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
   .tool { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 11px; }
   .tool:hover { background: var(--field); color: var(--ink); }
   .tool.armed { background: var(--danger, #e5484d); color: #fff; }
@@ -502,7 +502,7 @@
   .item.on { border-color: color-mix(in srgb, #30a46c 60%, transparent); background: color-mix(in srgb, #30a46c 10%, transparent); }
   .item.live { border-color: color-mix(in srgb, var(--live, #fa4f00) 60%, transparent); background: color-mix(in srgb, var(--live, #fa4f00) 12%, transparent); }
   .item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { flex: none; padding: 1px 6px; border-radius: 6px; background: #30a46c; color: #fff; font-size: 10px; font-weight: 750; }
+  .badge { flex: none; padding: 1px 6px; border-radius: 6px; background: #30a46c; color: #fff; font-size: 11px; font-weight: 750; }
   .badge.live { background: var(--live, #fa4f00); }
   .more, .empty { padding: 6px 8px; font-size: 12px; color: var(--muted); }
   .node-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 10px; }
