@@ -361,6 +361,9 @@
 
   function onKey(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null;
+    // Handled already (Alt+↓ on a grip moved the item): stepping too would also send the next item
+    // LIVE with Auto LIVE on. Keys inside a dialog are the dialog's.
+    if (event.defaultPrevented || target?.closest('[aria-modal="true"]')) return;
     if (target?.closest("input, textarea, select, [contenteditable]")) return;
     if ((event.key === "a" || event.key === "A") && !event.metaKey && !event.ctrlKey && !event.altKey && service && barPart && !addOpen && !editing) {
       event.preventDefault();

@@ -107,6 +107,20 @@ describe("keyboard manager", () => {
   });
 });
 
+describe("keys held with Ctrl, Cmd, Alt or Shift", () => {
+  it("never change Program: copying selected lyrics (Ctrl+C) does not also CUT", () => {
+    const seen: string[] = [];
+    const manager = createKeyboardManager(defaultShortcuts, { cut: () => seen.push("cut"), black: () => seen.push("black"), "clear-words": () => seen.push("clear-words"), logo: () => seen.push("logo"), take: () => seen.push("take") });
+    for (const code of ["KeyC", "KeyB", "KeyW", "KeyL", "Space"]) {
+      const key = press(code);
+      key.event.modified = true;
+      manager.onKeyDown(key.event);
+      expect(key.prevented()).toBe(false);
+    }
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("changing shortcuts", () => {
   it("moves a key that another action had, and refuses reserved keys", async () => {
     const { assignShortcut, canAssign, defaultShortcuts, shortcutLabels } = await import("./manager");

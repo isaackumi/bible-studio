@@ -699,7 +699,7 @@
     if (!arm(`song:${song.id}`)) return;
     await session.deleteSong(song.id);
     selectedId = null;
-    note = `${song.title} deleted.`;
+    note = "";
   }
 </script>
 

@@ -14,7 +14,7 @@
   const videos = $derived(pictures.images.filter((entry) => entry.kind === "video").length);
   const favoritesOpen = $derived(pictures.folder === FAVORITES);
   const crumbs = $derived(pictures.folder && !favoritesOpen ? crumbsOf(pictures.folder) : []);
-  const folderLabel = $derived(favoritesOpen ? t("Favourites") : pictures.folder ? folderName(pictures.folder) : "");
+  const folderLabel = $derived(favoritesOpen ? t("Favorites") : pictures.folder ? folderName(pictures.folder) : "");
   /** What the grid shows: every picture, or those whose names hold the words typed. */
   const shownImages = $derived(pictures.query.trim() ? pictures.images.filter((entry) => matchesQuery(entry.name, pictures.query)) : pictures.images);
   const parent = $derived(crumbs.length > 1 ? crumbs[crumbs.length - 2]! : null);
@@ -196,7 +196,7 @@
         <span class="places-label">{t("Go to")}</span>
         {#if pictures.favorites.length}
           <button type="button" class="place" class:on={favoritesOpen} onclick={() => pictures.openFavorites()}>
-            <i style:background="#f5a524"><Icon name="star" size={11} /></i>{t("Favourites")}
+            <i style:background="#f5a524"><Icon name="star" size={11} /></i>{t("Favorites")}
           </button>
         {/if}
         {#each pictures.places as place (place.path)}
@@ -244,7 +244,7 @@
                   <img use:thumb={entry.path} alt={entry.name} decoding="async" />
                 {/if}
               </button>
-              <button type="button" class="star" class:on={starred} aria-pressed={starred} aria-label={starred ? t("Take {name} out of Favourites", { name: entry.name }) : t("Add {name} to Favourites", { name: entry.name })} onclick={() => pictures.toggleFavorite(entry)}><Icon name="star" size={12} /></button>
+              <button type="button" class="star" class:on={starred} aria-pressed={starred} aria-label={starred ? t("Take {name} out of Favorites", { name: entry.name }) : t("Add {name} to Favorites", { name: entry.name })} onclick={() => pictures.toggleFavorite(entry)}><Icon name="star" size={12} /></button>
             </li>
           {/each}
         </ul>
@@ -290,7 +290,7 @@
           </div>
           {#if pictures.playingFolder && pictures.folder !== pictures.playingFolder}
             <button type="button" class="elsewhere" onclick={() => pictures.playingFolder && pictures.openFolder(pictures.playingFolder)}>
-              <Icon name="folder-open" size={14} /><span>{t("Playing from {folder}", { folder: pictures.playingFolder === FAVORITES ? t("Favourites") : folderName(pictures.playingFolder) })}</span><b>{t("Go there")}</b>
+              <Icon name="folder-open" size={14} /><span>{t("Playing from {folder}", { folder: pictures.playingFolder === FAVORITES ? t("Favorites") : folderName(pictures.playingFolder) })}</span><b>{t("Go there")}</b>
             </button>
           {/if}
         {/if}

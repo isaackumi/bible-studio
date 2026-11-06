@@ -4560,6 +4560,11 @@ class Session {
   /** Delete a service; if it is the one open, the next one opens (or none). */
   deleteService = async (id: string) => {
     const name = this.services.find((entry) => entry.id === id)?.name ?? "Service";
+    // Never the one running now: another service would open in its place mid-service.
+    if (this.service?.id === id && this.serviceRunning) {
+      this.warn(t("{name} is running. End the service before deleting it.", { name }));
+      return;
+    }
     await api.serviceDelete(id);
     this.cloudSoon();
     this.services = await api.serviceList();
@@ -6573,6 +6578,16 @@ class Session {
     this.toast = null;
   };
 
+  /** The pointer or keyboard is on the toast (reaching for Undo): it waits, and goes a little after. */
+  holdToast = (held: boolean) => {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (held || !this.toast) return;
+    const id = this.toast.id;
+    this.toastTimer = setTimeout(() => {
+      if (this.toast?.id === id) this.toast = null;
+    }, 3000);
+  };
+
   /** Start a tour, on its own page or desk, from any step. */
   startTour = async (id: TourId, from = 0) => {
     if (!(await this.openTourPage(id))) return;
@@ -7914,14 +7929,30 @@ class Session {
   };
 
   deleteSong = async (id: string) => {
+    const kept = this.songs.find((entry) => entry.id === id);
     await api.songDelete(id);
     this.cloudSoon();
     this.songs = await api.songList();
+    // A song deleted by mistake comes back as it was, from the toast.
+    if (kept) {
+      this.notify(t("{name} deleted.", { name: kept.title || t("Untitled song") }), {
+        ms: 10_000,
+        actions: [{ label: t("Undo"), run: () => { this.dismissToast(); void this.restoreSong(kept); } }],
+      });
+    }
     if (this.songFocus?.songId === id) {
       this.songFocus = null;
       this.warn(t("That song is no longer available."));
       this.previewModel(emptyModel(this.theme()), null);
     }
+  };
+
+  /** Put back a song deleted a moment ago (Undo). */
+  restoreSong = async (song: Song) => {
+    await api.songSave(sanitizeSong(song));
+    this.cloudSoon();
+    this.songs = await api.songList();
+    this.message = t("{name} is back.", { name: song.title || t("Untitled song") });
   };
 
   searchSongs = async (query: string) => {

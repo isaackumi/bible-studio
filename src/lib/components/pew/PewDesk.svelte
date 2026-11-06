@@ -64,6 +64,8 @@
   let detections = $state<SearchHit[]>([]);
   /** The last lines heard, for the transcript (older ones fade back). */
   const heard = $derived(session.captions.lines.slice(-40));
+  /** The screen is black on purpose: BLACK stays lit so it does not look like "nothing sent". */
+  const isBlack = $derived(session.live.program.model.layout === "black");
   const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
   const keyOf = (action: "take" | "black" | "clear" | "clear-words") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
@@ -823,10 +825,10 @@
         <button type="button" class="desk-btn" data-tip={t("Send to the audience from this window")} onclick={() => session.claimAudience()}>{t("Take control")}</button>
       {/if}
       <OutputMenu />
-      {#if session.liveOnClick}
-        <!-- Auto LIVE: while the service runs a click or an arrow goes straight to the audience. Said
-             beside LIVE, and one click puts Preview first again. -->
-        <button type="button" class="desk-btn auto-live" data-tip={t("Auto LIVE is on: a click or an arrow goes straight to the audience. Click for Preview first.")} onclick={() => session.setLiveOnClick(false)}>{t("Auto LIVE")}</button>
+      {#if session.liveOnClick || session.serviceRunning}
+        <!-- Auto LIVE: while the service runs a click or an arrow goes straight to the audience. A
+             switch beside LIVE that says which it is, on or off, and turns either way. -->
+        <button type="button" role="switch" aria-checked={session.liveOnClick} class="desk-btn auto-live" class:off={!session.liveOnClick} data-tip={session.liveOnClick ? t("Auto LIVE is on: a click or an arrow goes straight to the audience. Click for Preview first.") : t("Auto LIVE is off: a click goes to Preview, and LIVE sends it. Click to send clicks straight to the audience.")} onclick={() => session.setLiveOnClick(!session.liveOnClick)}><span class="switch-knob" aria-hidden="true"></span>{t("Auto LIVE")}</button>
       {/if}
       <button
         type="button"
@@ -836,9 +838,10 @@
         data-tip={`${displayLive ? t("On air: the audience sees Program") : programSet ? t("Program is set, but the audience window is closed") : t("Send Preview to Program")} (${keyOf("take")})`}
         onclick={() => session.take()}
       ><span class="pip"></span>{t("LIVE")}</button>
-      <!-- BLACK always shows: it is the button for when the wrong thing is up. CLEAR shows too;
-           hovering (or tabbing to) it slides out CLEAR WORDS. Every key works whether or not it shows. -->
-      <button type="button" class="desk-btn danger" data-tip={`${t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
+      <!-- BLACK always shows: it is the button for when the wrong thing is up, and it stays lit while
+           the screen is black. CLEAR shows too; hovering (or tabbing to) it drops CLEAR WORDS below it,
+           so nothing in this row moves under the pointer. Every key works whether or not it shows. -->
+      <button type="button" class="desk-btn danger" class:lit={isBlack} aria-pressed={isBlack} data-tip={`${isBlack ? t("The screen is black now") : t("Black program")} (${keyOf("black")})`} onclick={() => session.black()}>{t("BLACK")}</button>
       <span class="clears" role="group" aria-label={t("Clear")}>
         <span class="clears-more">
           <span class="clears-row">
@@ -847,10 +850,9 @@
         </span>
         <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
-      {#if session.canUndoProgram}
-        <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. -->
-        <button type="button" class="desk-btn ghost" data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
-      {/if}
+      <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. Its
+           place is kept while there is nothing to undo, so LIVE and BLACK never shift. -->
+      <button type="button" class="desk-btn ghost undo-slot" class:idle={!session.canUndoProgram} disabled={!session.canUndoProgram} aria-hidden={!session.canUndoProgram} tabindex={session.canUndoProgram ? 0 : -1} data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
     </div>
     <nav class="pb-tools" aria-label={t("Tools")}>
       <button type="button" class="desk-btn icon" aria-label={t("Go to anything")} data-tip={keys(t("Go to a page, song, verse, part or setting (⌘K)"))} onclick={() => (session.commandOpen = true)}><Icon name="search" size={16} /></button>
@@ -1066,7 +1068,6 @@
                   <span class="empty-icon" class:on={voiceActive}>{@render icon("mic")}</span>
                   <strong>{voiceActive ? t("Listening…") : t("Not listening")}</strong>
                   <span>{voiceActive ? t("What is said shows here, and verses it hears go to Preview.") : t("Start listening: what is said shows here, and verses it hears go to Preview.")}</span>
-                  {#if !voiceActive && session.voice.status !== "starting"}<button type="button" class="empty-action" onclick={toggleVoice}>{@render icon("mic")} {t("Start listening")}</button>{/if}
                 </div>
               {/if}
             </div>
@@ -1352,7 +1353,14 @@
   .shows-on { min-width: 0; margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
   .shows-on:hover { color: var(--ink); }
   /* Auto LIVE is on: said beside LIVE, in its colour. */
-  .auto-live { border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: #ff6b6b; font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
+  .auto-live { display: inline-flex; align-items: center; gap: 7px; border-color: color-mix(in srgb, #ff4d4d 55%, var(--line)); color: var(--live-text, #ff6b6b); font-size: 11px; font-weight: 750; letter-spacing: 0.02em; }
+  .auto-live.off { border-color: var(--line); color: var(--muted); }
+  /* A small switch: lit and to the right when on, grey and to the left when off. */
+  .switch-knob { position: relative; width: 22px; height: 12px; border-radius: 999px; background: currentColor; opacity: 0.9; }
+  .switch-knob::after { content: ""; position: absolute; top: 2px; left: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--panel); transition: left 160ms ease; }
+  .auto-live.off .switch-knob { opacity: 0.5; }
+  .auto-live.off .switch-knob::after { left: 2px; }
+  @media (prefers-reduced-motion: reduce) { .switch-knob::after { transition: none; } }
   .pb {
     height: 100%;
     min-height: 0;
@@ -1693,8 +1701,6 @@
   .panel-empty > span:not(.empty-icon) { max-width: 260px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
   .empty-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--muted); }
   .empty-icon.on { background: color-mix(in srgb, var(--presence) 16%, transparent); color: var(--presence-text); }
-  .empty-action { margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
-  .empty-action:hover { filter: brightness(1.08); }
   .queue-actions { display: flex; gap: 8px; }
   .verse:hover:not(.picked), .queue button:hover:not(.on), .detections button:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--line)); }
   .verse.picked { border-color: var(--accent); }
@@ -1749,14 +1755,17 @@
     padding: 0 10px;
   }
   .steppers { display: flex; gap: 6px; }
-  .clears { display: inline-flex; align-items: center; gap: 6px; }
+  .clears { position: relative; display: inline-flex; align-items: center; gap: 6px; }
   /* CLEAR WORDS slides out of CLEAR on hover. A grid track from 0fr to 1fr animates to the words'
      real width (max-width to a guess overshot: done in a third of the time, then a wait before it
      closed), with the gap folded in so nothing jumps. */
-  .clears-more { display: grid; grid-template-columns: 0fr; margin-right: -6px; opacity: 0; transition: grid-template-columns 240ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-right 240ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease 40ms; }
-  .clears-row { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; padding-right: 6px; transform: translateX(6px); transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .clears:hover .clears-more, .clears:focus-within .clears-more { grid-template-columns: 1fr; margin-right: 0; opacity: 1; transition-delay: 0ms, 0ms, 0ms; }
-  .clears:hover .clears-row, .clears:focus-within .clears-row { transform: none; }
+  /* CLEAR WORDS drops below CLEAR (over the desk, never across the bar), with a bridge so the pointer
+     can travel down to it. */
+  .clears-more { position: absolute; top: 100%; right: 0; z-index: 40; padding-top: 6px; opacity: 0; pointer-events: none; transform: translateY(-4px); transition: opacity 140ms ease, transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .clears-row { display: inline-flex; align-items: center; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: 0 10px 28px rgb(0 0 0 / 0.35); white-space: nowrap; }
+  .clears:hover .clears-more, .clears:focus-within .clears-more { opacity: 1; pointer-events: auto; transform: none; }
+  .undo-slot.idle { visibility: hidden; }
+  .desk-btn.danger.lit { background: #000; color: #fff; box-shadow: inset 0 0 0 2px var(--live, #e5484d); }
   .clears-main { position: relative; }
   .clears-main::after { content: ""; position: absolute; right: 3px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: currentColor; opacity: 0.45; transition: opacity 160ms ease; }
   .clears:hover .clears-main::after, .clears:focus-within .clears-main::after { opacity: 0; }

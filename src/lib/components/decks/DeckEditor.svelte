@@ -676,7 +676,8 @@
   .loop-row select { flex: none; width: 64px; height: 28px; padding: 0 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 12px; }
   .menu-note { margin: 4px 10px 2px; font-size: 11px; color: var(--muted); }
   .save { height: 36px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
-  .save:disabled { opacity: 0.45; cursor: default; }
+  /* Nothing to save: plainly off (a dim orange read as a button still waiting to be pressed). */
+  .save:disabled { background: var(--field); color: var(--muted); cursor: default; }
   .close { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); cursor: pointer; }
   .close.warn { background: #c8102e; border-color: #c8102e; color: #fff; }
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr) 300px; }

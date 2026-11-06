@@ -25,9 +25,9 @@ export type KeyInput = {
 };
 
 const ORDER: ShortcutAction[] = ["escape", "take", "cut", "previous", "next", "clear", "clear-words", "black", "logo", "focus", "library", "queue", "find"];
-// With Cmd, Ctrl or Alt held these keys belong to the page (Alt+↑/↓ moves an item in the service
-// list), so the desk does not also step or switch.
-const DESK_ACTIONS = new Set<ShortcutAction>(["focus", "library", "queue", "find", "previous", "next"]);
+// With Cmd, Ctrl, Alt or Shift held a key belongs to the page and the computer (Ctrl+C copies,
+// Alt+↑/↓ moves an item in the service list, ⌘W closes), never to the desk: no shortcut runs. A
+// copy of selected lyrics must not also CUT Preview to the screen.
 
 export function shortcutFor(map: ShortcutMap, code: string): ShortcutAction | null {
   for (const action of ORDER) {
@@ -61,7 +61,7 @@ export function createKeyboardManager(map: ShortcutMap, handlers: Partial<Record
       if (isTypingTarget(event.target)) typedAt = now();
       const action = shortcutFor(map, event.code);
       if (!action) return;
-      if (DESK_ACTIONS.has(action) && event.modified) return;
+      if (event.modified) return;
       if (event.code === "Backspace" && !isTypingTarget(event.target) && now() - typedAt < TYPING_GRACE_MS) {
         event.preventDefault();
         return;

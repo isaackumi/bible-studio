@@ -10,7 +10,8 @@
 
 {#if toast}
   {#key toast.id}
-    <div class="toast" class:warn={toast.tone === "warn"} role={toast.tone === "warn" ? "alert" : "status"} aria-live={toast.tone === "warn" ? "assertive" : "polite"} transition:fly={{ y: 10, duration: 180 }}>
+    <!-- It waits while the pointer or focus is on it, so an Undo never slips away under the hand. -->
+    <div class="toast" class:warn={toast.tone === "warn"} role={toast.tone === "warn" ? "alert" : "status"} aria-live={toast.tone === "warn" ? "assertive" : "polite"} onpointerenter={() => session.holdToast(true)} onpointerleave={() => session.holdToast(false)} onfocusin={() => session.holdToast(true)} onfocusout={() => session.holdToast(false)} transition:fly={{ y: 10, duration: 180 }}>
       <span class="tick"><Icon name={toast.tone === "warn" ? "alerts" : "check"} size={14} /></span>
       <div class="copy">
         <strong>{toast.text}</strong>
