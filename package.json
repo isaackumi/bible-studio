@@ -1,6 +1,6 @@
 {
   "name": "church-studio",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "description": "Offline church presentation studio",
   "private": true,
   "type": "module",

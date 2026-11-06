@@ -16,6 +16,17 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.16",
+    date: "2026-11-06",
+    highlights: [
+      { icon: "check", title: msg("Safer while you are live"), text: msg("Copying text with Ctrl or ⌘ no longer changes the screen, the Audience panel no longer covers LIVE and BLACK on a laptop, and BLACK stays lit while the screen is black."), show: null },
+      { icon: "reset", title: msg("Undo when something is deleted"), text: msg("A deleted song, sermon, slide deck, theme, picture or video comes back with Undo, and so does a desk layout that was reset."), show: null },
+      { icon: "stage", title: msg("Stage screens laid out for who reads them"), text: msg("Choose Standard, Side by side, Preacher or Clock in Settings › Stage display, and send the stage a message straight from On the screen."), show: null },
+      { icon: "keys", title: msg("MIDI pads and pedals"), text: msg("A pad, footswitch, keyboard or the band's software can press LIVE, Next, BLACK and the rest. Set it up in Settings › MIDI controller."), show: null },
+      { icon: "sparkles", title: msg("Easier to read and to start"), text: msg("Text is larger at its smallest, the readiness check runs when you start a service, and new operators see which monitor is theirs and which the congregation sees."), show: null },
+    ],
+  },
+  {
     version: "0.6.15",
     date: "2026-11-04",
     highlights: [
