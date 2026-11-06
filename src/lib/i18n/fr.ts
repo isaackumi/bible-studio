@@ -5743,4 +5743,12 @@ export const fr: Readonly<Record<string, string>> = {
   "{name} is back.": "{name} est de retour.",
   "The screen is black now": "L’écran est noir",
   "Auto LIVE is off: a click goes to Preview, and LIVE sends it. Click to send clicks straight to the audience.": "Auto LIVE est désactivé : un clic va dans l’aperçu, et LIVE l’envoie. Cliquez pour envoyer les clics directement au public.",
+  "Could not check which files are used: {reason}": "Impossible de vérifier quels fichiers sont utilisés : {reason}",
+  "Some files could not be removed: {reason}": "Certains fichiers n’ont pas pu être retirés : {reason}",
+  "The desk is back as it was.": "Le bureau est revenu tel qu’il était.",
+  "The samples could not be added: {reason}": "Les exemples n’ont pas pu être ajoutés : {reason}",
+  "The search could not finish: {reason}": "La recherche n’a pas pu se terminer : {reason}",
+  "This chapter could not be opened: {reason}": "Ce chapitre n’a pas pu être ouvert : {reason}",
+  "only you see this": "vous seul le voyez",
+  "what the congregation sees": "ce que voit l’assemblée",
 };

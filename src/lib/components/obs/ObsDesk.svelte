@@ -140,7 +140,7 @@
   const mediaOpen = $derived(session.workspace.production.mediaOpen);
   const docksVisible = $derived<[boolean, boolean, boolean, boolean]>([scenesOpen, true, mediaOpen, controlsOpen]);
   const chrome = $derived(
-    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(mediaOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}`,
+    `${Number(session.ready)}:${Number(focus)}:${Number(scenesOpen)}:${Number(mediaOpen)}:${Number(controlsOpen)}:${session.workspace.activeLayoutId}:${session.layoutVersion}`,
   );
 
   function retarget() {

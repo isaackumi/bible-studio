@@ -66,9 +66,27 @@
   const heard = $derived(session.captions.lines.slice(-40));
   /** The screen is black on purpose: BLACK stays lit so it does not look like "nothing sent". */
   const isBlack = $derived(session.live.program.model.layout === "black");
+
+  // A newcomer's first few times LIVE: a word beside Preview and Program says which is whose. Counted
+  // on this computer; after five it gets out of the way.
+  const LIVES_KEY = "church-studio.lives";
+  let livesSeen = $state(typeof localStorage === "undefined" ? 5 : Number(localStorage.getItem(LIVES_KEY)) || 0);
+  const newcomer = $derived(livesSeen < 5);
+  let lastLive: string | null = null;
+  $effect(() => {
+    const source = displayLive ? session.live.program.sourceId : null;
+    if (!source || source === lastLive || !newcomer) return;
+    lastLive = source;
+    livesSeen = untrack(() => livesSeen) + 1;
+    try {
+      localStorage.setItem(LIVES_KEY, String(livesSeen));
+    } catch {
+      // Storage blocked: the hint shows again next time.
+    }
+  });
   const undoKey = keys("⌘Z");
   /** The key for a desk action, as set in Settings › Keyboard. */
-  const keyOf = (action: "take" | "black" | "clear" | "clear-words") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
+  const keyOf = (action: "take" | "black" | "clear" | "clear-words" | "logo") => shortcutLabel(session.workspace.shortcuts ?? defaultShortcuts, action);
   /** The queue's Clear all was pressed once. */
   let clearArmed = $state(false);
   // The transcript follows the newest words as they are heard.
@@ -240,7 +258,7 @@
   let applying = false;
   let chromeReady = false;
   const chrome = $derived(
-    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}`,
+    `${Number(focus)}:${Number(showLibrary)}:${Number(showQueue)}:${Number(showPreview)}:${Number(showProgram)}:${session.workspace.activeLayoutId}:${session.layoutVersion}`,
   );
 
   function retarget() {
@@ -850,6 +868,8 @@
         </span>
         <button type="button" class="desk-btn ghost clears-main" data-tip={`${t("Clear everything back to the theme")} (${keyOf("clear")})`} onclick={() => session.clear()}>{t("CLEAR")}</button>
       </span>
+      <!-- LOGO, as on the other desks: the L key had no button, so an accidental L had no visible cause. -->
+      <button type="button" class="desk-btn ghost" data-tip={`${t("Logo on Program")} (${keyOf("logo")})`} onclick={() => session.logo()}>{t("LOGO")}</button>
       <!-- The wrong thing went up: put back what the audience saw before, without the keyboard. Its
            place is kept while there is nothing to undo, so LIVE and BLACK never shift. -->
       <button type="button" class="desk-btn ghost undo-slot" class:idle={!session.canUndoProgram} disabled={!session.canUndoProgram} aria-hidden={!session.canUndoProgram} tabindex={session.canUndoProgram ? 0 : -1} data-tip={`${t("Put back what the audience saw before")} (⌘Z)`} onclick={() => void session.undoProgram()}>{t("Undo")}</button>
@@ -1242,7 +1262,7 @@
 
 {#snippet panel_preview()}
                 <section class="pb-panel preview">
-                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if mode === "scriptures"}<TextSizeControl kind="verses" onopen={() => (sheet = "type")} />{/if}{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
+                  <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "preview")} ondragend={endPanelDrag}><span class="kicker">{t("Preview")}</span>{#if newcomer}<span class="kicker-hint">{t("only you see this")}</span>{/if}{#if mode === "scriptures"}<TextSizeControl kind="verses" onopen={() => (sheet = "type")} />{/if}{#if liveShowsOn}<button type="button" class="shows-on" data-tip={t("Which screens show it when you press LIVE. Change it in Settings › More screens.")} onclick={() => session.openSettings("screens")}>{t("LIVE shows it on {screens}", { screens: liveShowsOn })}</button>{/if}</header>
                   <div class="monitor"><Screen model={session.live.preview.model} sourceId={session.live.preview.sourceId} feeds={session.cameraFeeds} hint={t("Nothing on Preview yet. Pick a verse, song or slide.")} /><GoLive /></div>
                 </section>
 {/snippet}
@@ -1250,7 +1270,7 @@
 {#snippet panel_program()}
                 <section class="pb-panel output" class:on-air={displayLive}>
                   <header class="pb-head" role="group" aria-label={t("Drag to move this panel")} draggable={!focus} ondragstart={(event) => dragPanel(event, "program")} ondragend={endPanelDrag}>
-                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>
+                    <span class="kicker program">{#if displayLive}<span class="pip on"></span>{/if}{t("Program")}</span>{#if newcomer && !(programSet && !displayLive)}<span class="kicker-hint">{t("what the congregation sees")}</span>{/if}
                     {#if programSet && !displayLive}<span class="unseen" role="status" title={t("The audience can't see this")}>{t("Not on the screen")}</span>{/if}
                     <button
                       type="button"
@@ -1723,6 +1743,7 @@
     background: #050505;
   }
   .kicker { font-size: 11px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+  .kicker-hint { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .kicker.plain { font-size: 12px; letter-spacing: 0; text-transform: none; }
   .kicker.program { color: var(--live-text); }
   .pb-panel.preview { border-style: dashed; }

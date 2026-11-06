@@ -239,7 +239,7 @@
     session.setAppearance({ desk });
     session.finishOnboarding();
     // Loaded only now, and added in the background while the desk opens.
-    if (samples) void import("../../app/starter.svelte").then((starter) => starter.installStarterKit()).catch(() => {});
+    if (samples) void import("../../app/starter.svelte").then((starter) => starter.installStarterKit()).catch((error) => session.warn(t("The samples could not be added: {reason}", { reason: (error instanceof Error ? error.message : String(error)) })));
     // End on a first verse ready to show: John 3:16 on Preview, and what to press next.
     if (!tour && desk === "pewbeam") void session.showFirstVerse(translation);
     if (tour) session.startTour(desk === "obs" ? "production" : uses.length === 1 && uses[0] === "songs" ? "songs" : uses.length === 1 && uses[0] === "sermon" ? "sermon" : "scriptures");
