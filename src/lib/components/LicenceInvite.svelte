@@ -8,7 +8,7 @@
   let { invite }: { invite: { license: string; by?: string } } = $props();
 </script>
 
-<TopCard icon="church" title={invite.by ? t("{name} added you to their licence", { name: invite.by }) : t("You were added to another licence")} detail={t("This computer stays on its own library until you choose.")} onclose={() => session.notNowLicence(invite.license)}>
+<TopCard icon="church" title={invite.by ? t("{name} added you to their license", { name: invite.by }) : t("You were added to another license")} detail={t("This computer stays on its own library until you choose.")} onclose={() => session.notNowLicence(invite.license)}>
   <button type="button" onclick={() => session.openSettings("account")}>{t("Review")}</button>
   <button type="button" onclick={() => session.notNowLicence(invite.license)}>{t("Not now")}</button>
 </TopCard>

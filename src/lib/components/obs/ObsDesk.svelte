@@ -1146,7 +1146,7 @@
   .scene-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
   .scene-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .scene-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
+  .badge { position: absolute; left: 2px; bottom: 2px; z-index: 1; padding: 0 4px; border-radius: 4px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 13px; }
   .badge.live { background: var(--live); color: #fff; }
   .scene-rename { height: 24px; padding: 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--field); color: var(--ink); font: inherit; font-weight: 600; min-width: 0; }
   /* Row tools appear on hover, focus or selection; what is switched on always shows. */

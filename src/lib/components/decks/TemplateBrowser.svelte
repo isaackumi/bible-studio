@@ -99,8 +99,8 @@
       {/each}
     </div>
     <div class="look">
-      <div class="swatches" role="radiogroup" aria-label={t("Colours")}>
-        <button type="button" role="radio" aria-checked={!palette} class="swatch original" class:on={!palette} title={t("Each template's own colours")} onclick={() => (palette = null)}>{t("Own")}</button>
+      <div class="swatches" role="radiogroup" aria-label={t("Colors")}>
+        <button type="button" role="radio" aria-checked={!palette} class="swatch original" class:on={!palette} title={t("Each template's own colors")} onclick={() => (palette = null)}>{t("Own")}</button>
         {#each PALETTES as entry (entry.id)}
           <button type="button" role="radio" aria-checked={palette === entry.id} aria-label={t(entry.name)} title={t(entry.name)} class="swatch" class:on={palette === entry.id} style:background={fillCss(entry.bg)} onclick={() => (palette = entry.id)}>
             <span style:background={entry.accent}></span>
@@ -112,7 +112,7 @@
         {#each FONT_PAIRS as pair (pair.id)}<option value={pair.id}>{t(pair.name)}</option>{/each}
       </select>
     </div>
-    {#if palette || fonts}<p class="hint">{t("Colours and fonts change every template except the hand-made Featured ones.")}</p>{/if}
+    {#if palette || fonts}<p class="hint">{t("Colors and fonts change every template except the hand-made Featured ones.")}</p>{/if}
   </div>
 
   <div class="scroll">
@@ -190,7 +190,7 @@
   .thumb { position: relative; display: block; aspect-ratio: var(--aspect); max-height: 240px; border-radius: 8px; overflow: hidden; background: color-mix(in srgb, var(--ink) 6%, transparent); box-shadow: 0 0 0 1px var(--line); transition: box-shadow 0.15s, transform 0.15s; }
   .card:hover .thumb, .card:focus-visible .thumb { box-shadow: 0 0 0 2px var(--accent); transform: translateY(-1px); }
   .card:focus-visible { outline: none; }
-  .badge { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 10px; font-weight: 600; }
+  .badge { position: absolute; left: 6px; bottom: 6px; padding: 2px 6px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 11px; font-weight: 600; }
   .name { font-size: 12.5px; font-weight: 600; }
   .count, .empty { margin: 8px 0; font-size: 12px; color: var(--muted); }
   .show-more { display: block; margin: 14px auto 0; height: 32px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; cursor: pointer; }

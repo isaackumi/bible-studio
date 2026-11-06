@@ -404,7 +404,7 @@ button { cursor: pointer; }
 .transport button kbd, .kbd {
   font-family: var(--font-label);
   letter-spacing: 0.08em;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--brass);
 }
 .transport button.take kbd { color: var(--pigment-live-ink); }
@@ -764,6 +764,8 @@ select:focus-visible {
 .desk-btn:active:not(:disabled) { opacity: 0.88; }
 .desk-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .desk-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* A filled button that cannot be pressed yet is plainly grey: a dimmed accent still reads as "press me". */
+.desk-btn.primary:disabled, .desk-btn.live:disabled { opacity: 1; background: var(--field); border-color: var(--line); color: var(--muted); }
 /*
  * One button system, one meaning per color:
  *   live   red: sends something to the audience (LIVE, GO LIVE, Show alert). Nothing else is red.

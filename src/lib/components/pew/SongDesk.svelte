@@ -1380,7 +1380,7 @@
   .letter { position: sticky; top: -4px; z-index: 2; margin-top: 6px; padding: 4px 6px; font-size: 11px; font-weight: 800; color: var(--muted); background: var(--panel); }
   .more { padding: 10px; font-size: 12px; color: var(--muted); text-align: center; }
   .letters { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 0; padding: 4px 4px 14px 0; overflow: auto; }
-  .letters button { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1; }
+  .letters button { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; line-height: 1; }
   .letters button:hover { color: var(--accent-text); background: var(--field); }
   .list-tools { display: flex; gap: 6px; padding: 0 10px 6px; flex: none; }
   .list-filter { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--muted); }
@@ -1431,7 +1431,7 @@
     border-radius: 4px;
     background: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--accent-text);
-    font-size: 10px;
+    font-size: 11px;
     font-style: normal;
     font-weight: 700;
     letter-spacing: 0.06em;

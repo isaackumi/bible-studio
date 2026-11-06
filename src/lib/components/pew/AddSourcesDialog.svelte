@@ -500,7 +500,7 @@
   .verse-check .col { display: grid; gap: 6px; align-content: start; min-width: 0; }
   .verse-check .tr { justify-self: start; padding: 1px 7px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); font-size: 11px; font-weight: 750; }
   .verse-check p { margin: 0; font-size: 13px; line-height: 1.5; }
-  .verse-check sup { margin-right: 4px; font-size: 10px; font-weight: 750; color: var(--muted); }
+  .verse-check sup { margin-right: 4px; font-size: 11px; font-weight: 750; color: var(--muted); }
   .verse-check .problem { display: flex; align-items: center; gap: 6px; color: var(--danger, #e5484d); font-weight: 650; }
   .hint.warn { color: var(--danger, #e5484d); }
   .adder { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; height: min(70vh, 660px); }

@@ -77,7 +77,7 @@
   .q-line { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
   .q-text { min-width: 0; overflow-wrap: anywhere; }
   .q-line b { flex: none; font-variant-numeric: tabular-nums; }
-  .questions em { justify-self: start; padding: 1px 7px; border-radius: 99px; font-style: normal; font-size: 10.5px; font-weight: 700; background: color-mix(in srgb, var(--good, #3ccf7a) 20%, transparent); }
+  .questions em { justify-self: start; padding: 1px 7px; border-radius: 99px; font-style: normal; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--good, #3ccf7a) 20%, transparent); }
   .questions li.hard em { background: color-mix(in srgb, var(--danger, #ff6b6b) 22%, transparent); }
   .questions small { color: var(--muted); font-size: 11px; }
   .label { margin: 4px 0 0; color: var(--muted); font-size: 12px; font-weight: 700; }

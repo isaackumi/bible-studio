@@ -182,16 +182,16 @@
   .find:focus-within { border-color: var(--accent); }
   .clear { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--field); color: var(--muted); cursor: pointer; }
   .clear:hover { color: var(--ink); }
-  kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+  kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: inherit; font-size: 11px; font-weight: 700; color: var(--muted); }
   .recent { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 10px 16px 4px; }
-  .recent-label { font-size: 10.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+  .recent-label { font-size: 11px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
   .chip { display: inline-flex; align-items: center; gap: 5px; max-width: 180px; height: 24px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
   .chip:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
   .chip :global(svg) { flex: none; color: var(--muted); }
   .forget { margin-left: auto; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11.5px; cursor: pointer; }
   .forget:hover { color: var(--ink); text-decoration: underline; }
   .list { flex: 1; min-height: 0; max-height: min(58vh, 480px); overflow: auto; padding: 6px; scrollbar-width: thin; }
-  .group { margin: 10px 10px 4px; font-size: 10.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .group { margin: 10px 10px 4px; font-size: 11px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .group:first-child { margin-top: 6px; }
   .entry { width: 100%; display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 9px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .entry[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, var(--field)); }

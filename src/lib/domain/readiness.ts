@@ -142,9 +142,9 @@ export function cloudCheck(facts: { status: string; held: number; pendingMedia: 
     case "signedOut":
       return null;
     case "licenceChanged":
-      return { id: "cloud", state: "fail", title: msg("Cloud sync is paused"), detail: msg("This computer's licence changed. Choose in Cloud space whether to bring this library along."), fix };
+      return { id: "cloud", state: "fail", title: msg("Cloud sync is paused"), detail: msg("This computer's license changed. Choose in Cloud space whether to bring this library along."), fix };
     case "noSeat":
-      return { id: "cloud", state: "warn", title: msg("This computer is not syncing"), detail: msg("It is not on the licence. Sign in and activate it, then sync."), fix: { label: msg("Account"), action: "cloud" } };
+      return { id: "cloud", state: "warn", title: msg("This computer is not syncing"), detail: msg("It is not on the license. Sign in and activate it, then sync."), fix: { label: msg("Account"), action: "cloud" } };
     case "readOnly":
       return { id: "cloud", state: "warn", title: msg("The cloud is read-only"), detail: msg("Changes made here stay on this computer until the plan is renewed."), fix: { label: msg("Plans"), action: "plans" } };
     case "offline":

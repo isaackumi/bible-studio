@@ -71,7 +71,7 @@ export const FEATURE_LABELS: Record<PlanFeature, { label: string; soon?: boolean
   screens: { label: msg("Extra screens with their own job: timer, scripture, lyrics or stage") },
   "song-packs": { label: msg("Song packs") },
   "theme-library": { label: msg("Theme library: animated, photo and video backgrounds, full editing") },
-  "cloud-sync": { label: msg("Cloud space: a copy of your library, and one library across a Church licence's computers") },
+  "cloud-sync": { label: msg("Cloud space: a copy of your library, and one library across a Church license's computers") },
   ndi: { label: msg("NDI out with sound, and NDI cameras in") },
   streaming: { label: msg("Stream to YouTube and Facebook") },
   recording: { label: msg("Record the service") },

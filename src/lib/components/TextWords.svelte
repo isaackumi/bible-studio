@@ -75,7 +75,7 @@
     <button type="button" role="tab" aria-selected={mode === "simple"} class:armed onclick={toSimple} title={t("A heading and a body, in the theme's style")}>
       {armed ? t("Drop formatting?") : t("Simple")}
     </button>
-    <button type="button" role="tab" aria-selected={mode === "formatted"} onclick={toFormatted} title={t("Fonts, sizes, colours, highlight, bold, italic, underline, bullets and more")}>
+    <button type="button" role="tab" aria-selected={mode === "formatted"} onclick={toFormatted} title={t("Fonts, sizes, colors, highlight, bold, italic, underline, bullets and more")}>
       {t("Formatted")}
     </button>
   </div>

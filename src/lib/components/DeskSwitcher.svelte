@@ -95,7 +95,7 @@
   .name { display: none; white-space: nowrap; font-size: 12px; font-weight: 650; }
   .on .name { display: inline; }
   /* Questions or prayer requests are waiting for the operator: how many. */
-  .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10.5px; font-weight: 750; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+  .count { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; font-weight: 750; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 
   /* A slideshow is on the screen (amber while paused). */

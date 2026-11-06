@@ -28,7 +28,7 @@
 
   const ALIGNS: Array<{ id: Theme["align"]; label: string }> = [
     { id: "left", label: msg("Words to the left") },
-    { id: "center", label: msg("Words in the centre") },
+    { id: "center", label: msg("Words in the center") },
     { id: "right", label: msg("Words to the right") },
   ];
   const PLACES: Array<{ id: Theme["vertical"]; label: string }> = [

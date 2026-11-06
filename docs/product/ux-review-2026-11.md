@@ -48,7 +48,7 @@ The weak spots weren't missing features. The biggest was **live safety**: keys a
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
 | 11 | Toasts timed out while the pointer was on them. | The Undo slipped away under your hand. | **Fixed.** Toasts wait while hovered or focused. |
-| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, sermons and slide decks (Undo for 10 seconds). **Next:** themes and media, or a 30-day bin like the cloud's. |
+| 12 | Deleting a song couldn't be undone; the only guard was a 3-second "click again". | One wrong click lost a song typed in by hand. | **Fixed** for songs, sermons, slide decks and themes (Undo for 10 seconds). **Next:** media. Deleting it removes the file from disk, so Undo needs a bin on the native side. |
 | 13 | There is only one toast at a time, so a new one replaces the last. "Program is black, Undo" disappears as soon as "Added to service" arrives. | The important message loses to the trivial one. | **Fixed.** A warning or Undo toast stays; a plain confirmation that follows goes to the status line. |
 | 14 | Toasts sit bottom-left, over the song list, the Conductor's listening bar and Production's Scenes panel. | They cover the controls you need next. | **Next:** dock them above the monitors, or bottom-centre at a narrower width. |
 | 15 | Some failures say nothing: Bible word search, chapter load, the starter kit, the sign-in browser, and unused-media clean-up (where a failed lookup reads as "no files"). | A silent failure looks like the app is broken, or worse, gives a wrong answer. | **Fixed.** Each now says why it failed, where it happened. |
@@ -59,19 +59,19 @@ The weak spots weren't missing features. The biggest was **live safety**: keys a
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
 | 17 | The three desks name and style the same actions differently: "LIVE/BLACK/CLEAR" with "Preview/Program" on one, "Live/Black/Clear" with "Next/Live" on another, and four button styles in Production's transport column. | Volunteers rotate between desks, so every difference is something to relearn. | **Fixed** for the Production transport (one style, icons on all). **Next:** one vocabulary across the desks ("Next" is friendlier; pick it or "Preview" and use it everywhere). |
-| 18 | "Favourites" and "Favorites", "Colour" and "Color" both appear. | It looks unfinished, and it splits search results. | **Fixed** for Favorites. **Next:** pick US or UK English for every remaining line. |
+| 18 | "Favourites" and "Favorites", "Colour" and "Color" both appear. | It looks unfinished, and it splits search results. | **Fixed.** US English throughout: 64 lines, with their translations kept. |
 | 19 | The live transcript had two Listen buttons. | Two controls for one thing is confusing. | **Fixed.** One remains. |
-| 20 | The Design studio showed "Saved" beside an orange **Save changes** that looked active. | "Is it saved or not?" | **Fixed.** When there is nothing to save, the button is plainly grey. |
+| 20 | The Design studio showed "Saved" beside an orange **Save changes** that looked active. | "Is it saved or not?" | **Fixed.** When there is nothing to save, the button is plainly grey. The same now holds for every filled desk button that cannot be pressed yet. |
 | 21 | Audience tabs wrapped ("Pick / someone"). | It looks broken. | **Fixed.** |
-| 22 | Text at 10px is allowed by the design rules. | It's hard to read at arm's length, on a dim booth screen. | **Next:** raise the minimum to 11px and fix what the rule then catches. |
+| 22 | Text at 10px is allowed by the design rules. | It's hard to read at arm's length, on a dim booth screen. | **Fixed.** The minimum is 11px; 43 places were raised. |
 
 ## 4. Discoverability
 
 | # | Problem | Why it matters | Status |
 |---|---|---|---|
-| 23 | "Message to the stage…" opens the whole Settings dialog, and the desk's keys stop while it's open. | It's a live action buried in Settings. | **Next:** a small inline pop-up from the "On the screen" menu. |
+| 23 | "Message to the stage…" opens the whole Settings dialog, and the desk's keys stop while it's open. | It's a live action buried in Settings. | **Fixed.** Its own small dialog from On the screen, with six ready messages. The menu shows On while one is up. |
 | 24 | Preview and Program are only explained under More › "How this desk works". | They're the two words a newcomer must understand first. | **Fixed.** For the first five times LIVE: *only you see this* beside Preview, *what the congregation sees* beside Program. |
-| 25 | The Readiness check is in the More menu. | Its best moment is just before the service starts. | **Next:** offer it in the Start service dialog. |
+| 25 | The Readiness check is in the More menu. | Its best moment is just before the service starts. | **Fixed.** The Start service dialog checks while it is open and says *All set* or what needs a look, with See all. |
 | 26 | The favourite star only shows on hover in song search. | People can't see what they can star. | **Fixed.** Shown faintly at rest. |
 
 ## 5. Already improved this week
@@ -122,8 +122,8 @@ Checked against vendor pages and release notes, November 2026. These are often t
 ## 7. Suggested order of work
 
 1. **Live safety, finished:** opt-in Auto LIVE (7, a product decision); where toasts sit (14).
-2. **Recovery:** Undo for themes and media (12).
-3. **One desk vocabulary** (17), and one English (18).
+2. **Recovery:** Undo for media (12), via a bin on the native side.
+3. **One desk vocabulary** (17).
 4. **Stage display layout editor.**
 5. **CCLI auto-reporting** (start the partner application now; it takes time).
 6. **MIDI triggers.**

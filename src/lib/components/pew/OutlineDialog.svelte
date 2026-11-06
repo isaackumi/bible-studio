@@ -51,7 +51,7 @@
   }
 </script>
 
-<DeskDialog title={t("Programme outline")} huge {onclose}>
+<DeskDialog title={t("Program outline")} huge {onclose}>
   <div class="outline">
     <aside class="controls">
       <div class="group">
@@ -78,7 +78,7 @@
       </div>
     </aside>
     <div class="paper-wrap">
-      <iframe bind:this={frame} class="paper" title={t("Programme outline")} srcdoc={html}></iframe>
+      <iframe bind:this={frame} class="paper" title={t("Program outline")} srcdoc={html}></iframe>
     </div>
   </div>
 </DeskDialog>

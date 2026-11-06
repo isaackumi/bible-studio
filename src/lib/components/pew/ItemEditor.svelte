@@ -251,13 +251,13 @@
             </div>
           </div>
           <div class="field-row">
-            <span>{t("Accent colour")}</span>
-            <div class="ann-swatches" role="radiogroup" aria-label={t("Accent colour")}>
-              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title={t("The theme's colour")} style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>{t("Theme")}</button>
+            <span>{t("Accent color")}</span>
+            <div class="ann-swatches" role="radiogroup" aria-label={t("Accent color")}>
+              <button type="button" class="ann-swatch theme" role="radio" aria-checked={!announcement.accent} title={t("The theme's color")} style:--swatch={themeAccent(session.theme())} onclick={() => setAnnouncement({ accent: "" })}>{t("Theme")}</button>
               {#each ACCENT_SWATCHES as color (color)}
                 <button type="button" class="ann-swatch" role="radio" aria-checked={announcement.accent === color} aria-label={t("Accent {color}", { color })} style:--swatch={color} onclick={() => setAnnouncement({ accent: color })}></button>
               {/each}
-              <input type="color" aria-label={t("Pick any accent colour")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
+              <input type="color" aria-label={t("Pick any accent color")} value={announcement.accent || themeAccent(session.theme())} oninput={(event) => setAnnouncement({ accent: event.currentTarget.value })} />
             </div>
           </div>
           <TextStyleEditor style={draft.style ?? {}} onchange={(style: TextStyle) => (draft.style = style)} label={t("Text style for this item")} />

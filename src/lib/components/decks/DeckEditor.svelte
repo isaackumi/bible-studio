@@ -563,7 +563,7 @@
         <div class="stack">
           <span>{t("Line them up")}</span>
           <div class="align-together" role="group" aria-label={t("Line them up")}>
-            {#each [["left", t("Left")], ["center", t("Centre")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
+            {#each [["left", t("Left")], ["center", t("Center")], ["right", t("Right")], ["top", t("Top")], ["middle", t("Middle")], ["bottom", t("Bottom")]] as [where, label] (where)}
               <button type="button" onclick={() => alignPicked(where as "left")}>{label}</button>
             {/each}
           </div>
@@ -683,7 +683,7 @@
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 72px minmax(0, 1fr) 300px; }
   .body.panel-open { grid-template-columns: 72px 340px minmax(0, 1fr) 300px; }
   .rail { display: flex; flex-direction: column; gap: 4px; padding: 10px 6px; border-right: 1px solid var(--line); background: var(--panel); }
-  .rail button { display: grid; justify-items: center; gap: 4px; padding: 9px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+  .rail button { display: grid; justify-items: center; gap: 4px; padding: 9px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
   .rail button svg { width: 22px; height: 22px; }
   .rail button:hover { color: var(--ink); background: var(--field); }
   .rail button.on { color: var(--accent-text); background: color-mix(in srgb, var(--accent) 14%, transparent); }
@@ -702,7 +702,7 @@
   .page { display: block; width: 128px; aspect-ratio: var(--aspect, 16 / 9); max-height: 110px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: none; cursor: pointer; }
   .pages li.on .page { border-color: var(--accent); }
   .pages .page.is-live { box-shadow: 0 0 0 2px #ff1414, 0 0 18px rgb(255 20 20 / 0.35); }
-  .badge { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.08em; color: #fff; pointer-events: none; }
+  .badge { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 1; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; font-style: normal; letter-spacing: 0.08em; color: #fff; pointer-events: none; }
   .badge.live { background: #ff1414; }
   .badge.preview { background: var(--accent); }
   .num { font-size: 11px; color: var(--muted); }

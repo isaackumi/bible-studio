@@ -4058,7 +4058,7 @@ class Session {
     if (this.queuedStart === null) return;
     clearTimeout(this.queueTimer);
     this.queuedStart = null;
-    if (say) this.message = t("The waiting start is cancelled.");
+    if (say) this.message = t("The waiting start is canceled.");
   };
 
   /** The service running now (a part has begun and it has not been ended). */
@@ -8743,11 +8743,32 @@ class Session {
   /** Delete a theme you made. Built-in themes stay. */
   deleteTheme = async (id: string) => {
     if (factoryThemes().some((theme) => theme.id === id)) return;
+    const at = this.themes.findIndex((theme) => theme.id === id);
+    const kept = this.themes[at];
+    const wasInUse = this.workspace.themeId === id;
     await api.themeDelete(id);
     this.cloudSoon();
     this.themes = this.themes.filter((theme) => theme.id !== id);
-    if (this.workspace.themeId === id) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
-    this.message = t("Theme deleted.");
+    if (wasInUse) this.useTheme(this.themes[0]?.id ?? DEFAULT_THEME_ID);
+    if (!kept) {
+      this.message = t("Theme deleted.");
+      return;
+    }
+    // Back as it was (and in use again, if it was), from the toast.
+    this.notify(t("Theme deleted."), {
+      detail: kept.name,
+      ms: 10_000,
+      actions: [{ label: t("Undo"), run: () => {
+        this.dismissToast();
+        if (this.themes.some((theme) => theme.id === kept.id)) return;
+        const themes = [...this.themes];
+        themes.splice(Math.min(at, themes.length), 0, kept);
+        this.themes = themes;
+        void api.themeSave(kept).then(() => this.cloudSoon());
+        if (wasInUse) this.useTheme(kept.id);
+        this.message = t("{name} is back.", { name: kept.name });
+      } }],
+    });
   };
 
   useTheme = (id: string) => {

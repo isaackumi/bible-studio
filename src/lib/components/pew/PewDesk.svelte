@@ -816,6 +816,8 @@
   }
 
   let alertsOpen = $state(false);
+  /** The quick message to the stage (its own small dialog, not Settings). */
+  let stageMessageOpen = $state(false);
   let overlaysOpen = $state(false);
 </script>
 
@@ -926,7 +928,7 @@
           <button type="button" role="menuitem" onclick={() => { overlaysOpen = true; close(); }}>{@render icon("layers")} {t("Overlays…")}{#if overlaysOn}<span class="menu-state on">{overlaysOn}</span>{/if}</button>
           <div class="menu-sep"></div>
           <p class="menu-label">{t("For the people on stage")}</p>
-          <button type="button" role="menuitem" onclick={() => { session.openSettings("stage"); close(); }}>{@render icon("stage")} {t("Message to the stage…")}</button>
+          <button type="button" role="menuitem" onclick={() => { stageMessageOpen = true; close(); }}>{@render icon("stage")} {t("Message to the stage…")}{#if session.stageMessage}<span class="menu-state on">{t("On")}</span>{/if}</button>
         {/snippet}
       </ToolMenu>
       <ToolMenu label={t("More")} tip={t("Displays, look, help and settings")} tour="more">
@@ -1360,6 +1362,9 @@
 {#if overlaysOpen}
   <OverlaysDialog onclose={() => (overlaysOpen = false)} />
 {/if}
+{#if stageMessageOpen}
+  {#await import("../StageMessageDialog.svelte") then { default: StageMessageDialog }}<StageMessageDialog onclose={() => (stageMessageOpen = false)} />{/await}
+{/if}
 {#if alertsOpen}
   <AlertsDialog onclose={() => (alertsOpen = false)} />
 {/if}
@@ -1430,7 +1435,7 @@
   .pb-modes button:hover:not(.on) { background: var(--desk); color: var(--ink); }
   /* White on the accent is 3.4:1 for the default orange: bold keeps it readable. */
   .pb-modes button.on { background: var(--accent); color: var(--on-accent, #fff); font-weight: 750; }
-  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+  .pb-modes .lock { margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-size: 11px; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
   .pb-modes button.on .lock { background: rgb(255 255 255 / 0.22); color: white; }
   .pb-actions {
     margin-left: auto;
@@ -1696,7 +1701,7 @@
   .reading sup { color: var(--accent-text); font-size: 0.75em; margin-right: 4px; }
   .reading-ref, .sheet-ref { color: var(--mustard); font-size: 12px; letter-spacing: 0.04em; }
   .detections { display: flex; flex-direction: column; gap: 6px; }
-  .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+  .ai-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, #7c3aed 22%, transparent); color: #a78bfa; font-size: 11px; font-style: normal; font-weight: 700; vertical-align: 1px; }
   .side-tabs { display: flex; gap: 2px; min-width: 0; }
   .side-tabs button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; }
   .side-tabs button[aria-selected="true"] { background: var(--field); color: var(--ink); }
@@ -1755,7 +1760,7 @@
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.12em;
     cursor: pointer;
     min-width: 0;
@@ -1836,7 +1841,7 @@
   @container desk (max-width: 1560px) { .chip-name { display: none; } }
   /* Guided tours are also in the More menu; narrower desks keep the bar for live tools. */
   .pb-tools :global(.tool-menu > button) { position: relative; }
-  .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
+  .tool-dot { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; font-weight: 800; line-height: 16px; text-align: center; }
   .menu-state { margin-left: auto; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--field); color: var(--muted); }
   .menu-state.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent-text); }
   .now-audio-btn { width: 28px; height: 100%; border: 0; border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); background: none; color: var(--ink); display: grid; place-items: center; }

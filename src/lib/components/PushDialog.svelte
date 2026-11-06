@@ -84,7 +84,7 @@
     <p class="note">{t("Checking…")}</p>
   {:else}
     <p class="note">
-      {peers.length ? t("Sending to {names}", { names: peers.map((peer) => peer.name).join(", ") }) : t("No other computer found on this network. Open Church Studio on it, and check it is on the same licence and network.")}
+      {peers.length ? t("Sending to {names}", { names: peers.map((peer) => peer.name).join(", ") }) : t("No other computer found on this network. Open Church Studio on it, and check it is on the same license and network.")}
     </p>
     {#if !items.length && !files.length}<p class="note">{t("Nothing has changed since the last send.")}</p>{/if}
     {#each items as item (onlyKey(item))}

@@ -355,7 +355,7 @@
             </div>
           {/if}
           <label class="opt"><input type="checkbox" class="switch" checked={show.captions} onchange={(event) => pictures.setOptions({ captions: event.currentTarget.checked })} /><span><b>{t("Names as captions")}</b>{t("A picture's file name shows along the bottom: name a file “Youth Night – Friday 7pm”.")}</span></label>
-          <label class="opt"><input type="checkbox" class="switch" checked={show.themeBackground} onchange={(event) => pictures.setOptions({ themeBackground: event.currentTarget.checked })} /><span><b>{t("Theme background")}</b>{t("The theme's colour or motion shows around a picture that does not fill the screen. Off: plain black.")}</span></label>
+          <label class="opt"><input type="checkbox" class="switch" checked={show.themeBackground} onchange={(event) => pictures.setOptions({ themeBackground: event.currentTarget.checked })} /><span><b>{t("Theme background")}</b>{t("The theme's color or motion shows around a picture that does not fill the screen. Off: plain black.")}</span></label>
           <label class="opt"><input type="checkbox" class="switch" checked={show.fill} onchange={(event) => pictures.setOptions({ fill: event.currentTarget.checked })} /><span><b>{t("Fill the screen")}</b>{t("Each picture fills the whole screen, trimming its edges if its shape differs. Off: the whole picture shows.")}</span></label>
         </details>
 

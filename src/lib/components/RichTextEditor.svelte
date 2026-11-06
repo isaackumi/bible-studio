@@ -156,7 +156,7 @@
   ];
   const ALIGN: Array<{ command: string; title: string; lines: number[] }> = [
     { command: "justifyLeft", title: msg("Align left"), lines: [0, 0, 0] },
-    { command: "justifyCenter", title: msg("Centre"), lines: [1, 0, 1] },
+    { command: "justifyCenter", title: msg("Center"), lines: [1, 0, 1] },
     { command: "justifyRight", title: msg("Align right"), lines: [2, 0, 2] },
   ];
 </script>
@@ -184,16 +184,16 @@
     {/each}
     <span class="sep"></span>
     <span class="palette-wrap">
-      <button type="button" class="tb color" class:on={palette === "text"} aria-expanded={palette === "text"} title={t("Text colour")} aria-label={t("Text colour")} onmousedown={keep} onclick={() => (palette = palette === "text" ? null : "text")}>
+      <button type="button" class="tb color" class:on={palette === "text"} aria-expanded={palette === "text"} title={t("Text color")} aria-label={t("Text color")} onmousedown={keep} onclick={() => (palette = palette === "text" ? null : "text")}>
         <span class="glyph">A</span><i style:background={lastText}></i>
       </button>
       {#if palette === "text"}
-        <span class="palette" role="group" aria-label={t("Text colour")}>
+        <span class="palette" role="group" aria-label={t("Text color")}>
           {#each TEXT_COLORS as color (color)}
-            <button type="button" class="sw" style:background={color} title={color} aria-label={t("Text colour {color}", { color })} onmousedown={keep} onclick={() => { lastText = color; palette = null; run("foreColor", color); }}></button>
+            <button type="button" class="sw" style:background={color} title={color} aria-label={t("Text color {color}", { color })} onmousedown={keep} onclick={() => { lastText = color; palette = null; run("foreColor", color); }}></button>
           {/each}
-          <label class="pick" title={t("Any colour")}>
-            <input type="color" aria-label={t("Any text colour")} onchange={(event) => { lastText = event.currentTarget.value; palette = null; run("foreColor", event.currentTarget.value); }} />
+          <label class="pick" title={t("Any color")}>
+            <input type="color" aria-label={t("Any text color")} onchange={(event) => { lastText = event.currentTarget.value; palette = null; run("foreColor", event.currentTarget.value); }} />
             <Icon name="plus" size={10} />
           </label>
         </span>

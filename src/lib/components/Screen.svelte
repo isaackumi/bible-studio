@@ -80,5 +80,5 @@
     pointer-events: none;
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
   }
-  .fit-note { position: absolute; left: 6px; bottom: 6px; z-index: 4; margin: 0; padding: 2px 7px; border-radius: 6px; background: rgb(0 0 0 / 0.7); color: #ffd27a; font-size: 10px; font-weight: 700; pointer-events: auto; }
+  .fit-note { position: absolute; left: 6px; bottom: 6px; z-index: 4; margin: 0; padding: 2px 7px; border-radius: 6px; background: rgb(0 0 0 / 0.7); color: #ffd27a; font-size: 11px; font-weight: 700; pointer-events: auto; }
 </style>

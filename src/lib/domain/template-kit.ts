@@ -231,7 +231,7 @@ const shade = (color: string, alpha: string) => (color.length === 7 ? color + al
 export const PAGE_LAYOUTS: TemplateLayout[] = [
   {
     id: "centred",
-    name: msg("Centred"),
+    name: msg("Centered"),
     build: (k) => k.draw(k.place({ x: 8, y: 8, w: 84, h: 84 }, "center", 0.5, { line: true }), "center"),
   },
   {

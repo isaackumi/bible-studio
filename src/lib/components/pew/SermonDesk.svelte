@@ -397,7 +397,7 @@
   .row-tool { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
   .row-tool:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
   .row-tool.go-live:hover { color: var(--live, #e5484d); }
-  .badge { flex: none; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-text); font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge { flex: none; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-text); font-size: 11px; font-style: normal; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
   .badge.live { background: var(--live); color: #fff; }
 
   /* Library */

@@ -192,7 +192,7 @@
   .card-copy { display: grid; gap: 2px; }
   .radio { flex: none; width: 16px; height: 16px; border: 2px solid var(--line); border-radius: 50%; }
   .card[aria-pressed="true"] .radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 45%, transparent 50%); }
-  .tag { padding: 1px 7px; border-radius: 8px; background: color-mix(in srgb, #30a46c 20%, transparent); font-size: 10px; font-weight: 750; }
+  .tag { padding: 1px 7px; border-radius: 8px; background: color-mix(in srgb, #30a46c 20%, transparent); font-size: 11px; font-weight: 750; }
   .diagram { display: flex; align-items: center; gap: 6px; height: 34px; color: var(--muted); }
   .box { width: 34px; height: 22px; border-radius: 4px; border: 1px solid var(--line); background: var(--field); }
   .box.prev { border-color: var(--accent); }
@@ -211,7 +211,7 @@
   .steps.big { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; padding: 0; border: 0; }
   .steps.big button { display: grid; justify-items: center; gap: 1px; height: auto; padding: 10px 6px; border: 1px solid var(--line); border-radius: 10px; }
   .steps.big button strong { font-size: 18px; color: var(--ink); }
-  .steps.big button small { font-size: 10px; }
+  .steps.big button small { font-size: 11px; }
   .steps.big button[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); }
 
   .sample { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }

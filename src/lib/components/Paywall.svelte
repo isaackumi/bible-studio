@@ -212,7 +212,7 @@
             <button type="button" class="cta big" onclick={close}>{t("Start using it")} <Icon name="chevron-right" size={16} /></button>
           {:else}
             <div class="tick muted" aria-hidden="true"><Icon name="close" size={34} /></div>
-            <h1>{checkout.status === "cancelled" ? t("Checkout cancelled") : t("Checkout did not finish")}</h1>
+            <h1>{checkout.status === "cancelled" ? t("Checkout canceled") : t("Checkout did not finish")}</h1>
             <p class="lede">{checkout.message ?? t("Nothing was charged. Choose a plan to try again.")}</p>
             <button type="button" class="cta" onclick={() => session.dismissCheckout()}>{t("Back to plans")}</button>
           {/if}
@@ -384,7 +384,7 @@
   .billing { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: 300px; margin: 0 auto 26px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
   .billing button { position: relative; z-index: 1; height: 36px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; transition: color 0.2s; }
   .billing button[aria-checked="true"] { color: var(--panel); }
-  .save { margin-left: 4px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, #30a46c 85%, transparent); color: #fff; font-size: 10px; }
+  .save { margin-left: 4px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, #30a46c 85%, transparent); color: #fff; font-size: 11px; }
   .thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px; background: var(--ink); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
   .thumb.right { transform: translateX(100%); }
 
@@ -411,7 +411,7 @@
   .features li { display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
   .features li :global(svg) { flex: none; margin-top: 2px; color: var(--tone); }
   .features li.hit { font-weight: 800; color: var(--ink); background: color-mix(in srgb, var(--tone) 12%, transparent); margin: -3px -8px; padding: 3px 8px; border-radius: 8px; }
-  .features em { margin-left: 4px; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 10%, transparent); font-style: normal; font-size: 10px; font-weight: 700; color: var(--muted); }
+  .features em { margin-left: 4px; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 10%, transparent); font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }
   .everything { font-weight: 750; color: var(--muted); font-size: 12px; }
 
   .promo { display: grid; justify-items: center; gap: 6px; margin: 22px auto 0; }
