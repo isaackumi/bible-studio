@@ -314,7 +314,7 @@ export function defaultWorkspace(): Workspace {
     onlineBibles: { key: "", bibles: [] },
     songUses: [],
     parallelTranslationId: null,
-    stageLayout: { next: true, clock: true, notes: true, chords: true, size: "m" },
+    stageLayout: { next: true, clock: true, notes: true, chords: true, section: true, size: "m", arrange: "standard" },
     screens: [],
     monitorNames: {},
     pco: { appId: "", secret: "" },

@@ -79,11 +79,22 @@ describe("stage snapshot", () => {
     const model = emptyModel(defaultTheme());
     const snapshot = { program: model, next: model, live: true, desk: "Grace", at: 1 };
     // Older desks send no message or layout: the stage fills in the defaults.
-    expect(parseStage(JSON.stringify(snapshot))).toEqual({ ...snapshot, message: "", notes: "", layout: { next: true, clock: true, notes: true, chords: true, size: "m" } });
+    expect(parseStage(JSON.stringify(snapshot))).toEqual({ ...snapshot, message: "", notes: "", layout: { next: true, clock: true, notes: true, chords: true, section: true, size: "m", arrange: "standard" } });
     const withMessage = { ...snapshot, message: "Wrap up", layout: { next: false, clock: true, notes: false, size: "l" } };
     expect(parseStage(JSON.stringify(withMessage))).toMatchObject({ message: "Wrap up", layout: { next: false, size: "l" } });
     expect(parseStage(JSON.stringify({ program: model, at: 1 }))).toBeNull();
     expect(parseStage("{oops")).toBeNull();
     expect(parseStage(null)).toBeNull();
+  });
+});
+
+describe("stage arrangement", () => {
+  it("keeps a saved arrangement and the running part's time, and falls back safely", async () => {
+    const { sanitizeStageLayout, defaultStageLayout } = await import("./channel");
+    expect(defaultStageLayout()).toMatchObject({ arrange: "standard", section: true });
+    expect(sanitizeStageLayout({ arrange: "preacher", section: false })).toMatchObject({ arrange: "preacher", section: false });
+    // Saved before arrangements existed: the screen looks as it always did.
+    expect(sanitizeStageLayout({ next: true, clock: false, notes: true, chords: true, size: "l" })).toMatchObject({ arrange: "standard", section: true, clock: false, size: "l" });
+    expect(sanitizeStageLayout({ arrange: "sideways" }).arrange).toBe("standard");
   });
 });
