@@ -34,17 +34,49 @@ if (-not $info) {
   exit 1
 }
 
+if ($Stdin) {
+  # System.Speech asks the input stream for its position and length, and a pipe has neither ("Stream
+  # does not support seeking"). This wrapper reads the pipe forward and answers those questions with
+  # how far it has read, which is all the recognizer needs from a live stream.
+  Add-Type -Language CSharp -TypeDefinition @"
+using System;
+using System.IO;
+public sealed class ChurchStudioLiveStream : Stream {
+  private readonly Stream inner;
+  private long read;
+  public ChurchStudioLiveStream(Stream inner) { this.inner = inner; }
+  public override bool CanRead { get { return true; } }
+  public override bool CanSeek { get { return true; } }
+  public override bool CanWrite { get { return false; } }
+  public override long Length { get { return long.MaxValue; } }
+  public override long Position { get { return read; } set { } }
+  public override int Read(byte[] buffer, int offset, int count) {
+    int n = inner.Read(buffer, offset, count);
+    read += n;
+    return n;
+  }
+  public override long Seek(long offset, SeekOrigin origin) { return read; }
+  public override void Flush() { }
+  public override void SetLength(long value) { throw new NotSupportedException(); }
+  public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+  protected override void Dispose(bool disposing) { if (disposing) inner.Dispose(); base.Dispose(disposing); }
+}
+"@
+}
+
 $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine($info)
 # The app has already read the privacy switches, so a failure here is usually the device itself, and
 # it can be brief (just released by the microphone check, or Windows changing devices): try again
 # before giving up, and say what Windows said, for the operator and for a support file.
 $opened = $false
+$live = $null
 $why = ""
 for ($attempt = 1; $attempt -le 4 -and -not $opened; $attempt++) {
   try {
     if ($Stdin) {
       $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
-      $engine.SetInputToAudioStream([Console]::OpenStandardInput(), $format)
+      if (-not $live) { $live = New-Object ChurchStudioLiveStream([Console]::OpenStandardInput()) }
+      $engine.SetInputToAudioStream($live, $format)
     } else {
       $engine.SetInputToDefaultAudioDevice()
     }
