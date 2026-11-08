@@ -16,6 +16,13 @@ export type Release = { version: string; date: string; highlights: Highlight[] }
 
 export const CHANGELOG: Release[] = [
   {
+    version: "0.6.17",
+    date: "2026-11-08",
+    highlights: [
+      { icon: "check", title: msg("Listening works again on Windows"), text: msg("With the noise filter on, a microphone chosen, or listening being recorded, Windows stopped with “Stream does not support seeking”. It now hears the sound and finds verses again."), show: null },
+    ],
+  },
+  {
     version: "0.6.16",
     date: "2026-11-06",
     highlights: [

@@ -5804,4 +5804,6 @@ export const fr: Readonly<Record<string, string>> = {
   "A pad, footswitch, keyboard or the band's software can press LIVE, Next, BLACK and the rest. Set it up in Settings › MIDI controller.": "Un pad, un pédalier, un clavier ou le logiciel des musiciens peut appuyer sur LIVE, Suivant, BLACK et le reste. Réglez-le dans Réglages › Contrôleur MIDI.",
   "Easier to read and to start": "Plus facile à lire et à démarrer",
   "Text is larger at its smallest, the readiness check runs when you start a service, and new operators see which monitor is theirs and which the congregation sees.": "Le plus petit texte est plus grand, la vérification se fait au démarrage du culte, et les nouveaux opérateurs voient quel écran est le leur et lequel voit l’assemblée.",
+  "Listening works again on Windows": "L’écoute fonctionne de nouveau sous Windows",
+  "With the noise filter on, a microphone chosen, or listening being recorded, Windows stopped with “Stream does not support seeking”. It now hears the sound and finds verses again.": "Avec le filtre de bruit activé, un micro choisi ou l’écoute enregistrée, Windows s’arrêtait avec « Stream does not support seeking ». Il entend de nouveau le son et retrouve les versets.",
 };
